@@ -272,6 +272,12 @@ struct tile_attack
 /// harness can open a battle without a march.
 /// @p rp is UNUSED today (the opening reads no rate: the stock is the units' recon);
 /// kept so a future opening rate needs no signature change at every caller.
+/// BL-1531: bring @p units of @p attacker into the battle it is already fighting as attacker
+/// against @p defender over @p tile, as units of its attacking stack. False, touching nothing,
+/// with no such battle.
+bool join_tile_battle(world& w, entity_id tile, entity_id attacker, entity_id defender,
+                      const std::vector<entity_id>& units);
+
 bool open_tile_battle(world& w, int tick, entity_id tile, entity_id attacker, entity_id defender,
                       const std::vector<entity_id>& attacking_units,
                       const land_recon_params& rp = {});

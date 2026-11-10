@@ -130,6 +130,10 @@ force follows the hostility it faces — hostile stance or contested ground — 
 flat cap. It widens the AI-behaviour grant and is recorded in `../ai/AI_OPPONENT.md` § 11 when
 granted.
 
+**A nation's wages are a flat bill (Ben, 2026-11-08; `../military/MILITARY.md` § What a force costs).**
+Every unit, wing and ship is paid from the treasury whatever the budget weights say. It is its own
+term of the money loop and no line's share. Force sizing is what answers a threat.
+
 **Until then the rates carry the load (Ben, 2026-10-04, a stopgap — BL-1191, upkeep retune).**
 While every owner fills a flat cap whether or not anyone threatens it, the rates are sized so a
 guard under no threat does not bleed its owner. Both halves of the vector move by the one factor,

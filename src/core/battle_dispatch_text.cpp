@@ -1,8 +1,11 @@
 #include "battle_dispatch_text.hpp"
 
+#include "world/resource_names.hpp"
 #include "world/world.hpp"
 
+#include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstdio>
 
 namespace {
@@ -131,6 +134,41 @@ const char* battle_phase_word(battle_phase p)
         case battle_phase::concluded: return "Decided";
     }
     return "\xe2\x80\x94";
+}
+
+std::string interception_line(const world& w, const interception_record& r, entity_id me)
+{
+    if (me == null_entity || (r.victim_corp != me && r.interceptor_corp != me))
+        return {};
+    std::string good = resource_names::name_of(r.cargo_resource);
+    std::replace(good.begin(), good.end(), '_', ' ');
+    const std::string cargo = std::to_string(static_cast<long long>(std::lround(r.cargo_qty))) + " " + good;
+
+    if (r.victim_corp != me) // the taker's side
+    {
+        const std::string whose = std::string(" of ") + corp_name(w, r.victim_corp);
+        switch (r.outcome)
+        {
+        case interception_outcome::raid_sunk: return "Our raider sank " + cargo + whose + ".";
+        case interception_outcome::raid_prize: return "Our raider took a prize: " + cargo + whose + ", landed at our port.";
+        case interception_outcome::captured: return "Our forces captured " + cargo + whose + ".";
+        case interception_outcome::destroyed: return "Our forces destroyed " + cargo + whose + ".";
+        default: return {}; // the border and the front are nobody's taking
+        }
+    }
+    const std::string by = r.unseen ? std::string("an unseen raider")
+                                    : std::string("a raider of ") + corp_name(w, r.interceptor_corp);
+    switch (r.outcome)
+    {
+    case interception_outcome::raid_sunk: return cargo + " sunk at sea by " + by + ".";
+    case interception_outcome::raid_prize: return cargo + " taken at sea as a prize by " + by + ".";
+    case interception_outcome::captured: return cargo + " captured on the road by " + corp_name(w, r.interceptor_corp) + ".";
+    case interception_outcome::destroyed: return cargo + " destroyed on the road by " + corp_name(w, r.interceptor_corp) + ".";
+    case interception_outcome::refused_embargo: return cargo + " refused at the border of " + corp_name(w, r.interceptor_corp) + " by its embargo, and lost.";
+    case interception_outcome::returned_by_front: return cargo + " turned back by a front, and home whole.";
+    case interception_outcome::lost_behind_front: return cargo + " lost behind a front.";
+    }
+    return {};
 }
 
 std::string battle_dispatch_line(const world& w, const battle_dispatch& d)

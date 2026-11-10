@@ -701,6 +701,7 @@ economy = {
             small_arms = 0.4, armoured_vehicles = 0.1, artillery_pieces = 0.15,
             guided_weapons = 0.2, drones = 0.3,
             airframes = 0.1, -- BL-1436: a hull is as bulky as a vehicle
+            ship_hulls = 0.05, -- BL-1527: the bulkiest kit good there is
         },
     },
 
@@ -783,8 +784,7 @@ economy = {
         --                     recruit is priced as one unit of it.
         --   sea_per_port  20: Ben, 2026-11-02 - a completed, running port makes sea
         --                     recruits into the nation's one sea pool (cap 15 quarters).
-        --                     20 matches an airbase; an in-band pick, since nothing
-        --                     spends the sea pool until ships are raised.
+        --                     20 matches an airbase; a ship's hire spends the pool.
         recruits = {
             land_per_base  = 50,
             air_per_base   = 20,
@@ -1164,6 +1164,58 @@ economy = {
         -- in a straight line from the airbase to a province's nearest tile.
         -- A wing assigned N provinces spends a day across them: its attack and the
         -- fire it takes over each are 1/N of a day's.
+        -- BL-1430 (MILITARY.md § Sea): the four ship classes. Attack is milli-HP a day;
+        -- a viewer's detection D finds stealth S at D / (D + S) a day; range is steps over
+        -- water from an own port; pace is per-mille of a day per tile. Equal to
+        -- default_sea_params (sea_params.hpp). A first cut; the sprint's closing reading tunes it.
+        sea = {
+            patrol_detection_permille = 1500,
+            raid_take_permille_per_day = 100,
+            sea_hold_share_permille   = 600,
+            landing_days              = 3,
+            landing_penalty_days      = 5,
+            landing_penalty_permille  = 500,
+            morale_per_hp_permille    = 1000,
+            dock_morale_per_day       = 10,
+            resume_hp_permille        = 700,
+            resume_morale_permille    = 600,
+            refit_ppm_per_quarter     = 200000,
+            bomb_hp_per_hit_permille  = 10000,
+            refit_goods               = { steel = 3.0, machinery = 1.0 },
+            ship_upkeep_goods         = { refined_fuel = 2.0 },
+            classes = {
+                submarine = {
+                    hp = 60, attack = 3000, detection = 20, stealth = 600, range = 40,
+                    days_per_tile_permille = 700, muster_days = 180, crew = 20, hire_cost = 1200.0,
+                    hire_goods = { steel = 4.0, machinery = 3.0, electronics = 2.0 },
+                    missions = { "raid" },
+                    targets = { "capital", "transport" },
+                },
+                destroyer = {
+                    hp = 80, attack = 2000, detection = 200, stealth = 50, range = 25,
+                    days_per_tile_permille = 400, muster_days = 180, crew = 30, hire_cost = 900.0,
+                    hire_goods = { steel = 5.0, machinery = 3.0, electronics = 1.0 },
+                    missions = { "patrol", "escort", "raid", "blockade" },
+                    targets = { "submarine", "destroyer", "capital", "transport" },
+                },
+                capital = {
+                    hp = 200, attack = 6000, detection = 50, stealth = 30, range = 30,
+                    days_per_tile_permille = 500, muster_days = 360, crew = 100, hire_cost = 3500.0,
+                    hire_goods = { steel = 14.0, alloys = 4.0, machinery = 6.0, electronics = 2.0 },
+                    missions = { "patrol", "escort", "raid", "blockade" },
+                    targets = { "destroyer", "capital", "transport" },
+                },
+                transport = {
+                    hp = 80, attack = 0, detection = 10, stealth = 30, range = 30,
+                    days_per_tile_permille = 600, muster_days = 135, crew = 20, hire_cost = 700.0,
+                    capacity = 2,
+                    hire_goods = { steel = 6.0, machinery = 2.0 },
+                    missions = {},
+                    targets = {},
+                },
+            },
+        },
+
         air = {
             bombing_penalty_permille = 700, -- at share 0 a side's bombing lands at 30 %
             march_slow_permille      = 500, -- at share 0 a march step costs 1.5x
@@ -1960,6 +2012,7 @@ economy = {
         guided_weapons        = 0.02,
         drones                = 0.02,
         airframes             = 0.02, -- BL-1436
+        ship_hulls            = 0.02, -- BL-1527
     },
 
     -- ===================================================================

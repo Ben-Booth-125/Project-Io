@@ -455,13 +455,13 @@ int main()
         const std::string b69 = o69.str();
         world old;
         check(from_bytes(b69, old) && old.nation_embargoes.empty()
-                  && b69.size() == b.size() - world_save_embargo_section_bytes(s.w) - world_save_gen_capital_section_bytes(s.w) - world_save_recruits_section_bytes(s.w) - world_save_sea_recruits_section_bytes(s.w) - world_save_refusals_section_bytes(s.w) /* BL-1480 (v75), last */
+                  && b69.size() == b.size() - world_save_embargo_section_bytes(s.w) - world_save_gen_capital_section_bytes(s.w) - world_save_recruits_section_bytes(s.w) - world_save_sea_recruits_section_bytes(s.w) - world_save_refusals_section_bytes(s.w) /* BL-1480 (v75) */ - world_save_contributors_section_bytes(s.w) - world_save_occupation_section_bytes(s.w) - world_save_defend_section_bytes(s.w) - world_save_research_books_section_bytes(s.w) - world_save_ships_section_bytes(s.w) - world_save_growth_carry_section_bytes(s.w) - world_save_ended_section_bytes(s.w) /* last, v81 */
                                   - world_save_kit_goods_bytes(s.w) // BL-1422: arrays 49 wide before v74
                   && world_save_embargo_section_bytes(s.w) == 4 + 8 * 3,
               "R9c a v69 stream (today's less the 28-byte embargo section) loads with no embargo");
 
         // The section is last: count, then (author, embargoed) pairs ascending.
-        const std::size_t sec = b.size() - world_save_embargo_section_bytes(s.w) - world_save_gen_capital_section_bytes(s.w) - world_save_recruits_section_bytes(s.w) - world_save_sea_recruits_section_bytes(s.w) - world_save_refusals_section_bytes(s.w) /* BL-1480 (v75), last */;
+        const std::size_t sec = b.size() - world_save_embargo_section_bytes(s.w) - world_save_gen_capital_section_bytes(s.w) - world_save_recruits_section_bytes(s.w) - world_save_sea_recruits_section_bytes(s.w) - world_save_refusals_section_bytes(s.w) /* BL-1480 (v75) */ - world_save_contributors_section_bytes(s.w) - world_save_occupation_section_bytes(s.w) - world_save_defend_section_bytes(s.w) - world_save_research_books_section_bytes(s.w) - world_save_ships_section_bytes(s.w) - world_save_growth_carry_section_bytes(s.w) - world_save_ended_section_bytes(s.w) /* last, v81 */;
         const auto refused = [&](std::string bad, const char* what) {
             world untouched;
             check(!from_bytes(bad, untouched) && untouched.nations.empty() && untouched.nation_embargoes.empty(), what);

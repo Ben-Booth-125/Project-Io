@@ -603,7 +603,7 @@ int main()
                                        + world_save_alarm_section_bytes(wd)       // BL-1432 (v68), last
                                        + world_save_war_section_bytes(wd)          // BL-1459 (v69)
                                        + world_save_embargo_section_bytes(wd) + world_save_gen_capital_section_bytes(wd)     // BL-1418 (v70)
-                                       + world_save_recruits_section_bytes(wd) + world_save_sea_recruits_section_bytes(wd) + world_save_refusals_section_bytes(wd) /* BL-1480 (v75) */ + world_save_contributors_section_bytes(wd) /* BL-1470 (v77) */ + world_save_occupation_section_bytes(wd) + world_save_defend_section_bytes(wd) /* BL-1502 (v78), BL-1504 (v79) */ + world_save_research_books_section_bytes(wd) + world_save_growth_carry_section_bytes(wd) + world_save_ended_section_bytes(wd) /* BL-1562 (v83) */ /* BL-1539 (v80), last */;    // BL-1463 (v72), last
+                                       + world_save_recruits_section_bytes(wd) + world_save_sea_recruits_section_bytes(wd) + world_save_refusals_section_bytes(wd) /* BL-1480 (v75) */ + world_save_contributors_section_bytes(wd) /* BL-1470 (v77) */ + world_save_occupation_section_bytes(wd) + world_save_defend_section_bytes(wd) + world_save_research_books_section_bytes(wd) + world_save_ships_section_bytes(wd) + world_save_growth_carry_section_bytes(wd) + world_save_ended_section_bytes(wd) /* BL-1502 (v78), last */;    // BL-1463 (v72), last
         check(have && b57.size() == b56.size() + 8 + 36 * rows + unit_section + world_save_kit_goods_bytes(wd) && rows >= 2,
               "P23 v56 is today's stream less the days section (8 bytes + 36 a row) and the unit section");
 
@@ -676,7 +676,7 @@ int main()
                                          + world_save_alarm_section_bytes(wu)       // BL-1432 (v68), last
                                          + world_save_war_section_bytes(wu)          // BL-1459 (v69)
                                          + world_save_embargo_section_bytes(wu) + world_save_gen_capital_section_bytes(wu)     // BL-1418 (v70)
-                                         + world_save_recruits_section_bytes(wu) + world_save_sea_recruits_section_bytes(wu) + world_save_refusals_section_bytes(wu) /* BL-1480 (v75) */ + world_save_contributors_section_bytes(wu) /* BL-1470 (v77) */ + world_save_occupation_section_bytes(wu) + world_save_defend_section_bytes(wu) /* BL-1502 (v78), BL-1504 (v79) */ + world_save_research_books_section_bytes(wu) + world_save_growth_carry_section_bytes(wu) + world_save_ended_section_bytes(wu) /* BL-1562 (v83) */ /* BL-1539 (v80), last */;    // BL-1463 (v72), last
+                                         + world_save_recruits_section_bytes(wu) + world_save_sea_recruits_section_bytes(wu) + world_save_refusals_section_bytes(wu) /* BL-1480 (v75) */ + world_save_contributors_section_bytes(wu) /* BL-1470 (v77) */ + world_save_occupation_section_bytes(wu) + world_save_defend_section_bytes(wu) + world_save_research_books_section_bytes(wu) + world_save_ships_section_bytes(wu) + world_save_growth_carry_section_bytes(wu) + world_save_ended_section_bytes(wu) /* BL-1502 (v78), last */;    // BL-1463 (v72), last
         check(have && b58.size() == b57.size() + 4 + 16 * wu.units.size() + muster_section + world_save_kit_goods_bytes(wu),
               "P24 v57 is v58 less its section (4 bytes + 16 a unit)");
 
@@ -1855,8 +1855,9 @@ int main()
         // BL-1436 (Ben, 2026-11-03, kit tree form ruling 6): a sixth kit good, airframes,
         // follows the five at v76 - the five stay five values past 49, airframes one more.
         static_assert(k_resource_count_pre_airframes == k_resource_count_pre_kit_goods + 5
-                          && resource_count == k_resource_count_pre_airframes + 1,
-                      "PK: the kit goods are five appended values, then airframes (BL-1436)");
+                          && k_resource_count_pre_ship_hulls == k_resource_count_pre_airframes + 1
+                          && resource_count == k_resource_count_pre_ship_hulls + 1,
+                      "PK: the kit goods are five appended values, then airframes (BL-1436), then ship hulls (BL-1527)");
         world k = w;
         entity_id mid = null_entity;
         for (const auto& [id, m] : k.markets)
@@ -1910,7 +1911,7 @@ int main()
             // Every narrowed array lost exactly five elements: 4 bytes a float, 1 a bool.
             // BL-1480: today's v75 stream also carries the refusals section past v74.
             ok71 = ok71 && b72.size() > b71.size()
-                && b72.size() - b71.size() == world_save_kit_goods_bytes(k) + world_save_refusals_section_bytes(k) + world_save_contributors_section_bytes(k) + world_save_occupation_section_bytes(k) + world_save_defend_section_bytes(k) + world_save_research_books_section_bytes(k) + world_save_growth_carry_section_bytes(k) + world_save_ended_section_bytes(k) /* BL-1562 (v83) */;
+                && b72.size() - b71.size() == world_save_kit_goods_bytes(k) + world_save_refusals_section_bytes(k) + world_save_contributors_section_bytes(k) + world_save_occupation_section_bytes(k) + world_save_defend_section_bytes(k) + world_save_research_books_section_bytes(k) + world_save_ships_section_bytes(k) + world_save_growth_carry_section_bytes(k) + world_save_ended_section_bytes(k);
         }
         check(ok71, "PK a v73 stream (arrays 49 wide) reads, the kit goods zero and the rest as written");
 
@@ -1935,6 +1936,7 @@ int main()
         table[static_cast<std::size_t>(resource_type::guided_weapons)]    = 240.6f;
         table[dr] = 169.8f;
         table[static_cast<std::size_t>(resource_type::airframes)] = 274.2f; // BL-1436: the sixth
+        table[static_cast<std::size_t>(resource_type::ship_hulls)] = 179.8f; // BL-1527: the seventh
         world priced;
         bool priced_ok = false;
         {
@@ -2018,7 +2020,7 @@ int main()
             ok75 = m0.inventory[af] == 0.0f && m0.price[af] == 0.0f
                 && m0.price[st] == mk.price[st] && m0.inventory[st] == mk.inventory[st]
                 && old.tiles.size() == k.tiles.size() && b76.size() > b75.size()
-                && b76.size() - b75.size() == world_save_airframes_bytes(k) + world_save_contributors_section_bytes(k) + world_save_occupation_section_bytes(k) + world_save_defend_section_bytes(k) + world_save_research_books_section_bytes(k) + world_save_growth_carry_section_bytes(k) + world_save_ended_section_bytes(k) /* BL-1562 (v83) */;
+                && b76.size() - b75.size() == world_save_airframes_bytes(k) + world_save_ship_hulls_bytes(k) + world_save_contributors_section_bytes(k) + world_save_occupation_section_bytes(k) + world_save_defend_section_bytes(k) + world_save_research_books_section_bytes(k) + world_save_ships_section_bytes(k) + world_save_growth_carry_section_bytes(k) + world_save_ended_section_bytes(k);
         }
         check(ok75, "PA a v75 stream (arrays 54 wide) reads, airframes zero and the rest as written");
         std::string bad = b75;
@@ -2091,7 +2093,7 @@ int main()
         const bool ok76 = stamped == k_world_save_version_pre_contributors && from_bytes(b76, old)
             && old.sentiment.pairs == k.sentiment.pairs && old.sentiment.contributions.empty()
             && old.sentiment.seeds.empty()
-            && b77.size() - b76.size() == world_save_contributors_section_bytes(k) + world_save_occupation_section_bytes(k) + world_save_defend_section_bytes(k) + world_save_research_books_section_bytes(k) + world_save_growth_carry_section_bytes(k) + world_save_ended_section_bytes(k) /* BL-1562 (v83) */;
+            && b77.size() - b76.size() == world_save_ship_hulls_bytes(k) + world_save_contributors_section_bytes(k) + world_save_occupation_section_bytes(k) + world_save_defend_section_bytes(k) + world_save_research_books_section_bytes(k) + world_save_ships_section_bytes(k) + world_save_growth_carry_section_bytes(k) + world_save_ended_section_bytes(k);
         check(ok76, "PC a v76 stream reads, its rows whole and no provenance; v77 is v76 plus the section");
 
         // A share naming no row: splice the tail -- change the first share row's
@@ -2101,7 +2103,7 @@ int main()
         const std::size_t section = world_save_contributors_section_bytes(k);
         if (ok && bad.size() > section)
         {
-            const std::size_t subj_at = bad.size() - world_save_research_books_section_bytes(k) - world_save_growth_carry_section_bytes(k) - world_save_ended_section_bytes(k) /* BL-1562 (v83) */ - world_save_occupation_section_bytes(k) - world_save_defend_section_bytes(k) - section + 4 + 4;
+            const std::size_t subj_at = bad.size() - world_save_occupation_section_bytes(k) - world_save_defend_section_bytes(k) - world_save_research_books_section_bytes(k) - world_save_ships_section_bytes(k) - world_save_growth_carry_section_bytes(k) - world_save_ended_section_bytes(k) - section + 4 + 4;
             const uint32_t nobody = 0x7FFFFFF0u;
             std::memcpy(&bad[subj_at], &nobody, sizeof nobody);
         }
@@ -2155,7 +2157,7 @@ int main()
             && old.nations.at(subject_id).research_unbooked == 0.0
             && old.nations.at(subject_id).upkeep_unbooked == 0.0
             && old.nations.at(subject_id).returns.back().research == 0.0f
-            && b80.size() - b79.size() == world_save_research_books_section_bytes(k) + world_save_growth_carry_section_bytes(k) + world_save_ended_section_bytes(k) /* BL-1562 (v83) */;
+            && b80.size() - b79.size() == world_save_research_books_section_bytes(k) + world_save_ship_hulls_bytes(k) + world_save_ships_section_bytes(k) /* the naval merge (v88) */ + world_save_growth_carry_section_bytes(k) + world_save_ended_section_bytes(k) /* BL-1562 (v83) */;
         check(ok79, "PD a v79 stream reads with nothing unbooked and no research booked; v80 is v79 plus the section");
 
         // A site in flight on an old stream: its days move with the build days (x2/3),
@@ -2195,7 +2197,7 @@ int main()
 
         // A negative unbooked figure: the section's first row is (count, id, f64 ...).
         std::string bad = b80;
-        const std::size_t section = world_save_research_books_section_bytes(k) + world_save_growth_carry_section_bytes(k);
+        const std::size_t section = world_save_research_books_section_bytes(k) + world_save_ships_section_bytes(k) /* the naval merge (v88) */ + world_save_growth_carry_section_bytes(k);
         if (ok && bad.size() > section)
         {
             const double negative = -1.0;
@@ -2249,7 +2251,7 @@ int main()
         const bool ok80 = ok && stamped == k_world_save_version_pre_growth_carry && from_bytes(b80, old)
             && old.population_centres.at(cids[0]).growth_carry == 0.0f
             && old.population_centres.at(cids[1]).growth_carry == 0.0f
-            && b82.size() - b80.size() == world_save_growth_carry_section_bytes(k) + world_save_ended_section_bytes(k) /* BL-1562 (v83) */;
+            && b82.size() - b80.size() == world_save_ship_hulls_bytes(k) + world_save_ships_section_bytes(k) /* the naval merge (v88) */ + world_save_growth_carry_section_bytes(k) + world_save_ended_section_bytes(k) /* BL-1562 (v83) */;
         check(ok80, "PE a v80 stream reads with every growth carry 0; v82 is v80 plus the section");
 
         // A carry of 1.0 (a whole head the pass should have added) is refused whole.
@@ -2268,7 +2270,7 @@ int main()
     // PF (BL-1562, NATIONS.md § Elimination) -- v83 appends the ended nations after the
     // v82 growth carry. The flag round-trips by value on a nation with no ground; a v82
     // stream reads every nation as not ended; an ended nation that still owns a tile is
-    // refused whole; v81 (the naval branch's) is not on this line and is refused.
+    // refused whole.
     // -----------------------------------------------------------------------
     {
         static_assert(k_world_save_version_ended == 83 && world_save_version >= k_world_save_version_ended
@@ -2294,7 +2296,7 @@ int main()
             std::memcpy(&stamped, b82.data() + 4, sizeof stamped);
         world old;
         check(stamped == k_world_save_version_pre_ended && from_bytes(b82, old) && !old.nations.at(gone).ended
-                  && b83.size() - b82.size() == world_save_ended_section_bytes(k),
+                  && b83.size() - b82.size() == world_save_ship_hulls_bytes(k) + world_save_ships_section_bytes(k) /* the naval merge (v88) */ + world_save_ended_section_bytes(k),
               "PF a v82 stream reads every nation as not ended; v83 is v82 plus the section");
         world landed = k;
         for (auto& [nid, n] : landed.nations)
@@ -2302,15 +2304,98 @@ int main()
         world sentinel;
         check(!from_bytes(to_bytes(landed), sentinel) && sentinel.tiles.empty(),
               "PF an ended nation that still owns ground is REFUSED, destination untouched");
-        std::string v81 = b82;
-        if (v81.size() >= 8)
+    }
+
+    // -----------------------------------------------------------------------
+    // PG (the naval merge, world save v88) -- v88 stacks v80's research books, v81's naval
+    // sections, v82's growth carry and v83's ended nations, 56 wide. Every stream either
+    // line wrote still loads: the naval branch's v81 (naval only, no books), main's v83
+    // (55 wide, carry and ended, no naval) and today's v88; each section a stream lacks
+    // reads as empty, and each re-saves as today's stream.
+    // -----------------------------------------------------------------------
+    {
+        static_assert(world_save_version == 88 && k_world_save_version_stacked == 88
+                          && k_world_save_version_ship_kit == 81 && k_world_save_version_ended == 83,
+                      "PG pins v88 as the stacked version over v81 and v83");
+        static_assert(world_stream_has_research_books(80) && !world_stream_has_research_books(81)
+                          && world_stream_has_research_books(83) && world_stream_has_research_books(88)
+                          && world_stream_has_naval(81) && !world_stream_has_naval(82)
+                          && !world_stream_has_naval(83) && world_stream_has_naval(88)
+                          && !world_stream_has_growth_carry(81) && world_stream_has_growth_carry(88)
+                          && !world_stream_has_ended(82) && world_stream_has_ended(88)
+                          && world_stream_resource_width(81) == resource_count
+                          && world_stream_resource_width(83) == k_resource_count_pre_ship_hulls
+                          && world_stream_resource_width(88) == resource_count,
+                      "PG the section predicates say which stream holds what");
+        world k = w;
+        // Something in every stacked section: a booked figure, a carry and an ended nation.
+        entity_id booked = null_entity;
+        for (auto& [nid, n] : k.nations)
+            if (!n.returns.empty()) { booked = nid; break; }
+        if (booked != null_entity)
+            k.nations.at(booked).research_unbooked = 12.5;
+        entity_id carried = null_entity;
+        for (auto& [cid, pc] : k.population_centres) { carried = cid; break; }
+        if (carried != null_entity)
+            k.population_centres.at(carried).growth_carry = 0.25f;
+        const entity_id gone = k.create_entity();
+        nation_component nc{};
+        nc.name = "Ended";
+        nc.ended = true;
+        k.nations[gone] = nc;
+
+        const std::string b88 = to_bytes(k);
+        uint32_t stamped = 0;
+        if (b88.size() >= 8)
+            std::memcpy(&stamped, b88.data() + 4, sizeof stamped);
+        world back;
+        const bool ok88 = stamped == 88 && from_bytes(b88, back) && to_bytes(back) == b88
+            && back.state_hash(0) == k.state_hash(0) && back.nations.at(gone).ended
+            && (booked == null_entity || back.nations.at(booked).research_unbooked == 12.5)
+            && (carried == null_entity || back.population_centres.at(carried).growth_carry == 0.25f);
+        check(ok88, "PG a v88 stream loads every stacked section by value (bytes and hash equal)");
+
+        std::ostringstream o81(std::ios::binary);
+        write_world_snapshot_naval_v81(k, o81);
+        const std::string b81 = o81.str();
+        uint32_t s81 = 0;
+        if (b81.size() >= 8)
+            std::memcpy(&s81, b81.data() + 4, sizeof s81);
+        world w81;
+        const bool ok81 = s81 == 81 && from_bytes(b81, w81) && !w81.nations.at(gone).ended
+            && (booked == null_entity || w81.nations.at(booked).research_unbooked == 0.0)
+            && (carried == null_entity || w81.population_centres.at(carried).growth_carry == 0.0f)
+            && b88.size() - b81.size() == world_save_research_books_section_bytes(k)
+                                          + world_save_growth_carry_section_bytes(k)
+                                          + world_save_ended_section_bytes(k);
+        check(ok81, "PG a v81 stream (the naval branch's) loads: 56 wide, no books, carry or ended; v88 is v81 plus those three");
+        world again81;
+        check(ok81 && from_bytes(to_bytes(w81), again81) && to_bytes(again81) == to_bytes(w81),
+              "PG a loaded v81 world re-saves as a stable v88 stream");
+
+        std::ostringstream o83(std::ios::binary);
+        write_world_snapshot_pre_stacked(k, o83);
+        const std::string b83 = o83.str();
+        uint32_t s83 = 0;
+        if (b83.size() >= 8)
+            std::memcpy(&s83, b83.data() + 4, sizeof s83);
+        world w83;
+        const bool ok83 = s83 == 83 && from_bytes(b83, w83) && w83.nations.at(gone).ended
+            && (booked == null_entity || w83.nations.at(booked).research_unbooked == 12.5)
+            && (carried == null_entity || w83.population_centres.at(carried).growth_carry == 0.25f)
+            && w83.ships.empty()
+            && b88.size() - b83.size() == world_save_ship_hulls_bytes(k) + world_save_ships_section_bytes(k);
+        check(ok83, "PG a v83 stream loads: 55 wide, books, carry and ended, no naval section; v88 is v83 plus the column and the naval sections");
+
+        // A version between the two lines that no build here wrote is refused.
+        for (const uint32_t v : {84u, 85u, 86u, 87u, 89u})
         {
-            const uint32_t naval = 81;
-            std::memcpy(&v81[4], &naval, sizeof naval);
+            std::string other = b88;
+            std::memcpy(&other[4], &v, sizeof v);
+            world sentinel;
+            check(!from_bytes(other, sentinel) && sentinel.tiles.empty(),
+                  "PG a stream stamped v84..v87 or v89 (no layout on this line) is REFUSED");
         }
-        world sentinel81;
-        check(!from_bytes(v81, sentinel81) && sentinel81.tiles.empty(),
-              "PF a stream stamped v81 (the naval branch's, not on this line) is REFUSED");
     }
 
     std::printf("\n");

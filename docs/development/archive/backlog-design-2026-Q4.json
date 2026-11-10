@@ -11710,6 +11710,9 @@
         "design"
       ]
     },
+    "BL-1430": {
+      "design": "MILITARY.md § Sea (Ben, 2026-11-05, which replaces this item's open question on amphibious transport). The core every other sprint 64 item stands on: a ship entity with its save section, class table and sea pool spend, the orphan rule, tile-by-tile sailing, mission zones over sea provinces in range, the seeded daily detect-and-hit pass, upkeep and refit at the home port, tactical bombing of a detected ship, and the assign verbs. Combat.hpp's comments still read that the campaign raises no naval unit; correct them here. Harness: replay determinism, an all-submarine fight never hits an undetecting side, save round trip."
+    },
     "BL-1432": {
       "status": "complete",
       "glyph": "●",
@@ -13522,6 +13525,96 @@
         "archived"
       ]
     },
+    "BL-1470": {
+      "status": "complete",
+      "glyph": "●",
+      "sprint": 61,
+      "version_goal": "v0.3.0",
+      "written": "2026-10-31",
+      "parked": false,
+      "blocked_on": null,
+      "author": "main session (sprint 61 delivery, from Lane L, 2026-10-31)",
+      "requires": [],
+      "id": "BL-1470",
+      "short_name": "SENTIMENT_CONTRIBUTORS",
+      "category": "Politics",
+      "authority_doc": "docs/politics/RELATIONS.md",
+      "priority": "B",
+      "difficulty": 3,
+      "files": [
+        "src/world/sentiment.hpp",
+        "src/world/sentiment.cpp",
+        "src/world/hard_coded_world.cpp",
+        "src/world/world_save.cpp",
+        "src/ui/diplomacy_ledger.cpp"
+      ],
+      "title": "A sentiment row remembers what moved it, so the ledger can name the cause",
+      "design": "ledgers/diplomacy.md § Nations - the folded row: hovering a bar names its largest contributing conduct, and a seeded row names the war that seeded it with its region and year (RELATIONS § Where a grudge lands). Found by Lane L, sprint 61 (2026-10-31): the world keeps no record of which conduct moved a value, and hard_coded_world.cpp discards the grudge seed records (grudge_sentiment_seed) after seeding. THE WORK: keep, per (observer, subject) row, the largest live contributor per dimension (factor kind and, for a grudge, its seed record), decayed with the row; keep the grudge seeds; save it (next save version). sentiment.cpp still takes no world&. The ledger hover then reads it. Also consider a saved short history so the trend arrows and trade exposure survive a load (today a UI-side ring buffer). Check: sentiment_harness rows, save_roundtrip, world_determinism. CARRIED at the sprint 61 close (2026-11-05): built and merged; Ben's live click is owed on the diplomacy bar hover (Largest cause). CLOSED 2026-11-05: Ben's live click on the diplomacy bar hover passed.",
+      "_row_keys": [
+        "status",
+        "glyph",
+        "sprint",
+        "version_goal",
+        "written",
+        "parked",
+        "blocked_on",
+        "author",
+        "requires",
+        "id",
+        "short_name",
+        "category",
+        "authority_doc",
+        "priority",
+        "difficulty",
+        "files",
+        "title",
+        "design"
+      ]
+    },
+    "BL-1471": {
+      "status": "cancelled",
+      "glyph": "✕",
+      "sprint": 61,
+      "version_goal": "v0.3.0",
+      "written": "2026-10-31",
+      "parked": false,
+      "blocked_on": null,
+      "author": "main session (sprint 61 re-bless bisect, 2026-10-31)",
+      "requires": [],
+      "id": "BL-1471",
+      "short_name": "SEAT_OPENING_FORCE_LEAK",
+      "category": "Military",
+      "authority_doc": "docs/military/MILITARY.md",
+      "priority": "B",
+      "difficulty": 2,
+      "files": [
+        "src/world/state_industry.cpp",
+        "src/world/corporation_generation.cpp",
+        "src/world/spawn_seat.cpp"
+      ],
+      "title": "A seat whose capital base the state cut removed keeps its raised opening unit",
+      "design": "The seated nation opens unarmed (MILITARY.md; move_seat_force -> disarm_corporation removes every unit unit_is_raised calls raised). Found by the sprint 61 re-bless bisect (2026-10-31), seed 13 at b3fc19a6: size_opening_state_to_chest cut nation 47736's capital military_base at (122,69); demolishing a base nulls its units' muster_base, so the 50-man opening unit (id 91961) raised there reads as a garrison (unit_is_raised needs a non-null muster_base) and the seated player kept it: 6x200 + 50 = 1250 men. On main the road steer (BL-1468) spares that base and the count is the intended 1200, so the leak is latent, not gone. THE WORK: either the cut never removes a capital base (it is the muster point the opening force needs), or a unit raised at a base keeps a raised mark when the base goes, so disarm still removes it. Check: a fixture where the cut takes the seat's capital base; the seat opens with garrisons only. Digest-moving only on seeds where the cut hits a base. SUPERSEDED 2026-11-04 (main session, duplicate check): BL-1474 (major opening army) posts every major's eight as garrisons, never raised at a base, and lays the capital base fresh after; MILITARY.md § Nation garrisons: \"Taking a seat keeps the army\". The leak needed a unit raised at a cut capital base on the seat; no major holds one. Close as cancelled at the sprint close.",
+      "_row_keys": [
+        "status",
+        "glyph",
+        "sprint",
+        "version_goal",
+        "written",
+        "parked",
+        "blocked_on",
+        "author",
+        "requires",
+        "id",
+        "short_name",
+        "category",
+        "authority_doc",
+        "priority",
+        "difficulty",
+        "files",
+        "title",
+        "design"
+      ]
+    },
     "BL-1472": {
       "status": "complete",
       "glyph": "●",
@@ -14299,96 +14392,6 @@
         "archived"
       ]
     },
-    "BL-1471": {
-      "status": "cancelled",
-      "glyph": "✕",
-      "sprint": 61,
-      "version_goal": "v0.3.0",
-      "written": "2026-10-31",
-      "parked": false,
-      "blocked_on": null,
-      "author": "main session (sprint 61 re-bless bisect, 2026-10-31)",
-      "requires": [],
-      "id": "BL-1471",
-      "short_name": "SEAT_OPENING_FORCE_LEAK",
-      "category": "Military",
-      "authority_doc": "docs/military/MILITARY.md",
-      "priority": "B",
-      "difficulty": 2,
-      "files": [
-        "src/world/state_industry.cpp",
-        "src/world/corporation_generation.cpp",
-        "src/world/spawn_seat.cpp"
-      ],
-      "title": "A seat whose capital base the state cut removed keeps its raised opening unit",
-      "design": "The seated nation opens unarmed (MILITARY.md; move_seat_force -> disarm_corporation removes every unit unit_is_raised calls raised). Found by the sprint 61 re-bless bisect (2026-10-31), seed 13 at b3fc19a6: size_opening_state_to_chest cut nation 47736's capital military_base at (122,69); demolishing a base nulls its units' muster_base, so the 50-man opening unit (id 91961) raised there reads as a garrison (unit_is_raised needs a non-null muster_base) and the seated player kept it: 6x200 + 50 = 1250 men. On main the road steer (BL-1468) spares that base and the count is the intended 1200, so the leak is latent, not gone. THE WORK: either the cut never removes a capital base (it is the muster point the opening force needs), or a unit raised at a base keeps a raised mark when the base goes, so disarm still removes it. Check: a fixture where the cut takes the seat's capital base; the seat opens with garrisons only. Digest-moving only on seeds where the cut hits a base. SUPERSEDED 2026-11-04 (main session, duplicate check): BL-1474 (major opening army) posts every major's eight as garrisons, never raised at a base, and lays the capital base fresh after; MILITARY.md § Nation garrisons: \"Taking a seat keeps the army\". The leak needed a unit raised at a cut capital base on the seat; no major holds one. Close as cancelled at the sprint close.",
-      "_row_keys": [
-        "status",
-        "glyph",
-        "sprint",
-        "version_goal",
-        "written",
-        "parked",
-        "blocked_on",
-        "author",
-        "requires",
-        "id",
-        "short_name",
-        "category",
-        "authority_doc",
-        "priority",
-        "difficulty",
-        "files",
-        "title",
-        "design"
-      ]
-    },
-    "BL-1470": {
-      "status": "complete",
-      "glyph": "●",
-      "sprint": 61,
-      "version_goal": "v0.3.0",
-      "written": "2026-10-31",
-      "parked": false,
-      "blocked_on": null,
-      "author": "main session (sprint 61 delivery, from Lane L, 2026-10-31)",
-      "requires": [],
-      "id": "BL-1470",
-      "short_name": "SENTIMENT_CONTRIBUTORS",
-      "category": "Politics",
-      "authority_doc": "docs/politics/RELATIONS.md",
-      "priority": "B",
-      "difficulty": 3,
-      "files": [
-        "src/world/sentiment.hpp",
-        "src/world/sentiment.cpp",
-        "src/world/hard_coded_world.cpp",
-        "src/world/world_save.cpp",
-        "src/ui/diplomacy_ledger.cpp"
-      ],
-      "title": "A sentiment row remembers what moved it, so the ledger can name the cause",
-      "design": "ledgers/diplomacy.md § Nations - the folded row: hovering a bar names its largest contributing conduct, and a seeded row names the war that seeded it with its region and year (RELATIONS § Where a grudge lands). Found by Lane L, sprint 61 (2026-10-31): the world keeps no record of which conduct moved a value, and hard_coded_world.cpp discards the grudge seed records (grudge_sentiment_seed) after seeding. THE WORK: keep, per (observer, subject) row, the largest live contributor per dimension (factor kind and, for a grudge, its seed record), decayed with the row; keep the grudge seeds; save it (next save version). sentiment.cpp still takes no world&. The ledger hover then reads it. Also consider a saved short history so the trend arrows and trade exposure survive a load (today a UI-side ring buffer). Check: sentiment_harness rows, save_roundtrip, world_determinism. CARRIED at the sprint 61 close (2026-11-05): built and merged; Ben's live click is owed on the diplomacy bar hover (Largest cause). CLOSED 2026-11-05: Ben's live click on the diplomacy bar hover passed.",
-      "_row_keys": [
-        "status",
-        "glyph",
-        "sprint",
-        "version_goal",
-        "written",
-        "parked",
-        "blocked_on",
-        "author",
-        "requires",
-        "id",
-        "short_name",
-        "category",
-        "authority_doc",
-        "priority",
-        "difficulty",
-        "files",
-        "title",
-        "design"
-      ]
-    },
     "BL-1496": {
       "status": "complete",
       "glyph": "●",
@@ -15025,6 +15028,24 @@
         "design",
         "closed"
       ]
+    },
+    "BL-1527": {
+      "design": "MILITARY.md § Sea, the kit; RESOURCES.md § The kit goods. One live design per class on the existing designer. Ship hulls is a new terminal good at the Arms Works, priced by the margin anchor. Refit at the home port. New good moves the recipe table, so read PRODUCTION.md first."
+    },
+    "BL-1528": {
+      "design": "DIGITISATION_TREE.md § Naval. Author the nodes in the store and render with tech_tree_store.js. The ring and the research panel assume three branches per tree (ST gains ST-NA), so the store check and the panel's sector layout both change. Its quest and joint are authored here. The panel needs a live click."
+    },
+    "BL-1529": {
+      "design": "MILITARY.md § Sea; LOGISTICS.md § 7; SUPPLY.md, the lane. The seeded daily raid on a sea leg in the zone, the escort share, submarine sink against surface prize, and the announcement with \"an unseen raider\". Must conserve: a sunk cargo is destroyed, a prize lands at the nearest own port. Land interdiction is unchanged. Harness: replay determinism, money and goods conservation, friend immunity, undetected submarine ignores escort."
+    },
+    "BL-1530": {
+      "design": "MILITARY.md § Sea; TRADE.md, ports. The share per province, the holding bar, the reveal. A held port-mouth province stops sea legs and trade points; the route pricer reads the port as lost, and the caches invalidate on both edges. Harness: prices move at the blockaded market, reopening is same-day, a convoy at sea finishes its leg."
+    },
+    "BL-1531": {
+      "design": "MILITARY.md § Sea, landings; § Domains and traversal. Embark, carried supplies aboard, loss with a sunk transport, the landing door, the attacker's opening penalty, and life on carried supplies until the network reaches. Read Fronts and Occupation first: a landed unit's front and a taken port's effect on reach are the seams. Live click required. A ship class has no base capacity yet: this item adds it, and is the first reader of ship_live_stats::capacity, which a transport hull already moves."
+    },
+    "BL-1534": {
+      "design": "ledgers/military.md; MILITARY.md § Sea. Replace the stub tab, draw ships on water with class and owner, and add mission assignment by right-click, embark and land presses, a closed-port mark on the map, and raid causes in the Convoys ledger. Every control updates ACTIONS.json and every surface the question log. Every press needs a live click. The ship classes join the existing unit designer (set_ship_design), and a refit press sits on a ship at its home port (refit_ship): both verbs are on the seam with no player surface until this item. The live click owed by the Naval research branch goes with this pass: open the research panel, shift-click a Naval node, see it queue. Some rim labels overlap on the ten-branch ring (Order with Mass Surveillance, Anti-Ship Missiles with Long-Range Precision Strike): look at them there, at zoom. LOGISTICS.md § 7 also owes two surfaces no interception has yet: the Convoys ledger row leaving with a stated cause, and the tile marked for a few ticks. Both read economy_report::interceptions, on land and at sea. BL-1531 (troop landings) owes its live click here: board at a port, land on a coast, see a contested landing. The off-road dash must be looked at on a landed unit beside a hostile port."
     }
   }
 }

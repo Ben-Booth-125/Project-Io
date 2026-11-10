@@ -125,6 +125,7 @@ inline world_gen_config parsed_gen_config(lua_state& lua)
 #include "world/finish_campaign_world.hpp"  // BL-1085: the band, the search params
 #include "world/landscape_search.hpp"
 #include "world/nation_generation.hpp"    // BL-1474: seed_major_opening_armies
+#include "world/sea_combat.hpp"           // BL-1532: seed_major_opening_fleets
 #include "world/stockpile_budget.hpp"     // BL-1042: the shipped path's charter budget
 #include "world/state_industry.hpp"       // BL-1402: fold_to_ground, fold_report (the probe)
 #include "world/world.hpp"
@@ -464,6 +465,11 @@ inline shipped_landscape apply_shipped_landscape(
         print_lp_seed_report(out.lp);
         // ... and its second site-road call, after the seeding (a port it landed).
         lay_site_roads_every_body(w);
+        // BL-1532: finish_campaign_world's major opening fleet, verbatim, right after it.
+        if (kit != nullptr && kit->has_fleet())
+            print_opening_fleets(seed_major_opening_fleets(w, kit->fleet, kit->fleet_per_port, kit->sea_recruits));
+        // BL-1551: finish_campaign_world's arms reserve, verbatim, right after it.
+        seed_arms_reserve(w);
     }
 
     return out;

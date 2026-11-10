@@ -1,3 +1,4 @@
+#include "nation_generation.hpp" // BL-1617: nation_garrison_params
 #include "state_industry.hpp"
 #include "recruits.hpp" // refund_muster_recruits
 
@@ -67,7 +68,8 @@ strategic_sector strategic_sector_of(const recipe_registry& reg, building_type t
     if (makes(resource_type::ordnance) || makes(resource_type::small_arms)
         || makes(resource_type::armoured_vehicles) || makes(resource_type::artillery_pieces)
         || makes(resource_type::guided_weapons) || makes(resource_type::drones)
-        || makes(resource_type::airframes)) // BL-1436: the sixth kit good
+        || makes(resource_type::airframes)  // BL-1436: the sixth kit good
+        || makes(resource_type::ship_hulls)) // BL-1527: the seventh
         return strategic_sector::arms;
     if (makes(resource_type::spacecraft_components) || makes(resource_type::propellant))
         return strategic_sector::space;
@@ -1110,6 +1112,7 @@ opening_state_cut_report size_opening_state_to_chest(world& w, const recipe_regi
     opening_state_cut_report rep;
     const unit_upkeep_params& up = reg.military().upkeep;
     std::map<entity_id, float> wage;
+    std::map<entity_id, int>   men;
     {
         std::vector<entity_id> uids;
         for (const auto& [uid, u] : w.units) uids.push_back(uid);
@@ -1118,9 +1121,21 @@ opening_state_cut_report size_opening_state_to_chest(world& w, const recipe_regi
         {
             const unit_component& u = w.units.at(uid);
             if (u.count > 0 && w.nations.count(u.owner) != 0)
+            {
                 wage[u.owner] += resolve_unit_upkeep(u, up).credits;
+                men[u.owner]  += u.count;
+            }
         }
     }
+    // BL-1617 (MILITARY.md § Nation garrisons): a minor's garrisons are sized to its income
+    // at the handoff, so the chest need only carry the one token garrison until then.
+    if (skip_majors)
+        for (auto& [nid, pay] : wage)
+            if (const auto n = w.nations.find(nid); n != w.nations.end() && !n->second.is_major)
+            {
+                const int token = nation_garrison_params{}.min_count;
+                pay = pay * std::min(1.0f, static_cast<float>(token) / static_cast<float>(std::max(1, men[nid])));
+            }
     for (const entity_id nid : gate_nations(w, gate_rail_tiles(w)))
     {
         const nation_component& nc = w.nations.at(nid);

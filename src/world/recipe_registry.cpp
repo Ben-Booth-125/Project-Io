@@ -1063,6 +1063,120 @@ void recipe_registry::load_from_lua(lua_state& lua)
             mp.air = ap;
         }
 
+        // BL-1430 (MILITARY.md § Sea): economy.military.sea. Absent = the C++ defaults
+        // (which equal the shipped Lua). Every class named must be one of the four, every
+        // mission and target one the theatre has; an out-of-domain number THROWS, never
+        // clamps (the authoring boundary's untrusted-input rule).
+        sol::optional<sol::table> sea = (*military)["sea"];
+        if (sea)
+        {
+            sea_params ap = mp.sea;
+            const auto bad = [](const std::string& what) {
+                throw std::runtime_error("recipe_registry: economy.military.sea." + what);
+            };
+            const auto read_int = [&](sol::table& t, const char* key, int lo, int hi, int& out,
+                                      const std::string& where) {
+                out = t.get_or(key, out);
+                if (out < lo || out > hi)
+                    bad(where + key + " is outside [" + std::to_string(lo) + ", "
+                        + std::to_string(hi) + "]");
+            };
+            sol::table at = *sea;
+            read_int(at, "patrol_detection_permille", 0, 10000, ap.patrol_detection_permille, "");
+            read_int(at, "raid_take_permille_per_day", 0, 1000, ap.raid_take_permille_per_day, "");
+            read_int(at, "sea_hold_share_permille", 1, 1000, ap.sea_hold_share_permille, "");
+            read_int(at, "landing_days", 1, 3650, ap.landing_days, "");
+            read_int(at, "landing_penalty_days", 0, 3650, ap.landing_penalty_days, "");
+            read_int(at, "landing_penalty_permille", 0, 1000, ap.landing_penalty_permille, "");
+            read_int(at, "morale_per_hp_permille", 0, 10000, ap.morale_per_hp_permille, "");
+            read_int(at, "dock_morale_per_day", 0, 1000, ap.dock_morale_per_day, "");
+            read_int(at, "resume_hp_permille", 0, 1000, ap.resume_hp_permille, "");
+            read_int(at, "resume_morale_permille", 0, 1000, ap.resume_morale_permille, "");
+            read_int(at, "refit_ppm_per_quarter", 0, k_ship_hp_full, ap.refit_ppm_per_quarter, "");
+            read_int(at, "bomb_hp_per_hit_permille", 0, 1000000, ap.bomb_hp_per_hit_permille, "");
+            if (sol::optional<sol::table> rg = at["refit_goods"])
+            {
+                ap.refit_goods = {};
+                read_resource_map(*rg, ap.refit_goods, "military.sea.refit_goods");
+            }
+            if (sol::optional<sol::table> ug = at["ship_upkeep_goods"])
+            {
+                ap.ship_upkeep_goods = {};
+                read_resource_map(*ug, ap.ship_upkeep_goods, "military.sea.ship_upkeep_goods");
+            }
+            static const char* const k_class_keys[ship_class_count] = {
+                "submarine", "destroyer", "capital", "transport",
+            };
+            static const char* const k_mission_keys[sea_mission_count] = {
+                "none", "patrol", "escort", "raid", "blockade",
+            };
+            if (sol::optional<sol::table> classes = at["classes"])
+            {
+                for (const auto& kv : *classes)
+                {
+                    const std::string key = kv.first.as<std::string>();
+                    int ci = -1;
+                    for (int i = 0; i < ship_class_count; ++i)
+                        if (key == k_class_keys[i]) ci = i;
+                    if (ci < 0)
+                        bad("classes names an unknown class '" + key + "'");
+                    sol::table t = kv.second.as<sol::table>();
+                    ship_class_stats& c = ap.cls[static_cast<std::size_t>(ci)];
+                    const std::string where = "classes." + key + ".";
+                    read_int(t, "hp", 1, 100000, c.hp, where);
+                    read_int(t, "attack", 0, 1000000, c.attack, where);
+                    read_int(t, "detection", 0, 100000, c.detection, where);
+                    read_int(t, "stealth", 0, 100000, c.stealth, where);
+                    read_int(t, "range", 0, 100000, c.range, where);
+                    read_int(t, "days_per_tile_permille", 1, 100000, c.days_per_tile_permille, where);
+                    read_int(t, "break_hp_permille", 0, 1000, c.break_hp_permille, where);
+                    read_int(t, "break_morale_permille", 0, 1000, c.break_morale_permille, where);
+                    read_int(t, "muster_days", 1, 3650, c.muster_days, where);
+                    read_int(t, "crew", 0, 100000, c.crew, where);
+                    read_int(t, "capacity", 0, 1000, c.capacity, where); // BL-1531
+                    c.hire_cost = t.get_or("hire_cost", c.hire_cost);
+                    if (!std::isfinite(c.hire_cost) || c.hire_cost < 0.0f)
+                        bad(where + "hire_cost is not a finite non-negative number");
+                    if (sol::optional<sol::table> hg = t["hire_goods"])
+                    {
+                        c.hire_goods = {};
+                        read_resource_map(*hg, c.hire_goods, "military.sea." + where + "hire_goods");
+                    }
+                    if (sol::optional<sol::table> ms = t["missions"])
+                    {
+                        c.missions = 0;
+                        for (const auto& mkv : *ms)
+                        {
+                            const std::string mk = mkv.second.as<std::string>();
+                            int mi = -1;
+                            for (int i = 1; i < sea_mission_count; ++i)
+                                if (mk == k_mission_keys[i]) mi = i;
+                            if (mi < 0)
+                                bad(where + "missions names an unknown mission '" + mk + "'");
+                            c.missions = static_cast<uint8_t>(c.missions
+                                | sea_mission_bit(static_cast<sea_mission>(mi)));
+                        }
+                    }
+                    if (sol::optional<sol::table> ts = t["targets"])
+                    {
+                        c.targets = 0;
+                        for (const auto& tkv : *ts)
+                        {
+                            const std::string tk = tkv.second.as<std::string>();
+                            int ti = -1;
+                            for (int i = 0; i < ship_class_count; ++i)
+                                if (tk == k_class_keys[i]) ti = i;
+                            if (ti < 0)
+                                bad(where + "targets names an unknown class '" + tk + "'");
+                            c.targets = static_cast<uint8_t>(c.targets
+                                | ship_class_bit(static_cast<ship_class>(ti)));
+                        }
+                    }
+                }
+            }
+            mp.sea = ap;
+        }
+
         // BL-1463 (MILITARY.md § Recruits): economy.military.recruits. Absent = the C++
         // defaults (which equal the shipped Lua). Every key must be one of the four;
         // a count must be an integer in [0, k_recruit_rate_max = 1000], the LP cost finite in [0, 1000].

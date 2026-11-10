@@ -357,7 +357,7 @@ set(IO_WARNING_FLAGS
 target_compile_options(ProjectIo PRIVATE ${IO_WARNING_FLAGS})
 target_compile_options(io_ground_bake PRIVATE ${IO_WARNING_FLAGS})
 
-# verify_api.cpp needs /bigobj on MSVC.
+# verify_api.cpp and startup_screens.cpp need /bigobj on MSVC.
 #
 # It is one translation unit holding the WHOLE verify surface — every
 # `v.set_function(...)` binding, each of which instantiates a pile of sol2

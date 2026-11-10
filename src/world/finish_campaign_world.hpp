@@ -162,6 +162,11 @@ std::int64_t finish_campaign_weight_ms(const world_params& params);
 /// Prints the `[stockpile_budget]` and `[landscape_search]` lines Begin always
 /// printed, and one `[finish_campaign_world]` line at the end -- the log proof
 /// tools/verify/begin_adopts_check.js reads.
+/// BL-1551 (Ben, 2026-11-08; MILITARY.md § What a force costs): every nation opens with a
+/// reserve of arms on the shelf of its capital's market, so it can raise a first force
+/// before its works or its imports arrive. First-cut quantities; the market's from here.
+void seed_arms_reserve(world& w);
+
 finish_campaign_result finish_campaign_world(world& w, generation_report& report,
                                              recipe_registry& reg,
                                              const world_params& params,

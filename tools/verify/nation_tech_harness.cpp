@@ -942,7 +942,7 @@ void rows_t1(const recipe_registry& reg)
         }
     }
     check(placeholders, "T1f every placeholder carries one unread effect waiting on its system");
-    check(quests && quests_n == 9, "T1g all nine quest deeds are declared unread (no deed reader exists)");
+    check(quests && quests_n == 10, "T1g all ten quest deeds are declared unread (no deed reader exists)");
     std::printf("     quests whose deed can complete today: %d of %d\n", deeds_open, quests_n);
 }
 

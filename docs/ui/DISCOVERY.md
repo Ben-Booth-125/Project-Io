@@ -98,6 +98,12 @@ branch point is `is_player_owned(world, building)` (with `owner_corp_of` behind 
 This rule is what makes decisions interesting rather than trivial: intelligence is *earned by
 reasoning over public signals*, not handed over.
 
+### Ships are found, not seen
+
+**A ship is on the map only where its finder's side has found it** (`ledgers/military.md` § Ships on the
+map; `../military/MILITARY.md` § Sea). It is the one thing on the ground the survey does not reveal, because
+stealth is what a submarine is for. What is found is its class and owner, never its orders or condition.
+
 ### The operational fog is unchanged
 
 **Ben, 2026-08-26: operational fog persists.** Retiring the banded standing read was a ruling about

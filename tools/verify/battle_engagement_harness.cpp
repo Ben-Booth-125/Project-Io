@@ -34,6 +34,7 @@
 // Run: battle_engagement_harness
 // ---------------------------------------------------------------------------
 
+#include "core/battle_dispatch_text.cpp" // the builder compiles only src/world
 #include "core/battle_dispatch_text.hpp" // BL-468: the phrase bank, testable because it is its own TU
 #include "world/air_combat.hpp" // BL-1426: run_air_missions, the repair pass
 #include "world/battle_system.hpp"

@@ -46,10 +46,9 @@
 // to be able to fight over it.
 //
 // WHO ACTUALLY FIELDS THEM. The Era -1 sim
-// (docs/generation/MILITARY_HISTORY.md § Naval) — the campaign raises no naval
-// units, so campaign-era naval stays unmodelled as a matter of scope. This
-// engine does not know or care which of the two is calling it, which is the
-// property that lets the same resolver serve both.
+// (docs/generation/MILITARY_HISTORY.md § Naval). The campaign's ships are not rows
+// of this engine: they are `world::ships`, and sea_combat.hpp resolves them
+// (MILITARY.md § Sea).
 //
 // SIEGES ARE A DOCTRINE CHOICE. There is no separate siege resolution path in
 // this first cut — an army besieging a position picks a doctrine_row with an

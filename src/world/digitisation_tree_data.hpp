@@ -22,10 +22,10 @@ enum class tier : std::uint8_t { travel = 0, minor = 1, major = 2, quest = 3 };
 enum class effect_kind : std::uint8_t { modifier = 0, unlock_recipe = 1, unlock_structure = 2, mechanic = 3, unread = 4, unlock_kit = 5 };
 enum class effect_op : std::uint8_t { multiply = 0, add = 1 };
 
-inline constexpr int node_count        = 194;
+inline constexpr int node_count        = 212;
 inline constexpr int max_groups        = 2; ///< Most requirement groups any node has.
 inline constexpr int max_group_members = 2; ///< Most members any one group has.
-inline constexpr int effect_count      = 297; ///< Rows in `effects` (a list scope is one row per member).
+inline constexpr int effect_count      = 329; ///< Rows in `effects` (a list scope is one row per member).
 
 /// One node of the Digitisation tree. `groups[g][m]` is a node index, -1 past the group's end;
 /// a node is open when every one of its `group_count` groups has at least one held member.
@@ -265,6 +265,24 @@ inline constexpr std::array<node, node_count> nodes = {{
     /* 191 */ {"DG-NE-SO-F2", "Counter-Drone Defence", tier::minor, 4, 8, 1, {{{189, -1}, {-1, -1}}}, -1, false, false, false, false, false, "NE-SO", "", "", "opens layered defence with counter-drone (air defence launcher)", 293, 294, ""},
     /* 192 */ {"DG-NE-SO-F", "Loitering Munitions", tier::major, 4, 24, 2, {{{190, -1}, {191, -1}}}, -1, false, false, false, false, false, "NE-SO", "", "", "opens loitering drones (artillery munitions, drone armament)", 294, 296, ""},
     /* 193 */ {"DG-PR-EN-W", "Wind Power", tier::major, 2, 12, 2, {{{39, -1}, {41, -1}}}, -1, false, false, false, false, false, "PR-EN", "", "", "unlocks the Wind Turbine: land power with no fuel", 296, 297, ""},
+    /* 194 */ {"DG-ST-NV-T1", "Seamanship I", tier::travel, 1, 1, 0, {{{-1, -1}, {-1, -1}}}, -1, false, false, true, false, false, "ST-NV", "", "", "+1% strength for every ship", 297, 298, ""},
+    /* 195 */ {"DG-ST-NV-T2", "Seamanship II", tier::travel, 1, 1, 1, {{{194, -1}, {-1, -1}}}, -1, false, false, false, false, false, "ST-NV", "", "", "+1% strength for every ship", 298, 299, ""},
+    /* 196 */ {"DG-ST-NV-A1", "Gas-Turbine Propulsion", tier::minor, 1, 2, 1, {{{195, -1}, {-1, -1}}}, -1, false, false, false, false, false, "ST-NV", "", "", "opens gas-turbine hull, compartmented hull, roll-on assault hull", 299, 302, ""},
+    /* 197 */ {"DG-ST-NV-A2", "Streamlined Hulls", tier::minor, 1, 2, 1, {{{195, -1}, {-1, -1}}}, -1, false, false, false, false, false, "ST-NV", "", "", "opens streamlined snorkel hull", 302, 303, ""},
+    /* 198 */ {"DG-ST-NV-A", "Reactor Propulsion", tier::major, 2, 12, 2, {{{196, -1}, {197, -1}}}, -1, false, false, false, false, false, "ST-NV", "", "", "opens reactor pressure hull, quieted composite hull, reactor capital hull, fast sealift hull", 303, 307, ""},
+    /* 199 */ {"DG-ST-NV-T3", "Seamanship III", tier::travel, 2, 2, 1, {{{198, -1}, {-1, -1}}}, -1, false, false, false, false, false, "ST-NV", "", "", "+1% strength for every ship", 307, 308, ""},
+    /* 200 */ {"DG-ST-NV-T4", "Seamanship IV", tier::travel, 3, 3, 1, {{{199, -1}, {-1, -1}}}, -1, false, false, false, false, false, "ST-NV", "", "", "+1% strength for every ship", 308, 309, ""},
+    /* 201 */ {"DG-ST-NV-T5", "Seamanship V", tier::travel, 2, 2, 1, {{{198, -1}, {-1, -1}}}, -1, false, false, false, false, false, "ST-NV", "", "", "+1% strength for every ship", 309, 310, ""},
+    /* 202 */ {"DG-ST-NV-T6", "Seamanship VI", tier::travel, 3, 3, 1, {{{201, -1}, {-1, -1}}}, -1, false, false, false, false, false, "ST-NV", "", "", "+1% strength for every ship", 310, 311, ""},
+    /* 203 */ {"DG-ST-NV-B1", "Naval Fire Control", tier::minor, 3, 6, 1, {{{200, -1}, {-1, -1}}}, -1, false, false, false, false, false, "ST-NV", "", "", "opens anti-submarine rockets, radar-laid main battery", 311, 313, ""},
+    /* 204 */ {"DG-ST-NV-B2", "Homing Torpedoes", tier::minor, 3, 6, 1, {{{200, -1}, {-1, -1}}}, -1, false, false, false, false, false, "ST-NV", "", "", "opens homing torpedoes", 313, 314, ""},
+    /* 205 */ {"DG-ST-NV-B", "Anti-Ship Missiles", tier::major, 4, 24, 2, {{{203, -1}, {204, -1}}}, -1, false, false, false, false, false, "ST-NV", "", "", "opens wire-guided hunter torpedoes, anti-ship missiles, vertical-launch missile cells", 314, 317, ""},
+    /* 206 */ {"DG-ST-NV-C1", "Search Radar", tier::minor, 3, 6, 1, {{{202, -1}, {-1, -1}}}, -1, false, false, false, false, false, "ST-NV", "", "", "opens variable-depth sonar, surface search radar, warning radar", 317, 320, ""},
+    /* 207 */ {"DG-ST-NV-C2", "Passive Sonar", tier::minor, 3, 6, 1, {{{202, -1}, {-1, -1}}}, -1, false, false, false, false, false, "ST-NV", "", "", "opens passive sonar array", 320, 321, ""},
+    /* 208 */ {"DG-ST-NV-C", "Fleet Data Link", tier::major, 4, 24, 2, {{{206, -1}, {207, -1}}}, -1, false, false, false, false, false, "ST-NV", "", "", "opens towed sonar array, towed array and data link, phased-array radar, convoy data link", 321, 325, ""},
+    /* 209 */ {"DG-ST-NV-M", "Sea Power", tier::travel, 4, 4, 2, {{{205, -1}, {208, -1}}}, -1, false, false, false, true, false, "ST-NV", "", "", "+3% strength for every ship", 325, 326, ""},
+    /* 210 */ {"DG-ST-NV-Q", "Blue Water", tier::quest, 2, 6, 1, {{{198, -1}, {-1, -1}}}, -1, true, false, false, false, false, "ST-NV", "", "a fleet keeps a sea zone through a war", "ship muster time -20%", 326, 327, "sea control"},
+    /* 211 */ {"DG-J-STNV-STOR", "Coastal Security", tier::travel, 3, 3, 2, {{{202, -1}, {125, -1}}}, -1, false, false, false, false, true, "", "", "", "+1% strength for every ship and -1% unrest", 327, 329, ""},
 }};
 
 inline constexpr std::array<effect, effect_count> effects = {{
@@ -565,6 +583,38 @@ inline constexpr std::array<effect, effect_count> effects = {{
     /* 294 */ {192, effect_kind::unlock_kit, "", "", effect_op::multiply, 1.0f, "art.munitions.loitering_drones", "", ""},
     /* 295 */ {192, effect_kind::unlock_kit, "", "", effect_op::multiply, 1.0f, "drn.armament.loitering", "", ""},
     /* 296 */ {193, effect_kind::unlock_recipe, "", "", effect_op::multiply, 1.0f, "wind_turbine", "", ""},
+    /* 297 */ {194, effect_kind::unread, "", "", effect_op::multiply, 1.0f, "", "+1% strength for every ship", "ship strength"},
+    /* 298 */ {195, effect_kind::unread, "", "", effect_op::multiply, 1.0f, "", "+1% strength for every ship", "ship strength"},
+    /* 299 */ {196, effect_kind::unlock_kit, "", "", effect_op::multiply, 1.0f, "des.hull.gas_turbine", "", ""},
+    /* 300 */ {196, effect_kind::unlock_kit, "", "", effect_op::multiply, 1.0f, "cap.hull.compartmented", "", ""},
+    /* 301 */ {196, effect_kind::unlock_kit, "", "", effect_op::multiply, 1.0f, "tra.hull.roll_on", "", ""},
+    /* 302 */ {197, effect_kind::unlock_kit, "", "", effect_op::multiply, 1.0f, "sub.hull.snorkel", "", ""},
+    /* 303 */ {198, effect_kind::unlock_kit, "", "", effect_op::multiply, 1.0f, "sub.hull.reactor", "", ""},
+    /* 304 */ {198, effect_kind::unlock_kit, "", "", effect_op::multiply, 1.0f, "des.hull.quiet", "", ""},
+    /* 305 */ {198, effect_kind::unlock_kit, "", "", effect_op::multiply, 1.0f, "cap.hull.reactor", "", ""},
+    /* 306 */ {198, effect_kind::unlock_kit, "", "", effect_op::multiply, 1.0f, "tra.hull.fast", "", ""},
+    /* 307 */ {199, effect_kind::unread, "", "", effect_op::multiply, 1.0f, "", "+1% strength for every ship", "ship strength"},
+    /* 308 */ {200, effect_kind::unread, "", "", effect_op::multiply, 1.0f, "", "+1% strength for every ship", "ship strength"},
+    /* 309 */ {201, effect_kind::unread, "", "", effect_op::multiply, 1.0f, "", "+1% strength for every ship", "ship strength"},
+    /* 310 */ {202, effect_kind::unread, "", "", effect_op::multiply, 1.0f, "", "+1% strength for every ship", "ship strength"},
+    /* 311 */ {203, effect_kind::unlock_kit, "", "", effect_op::multiply, 1.0f, "des.armament.rocket", "", ""},
+    /* 312 */ {203, effect_kind::unlock_kit, "", "", effect_op::multiply, 1.0f, "cap.armament.rifled", "", ""},
+    /* 313 */ {204, effect_kind::unlock_kit, "", "", effect_op::multiply, 1.0f, "sub.armament.homing", "", ""},
+    /* 314 */ {205, effect_kind::unlock_kit, "", "", effect_op::multiply, 1.0f, "sub.armament.hunter", "", ""},
+    /* 315 */ {205, effect_kind::unlock_kit, "", "", effect_op::multiply, 1.0f, "des.armament.missile", "", ""},
+    /* 316 */ {205, effect_kind::unlock_kit, "", "", effect_op::multiply, 1.0f, "cap.armament.vertical", "", ""},
+    /* 317 */ {206, effect_kind::unlock_kit, "", "", effect_op::multiply, 1.0f, "des.sensors.variable", "", ""},
+    /* 318 */ {206, effect_kind::unlock_kit, "", "", effect_op::multiply, 1.0f, "cap.sensors.search", "", ""},
+    /* 319 */ {206, effect_kind::unlock_kit, "", "", effect_op::multiply, 1.0f, "tra.sensors.warning", "", ""},
+    /* 320 */ {207, effect_kind::unlock_kit, "", "", effect_op::multiply, 1.0f, "sub.sensors.passive", "", ""},
+    /* 321 */ {208, effect_kind::unlock_kit, "", "", effect_op::multiply, 1.0f, "sub.sensors.towed", "", ""},
+    /* 322 */ {208, effect_kind::unlock_kit, "", "", effect_op::multiply, 1.0f, "des.sensors.towed", "", ""},
+    /* 323 */ {208, effect_kind::unlock_kit, "", "", effect_op::multiply, 1.0f, "cap.sensors.phased", "", ""},
+    /* 324 */ {208, effect_kind::unlock_kit, "", "", effect_op::multiply, 1.0f, "tra.sensors.datalink", "", ""},
+    /* 325 */ {209, effect_kind::unread, "", "", effect_op::multiply, 1.0f, "", "+3% strength for every ship", "ship strength"},
+    /* 326 */ {210, effect_kind::unread, "", "", effect_op::multiply, 1.0f, "", "ship muster time -20%", "ship muster time"},
+    /* 327 */ {211, effect_kind::unread, "", "", effect_op::multiply, 1.0f, "", "+1% strength for every ship", "ship strength"},
+    /* 328 */ {211, effect_kind::unread, "", "", effect_op::multiply, 1.0f, "", "-1% unrest", "unrest"},
 }};
 
 /// One branch of the ring, in store order (tree by tree, Production / Network / State). The
@@ -577,7 +627,7 @@ struct branch_info
     const char* tree_name; ///< "Production".
 };
 
-inline constexpr int branch_count = 9;
+inline constexpr int branch_count = 10;
 inline constexpr std::array<branch_info, branch_count> branches = {{
     {"PR-EX", "Extraction", "PR", "Production"},
     {"PR-PC", "Processing", "PR", "Production"},
@@ -586,6 +636,7 @@ inline constexpr std::array<branch_info, branch_count> branches = {{
     {"NE-MK", "Markets", "NE", "Network"},
     {"NE-FR", "Freight", "NE", "Network"},
     {"ST-FO", "Force", "ST", "State"},
+    {"ST-NV", "Naval", "ST", "State"},
     {"ST-OR", "Order", "ST", "State"},
     {"ST-AC", "Accord", "ST", "State"},
 }};
@@ -787,9 +838,27 @@ inline constexpr std::array<const char*, node_count> keys_next_branch = {{
     /* 191 */ "",
     /* 192 */ "",
     /* 193 */ "",
+    /* 194 */ "",
+    /* 195 */ "",
+    /* 196 */ "",
+    /* 197 */ "",
+    /* 198 */ "",
+    /* 199 */ "",
+    /* 200 */ "",
+    /* 201 */ "",
+    /* 202 */ "",
+    /* 203 */ "",
+    /* 204 */ "",
+    /* 205 */ "",
+    /* 206 */ "",
+    /* 207 */ "",
+    /* 208 */ "",
+    /* 209 */ "",
+    /* 210 */ "Orbital Fleet",
+    /* 211 */ "",
 }};
 
-/// The index of the node with store id @p id, or -1. Linear over 194 nodes: a lookup, not a hot path.
+/// The index of the node with store id @p id, or -1. Linear over 212 nodes: a lookup, not a hot path.
 constexpr int find_node(std::string_view id)
 {
     for (int i = 0; i < node_count; ++i)

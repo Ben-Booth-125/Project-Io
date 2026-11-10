@@ -24,6 +24,7 @@
 #include "icons.hpp"
 
 #include "world/recipe_registry.hpp"
+#include "world/sea_combat.hpp" // ship_live_stats
 #include "world/unit_designs.hpp"
 #include "world/unit_roster.hpp"
 #include "world/world.hpp"
@@ -91,6 +92,14 @@ stat_bands land_design_stat_bands(const recipe_registry& reg, land_class c,
 /// An air wing's bands: Condition (HP, morale, supply), Combat (air attack, soft
 /// attack, hard attack, strategic), Field (recon, range). A rival's wing reads "—".
 stat_bands wing_stat_bands(const world& w, const recipe_registry& reg, entity_id wing);
+
+/// BL-1534: a ship's bands: Condition (HP, morale, supply), Combat (attack, detection, stealth),
+/// Field (speed, range, and a transport's capacity). A rival's ship reads "—".
+stat_bands ship_stat_bands(const world& w, const recipe_registry& reg, entity_id ship);
+
+/// BL-1534: a ship design's bands, with signed deltas of @p shown against @p live. @p range is
+/// the class's alone and carries none.
+stat_bands ship_design_stat_bands(const ship_live_stats& shown, const ship_live_stats& live, int range);
 
 /// An air design's bands: its HP at full under Condition, then Combat and Field, with
 /// signed deltas of @p shown against @p live.

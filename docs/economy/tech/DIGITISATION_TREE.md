@@ -1,6 +1,6 @@
 # Project Io — The Digitisation Tree
 
-> **Settles:** the nodes of the Digitisation age's tech tree — its three trees, nine branches,
+> **Settles:** the nodes of the Digitisation age's tech tree — its three trees, ten branches,
 > clusters, pairs, joints, masteries, quests and placeholders · every node's advantage, ring and
 > requirements · which next-age branch each quest keys · the traps the tree carries for Era 1.
 > **Not here:** the grammar every age's tree obeys, research points and the queue (../RESEARCH) ·
@@ -11,9 +11,10 @@
 
 The Digitisation tree is the tech tree of the age the campaign opens in, 1960 onward (`../ERAS.md`
 § Era 1). Every nation starts holding none of it (`../RESEARCH.md` § Who holds technology). It is the
-first tree cut to the grammar in `../RESEARCH.md` § The shape of an age's tree: 193 nodes in three
-trees of three branches, on four rings — 160 in the branches' common shape and 33 kit nodes that
-lengthen the arms of Force, Processing and Signal & Orbit (§ Kit).
+first tree cut to the grammar in `../RESEARCH.md` § The shape of an age's tree: 211 nodes in three
+trees of ten branches, on four rings — 160 in the nine original branches' common shape, 33 kit nodes
+that lengthen the arms of Force, Processing and Signal & Orbit (§ Kit), and 18 for State's fourth
+branch, Naval, and its joint (§ Naval).
 
 The store is `digitisation_tree.json`, canonical for every node; this document owns the prose and
 carries the store's tables, rendered by `node tools/session/tech_tree_store.js digitisation`, which
@@ -30,7 +31,7 @@ The shape is the design; the numbers are where it starts.
 |---|---|---|
 | **Production** | what the nation can extract and make | Extraction · Processing · Energy |
 | **Network** | how far and fast the nation moves goods and word | Signal & Orbit · Markets · Freight |
-| **State** | what the nation can field, hold and keep calm | Force · Order · Accord |
+| **State** | what the nation can field, hold and keep calm | Force · Naval · Order · Accord |
 
 Arranged in a ring, the trees sit Production, Network, State, and each branch's neighbours are the
 branches beside it — including the branch across a tree boundary.
@@ -67,11 +68,12 @@ A branch's six travel nodes all carry its theme; its mastery carries the theme a
 | Markets | +1% trade capacity at every Marketplace | Market Depth, +3% |
 | Freight | −1% logistics cost | Logistics Backbone, −3% |
 | Force | +1% strength for every unit | Combined Arms, +3% |
+| Naval | +1% strength for every ship | Sea Power, +3% |
 | Order | −1% unrest in every province | Civic Trust, −3% |
 | Accord | −1% Alarm toward you | Diplomatic Standing, −3% |
 
-**Seven joints** sit where neighbouring branches meet, each needing the facing arm of both. Two
-boundaries carry no joint — Markets | Freight and Force | Order — each beside a placeholder cluster;
+**Eight joints** sit where neighbouring branches meet, each needing the facing arm of both. Two
+boundaries carry no joint — Markets | Freight and Force | Naval — each beside a placeholder cluster;
 the espionage and politics systems place their joints there when they land.
 
 ## The traps
@@ -110,6 +112,7 @@ sketched by what the quests open:
 | Markets | Open Markets | Off-World Exchange — markets on other bodies |
 | Freight | Ten Lanes | Orbital Port & Depots — staging and refuelling above the home body |
 | Force | Proven Readiness | Space Force — units that hold orbit |
+| Naval | Blue Water | Orbital Fleet — ships that keep the lanes between bodies |
 | Order | Broad Consensus | Settlement Charters — governing off-world population |
 | Accord | Quiet Borders | Planetary Accords — shared limits on climate Load |
 
@@ -123,10 +126,25 @@ nodes also open kit beside their own advantage: *Armoured Carriers*, *Early Warn
 *Mechanised Divisions*, *Precision Munitions* and *Airmobile Forces* in Force, *Numerical Control*
 in Processing.
 
-**Kit lives by subject in three branches**: small arms, section weapons, missiles, guns and
+**Kit lives by subject in four branches**: small arms, section weapons, missiles, guns and
 vehicles in **Force**; armour materials and airframes in **Processing**; sensors, fire control,
-drones and networked kit in **Signal & Orbit**. No kit node requires a node of another branch
-(Ben, 2026-11-03); the tie between them is the goods — later kit draws electronics off the shelf.
+drones and networked kit in **Signal & Orbit**; every ship's kit in **Naval**. No kit node requires a
+node of another branch (Ben, 2026-11-03); the tie between them is the goods — later kit draws
+electronics off the shelf.
+
+## Naval
+
+**State's fourth branch is Naval (Ben, 2026-11-05).** It opens ships' hulls, armament and sensors in the
+three slots of `../../military/MILITARY.md` § Sea, for the four classes. It obeys the grammar every branch
+does (`../RESEARCH.md` § The shape of an age's tree): travel nodes with one stacking buff, clusters of
+two minors feeding a major, a mastery, one quest keying the next age's branch, and a joint on the ring.
+No Naval kit node requires a node of another branch.
+
+It sits between Force and Order on the ring. Its clusters follow the slots: the first opens hulls, the
+second armament, the third sensors, each with a minor for the surface classes, a minor for the
+submarine and a major for the later rung of every class. Nine nodes open the ships' 22 later items.
+Its joint, *Coastal Security*, needs Naval's and Order's facing arms. Its travel nodes carry one
+stacking buff to every ship, and its quest's deed is keeping a sea zone through a war.
 
 **Kit clusters lengthen the existing arms (Ben, 2026-11-03).** Each is two minors feeding a major,
 laid in line along an arm: its minors hang off the arm node before them, and the arm's next node
@@ -151,7 +169,8 @@ its catalogue items, for display; the catalogue's `research_node` (`src/world/un
 what the lock rule reads. `tools/session/tech_tree_store.js --check` holds the two equal both ways.
 
 **The age runs slower with its kit (Ben, 2026-11-03).** The kit raises the whole age from 1087 to
-1423 cost units, about 31% more, and the RP unit is not re-tuned to absorb it.
+1423 cost units, about 31% more, and the RP unit is not re-tuned to absorb it. Naval raises it again to
+1536, about 8%, on the same rule (Ben, 2026-11-05).
 
 ## Effects
 
@@ -177,7 +196,7 @@ shape; `nation_tech_harness` holds the store to what the code reads.
 
 <!-- BEGIN GENERATED NODES (tools/session/tech_tree_store.js) -->
 
-**194 nodes** — 70 travel (7 joints, 9 masteries), 73 minor, 42 major, 9 quest; 12 placeholder nodes. Whole age: 1435 cost units.
+**212 nodes** — 78 travel (8 joints, 10 masteries), 79 minor, 45 major, 10 quest; 12 placeholder nodes. Whole age: 1548 cost units.
 
 ### Production — what the nation can extract and make
 
@@ -373,6 +392,28 @@ shape; `nation_tech_harness` holds the store to what the code reads.
 | `DG-ST-FO-H2` | Armoured Self-Propelled Guns | minor | 4 | opens the armoured self-propelled chassis (artillery tow) | Long-Range Precision Strike |
 | `DG-ST-FO-H` | Active Protection | major | 4 | opens active protection (armour, the heavy fighting vehicle) | Wheeled Carriers + Armoured Self-Propelled Guns |
 
+#### Naval (`ST-NV`)
+
+| Id | Node | Tier | Ring | Advantage | Requires |
+|---|---|---|---|---|---|
+| `DG-ST-NV-T1` | Seamanship I | travel | 1 | +1% strength for every ship | — (open) |
+| `DG-ST-NV-T2` | Seamanship II | travel | 1 | +1% strength for every ship | Seamanship I |
+| `DG-ST-NV-A1` | Gas-Turbine Propulsion | minor | 1 | opens gas-turbine hull, compartmented hull, roll-on assault hull | Seamanship II |
+| `DG-ST-NV-A2` | Streamlined Hulls | minor | 1 | opens streamlined snorkel hull | Seamanship II |
+| `DG-ST-NV-A` | Reactor Propulsion | major | 2 | opens reactor pressure hull, quieted composite hull, reactor capital hull, fast sealift hull | Gas-Turbine Propulsion + Streamlined Hulls |
+| `DG-ST-NV-T3` | Seamanship III | travel | 2 | +1% strength for every ship | Reactor Propulsion |
+| `DG-ST-NV-T4` | Seamanship IV | travel | 3 | +1% strength for every ship | Seamanship III |
+| `DG-ST-NV-T5` | Seamanship V | travel | 2 | +1% strength for every ship | Reactor Propulsion |
+| `DG-ST-NV-T6` | Seamanship VI | travel | 3 | +1% strength for every ship | Seamanship V |
+| `DG-ST-NV-B1` | Naval Fire Control | minor | 3 | opens anti-submarine rockets, radar-laid main battery | Seamanship IV |
+| `DG-ST-NV-B2` | Homing Torpedoes | minor | 3 | opens homing torpedoes | Seamanship IV |
+| `DG-ST-NV-B` | Anti-Ship Missiles | major | 4 | opens wire-guided hunter torpedoes, anti-ship missiles, vertical-launch missile cells | Naval Fire Control + Homing Torpedoes |
+| `DG-ST-NV-C1` | Search Radar | minor | 3 | opens variable-depth sonar, surface search radar, warning radar | Seamanship VI |
+| `DG-ST-NV-C2` | Passive Sonar | minor | 3 | opens passive sonar array | Seamanship VI |
+| `DG-ST-NV-C` | Fleet Data Link | major | 4 | opens towed sonar array, towed array and data link, phased-array radar, convoy data link | Search Radar + Passive Sonar |
+| `DG-ST-NV-M` | Sea Power | mastery | 4 | +3% strength for every ship | Anti-Ship Missiles + Fleet Data Link |
+| `DG-ST-NV-Q` | Blue Water | quest | 2 | ship muster time -20%. **Deed:** a fleet keeps a sea zone through a war. **Keys next age:** Orbital Fleet | Reactor Propulsion |
+
 #### Order (`ST-OR`)
 
 | Id | Node | Tier | Ring | Advantage | Requires |
@@ -428,5 +469,6 @@ shape; `nation_tech_harness` holds the store to what the code reads.
 | `DG-J-NEFR-STFO` | Military Logistics | 3 | +3% unit movement and -1% logistics cost | Route Planning VI + Drill & Training IV |
 | `DG-J-STOR-STAC` | Public Diplomacy | 3 | -1% unrest and -1% Alarm toward you | Civil Service VI + Diplomatic Corps IV |
 | `DG-J-STAC-PREX` | Resource Diplomacy | 3 | +1% extraction rate and -1% Alarm toward you | Diplomatic Corps VI + Field Practice IV |
+| `DG-J-STNV-STOR` | Coastal Security | 3 | +1% strength for every ship and -1% unrest | Seamanship VI + Civil Service IV |
 
 <!-- END GENERATED NODES -->

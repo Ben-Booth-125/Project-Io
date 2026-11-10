@@ -24,7 +24,7 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 > **Generated file.** Produced by `node tools/session/render_actions.js`.
 > Edit the JSON, then re-run; hand edits here are overwritten.
 
-*226 entries — 54 gameplay · 39 canvas · 15 lens · 77 ledger · 41 chrome.*
+*242 entries — 60 gameplay · 41 canvas · 15 lens · 85 ledger · 41 chrome.*
 
 ---
 
@@ -1040,6 +1040,125 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 
 **Reason to select.** Shut a rival's goods out of your markets: protect your producers or punish its conduct, at the cost of its regard and of what its goods would have supplied.
 
+### `gameplay.hire_ship` — The Military ledger's Sea tab (ledger.military_sea_raise). Also a corp_verb (corp_verb::hire_ship, 55) on the command seam.
+
+**Press.** Over the seam: COMMAND corp=<nation> nation=<nation> verb=55 tile=<the port's tile> unit_type=<sea roster row: 0 Attack Submarine, 1 Fleet Destroyer, 2 Capital Ship, 3 Fleet Transport>.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `tile` | `entity_id (tile)` | The tile of one of the actor's own completed ports. |
+| `unit_type` | `uint16 sea roster row` | Which ship class to raise (ship_roster_table, src/world/sea_combat.hpp). |
+
+**Valid when:**
+- The actor is the nation (corp == as_nation, or as_nation unnamed); on the wire `COMMAND corp=<nation> nation=<nation> ...`, any other actor rejected_not_owner.
+- unit_type names a sea row (rejected_invalid otherwise) the nation's shelves can field now, by the land rows' binary gate (rejected_invalid otherwise).
+- tile is a tile (rejected_invalid) carrying the actor's own completed port with water at its mouth (rejected_placement).
+- The nation's sea pool holds the class's crew (rejected_no_recruits).
+- Its uncommitted treasury covers the class's credits with the hire goods and its live design's kit goods, and its shelves hold those goods (rejected_funds).
+
+**Expected output.** The credits, goods and crew are spent and the ship is created at the port's mouth with the class's muster days to run, doing nothing until they end. Its id returns through out_building. The ship records the class's live design. Saved (world_save_version 80).
+
+**Reason to select.** Raise a ship: submarines to raid, destroyers to find them, capital ships to hold water, transports to carry an army.
+
+### `gameplay.assign_sea_mission` — The ship card on the Selection band (ledger.selection_ship_mission, ledger.selection_ship_remove_province) and a right-click on water of the Planetary canvas with a warship selected (canvas.ship_order). Also a corp_verb (corp_verb::assign_sea_mission, 56) on the command seam.
+
+**Press.** Over the seam: COMMAND corp=<nation> nation=<nation> verb=56 subject=<ship> order=<0 none, 1 patrol, 2 escort, 3 raid, 4 blockade> provinces=<id>,<id>,...
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `subject` | `entity_id (ship)` | One of the actor's own ships. |
+| `order` | `uint32 sea_mission` | The mission. 0 recalls the ship home and names no province. |
+| `provinces` | `province ids` | The zone: 1 to 8 distinct sea provinces, any order. |
+
+**Valid when:**
+- The actor is the nation (corp == as_nation, or as_nation unnamed); on the wire `COMMAND corp=<nation> nation=<nation> ...`, any other actor rejected_not_owner.
+- subject is a ship (rejected_invalid) of the actor (rejected_not_owner).
+- order is a mission (rejected_invalid) its class works: a submarine raids; a destroyer and a capital ship patrol, escort, raid and blockade; a transport works no mission (rejected_invalid).
+- none names no province and every other mission 1 to 8 distinct real provinces (rejected_invalid).
+- Each province is water, within the class's range over water of an own port, and reachable by this ship (rejected_placement).
+- The assignment changes something (rejected_state).
+
+**Expected output.** The ship sets its course: it sails tile by tile to the zone's nearest tile and works it, its day spread over the provinces; on none it sails home. A ship that has broken off keeps its course home and takes the mission up once mended. Saved (world_save_version 80).
+
+**Reason to select.** Put a raised ship to work: hunt hostile ships, cover or raid sea lanes, or stand off a hostile port.
+
+### `gameplay.set_ship_design` — The ship designer (ledger.military_open_ship_designer), its Save. Also a corp_verb (corp_verb::set_ship_design, 57) on the command seam.
+
+**Press.** Over the seam: COMMAND corp=<nation> nation=<nation> verb=57 order=<ship class> recipe=<slot> unit_type=<ship kit id>.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `order` | `uint32 ship_class` | 0 submarine, 1 destroyer, 2 capital ship, 3 transport. |
+| `recipe` | `uint16 slot` | The slot: 0 hull, 1 armament, 2 sensors. A transport has no armament. |
+| `unit_type` | `uint16 ship kit id` | A ship_kit_catalogue() id (src/world/unit_designs.hpp) that fits that class and slot; the slot's base item puts it back to base kit. |
+
+**Valid when:**
+- The actor is a nation, designing its own (rejected_not_owner otherwise). BL-1533 (AI_OPPONENT.md § 11, the fleet grant read 2026-11-08): a rival designs too, fitting before it hires.
+- The class, slot and item exist and the item fits that class and slot (rejected_invalid otherwise).
+- The item is researched (rejected_tech_locked otherwise); base kit always is.
+- The slot does not already hold it (rejected_state otherwise). A refusal mutates nothing.
+
+**Expected output.** The class's live ship design holds the item (nation_component::ship_design_kit). The next ship hired of that class records the design and buys its kit goods; ships already at sea keep their kit until refitted. Saved (world_save_version 81).
+
+**Reason to select.** Field better ships as research opens new hulls, armament and sensors.
+
+### `gameplay.refit_ship` — The ship card's Refit press (ledger.selection_ship_refit). Also a corp_verb (corp_verb::refit_ship, 58) on the command seam.
+
+**Press.** Over the seam: COMMAND corp=<nation> nation=<nation> verb=58 subject=<ship id>.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `subject` | `entity_id (ship)` | The ship to refit to its class's live design. |
+
+**Valid when:**
+- The ship exists (rejected_invalid) and is the actor's (rejected_not_owner).
+- Its kit differs from the live design, it is not raising or refitting, and it holds no mission, a broken-off ship's included (rejected_state).
+- It lies at the mouth of its home port, still its nation's standing port, with no course (rejected_placement).
+- Its uncommitted treasury covers the changed slots' goods and its shelves hold them (rejected_funds). A refusal mutates nothing.
+
+**Expected output.** The goods of each changed slot are spent, the ship records the live design, and it is out of action for its class's muster days. Its hull share is kept.
+
+**Reason to select.** Bring a ship in port up to the design research has opened since it was raised.
+
+### `gameplay.embark_unit` — A transport's card, Board beside a unit (ledger.selection_ship_board). Also a corp_verb (corp_verb::embark_unit, 59) on the command seam.
+
+**Press.** Over the seam: COMMAND corp=<nation> nation=<nation> verb=59 subject=<unit id> order=<ship id>.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `subject` | `entity_id (unit)` | The land unit that boards. |
+| `order` | `entity_id (ship)` | The transport it boards. |
+
+**Valid when:**
+- The unit exists (rejected_invalid), is the actor's (rejected_not_owner), has men and is a land row (rejected_invalid).
+- The ship exists (rejected_invalid), is the actor's (rejected_not_owner) and is a transport (rejected_invalid).
+- The unit is in no battle, not refitting and not in the surf; the ship is raised, not broken off, has no course or landing order, and has room (rejected_state).
+- The unit stands on or beside the actor's own standing, open port that no enemy occupies, and the ship lies at that port's mouth (rejected_placement). A refusal mutates nothing.
+
+**Expected output.** The unit leaves the land and goes aboard, keeping its carried supplies. Its order, front, post and muster base end. It draws no goods and its wage is still paid.
+
+**Reason to select.** Load an army for a crossing no road can make.
+
+### `gameplay.land_units` — A right-click on land of the Planetary canvas with a transport selected (canvas.ship_order), and the card's Recall (ledger.selection_ship_recall). Also a corp_verb (corp_verb::land_units, 60) on the command seam.
+
+**Press.** Over the seam: COMMAND corp=<nation> nation=<nation> verb=60 subject=<ship id> tile=<coast tile>. A null tile recalls a landing.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `subject` | `entity_id (ship)` | The transport. |
+| `tile` | `entity_id (tile), or null` | The coast tile to land on; null sails it home. |
+
+**Valid when:**
+- The ship exists (rejected_invalid), is the actor's (rejected_not_owner) and is a transport (rejected_invalid).
+- No unit of it is in the surf (rejected_state). A recall needs a landing under way (rejected_state).
+- It is raised, not broken off, and has units aboard (rejected_state).
+- The tile is land touching the sea, on own, friend's, hostile or no one's ground and never a neutral's, with water beside it the ship can reach, in its class's range of an own port (rejected_placement).
+- Every unit aboard may stand on the tile (rejected_terrain). A refusal mutates nothing.
+
+**Expected output.** The transport sails to the water beside the tile and lands its units over the authored days. On hostile ground those days run only while its side holds that sea province. A hostile stack on the tile opens the ordinary campaign battle, fought from the surf.
+
+**Reason to select.** Put an army ashore where the road does not go, once the water is won.
+
 ---
 
 ## Canvas — looking around: navigation, selection, hover, time
@@ -1330,7 +1449,7 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 **Valid when:**
 - The app is in-game and no ImGui text field has keyboard focus.
 
-**Expected output.** Toggles the research panel (the same flag as nav rail slot 4). The research panel: the Digitisation tree drawn as three trees in a ring (Production, Network, State; three branches each; four cost rings inside out; no centre node) on the canvas, and in the fold-out column the seat's nation with its RP a quarter, RP in hand and held count, and its research queue with each entry's arrival quarter, Remove last and Clear - always shown while the seat's nation exists. Shift + left click on a node queues it; shift-click on a queued node takes it off with the entries that need it. Every node, every requirement link (an AND link - a node with two or more requirement groups - in the accent), pick-one pairs outlined in red with a dashed tie, quests as amber diamonds, placeholders dashed and muted; held nodes green, queued nodes ringed with their queue position. Hovering a node opens the shared hover card: name, tier, ring, RP cost, exact advantage, "Requires: A + B" (groups joined by +, members by or), a quest's deed and the next-age branch it keys, a pair's sibling, and the node's state. Opening it closes any other ledger; pressing F9 again closes it (toggle rule). Sim, view, and selection untouched.
+**Expected output.** Toggles the research panel (the same flag as nav rail slot 4). The research panel: the Digitisation tree drawn as three trees in a ring (Production, Network, State; three branches each and a fourth, Naval, in State; four cost rings inside out; no centre node) on the canvas, and in the fold-out column the seat's nation with its RP a quarter, RP in hand and held count, and its research queue with each entry's arrival quarter, Remove last and Clear - always shown while the seat's nation exists. Shift + left click on a node queues it; shift-click on a queued node takes it off with the entries that need it. Every node, every requirement link (an AND link - a node with two or more requirement groups - in the accent), pick-one pairs outlined in red with a dashed tie, quests as amber diamonds, placeholders dashed and muted; held nodes green, queued nodes ringed with their queue position. Hovering a node opens the shared hover card: name, tier, ring, RP cost, exact advantage, "Requires: A + B" (groups joined by +, members by or), a quest's deed and the next-age branch it keys, a pair's sibling, and the node's state. Opening it closes any other ledger; pressing F9 again closes it (toggle rule). Sim, view, and selection untouched.
 
 **Reason to select.** Read which technologies the nation can reach and what each gives, and shift-click nodes to plan its research queue.
 
@@ -1595,6 +1714,38 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 **Expected output.** Toggles the province as a goal, at most three; the click is consumed (no selection). The declaration's goal list, justifications and price update on the next frame. Nothing is sent.
 
 **Reason to select.** Name the ground the war is for: the goals are what the war score counts and what a peace can cede.
+
+### `canvas.ship_select` — Planetary canvas: the ship marker - a diamond with the class's silhouette in its owner's colour, on each water tile holding a ship you can see, with the number there when more than one.
+
+**Press.** Left-click the marker. A repeat click walks to the next ship on the tile, in id order, and wraps.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `tile` | `tile on the canvas` | The marker pressed. |
+
+**Valid when:**
+- The hex surveyed and drawn at a radius of 6 px or more. Your own ships always; another nation's only on a day your side finds it, or on water it holds.
+
+**Expected output.** Selects the ship: its card on the Selection band. A rival's shows its class and owner only. No world change.
+
+**Reason to select.** Pick up a ship from the map, or see what a found ship is.
+
+### `canvas.ship_order` — Planetary canvas with one of your ships selected: the hovered hex is outlined in the sea colour with a line at the cursor saying what a right-click would do, or in red with why it is refused.
+
+**Press.** Right-click. A warship: water, adding its sea province on its current mission. A transport: land, ordering its landing on that tile.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `tile` | `the right-clicked tile` | Its sea province joins the zone, or it is where the landing goes. |
+
+**Valid when:**
+- Your own ship is selected; no construction or road tool is armed, no march pick is armed, no lens is on.
+- The line reads sea_mission_check and land_units_check, so it cannot disagree with the press. A warship over land and a transport over water say nothing and the press does nothing.
+- A warship refuses with no mission held, a province already assigned, eight assigned, out of range, or a blockade away from a hostile port's mouth. A transport refuses with nothing aboard, ground it may not land on, or a unit aboard that cannot stand there.
+
+**Expected output.** Issues gameplay.assign_sea_mission with the whole list, or gameplay.land_units, at the frame's end through the seam.
+
+**Reason to select.** Send a ship to work water, or put an army ashore.
 
 ---
 
@@ -2207,7 +2358,7 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 **Valid when:**
 - In-game
 
-**Expected output.** Toggles the research panel open; re-click closes; opening closes any other ledger. The research panel: the Digitisation tree drawn as three trees in a ring (Production, Network, State; three branches each; four cost rings inside out; no centre node) on the canvas, and in the fold-out column the seat's nation with its RP a quarter, RP in hand and held count, and its research queue with each entry's arrival quarter, Remove last and Clear - always shown while the seat's nation exists. Shift + left click on a node queues it; shift-click on a queued node takes it off with the entries that need it. Every node, every requirement link (an AND link - a node with two or more requirement groups - in the accent), pick-one pairs outlined in red with a dashed tie, quests as amber diamonds, placeholders dashed and muted; held nodes green, queued nodes ringed with their queue position. Hovering a node opens the shared hover card: name, tier, ring, RP cost, exact advantage, "Requires: A + B" (groups joined by +, members by or), a quest's deed and the next-age branch it keys, a pair's sibling, and the node's state.
+**Expected output.** Toggles the research panel open; re-click closes; opening closes any other ledger. The research panel: the Digitisation tree drawn as three trees in a ring (Production, Network, State; three branches each and a fourth, Naval, in State; four cost rings inside out; no centre node) on the canvas, and in the fold-out column the seat's nation with its RP a quarter, RP in hand and held count, and its research queue with each entry's arrival quarter, Remove last and Clear - always shown while the seat's nation exists. Shift + left click on a node queues it; shift-click on a queued node takes it off with the entries that need it. Every node, every requirement link (an AND link - a node with two or more requirement groups - in the accent), pick-one pairs outlined in red with a dashed tie, quests as amber diamonds, placeholders dashed and muted; held nodes green, queued nodes ringed with their queue position. Hovering a node opens the shared hover card: name, tier, ring, RP cost, exact advantage, "Requires: A + B" (groups joined by +, members by or), a quest's deed and the next-age branch it keys, a pair's sibling, and the node's state.
 
 **Reason to select.** Answers "which technologies can my nation reach, what does each give, and when will my plan arrive?"
 
@@ -2262,13 +2413,13 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 **Valid when:**
 - In-game
 
-**Expected output.** Toggles the Military ledger open in the fold-out column; re-click closes; opening closes any other ledger. No lens is armed. Two tabs, Recruit (default) and Design; re-clicking the ACTIVE tab closes the ledger (toggle rule), the other tab is a view change. RECRUIT: a base picker listing your nation's completed military bases, each named by the place its province holds with the count of your units standing on its tile (the first is chosen by default; choosing one is a target selection, not a toggle); your treasury room; under the Recruit / Design tabs a row of THEATRE TABS, Land / Air / Sea, each with its count (ledger.military_theatre_tab; Land by default), one theatre shown at a time. The recruit pools are NOT in the ledger: they are the header's recruit readouts (chrome.header_recruit_hover); a Raise needs its men (50) or a wing its crew from the theatre's pool, and a Raise the pool cannot fill says so in its tooltip. Land: the roster - every unit type the campaign band admits, newest band first, each with its price in credits, its land class and numbers (soft, hard, hardness, defence) and a Raise press; a type your nation cannot field is listed dimmed, the goods or port it lacks on its Raise press's tooltip; and the muster queue ('Nothing mustering.' when empty) - one row per muster order of yours with the unit type, its base and a progress bar of days left. With no completed base Recruit says 'No military base' and offers 'Find a site for a base' (why is the tooltip of both). Explanation is never ledger text: every refusal reason and intro sentence is the hover tooltip of the control it explains (Ben, 2026-10-30). Air: the airbase picker, the six air rows and your wings. Sea: a stub - 'Ships are not raised yet.' and your nation's ports under a picker. DESIGN (the same theatre tabs; Sea reads 'Ships are not designed yet.'): Land - one row per land class (infantry, motorised, mechanised, armour, light armour, artillery, air defence) with its live design's numbers; pressing a class opens the unit designer on the full canvas (ledger.military_open_designer). Below, every unit type with its obsolete toggle (gameplay.set_unit_obsolete). Closing the ledger by any path (this icon, the active tab's re-press, another ledger opening) also closes an open unit designer, through its close catch: an unsaved draft asks Save or Discard first.
+**Expected output.** Toggles the Military ledger open in the fold-out column; re-click closes; opening closes any other ledger. No lens is armed. Two tabs, Recruit (default) and Design; re-clicking the ACTIVE tab closes the ledger (toggle rule), the other tab is a view change. RECRUIT: a base picker listing your nation's completed military bases, each named by the place its province holds with the count of your units standing on its tile (the first is chosen by default; choosing one is a target selection, not a toggle); your treasury room; under the Recruit / Design tabs a row of THEATRE TABS, Land / Air / Sea, each with its count (ledger.military_theatre_tab; Land by default), one theatre shown at a time. The recruit pools are NOT in the ledger: they are the header's recruit readouts (chrome.header_recruit_hover); a Raise needs its men (50) or a wing its crew from the theatre's pool, and a Raise the pool cannot fill says so in its tooltip. Land: the roster - every unit type the campaign band admits, newest band first, each with its price in credits, its land class and numbers (soft, hard, hardness, defence) and a Raise press; a type your nation cannot field is listed dimmed, the goods or port it lacks on its Raise press's tooltip; and the muster queue ('Nothing mustering.' when empty) - one row per muster order of yours with the unit type, its base and a progress bar of days left. With no completed base Recruit says 'No military base' and offers 'Find a site for a base' (why is the tooltip of both). Explanation is never ledger text: every refusal reason and intro sentence is the hover tooltip of the control it explains (Ben, 2026-10-30). Air: the airbase picker, the six air rows and your wings. Sea: your nation's ports under a picker, the four ship rows and your ships. DESIGN (the same theatre tabs; Sea lists the four ship classes, each opening the designer): Land - one row per land class (infantry, motorised, mechanised, armour, light armour, artillery, air defence) with its live design's numbers; pressing a class opens the unit designer on the full canvas (ledger.military_open_designer). Below, every unit type with its obsolete toggle (gameplay.set_unit_obsolete). Closing the ledger by any path (this icon, the active tab's re-press, another ledger opening) also closes an open unit designer, through its close catch: an unsaved draft asks Save or Discard first.
 
 **Reason to select.** Answers 'what force can I raise, where, at what cost - and what is it raised with?'. It is the broad door to every hire: every base and every unit type on one surface, where the tile card's Hire list shows one base's rows only.
 
 ### `ledger.military_raise` — Military ledger (nav rail slot 7), Recruit tab, a roster row's 'Raise' press
 
-**Press.** Choose a base in the picker, then click 'Raise' on a roster row
+**Press.** Choose a base in the picker, then click 'Raise' on a roster row. Hovering 'Raise' shows what the hire takes: credits and each good, needed against held, a short one red. Hovering the row's NAME shows its card: the type, its class, and the stat grid of what it raises; held 2 s the card freezes and its cells name their stats on hover.
 
 | Arg | Type | Meaning |
 |---|---|---|
@@ -2278,7 +2429,7 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 **Valid when:**
 - A completed military base of yours is chosen in the picker (Raise is disabled otherwise; its tooltip reads 'No military base to raise it at.')
 - Your nation can field the row (dimmed otherwise; the Raise tooltip names the goods or port it lacks)
-- The row's credit price is within your treasury room (Raise disabled otherwise; its tooltip reads 'The treasury cannot cover it.'). A disabled Raise shows its reason only on hover, never as ledger text.
+- The row's credit price is within your treasury room (Raise disabled otherwise; its tooltip reads 'The treasury cannot cover it.'), and the hire's goods are on your shelves as the verb plans them (disabled otherwise; its tooltip names each short good, held of needed: 'Short of steel (0 of 6) and machinery (0 of 2).'), and the goods' price bound fits the room with the credits ('The treasury cannot cover it and its goods.'). Every theatre's Raise checks the same legs. A disabled Raise shows its reason only on hover, never as ledger text.
 
 **Expected output.** Issues gameplay.hire_unit with {tile, unit_type} - the same pending request the tile card's Hire press makes, executed at the frame's end through the corp-command seam with its full live re-validation. Not a second hire path. A landed press shows its result above the roster: 'Unit mustering.'. A refusal - 'Can't afford or supply it.' (either payment leg) or 'Hiring failed.' - is not ledger text: it is the pressed row's Raise tooltip (Ben, 2026-10-30).
 
@@ -2576,7 +2727,7 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 **Valid when:**
 - The Military ledger is open (nav rail slot 7).
 
-**Expected output.** The view lists that theatre alone. Recruit's Land holds the military-base picker, the land roster and the muster queue; Recruit's Air holds the airbase picker, the six air rows and the player's wings; Recruit's Sea is a stub - 'Ships are not raised yet.' and one row per completed port of your nation under a picker (the first chosen; choosing one is a target selection with no other effect), or 'No port'. Design's Land holds the land classes and the obsolete toggles; Design's Air the six air classes; Design's Sea reads 'Ships are not designed yet.'. No world change.
+**Expected output.** The view lists that theatre alone. Recruit's Land holds the military-base picker, the land roster and the muster queue; Recruit's Air holds the airbase picker, the six air rows and the player's wings; Recruit's Sea holds one row per completed port of your nation under a picker (the first chosen; choosing one is a target selection with no other effect), or 'No port', the four ship rows and your ships. Design's Land holds the land classes and the obsolete toggles; Design's Air the six air classes; Design's Sea reads 'Ships are not designed yet.'. No world change.
 
 **Reason to select.** Work one theatre at a time: the ledger column is narrow, and land and air together are long.
 
@@ -2897,6 +3048,119 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 
 **Reason to select.** Fight on for better terms.
 
+### `ledger.military_sea_raise` — Military ledger, Recruit, Sea tab: one row per ship type with its price and a Raise press, under the port picker.
+
+**Press.** Choose a port in the picker, then click Raise on a row.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `row` | `sea roster row` | The ship raised. |
+| `port` | `the picker's port` | Where it is raised. |
+
+**Valid when:**
+- Reads hire_ship_check: the row is fieldable, the port is yours and complete with water at its mouth, the sea pool holds its crew. The credit leg is checked here and the goods leg answers on the press. Why a Raise is off is its tooltip.
+
+**Expected output.** Issues gameplay.hire_ship at the frame's end; the ledger shows "Ship mustering." or the refusal is the row's tooltip.
+
+**Reason to select.** Raise a ship at a port.
+
+### `ledger.military_select_ship` — Military ledger, Recruit, Sea tab: "Your ships", one row per ship with what it is doing.
+
+**Press.** Click a row.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `ship` | `row` | The ship selected. |
+
+**Valid when:**
+- Your own ships only.
+
+**Expected output.** Selects the ship: its card on the Selection band, its zone outlined on the canvas, its marker ringed. No world change.
+
+**Reason to select.** Pick up a ship from the list.
+
+### `ledger.military_open_ship_designer` — Military ledger, Design, Sea tab: one row per ship class with its numbers.
+
+**Press.** Click a class row; click it again to close (the toggle rule).
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `class` | `ship class` | The class opened. |
+
+**Valid when:**
+- None. Locked kit is listed with the Naval node that opens it. A transport has no armament box.
+
+**Expected output.** Opens the full-canvas designer on the class: hull, armament, sensors. A pick drafts; Save sends gameplay.set_ship_design per changed slot.
+
+**Reason to select.** Choose what a class of ship is raised with.
+
+### `ledger.selection_ship_mission` — Selection band, a warship's card, its Mission column: None and only the missions its class works.
+
+**Press.** Click a mission. The lit one recalls the ship (the toggle rule).
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `mission` | `sea_mission` | The mission set. |
+
+**Valid when:**
+- Your own ship. A mission the seam would refuse over the zone it has is disabled with the reason as its tooltip.
+
+**Expected output.** Issues gameplay.assign_sea_mission at the frame's end, or with no zone yet holds the choice on the card and sends nothing.
+
+**Reason to select.** Choose what a ship does before naming where.
+
+### `ledger.selection_ship_remove_province` — Selection band, a warship's card, its Zone column: each sea province with an x.
+
+**Press.** Click x beside a province.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `province` | `row` | The province removed. |
+
+**Valid when:**
+- Your own ship.
+
+**Expected output.** Issues gameplay.assign_sea_mission with the rest of the list; removing the last recalls the ship, the mission staying held on the card.
+
+**Reason to select.** Pull a ship off a stretch of water.
+
+### `ledger.selection_ship_refit` — Selection band, any of your ships' cards: Refit.
+
+**Press.** Click Refit.
+
+**Valid when:**
+- Reads refit_ship_check: on an older design, raised, no mission, lying at its home port. Why it is off is its tooltip; when on, the tooltip names the goods.
+
+**Expected output.** Issues gameplay.refit_ship: it buys each changed slot's goods and is out of action for its muster days.
+
+**Reason to select.** Bring a ship up to the live design.
+
+### `ledger.selection_ship_board` — Selection band, a transport's card, "Ready to board": each land unit embark_check would take, with a Board press.
+
+**Press.** Click Board beside a unit.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `unit` | `row` | The land unit that boards. |
+
+**Valid when:**
+- Listed only while the seam would take it: on or beside your open port, the transport at that port's mouth with room, the unit out of battle.
+
+**Expected output.** Issues gameplay.embark_unit; the unit moves to the Aboard list and leaves the map.
+
+**Reason to select.** Load an army for a crossing.
+
+### `ledger.selection_ship_recall` — Selection band, a transport's card with a landing ordered: Recall.
+
+**Press.** Click Recall.
+
+**Valid when:**
+- Disabled while its units are in the surf: the fight decides it.
+
+**Expected output.** Issues gameplay.land_units with a null tile: the landing is off and it sails home, its units still aboard.
+
+**Reason to select.** Call off a landing the water has turned against.
+
 ---
 
 ## Chrome — startup, the system menu, settings, F-keys
@@ -2993,7 +3257,7 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 - App is in game.
 - Not while an ImGui widget owns the keyboard.
 
-**Expected output.** Toggles the research panel (nav slot 4) and its fold-out column. The research panel: the Digitisation tree drawn as three trees in a ring (Production, Network, State; three branches each; four cost rings inside out; no centre node) on the canvas, and in the fold-out column the seat's nation with its RP a quarter, RP in hand and held count, and its research queue with each entry's arrival quarter, Remove last and Clear - always shown while the seat's nation exists. Shift + left click on a node queues it; shift-click on a queued node takes it off with the entries that need it. Every node, every requirement link (an AND link - a node with two or more requirement groups - in the accent), pick-one pairs outlined in red with a dashed tie, quests as amber diamonds, placeholders dashed and muted; held nodes green, queued nodes ringed with their queue position. Hovering a node opens the shared hover card: name, tier, ring, RP cost, exact advantage, "Requires: A + B" (groups joined by +, members by or), a quest's deed and the next-age branch it keys, a pair's sibling, and the node's state. Opening it closes any other ledger; F9 again closes it.
+**Expected output.** Toggles the research panel (nav slot 4) and its fold-out column. The research panel: the Digitisation tree drawn as three trees in a ring (Production, Network, State; three branches each and a fourth, Naval, in State; four cost rings inside out; no centre node) on the canvas, and in the fold-out column the seat's nation with its RP a quarter, RP in hand and held count, and its research queue with each entry's arrival quarter, Remove last and Clear - always shown while the seat's nation exists. Shift + left click on a node queues it; shift-click on a queued node takes it off with the entries that need it. Every node, every requirement link (an AND link - a node with two or more requirement groups - in the accent), pick-one pairs outlined in red with a dashed tie, quests as amber diamonds, placeholders dashed and muted; held nodes green, queued nodes ringed with their queue position. Hovering a node opens the shared hover card: name, tier, ring, RP cost, exact advantage, "Requires: A + B" (groups joined by +, members by or), a quest's deed and the next-age branch it keys, a pair's sibling, and the node's state. Opening it closes any other ledger; F9 again closes it.
 
 **Reason to select.** Answers "which technologies can my nation reach, what does each give, and when will my plan arrive?" - the route to the queue_research press.
 

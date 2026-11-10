@@ -542,6 +542,23 @@ void unit_marker(ImDrawList* dl, ImVec2 centre, float r, ImU32 fill, bool commit
 /// (`building(…, airbase, …)` draws it), and what the wing marker carries.
 void aircraft(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
 
+/// BL-1534: a ship in profile, bow to the right, one silhouette per class: a low hull with a
+/// sail (submarine), a thin pointed hull with one small house (destroyer), a heavy hull with a
+/// stepped house and guns fore and aft (capital ship), a flat hull with a cargo box (transport).
+void ship(ImDrawList* dl, ImVec2 centre, float r, ship_class cls, ImU32 colour);
+
+/// BL-1534: a SHIP marker: a dark diamond of half-width @p r ringed in the owner's colour
+/// (@p fill) with the class's silhouette on it; @p count (> 1) prints as a badge; @p hovered
+/// rings it in `palette::hover`. A diamond, where a land counter is square and a wing round.
+void ship_marker(ImDrawList* dl, ImVec2 centre, float r, ship_class cls, ImU32 fill, int count,
+                 bool hovered = false);
+
+/// BL-1534: a CLOSED PORT: a no-entry sign, a red ring with a bar across a dark disc.
+void closed_port_mark(ImDrawList* dl, ImVec2 centre, float r);
+
+/// BL-1534: where a cargo was taken: a cross in a ring in @p colour, for a few ticks.
+void interception_mark(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
+
 /// BL-1450: an air WING marker — a round dark plate of radius @p r ringed in the
 /// owner's colour (@p fill) with the aircraft on it; @p count (> 1) prints as a
 /// badge at its lower right; @p hovered rings it in `palette::hover`. Round where
@@ -727,6 +744,7 @@ enum class stat_glyph : uint8_t
     strategic,    ///< Hits on buildings: a bomb falling onto a ground line.
     range,        ///< Reach from the airbase: three quarter-rings from a corner point.
     supply,       ///< Upkeep met: the `supply` route pair.
+    capacity,     ///< Land units a transport carries: two boxes on a deck line.
 };
 
 /// Draw stat glyph @p which centred at @p centre, half-extent @p r, stroked in

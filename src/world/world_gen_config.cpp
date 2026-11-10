@@ -154,7 +154,7 @@ void world_gen_config::load_from_lua(lua_state& lua)
                     }
                 };
                 const std::string where = "world_gen.opening_kit.configs." + kit;
-                keys_in(t, { "treasury", "handoff_treasury", "logistics", "extraction", "processing", "civic", "army" }, where);
+                keys_in(t, { "treasury", "handoff_treasury", "logistics", "extraction", "processing", "civic", "army", "fleet" }, where);
                 opening_kit_config c;
                 c.name = kit;
                 {
@@ -297,6 +297,45 @@ void world_gen_config::load_from_lua(lua_state& lua)
                     };
                     count("men", 1, 10000, c.army_men);
                     count("land_recruits", 0, 1000000, c.land_recruits);
+                }
+                if (const sol::object fo = t["fleet"]; fo.valid() && fo.get_type() != sol::type::table)
+                    throw std::runtime_error(where + ".fleet must be a table");
+                if (sol::optional<sol::table> fl = t["fleet"])
+                {
+                    // BL-1532 (MILITARY.md § Sea, Ben 2026-11-07): the fixed fleet.
+                    keys_in(*fl, { "ships", "per_port", "sea_recruits" }, where + ".fleet");
+                    if (sol::optional<sol::table> ls = (*fl)["ships"])
+                    {
+                        list_only(*ls, where + ".fleet.ships");
+                        // The ship_class enumerators, in order (components.hpp).
+                        static const char* const names[] = { "submarine", "destroyer", "capital", "transport" };
+                        for (std::size_t i = 1; i <= ls->size(); ++i)
+                        {
+                            const sol::object e = (*ls)[i];
+                            if (e.get_type() != sol::type::string)
+                                throw std::runtime_error(where + ".fleet.ships[" + std::to_string(i)
+                                                         + "] must be a ship class name");
+                            const std::string n = e.as<std::string>();
+                            std::uint8_t k = 0;
+                            while (k < 4 && n != names[k])
+                                ++k;
+                            if (k == 4)
+                                throw std::runtime_error(where + ".fleet.ships: unknown ship class '" + n + "'");
+                            c.fleet.push_back(k);
+                        }
+                    }
+                    const auto count = [&](const char* key, int lo, int hi, int& out) {
+                        const sol::object o = (*fl)[key];
+                        if (!o.valid())
+                            return;
+                        const double v = o.get_type() == sol::type::number ? o.as<double>() : -1.0;
+                        if (!(v >= lo && v <= hi) || v != static_cast<double>(static_cast<int>(v)))
+                            throw std::runtime_error(where + ".fleet." + key + " must be an integer in ["
+                                                     + std::to_string(lo) + ", " + std::to_string(hi) + "]");
+                        out = static_cast<int>(v);
+                    };
+                    count("per_port", 1, 64, c.fleet_per_port);
+                    count("sea_recruits", 0, 1000000, c.sea_recruits);
                 }
                 opening_kit.configs.emplace(kit, std::move(c));
             }

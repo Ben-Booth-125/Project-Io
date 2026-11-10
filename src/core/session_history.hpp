@@ -25,6 +25,8 @@
 struct economy_report;
 struct ui_state;
 
+struct ui_state;
+
 namespace session_history {
 
 /// The app-owned, unserialised history stores step_economy appends to each tick
@@ -65,6 +67,15 @@ void post_battle_dispatches(const world& w, const economy_report& report,
 /// step daily, from the app's day loop, so their traffic is posted the day it happens).
 void post_battle_dispatches(const world& w, const std::vector<battle_dispatch>& dispatches,
                             ui::chat_state& chat, int day_tick);
+
+/// BL-1529 (LOGISTICS.md § 7): a line on the Field channel for each convoy of the player's
+/// cut, raided or lost this tick, and each the player took. Presentation only.
+void post_interceptions(const world& w, const economy_report& report, ui::chat_state& chat, int day_tick);
+
+/// BL-1534 (LOGISTICS.md § 7): keep this tick's interceptions the player is party to for a few
+/// ticks, so the Convoys ledger states a lost cargo's cause and the canvas marks its tile. View
+/// state only; older ones drop here.
+void note_convoy_losses(const world& w, const economy_report& report, ::ui_state& ui_s);
 
 /// War dispatches (BL-1480; Ben, 2026-11-03, NR-1120; RELATIONS.md § 7): every
 /// declaration and peace the player's nation is party to, raised as one line on the

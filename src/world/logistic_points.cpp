@@ -1,4 +1,5 @@
 #include "logistic_points.hpp"
+#include "stance.hpp" // BL-1531: a friend's shore
 
 #include "logistics.hpp"       // body_tile_grid, invalidate_logistics_caches
 #include "market_clearing.hpp" // market_for_tile
@@ -220,6 +221,8 @@ std::unordered_map<entity_id, float> lp_lane_walk(world& w, entity_id body,
         (void)bid;
         if (b.type != building_type::port || b.ticks_remaining > 0 || b.decommissioned)
             continue;
+        if (w.closed_ports.count(b.tile) != 0)
+            continue; // BL-1530: a blockaded port takes no landing, and makes no points below
         const auto tit = w.tiles.find(b.tile);
         if (tit != w.tiles.end() && tit->second.body == body)
             landings.insert(b.tile);
@@ -495,7 +498,7 @@ lp_tick resolve_logistic_points(world& w, const std::vector<lp_supply_claim>& su
     {
         const building_component& b = w.buildings.at(bid);
         lp_network net;
-        if (!lp_source_network(b.type, net) || !lp_source_running(b))
+        if (!lp_source_network(b.type, net) || !lp_source_running(b) || (b.type == building_type::port && w.closed_ports.count(b.tile) != 0))
             continue;
         const auto tit = w.tiles.find(b.tile);
         if (tit == w.tiles.end())
@@ -851,6 +854,18 @@ entity_id chain_anchor(const world& w, entity_id nation, entity_id body)
     return nit->second.capital_tile;
 }
 
+/// BL-1531 (MILITARY.md § Sea, landings): a sea source's lane lands no points on land a nation
+/// hostile to @p nation holds, either way declared. A landed army must take the port, and one it
+/// occupies reads as its own. Hostility alone: a world with no hostile pair cannot move here.
+bool lane_barred(const world& w, entity_id nation, const lp_source_ref& s, entity_id tile)
+{
+    if (s.network != lp_network::sea || tile == s.tile)
+        return false;
+    const entity_id holder = w.tile_controller(tile);
+    return holder != null_entity && holder != nation
+        && (is_hostile(w, nation, holder) || is_hostile(w, holder, nation));
+}
+
 const std::vector<lp_source_ref>& memo_sources(world& w, lp_reach_memo& memo, entity_id nation,
                                                entity_id body)
 {
@@ -862,7 +877,7 @@ const std::vector<lp_source_ref>& memo_sources(world& w, lp_reach_memo& memo, en
     for (const auto& [bid, b] : w.buildings)
     {
         lp_network net;
-        if (!lp_source_network(b.type, net) || !lp_source_running(b))
+        if (!lp_source_network(b.type, net) || !lp_source_running(b) || (b.type == building_type::port && w.closed_ports.count(b.tile) != 0))
             continue;
         const auto st = w.tiles.find(b.tile);
         const auto sn = w.tile_to_nation.find(b.tile);
@@ -964,7 +979,7 @@ struct route_cand { float norm; entity_id building; float reach; lp_network net;
 
 /// THE QUALIFYING SOURCES for @p tile, nearest first (a tie to the lower building id):
 /// every running source of @p nation on @p body whose own reach touches the tile and
-/// that is connected to the capital. The one ranking `lp_route_to` routes on and
+/// that is connected to the capital, save a lane barred from a hostile port (`lane_barred`). The one ranking `lp_route_to` routes on and
 /// `lp_route_flow` reads back, so the two cannot disagree about which sources carry a
 /// request. @p blocked is set when a source reached the tile but has no chain back.
 std::vector<route_cand> route_cands(world& w, lp_reach_memo& memo, entity_id nation,
@@ -981,6 +996,8 @@ std::vector<route_cand> route_cands(world& w, lp_reach_memo& memo, entity_id nat
             continue;
         const float r = lp_reach(s.network, dit->second);
         if (!(r > 0.0f))
+            continue;
+        if (lane_barred(w, nation, s, tile))
             continue;
         if (!memo_connected(w, memo, nation, s, body, centre))
         {
@@ -1113,7 +1130,7 @@ std::unordered_set<entity_id> lp_reached_tiles(world& w, lp_reach_memo& memo, en
         if (!memo_connected(w, memo, nation, s, body, centre))
             continue;
         for (const auto& [tile, d] : memo_field(w, memo, s, body))
-            if (lp_reach(s.network, d) > 0.0f)
+            if (lp_reach(s.network, d) > 0.0f && !lane_barred(w, nation, s, tile))
                 out.insert(tile);
     }
     return out;

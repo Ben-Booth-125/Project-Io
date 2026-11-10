@@ -386,6 +386,7 @@ struct military_ledger_state
         bool          enabled   = false; ///< The Raise press is live.
         float         price     = 0.0f;
         std::string   reason;            ///< Why the row is dimmed or Raise is off; empty when live.
+        float         name_x = -1.0f, name_y = -1.0f; ///< The name's centre: its hover is the row's card.
     };
     std::vector<drawn_base>  bases;
     std::vector<drawn_raise> raises; ///< One per roster row, drawn order.
@@ -422,6 +423,7 @@ struct military_ledger_state
         bool          fieldable = false, enabled = false;
         float         price = 0.0f;
         std::string   reason;
+        float         name_x = -1.0f, name_y = -1.0f; ///< The name's centre: its hover is the row's card.
     };
     std::vector<drawn_air_raise> air_raises;
     struct drawn_wing { entity_id id = null_entity; float x = -1.0f, y = -1.0f; };
@@ -431,9 +433,19 @@ struct military_ledger_state
     // The recruit pools moved to the header (BL-1472; HEADER.md § Contents, Recruits):
     // Recruit carries no pool strip, and `ui::header_recruits_drawn()` records them.
 
-    // ── BL-1472: the Sea tab's stub (military.md § Grouped by theatre) ──
+    // ── BL-1534: the Sea tab (military.md § Grouped by theatre) ──
     /// The chosen PORT (the Sea picker), a target selector as `base` is.
     entity_id sea_base = null_entity;
+    /// A sea Raise press queued for app::render, which sends `hire_ship`.
+    entity_id     pending_ship_tile = null_entity;
+    std::uint16_t pending_ship_row  = 0;
+    std::string   sea_message;              ///< The hire seam's answer (app writes it).
+    int           sea_raise_row     = -1;
+    bool          sea_raise_refused = false;
+    std::vector<drawn_air_raise> sea_raises; ///< The Sea roster's rows.
+    struct drawn_ship_row { entity_id id = null_entity; float x = -1.0f, y = -1.0f; };
+    std::vector<drawn_ship_row> ship_rows;   ///< Recruit's "Your ships": each press selects it.
+    std::vector<drawn_class> sea_class_rows; ///< Design's Sea rows (cls = ship_class).
     std::vector<drawn_base> ports; ///< The Sea picker's rows (`units` unused, 0).
 };
 
@@ -620,6 +632,52 @@ struct wing_ui_state
     std::vector<drawn_marker> markers;   ///< Ground-space centres (the press point).
 };
 
+/// BL-1534: the ship card and the canvas's right-click order (ship_card.hpp). VIEW state plus
+/// the queued orders.
+struct ship_ui_state
+{
+    /// The mission a warship with no zone is set to work next, as a wing's.
+    std::map<entity_id, std::uint8_t> intent;
+    /// Orders queued for app::render, sent through the seam in order.
+    std::vector<corp_command> pending;
+    std::string               last_message; ///< The seam's answer (app writes it).
+
+    entity_id                 message_ship = null_entity; ///< The ship `last_message` is about.
+
+    // Published each frame the card draws.
+    struct drawn_mission { int mission = 0; float x = -1.0f, y = -1.0f; bool enabled = false, active = false; std::string reason; };
+    std::vector<drawn_mission> missions;
+    struct drawn_province { uint32_t province = 0; float x = -1.0f, y = -1.0f; };
+    std::vector<drawn_province> removes;
+    struct drawn_board { entity_id unit = null_entity; float x = -1.0f, y = -1.0f; };
+    std::vector<drawn_board> boards;   ///< Each unit ready to board: its Board press.
+    int         aboard_rows = 0;
+    float       refit_x = -1.0f, refit_y = -1.0f;
+    bool        refit_enabled = false;
+    std::string refit_reason;
+    float       recall_x = -1.0f, recall_y = -1.0f;
+    entity_id   drawn_ship = null_entity;
+
+    // Published by the Planetary canvas.
+    int         hover_kind = 0;        ///< 0 nothing, 1 an order, 2 refused.
+    std::string hover_text;
+    struct drawn_marker { entity_id ship = null_entity; float x = -1.0f, y = -1.0f; int count = 0; bool mine = false; };
+    std::vector<drawn_marker> markers; ///< Ground-space centres (the press point).
+    int closed_marks = 0;              ///< Closed-port marks drawn this frame.
+    int loss_marks   = 0;              ///< Interception marks drawn this frame.
+};
+
+/// BL-1534 (LOGISTICS.md § 7): a cargo the player lost or took, kept a few ticks: the Convoys
+/// ledger states its cause and the canvas marks its tile. VIEW state, fed from the economy
+/// report; a load drops it, as a report is not saved.
+struct convoy_loss
+{
+    std::string line;       ///< The Field channel's own sentence.
+    entity_id   tile = null_entity;
+    int         tick = 0;   ///< Econ tick it happened on.
+    bool        lost = false; ///< The player's cargo, rather than the player's taking.
+};
+
 /// The unit designer (docs/ui/ledgers/military.md § The designer): the full-canvas
 /// takeover `detail_surface::unit_designer`, keyed by land class. Which class is
 /// open lives in `ui_state::expanded`; this holds the rest of its view state, the
@@ -652,7 +710,7 @@ struct unit_designer_state
 
     /// Save's picks, queued for app::render, which sends one `set_unit_design`
     /// per changed slot (the seam is per slot).
-    struct pending_pick { int cls = -1; int slot = 0; std::uint16_t item = 0; bool air = false; }; ///< `air`: an air class, sent as `set_air_design` (BL-1450).
+    struct pending_pick { int cls = -1; int slot = 0; std::uint16_t item = 0; bool air = false; bool sea = false; }; ///< `air`: an air class, sent as `set_air_design` (BL-1450). `sea`: a ship class, `set_ship_design` (BL-1534).
     std::vector<pending_pick> pending;
     /// The seam's answer to the last Save, written by app::render after sending
     /// `pending`: `save_answered` is set, and `refused` holds the picks it refused.
@@ -695,6 +753,7 @@ struct unit_designer_state
     int   stale_units = 0;            ///< Field units of the class on an older design.
     int   drawn_cls   = -1;           ///< The class drawn this frame; -1 = closed.
     bool  drawn_air   = false;        ///< BL-1450: the class drawn is an AIR class (`detail_surface::air_designer`).
+    bool  drawn_sea   = false;        ///< BL-1534: the class drawn is a SHIP class (`detail_surface::ship_designer`).
 
     /// The unit card's type-name press (opens the designer for the unit's class).
     float card_type_x = -1.0f, card_type_y = -1.0f;
@@ -1243,6 +1302,9 @@ struct ui_state
     diplomacy_ledger_state diplomacy; ///< The Diplomacy ledger (rail slot 8; ledgers/diplomacy.md).
     unit_designer_state   designer; ///< The full-canvas unit designer (military.md § The designer).
     wing_ui_state         wing;         ///< BL-1450: the wing card and the canvas right-click assignment.
+    ship_ui_state         ship;         ///< BL-1534: the ship card and the canvas right-click order.
+    std::vector<convoy_loss> convoy_losses; ///< BL-1534: cargo lost or taken lately, newest last.
+    int                      convoy_loss_rows = 0; ///< BL-1534: "Lost" rows the Convoys ledger drew this frame.
 
 
     // THE CONTRACTS LEDGER'S VIEW STATE IS GONE (BL-693). The mercenary

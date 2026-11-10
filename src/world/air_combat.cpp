@@ -7,6 +7,7 @@
 #include "province.hpp"        // province_holder_for
 #include "recipe_registry.hpp"
 #include "recruits.hpp"        // BL-1463: a wing spends its crew from the air pool
+#include "nation_step.hpp"     // BL-1550: nation_wages_short
 #include "stance.hpp"          // is_hostile
 #include "unit_designs.hpp"
 #include "world.hpp"
@@ -905,7 +906,9 @@ wing_upkeep_tick run_wing_upkeep(world& w, const recipe_registry& reg, economy_r
                                              ap.wing_upkeep_goods);
         if (share < 1000)
             ++out.unmet;
-        wg.supply_factor_permille = step_unit_supply_toward(wg.supply_factor_permille, share, up);
+        // BL-1550: an unpaid crew weakens by the same rule as an unsupplied one.
+        wg.supply_factor_permille = step_unit_supply_toward(
+            wg.supply_factor_permille, nation_wages_short(w, reg, wg.owner) ? 0 : share, up);
     }
     for (const entity_id wid : disband)
     {

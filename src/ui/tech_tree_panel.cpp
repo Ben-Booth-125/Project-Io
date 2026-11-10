@@ -17,6 +17,7 @@
 #include <cstdio>
 #include <cstring>
 #include <string>
+#include <imgui_internal.h> // ImRect: the rim labels' clearing
 #include <vector>
 
 namespace ui {
@@ -31,13 +32,13 @@ constexpr float kDeg = kPi / 180.0f;
 // ---------------------------------------------------------------------------
 // Layout — the approved render (Ben's design session, 2026-10-10)
 // ---------------------------------------------------------------------------
-// Three tree sectors of 120 degrees — Production centred at the top (-90),
-// Network at 30, State at 150, angles growing clockwise on screen — each with
-// three branch wedges 38 degrees apart, and no centre node. Along a branch's
+// Three tree sectors — Production centred at the top (-90), angles growing
+// clockwise on screen — of three, three and four branch wedges 34 degrees apart,
+// with no centre node (the constants below). Along a branch's
 // angle `a`, in BASE radius units (scaled to the canvas):
 //
 //   Travel I 48 -> Travel II 74 -> cluster A minors 102 (a +-6) -> major A 134
-//   -> two arms at a-10 / a+10: Travel III / V 164 -> ... -> the rim majors 264
+//   -> two arms at a-9 / a+9: Travel III / V 164 -> ... -> the rim majors 264
 //   -> mastery 318.
 //
 // An arm is laid by DEPTH (BL-1436: kit clusters lengthen the arms, DIGITISATION_TREE.md
@@ -53,11 +54,16 @@ constexpr float kDeg = kPi / 180.0f;
 //
 // The layout is a pure function of the store's ids, so it is computed once.
 
-constexpr float kTreeCentre[3] = {-90.0f, 30.0f, 150.0f};
-constexpr float kBranchStep    = 38.0f;
+// Ten branches on the ring: Production 3, Network 3, State 4 (DIGITISATION_TREE.md § Naval).
+// Inside a tree they sit kBranchStep apart; the three tree boundaries share what is left.
+constexpr int   kTreeFirstBranch[4] = {0, 3, 6, 10};
+static_assert(kTreeFirstBranch[3] == dg::branch_count, "the ring's sectors name every branch");
+constexpr float kBranchStep    = 34.0f;
+constexpr float kTreeGap       = (360.0f - 7.0f * kBranchStep) / 3.0f;
+constexpr float kFirstBranchAngle = -90.0f - kBranchStep; ///< Production stays centred at the top.
 constexpr float kRimRadius     = 318.0f; ///< The mastery ring, the outermost node.
-constexpr float kLabelRadius   = 346.0f; ///< Branch labels.
-constexpr float kFitRadius     = 372.0f; ///< What the default zoom fits inside the canvas.
+constexpr float kLabelRadius   = 372.0f; ///< Branch labels.
+constexpr float kFitRadius     = 396.0f; ///< What the default zoom fits inside the canvas.
 constexpr float kHubRadius     = 40.0f;  ///< The empty hub the tree names sit in (radius 0 maps here).
 constexpr float kNameRadius    = 42.0f;  ///< A tree name's centre, raw base units, on its tree's axis.
 
@@ -81,7 +87,16 @@ int branch_index(const char* key)
 
 float branch_angle(int b)
 {
-    return kTreeCentre[b / 3] + static_cast<float>(b % 3 - 1) * kBranchStep;
+    int t = 0;
+    while (t < 2 && b >= kTreeFirstBranch[t + 1])
+        ++t;
+    return kFirstBranchAngle + static_cast<float>(b - t) * kBranchStep + static_cast<float>(t) * kTreeGap;
+}
+
+/// A tree's axis: halfway between its first and last branch.
+float tree_centre(int t)
+{
+    return (branch_angle(kTreeFirstBranch[t]) + branch_angle(kTreeFirstBranch[t + 1] - 1)) * 0.5f;
 }
 
 /// The slot suffix of a branch node's id: "DG-PR-EX-A1" -> "A1".
@@ -232,7 +247,7 @@ std::array<node_place, dg::node_count> compute_layout()
         const int b = branch_index(n.branch);
         const int s = side[static_cast<std::size_t>(i)];
         const int top = std::max(1, deepest[static_cast<std::size_t>(b * 2 + (s > 0 ? 1 : 0))]);
-        const float arm = branch_angle(b) + (s > 0 ? 10.0f : -10.0f);
+        const float arm = branch_angle(b) + (s > 0 ? 9.0f : -9.0f);
         const char* slot = slot_of(n.id);
         float d = 0.0f;
         if (slot[0] != 'T' && (slot[1] == '1' || slot[1] == '2'))
@@ -563,8 +578,10 @@ void draw_node(ImDrawList* dl, ImVec2 c, float r, const dg::node& n, node_state 
 
 /// Text anchored outward from the ring's centre along @p ang (degrees): to the
 /// right of the point on the right half, left on the left, centred top/bottom.
+/// A label already on the ring. Each one placed steps a line further from the centre until it
+/// clears those before it, so ten branches' rim names never print over each other.
 void outward_text(ImDrawList* dl, ImFont* font, float size, ImVec2 at, float ang, ImU32 col,
-                  const char* text, float centre_band = 0.35f)
+                  const char* text, float centre_band, std::vector<ImRect>& placed)
 {
     const ImVec2 ts = font->CalcTextSizeA(size, FLT_MAX, 0.0f, text);
     const float cx = std::cos(ang * kDeg), cy = std::sin(ang * kDeg);
@@ -575,6 +592,17 @@ void outward_text(ImDrawList* dl, ImFont* font, float size, ImVec2 at, float ang
     if (cy > 0.35f)       p.y += 0.0f;
     else if (cy < -0.35f) p.y -= ts.y;
     else                  p.y -= ts.y * 0.5f;
+    const float step = cy < 0.0f ? -ts.y : ts.y;
+    const auto clashes = [&](const ImVec2 q) {
+        const ImRect box(q, {q.x + ts.x, q.y + ts.y});
+        for (const ImRect& o : placed)
+            if (o.Overlaps(box))
+                return true;
+        return false;
+    };
+    for (int tries = 0; tries < 8 && clashes(p); ++tries)
+        p.y += step;
+    placed.emplace_back(p, ImVec2{p.x + ts.x, p.y + ts.y});
     dl->AddText(font, size, p, col, text); // fit-exempt: free-standing ring label, no container to fit
 }
 
@@ -1028,7 +1056,7 @@ void draw_tech_tree_panel(const world& w, const research_params& p, ui_state& s)
     // Sector dividers between the three trees.
     for (int t = 0; t < 3; ++t)
     {
-        const float ang = kTreeCentre[t] + 60.0f;
+        const float ang = branch_angle(kTreeFirstBranch[t + 1] - 1) + kTreeGap * 0.5f;
         dashed_line(dl, at(ang, 20.0f), at(ang, kLabelRadius), IM_COL32(120, 126, 138, 70), 1.0f, 6.0f);
     }
 
@@ -1117,7 +1145,14 @@ void draw_tech_tree_panel(const world& w, const research_params& p, ui_state& s)
             dl->AddCircle(c, r + 4.0f, palette::hover, 0, 2.0f);
     }
 
-    // --- labels: rim majors, branch names on the rim, tree names inside
+    // --- labels: branch names on the rim, then rim majors around them, tree names inside
+    std::vector<ImRect> placed_labels;
+    for (int b = 0; b < dg::branch_count; ++b)
+    {
+        const float a = branch_angle(b);
+        outward_text(dl, font, ImGui::GetFontSize(), at(a, kLabelRadius), a, palette::research_accent,
+                     dg::branches[static_cast<std::size_t>(b)].name, 0.35f, placed_labels);
+    }
     for (int i = 0; i < dg::node_count; ++i)
     {
         const dg::node& n = node_at(i);
@@ -1131,28 +1166,22 @@ void draw_tech_tree_panel(const world& w, const research_params& p, ui_state& s)
         // each other.
         outward_text(dl, font, small, lp, pl.ang,
                      n.is_placeholder ? palette::research_muted : palette::text_secondary, n.name,
-                     0.04f);
-    }
-    for (int b = 0; b < dg::branch_count; ++b)
-    {
-        const float a = branch_angle(b);
-        outward_text(dl, font, ImGui::GetFontSize(), at(a, kLabelRadius), a, palette::research_accent,
-                     dg::branches[static_cast<std::size_t>(b)].name);
+                     0.04f, placed_labels);
     }
     // Tree names inside their own sectors (Ben, 2026-10-10): each on its
-    // tree's axis in the hub, inside the ring of its three root travel nodes,
+    // tree's axis in the hub, inside the ring of its root travel nodes,
     // so the three never run together at the centre.
     for (int t = 0; t < 3; ++t)
     {
-        const char* tn = dg::branches[static_cast<std::size_t>(t * 3)].tree_name;
+        const char* tn = dg::branches[static_cast<std::size_t>(kTreeFirstBranch[t])].tree_name;
         const ImVec2 ts = font->CalcTextSizeA(small, FLT_MAX, 0.0f, tn);
-        const ImVec2 c  = raw(kTreeCentre[t], kNameRadius);
+        const ImVec2 c  = raw(tree_centre(t), kNameRadius);
         dl->AddText(font, small, {c.x - ts.x * 0.5f, c.y - ts.y * 0.5f}, palette::research_accent,
                     tn); // fit-exempt: free-standing ring label
     }
-    // Ring numerals on the one boundary no joint sits on.
+    // Ring numerals on the Markets | Freight boundary, which no joint sits on.
     {
-        const float ang = 49.0f;
+        const float ang = (branch_angle(4) + branch_angle(5)) * 0.5f;
         const float mids[4] = {96.0f, 150.0f, 212.0f, 292.0f};
         for (int r = 0; r < 4; ++r)
         {

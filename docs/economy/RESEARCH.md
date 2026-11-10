@@ -74,7 +74,8 @@ One tree per age, cut to one grammar (Ben, 2026-10-10). The Digitisation tree is
 Digitisation tree's quests.
 
 **Three trees in a ring, no centre.** An age's tree is three trees — *Production*, *Network*,
-*State* — each a sector of the ring, each split into three **branches**. Rings run from the inside
+*State* — each a sector of the ring, each split into **branches**: three each, and a fourth in State,
+**Naval** (Ben, 2026-11-05). Rings run from the inside
 out and stand for cost: a node on an outer ring costs more. There is no central node; every
 branch's first travel node is open from the start.
 

@@ -32,6 +32,7 @@
 #include "ui/construction_sites.hpp" // the site finder (Ben, 2026-10-25): construction_sites.lua
 #include "ui/selection_panel.hpp"
 #include "ui/stat_grid.hpp"      // BL-1454: verify.stat_grids, the grids on screen
+#include "ui/hover_card.hpp"     // freezable_tooltip_frozen: a Raise row's card frozen
 #include "ui/alerts.hpp"        // BL-1515: verify.alerts
 #include "ui/header_panel.hpp"   // BL-1472: verify.header_recruits, the header's readouts
 #include "ui/corporation_dashboard.hpp"
@@ -40,6 +41,9 @@
 #include "ui/foldout_column.hpp"
 #include "ui/nav_pane.hpp"
 #include "world/air_combat.hpp"    // BL-1450: wings, the air roster — the air readouts and stage_wing
+#include "world/sea_combat.hpp"    // BL-1534: ships, the sea roster - the sea readouts and stage_ship
+#include "ui/ship_card.hpp"       // BL-1534: ship_status_text
+#include "core/session_history.hpp" // BL-1534: stage_interception
 #include "world/unit_designs.hpp"  // BL-1450: air_design_of
 #include "world/unit_roster.hpp"   // unit_roster_table — military_ledger() names its rows
 #include "world/recruits.hpp"      // BL-1463: recruit_pools() / grant_recruits()
@@ -232,6 +236,7 @@ constexpr const char* k_resource_slugs[] = {
     "guided_weapons",          // 52
     "drones",                  // 53
     "airframes",               // 54 (BL-1436)
+    "ship_hulls",              // 55 (BL-1527)
 };
 static_assert(std::size(k_resource_slugs) == static_cast<std::size_t>(resource_type::count),
               "resource_type grew - append its slug to k_resource_slugs (and keep the order)");
@@ -1763,6 +1768,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             case ui::selection_kind::nation:      k = "nation";      break;
             case ui::selection_kind::corporation: k = "corporation"; break;
             case ui::selection_kind::wing:        k = "wing";        break; // BL-1450
+            case ui::selection_kind::ship:        k = "ship";        break; // BL-1534
             default:                              k = "none";        break;
             }
             // BL-1427: a front is a fourth non-entity channel; the band draws it
@@ -1788,6 +1794,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             case ui::selection_kind::building: k = "building"; break;
             case ui::selection_kind::unit:     k = "unit";     break;
             case ui::selection_kind::wing:     k = "wing";     break; // BL-1450: a wing marker
+            case ui::selection_kind::ship:     k = "ship";     break; // BL-1534: a ship marker
             default:                           k = "none";     break;
             }
             out["hovered_kind"] = std::string(k);
@@ -3194,6 +3201,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             e["x"] = r.x; e["y"] = r.y;
             e["fieldable"] = r.fieldable; e["enabled"] = r.enabled;
             e["price"] = r.price; e["reason"] = r.reason;
+            e["name_x"] = r.name_x; e["name_y"] = r.name_y;
             raises[++k] = e;
         }
         out["raises"] = raises;
@@ -3257,6 +3265,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             e["x"] = r.x; e["y"] = r.y;
             e["fieldable"] = r.fieldable; e["enabled"] = r.enabled;
             e["price"] = r.price; e["reason"] = r.reason;
+            e["name_x"] = r.name_x; e["name_y"] = r.name_y;
             araises[++k] = e;
         }
         out["air_raises"] = araises;
@@ -3278,6 +3287,39 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             aclasses[++k] = e;
         }
         out["air_classes"] = aclasses;
+        // BL-1534: the Sea tab's rows, as the Air tab's.
+        sol::table sraises = st.create_table();
+        k = 0;
+        for (const auto& r : m.sea_raises)
+        {
+            sol::table e = st.create_table();
+            e["row"] = static_cast<int>(r.row); e["x"] = r.x; e["y"] = r.y;
+            e["fieldable"] = r.fieldable; e["enabled"] = r.enabled; e["price"] = r.price; e["reason"] = r.reason;
+            e["name_x"] = r.name_x; e["name_y"] = r.name_y;
+            sraises[++k] = e;
+        }
+        out["sea_raises"] = sraises;
+        // A row's card frozen now (hover_card.hpp freezable_tooltip): its cells take hover.
+        out["card_frozen"] = ui::freezable_tooltip_frozen();
+        out["sea_message"] = m.sea_message;
+        sol::table srows = st.create_table();
+        k = 0;
+        for (const auto& r : m.ship_rows)
+        {
+            sol::table e = st.create_table();
+            e["id"] = static_cast<unsigned>(r.id); e["x"] = r.x; e["y"] = r.y;
+            srows[++k] = e;
+        }
+        out["ship_rows"] = srows;
+        sol::table sclasses = st.create_table();
+        k = 0;
+        for (const auto& c : m.sea_class_rows)
+        {
+            sol::table e = st.create_table();
+            e["cls"] = c.cls; e["x"] = c.x; e["y"] = c.y;
+            sclasses[++k] = e;
+        }
+        out["sea_classes"] = sclasses;
         return out;
     });
 
@@ -3355,9 +3397,9 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     // is not; clamped to the save's pool ceiling. Returns the pool after, -1 if refused.
     v.set_function("grant_recruits", [this](const std::string& theatre, int n) -> int {
         const auto nit = m_world.nations.find(player_actor(m_world));
-        if (nit == m_world.nations.end() || n < 0 || (theatre != "land" && theatre != "air"))
+        if (nit == m_world.nations.end() || n < 0 || (theatre != "land" && theatre != "air" && theatre != "sea"))
             return -1;
-        int32_t& pool = theatre == "land" ? nit->second.land_recruits : nit->second.air_recruits;
+        int32_t& pool = theatre == "land" ? nit->second.land_recruits : theatre == "air" ? nit->second.air_recruits : nit->second.sea_recruits;
         pool = static_cast<int32_t>(std::min<int64_t>(static_cast<int64_t>(pool) + n, k_recruit_pool_max));
         return pool;
     });
@@ -3404,6 +3446,238 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             mk[++k] = e;
         }
         out["markers"] = mk;
+        return out;
+    });
+
+    // BL-1534: the ship card and the canvas's right-click order: all of it on screen, as
+    // wing_card's. No tile data: a script finds a sea province or a coast by sweeping the
+    // pointer and reading the hover line, as the player does.
+    v.set_function("ship_card", [this]() {
+        sol::state& st = m_lua.state();
+        const auto& u = m_ui.ship;
+        sol::table out = st.create_table();
+        out["ship"]       = static_cast<unsigned>(m_ui.selected_entity == u.drawn_ship ? u.drawn_ship : null_entity);
+        out["message"]    = u.last_message;
+        out["hover_kind"] = std::string(u.hover_kind == 1 ? "order" : u.hover_kind == 2 ? "refused" : "none");
+        out["hover_text"] = u.hover_text;
+        out["aboard_rows"]  = u.aboard_rows;
+        out["closed_marks"] = u.closed_marks;
+        out["loss_marks"]   = u.loss_marks;
+        out["loss_rows"]    = m_ui.convoy_loss_rows;
+        out["refit_x"] = u.refit_x; out["refit_y"] = u.refit_y;
+        out["refit_enabled"] = u.refit_enabled; out["refit_reason"] = u.refit_reason;
+        out["recall_x"] = u.recall_x; out["recall_y"] = u.recall_y;
+        // A rival's orders are private (BL-068): its card does not state them, nor does this.
+        out["status"] = ui::ship_is_players(m_world, u.drawn_ship)
+                            ? ui::ship_status_text(m_world, m_registry, u.drawn_ship) : std::string();
+        sol::table ms = st.create_table();
+        int k = 0;
+        for (const auto& mi : u.missions)
+        {
+            sol::table e = st.create_table();
+            e["mission"] = mi.mission; e["x"] = mi.x; e["y"] = mi.y;
+            e["enabled"] = mi.enabled; e["active"] = mi.active; e["reason"] = mi.reason;
+            ms[++k] = e;
+        }
+        out["missions"] = ms;
+        sol::table rs = st.create_table();
+        k = 0;
+        for (const auto& r : u.removes)
+        {
+            sol::table e = st.create_table();
+            e["province"] = r.province; e["x"] = r.x; e["y"] = r.y;
+            rs[++k] = e;
+        }
+        out["removes"] = rs;
+        sol::table bs = st.create_table();
+        k = 0;
+        for (const auto& b : u.boards)
+        {
+            sol::table e = st.create_table();
+            e["unit"] = static_cast<unsigned>(b.unit); e["x"] = b.x; e["y"] = b.y;
+            bs[++k] = e;
+        }
+        out["boards"] = bs;
+        sol::table mk = st.create_table();
+        k = 0;
+        for (const auto& r : u.markers)
+        {
+            sol::table e = st.create_table();
+            e["ship"] = static_cast<unsigned>(r.ship); e["x"] = r.x; e["y"] = r.y;
+            e["count"] = r.count; e["mine"] = r.mine;
+            mk[++k] = e;
+        }
+        out["markers"] = mk;
+        return out;
+    });
+
+    // BL-1534: the PLAYER's ships: id, class, mission, zone size, muster days, who is aboard.
+    // A rival's are not listed (BL-068). Counts and ids only; no tile data.
+    v.set_function("ships", [this]() {
+        sol::state& st = m_lua.state();
+        sol::table out = st.create_table();
+        int k = 0;
+        for (const auto& [sid, sh] : m_world.ships)
+        {
+            if (sh.owner != m_world.player_entity)
+                continue;
+            sol::table e = st.create_table();
+            e["id"] = static_cast<unsigned>(sid);
+            e["cls"] = static_cast<int>(ship_class_of(sh));
+            e["mission"] = static_cast<int>(sh.mission);
+            e["provinces"] = static_cast<int>(sh.provinces.size());
+            e["muster_days"] = sh.muster_days;
+            e["refitting"] = sh.refitting;
+            e["aboard"] = static_cast<int>(sh.aboard.size());
+            e["landing"] = sh.landing_tile != null_entity;
+            e["home_port"] = static_cast<unsigned>(sh.home_port);
+            out[++k] = e;
+        }
+        return out;
+    });
+
+    // BL-1534 STAGING: a ship of sea roster row @p row at the player's port @p port (a building
+    // id), raised and ready, bypassing the hire as stage_wing does. Returns the ship id, or 0.
+    // A rival's ship is staged by naming a building of theirs. Verify-only, behind --verify.
+    // BL-1534 STAGING: a built port of the player's on its own ground beside the sea, on the active
+    // body, since a seat's opening port may stand on a lake and a lake has no mouth. Returns the
+    // building's id, or 0; `verify.buildings()` is the existing read of where it stands. Verify-only.
+    v.set_function("stage_sea_port", [this]() -> unsigned {
+        const entity_id nation = player_nation(m_world);
+        if (nation == null_entity)
+            return 0u;
+        std::vector<entity_id> ids;
+        for (const auto& [tid, tc] : m_world.tiles)
+            if (tc.body == m_ui.active_body && !placement_rules::is_water_tile(tc.substrate))
+                ids.push_back(tid);
+        std::sort(ids.begin(), ids.end());
+        std::unordered_set<entity_id> occupied;
+        for (const auto& [bid, b] : m_world.buildings)
+            occupied.insert(b.tile);
+        for (const entity_id tid : ids)
+        {
+            const auto hn = m_world.tile_to_nation.find(tid);
+            if (hn == m_world.tile_to_nation.end() || hn->second != nation || occupied.count(tid) != 0)
+                continue;
+            const entity_id p = m_world.create_entity();
+            building_component pc{};
+            pc.tile = tid;
+            pc.type = building_type::port; // built + active: ticks_remaining 0
+            m_world.buildings[p] = pc;
+            if (port_mouth_tile(m_world, p) != null_entity)
+            {
+                m_world.nations.at(nation).state_assets.push_back(p);
+                invalidate_logistics_caches(m_world);
+                return static_cast<unsigned>(p);
+            }
+            m_world.buildings.erase(p);
+        }
+        return 0u;
+    });
+
+    v.set_function("stage_ship", [this](unsigned port, int row, sol::optional<bool> rival) -> unsigned {
+        const auto bit = m_world.buildings.find(static_cast<entity_id>(port));
+        if (bit == m_world.buildings.end() || bit->second.type != building_type::port
+            || row < 0 || row >= static_cast<int>(ship_roster_table().size()))
+            return 0u;
+        const entity_id mouth = port_mouth_tile(m_world, bit->first);
+        if (mouth == null_entity)
+            return 0u;
+        sea_ship sh;
+        sh.owner     = owner_nation_of(m_world, bit->first);
+        if (rival.value_or(false)) // another nation's ship in this port's water, found or not
+            for (const auto& [nid, n] : m_world.nations)
+                if (nid != sh.owner)
+                {
+                    sh.owner = nid;
+                    break;
+                }
+        sh.home_port = bit->first;
+        sh.tile      = mouth;
+        sh.type      = static_cast<std::uint16_t>(row);
+        sh.kit       = ship_design_of(m_world, sh.owner, ship_roster_table()[static_cast<std::size_t>(row)].cls);
+        const entity_id sid = m_world.create_entity();
+        m_world.ships.emplace(sid, std::move(sh));
+        return static_cast<unsigned>(sid);
+    });
+
+    // BL-1534 STAGING: stand one of the player's idle land units on the player's port @p port
+    // (a building id), so a transport's card has a unit to board. Returns its id, or 0; nothing
+    // of the tile. Verify-only, behind --verify.
+    v.set_function("stage_unit_at_port", [this](unsigned port) -> unsigned {
+        const auto bit = m_world.buildings.find(static_cast<entity_id>(port));
+        if (bit == m_world.buildings.end() || bit->second.type != building_type::port
+            || !owner_holds(m_world, m_world.player_entity, bit->first))
+            return 0u;
+        for (auto& [uid, u] : m_world.units)
+            if (u.owner == m_world.player_entity && u.count > 0 && !unit_in_battle(m_world, uid))
+            {
+                u.position = bit->second.tile;
+                return static_cast<unsigned>(uid);
+            }
+        return 0u;
+    });
+
+    // BL-1534 STAGING: close port @p port (a building id), so the canvas's mark has something to
+    // mark, whoever's it is; the next sea day recomputes the set. Verify-only, behind --verify.
+    v.set_function("stage_closed_port", [this](unsigned port) -> bool {
+        const auto bit = m_world.buildings.find(static_cast<entity_id>(port));
+        if (bit == m_world.buildings.end() || bit->second.type != building_type::port)
+            return false;
+        m_world.closed_ports.insert(bit->second.tile);
+        return true;
+    });
+
+    // BL-1534 STAGING: an interception of the player's cargo at building @p at's tile, through
+    // the same note the economy report goes through. Verify-only, behind --verify.
+    v.set_function("stage_interception", [this](unsigned at, bool unseen) -> bool {
+        const auto bit = m_world.buildings.find(static_cast<entity_id>(at));
+        if (bit == m_world.buildings.end())
+            return false;
+        economy_report rep;
+        interception_record rec;
+        rec.victim_corp = player_nation(m_world);
+        rec.tile        = bit->second.tile;
+        rec.cargo_qty   = 12.0f;
+        rec.outcome     = interception_outcome::raid_sunk;
+        rec.unseen      = unseen;
+        rep.interceptions.push_back(rec);
+        session_history::note_convoy_losses(m_world, rep, m_ui);
+        return true;
+    });
+
+    // BL-1534 STAGING: the day's pass found ship @p id for the player, or did not, so a capture
+    // can see the marker's two states. Returns whether the ship exists. Verify-only, behind --verify.
+    v.set_function("stage_ship_found", [this](unsigned id, bool found) -> bool {
+        const entity_id sid = static_cast<entity_id>(id);
+        if (found) m_world.ships_found_by_player.insert(sid);
+        else       m_world.ships_found_by_player.erase(sid);
+        return m_world.ships.count(sid) != 0;
+    });
+
+    // Select a ship (its card on the Selection band), as select_wing does a wing.
+    v.set_function("select_ship", [this](unsigned id) -> bool {
+        const entity_id sid = static_cast<entity_id>(id);
+        if (m_world.ships.find(sid) == m_world.ships.end())
+            return false;
+        m_ui.clear_battle_selection();
+        m_ui.clear_front_selection();
+        m_ui.selected_entity      = sid;
+        m_ui.selection_unit_group = false;
+        return true;
+    });
+
+    // BL-1534: the designer open on a SHIP class, as air_designer() reads an air class. Its
+    // boxes and presses are unit_designer()'s, the one machine.
+    v.set_function("ship_designer", [this]() {
+        sol::state& st = m_lua.state();
+        const auto& d = m_ui.designer;
+        sol::table out = st.create_table();
+        out["open"]          = d.drawn_cls >= 0 && d.drawn_sea;
+        out["cls"]           = d.drawn_sea ? d.drawn_cls : -1;
+        out["message"]       = d.last_message;
+        out["boxes"]         = static_cast<int>(d.boxes.size());
+        out["changed_slots"] = d.changed_slots;
         return out;
     });
 
@@ -3973,6 +4247,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         else if (n == "corp_rollup")      s = detail_surface::corp_rollup;
         else if (n == "unit_designer")    s = detail_surface::unit_designer; // key = land class
         else if (n == "air_designer")     s = detail_surface::air_designer;  // BL-1450: key = air class
+        else if (n == "ship_designer")    s = detail_surface::ship_designer; // BL-1534: key = ship class
         if (s == detail_surface::none) ui::fold(m_ui);
         else                           ui::expand(m_ui, s, key.value_or(0));
     });

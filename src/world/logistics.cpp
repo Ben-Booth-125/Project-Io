@@ -1193,6 +1193,8 @@ const std::vector<entity_id>& body_active_port_tiles(world& w, entity_id body)
         (void)bid;
         if (bc.type != building_type::port || bc.ticks_remaining > 0 || bc.decommissioned)
             continue;
+        if (w.closed_ports.count(bc.tile) != 0)
+            continue; // BL-1530: a blockaded port loads and unloads no sea leg, for anyone
         const auto tit = w.tiles.find(bc.tile);
         if (tit != w.tiles.end() && tit->second.body == body)
             ports.push_back(bc.tile);
@@ -2071,12 +2073,16 @@ convoy_route convoy_route_for(world& w, const convoy_component& cv, entity_id pa
     }
     else if (cv.port_a != null_entity && cv.port_b != null_entity)
     {
-        if (!append_leg(w, party, body, st, cv.port_a, leg_domain::land, convoy_mode::land, tiles, legs)
-            || !append_leg(w, party, body, cv.port_a, cv.port_b, leg_domain::sea, convoy_mode::sea,
-                           tiles, legs)
-            || !append_leg(w, party, body, cv.port_b, dt, leg_domain::land, convoy_mode::land, tiles,
-                           legs))
+        if (!append_leg(w, party, body, st, cv.port_a, leg_domain::land, convoy_mode::land, tiles, legs))
             return route; // a leg the dispatch walked no longer exists: no lane
+        route.sea_first = static_cast<int>(tiles.size()) - 1;
+        if (!append_leg(w, party, body, cv.port_a, cv.port_b, leg_domain::sea, convoy_mode::sea,
+                        tiles, legs))
+            return route;
+        route.sea_last = static_cast<int>(tiles.size()) - 1;
+        if (!append_leg(w, party, body, cv.port_b, dt, leg_domain::land, convoy_mode::land, tiles,
+                        legs))
+            return route;
     }
     else
     {

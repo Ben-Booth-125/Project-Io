@@ -18,6 +18,8 @@
 #include "survey_system.hpp"
 #include "unit_roster.hpp" // BL-571: resolve_unit_upkeep, unit_upkeep_params
 #include "world.hpp"
+#include "recruits.hpp"          // BL-1550: wing_crew
+#include "sea_combat.hpp"        // BL-1550: ship_crew
 
 #include <algorithm>
 #include <cmath>
@@ -274,9 +276,45 @@ float discontent_output_scalar(const world& w, entity_id tile, const tax_params&
 }
 
 
+float nation_crew_wage_bill(const world& w, const recipe_registry& reg, entity_id nation)
+{
+    // The same wage per head as a soldier (Ben, 2026-11-08), for what stands: a wing or
+    // ship still mustering has drawn no pay yet. Ascending by the containers' own order;
+    // the sum of per-hull terms is the only thing read.
+    const float per_head = reg.military().upkeep.credits_per_head;
+    float bill = 0.0f;
+    for (const auto& [wid, wg] : w.wings)
+        if (wg.owner == nation && wg.muster_days <= 0)
+            bill += per_head * static_cast<float>(wing_crew(reg, wg.type));
+    for (const auto& [sid, s] : w.ships)
+        if (s.owner == nation && s.muster_days <= 0)
+            bill += per_head * static_cast<float>(ship_crew(reg, s.type));
+    return bill;
+}
+
+float nation_wage_bill(const world& w, const recipe_registry& reg, entity_id nation)
+{
+    const unit_upkeep_params& up = reg.military().upkeep;
+    float bill = nation_crew_wage_bill(w, reg, nation);
+    for (const auto& [uid, u] : w.units)
+        if (u.owner == nation && u.count > 0)
+            bill += resolve_unit_upkeep(u, up).credits;
+    for (const auto& [sid, s] : w.ships)
+        for (const auto& [uid, u] : s.aboard)
+            if (u.owner == nation)
+                bill += resolve_unit_upkeep(u, up).credits;
+    return bill;
+}
+
+bool nation_wages_short(const world& w, const recipe_registry& reg, entity_id nation)
+{
+    const auto nit = w.nations.find(nation);
+    return nit != w.nations.end() && std::max(0.0f, nit->second.treasury) < nation_wage_bill(w, reg, nation);
+}
+
 void run_nation_garrison_upkeep(world& w, const recipe_registry& reg, const lp_tick* lp)
 {
-    if (w.units.empty() || w.nations.empty())
+    if ((w.units.empty() && w.ships.empty() && w.wings.empty()) || w.nations.empty())
         return;
 
     const unit_upkeep_params& up = reg.military().upkeep;
@@ -301,6 +339,29 @@ void run_nation_garrison_upkeep(world& w, const recipe_registry& reg, const lp_t
             by_nation[u.owner].push_back(id);
         }
     }
+    // BL-1531 (MILITARY.md § Sea, landings): a unit aboard a transport draws nothing, but its
+    // wage is still the nation's, so a fleet of transports is no way off the payroll.
+    std::map<entity_id, float> aboard_bill;
+    for (const auto& [sid, s] : w.ships)
+        for (const auto& [uid, u] : s.aboard)
+            if (w.nations.find(u.owner) != w.nations.end())
+            {
+                aboard_bill[u.owner] += resolve_unit_upkeep(u, up).credits;
+                by_nation[u.owner]; // a nation with its whole army afloat still pays
+            }
+    // BL-1550: crews are on the same bill, and a nation with only hulls still owes it.
+    std::map<entity_id, float> crew_bill;
+    for (const auto& [wid, wg] : w.wings)
+        if (w.nations.find(wg.owner) != w.nations.end())
+            crew_bill.emplace(wg.owner, 0.0f);
+    for (const auto& [sid, s] : w.ships)
+        if (w.nations.find(s.owner) != w.nations.end())
+            crew_bill.emplace(s.owner, 0.0f);
+    for (auto& [nation, b] : crew_bill)
+    {
+        b = nation_crew_wage_bill(w, reg, nation);
+        by_nation[nation];
+    }
     if (by_nation.empty())
         return;
 
@@ -314,37 +375,15 @@ void run_nation_garrison_upkeep(world& w, const recipe_registry& reg, const lp_t
         float bill = 0.0f;
         for (const entity_id uid : unit_ids)
             bill += resolve_unit_upkeep(w.units.at(uid), up).credits;
+        if (const auto ab = aboard_bill.find(nation_id); ab != aboard_bill.end())
+            bill += ab->second;
 
-        // The share: run_national_budget's own formula (nation_budget.cpp),
-        // recomputed here rather than read off its report — that pass early-
-        // outs whole (touches nothing) whenever this tick's CLAIM list is
-        // empty, which it always is for a line with no corp claimant, so its
-        // report cannot be trusted to carry this nation's military_research
-        // share at all.
-        float paid = 0.0f;
-        if (bill > 0.0f && nc.treasury > 0.0f)
-        {
-            const auto bit = w.nation_budgets.find(nation_id);
-            if (bit != w.nation_budgets.end())
-            {
-                const nation_budget& bud = bit->second;
-                const float reserve = std::clamp(bud.reserve_fraction, 0.0f, 1.0f);
-                const float spendable = nc.treasury * (1.0f - reserve);
+        if (const auto cb = crew_bill.find(nation_id); cb != crew_bill.end())
+            bill += cb->second;
 
-                float weight_total = 0.0f;
-                for (std::size_t i = 0; i < priority_count; ++i)
-                    if (std::isfinite(bud.weights[i]) && bud.weights[i] > 0.0f)
-                        weight_total += bud.weights[i];
-
-                const std::size_t mi =
-                    static_cast<std::size_t>(budget_priority::military_research);
-                if (spendable > 0.0f && weight_total > 0.0f && bud.weights[mi] > 0.0f)
-                {
-                    const float share = spendable * (bud.weights[mi] / weight_total);
-                    paid = std::min(share, bill);
-                }
-            }
-        }
+        // BL-1550 (Ben, 2026-11-08; MILITARY.md § What a force costs): A FLAT BILL. It is owed
+        // whatever the budget weights say and is no line's share; the treasury pays what it holds.
+        const float paid = std::min(std::max(0.0f, nc.treasury), bill);
 
         if (paid > 0.0f)
         {

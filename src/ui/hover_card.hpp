@@ -82,4 +82,23 @@ void draw_hover_card(ImVec2 anchor,
                      ImVec2* out_min = nullptr,
                      ImVec2* out_max = nullptr);
 
+/// Seconds an item is hovered before its freezable tooltip freezes (TOOLTIP.md § The
+/// freezable tooltip). The tooltip shows at once; the freeze is 2 s after it appears, as
+/// the hover card's stick is 2 s after it appears.
+inline constexpr float kFreezableTooltipFreezeSec = 2.0f;
+
+/// A TOOLTIP THAT FREEZES (TOOLTIP.md § The freezable tooltip). Call right after the item
+/// it belongs to, every frame. While the item is hovered it is an ordinary tooltip that
+/// tracks the pointer. After `kFreezableTooltipFreezeSec` of hover it FREEZES where it
+/// stands and, unlike the hover card, TAKES the pointer: its content's own items are
+/// hoverable, so each carries its own tooltip (a nested one). A frozen tooltip closes once
+/// the pointer leaves its rect inflated by `kHoverCardExitPadPx` and is off the item.
+/// One freezes at a time. @p id names it within the current ID stack; @p dt is the frame's
+/// dwell step (the fixed verify step under `--verify`). Returns true while it is frozen.
+bool freezable_tooltip(const char* id, float dt, const std::function<void()>& content);
+
+/// Is a freezable tooltip frozen now, and whose (`ImGui::GetID` of its @p id)? For the
+/// verify reads.
+bool freezable_tooltip_frozen(unsigned* owner = nullptr);
+
 } // namespace ui

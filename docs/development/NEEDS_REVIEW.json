@@ -576,6 +576,173 @@
     "docs/economy/POPULATION.md"
    ],
    "resolution": null
+  },
+  {
+   "id": "NR-1141",
+   "title": "Naval design details I filled in behind your form",
+   "raised": "2026-11-05",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "SEA_THEATRE (BL-1430), MILITARY.md § Sea",
+   "what": "Your form settled the shape; I wrote these to make it whole. (1) A blockade closes the port for everyone, neutrals included, with no Alarm cost to the blockader. (2) Prize cargo goes to the raider's nearest own port in range, or is sunk. (3) An escort covers its own nation's cargo, not a friend's. (4) Submarines count for nothing in sea control. (5) Mission reach is a per-class range over water from any own port. (6) A landing is refused on a neutral's coast. (7) Ship hulls are one new good, made at the Arms Works. (8) Sea fights keep no battle record: a damaged ship breaks off home. (9) A ship's attack never reaches the shore, since you did not pick bombardment.",
+   "why_it_matters": "Items 1, 3 and 6 decide how third parties feel a sea war; item 8 means sea fights read differently from land battles."
+  },
+  {
+   "id": "NR-1142",
+   "title": "Does offshore drilling join sprint 64?",
+   "raised": "2026-11-05",
+   "kind": "question",
+   "status": "resolved",
+   "source": "OFFSHORE_DRILLING (BL-1522)",
+   "what": "You ruled offshore drilling lands with the naval system, and it is parked on that. It is a separate build: new sea petroleum moves world generation, TILES.md must change, and shelf-only against open ocean is unruled. I left it out of sprint 64's plan.",
+   "why_it_matters": "Adding it enlarges an already five-difficulty sprint and adds a second world-mover to its re-bless.",
+   "resolved": "2026-11-05",
+   "resolution": "Ben, 2026-11-05: keep it out of sprint 64. BL-1522 (offshore drilling) stays parked."
+  },
+  {
+   "id": "NR-1181",
+   "title": "Seven sea-day details taken inside the sea theatre core",
+   "raised": "2026-11-06",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "SEA_THEATRE (BL-1430)",
+   "what": "Taken so the core could land; each is one line to change. (1) A ship working a zone spreads its presence 1/N over the zone's provinces, as a wing's day does. (2) A ship fires when its side found a target even with no mission; a broken-off ship does not fire. (3) Refit at the home port costs goods only, no recruits. (4) A hire spends sea recruits and refunds them only if its port is lost before it stands. (5) A ship working a zone that holds its own mouth does not mend there; only a ship broken off or recalled does. (6) A ship that loses its home re-homes to the nearest own port BY WATER, and disbands if it can reach none, even with a port on another sea. (7) A blockade order is legal on any in-range water; its target and effect arrive with BL-1530 (sea control and blockade).",
+   "why_it_matters": "(1) makes a larger zone thinner, which is the trade-off the zone choice is meant to carry. (2) means a ship in transit can start a fight."
+  },
+  {
+   "id": "NR-1182",
+   "title": "Ship refit: four calls taken inside the ship kit",
+   "raised": "2026-11-06",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "SHIP_KIT (BL-1527)",
+   "what": "Taken so the item could land; each is small to change. (1) A refitting ship is in dock: it neither fights nor can be hit. A land refit fights on its old kit, so this differs, and a ship can dodge fire by refitting, at the price of goods and its muster days. The alternative is hittable in dock. (2) In dock it still draws quarterly supply and does not mend. (3) A broken-off ship must be recalled to no mission before it can refit, as MILITARY.md says. (4) Base kit draws nothing beyond the hire goods, mirroring airframes, so ship hulls have no demand until the naval branch (BL-1528) opens later kit.",
+   "why_it_matters": "Call (1) sets how a blockaded fleet can behave once BL-1530 (sea control) counts presence: a docked ship would not count, and could not be sunk at its mouth."
+  },
+  {
+   "id": "NR-1183",
+   "title": "Raid: calls taken inside BL-1529 (patrol escort raid)",
+   "raised": "2026-11-06",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "SHIP_KIT (BL-1527)",
+   "what": "Taken so the item could land; each is small to change. (1) A refitting ship is in dock: it neither fights nor can be hit. A land refit fights on its old kit, so this differs, and a ship can dodge fire by refitting, at the price of goods and its muster days. The alternative is hittable in dock. (2) In dock it still draws quarterly supply and does not mend. (3) A broken-off ship must be recalled to no mission before it can refit, as MILITARY.md says. (4) Base kit draws nothing beyond the hire goods, mirroring airframes, so ship hulls have no demand until the naval branch (BL-1528) opens later kit.",
+   "why_it_matters": "Call (1) sets how a blockaded fleet can behave once BL-1530 (sea control) counts presence: a docked ship would not count, and could not be sunk at its mouth.",
+   "detail": "1. Each raider rolls on its own against the whole escort force reaching it, rather than all raiders pooling attack against all escorts, and a zone of N provinces scales its chance by 1/N. MILITARY.md § Sea was reworded to say so. Alternative: pool them, so raiders share one roll. 2. An escort counts as having detected a raider when its SIDE has, patrols and recon included, as the daily pass reads detection. Alternative: the escort's own detection only. 3. A raid rolls its own detection, one answer per raider, day and owner, apart from the sea pass, so a raider fought that quarter can still read as unseen. 4. A cargo held at sea in a raider's zone rolls all 90 days of the tick, so holding there nearly always loses it. 5. The Field line names the cargo and the interceptor, not the lane, since a market has no name; LOGISTICS.md § 7 was reworded. It now also voices land cuts, embargo refusals and front losses, which were dropped silently before, so a player at war will see more lines. 6. Friendship hole, older than this work: a declares on b, b offers, a accepts, and both states stand, against stance.hpp's invariant. The raid refuses a friend either way; the land interdiction does not. Should accept clear the declaration, or be refused? 7. Land capture does not read the embargo, though a prize now does. Left as it was. 8. The take chance is a first cut, 100 per mille a day, before BL-1526 (sea trade reading)."
+  },
+  {
+   "id": "NR-1184",
+   "title": "Blockade: calls taken inside BL-1530 (sea control and blockade)",
+   "raised": "2026-11-06",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "SHIP_KIT (BL-1527)",
+   "what": "Taken so the item could land; each is small to change. (1) A refitting ship is in dock: it neither fights nor can be hit. A land refit fights on its old kit, so this differs, and a ship can dodge fire by refitting, at the price of goods and its muster days. The alternative is hittable in dock. (2) In dock it still draws quarterly supply and does not mend. (3) A broken-off ship must be recalled to no mission before it can refit, as MILITARY.md says. (4) Base kit draws nothing beyond the hire goods, mirroring airframes, so ship hulls have no demand until the naval branch (BL-1528) opens later kit.",
+   "why_it_matters": "Call (1) sets how a blockaded fleet can behave once BL-1530 (sea control) counts presence: a docked ship would not count, and could not be sunk at its mouth.",
+   "detail": "1. A cargo not yet at sea, bound through a closed port, waits at its loading port until the port opens, rather than rerouting or being lost. Long blockades therefore hold cargo on the quay. MILITARY.md § Sea now says so. 2. A closed port also makes no Logistic Points and takes no sea lane landing, so a blockade starves supply as well as trade. The doc named only trade points. MILITARY.md § Sea now says so. Alternative: points keep flowing. 3. A blockade may only be ASSIGNED at the mouth of a port of a declared-hostile nation, every province of its zone, since a blockader also raids and holds water and would otherwise dominate the raid mission. 4. A side is one nation: allies do not pool, so two allies at 300 each against 400 hold nothing. MILITARY.md § Sea now says so. Alternative: pool them. 5. The hold bar is a first cut, 600 per mille. 6. Closed ports were added inside save v81 with no bump, since v81 has not left this branch: a v81 file written on this branch before today is refused, not misread. 7. logistic_points_harness shows 18 failures and lp_pool_harness one, the same on the pre-naval base 1a00b32c, so older than this branch and not traced here. They are not in the known-red list. Correction to NR-1183 item 5: a market does have a city name (market_city_name), but in the UI layer, which the Field line's text does not link. Naming the lane is possible by moving it."
+  },
+  {
+   "id": "NR-1185",
+   "title": "Landings: calls taken inside BL-1531 (troop landings)",
+   "raised": "2026-11-06",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "SHIP_KIT (BL-1527)",
+   "what": "Taken so the item could land; each is small to change. (1) A refitting ship is in dock: it neither fights nor can be hit. A land refit fights on its old kit, so this differs, and a ship can dodge fire by refitting, at the price of goods and its muster days. The alternative is hittable in dock. (2) In dock it still draws quarterly supply and does not mend. (3) A broken-off ship must be recalled to no mission before it can refit, as MILITARY.md says. (4) Base kit draws nothing beyond the hire goods, mirroring airframes, so ship hulls have no demand until the naval branch (BL-1528) opens later kit.",
+   "why_it_matters": "Call (1) sets how a blockaded fleet can behave once BL-1530 (sea control) counts presence: a docked ship would not count, and could not be sunk at its mouth.",
+   "detail": "1. First-cut numbers: a transport carries 2 land units, landing takes 3 days, and the units in the surf fight at half for 5 days. Capacity counts units, not men, as the kit data already did. 2. A contested landing fights from the water beside the coast (the surf). Repulsed or withdrawn it goes back aboard and home, never along the shore. If the transport breaks off and leaves it there, it is lost. 3. Winning does not bring it ashore if a beaten defender with nowhere to go still stands on the tile, as on land. On land the advance waits; from the surf the units go back aboard. It may be ordered again. 4. New rule, beyond the design text: a lane lands no Logistic Points on a port of a nation hostile to the army, declared either way, and a port it occupies does. Without it, an army beside any standing hostile port on a lane was already fed, so \"must take a port\" meant nothing. A neutral's port still lands points, so no peacetime world moves. This also moves a garrison at home within 8 tiles of a hostile port on its lane. 5. A blockade now reads a port's holder, its occupier where it has one. So a former owner can close the port it lost, and the occupier's friend cannot. 6. A unit that boards loses its muster base, so a base lost or ceded while it sails cannot disband it on arrival. Alternative: keep the tie. 7. A transport with no own port left is disbanded by the orphan rule, and everyone aboard and in the surf goes with it, even a day from landing. Alternative: a loaded ship finishes its order first. 8. A landing may be ordered onto hostile ground before the water is held: it lies off the coast and waits. Hostile ground counts either way declared, unlike blockade and raid, which need the side's own declaration. 9. A coast of no one is open to a landing, which the design did not name. Also: battle_engagement_harness had not linked since battle_dispatch_line moved to core; it now includes that source and passes."
+  },
+  {
+   "id": "NR-1186",
+   "title": "Sea UI: calls taken inside BL-1534 (sea UI), and its live click is owed",
+   "raised": "2026-11-06",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "SHIP_KIT (BL-1527)",
+   "what": "Taken so the item could land; each is small to change. (1) A refitting ship is in dock: it neither fights nor can be hit. A land refit fights on its old kit, so this differs, and a ship can dodge fire by refitting, at the price of goods and its muster days. The alternative is hittable in dock. (2) In dock it still draws quarterly supply and does not mend. (3) A broken-off ship must be recalled to no mission before it can refit, as MILITARY.md says. (4) Base kit draws nothing beyond the hire goods, mirroring airframes, so ship hulls have no demand until the naval branch (BL-1528) opens later kit.",
+   "why_it_matters": "Call (1) sets how a blockaded fleet can behave once BL-1530 (sea control) counts presence: a docked ship would not count, and could not be sunk at its mouth.",
+   "detail": "THE LIVE CLICK IS OWED: computer-use access was declined on 2026-11-07, so no press has been tried by hand. BL-1531 (troop landings) owes its own with it. 1. Only found ships draw, and that includes a neutral's, found by the same roll, though the day's pass does not treat a neutral as found. Alternative: neutrals always visible. 2. What the map draws is recorded by the sea day's own pass, as world::ships_found_by_player, neither hashed nor saved. So a loaded game shows no rival's ship until its next day. Alternative: save it, at the cost of a field. 3. A ship found on station in one province may stand on a tile in another; it draws where it is. A ship under way is on no province, so it cannot be found until it arrives. 4. Boarding is pressed on the transport card only, not the unit card. Alternative: both. 5. A port on a lake raises no ship, and says so. A lake's shore passes the coastal test for a port, so a seat can open with a port that cannot raise anything: the verify world's seat does. BL-1532 (opening fleets) should expect that; generation may want to prefer the sea for a port. Yours to rule. 6. Sea provinces read as \"Sea province 34433\" on the card and hover line: they have no names. Reads poorly. Naming them is work if you want it. 7. A Lost row and its mark stay 3 ticks. A marker is a diamond with the class glyph and a stack count. First-cut choices. 8. Verify staging added, each returning an id or a yes and no position: stage_sea_port, stage_ship (with a rival flag), stage_ship_found, stage_unit_at_port, stage_closed_port, stage_interception, plus the reads ships, ship_card, ship_designer. No new tile grant: the script aims at the marker the canvas publishes and the existing tile_screen on the port verify.buildings lists. grant_recruits now takes \"sea\". 9. Three rim labels were overlapping, not two: Networked Warfare and Loitering Munitions as well. A label now steps a line outward until clear, so Anti-Ship Missiles sits just under the Naval branch name. 10. LIVE CLICK 2026-11-07: a fresh seat cannot raise any ship. Every class needs steel and machinery off the nation's shelves, and the opening shelves hold none, still none a year on. The Raise row does not dim for goods, so the press is refused with a vague \"Can't afford or supply it.\" Work either way: dim the row and name the short goods. The call is yours: should an opening seat be able to raise a ship at all, or is that BL-1532 (opening fleets)'s job?"
+  },
+  {
+   "id": "NR-1187",
+   "title": "Opening fleets: calls taken inside BL-1532 (opening fleets)",
+   "raised": "2026-11-07",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "OPENING_FLEETS (BL-1532)",
+   "what": "Taken inside your form answers so the item could build; each is one line of scripts/world_gen.lua or one rule to change. (1) Minors open with no ship: \"fixed kit fleet\" read as no history fleet at all, and the kit is a major's. Minors will raise fleets only through BL-1533 (rival fleets). (2) The fixed shares are two destroyers, one capital ship, one submarine, one transport: five ships, list value 7,200 credits at hire prices. (3) A port berths three opening ships; the rest spill to the next-nearest sea port. With the kit capped at one port, most majors berth all five at one port. (4) \"Nearest the capital\" is straight-line hex distance, tile id breaking ties. (5) The sea pool opens on 100 recruits, enough to raise one capital ship or three destroyers. (6) \"Prefer the sea\": the kit cap's LAST port slot admits only a sea-mouthed port while one stands on the major's ground and none is kept; kit cover still picks which. A lake port is still legitimate logistics (lanes cross lakes), so generation still places them. (7) Opening ships lie docked at their mouths with no mission, and a docked ship counts as present in its mouth's province, so two majors hostile at the opening that share a coastal sea province would fight from day one. None did in the 16 seeds' settle (no ship lost HP), but play may. Alternative: docked ships with no mission are not engaged until a war is declared in play.",
+   "why_it_matters": "Call (7) decides whether a fleet can be sunk in harbour before its owner has given an order. Measured: 16 seeds, 425 ships, 85 of 94 majors with a fleet, cover unchanged by the cap rule (76 -> 76).",
+   "detail": "Measured with tools/verify/port_mouth_census (new) over the 16 library seeds, before and after."
+  },
+  {
+   "id": "NR-1188",
+   "title": "Opening fleets: the transport can berth where no land unit can reach it",
+   "raised": "2026-11-08",
+   "kind": "question",
+   "status": "resolved",
+   "source": "OPENING_FLEETS (BL-1532) live click",
+   "what": "Live click, Quick Start seat Keitoheim Meido, 1960 Jan 26. The kit lists the transport fifth, so with three ships to a berth it spills to the second sea port. Here that is Dutum, a small island port with no military base and no land unit. Boarding needs a land unit on or beside the transport's own port, a transport takes no order to sail to another port, and land units are raised only at a base. So this seat's transport can never be boarded, and the landing can never be clicked. Tukornom, the capital port and the only base, holds the three warships.",
+   "options": "A) Put the transport first in the kit list (one line of scripts/world_gen.lua): it always berths at the capital port. Moves every digest pin like the rest of the fleet, inside the same BL-1535 (naval war reading) re-bless. B) Berth the transport at the first berth that a base or land unit can reach overland: a new rule in seed_major_opening_fleets. C) Give transports an order to sail to another own port: a new verb, BL-1534 (sea UI) scope. D) Accept it: an island transport waits for a base built on the island.",
+   "recommendation": "A, cheapest and always legible; C is worth a backlog item on its own merits.",
+   "resolution": "Ben, 2026-11-08: A, transport first. Both kits list the transport first, so it berths at the capital port; written into MILITARY.md § Sea.",
+   "resolved": "2026-11-08"
+  },
+  {
+   "id": "NR-1189",
+   "title": "Rival nations' land hire: MILITARY.md says the build scorer hires, the code hires only for corporations",
+   "raised": "2026-11-08",
+   "kind": "question",
+   "status": "resolved",
+   "source": "RIVAL_FLEETS (BL-1533) landing force",
+   "what": "MILITARY.md § The muster interface says rival nations hire land units through the build scorer, carried to the nation unchanged (Ben, 2026-10-23), under a soft cap of three. The scorer in src/world/corp_ai.cpp scores a hire only when the actor is not a nation (a BL-1401 comment: a corporation's only), and corporations are retired. So today no rival nation hires a land unit in the build pass. The landing force (Ben, 2026-11-08) now hires one for a ready transport, inside the sea pass; that is the only rival land hire running.",
+   "options": "A) The doc is right: restore the build pass's land hire for rival nations (work; moves every digest pin, inside a re-bless). B) The code is right: strike the sentence from MILITARY.md and leave land hiring to the landing force and the opening army. C) Leave both until BL-1535 (naval war reading) shows whether armies run short.",
+   "recommendation": "A reads truest to the 2026-10-23 ruling, but it is a world-mover; B is a doc edit today. Your call.",
+   "resolution": "Ben, 2026-11-08, by the force-sizing form: rival nations hire land units again, up to the income target (MILITARY.md § Force sizing). The work is BL-1552 (force sizing)."
+  },
+  {
+   "id": "NR-1190",
+   "title": "Arms Works open unfed where steel or machinery is out of reach",
+   "raised": "2026-11-08",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "FORCE_EQUIPMENT (BL-1551)",
+   "what": "Most majors cannot feed an Arms Works at generation: their machinery slot itself fails for want of refined copper. The kit then substituted the arms slots into more steel, silicon or rations, so no major held a works. To honour \"majors open with Arms Works\" the arms recipes are exempt from the want and feed gates: the works stands idle until its inputs arrive, and pays its upkeep meanwhile.",
+   "options": "A) Keep: the works stands, idle where unfed. B) Let it substitute, and rely on the reserve and imports. C) Fix the machinery chain in the kit first (work; a separate item).",
+   "taken": "A, as the nearest reading of the ruling."
+  },
+  {
+   "id": "NR-1191",
+   "title": "Force sizing: income read as operating surplus; the landing hire sits outside the target",
+   "raised": "2026-11-08",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "FORCE_SIZING (BL-1552)",
+   "what": "Two calls. Income is the mean of the last four returns of income plus taxes less expenditure, maintenance and wages, floored at zero, so a nation is not sized on gross takings it has already spent. The landing force hired for a ready transport (Ben, 2026-11-08) stays outside the target, since it is a mission need rather than a standing force.",
+   "options": "A) Keep both. B) Size on gross income. C) Count the landing hire inside the target.",
+   "taken": "A. First-cut numbers: base share 0.20, ceiling 0.50, threat span 3."
+  },
+  {
+   "id": "NR-1192",
+   "title": "Minor income: floor applies to every nation; garrisons use the 0.50 ceiling; digests moved",
+   "raised": "2026-11-09",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "MINOR_PLANT_FLOOR (BL-1616), GARRISON_INCOME (BL-1617)",
+   "what": "Three calls. The plant floor visits every nation, because majors are not known until after the walk; the kit then replaces a major's floor firm. Garrisons are paid at the 0.50 force ceiling, not the threat-scaled share, so a minor is not stripped by its first reading. The opening chest cut now reserves only the 20-man token's pay. Measured on four seeds: 22 of 112 minors still open plantless, and 15 of the 23 broke rivals at tick 40 are among those. World digests moved and wait on the re-bless.",
+   "options": "A) Keep all three. B) Use the base share 0.20 for garrisons. C) Give plantless minors another income source.",
+   "taken": "A."
+  },
+  {
+   "id": "NR-1156",
+   "title": "A blockade moves prices both ways: what it re-ships falls, what it imports rises",
+   "raised": "2026-11-10",
+   "kind": "question",
+   "status": "resolved",
+   "source": "NAVAL_WAR_READING (BL-1535)",
+   "what": "MILITARY.md § Blockade says the cost of a closed port lands on the blockaded market's prices. On the three library seeds where a blockade closed a port, it did not. Blockaded price against its own price the tick before closing, netted of the other markets' move over the same span: seed 0 0.998 vs 1.040, seed 31 1.038 vs 1.038, seed 60 1.055 vs 1.026 (110, 864, 880 readings). The blockaded markets read 14-24% below other markets, but they were cheap before closing. Likely cause, unconfirmed: each market has other ports or land routes, so one closed port reroutes trade without shortage. CORRECTED 2026-11-10 (Ben chose C, \"Make closure bite\"; the reading below came after, and changes the premise). The all-goods mean hid two opposite moves. Each closure shut 1 of its market's 5-7 ports. On seed 31 it cut landings 67% (sea 1041 -> 108 a tick) but cut the market's own buying faster: steel demand 73 -> 21 against supply 27 -> 11, all of it in the construction/upkeep/trade channel (no household, background or processor steel), so steel fell 20% against +8% elsewhere and silica's shelf grew 14 -> 34. Likely cause, unproven: the closed port's trade points went, so the owner's outbound trades stopped buying there. Pure imports did rise: seed 60 tobacco +88% against +53% elsewhere. Open oddity: seed 31 machinery fell 473 -> 370 with supply 1.7 -> 0.1 and demand flat; not yet explained.",
+   "options": "A) Accept: a blockade already bites both ways (an entrepot gluts on what it re-ships, starves on what it imports); correct the reading and leave the code. B) Bite harder on imports only: a closure leaves outbound trades bidding, their cargo waiting at the quay as the doc says, so demand holds while supply falls. C) Measure first which channel the lost demand is, then choose.",
+   "taken": "A (Ben, 2026-11-10: \"Accept as is\"). No extra price rule; MILITARY.md § Blockade now says a blockade moves prices both ways. The machinery oddity is filed as BL-1618 (price falls as supply vanishes).",
+   "resolved": "2026-11-10"
   }
  ]
 }

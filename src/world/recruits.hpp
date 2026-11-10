@@ -58,7 +58,7 @@ enum class recruit_theatre : uint8_t
 {
     land = 0, ///< military_base -> land_recruits
     air  = 1, ///< airbase       -> air_recruits
-    sea  = 2, ///< port          -> sea_recruits (Ben, 2026-11-02); nothing spends it yet
+    sea  = 2, ///< port          -> sea_recruits (Ben, 2026-11-02); `hire_ship` spends it
 };
 
 /// The land recruits a hire of land roster row @p row spends: its men at muster.

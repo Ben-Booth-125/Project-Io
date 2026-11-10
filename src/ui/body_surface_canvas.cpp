@@ -29,6 +29,7 @@
 #include "world/market_clearing.hpp" // market_for_tile (Scarcity catchment, prices)
 #include "world/placement_rules.hpp"
 #include "wing_card.hpp"          // BL-1450: the wing right-click assignment
+#include "ship_card.hpp"          // BL-1534: the ship right-click order
 #include "world/air_combat.hpp"     // BL-1450: wings, their airbase tile
 #include "world/stance.hpp"           // is_hostile: right-click attack vs declare (BL-1443)
 #include "world/river_generation.hpp"   // BL-1340: hex_side_for_offset — a road draws across its edge
@@ -3269,6 +3270,38 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     if (const auto sw = w.wings.find(state.selected_entity);
         sw != w.wings.end() && is_player_side(w, sw->second.owner))
         wing_assigned = sw->second.provinces;
+    // SHIPS (BL-1534; MILITARY.md § Sea). A ship stands on a water tile, so its marker draws
+    // there, a diamond at the hex's centre: the player's own, and a rival's only where the last
+    // sea day's pass found it (`world::ships_found_by_player`, BL-068). Ascending id per tile.
+    std::unordered_map<entity_id, std::vector<entity_id>> tile_ships;
+    prune_ship_intents(w, state);
+    state.ship.markers.clear();
+    state.ship.closed_marks = 0;
+    state.ship.loss_marks   = 0;
+    for (const auto& [sid, sh] : w.ships) // a sorted map: ascending id on each tile
+    {
+        if (!ship_seen_by_player(w, state, sid))
+            continue;
+        const auto tit = w.tiles.find(sh.tile);
+        if (tit != w.tiles.end() && tit->second.body == state.active_body)
+            tile_ships[sh.tile].push_back(sid);
+    }
+    // The selected ship's zone takes the same outline as a wing's, in the sea's colour, and
+    // the coast it is ordered to land on is ringed.
+    ImU32     zone_colour  = palette::air_assigned;
+    entity_id landing_mark = null_entity;
+    if (const auto ss = w.ships.find(state.selected_entity);
+        ss != w.ships.end() && is_player_side(w, ss->second.owner))
+    {
+        wing_assigned = ss->second.provinces;
+        zone_colour   = palette::sea_assigned;
+        landing_mark  = ss->second.landing_tile;
+    }
+    // BL-1534 (LOGISTICS.md § 7): a cargo lost or taken lately marks its tile.
+    std::unordered_map<entity_id, bool> loss_tiles;
+    for (const convoy_loss& cl : state.convoy_losses)
+        if (cl.tile != null_entity)
+            loss_tiles[cl.tile] = cl.lost;
     // THE DECLARATION'S GOAL PICKING (ledgers/diplomacy.md § The declaration; § 3:
     // a mode of the declaration flow, not an overlay_mode). While it is open every
     // province of the target is outlined as a possible goal, and the chosen ones in
@@ -6368,6 +6401,57 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 }
             }
 
+            // SHIPS (BL-1534): the ships on this tile, one diamond carrying their count. Its
+            // press selects a ship; a repeat press walks to the next ship here.
+            if (draw_r >= 6.0f && revealed && !tile_ships.empty())
+            {
+                if (const auto ts = tile_ships.find(id); ts != tile_ships.end() && !ts->second.empty())
+                {
+                    const std::vector<entity_id>& ss = ts->second;
+                    const float sr = std::max(9.0f, draw_r * 0.42f);
+                    const ImVec2 spos{cx, cy};
+                    entity_id next  = ss.front();
+                    entity_id shown = ss.front();
+                    for (std::size_t si = 0; si < ss.size(); ++si)
+                        if (ss[si] == state.selected_entity)
+                        {
+                            next  = ss[(si + 1) % ss.size()];
+                            shown = ss[si];
+                        }
+                    const sea_ship& sh = w.ships.at(shown);
+                    const bool hovered = state.overlay == overlay_mode::none
+                                      && std::find(ss.begin(), ss.end(), state.hovered_entity) != ss.end();
+                    const bool lit = std::find(ss.begin(), ss.end(), state.selected_entity) != ss.end();
+                    icons::ship_marker(dl, spos, sr, ship_class_of(sh), corp_identity(sh.owner),
+                                       static_cast<int>(ss.size()), hovered || lit);
+                    marker_hit_zone hz;
+                    hz.id     = next;
+                    hz.kind   = marker_hit_zone::kind::unit; // a marker the player aimed at, ahead of the ground
+                    hz.centre = spos;
+                    hz.radius = sr * 1.1f;
+                    state.marker_hit_zones.push_back(hz);
+                    state.ship.markers.push_back({next, spos.x, spos.y, static_cast<int>(ss.size()),
+                                                  is_player_side(w, sh.owner)});
+                }
+            }
+            // A CLOSED PORT (BL-1534): the blockade is public, as the port's trade stopping is.
+            if (draw_r >= 6.0f && revealed && !w.closed_ports.empty() && w.closed_ports.count(id) != 0)
+            {
+                icons::closed_port_mark(dl, {cx - draw_r * 0.46f, cy - draw_r * 0.46f}, std::max(6.0f, draw_r * 0.22f));
+                ++state.ship.closed_marks;
+            }
+            // WHERE A CARGO WAS TAKEN (BL-1534): for the few ticks the Convoys ledger states it.
+            if (draw_r >= 6.0f && revealed && !loss_tiles.empty())
+                if (const auto lt = loss_tiles.find(id); lt != loss_tiles.end())
+                {
+                    icons::interception_mark(dl, {cx + draw_r * 0.46f, cy + draw_r * 0.40f}, std::max(6.0f, draw_r * 0.22f),
+                                             lt->second ? palette::air_refused : palette::selection);
+                    ++state.ship.loss_marks;
+                }
+            if (id == landing_mark && landing_mark != null_entity)
+                for (int s = 0; s < 6; ++s)
+                    dl->AddLine(verts[s], verts[(s + 1) % 6], palette::sea_assigned, 3.0f);
+
             pm.mark(canvas_pass_meter::markers, dl);
             // Selection outline is drawn on every visible copy of the selected
             // tile; hover is deferred to a single nearest copy, resolved below.
@@ -6442,7 +6526,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                         if (nid != null_entity && w.provinces.province_of(nid) == wp)
                             continue;
                         dl->AddLine(verts[k_side_verts[s][0]], verts[k_side_verts[s][1]],
-                                    palette::air_assigned, 2.5f);
+                                    zone_colour, 2.5f);
                     }
             }
             // While declaring, a possible goal's own outline is its highlight: the
@@ -6996,7 +7080,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         const entity_id over_marker =
             resolve_marker_hit(state.marker_hit_zones, mouse_g.x, mouse_g.y);
         const bool pointer_free = hovered_tile != null_entity
-                               && (over_marker == null_entity || (w.units.count(over_marker) == 0 && w.wings.count(over_marker) == 0));
+                               && (over_marker == null_entity || (w.units.count(over_marker) == 0 && w.wings.count(over_marker) == 0 && w.ships.count(over_marker) == 0));
 
         // Pass 1: geometry per wrap copy, and the hover.
         struct seg { ImVec2 a, b; std::size_t front; std::size_t edge; };
@@ -8076,13 +8160,29 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         state.wing.hover_province = pid;
         state.wing.hover_text     = wing_preview.text;
     }
-    if (wing_preview.kind != 0)
+    // SHIP ORDERS (BL-1534; military.md § Ships on the map): the same line for the selected
+    // ship: a sea province joins a warship's zone, a coast is where a transport lands.
+    // `preview_ship_order` reads the seam's own checks. Reads only; the press is below.
+    state.ship.hover_kind = 0;
+    state.ship.hover_text.clear();
+    ship_order_preview ship_preview;
+    if (!state.construction.active && state.construction.road_arm_tile == null_entity
+        && state.pending_march_unit == null_entity && state.overlay == overlay_mode::none
+        && ship_is_players(w, state.selected_entity) && have_hover && hovered_tile != null_entity)
     {
-        const ImU32 oc = wing_preview.kind == 1 ? palette::air_assigned : palette::air_refused;
+        ship_preview = preview_ship_order(w, reg, state, state.selected_entity, hovered_tile);
+        state.ship.hover_kind = ship_preview.kind;
+        state.ship.hover_text = ship_preview.text;
+    }
+    if (wing_preview.kind != 0 || ship_preview.kind != 0)
+    {
+        const bool  is_ship = ship_preview.kind != 0;
+        const bool  order   = (is_ship ? ship_preview.kind : wing_preview.kind) == 1;
+        const ImU32 oc = !order ? palette::air_refused : is_ship ? palette::sea_assigned : palette::air_assigned;
         for (int s = 0; s < 6; ++s)
             dl->AddLine(hover_verts[s], hover_verts[(s + 1) % 6], oc, 3.0f);
         ImDrawList*  fdl = ImGui::GetForegroundDrawList();
-        const char*  txt = wing_preview.text.c_str();
+        const char*  txt = is_ship ? ship_preview.text.c_str() : wing_preview.text.c_str();
         const ImVec2 ts  = ImGui::CalcTextSize(txt);
         const float  pad = 4.0f;
         const ImVec2 tl { mouse.x + 16.0f, mouse.y + 16.0f };
@@ -9017,7 +9117,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                     unit_of_other_tile = (mu->second.position != hovered_tile);
             // BL-1450: a wing marker is aimed at too — a press on it selects a wing,
             // never a cycle step on the airbase tile under it.
-            if (marker_hit != null_entity && w.wings.count(marker_hit) != 0)
+            if (marker_hit != null_entity && (w.wings.count(marker_hit) != 0 || w.ships.count(marker_hit) != 0))
                 unit_of_other_tile = true;
             if (hovered_tile != null_entity && state.selection_cycle_tile == hovered_tile
                 && !unit_of_other_tile)
@@ -9192,6 +9292,9 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         state.wing.pending_mission   = static_cast<std::uint8_t>(wing_preview.mission);
         state.wing.pending_provinces = wing_preview.provinces;
     }
+    // The ship's right-click (BL-1534), on the same rule.
+    if (ImGui::IsMouseClicked(ImGuiMouseButton_Right) && ship_preview.kind == 1)
+        state.ship.pending.push_back(ship_preview.cmd);
 
     // BL-737: the camera. One squash over every map-space vertex emitted since
     // v_map_start — fills, strokes, ground images, glyphs and labels alike —

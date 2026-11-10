@@ -65,6 +65,11 @@
      "travel_theme": "+1% strength for every unit"
     },
     {
+     "key": "ST-NV",
+     "name": "Naval",
+     "travel_theme": "+1% strength for every ship"
+    },
+    {
      "key": "ST-OR",
      "name": "Order",
      "travel_theme": "-1% unrest in every province"
@@ -5010,6 +5015,448 @@
     }
    ],
    "cost_units": 12
+  },
+  {
+   "id": "DG-ST-NV-T1",
+   "name": "Seamanship I",
+   "tier": "travel",
+   "ring": 1,
+   "tree": "ST",
+   "branch": "ST-NV",
+   "requires": [],
+   "advantage": "+1% strength for every ship",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "+1% strength for every ship",
+     "waits_on": "ship strength"
+    }
+   ],
+   "cost_units": 1
+  },
+  {
+   "id": "DG-ST-NV-T2",
+   "name": "Seamanship II",
+   "tier": "travel",
+   "ring": 1,
+   "tree": "ST",
+   "branch": "ST-NV",
+   "requires": [
+    [
+     "DG-ST-NV-T1"
+    ]
+   ],
+   "advantage": "+1% strength for every ship",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "+1% strength for every ship",
+     "waits_on": "ship strength"
+    }
+   ],
+   "cost_units": 1
+  },
+  {
+   "id": "DG-ST-NV-A1",
+   "name": "Gas-Turbine Propulsion",
+   "tier": "minor",
+   "ring": 1,
+   "tree": "ST",
+   "branch": "ST-NV",
+   "requires": [
+    [
+     "DG-ST-NV-T2"
+    ]
+   ],
+   "advantage": "opens gas-turbine hull, compartmented hull, roll-on assault hull",
+   "effects": [
+    {
+     "kind": "unlock_kit",
+     "items": [
+      "des.hull.gas_turbine",
+      "cap.hull.compartmented",
+      "tra.hull.roll_on"
+     ]
+    }
+   ],
+   "cost_units": 2
+  },
+  {
+   "id": "DG-ST-NV-A2",
+   "name": "Streamlined Hulls",
+   "tier": "minor",
+   "ring": 1,
+   "tree": "ST",
+   "branch": "ST-NV",
+   "requires": [
+    [
+     "DG-ST-NV-T2"
+    ]
+   ],
+   "advantage": "opens streamlined snorkel hull",
+   "effects": [
+    {
+     "kind": "unlock_kit",
+     "items": [
+      "sub.hull.snorkel"
+     ]
+    }
+   ],
+   "cost_units": 2
+  },
+  {
+   "id": "DG-ST-NV-A",
+   "name": "Reactor Propulsion",
+   "tier": "major",
+   "ring": 2,
+   "tree": "ST",
+   "branch": "ST-NV",
+   "requires": [
+    [
+     "DG-ST-NV-A1"
+    ],
+    [
+     "DG-ST-NV-A2"
+    ]
+   ],
+   "advantage": "opens reactor pressure hull, quieted composite hull, reactor capital hull, fast sealift hull",
+   "effects": [
+    {
+     "kind": "unlock_kit",
+     "items": [
+      "sub.hull.reactor",
+      "des.hull.quiet",
+      "cap.hull.reactor",
+      "tra.hull.fast"
+     ]
+    }
+   ],
+   "cost_units": 12
+  },
+  {
+   "id": "DG-ST-NV-T3",
+   "name": "Seamanship III",
+   "tier": "travel",
+   "ring": 2,
+   "tree": "ST",
+   "branch": "ST-NV",
+   "requires": [
+    [
+     "DG-ST-NV-A"
+    ]
+   ],
+   "advantage": "+1% strength for every ship",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "+1% strength for every ship",
+     "waits_on": "ship strength"
+    }
+   ],
+   "cost_units": 2
+  },
+  {
+   "id": "DG-ST-NV-T4",
+   "name": "Seamanship IV",
+   "tier": "travel",
+   "ring": 3,
+   "tree": "ST",
+   "branch": "ST-NV",
+   "requires": [
+    [
+     "DG-ST-NV-T3"
+    ]
+   ],
+   "advantage": "+1% strength for every ship",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "+1% strength for every ship",
+     "waits_on": "ship strength"
+    }
+   ],
+   "cost_units": 3
+  },
+  {
+   "id": "DG-ST-NV-T5",
+   "name": "Seamanship V",
+   "tier": "travel",
+   "ring": 2,
+   "tree": "ST",
+   "branch": "ST-NV",
+   "requires": [
+    [
+     "DG-ST-NV-A"
+    ]
+   ],
+   "advantage": "+1% strength for every ship",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "+1% strength for every ship",
+     "waits_on": "ship strength"
+    }
+   ],
+   "cost_units": 2
+  },
+  {
+   "id": "DG-ST-NV-T6",
+   "name": "Seamanship VI",
+   "tier": "travel",
+   "ring": 3,
+   "tree": "ST",
+   "branch": "ST-NV",
+   "requires": [
+    [
+     "DG-ST-NV-T5"
+    ]
+   ],
+   "advantage": "+1% strength for every ship",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "+1% strength for every ship",
+     "waits_on": "ship strength"
+    }
+   ],
+   "cost_units": 3
+  },
+  {
+   "id": "DG-ST-NV-B1",
+   "name": "Naval Fire Control",
+   "tier": "minor",
+   "ring": 3,
+   "tree": "ST",
+   "branch": "ST-NV",
+   "requires": [
+    [
+     "DG-ST-NV-T4"
+    ]
+   ],
+   "advantage": "opens anti-submarine rockets, radar-laid main battery",
+   "effects": [
+    {
+     "kind": "unlock_kit",
+     "items": [
+      "des.armament.rocket",
+      "cap.armament.rifled"
+     ]
+    }
+   ],
+   "cost_units": 6
+  },
+  {
+   "id": "DG-ST-NV-B2",
+   "name": "Homing Torpedoes",
+   "tier": "minor",
+   "ring": 3,
+   "tree": "ST",
+   "branch": "ST-NV",
+   "requires": [
+    [
+     "DG-ST-NV-T4"
+    ]
+   ],
+   "advantage": "opens homing torpedoes",
+   "effects": [
+    {
+     "kind": "unlock_kit",
+     "items": [
+      "sub.armament.homing"
+     ]
+    }
+   ],
+   "cost_units": 6
+  },
+  {
+   "id": "DG-ST-NV-B",
+   "name": "Anti-Ship Missiles",
+   "tier": "major",
+   "ring": 4,
+   "tree": "ST",
+   "branch": "ST-NV",
+   "requires": [
+    [
+     "DG-ST-NV-B1"
+    ],
+    [
+     "DG-ST-NV-B2"
+    ]
+   ],
+   "advantage": "opens wire-guided hunter torpedoes, anti-ship missiles, vertical-launch missile cells",
+   "effects": [
+    {
+     "kind": "unlock_kit",
+     "items": [
+      "sub.armament.hunter",
+      "des.armament.missile",
+      "cap.armament.vertical"
+     ]
+    }
+   ],
+   "cost_units": 24
+  },
+  {
+   "id": "DG-ST-NV-C1",
+   "name": "Search Radar",
+   "tier": "minor",
+   "ring": 3,
+   "tree": "ST",
+   "branch": "ST-NV",
+   "requires": [
+    [
+     "DG-ST-NV-T6"
+    ]
+   ],
+   "advantage": "opens variable-depth sonar, surface search radar, warning radar",
+   "effects": [
+    {
+     "kind": "unlock_kit",
+     "items": [
+      "des.sensors.variable",
+      "cap.sensors.search",
+      "tra.sensors.warning"
+     ]
+    }
+   ],
+   "cost_units": 6
+  },
+  {
+   "id": "DG-ST-NV-C2",
+   "name": "Passive Sonar",
+   "tier": "minor",
+   "ring": 3,
+   "tree": "ST",
+   "branch": "ST-NV",
+   "requires": [
+    [
+     "DG-ST-NV-T6"
+    ]
+   ],
+   "advantage": "opens passive sonar array",
+   "effects": [
+    {
+     "kind": "unlock_kit",
+     "items": [
+      "sub.sensors.passive"
+     ]
+    }
+   ],
+   "cost_units": 6
+  },
+  {
+   "id": "DG-ST-NV-C",
+   "name": "Fleet Data Link",
+   "tier": "major",
+   "ring": 4,
+   "tree": "ST",
+   "branch": "ST-NV",
+   "requires": [
+    [
+     "DG-ST-NV-C1"
+    ],
+    [
+     "DG-ST-NV-C2"
+    ]
+   ],
+   "advantage": "opens towed sonar array, towed array and data link, phased-array radar, convoy data link",
+   "effects": [
+    {
+     "kind": "unlock_kit",
+     "items": [
+      "sub.sensors.towed",
+      "des.sensors.towed",
+      "cap.sensors.phased",
+      "tra.sensors.datalink"
+     ]
+    }
+   ],
+   "cost_units": 24
+  },
+  {
+   "id": "DG-ST-NV-M",
+   "name": "Sea Power",
+   "tier": "travel",
+   "mastery": true,
+   "ring": 4,
+   "tree": "ST",
+   "branch": "ST-NV",
+   "requires": [
+    [
+     "DG-ST-NV-B"
+    ],
+    [
+     "DG-ST-NV-C"
+    ]
+   ],
+   "advantage": "+3% strength for every ship",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "+3% strength for every ship",
+     "waits_on": "ship strength"
+    }
+   ],
+   "cost_units": 4
+  },
+  {
+   "id": "DG-ST-NV-Q",
+   "name": "Blue Water",
+   "tier": "quest",
+   "ring": 2,
+   "tree": "ST",
+   "branch": "ST-NV",
+   "requires": [
+    [
+     "DG-ST-NV-A"
+    ]
+   ],
+   "deed": "a fleet keeps a sea zone through a war",
+   "deed_effect": {
+    "kind": "unread",
+    "waits_on": "sea control"
+   },
+   "advantage": "ship muster time -20%",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "ship muster time -20%",
+     "waits_on": "ship muster time"
+    }
+   ],
+   "keys_next_branch": "Orbital Fleet",
+   "cost_units": 6
+  },
+  {
+   "id": "DG-J-STNV-STOR",
+   "name": "Coastal Security",
+   "tier": "travel",
+   "joint": true,
+   "ring": 3,
+   "tree": "ST",
+   "branch": null,
+   "requires": [
+    [
+     "DG-ST-NV-T6"
+    ],
+    [
+     "DG-ST-OR-T4"
+    ]
+   ],
+   "advantage": "+1% strength for every ship and -1% unrest",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "+1% strength for every ship",
+     "waits_on": "ship strength"
+    },
+    {
+     "kind": "unread",
+     "what": "-1% unrest",
+     "waits_on": "unrest"
+    }
+   ],
+   "cost_units": 3
   }
  ]
 }

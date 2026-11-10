@@ -59,6 +59,7 @@
 #include <cmath>     // std::ceil (construction ETA), std::pow/log10/floor (nice_ceil axis)
 #include <cstddef>   // std::ptrdiff_t (nth_element iterator offset)
 #include "wing_card.hpp" // BL-1450: the wing card
+#include "ship_card.hpp" // BL-1534: the ship card
 #include <cstdio>    // std::snprintf (tile coord caption + chart labels)
 #include <cfloat>    // FLT_MAX (net-profit PlotLines auto-scale)
 #include <cstring>   // std::strcmp (header title/kind de-dup)
@@ -3065,7 +3066,9 @@ std::string building_method_line(const world& w, const recipe_registry& reg,
             // The market rides the hover (the card's column fits ~30 characters);
             // the figure is the line.
             const float pts = building_trade_points(reg, b, contention, /*upkeep_met=*/true);
-            if (pts > 0.0f)
+            if (b.type == building_type::port && w.closed_ports.count(b.tile) != 0)
+                std::snprintf(buf, sizeof buf, "Blockaded: makes no trade points");
+            else if (pts > 0.0f)
                 std::snprintf(buf, sizeof buf, "Makes %.1f trade points / qtr", static_cast<double>(pts));
             else
                 std::snprintf(buf, sizeof buf, "Makes trade points for %s", market.c_str());
@@ -4720,6 +4723,9 @@ void draw_selection_content(world& w, const recipe_registry& reg,
     // canvas already shows the name (Ben, 2026-10-13). Every other kind keeps it.
     // BL-1450: an air WING owns its whole card (wing_card.hpp), header included.
     if (kind == selection_kind::wing && draw_wing_selection(w, reg, ui))
+        return;
+    // BL-1534: so does a SHIP (ship_card.hpp).
+    if (kind == selection_kind::ship && draw_ship_selection(w, reg, ui))
         return;
 
     if (kind == selection_kind::tile)

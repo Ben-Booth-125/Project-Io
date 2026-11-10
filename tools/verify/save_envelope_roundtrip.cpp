@@ -1072,15 +1072,63 @@ int main()
     }
 
     // -----------------------------------------------------------------------
+    // S9d -- BL-1527 (save_game_version 26): a v25 envelope, its arrays 55 wide and its
+    // world a v80 snapshot, reads whole: the first 55 slots as written, ship hulls 0.
+    // -----------------------------------------------------------------------
+    {
+        static_assert(save_game_version_ship_hulls == 26 && save_game_version_pre_ship_hulls == 25,
+                      "S9d pins v26 as ship hulls' envelope layout");
+        world w = make_world();
+        save_envelope env = make_envelope();
+        if (!env.report.bodies.empty())
+        {
+            auto& st = env.report.bodies[0].state.endowment;
+            for (std::size_t r = 0; r < resource_count; ++r)
+                st[r] = 1.0f + 0.125f * static_cast<float>(r);
+            env.report.bodies[0].undrawn.endowment = st;
+        }
+        check(write_save_game_at(k_path, w, env, save_game_version_pre_ship_hulls),
+              "S9d the verification writer wrote a v25 file");
+        world         lw;
+        save_envelope le;
+        const bool ok = read_save_game(k_path, lw, le);
+        bool endow = ok && !le.report.bodies.empty();
+        if (endow)
+        {
+            const auto& got = le.report.bodies[0].state.endowment;
+            for (std::size_t r = 0; r < resource_count; ++r)
+            {
+                const float want = r < k_resource_count_pre_ship_hulls ? 1.0f + 0.125f * static_cast<float>(r) : 0.0f;
+                endow = endow && got[r] == want;
+            }
+        }
+        check(endow && same_market_history(le.market_history, env.market_history)
+                  && le.planetary_pan_y == env.planetary_pan_y
+                  && le.params.major_target == env.params.major_target,
+              "S9d a v25 file reads whole: its 55 endowment slots as written, ship hulls 0, everything after intact");
+        {
+            std::fstream f(k_path, std::ios::binary | std::ios::in | std::ios::out);
+            f.seekp(4, std::ios::beg);
+            const uint32_t v26 = save_game_version_ship_hulls;
+            f.write(reinterpret_cast<const char*>(&v26), sizeof(v26));
+        }
+        world         bw;
+        save_envelope be;
+        be.speed = 77;
+        check(!read_save_game(k_path, bw, be) && be.speed == 77,
+              "S9d a 55-wide file stamped v26 is REFUSED, destination untouched");
+    }
+
+    // -----------------------------------------------------------------------
     // S11 -- SAVE_BUILDING_REPORT (save_game_version 27): the last economy
     // report's read slice and the corp standings round-trip FIELD-EXACT, and
     // the indices the reader rebuilds equal the ones a live report holds.
     // S12 -- a v25 stream (no tail) still reads whole and opens with an EMPTY
     // report, as every load did before v27.
     // -----------------------------------------------------------------------
-    static_assert(save_game_version == 27 && save_game_version_econ_report == 27
+    static_assert(save_game_version == 29 && save_game_version_econ_report == 27
                       && save_game_version_pre_econ_report == 25,
-                  "S11/S12 pin v27 as the last-report layout over a v25 prefix");
+                  "S11/S12 pin v27 as the first last-report layout over a v25 prefix (v29 today)");
     {
         world w = make_world();
         save_envelope env = make_envelope();
@@ -1287,18 +1335,37 @@ int main()
                   && ve.params.major_target == env.params.major_target
                   && same_market_history(ve.market_history, env.market_history),
               "S12 the rest of a v25 envelope reads whole");
-        // v26 is BL-1527's layout on another branch, not one this build reads.
+        // The naval merge: v26 (BL-1527, 56 wide, no tail) reads like v25 - an EMPTY report.
+        check(write_save_game_at(k_path, w, env, save_game_version_ship_hulls),
+              "S12 the verification writer wrote a v26 file");
+        save_envelope ne;
+        ne.last_corp_standings.push_back(corp_standing{});
+        const bool nok = read_save_game(k_path, vw, ne);
+        check(nok && ne.last_econ_report.buildings.empty() && ne.last_corp_standings.empty()
+                  && same_market_history(ne.market_history, env.market_history)
+                  && ne.params.major_target == env.params.major_target,
+              "S12 a v26 stream (56 wide, no report tail) is ACCEPTED and opens with an EMPTY report");
+        // The naval merge: v27 (55 wide, with the tail) still reads its report.
+        check(write_save_game_at(k_path, w, env, save_game_version_econ_report),
+              "S12 the verification writer wrote a v27 file");
+        save_envelope te;
+        const bool tok = read_save_game(k_path, vw, te);
+        check(tok && te.last_econ_report.buildings.size() == r.buildings.size()
+                  && te.last_corp_standings.size() == 2
+                  && same_market_history(te.market_history, env.market_history),
+              "S12 a v27 stream (55 wide, report tail) is ACCEPTED with its report");
+        // A version no build has written is refused.
         write_save_game(k_path, w, env);
         {
             std::fstream f(k_path, std::ios::binary | std::ios::in | std::ios::out);
             f.seekp(4, std::ios::beg);
-            const uint32_t v26 = 26; // held by BL-1527's branch; not a layout this build reads
-            f.write(reinterpret_cast<const char*>(&v26), sizeof(v26));
+            const uint32_t v30 = save_game_version + 1;
+            f.write(reinterpret_cast<const char*>(&v30), sizeof(v30));
         }
         save_envelope be;
         be.speed = 55;
         check(!read_save_game(k_path, vw, be) && be.speed == 55,
-              "S12 a stream stamped v26 (another branch's layout) is REFUSED, destination untouched");
+              "S12 a stream stamped v30 (no layout yet) is REFUSED, destination untouched");
     }
 
     // -----------------------------------------------------------------------
@@ -1306,7 +1373,8 @@ int main()
     // hostile count, an out-of-range enum byte, a non-finite float and a
     // truncated tail are each REFUSED before anything is allocated or moved,
     // and the destination world and envelope are left exactly as they were.
-    // The tail's offset is the size of the same envelope written at v25.
+    // The tail's offset is the size of the same envelope written at v26 (56 wide, no tail),
+    // plus the world sections a v88 snapshot carries and the v26 file's v81 world does not.
     // -----------------------------------------------------------------------
     {
         auto file_size = [](const char* p) {
@@ -1337,11 +1405,13 @@ int main()
         b.building = 7001;
         b.type     = building_type::processing_facility;
         env.last_econ_report.buildings.push_back(b);
-        write_save_game_at(k_path, w, env, save_game_version_pre_econ_report);
-        const std::uint64_t tail = file_size(k_path);
+        write_save_game_at(k_path, w, env, save_game_version_ship_hulls);
+        const std::uint64_t tail = file_size(k_path) + world_save_research_books_section_bytes(w)
+                                 + world_save_growth_carry_section_bytes(w)
+                                 + world_save_ended_section_bytes(w);
         write_save_game(k_path, w, env);
         const std::uint64_t full = file_size(k_path);
-        check(full > tail, "S13 anchor: the v27 file is longer than its v25 twin (the tail is there)");
+        check(full > tail, "S13 anchor: the v29 file is longer than its tail offset (the tail is there)");
         {
             world lw; save_envelope le;
             check(read_save_game(k_path, lw, le) && le.last_econ_report.buildings.size() == 1,

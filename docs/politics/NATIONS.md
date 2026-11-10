@@ -225,7 +225,7 @@ indexed by them):
 |---|---|
 | `logistics_maintenance` | keeping the road/hub network standing (LOGISTICS.md) |
 | `schooling` | population capability |
-| `military_research` | force-side research, and a nation's own garrison upkeep (MILITARY.md § Nation garrisons) |
+| `military_research` | force-side research; a force's wages are a flat bill and no line's share (MILITARY.md § What a force costs) |
 | `academic_research` | the civil tech ladder — treasury the line spends converts to the nation's research points (`../economy/RESEARCH.md` § Research points) |
 | `public_exploration` | state-funded survey — DISCOVERY.md's geographic fog |
 | `contracted_force` | buying force the nation does not raise — BL-572 (contract offers) derives an offer from this line's spendable share; the contract form itself carries no sell side to buy through (CONTRACTS.md § Explicitly out of scope) |
@@ -703,13 +703,11 @@ of another nation is `docs/politics/RELATIONS.md`'s.
 **Related authorities.** `docs/generation/NATION_GENERATION.md` (how a nation is made),
 `docs/economy/FINANCE.md` (the money loop a law's charge is accounted in), `docs/economy/MARKETS.md`
 (§ Tariffs, the clearing-tick half), `docs/politics/RELATIONS.md` (sentiment between nations), `docs/economy/CONTRACTS.md` (§ Explicitly out of scope, the sell side
-the `contracted_force` line would buy through), `docs/military/MILITARY.md` (§ Nation garrisons, the
-`military_research` line's other consumer), `docs/SYSTEMS.md` (§ Policy, § Conditions),
+the `contracted_force` line would buy through), `docs/military/MILITARY.md` (§ What a force costs, wages as a flat bill), `docs/SYSTEMS.md` (§ Policy, § Conditions),
 `.claude/rules/io-standing-rules.md` (the grant's exact terms).
 
 **Owning items.** BL-541 (directional tariffs);
 BL-543 (value anchor) and BL-544 (unit wage reference) for the price anchor; BL-155 (law/policy
 surface) for the four-family taxonomy and the ten-law list; BL-186 (laws ledger UI); BL-555 (who
 is paying me) for the earmark surface; BL-572 (contract
-offers) for the `contracted_force` line's derivation; BL-571 (nation garrisons) for the
-`military_research` line's garrison-upkeep consumer.
+offers) for the `contracted_force` line's derivation; BL-1550 (force pay) for the flat wage bill.

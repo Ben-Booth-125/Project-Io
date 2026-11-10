@@ -157,14 +157,14 @@ for (const n of nodes) {
 for (const u of unparsed) err(`direction audit cannot parse — ${u}`);
 
 // ---- the kit link (BL-1436; Ben, 2026-11-03, ruling 7) -------------------------------------
-// The kit catalogue (src/world/unit_designs.cpp, the land `later(...)` and air `alater(...)`
+// The kit catalogue (src/world/unit_designs.cpp, the land `later(...)`, air `alater(...)` and ship `slater(...)`
 // rows) names each later item's research node; the store's unlock_kit effects name each node's
 // items. Both directions must agree: every catalogue item's node is in the store and carries an
 // unlock_kit naming it, and every unlock_kit item is a catalogue item naming that node.
 if (age === 'digitisation') {
   const cat = fs.readFileSync(path.join(root, 'src', 'world', 'unit_designs.cpp'), 'utf8');
   const itemNode = new Map();
-  for (const m of cat.matchAll(/\ba?later\(\s*"([a-z0-9_.]+)"[^\n]*?"(DG-[A-Z0-9-]+)"/g)) {
+  for (const m of cat.matchAll(/\b[as]?later\(\s*"([a-z0-9_.]+)"[^\n]*?"(DG-[A-Z0-9-]+)"/g)) {
     if (itemNode.has(m[1])) err(`catalogue: item ${m[1]} listed twice`);
     itemNode.set(m[1], m[2]);
   }

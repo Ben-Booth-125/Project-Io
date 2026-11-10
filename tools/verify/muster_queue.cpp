@@ -19,6 +19,7 @@
 // Run: muster_queue
 // ---------------------------------------------------------------------------
 
+#include "world/unit_designs.hpp"
 #include "world/components.hpp"
 #include "world/corp_command.hpp"
 #include "world/economy_system.hpp"
@@ -94,6 +95,8 @@ std::string to_bytes(const world& w)
 
 int main()
 {
+    set_class_equipment_waived_for_harness(true); // BL-1551: this harness tests the queue
+
     std::printf("=== muster queue (BL-1435) ===\n");
     const recipe_registry reg{};
     constexpr uint16_t levy = 0; // ungated, every band: infantry, 90 days

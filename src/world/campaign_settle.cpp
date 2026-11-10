@@ -94,7 +94,9 @@ settle_tick_result run_settle_tick(world& w, const recipe_registry& live_reg, in
     // haul by the clear has sold at home. Dispatch reads LAST tick's resolved
     // prices and supply/demand (clear_markets rewrites them only below).
     advance_convoys(w);
-    credit_arrived_convoys(w, day_tick);
+    // BL-1529: the raid reads this tick's sweep, which the arrivals spend.
+    std::vector<interception_record> interceptions = raid_convoys(w, reg, day_tick);
+    credit_arrived_convoys(w, day_tick, &interceptions);
     lap_done(0); // convoys: advance + arrivals
 
     // BL-409 / BL-630: under spectate -- a spectate session, or the settle,
@@ -102,6 +104,7 @@ settle_tick_result run_settle_tick(world& w, const recipe_registry& live_reg, in
     // corp, the player's included: the prohibition the flag lifts has no
     // subject to protect, and every corp files real returns.
     out.report = run_economy_step(w, reg, spectating);
+    out.report.interceptions = std::move(interceptions);
     // BL-1266 (TRADE.md): the trade pass, BEFORE the clear -- a trade buys on
     // its source shelf this tick and the clear bills it at the posted price. It
     // draws the same tick's LP pool the march (inside run_economy_step) already
@@ -147,6 +150,7 @@ settle_tick_result run_settle_tick(world& w, const recipe_registry& live_reg, in
     // sees the posted world. A no-op on a world with no generation record (a load).
     if (econ_step == k_campaign_settle_ticks - 1 && !w.gen_garrisons.empty())
     {
+        print_garrison_income(size_garrisons_to_income(w, reg)); // BL-1617: its returns are filed
         print_garrison_repost(repost_garrisons_on_cover(w, &reg.military()));
         // BL-1501: THE SHARE THE FIRST QUARTER LIVES ON. The daily pass reads
         // `lp_share_permille` (`stocks_after_day`) for the ninety days before the first live

@@ -4,12 +4,13 @@
 -- shift-click on a queued node takes it off with the entries that need it).
 --
 -- Captures (screenshots/):
---   tech_tree_inspect      the ring: 160 nodes, four cost rings, AND links in
+--   tech_tree_inspect      the ring: 211 nodes in ten branches, four cost rings, AND links in
 --                          the accent, pairs outlined red, quests as amber
 --                          diamonds, placeholders dashed; each tree's name in
 --                          its own sector; the legend; the queue column.
 --   tech_tree_hover_major  the shared hover card on a major (Offshore Drilling).
 --   tech_tree_hover_quest  the card on a quest (Strategic Reserve): deed, keys.
+--   tech_tree_hover_naval  the card on a Naval major (Reactor Propulsion): the kit it opens.
 --   tech_tree_queue        one shift-click on Seismic Survey queued it with its
 --                          two requirements ahead of it: 3 entries with arrivals.
 --   tech_tree_unqueue      a shift-click on queued Field Practice II took it off
@@ -48,6 +49,9 @@ verify.capture("tech_tree_hover_major")
 x, y = node("DG-PR-EX-Q")
 verify.hover(x, y, 40)
 verify.capture("tech_tree_hover_quest")
+x, y = node("DG-ST-NV-A")
+verify.hover(x, y, 40)
+verify.capture("tech_tree_hover_naval")
 
 -- A plain click only inspects: nothing is queued.
 verify.expect(count(verify.tech_tree_queue()) == 0, "queue starts empty")

@@ -466,9 +466,34 @@ void add_goods(std::array<float, resource_count>& out, uint16_t item)
 
 } // namespace
 
+static bool g_class_equipment_waived = false;
+void set_class_equipment_waived_for_harness(bool waived) { g_class_equipment_waived = waived; }
+
+std::array<float, resource_count> land_class_equipment(land_class c)
+{
+    if (g_class_equipment_waived)
+        return {}; // a harness testing the queue or the scorer, not the shelves
+    // BL-1551 (Ben, 2026-11-08; MILITARY.md § What a force costs): by kind, per unit raised.
+    // First-cut quantities on the catalogue's own scale (AP(2), AV(2)); read by the census.
+    std::array<float, resource_count> out{};
+    const auto put = [&](resource_type r, float q) { out[static_cast<std::size_t>(r)] = q; };
+    switch (c)
+    {
+        case land_class::infantry:     put(resource_type::small_arms, 2.0f); break;
+        case land_class::motorised:    put(resource_type::small_arms, 2.0f); put(resource_type::armoured_vehicles, 1.0f); break;
+        case land_class::mechanised:   put(resource_type::small_arms, 1.0f); put(resource_type::armoured_vehicles, 2.0f); break;
+        case land_class::armour:       put(resource_type::armoured_vehicles, 4.0f); break;
+        case land_class::light_armour: put(resource_type::armoured_vehicles, 2.0f); break;
+        case land_class::artillery:    put(resource_type::artillery_pieces, 3.0f); break;
+        case land_class::air_defence:  put(resource_type::artillery_pieces, 2.0f); break;
+        case land_class::none:         break;
+    }
+    return out;
+}
+
 std::array<float, resource_count> kit_goods(land_class c, const unit_design& d)
 {
-    std::array<float, resource_count> out{};
+    std::array<float, resource_count> out = land_class_equipment(c);
     for (int slot = 0; slot < slot_count(c); ++slot)
         add_goods(out, kit_item_at(c, slot, d.fit[static_cast<std::size_t>(slot)]));
     return out;
@@ -834,5 +859,327 @@ bool air_design_valid(air_class c, const unit_design& d)
     for (int s = 0; s < k_air_kit_slot_count; ++s)
         if (d.fit[static_cast<std::size_t>(s)] >= air_kit_items_for(c, s).size())
             return false;
+    return true;
+}
+
+// ===========================================================================
+// BL-1527 — the ship catalogue (MILITARY.md § Sea). Delta units are the class table's:
+// HP, milli-HP a day of attack, detection and stealth points, per-mille of a day to sail
+// a tile (negative is faster), land units carried. APPEND-ONLY within a slot.
+// ===========================================================================
+
+namespace {
+
+using sc = ship_class;
+
+// GOODS: a later hull draws SHIP HULLS (SH), the seventh kit good; armament draws
+// artillery pieces (AP) or guided weapons (GW); sensors draw electronics (EL).
+constexpr kit_good SH(float q) { return {resource_type::ship_hulls, q}; }
+
+constexpr uint8_t k_hits_submarine = static_cast<uint8_t>(1u << static_cast<unsigned>(ship_class::submarine));
+
+constexpr ship_kit_item sbase(const char* id, const char* name, sc c, uint8_t slot)
+{
+    return {id, name, c, slot, {}, {}, 0, nullptr};
+}
+
+/// Delta order is ship_combat_stats': hp, attack, detection, stealth, pace, capacity, targets.
+constexpr ship_kit_item slater(const char* id, const char* name, sc c, uint8_t slot,
+                               ship_combat_stats d, const char* node,
+                               kit_good g0, kit_good g1 = {}, kit_good g2 = {})
+{
+    const uint8_t n = static_cast<uint8_t>(1 + (g1.qty > 0.0f ? 1 : 0) + (g2.qty > 0.0f ? 1 : 0));
+    return {id, name, c, slot, d, {g0, g1, g2}, n, node};
+}
+
+constexpr ship_kit_item k_ship_items[] = {
+    // --- Submarine: Hull (0) · Armament (1) · Sensors (2) ----------------------
+    sbase ("sub.hull.diesel",          "Diesel-electric hull",            sc::submarine, 0),
+    slater("sub.hull.snorkel",         "Streamlined snorkel hull",        sc::submarine, 0, {10, 0, 0, 100, -50, 0, 0},  "DG-ST-NV-A2", SH(2)),
+    slater("sub.hull.reactor",         "Reactor pressure hull",           sc::submarine, 0, {20, 0, 0, 150, -200, 0, 0}, "DG-ST-NV-A",  SH(4), EL(2)),
+    sbase ("sub.armament.straight",    "Straight-running torpedoes",      sc::submarine, 1),
+    slater("sub.armament.homing",      "Homing torpedoes",                sc::submarine, 1, {0, 800, 0, 0, 0, 0, 0},     "DG-ST-NV-B2", GW(1)),
+    slater("sub.armament.hunter",      "Wire-guided hunter torpedoes",    sc::submarine, 1, {0, 1500, 0, 0, 0, 0, k_hits_submarine}, "DG-ST-NV-B", GW(3), EL(1)),
+    sbase ("sub.sensors.hydrophone",   "Hydrophones",                     sc::submarine, 2),
+    slater("sub.sensors.passive",      "Passive sonar array",             sc::submarine, 2, {0, 0, 20, 0, 0, 0, 0},      "DG-ST-NV-C2", EL(1)),
+    slater("sub.sensors.towed",        "Towed sonar array",               sc::submarine, 2, {0, 0, 60, 0, 0, 0, 0},      "DG-ST-NV-C",  EL(3)),
+    // --- Destroyer ------------------------------------------------------------
+    sbase ("des.hull.flush_deck",      "Flush-deck hull",                 sc::destroyer, 0),
+    slater("des.hull.gas_turbine",     "Gas-turbine hull",                sc::destroyer, 0, {10, 0, 0, 0, -50, 0, 0},    "DG-ST-NV-A1", SH(2)),
+    slater("des.hull.quiet",           "Quieted composite hull",          sc::destroyer, 0, {20, 0, 0, 40, -100, 0, 0},  "DG-ST-NV-A",  SH(3), EL(1)),
+    sbase ("des.armament.guns",        "Dual-purpose guns and depth charges", sc::destroyer, 1),
+    slater("des.armament.rocket",      "Anti-submarine rockets",          sc::destroyer, 1, {0, 500, 0, 0, 0, 0, 0},     "DG-ST-NV-B1", AP(2)),
+    slater("des.armament.missile",     "Anti-ship missiles",              sc::destroyer, 1, {0, 1200, 0, 0, 0, 0, 0},    "DG-ST-NV-B",  GW(3), EL(1)),
+    sbase ("des.sensors.hull_sonar",   "Hull sonar",                      sc::destroyer, 2),
+    slater("des.sensors.variable",     "Variable-depth sonar",            sc::destroyer, 2, {0, 0, 80, 0, 0, 0, 0},      "DG-ST-NV-C1", EL(2)),
+    slater("des.sensors.towed",        "Towed array and data link",       sc::destroyer, 2, {0, 0, 180, 0, 0, 0, 0},     "DG-ST-NV-C",  EL(4)),
+    // --- Capital ship ---------------------------------------------------------
+    sbase ("cap.hull.armoured",        "Armoured hull",                   sc::capital, 0),
+    slater("cap.hull.compartmented",   "Compartmented hull",              sc::capital, 0, {40, 0, 0, 0, 0, 0, 0},        "DG-ST-NV-A1", SH(5)),
+    slater("cap.hull.reactor",         "Reactor capital hull",            sc::capital, 0, {60, 0, 0, 0, -100, 0, 0},     "DG-ST-NV-A",  SH(8), EL(2)),
+    sbase ("cap.armament.turrets",     "Heavy gun turrets",               sc::capital, 1),
+    slater("cap.armament.rifled",      "Radar-laid main battery",         sc::capital, 1, {0, 1500, 0, 0, 0, 0, 0},      "DG-ST-NV-B1", AP(4)),
+    slater("cap.armament.vertical",    "Vertical-launch missile cells",   sc::capital, 1, {0, 3000, 0, 0, 0, 0, 0},      "DG-ST-NV-B",  GW(6), EL(2)),
+    sbase ("cap.sensors.optical",      "Optical rangefinders",            sc::capital, 2),
+    slater("cap.sensors.search",       "Surface search radar",            sc::capital, 2, {0, 0, 50, 0, 0, 0, 0},        "DG-ST-NV-C1", EL(2)),
+    slater("cap.sensors.phased",       "Phased-array radar",              sc::capital, 2, {0, 0, 120, 0, 0, 0, 0},       "DG-ST-NV-C",  EL(4)),
+    // --- Transport: Hull (0) · Sensors (2); it has no armament ------------------
+    sbase ("tra.hull.liner",           "Converted freighter hull",        sc::transport, 0),
+    slater("tra.hull.roll_on",         "Roll-on assault hull",            sc::transport, 0, {10, 0, 0, 0, -50, 1, 0},    "DG-ST-NV-A1", SH(2)),
+    slater("tra.hull.fast",            "Fast sealift hull",               sc::transport, 0, {20, 0, 0, 0, -150, 2, 0},   "DG-ST-NV-A",  SH(4)),
+    sbase ("tra.sensors.lookout",      "Lookouts and navigation radar",   sc::transport, 2),
+    slater("tra.sensors.warning",      "Warning radar",                   sc::transport, 2, {0, 0, 20, 0, 0, 0, 0},      "DG-ST-NV-C1", EL(1)),
+    slater("tra.sensors.datalink",     "Convoy data link",                sc::transport, 2, {0, 0, 50, 0, 0, 0, 0},      "DG-ST-NV-C",  EL(2)),
+};
+
+constexpr std::size_t k_ship_item_count = sizeof(k_ship_items) / sizeof(k_ship_items[0]);
+
+constexpr bool ship_zero(const ship_combat_stats& d)
+{
+    return d.hp == 0 && d.attack == 0 && d.detection == 0 && d.stealth == 0
+        && d.days_per_tile_permille == 0 && d.capacity == 0 && d.targets == 0;
+}
+
+constexpr const char* ship_first_error()
+{
+    if (k_ship_item_count >= k_no_kit_item)
+        return "ship catalogue too large for a u16 id";
+    for (std::size_t i = 0; i < k_ship_item_count; ++i)
+    {
+        const ship_kit_item& it = k_ship_items[i];
+        if (it.id == nullptr || it.id[0] == '\0' || it.name == nullptr || it.name[0] == '\0')
+            return "a ship item has no id or name";
+        if (static_cast<int>(it.cls) >= ship_class_count || it.slot >= k_ship_kit_slot_count)
+            return "a ship item names a class or slot that does not exist";
+        if (it.cls == sc::transport && it.slot == 1)
+            return "a transport has no armament";
+        if (it.cls == sc::capital && (it.delta.targets & k_hits_submarine) != 0)
+            return "a capital ship cannot hit a submarine";
+        if (it.delta.stealth < 0 || it.delta.detection < 0)
+            return "ship kit only adds stealth and detection";
+        for (std::size_t j = 0; j < i; ++j)
+        {
+            if (str_eq(k_ship_items[j].id, it.id))
+                return "two ship items share an id";
+            if (it.research_node != nullptr && k_ship_items[j].cls == it.cls && k_ship_items[j].slot == it.slot
+                && str_eq(k_ship_items[j].research_node, it.research_node))
+                return "two ship items of one slot share a research node";
+        }
+        if (it.goods_count > k_kit_goods_max)
+            return "a ship item names too many goods";
+        if (it.research_node != nullptr && io::dg::find_node(it.research_node) < 0)
+            return "a ship item names a node the tree does not hold";
+        if (it.research_node == nullptr)
+        {
+            if (!ship_zero(it.delta) || it.goods_count != 0)
+                return "a base ship item carries a delta or goods";
+        }
+        else
+        {
+            if (it.research_node[0] == '\0' || it.goods_count == 0)
+                return "a later ship item names no research node or no goods";
+            for (std::size_t g = 0; g < it.goods_count; ++g)
+                if (!(it.goods[g].qty > 0.0f))
+                    return "a later ship item names a good of no quantity";
+        }
+    }
+    for (int c = 0; c < ship_class_count; ++c)
+        for (int s = 0; s < k_ship_kit_slot_count; ++s)
+        {
+            if (static_cast<sc>(c) == sc::transport && s == 1)
+                continue;
+            int count = 0, bases = 0;
+            bool base_first = false;
+            for (std::size_t i = 0; i < k_ship_item_count; ++i)
+            {
+                const ship_kit_item& it = k_ship_items[i];
+                if (static_cast<int>(it.cls) != c || static_cast<int>(it.slot) != s)
+                    continue;
+                if (it.research_node == nullptr)
+                {
+                    ++bases;
+                    base_first = (count == 0);
+                }
+                ++count;
+            }
+            if (bases != 1 || !base_first)
+                return "a ship slot has no base item listed first, or more than one";
+            if (count - 1 < 2 || count - 1 > 4)
+                return "a ship slot has fewer than two or more than four later items";
+        }
+    return nullptr;
+}
+
+static_assert(ship_first_error() == nullptr, "the ship kit catalogue is malformed: see ship_first_error()");
+
+struct ship_slot_index
+{
+    std::vector<uint16_t> items[ship_class_count][k_ship_kit_slot_count];
+    std::vector<uint8_t>  variant;
+};
+
+const ship_slot_index& ship_index()
+{
+    static const ship_slot_index idx = [] {
+        ship_slot_index s;
+        s.variant.assign(k_ship_item_count, 0);
+        for (std::size_t i = 0; i < k_ship_item_count; ++i)
+        {
+            const ship_kit_item& it = k_ship_items[i];
+            std::vector<uint16_t>& v = s.items[static_cast<std::size_t>(it.cls)][it.slot];
+            s.variant[i] = static_cast<uint8_t>(v.size());
+            v.push_back(static_cast<uint16_t>(i));
+        }
+        return s;
+    }();
+    return idx;
+}
+
+bool ship_class_ok(ship_class c, int slot)
+{
+    return static_cast<int>(c) < ship_class_count && slot >= 0 && slot < k_ship_kit_slot_count;
+}
+
+} // namespace
+
+const std::vector<ship_kit_item>& ship_kit_catalogue()
+{
+    static const std::vector<ship_kit_item> v(std::begin(k_ship_items), std::end(k_ship_items));
+    return v;
+}
+
+const char* ship_kit_catalogue_first_error()
+{
+    return ship_first_error();
+}
+
+const char* ship_kit_slot_name(int slot)
+{
+    static const char* const names[k_ship_kit_slot_count] = {"Hull", "Armament", "Sensors"};
+    return (slot >= 0 && slot < k_ship_kit_slot_count) ? names[slot] : "";
+}
+
+const std::vector<uint16_t>& ship_kit_items_for(ship_class c, int slot)
+{
+    if (!ship_class_ok(c, slot))
+        return k_no_items;
+    return ship_index().items[static_cast<std::size_t>(c)][slot];
+}
+
+uint16_t ship_kit_item_at(ship_class c, int slot, uint8_t variant)
+{
+    const std::vector<uint16_t>& v = ship_kit_items_for(c, slot);
+    return variant < v.size() ? v[variant] : k_no_kit_item;
+}
+
+uint16_t ship_kit_item_by_id(std::string_view id)
+{
+    for (std::size_t i = 0; i < k_ship_item_count; ++i)
+        if (id == k_ship_items[i].id)
+            return static_cast<uint16_t>(i);
+    return k_no_kit_item;
+}
+
+uint8_t ship_kit_variant_of(uint16_t item)
+{
+    return item < k_ship_item_count ? ship_index().variant[item] : uint8_t{0};
+}
+
+bool ship_kit_item_researched(const world& w, entity_id nation, uint16_t item)
+{
+    if (item >= k_ship_item_count)
+        return false;
+    const ship_kit_item& it = k_ship_items[item];
+    if (it.research_node == nullptr)
+        return true;
+    if (g_waived)
+        return true;
+    const int node = io::dg::find_node(it.research_node);
+    return node >= 0 && nation_holds(w, nation, node);
+}
+
+unit_design ship_design_of(const world& w, entity_id nation, ship_class c)
+{
+    unit_design d;
+    const auto nit = w.nations.find(nation);
+    if (nit == w.nations.end() || static_cast<int>(c) >= ship_class_count)
+        return d;
+    for (const uint16_t item : nit->second.ship_design_kit)
+    {
+        if (item >= k_ship_item_count || k_ship_items[item].cls != c)
+            continue;
+        d.fit[k_ship_items[item].slot] = ship_kit_variant_of(item);
+    }
+    return d;
+}
+
+uint16_t ship_design_fitted(const world& w, entity_id nation, ship_class c, int slot)
+{
+    if (!ship_class_ok(c, slot))
+        return k_no_kit_item;
+    return ship_kit_item_at(c, slot, ship_design_of(w, nation, c).fit[static_cast<std::size_t>(slot)]);
+}
+
+ship_combat_stats ship_kit_delta(ship_class c, const unit_design& d)
+{
+    ship_combat_stats s;
+    for (int slot = 0; slot < k_ship_kit_slot_count; ++slot)
+    {
+        const uint16_t item = ship_kit_item_at(c, slot, d.fit[static_cast<std::size_t>(slot)]);
+        if (item == k_no_kit_item)
+            continue;
+        const ship_combat_stats& k = k_ship_items[item].delta;
+        s.hp += k.hp; s.attack += k.attack; s.detection += k.detection; s.stealth += k.stealth;
+        s.days_per_tile_permille += k.days_per_tile_permille; s.capacity += k.capacity;
+        s.targets = static_cast<uint8_t>(s.targets | k.targets);
+    }
+    return s;
+}
+
+std::array<float, resource_count> ship_kit_goods(ship_class c, const unit_design& d)
+{
+    std::array<float, resource_count> out{};
+    for (int slot = 0; slot < k_ship_kit_slot_count; ++slot)
+    {
+        const uint16_t item = ship_kit_item_at(c, slot, d.fit[static_cast<std::size_t>(slot)]);
+        if (item >= k_ship_item_count)
+            continue;
+        const ship_kit_item& it = k_ship_items[item];
+        for (std::size_t g = 0; g < it.goods_count; ++g)
+            out[static_cast<std::size_t>(it.goods[g].res)] += it.goods[g].qty;
+    }
+    return out;
+}
+
+std::array<float, resource_count> ship_kit_refit_goods(ship_class c, const unit_design& from,
+                                                       const unit_design& to)
+{
+    std::array<float, resource_count> out{};
+    for (int slot = 0; slot < k_ship_kit_slot_count; ++slot)
+    {
+        const std::size_t sl = static_cast<std::size_t>(slot);
+        if (from.fit[sl] == to.fit[sl])
+            continue;
+        const uint16_t item = ship_kit_item_at(c, slot, to.fit[sl]);
+        if (item >= k_ship_item_count)
+            continue;
+        const ship_kit_item& it = k_ship_items[item];
+        for (std::size_t g = 0; g < it.goods_count; ++g)
+            out[static_cast<std::size_t>(it.goods[g].res)] += it.goods[g].qty;
+    }
+    return out;
+}
+
+bool ship_design_valid(ship_class c, const unit_design& d)
+{
+    if (static_cast<int>(c) >= ship_class_count)
+        return false;
+    for (int s = 0; s < k_ship_kit_slot_count; ++s)
+    {
+        const std::size_t n = ship_kit_items_for(c, s).size();
+        const uint8_t v = d.fit[static_cast<std::size_t>(s)];
+        if (n == 0 ? v != 0 : v >= n)
+            return false;
+    }
     return true;
 }

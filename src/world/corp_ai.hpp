@@ -2,6 +2,8 @@
 
 #include "components.hpp"
 #include "corp_command.hpp"
+#include <map>
+#include <set>
 #include "entity.hpp"
 
 #include <array>
@@ -533,6 +535,33 @@ void score_nation_air(world& w, const recipe_registry& reg, entity_id nation, in
 /// for the harness - BL-1426: a province holding only a hostile bunker scores 0 for
 /// strategic bombing, the bunker grant admitting no strike on another's bunker.
 int64_t rival_air_province_score(const world& w, entity_id nation, air_mission m, uint32_t province);
+
+/// BL-1552 (MILITARY.md § Force sizing): the most of its income a nation's force may cost.
+inline constexpr float k_force_max_share = 0.50f; ///< The ceiling threat climbs to. First cut.
+/// Its operating surplus before military pay, averaged over a year of returns; never negative.
+float nation_force_income(const nation_component& nc);
+
+/// BL-1552 (MILITARY.md § Force sizing): what sizes a nation's forces.
+struct force_reading
+{
+    float income = 0.0f, running = 0.0f, share = 0.0f, target = 0.0f, threat = 0.0f, own_value = 0.0f;
+};
+/// What a nation's whole force would cost to hire: the ONE number another nation may read.
+float nation_force_value(const world& w, const recipe_registry& reg, entity_id nation);
+force_reading read_nation_force(const world& w, const recipe_registry& reg, entity_id nation,
+                                const std::map<entity_id, std::set<entity_id>>& borders);
+/// At most one hire in each theatre towards the income target. Never the player's nation.
+void score_nation_force(world& w, const recipe_registry& reg, entity_id nation, int tick,
+                        const std::map<entity_id, std::set<entity_id>>& borders);
+
+/// BL-1533 (AI_OPPONENT.md § 11, "Rival nations sail fleets", Ben 2026-11-05, read
+/// 2026-11-08): a rival nation's sea pass - while mobilised, design and hire one ship
+/// at its own port under a soft cap of three, give each of its own raised warships the
+/// one best zone its class works, and board and land its idle units on a hostile coast
+/// beside water it holds - all through the legal verbs. Of other nations' ships it reads
+/// only its own sightings. Does nothing for the player's nation (or an unknown one).
+/// Called by run_corp_strategic_step after the air pass; exported for the harness.
+void score_nation_sea(world& w, const recipe_registry& reg, entity_id nation, int tick);
 
 /// BL-1426 (AI_OPPONENT.md § 11, "Rival nations build bunkers on their own ground",
 /// Ben 2026-10-31; MILITARY.md § Fortifications): a rival nation's bunker pass - in
