@@ -6554,9 +6554,9 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     // head, gliding with the beam's clock. A press selects it; markers do not outrank a
     // lens, so under one it takes no press (BL-664). A rival's draws only on ground the
     // player's own vision lights (DISCOVERY.md), with the Resource lens's lifted fog not
-    // counting. Several on one tile draw as ONE marker, its glyph and count in one box, the
-    // clutter guard: the press walks them, as the wing marker walks its wings. The marker
-    // and its box grow with the zoom (Ben, 2026-11-09). Off below the counters' zoom.
+    // counting. A marker is its glyph and count in one box, a lone convoy's reading 1 (Ben,
+    // 2026-11-10); several on one tile draw as ONE marker, the clutter guard: the press
+    // walks them, as the wing marker walks its wings. The marker and its box grow with the zoom (Ben, 2026-11-09). Off below the counters' zoom.
     state.convoy_zones.clear();
     if (draw_r >= 6.0f && !state.convoy_markers.empty())
     {
@@ -6585,13 +6585,55 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             }
             by_tile[ht].push_back({ &m, p });
         }
-        // THE MARKER KEEPS ITS CONVOY (Ben, 2026-11-09: the jitter on stacking). A tile's
-        // one marker is drawn at its lead convoy's point; the lead was the lowest id, so a
-        // lower-id convoy catching another up on its tile moved the marker from one point
-        // to the other in a frame. The convoy a tile's marker drew last frame stays its
-        // lead while it is still there; the lowest id leads a tile only when none does.
+        // THE MARKER NEVER JUMPS (Ben, 2026-11-09 and 2026-11-10: "the box tracks the
+        // furthest back convoy in that tile, so when a convoy merges or splits the box
+        // jumps"). A tile's one marker is drawn at its ANCHOR convoy: the selected one,
+        // else the convoy it anchored last frame while that one is still on the tile,
+        // else the player's own before a rival's, then the most advanced along its lane
+        // (lowest id on a tie). And every convoy
+        // carries a TRAIL: where it was drawn and where its lane put it last frame. A
+        // frame draws the anchor at its lane point plus what is left of last frame's
+        // offset from it, three quarters kept a frame - so a convoy moving on its lane
+        // has no offset and no lag, and a change of anchor, a merge or a split slides
+        // over a few frames instead of snapping. A convoy hidden in a shared marker is
+        // drawn AT the marker, so when it leaves it sets out from there. View state only.
+        struct convoy_trail { ImVec2 drawn{}, target{}; };
+        static std::unordered_map<std::uint32_t, convoy_trail> s_convoy_trail;
+        static entity_id s_convoy_trail_body = null_entity;
+        if (s_convoy_trail_body != state.active_body)
+        {
+            s_convoy_trail.clear();
+            s_convoy_trail_body = state.active_body;
+        }
+        std::unordered_map<std::uint32_t, convoy_trail> trail_now;
         static std::unordered_map<entity_id, std::uint32_t> s_convoy_lead;
         std::unordered_map<entity_id, std::uint32_t> convoy_lead_now;
+        constexpr float k_trail_keep = 0.75f;
+        const auto unwrap_near = [&](ImVec2 v, ImVec2 ref) {
+            while (v.x - ref.x > local_period * 0.5f) v.x -= local_period;
+            while (ref.x - v.x > local_period * 0.5f) v.x += local_period;
+            return v;
+        };
+        // The point along the lane, in ground space: between the two tiles whose clock
+        // brackets p.
+        const auto lane_point = [&](const head_mark& hm, ImVec2& out) -> bool {
+            const ui_state::convoy_marker& cm = *hm.m;
+            const std::size_t n = cm.path.size();
+            const std::size_t hi = std::min<std::size_t>(
+                static_cast<std::size_t>(std::lower_bound(cm.at.begin(), cm.at.end(), hm.p) - cm.at.begin()),
+                n - 1);
+            const std::size_t lo = hi > 0 ? hi - 1 : 0;
+            const auto ta = w.tiles.find(cm.path[lo]);
+            const auto tb = w.tiles.find(cm.path[hi]);
+            if (ta == w.tiles.end() || tb == w.tiles.end())
+                return false;
+            const float span = cm.at[hi] - cm.at[lo];
+            const float t = span > 0.0f ? std::clamp((hm.p - cm.at[lo]) / span, 0.0f, 1.0f) : 1.0f;
+            const ImVec2 a = hex_local_centre(ta->second.grid_x, ta->second.grid_y, hex_size);
+            const ImVec2 b = unwrap_near(hex_local_centre(tb->second.grid_x, tb->second.grid_y, hex_size), a);
+            out = { a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t };
+            return true;
+        };
         const float cr = std::max(6.0f, draw_r * 0.24f);
         // The count reads at the marker's scale, and never below legible.
         const float count_font = std::max(ImGui::GetFontSize() * 0.75f, cr * 1.1f);
@@ -6614,42 +6656,54 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 hovered = hovered || marks[i].m->id == state.hovered_convoy;
             }
             if (!selected)
+            {
+                bool kept = false;
                 if (const auto pl = s_convoy_lead.find(tile); pl != s_convoy_lead.end())
                     for (std::size_t i = 0; i < marks.size(); ++i)
                         if (marks[i].m->id == pl->second)
+                        {
                             lead = i;
+                            kept = true;
+                        }
+                // Else the player's own before a rival's, so a shared marker wears the
+                // player's colour, then the most advanced; marks are in ascending id, so
+                // a tie keeps the lowest.
+                if (!kept)
+                    for (std::size_t i = 1; i < marks.size(); ++i)
+                        if (marks[i].m->mine != marks[lead].m->mine ? marks[i].m->mine
+                                                                    : marks[i].p > marks[lead].p)
+                            lead = i;
+            }
             convoy_lead_now[tile] = marks[lead].m->id;
             const ui_state::convoy_marker& m = *marks[lead].m;
-            // The point along the lane: between the two tiles whose clock brackets p.
-            const std::size_t n = m.path.size();
-            const float p = marks[lead].p;
-            const std::size_t hi = std::min<std::size_t>(
-                static_cast<std::size_t>(std::lower_bound(m.at.begin(), m.at.end(), p) - m.at.begin()),
-                n - 1);
-            const std::size_t lo = hi > 0 ? hi - 1 : 0;
-            const auto ta = w.tiles.find(m.path[lo]);
-            const auto tb = w.tiles.find(m.path[hi]);
-            if (ta == w.tiles.end() || tb == w.tiles.end())
+            ImVec2 target{};
+            if (!lane_point(marks[lead], target))
                 continue;
-            const float span = m.at[hi] - m.at[lo];
-            const float t = span > 0.0f ? std::clamp((p - m.at[lo]) / span, 0.0f, 1.0f) : 1.0f;
-            const ImVec2 a = hex_local_centre(ta->second.grid_x, ta->second.grid_y, hex_size);
-            ImVec2       b = hex_local_centre(tb->second.grid_x, tb->second.grid_y, hex_size);
-            if (b.x - a.x > local_period * 0.5f)       b.x -= local_period;
-            else if (a.x - b.x > local_period * 0.5f)  b.x += local_period;
-            const ImVec2 sc = to_screen({ a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t });
+            ImVec2 drawn = target;
+            if (const auto tr = s_convoy_trail.find(m.id); tr != s_convoy_trail.end())
+            {
+                const ImVec2 off{ (unwrap_near(tr->second.drawn, tr->second.target).x - tr->second.target.x) * k_trail_keep,
+                                  (tr->second.drawn.y - tr->second.target.y) * k_trail_keep };
+                if (off.x * off.x + off.y * off.y > 0.04f)
+                    drawn = { target.x + off.x, target.y + off.y };
+            }
+            for (const head_mark& hm : marks)
+            {
+                ImVec2 own = target;
+                if (hm.m != &m)
+                    (void)lane_point(hm, own);
+                trail_now[hm.m->id] = { drawn, own };
+            }
+            const ImVec2 sc = to_screen(drawn);
             if (sc.y < grid_area_origin.y - cr * 2.0f
                 || sc.y > grid_area_origin.y + grid_area_size.y + cr * 2.0f)
                 continue;
             const ImU32 col = corp_identity(m.owner);
             const ImU32 edge_col = selected ? palette::selection : hovered ? palette::hover : col;
+            // A lone convoy reads as a stack of one (Ben, 2026-11-10): the same box, a 1.
             char num[12] = "";
-            ImVec2 count_size{};
-            if (marks.size() > 1)
-            {
-                std::snprintf(num, sizeof num, "%d", static_cast<int>(marks.size()));
-                count_size = ImGui::GetFont()->CalcTextSizeA(count_font, FLT_MAX, 0.0f, num);
-            }
+            std::snprintf(num, sizeof num, "%d", static_cast<int>(marks.size()));
+            const ImVec2 count_size = ImGui::GetFont()->CalcTextSizeA(count_font, FLT_MAX, 0.0f, num);
             const int k_min = (period_px > 0.0f)
                 ? static_cast<int>(std::ceil((visible_left  - sc.x) / period_px)) : 0;
             const int k_max = (period_px > 0.0f)
@@ -6658,33 +6712,21 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             {
                 const ImVec2 mp{ sc.x + static_cast<float>(k) * period_px, sc.y };
                 ui_state::convoy_zone z;
-                if (marks.size() > 1)
-                {
-                    // One box holds the glyph and the count together (Ben, 2026-11-09), so
-                    // the number reads as the marker's and the press answers on all of it.
-                    const float pad_x = std::max(3.0f, count_font * 0.3f);
-                    const float pad_y = std::max(1.0f, count_font * 0.1f);
-                    const float half_h = std::max(cr + 1.0f, count_size.y * 0.5f + pad_y);
-                    const ImVec2 bmin{ mp.x - cr - 2.0f, mp.y - half_h };
-                    const ImVec2 bmax{ mp.x + cr + 2.0f + count_size.x + pad_x, mp.y + half_h };
-                    dl->AddRectFilled(bmin, bmax, IM_COL32(14, 18, 26, 215), 3.0f);
-                    dl->AddRect(bmin, bmax, edge_col, 3.0f, 0, (selected || hovered) ? 2.0f : 1.0f);
-                    icons::convoy(dl, mp, cr * 0.72f, col);
-                    dl->AddText(ImGui::GetFont(), count_font,
-                                { mp.x + cr + 2.0f, mp.y - count_size.y * 0.5f },
-                                IM_COL32(236, 240, 248, 255), num); // fit-exempt: the box is measured from this text
-                    z.box_min = bmin;
-                    z.box_max = bmax;
-                }
-                else
-                {
-                    dl->AddCircleFilled(mp, cr, IM_COL32(14, 18, 26, 215));
-                    if (selected || hovered)
-                        dl->AddCircle(mp, cr + 1.0f, selected ? palette::selection : palette::hover, 0, 2.0f);
-                    else
-                        dl->AddCircle(mp, cr, col, 0, 1.0f);
-                    icons::convoy(dl, mp, cr * 0.72f, col);
-                }
+                // One box holds the glyph and the count together (Ben, 2026-11-09), so
+                // the number reads as the marker's and the press answers on all of it.
+                const float pad_x = std::max(3.0f, count_font * 0.3f);
+                const float pad_y = std::max(1.0f, count_font * 0.1f);
+                const float half_h = std::max(cr + 1.0f, count_size.y * 0.5f + pad_y);
+                const ImVec2 bmin{ mp.x - cr - 2.0f, mp.y - half_h };
+                const ImVec2 bmax{ mp.x + cr + 2.0f + count_size.x + pad_x, mp.y + half_h };
+                dl->AddRectFilled(bmin, bmax, IM_COL32(14, 18, 26, 215), 3.0f);
+                dl->AddRect(bmin, bmax, edge_col, 3.0f, 0, (selected || hovered) ? 2.0f : 1.0f);
+                icons::convoy(dl, mp, cr * 0.72f, col);
+                dl->AddText(ImGui::GetFont(), count_font,
+                            { mp.x + cr + 2.0f, mp.y - count_size.y * 0.5f },
+                            IM_COL32(236, 240, 248, 255), num); // fit-exempt: the box is measured from this text
+                z.box_min = bmin;
+                z.box_max = bmax;
                 z.id     = next;
                 z.centre = mp;
                 z.radius = cr * 1.25f;
@@ -6696,6 +6738,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             }
         }
         s_convoy_lead.swap(convoy_lead_now);
+        s_convoy_trail.swap(trail_now);
     }
     {
         // Hover: the nearest marker under the pointer, with no lens (BL-664). One frame

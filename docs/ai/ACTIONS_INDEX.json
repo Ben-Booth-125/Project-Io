@@ -739,7 +739,7 @@
   ],
   [
    "canvas.convoy_select",
-   "The Planetary canvas: a convoy marker at a lane's head, a chevron on a dark disc in the owner's colour, with a count when several share the tile (BL-1506; SELECTION.md § The convoy element)."
+   "The Planetary canvas: a convoy marker at a lane's head: a rectangle holding the convoy chevron in the owner's colour and the count of convoys on that tile, a lone convoy's reading 1; the press answers on the rectangle (BL-1506; Ben 2026-11-10; SELECTION.md § The convoy element)."
   ],
   [
    "canvas.unit_drag_select",

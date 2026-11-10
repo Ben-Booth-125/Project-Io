@@ -1487,7 +1487,7 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 
 **Reason to select.** Reach a unit already on the move, to redirect it.
 
-### `canvas.convoy_select` — The Planetary canvas: a convoy marker at a lane's head, a chevron on a dark disc in the owner's colour, with a count when several share the tile (BL-1506; SELECTION.md § The convoy element).
+### `canvas.convoy_select` — The Planetary canvas: a convoy marker at a lane's head: a rectangle holding the convoy chevron in the owner's colour and the count of convoys on that tile, a lone convoy's reading 1; the press answers on the rectangle (BL-1506; Ben 2026-11-10; SELECTION.md § The convoy element).
 
 **Press.** Left-click the marker. A repeat press on a marker holding several walks to the next.
 

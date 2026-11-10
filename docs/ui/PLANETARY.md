@@ -440,6 +440,11 @@ Beyond the base grid and the chrome in the table above, the draw pass
 - **Activity fog + convoy beams** — the intra-body vision layers
   (`permanent_vision`, `convoy_beams` in `ui_state`) and the
   survey region mask. Model authority: [DISCOVERY.md](DISCOVERY.md).
+- **Convoy markers** — one per tile at a lane's head: a rectangle holding the convoy glyph and
+  the count of convoys on that tile, a lone convoy's reading **1** (Ben, 2026-11-10: "render lone
+  convoys the same as stacks"). The press answers on the rectangle. The marker never jumps: it
+  slides when the convoy it is drawn at changes, or a convoy joins or leaves it
+  ([SELECTION.md](SELECTION.md) § The convoy element).
 - **Hover/selection chrome** — the highlight convention, the glance-then-stick
   hover card ([TOOLTIP.md](TOOLTIP.md)), and the construction placement ghost.
 
