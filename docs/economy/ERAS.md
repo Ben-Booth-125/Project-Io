@@ -259,7 +259,7 @@ so the space programme is *itself* the largest single contributor to Alarm (§ A
 cannot dodge the dangerous technology — the skill is buying the reassurance that lets them hold it
 while they race for orbit.
 
-When all three conditions hold, space bodies become accessible to trade, and the Ice Extractor and Assembly Plant become available for construction. The operative half of the gate in the shipment layer is launchpad presence and propellant — a trade between bodies ships iff the trader holds a launchpad on the source body (`corp_has_launchpad_on`, `src/world/supply_system.cpp`; SUPPLY.md § Infrastructure gates) and the source shelf holds the launch's propellant at a price the ceiling admits (`TRADE.md` § A trade).
+When all three conditions hold, space bodies become accessible to trade, and the next age's tree opens to the nation (§ Far-space technology), where the Ice Extractor and the rest of far space are researched (Ben, 2026-11-10). The operative half of the gate in the shipment layer is launchpad presence and propellant — a trade between bodies ships iff the trader holds a launchpad on the source body (`corp_has_launchpad_on`, `src/world/supply_system.cpp`; SUPPLY.md § Infrastructure gates) and the source shelf holds the launch's propellant at a price the ceiling admits (`TRADE.md` § A trade).
 
 ---
 

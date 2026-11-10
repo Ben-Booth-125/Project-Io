@@ -1701,12 +1701,17 @@
      "DG-NE-SO-B2"
     ]
    ],
-   "advantage": "the Launchpad may operate (with the staffed pad and propellant reserve); convoys may dispatch to other bodies",
+   "advantage": "the Launchpad may operate (with the staffed pad and propellant reserve); convoys may dispatch to other bodies; station cores may be launched",
    "effects": [
     {
      "kind": "mechanic",
      "key": "space_dispatch",
      "what": "the Launchpad may operate; convoys may dispatch to other bodies"
+    },
+    {
+     "kind": "mechanic",
+     "key": "space_station_core",
+     "what": "station cores may be launched"
     }
    ],
    "cost_units": 24
@@ -1796,7 +1801,7 @@
      "DG-NE-SO-B"
     ]
    ],
-   "advantage": "+3% national research; station cores may be launched and Research modules fitted",
+   "advantage": "+3% national research; Research modules may be fitted",
    "effects": [
     {
      "kind": "modifier",
@@ -1804,11 +1809,6 @@
      "scope": "all",
      "op": "add",
      "value": 0.03
-    },
-    {
-     "kind": "mechanic",
-     "key": "space_station_core",
-     "what": "station cores may be launched"
     },
     {
      "kind": "mechanic",

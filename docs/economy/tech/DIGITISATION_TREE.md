@@ -175,7 +175,7 @@ industry that makes their parts.
 | `space_role_observation` | The Observation satellite | Thermal Imaging | Signal & Orbit |
 | `space_role_survey` | The Survey satellite | Seismic Survey | Extraction |
 | `astronaut_training` | The Astronaut Training Centre | Mass Higher Education | Signal & Orbit |
-| `space_station_core` | The station core | Research Culture | Signal & Orbit |
+| `space_station_core` | The station core | Rocketry | Signal & Orbit |
 | `space_module_research` | The Research module | Research Culture | Signal & Orbit |
 | `space_module_defence` | The Defence module | Integrated Air Defence | Signal & Orbit |
 | `space_module_observatory` | The Observatory module | Scanned-Array Radar | Signal & Orbit |
@@ -313,11 +313,11 @@ shape; `nation_tech_harness` holds the store to what the code reads.
 | `DG-NE-SO-T6` | Research Grant VI | travel | 3 | +1% national research | Integrated Air Defence |
 | `DG-NE-SO-B1` | Pad Ground Support | minor | 3 | Launchpad build cost -25% | Research Grant IV |
 | `DG-NE-SO-B2` | Guidance Systems | minor | 3 | launch propellant -5% | Research Grant IV |
-| `DG-NE-SO-B` | Rocketry | major | 4 | the Launchpad may operate (with the staffed pad and propellant reserve); convoys may dispatch to other bodies | Pad Ground Support + Guidance Systems |
+| `DG-NE-SO-B` | Rocketry | major | 4 | the Launchpad may operate (with the staffed pad and propellant reserve); convoys may dispatch to other bodies; station cores may be launched | Pad Ground Support + Guidance Systems |
 | `DG-NE-SO-C1` | Reserved minor | minor (placeholder) | 4 | reserved for espionage: signals intelligence | Loitering Munitions |
 | `DG-NE-SO-C2` | Reserved minor | minor (placeholder) | 4 | reserved for espionage: signals intelligence | Loitering Munitions |
 | `DG-NE-SO-C` | [Espionage] | major (placeholder) | 4 | placeholder cluster: signals intelligence; effects authored when the espionage system exists | Reserved minor + Reserved minor |
-| `DG-NE-SO-M` | Research Culture | mastery | 4 | +3% national research; station cores may be launched and Research modules fitted | Rocketry |
+| `DG-NE-SO-M` | Research Culture | mastery | 4 | +3% national research; Research modules may be fitted | Rocketry |
 | `DG-NE-SO-Q` | First Cargo to Orbit | quest | 4 | launch propellant -5%. **Deed:** one convoy completed to another body. **Keys next age:** Interplanetary Convoys | Rocketry |
 | `DG-NE-SO-D1` | Airborne Radar | minor | 2 | opens airborne radar (pulse-doppler, terrain-following, side-looking) | Research Grant III |
 | `DG-NE-SO-D2` | Long-Endurance Drones | minor | 2 | opens the long-endurance drone and its satellite datalink | Research Grant III |

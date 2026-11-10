@@ -1627,8 +1627,8 @@
    "design": "A fold-out ledger. The station designer shows the grid with the core at the centre, picks a module per slot, saves and applies templates, upgrades the grid, marks edge slots and idle modules, and shows power, crew and life support budgets. Needs a live click."
   },
   {
-   "status": "designed",
-   "glyph": "○",
+   "status": "complete",
+   "glyph": "●",
    "sprint": 65,
    "version_goal": "v0.4.0",
    "written": "2026-11-10",
@@ -1970,8 +1970,8 @@
    "design": "ERAS.md § Firsts. Satellite, crew in orbit, station core, crew on a moon, base, space convoy."
   },
   {
-   "status": "designed",
-   "glyph": "○",
+   "status": "complete",
+   "glyph": "●",
    "sprint": 66,
    "version_goal": "v0.5.0",
    "written": "2026-11-10",
@@ -2084,6 +2084,32 @@
    "files": [],
    "title": "Spectate rivals in far space, and a visual check of the far-space surfaces",
    "design": "A verify script and a spectated run: do rivals reach the moons, close the propellant loop, found bases?"
+  },
+  {
+   "status": "designed",
+   "glyph": "○",
+   "sprint": 66,
+   "version_goal": "v0.5.0",
+   "written": "2026-11-10",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Claude (lane C report, BL-1607)",
+   "requires": [
+    "BL-1607"
+   ],
+   "category": "Space",
+   "priority": "A",
+   "difficulty": 3,
+   "id": "BL-1612",
+   "short_name": "EARLY_SPACE_RESEARCHABLE",
+   "authority_doc": "docs/economy/RESEARCH.md",
+   "files": [
+    "src/world/nation_tech.hpp",
+    "src/world/nation_tech.cpp",
+    "src/world/world_save.cpp"
+   ],
+   "title": "A nation can research the next age's tree once it meets the Era 1 -> Era 2 gate",
+   "design": "ERAS.md § Era 1 -> Era 2 gate, § Far-space technology. A nation's tech state holds one held set and one queue sized to the Digitisation tree; add per-tree state (held set + queue for the Early Space tree) with its save leg, a pure gate query (Rocketry held, a staffed home Launchpad, propellant on the home shelf), and branch availability keyed by the Digitisation quest that keys each branch. Quest deeds are all declared unread today, so a branch key also needs its quest's deed read (or a stand-in the gate opens). Done when a harness researches an Early Space node after the gate and is refused before it."
   }
  ]
 }

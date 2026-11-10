@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*38 entries — 35 open, 3 resolved.*
+*40 entries — 37 open, 3 resolved.*
 
 ---
 
@@ -413,6 +413,34 @@ hard_coded_world.cpp sets mass_earths only on the homeworld; planetology's per-b
 > **Recommendation:** Copy the masses and re-bless at the v0.4.0 cut; you said continuity between releases is not a constraint.
 
 *Files: `src/world/hard_coded_world.cpp`, `src/world/orbital_graph.cpp`, `src/world/logistics.cpp`*
+
+### NR-1165 — Which Digitisation node unlocks each near-space thing, and the Early Space tree's first cut
+*decision taken on your behalf · raised 2026-11-10 · from BL-1592 + BL-1607 lane report*
+
+Every near-space unlock rides an existing Digitisation node as an added mechanic effect (no node added): e.g. Comms role on Communication Satellites, Navigation on Satellite Navigation, Observation on Thermal Imaging, Survey on Seismic Survey, astronaut training on Mass Higher Education, Dock on Gantry Cranes, Power on Photolithography, 7x5 grid on Numerical Control; the station core sits on Rocketry so a nation can found a station as soon as it can launch. The Early Space tree's first cut is three trees of one branch each (In-Situ Propellant, Interplanetary Convoys, Space Force; 54 nodes), keyed by the Digitisation quests named in keys_next_branch; the other six named branches are reserved. Kit item keys (two drives, two tanks, two armaments, two armours, a debris arm) were invented; quest deeds, advantage figures and Era 3 branch names are placeholders.
+
+**Why it matters.** Where an unlock sits sets how soon a nation reaches each module, which is the opening of the space race.
+
+- Keep
+- Move named unlocks
+
+> **Recommendation:** Keep until the spectator run shows how soon rivals reach each module.
+
+*Files: `docs/economy/tech/DIGITISATION_TREE.md`, `docs/economy/tech/EARLY_SPACE_TREE.md`, `src/world/space_tech_keys.hpp`*
+
+### NR-1166 — Novel work: per-tree research state so a nation can research the next age's tree
+*novel-work · raised 2026-11-10 · from BL-1607 lane report*
+
+The research queue has one held set and one queue, both sized to the Digitisation tree, and no Era 1 -> Era 2 gate query exists. Filed as BL-1612 (early space researchable): per-tree state with a save leg, the gate query, and branch keys by quest. All Digitisation quest deeds are declared unread, so no branch can be keyed today; the item reads them or lets the gate stand in.
+
+**Why it matters.** It grows the research system from one age to two, which no doc had designed in code terms.
+
+- Build it as filed
+- Collapse far-space unlocks onto the Digitisation tree instead
+
+> **Recommendation:** Build it as filed; it is the shape RESEARCH.md already describes.
+
+*Files: `docs/economy/RESEARCH.md`, `src/world/nation_tech.cpp`*
 
 ---
 
