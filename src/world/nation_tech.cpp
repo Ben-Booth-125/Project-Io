@@ -1046,7 +1046,14 @@ enqueue_result enqueue_early_space_node(world& w, entity_id nation, int es_node,
 bool structure_unlocked(const world& w, entity_id corp, building_type type)
 {
     const effect_tables& t = tables();
-    if (t.structure_unlocks.empty() || corp == null_entity)
+    if (corp == null_entity)
+        return true;
+    // BL-1582 (SPACE_ASSETS.md § Astronauts; the Digitisation tree's Mass Higher
+    // Education, "the Astronaut Training Centre may be built"): the centre is
+    // gated by its MECHANIC key, which a structure unlock does not carry.
+    if (type == building_type::astronaut_training_centre)
+        return nation_has_mechanic(w, owner_home_nation(w, corp), space_keys::astronaut_training);
+    if (t.structure_unlocks.empty())
         return true;
     bool named = false;
     for (const resolved_unlock& u : t.structure_unlocks)

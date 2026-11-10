@@ -199,6 +199,13 @@ void run_nation_step(world& w, const recipe_registry& reg, economy_report& repor
     advance_research(w, reg.research(), &report.research);
     run_nation_research_repick(w, reg, spectating, &report.research_picks);
 
+    // ---- 6b. Pending near-space orders (BL-1587, SPACE_ASSETS.md § Signal delay) —
+    // an order issued outside comms coverage last quarter reaches its station or
+    // satellite now: re-validated, then applied or dropped. Before the asset step,
+    // so a module it launches is reported as this quarter's launch. An empty
+    // queue does nothing, so a world without one ticks as before.
+    run_space_orders(w, reg, econ_tick, &report.space_orders);
+
     // ---- 7. Space assets (BL-1327, SPACE_ASSETS.md) — arrivals, then each
     // placed asset's quarterly upkeep paid whole from its owner's treasury or
     // counted unpaid (decaying, then lost). Ascending asset id; an empty store

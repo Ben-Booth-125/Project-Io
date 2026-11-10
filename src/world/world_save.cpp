@@ -2224,6 +2224,42 @@ void write_world_snapshot_at(const world& w, std::ostream& out, uint32_t version
             w_vec(out, st.es_queue, [](std::ostream& s, const uint16_t& q) { w_u16(s, q); });
         }
     }
+
+    // world_save_version 83 (BL-1581, BL-1586, BL-1587): THE SPACE NODES AND THE
+    // PENDING ORDERS, the last section — every asset's node and role, then the
+    // signal-delay queue in its stored order.
+    if (version >= k_world_save_version_space_nodes)
+    {
+        w_u32(out, static_cast<uint32_t>(w.space_assets.size()));
+        for (const auto& [aid, a] : w.space_assets) // std::map: ascending
+        {
+            w_id(out, aid);
+            w_id(out, a.node.body);
+            w_enum(out, a.node.kind);
+            w_enum(out, a.role);
+        }
+        w_u32(out, w.next_space_order_id);
+        w_u32(out, static_cast<uint32_t>(w.space_orders.size()));
+        for (const space_order& o : w.space_orders)
+        {
+            const space_command& c = o.cmd;
+            w_u32(out, o.id);
+            w_i32(out, o.due_tick);
+            w_id(out, c.nation);
+            w_u8(out, c.verb);
+            w_u8(out, c.cls);
+            w_u8(out, c.role);
+            w_id(out, c.node_body);
+            w_u8(out, c.node_kind);
+            w_id(out, c.subject);
+            w_i32(out, c.slot);
+            w_i32(out, c.slot_to);
+            w_u8(out, c.module);
+            w_str(out, c.name);
+            w_u8(out, c.layout.level);
+            w_bytes(out, c.layout.kinds);
+        }
+    }
 }
 
 void write_world_snapshot_pre_early_space(const world& w, std::ostream& out)
@@ -2239,6 +2275,22 @@ std::size_t world_save_early_space_section_bytes(const world& w)
     for (const auto& [nid, st] : w.nation_tech)
         if (!st.es_empty())
             n += 4 + 4 + 4 * words + 4 + 2 * st.es_queue.size();
+    return n;
+}
+
+void write_world_snapshot_pre_space_nodes(const world& w, std::ostream& out)
+{
+    // VERIFICATION ONLY (BL-1581): the v82 stream shape - no space-node section.
+    write_world_snapshot_at(w, out, k_world_save_version_pre_space_nodes);
+}
+
+std::size_t world_save_space_node_section_bytes(const world& w)
+{
+    std::size_t n = 4 + w.space_assets.size() * (4 + 4 + 1 + 1);
+    n += 4 + 4;
+    for (const space_order& o : w.space_orders)
+        n += 4 + 4 + 4 + 1 + 1 + 1 + 4 + 1 + 4 + 4 + 4 + 1 + (4 + o.cmd.name.size()) + 1
+           + (4 + o.cmd.layout.kinds.size());
     return n;
 }
 
@@ -2678,7 +2730,9 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
             && version != k_world_save_version_pre_defend     // BL-1504: v78, no defend orders
             && version != k_world_save_version_pre_research_books // BL-1539: v79, nothing booked
             && version != k_world_save_version_pre_stations   // BL-1583: v80, no stations
-            && version != k_world_save_version_pre_early_space)) // BL-1612: v81, no Early Space progress
+            // ---- sprint 65 save bumps: append each parallel lane's prefix version here ----
+            && version != k_world_save_version_pre_early_space // BL-1612: v81, no Early Space progress
+            && version != k_world_save_version_pre_space_nodes)) // BL-1581: v82, nodes derived, no orders
         return false; // mismatched version -- refuse rather than misread
 
     // BL-1422: a stream before the kit goods carries every per-resource array 49 wide;
@@ -4694,6 +4748,76 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
             }
             if (st.es_empty())
                 return false; // the writer never writes an empty record
+        }
+    }
+
+    // v83 (BL-1581, BL-1586, BL-1587): the space nodes and the pending orders.
+    // Untrusted, cross-checked whole (see world_save.hpp's v83 entry). A v82 (and
+    // older) stream ends before it: its nodes are DERIVED from what it does carry.
+    if (version >= k_world_save_version_space_nodes)
+    {
+        uint32_t count = 0;
+        if (!r_u32(in, count) || count != s.space_assets.size())
+            return false;
+        auto ait = s.space_assets.begin(); // the store is ascending; so is the section
+        for (uint32_t k = 0; k < count; ++k, ++ait)
+        {
+            entity_id aid = null_entity;
+            space_asset& a = ait->second;
+            if (!r_id(in, aid) || aid != ait->first || !r_id(in, a.node.body)
+                || !r_enum(in, a.node.kind, orbital_node_kind::l5)
+                || !r_enum(in, a.role, space_satellite_role::survey))
+                return false;
+            if (a.node.body != a.dest.body || space_slot_of(a.node.kind) != a.dest.slot
+                || (a.cls != space_asset_class::satellite && a.role != space_satellite_role::none))
+                return false;
+            // A live station part sits at its station's node.
+            if (a.station != null_entity && a.state != space_asset_state::lost)
+            {
+                const auto sit = s.stations.find(a.station);
+                if (sit != s.stations.end() && sit->second.node != a.node)
+                    return false;
+            }
+        }
+
+        if (!r_u32(in, s.next_space_order_id) || !r_u32(in, count) || count > k_space_orders_max)
+            return false;
+        s.space_orders.reserve(count);
+        for (uint32_t k = 0; k < count; ++k)
+        {
+            space_order o;
+            space_command& c = o.cmd;
+            if (!r_u32(in, o.id) || !r_i32(in, o.due_tick) || !r_id(in, c.nation) || !r_u8(in, c.verb)
+                || !r_u8(in, c.cls) || !r_u8(in, c.role) || !r_id(in, c.node_body)
+                || !r_u8(in, c.node_kind) || !r_id(in, c.subject) || !r_i32(in, c.slot)
+                || !r_i32(in, c.slot_to) || !r_u8(in, c.module) || !r_str(in, c.name)
+                || !r_u8(in, c.layout.level) || !r_bytes(in, c.layout.kinds))
+                return false;
+            if ((k > 0 && o.id <= s.space_orders.back().id) || o.id >= s.next_space_order_id
+                || o.due_tick < 0 || s.nations.count(c.nation) == 0 || c.verb >= space_verb_count
+                || !space_verb_delayed(static_cast<space_verb>(c.verb))
+                || c.cls >= space_asset_class_count || c.role >= space_satellite_role_count
+                || c.node_kind >= orbital_node_kind_count
+                || (c.module != k_no_station_module && c.module >= station_fittable_kind_count)
+                || c.name.size() > k_station_template_name_max || c.layout.level > k_station_max_level
+                || c.layout.kinds.size() > static_cast<std::size_t>(station_grid_width(k_station_max_level)
+                                                                    * station_grid_height(k_station_max_level)))
+                return false;
+            s.space_orders.push_back(std::move(o));
+        }
+    }
+    else
+    {
+        // The pre-v83 derivation: a live station part at its station's node; a
+        // surface asset at its body's surface; any other at its body's low orbit.
+        for (auto& [aid, a] : s.space_assets)
+        {
+            a.node = orbital_node{a.dest.body, a.dest.slot == space_slot::surface
+                                                   ? orbital_node_kind::surface
+                                                   : orbital_node_kind::low_orbit};
+            if (a.station != null_entity)
+                if (const auto sit = s.stations.find(a.station); sit != s.stations.end())
+                    a.node = sit->second.node;
         }
     }
 

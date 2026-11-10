@@ -52,12 +52,6 @@ float pip_row_end(const circum_node_mark& m)
 
 } // namespace
 
-int orbital_slots_held(const world& /*w*/, orbital_node /*n*/)
-{
-    // BL-1581 (slot occupancy) wires this to the slot store.
-    return 0;
-}
-
 std::string orbital_node_display_name(const world& w, orbital_node n)
 {
     const auto it = w.bodies.find(n.body);

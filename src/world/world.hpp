@@ -13,6 +13,7 @@
 #include "sentiment.hpp"    // sentiment_table (BL-545 relational substrate, below)
 #include "space_assets.hpp" // space_asset (BL-1327: nations' space assets, below)
 #include "stations.hpp"     // space_station, station_template (BL-1583, below)
+#include "space_command.hpp" // space_order (BL-1587/BL-1588: the signal-delay queue, below)
 #include "war.hpp"          // war_record, peace_offer (BL-1459/BL-1428 wars, below)
 
 #include <atomic>
@@ -1053,6 +1054,15 @@ struct world
     /// BL-1583 — each nation's named station templates, nation then name ascending.
     /// No empty inner map is kept. SERIALISED (v81) and hashed when non-empty.
     std::map<entity_id, std::map<std::string, station_template>> station_templates;
+
+    /// BL-1587 / BL-1588 — the PENDING near-space orders: commands to a station or a
+    /// satellite outside its nation's comms coverage, waiting one quarter for a signal
+    /// (space_command.hpp). Issue order (ids ascend); applied and removed by
+    /// `run_space_orders` in the nation step. SERIALISED (world_save.cpp, v82) and
+    /// folded into `state_hash` when non-empty.
+    std::vector<space_order> space_orders;
+    /// The next pending order's id. SERIALISED (v82); hashed when non-zero.
+    uint32_t next_space_order_id = 0;
 
     /// Enacted and un-enacted laws (BL-343). A world-level list rather than a
     /// per-corp one: a law is enacted over the world and charged to whoever it

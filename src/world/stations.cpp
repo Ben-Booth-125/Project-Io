@@ -1,6 +1,8 @@
 #include "stations.hpp"
 
 #include "components.hpp"
+#include "nation_tech.hpp"     // nation_has_mechanic (BL-1582: module and upgrade keys)
+#include "space_tech_keys.hpp"
 #include "world.hpp"
 
 #include <algorithm>
@@ -28,20 +30,49 @@ bool node_valid(const world& w, orbital_node node)
     return bit != w.bodies.end() && bit->second.type != body_type::star;
 }
 
-space_destination dest_of(orbital_node node) { return {node.body, space_slot::orbit}; }
-
 bool in_place(const space_asset& a)
 {
     return a.state == space_asset_state::active || a.state == space_asset_state::decaying;
 }
 
-/// The pure half of THE ONE STATION LAUNCH: the quote, then the crew check.
-/// (BL-1581/1582 replace the pricing and add the slot check here, and only here.)
+/// BL-1582: the key a fittable module kind needs (space_tech_keys.hpp). The
+/// Shipyard's is far space's, so no nation holds it in Era 1.
+std::string_view module_key(uint8_t kind)
+{
+    switch (static_cast<station_module_kind>(kind))
+    {
+        case station_module_kind::research:             return space_keys::module_research;
+        case station_module_kind::defence:              return space_keys::module_defence;
+        case station_module_kind::power:                return space_keys::module_power;
+        case station_module_kind::dock:                 return space_keys::module_dock;
+        case station_module_kind::habitation:           return space_keys::module_habitation;
+        case station_module_kind::life_support:         return space_keys::module_life_support;
+        case station_module_kind::fuel_depot:           return space_keys::module_fuel_depot;
+        case station_module_kind::shipyard:             return space_keys::module_shipyard;
+        case station_module_kind::microgravity_factory: return space_keys::module_microgravity_factory;
+        case station_module_kind::observatory:          return space_keys::module_observatory;
+        case station_module_kind::comms_relay:          return space_keys::module_comms_relay;
+        case station_module_kind::cargo_hold:           return space_keys::module_cargo_hold;
+        case station_module_kind::market:               return space_keys::module_market;
+        case station_module_kind::truss:                break;
+    }
+    return {};
+}
+
+/// BL-1582: the key the upgrade FROM @p level needs: 5x3 -> 7x5 is
+/// `space_grid_7x5`, 7x5 -> 9x7 is far space's `space_grid_9x7`.
+std::string_view upgrade_key(int level)
+{
+    return level == 0 ? space_keys::grid_7x5 : space_keys::grid_9x7;
+}
+
+/// The pure half of THE ONE STATION LAUNCH: the quote (slot, gate, goods,
+/// treasury — space_assets.cpp), then the crew check.
 station_op quote_station_launch(const world& w, const space_asset_params& sp, entity_id nation,
                                 space_asset_class cls, orbital_node node, int crew)
 {
     station_op op;
-    const space_launch_quote q = quote_space_launch(w, sp, nation, cls, dest_of(node));
+    const space_launch_quote q = quote_space_launch(w, sp, nation, cls, node);
     op.launch = q.result;
     if (q.result == space_launch_result::rejected_unknown_nation)
     {
@@ -70,7 +101,7 @@ station_op station_launch(world& w, const space_asset_params& sp, entity_id nati
     station_op op = quote_station_launch(w, sp, nation, cls, node, crew);
     if (op.result != station_result::ok)
         return op;
-    const space_launch_quote q = launch_space_asset(w, sp, nation, cls, dest_of(node));
+    const space_launch_quote q = launch_space_asset(w, sp, nation, cls, node);
     op.launch = q.result;
     if (q.result != space_launch_result::launched) // unreachable: the quote above passed
     {
@@ -190,6 +221,11 @@ station_op fit_station_module(world& w, const space_asset_params& sp, const stat
         op.result = station_result::rejected_edge_only;
         return op;
     }
+    if (!nation_has_mechanic(w, nation, module_key(k))) // BL-1582
+    {
+        op.result = station_result::rejected_tech_locked;
+        return op;
+    }
     const orbital_node node = st->node;
     station_op l = station_launch(w, sp, nation, space_asset_class::station_module, node,
                                   std::max(0, spec.crew_needed));
@@ -294,6 +330,11 @@ station_op upgrade_station(world& w, const space_asset_params& sp, entity_id nat
     if (st->level >= k_station_max_level)
     {
         op.result = station_result::rejected_max_level;
+        return op;
+    }
+    if (!nation_has_mechanic(w, nation, upgrade_key(st->level))) // BL-1582
+    {
+        op.result = station_result::rejected_tech_locked;
         return op;
     }
     const orbital_node node = st->node;

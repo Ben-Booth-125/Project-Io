@@ -52,10 +52,9 @@ struct circum_node_mark
     int          held     = 0;     ///< orbital_slots_held.
 };
 
-/// Slots of @p n held by an asset. Always 0 until slot occupancy lands
-/// (BL-1581): this is the one place it is wired, and every pip and the hover
-/// card's free count read through it.
-int orbital_slots_held(const world& w, orbital_node n);
+// Slots of a node held by an asset: the world's `orbital_slots_held`
+// (space_assets.hpp, BL-1581), which every pip and the hover card's free count
+// read. (The UI stub of the same name is retired: ADL found both.)
 
 /// The node's on-screen name: "Vother L4", "Rivekhaik high orbit".
 std::string orbital_node_display_name(const world& w, orbital_node n);

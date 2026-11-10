@@ -854,6 +854,41 @@ uint64_t world::state_hash(int tick) const
                 fnv1a_f32(h, a.upkeep);
                 fnv1a_i32(h, a.unpaid_quarters);
                 fnv1a_f32(h, a.launch_cost);
+                // BL-1581 / BL-1586: the node it sits at and a satellite's role.
+                fnv1a_u32(h, a.node.body);
+                fnv1a_u32(h, static_cast<uint32_t>(a.node.kind));
+                fnv1a_u32(h, static_cast<uint32_t>(a.role));
+            }
+        }
+        // BL-1587 / BL-1588: the pending near-space orders — folded only when any
+        // is held or was ever issued, so a world without them hashes as before.
+        if (!space_orders.empty() || next_space_order_id != 0)
+        {
+            fnv1a_u32(h, 0x0D3Au); // tag: cannot alias the asset run above
+            fnv1a_u32(h, next_space_order_id);
+            fnv1a_u32(h, static_cast<uint32_t>(space_orders.size()));
+            for (const space_order& o : space_orders)
+            {
+                const space_command& c = o.cmd;
+                fnv1a_u32(h, o.id);
+                fnv1a_i32(h, o.due_tick);
+                fnv1a_u32(h, c.nation);
+                fnv1a_u32(h, c.verb);
+                fnv1a_u32(h, c.cls);
+                fnv1a_u32(h, c.role);
+                fnv1a_u32(h, c.node_body);
+                fnv1a_u32(h, c.node_kind);
+                fnv1a_u32(h, c.subject);
+                fnv1a_i32(h, c.slot);
+                fnv1a_i32(h, c.slot_to);
+                fnv1a_u32(h, c.module);
+                fnv1a_u32(h, static_cast<uint32_t>(c.name.size()));
+                for (const char ch : c.name)
+                    fnv1a_u32(h, static_cast<uint8_t>(ch));
+                fnv1a_u32(h, c.layout.level);
+                fnv1a_u32(h, static_cast<uint32_t>(c.layout.kinds.size()));
+                for (const uint8_t k : c.layout.kinds)
+                    fnv1a_u32(h, k);
             }
         }
         // BL-1583 / BL-1585: the stations, their templates, the station fields on
