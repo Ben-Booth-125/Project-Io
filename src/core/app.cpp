@@ -2136,6 +2136,8 @@ void app::step_economy()
         // BL-1480 (NR-1120): a declaration or peace the player is party to - the rival's
         // pass above, or the player's own press since the last step.
         session_history::post_war_dispatches(m_world, m_war_log_cursor, m_chat, day);
+        // BL-1605: a solar storm that struck the player's assets, or an Observatory's warning.
+        session_history::post_solar_storm_notices(m_world, m_last_econ_report, m_chat, day);
         // Persona counsel: ~1.05 s/tick measured 2026-08-12 (NR-210 records
         // the open in-game hitch). It was suppressed through the old validation
         // run; the settle now has no presentation half at all.

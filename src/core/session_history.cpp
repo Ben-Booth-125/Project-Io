@@ -78,6 +78,34 @@ void post_war_dispatches(const world& w, std::size_t& cursor, ui::chat_state& ch
     }
 }
 
+void post_solar_storm_notices(const world& w, const economy_report& report,
+                              ui::chat_state& chat, int day_tick)
+{
+    const solar_storm_report& s = report.solar_storms;
+    const entity_id me = player_nation(w);
+    if (me == null_entity || s.nations.empty())
+        return;
+    const int field = (static_cast<int>(chat.channels.size()) > ui::chat_state::k_field_channel)
+                          ? ui::chat_state::k_field_channel
+                          : ui::chat_state::k_public_channel;
+    for (const solar_storm_nation_row& r : s.nations)
+    {
+        if (r.nation != me)
+            continue; // a rival's assets stay in the fog
+        if (r.satellites_dark > 0 || r.stations_struck > 0)
+            ui::chat_post(chat, day_tick, null_entity, field,
+                          "Solar storm: " + std::to_string(r.satellites_dark) + " satellite"
+                              + (r.satellites_dark == 1 ? "" : "s") + " dark and "
+                              + std::to_string(r.modules_stopped) + " station module"
+                              + (r.modules_stopped == 1 ? "" : "s")
+                              + " stopped outside a planet's shelter this quarter.");
+        if (r.warned)
+            ui::chat_post(chat, day_tick, null_entity, field,
+                          "Observatory: a solar storm will strike next quarter. Satellites and "
+                          "stations at Lagrange points and asteroids will stop for the quarter.");
+    }
+}
+
 void post_nation_agency_comms(const world& w, const economy_report& report,
                               ui::chat_state& chat, int day_tick)
 {

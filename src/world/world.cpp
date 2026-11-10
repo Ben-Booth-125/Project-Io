@@ -1,5 +1,7 @@
 #include "world.hpp"
 
+#include "solar_storm.hpp" // BL-1605: the activity-fog twin darkens a struck Comms satellite
+
 #include <algorithm>
 #include <cmath>
 #include <cstring>
@@ -1453,7 +1455,8 @@ bool player_comms_lift(const world& w)
     {
         (void)id;
         if (a.owner == n && a.cls == space_asset_class::satellite
-            && a.role == space_satellite_role::comms && a.state == space_asset_state::active)
+            && a.role == space_satellite_role::comms && a.state == space_asset_state::active
+            && !solar_storm_satellite_dark(w, a, w.current_econ_tick)) // BL-1605
         {
             sat = true;
             break;

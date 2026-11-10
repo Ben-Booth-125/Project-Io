@@ -235,6 +235,11 @@ void run_nation_step(world& w, const recipe_registry& reg, economy_report& repor
     // No asset and no station does nothing, so such a world ticks as before.
     run_space_effects(w, space_effects_params{}, reg.stations(), reg.price_band().reservation_mult,
                       econ_tick, &report.space_effects);
+    // ---- 7c'. Solar storms (BL-1605, EVENTS.md § Solar storms) — a READ of the
+    // quarter's storm, derived from seed and tick: who it struck (the effects
+    // above already ran dark) and whom an Observatory warns of the next. Nothing
+    // in space reports nothing.
+    run_solar_storm_report(w, reg.stations(), econ_tick, &report.solar_storms);
     // ---- 7d. Space units (BL-1594 / BL-1595, SPACE_FLEETS.md) — after the station
     // step, so a lost station's depot stock is dropped: each unit's upkeep (unpaid
     // counts, lost at the dial), then each station's Fuel-depot fill off its owner's

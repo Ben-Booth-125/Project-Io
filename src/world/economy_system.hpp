@@ -10,6 +10,7 @@
 #include "nation_step.hpp"   // earmark_result (Sprint N3 T6)
 #include "space_programme.hpp" // space_purchase (BL-644)
 #include "space_effects.hpp"   // space_effects_report (BL-1584 / BL-1586)
+#include "solar_storm.hpp"     // solar_storm_report (BL-1605)
 #include "network_upkeep.hpp"  // network_purchase (BL-643)
 #include "corp_command.hpp"    // firm_exit_record (BL-743)
 #include "logistic_points.hpp" // BL-1309: lp_tick
@@ -584,6 +585,12 @@ struct economy_report
     /// space_effects.hpp): rations bought or a station starved, RP earned in
     /// coverage, factory lots, regions mapped from orbit.
     space_effects_report space_effects;
+
+    /// BL-1605 (solar_storm.hpp; EVENTS.md § Solar storms): whether this quarter
+    /// carries a solar storm, whom it struck (satellites dark, station modules
+    /// stopped), and which nations a working Observatory warned of next
+    /// quarter's. Report-only: the storm is derived from seed and tick.
+    solar_storm_report solar_storms;
 
     /// BL-1335 (NATIONS.md § Taxes and Discontent): each nation's tax quarter —
     /// tier, credits taken, Discontent before and after. Ascending nation id.
