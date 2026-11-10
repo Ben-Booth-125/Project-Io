@@ -25,6 +25,8 @@
 #include "ui/convoys_ledger.hpp"
 #include "ui/military_ledger.hpp"
 #include "ui/diplomacy_ledger.hpp"
+#include "ui/space_ledger.hpp"
+#include "world/space_command.hpp" // apply_space_command — the Space ledger's presses
 #include "ui/unit_art.hpp"        // the unit designer's class art, loaded once
 #include "ui/unit_designer.hpp"   // the full-canvas unit designer
 #include "ui/wing_card.hpp"       // BL-1450: reset_wing_ui beside reset_unit_designer
@@ -3115,6 +3117,9 @@ void app::render()
     // while closed.
     ui::draw_diplomacy_ledger(m_world, m_registry, m_last_econ_report, m_last_corp_standings, m_ui,
                               m_ui.show_diplomacy_ledger);
+    // Space ledger — nav slot 9 (ledgers/space.md). Its presses queue on
+    // m_ui.space.pending, sent below through apply_space_command.
+    ui::draw_space_ledger(m_world, m_registry, m_ui, m_ui.show_space_ledger);
     // The unit designer (military.md § The designer): a full-canvas takeover the
     // Design tab's class rows and the unit card's type name open. Its picks draft;
     // Save queues `designer.pending`, sent below as `set_unit_design` — or, for an
@@ -3976,6 +3981,19 @@ void app::render()
             m_ui.research_message = "The research queue refused that press.";
     }
     m_ui.pending_research_commands.clear(); // consume the requests
+
+    // Space presses (ledgers/space.md): every launch, station, template and
+    // satellite order through the near-space seam an agent's command takes —
+    // validated whole, queued as a pending order outside comms coverage. A
+    // spectator issues nothing. The answer is the ledger's message line.
+    for (const space_command& cmd : m_ui.space.pending)
+    {
+        if (m_ui.spectating || cmd.nation == null_entity)
+            break;
+        const space_command_outcome o = apply_space_command(m_world, m_registry, cmd);
+        m_ui.space.message = ui::space_outcome_text(cmd, o);
+    }
+    m_ui.space.pending.clear(); // consume the requests
 
     // Diplomacy presses (ledgers/diplomacy.md) — declare_war, answer_war, the peace
     // verbs, offer/accept friendship and return_to_neutral, each through the same

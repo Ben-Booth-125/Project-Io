@@ -311,7 +311,7 @@
   ],
   [
    "ledger.nav_generation",
-   "Nav rail, slot 10 (plate/continent glyph)"
+   "Nav rail, slot 11 (plate/continent glyph)"
   ],
   [
    "ledger.generation_body_selector",
@@ -371,7 +371,7 @@
   ],
   [
    "ledger.nav_history",
-   "Nav rail, slot 9 (History icon)"
+   "Nav rail, slot 10 (History icon)"
   ],
   [
    "ledger.nav_market",
@@ -547,7 +547,7 @@
   ],
   [
    "ledger.decision_feed_open",
-   "Navigation rail slot 11, \"AI decisions\""
+   "Navigation rail slot 12, \"AI decisions\""
   ],
   [
    "ledger.decision_feed_filter_corp",
@@ -587,7 +587,7 @@
   ],
   [
    "ledger.strategy_readout_open",
-   "Navigation rail slot 12, \"Strategy readout\""
+   "Navigation rail slot 13, \"Strategy readout\""
   ],
   [
    "ledger.strategy_readout_select_corp",
@@ -846,6 +846,50 @@
    "Nav rail, slot 8 (the Diplomacy glyph), after Military."
   ],
   [
+   "ledger.nav_space",
+   "Nav rail, slot 9 (the satellite glyph), after Diplomacy."
+  ],
+  [
+   "ledger.space_tab",
+   "Space ledger (nav rail slot 9; docs/ui/ledgers/space.md), the Launch / Assets / Stations / Crew tab strip."
+  ],
+  [
+   "ledger.space_launch",
+   "Space ledger (nav rail slot 9; docs/ui/ledgers/space.md), Launch view: the class picker (Satellite, Station core, Crewed mission, Rover), the satellite's Role picker (Comms, Navigation, Observation, Survey), the destination list, the quote and the Launch press."
+  ],
+  [
+   "ledger.space_retask",
+   "Space ledger (nav rail slot 9; docs/ui/ledgers/space.md), Assets view: a satellite row, expanded in place, and its Retask role presses."
+  ],
+  [
+   "ledger.space_designer_slot",
+   "Space ledger (nav rail slot 9; docs/ui/ledgers/space.md), Stations view: the station picker and the designer grid - 5x3, 7x5 or 9x7 slots drawn as they are, the core ('Core') at the centre, each fitted module by its short tag, edge slots outlined, a module stopped by a shortfall outlined red, an edge-only module off the edge outlined amber; the budgets above it (Power, Crew room, Life support, Crew, each supply / demand, red when short)."
+  ],
+  [
+   "ledger.space_fit_module",
+   "Space ledger (nav rail slot 9; docs/ui/ledgers/space.md), Stations view, an empty slot picked: the module list."
+  ],
+  [
+   "ledger.space_remove_module",
+   "Space ledger (nav rail slot 9; docs/ui/ledgers/space.md), Stations view, a filled slot picked: Remove."
+  ],
+  [
+   "ledger.space_move_module",
+   "Space ledger (nav rail slot 9; docs/ui/ledgers/space.md), Stations view, a filled slot picked: Move, then an empty slot."
+  ],
+  [
+   "ledger.space_save_template",
+   "Space ledger (nav rail slot 9; docs/ui/ledgers/space.md), Stations view, Templates: the name field and 'Save layout'."
+  ],
+  [
+   "ledger.space_apply_template",
+   "Space ledger (nav rail slot 9; docs/ui/ledgers/space.md), Stations view, Templates: a saved template's Apply and Delete presses."
+  ],
+  [
+   "ledger.space_upgrade",
+   "Space ledger (nav rail slot 9; docs/ui/ledgers/space.md), Stations view: 'Upgrade to 7x5' / 'Upgrade to 9x7' with the truss launch's cost."
+  ],
+  [
    "ledger.diplomacy_tab",
    "Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), the 'Nations' / 'Wars' tab strip."
   ],
@@ -907,47 +951,47 @@
   ],
   [
    "gameplay.space_launch",
-   "No UI surface yet (the circumplanetary canvas's launch and station controls are the UI lane's). In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam — a sibling of corp_command, because the template verbs carry a name and a layout the fixed corp_command record cannot. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed)."
+   "The Space ledger (nav rail slot 9): ledger.space_launch. In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam — a sibling of corp_command, because the template verbs carry a name and a layout the fixed corp_command record cannot. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed)."
   ],
   [
    "gameplay.space_found_station",
-   "No UI surface yet (the circumplanetary canvas's launch and station controls are the UI lane's). In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam — a sibling of corp_command, because the template verbs carry a name and a layout the fixed corp_command record cannot. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed)."
+   "The Space ledger (nav rail slot 9): ledger.space_launch (class Station core). In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam — a sibling of corp_command, because the template verbs carry a name and a layout the fixed corp_command record cannot. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed)."
   ],
   [
    "gameplay.space_fit_module",
-   "No UI surface yet (the circumplanetary canvas's launch and station controls are the UI lane's). In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam — a sibling of corp_command, because the template verbs carry a name and a layout the fixed corp_command record cannot. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed)."
+   "The Space ledger (nav rail slot 9): ledger.space_fit_module. In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam — a sibling of corp_command, because the template verbs carry a name and a layout the fixed corp_command record cannot. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed)."
   ],
   [
    "gameplay.space_remove_module",
-   "No UI surface yet (the circumplanetary canvas's launch and station controls are the UI lane's). In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam — a sibling of corp_command, because the template verbs carry a name and a layout the fixed corp_command record cannot. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed)."
+   "The Space ledger (nav rail slot 9): ledger.space_remove_module. In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam — a sibling of corp_command, because the template verbs carry a name and a layout the fixed corp_command record cannot. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed)."
   ],
   [
    "gameplay.space_refit_module",
-   "No UI surface yet (the circumplanetary canvas's launch and station controls are the UI lane's). In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam — a sibling of corp_command, because the template verbs carry a name and a layout the fixed corp_command record cannot. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed)."
+   "The Space ledger (nav rail slot 9): ledger.space_move_module. In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam — a sibling of corp_command, because the template verbs carry a name and a layout the fixed corp_command record cannot. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed)."
   ],
   [
    "gameplay.space_apply_template",
-   "No UI surface yet (the circumplanetary canvas's launch and station controls are the UI lane's). In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam — a sibling of corp_command, because the template verbs carry a name and a layout the fixed corp_command record cannot. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed)."
+   "The Space ledger (nav rail slot 9): ledger.space_apply_template. In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam — a sibling of corp_command, because the template verbs carry a name and a layout the fixed corp_command record cannot. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed)."
   ],
   [
    "gameplay.space_save_template",
-   "No UI surface yet (the circumplanetary canvas's launch and station controls are the UI lane's). In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam — a sibling of corp_command, because the template verbs carry a name and a layout the fixed corp_command record cannot. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed)."
+   "The Space ledger (nav rail slot 9): ledger.space_save_template. In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam — a sibling of corp_command, because the template verbs carry a name and a layout the fixed corp_command record cannot. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed)."
   ],
   [
    "gameplay.space_delete_template",
-   "No UI surface yet (the circumplanetary canvas's launch and station controls are the UI lane's). In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam — a sibling of corp_command, because the template verbs carry a name and a layout the fixed corp_command record cannot. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed)."
+   "The Space ledger (nav rail slot 9): ledger.space_apply_template (Delete). In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam — a sibling of corp_command, because the template verbs carry a name and a layout the fixed corp_command record cannot. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed)."
   ],
   [
    "gameplay.space_upgrade_station",
-   "No UI surface yet (the circumplanetary canvas's launch and station controls are the UI lane's). In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam — a sibling of corp_command, because the template verbs carry a name and a layout the fixed corp_command record cannot. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed)."
+   "The Space ledger (nav rail slot 9): ledger.space_upgrade. In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam — a sibling of corp_command, because the template verbs carry a name and a layout the fixed corp_command record cannot. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed)."
   ],
   [
    "gameplay.space_retask_satellite",
-   "No UI surface yet (the circumplanetary canvas's launch and station controls are the UI lane's). In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam — a sibling of corp_command, because the template verbs carry a name and a layout the fixed corp_command record cannot. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed)."
+   "The Space ledger (nav rail slot 9): ledger.space_retask. In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam — a sibling of corp_command, because the template verbs carry a name and a layout the fixed corp_command record cannot. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed)."
   ],
   [
    "gameplay.space_move_satellite",
-   "No UI surface yet (the circumplanetary canvas's launch and station controls are the UI lane's). In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam — a sibling of corp_command, because the template verbs carry a name and a layout the fixed corp_command record cannot. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed)."
+   "No UI surface yet: the Space ledger offers no satellite Move. In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam — a sibling of corp_command, because the template verbs carry a name and a layout the fixed corp_command record cannot. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed)."
   ]
  ]
 }

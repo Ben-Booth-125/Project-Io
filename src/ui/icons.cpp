@@ -1837,6 +1837,30 @@ void diplomacy(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
     dl->AddCircle({ centre.x + off, centre.y }, cr, colour, 0, 1.5f);
 }
 
+void satellite(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
+{
+    // A filled body between two outlined panel wings on one boom, the whole
+    // figure rotated -30 degrees. Points are laid out on the boom's axis (u) and
+    // across it (v), then rotated into screen space.
+    const float cs = 0.8660254f, sn = -0.5f; // cos/sin of -30 degrees
+    const auto at = [&](float u, float v) {
+        return ImVec2{centre.x + u * cs - v * sn, centre.y + u * sn + v * cs};
+    };
+    const float body = r * 0.26f;
+    const float wing_in = r * 0.40f, wing_out = r * 1.0f, wing_h = r * 0.34f;
+    dl->AddLine(at(-wing_in, 0.0f), at(wing_in, 0.0f), colour, 1.5f);
+    dl->AddQuadFilled(at(-body, -body), at(body, -body), at(body, body), at(-body, body), colour);
+    for (const float side : {-1.0f, 1.0f})
+    {
+        const ImVec2 a = at(side * wing_in, -wing_h), b = at(side * wing_out, -wing_h);
+        const ImVec2 c = at(side * wing_out, wing_h), d = at(side * wing_in, wing_h);
+        dl->AddQuad(a, b, c, d, colour, 1.5f);
+        // One cell line across the wing, so it reads as a panel rather than a box.
+        dl->AddLine(at(side * (wing_in + wing_out) * 0.5f, -wing_h), at(side * (wing_in + wing_out) * 0.5f, wing_h),
+                    colour, 1.0f);
+    }
+}
+
 void acquisition(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
 {
     // Two OUTLINED squares of different sizes with a short arrow running from

@@ -24,7 +24,7 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 > **Generated file.** Produced by `node tools/session/render_actions.js`.
 > Edit the JSON, then re-run; hand edits here are overwritten.
 
-*237 entries — 65 gameplay · 40 canvas · 15 lens · 76 ledger · 41 chrome.*
+*248 entries — 65 gameplay · 40 canvas · 15 lens · 87 ledger · 41 chrome.*
 
 ---
 
@@ -1040,7 +1040,7 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 
 **Reason to select.** Shut a rival's goods out of your markets: protect your producers or punish its conduct, at the cost of its regard and of what its goods would have supplied.
 
-### `gameplay.space_launch` — No UI surface yet (the circumplanetary canvas's launch and station controls are the UI lane's). In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam — a sibling of corp_command, because the template verbs carry a name and a layout the fixed corp_command record cannot. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed).
+### `gameplay.space_launch` — The Space ledger (nav rail slot 9): ledger.space_launch. In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam — a sibling of corp_command, because the template verbs carry a name and a layout the fixed corp_command record cannot. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed).
 
 **Press.** In-process: apply_space_command({nation, verb=0 launch, cls, role, node_body, node_kind}).
 
@@ -1063,7 +1063,7 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 
 **Reason to select.** Put a satellite where its role pays (comms coverage, navigation, observation, survey), or reach another body with a rover or a crew.
 
-### `gameplay.space_found_station` — No UI surface yet (the circumplanetary canvas's launch and station controls are the UI lane's). In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam — a sibling of corp_command, because the template verbs carry a name and a layout the fixed corp_command record cannot. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed).
+### `gameplay.space_found_station` — The Space ledger (nav rail slot 9): ledger.space_launch (class Station core). In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam — a sibling of corp_command, because the template verbs carry a name and a layout the fixed corp_command record cannot. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed).
 
 **Press.** In-process: apply_space_command({nation, verb=1 found_station, node_body, node_kind}).
 
@@ -1083,7 +1083,7 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 
 **Reason to select.** Open a crewed platform: the frame every module is fitted into.
 
-### `gameplay.space_fit_module` — No UI surface yet (the circumplanetary canvas's launch and station controls are the UI lane's). In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam — a sibling of corp_command, because the template verbs carry a name and a layout the fixed corp_command record cannot. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed).
+### `gameplay.space_fit_module` — The Space ledger (nav rail slot 9): ledger.space_fit_module. In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam — a sibling of corp_command, because the template verbs carry a name and a layout the fixed corp_command record cannot. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed).
 
 **Press.** In-process: apply_space_command({nation, verb=2 fit_module, subject=station, slot, module}).
 
@@ -1105,7 +1105,7 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 
 **Reason to select.** Give a station power, crew room, research, a dock — whatever its role needs.
 
-### `gameplay.space_remove_module` — No UI surface yet (the circumplanetary canvas's launch and station controls are the UI lane's). In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam — a sibling of corp_command, because the template verbs carry a name and a layout the fixed corp_command record cannot. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed).
+### `gameplay.space_remove_module` — The Space ledger (nav rail slot 9): ledger.space_remove_module. In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam — a sibling of corp_command, because the template verbs carry a name and a layout the fixed corp_command record cannot. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed).
 
 **Press.** In-process: apply_space_command({nation, verb=3 remove_module, subject=station, slot}).
 
@@ -1123,7 +1123,7 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 
 **Reason to select.** Free a slot for a better module, or shed a module's upkeep.
 
-### `gameplay.space_refit_module` — No UI surface yet (the circumplanetary canvas's launch and station controls are the UI lane's). In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam — a sibling of corp_command, because the template verbs carry a name and a layout the fixed corp_command record cannot. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed).
+### `gameplay.space_refit_module` — The Space ledger (nav rail slot 9): ledger.space_move_module. In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam — a sibling of corp_command, because the template verbs carry a name and a layout the fixed corp_command record cannot. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed).
 
 **Press.** In-process: apply_space_command({nation, verb=4 refit_module, subject=station, slot=from, slot_to=to}).
 
@@ -1142,7 +1142,7 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 
 **Reason to select.** Bring an enclosed Dock back to the edge after an upgrade, or rearrange a layout.
 
-### `gameplay.space_apply_template` — No UI surface yet (the circumplanetary canvas's launch and station controls are the UI lane's). In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam — a sibling of corp_command, because the template verbs carry a name and a layout the fixed corp_command record cannot. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed).
+### `gameplay.space_apply_template` — The Space ledger (nav rail slot 9): ledger.space_apply_template. In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam — a sibling of corp_command, because the template verbs carry a name and a layout the fixed corp_command record cannot. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed).
 
 **Press.** In-process: apply_space_command({nation, verb=5 apply_template, subject=station, name}).
 
@@ -1160,7 +1160,7 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 
 **Reason to select.** Build a station out to a saved plan in one order.
 
-### `gameplay.space_save_template` — No UI surface yet (the circumplanetary canvas's launch and station controls are the UI lane's). In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam — a sibling of corp_command, because the template verbs carry a name and a layout the fixed corp_command record cannot. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed).
+### `gameplay.space_save_template` — The Space ledger (nav rail slot 9): ledger.space_save_template. In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam — a sibling of corp_command, because the template verbs carry a name and a layout the fixed corp_command record cannot. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed).
 
 **Press.** In-process: apply_space_command({nation, verb=6 save_template, name, layout}).
 
@@ -1178,7 +1178,7 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 
 **Reason to select.** Keep a station layout to apply again.
 
-### `gameplay.space_delete_template` — No UI surface yet (the circumplanetary canvas's launch and station controls are the UI lane's). In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam — a sibling of corp_command, because the template verbs carry a name and a layout the fixed corp_command record cannot. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed).
+### `gameplay.space_delete_template` — The Space ledger (nav rail slot 9): ledger.space_apply_template (Delete). In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam — a sibling of corp_command, because the template verbs carry a name and a layout the fixed corp_command record cannot. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed).
 
 **Press.** In-process: apply_space_command({nation, verb=7 delete_template, name}).
 
@@ -1195,7 +1195,7 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 
 **Reason to select.** Tidy away a layout no longer wanted.
 
-### `gameplay.space_upgrade_station` — No UI surface yet (the circumplanetary canvas's launch and station controls are the UI lane's). In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam — a sibling of corp_command, because the template verbs carry a name and a layout the fixed corp_command record cannot. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed).
+### `gameplay.space_upgrade_station` — The Space ledger (nav rail slot 9): ledger.space_upgrade. In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam — a sibling of corp_command, because the template verbs carry a name and a layout the fixed corp_command record cannot. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed).
 
 **Press.** In-process: apply_space_command({nation, verb=8 upgrade_station, subject=station}).
 
@@ -1214,7 +1214,7 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 
 **Reason to select.** Make room for more modules.
 
-### `gameplay.space_retask_satellite` — No UI surface yet (the circumplanetary canvas's launch and station controls are the UI lane's). In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam — a sibling of corp_command, because the template verbs carry a name and a layout the fixed corp_command record cannot. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed).
+### `gameplay.space_retask_satellite` — The Space ledger (nav rail slot 9): ledger.space_retask. In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam — a sibling of corp_command, because the template verbs carry a name and a layout the fixed corp_command record cannot. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed).
 
 **Press.** In-process: apply_space_command({nation, verb=9 retask_satellite, subject=satellite, role}).
 
@@ -1232,7 +1232,7 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 
 **Reason to select.** Repurpose a satellite already in a scarce slot.
 
-### `gameplay.space_move_satellite` — No UI surface yet (the circumplanetary canvas's launch and station controls are the UI lane's). In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam — a sibling of corp_command, because the template verbs carry a name and a layout the fixed corp_command record cannot. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed).
+### `gameplay.space_move_satellite` — No UI surface yet: the Space ledger offers no satellite Move. In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam — a sibling of corp_command, because the template verbs carry a name and a layout the fixed corp_command record cannot. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed).
 
 **Press.** In-process: apply_space_command({nation, verb=10 move_satellite, subject=satellite, node_body, node_kind}).
 
@@ -2228,7 +2228,7 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 
 **Reason to select.** The chart says which side is bigger at a glance; the hover says WHICH outflow is the one to act on.
 
-### `ledger.nav_generation` — Nav rail, slot 10 (plate/continent glyph)
+### `ledger.nav_generation` — Nav rail, slot 11 (plate/continent glyph)
 
 **Press.** Click the plate glyph in the developer tail of the left icon rail
 
@@ -2434,7 +2434,7 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 
 **Reason to select.** Answers 'how well is my nation doing?' - the treasury and the quarter's money, which is the honest answer to that question today.
 
-### `ledger.nav_history` — Nav rail, slot 9 (History icon)
+### `ledger.nav_history` — Nav rail, slot 10 (History icon)
 
 **Press.** Click the history glyph on the left icon rail
 
@@ -2591,9 +2591,9 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 
 **Reason to select.** Done with this building; back to comparing the tile's other stacks, or to building something else here.
 
-### `ledger.decision_feed_open` — Navigation rail slot 11, "AI decisions"
+### `ledger.decision_feed_open` — Navigation rail slot 12, "AI decisions"
 
-**Press.** Click nav rail slot 11 to open the AI decision feed; click it again to close
+**Press.** Click nav rail slot 12 to open the AI decision feed; click it again to close
 
 **Valid when:**
 - In game (not the menu or the generation screen)
@@ -2632,9 +2632,9 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 
 **Reason to select.** To ask a specific question of the run rather than scroll it. 'Every solvency-defence idle' and 'every build' are different questions, and the reason code is what separates them.
 
-### `ledger.strategy_readout_open` — Navigation rail slot 12, "Strategy readout"
+### `ledger.strategy_readout_open` — Navigation rail slot 13, "Strategy readout"
 
-**Press.** Click nav rail slot 12 to open the Strategy readout; click it again to close
+**Press.** Click nav rail slot 13 to open the Strategy readout; click it again to close
 
 **Valid when:**
 - In game (not the menu or the generation screen)
@@ -2891,6 +2891,150 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 **Expected output.** Toggles the Diplomacy ledger open in the fold-out column; re-click closes; opening closes any other ledger. Opening on Nations arms the Nations lens, and closing the ledger, or leaving Nations for Wars, disarms it if it is still armed; a lens the player chose meanwhile stands. The lens paints only on the Planetary canvas: on Solar or Circumplanetary it stays armed and paints when the player descends. Two tabs, Nations (default) and Wars; re-clicking the ACTIVE tab closes the ledger (toggle rule), the other tab is a view change (ledger.diplomacy_tab). NATIONS: a dropdown of the nations holding ground, hostile first then by Alarm toward you (ledger.diplomacy_choose_nation), with the chosen nation below it - its colour swatch, an 'At war' or 'Truce' chip, the stance chips you -> them (Hostile, Friend, Offer sent, Neutral) and them -> you (Hostile, Friend, Offer pending, Neutral), and its Access, Trust and Alarm toward you as signed bars over [-100, 100] with the figure and a trend arrow over the last four ticks (green when the move is good for you; Alarm's bar is amber above zero). Hovering a bar shows the value, its band (adverse, wary, neutral, favourable, trusted), the four-tick change, its largest cause - the conduct with the largest decayed share of that value on its side, e.g. 'Largest cause: trade (+12.0)' - and, while the nation still carries an inherited grudge, the war that seeded it with its region and year ('Seeded by an old war: the seat sacked at <region>, 1196 CE'; RELATIONS.md § Where a grudge lands), then the war that links the pair, if any (the open war, else the last one). Its detail and presses follow (ledger.diplomacy_choose_nation). Closing the ledger by any path closes an open declaration without effect. Explanation is a tooltip: a disabled press says why on hover.
 
 **Reason to select.** Answers 'who could I fight, who might fight me, and what would it cost?'. Read it before declaring war, and to see who is alarmed by you.
+
+### `ledger.nav_space` — Nav rail, slot 9 (the satellite glyph), after Diplomacy.
+
+**Press.** Click the satellite glyph on the left icon rail.
+
+**Valid when:**
+- In-game
+
+**Expected output.** Toggles the Space ledger open in the fold-out column; re-click closes; opening closes any other ledger. No lens on open. Four tabs - Launch (default), Assets, Stations, Crew; re-clicking the ACTIVE tab closes the ledger (toggle rule), another tab is a view change (ledger.space_tab). Under the tabs on every view, the pending line: 'No orders waiting on a signal.' or 'N orders pending - no signal', its tooltip listing each order and the quarter it is due.
+
+**Reason to select.** Answers 'what does my nation have in space, and what can it launch next?'.
+
+### `ledger.space_tab` — Space ledger (nav rail slot 9; docs/ui/ledgers/space.md), the Launch / Assets / Stations / Crew tab strip.
+
+**Press.** Click a tab.
+
+**Valid when:**
+- The Space ledger is open.
+
+**Expected output.** Shows that view. Re-clicking the active tab closes the ledger. LAUNCH: the class picker, the destination picker and the quote (ledger.space_launch). ASSETS: one row per satellite, station core, crewed mission and rover of yours that is not lost - class (and a satellite's role), node, state (in transit with its arrival quarter / active / decaying), upkeep per quarter, 'in coverage' or 'no signal', and 'pending - no signal (N)' when an order to it waits. A station row opens the Stations view on that station; a satellite row expands in place (ledger.space_retask). STATIONS: the station picker and the designer (ledger.space_designer_slot). CREW: the astronaut pool, its cap (per running Astronaut Training Centre), the centres built and running, astronauts trained per quarter (0 at the cap), then each station's crew aboard against crew needed and each crewed mission's crew.
+
+**Reason to select.** Move between the four questions the ledger answers.
+
+### `ledger.space_launch` — Space ledger (nav rail slot 9; docs/ui/ledgers/space.md), Launch view: the class picker (Satellite, Station core, Crewed mission, Rover), the satellite's Role picker (Comms, Navigation, Observation, Survey), the destination list, the quote and the Launch press.
+
+**Press.** Pick a class (and a role for a satellite), press a destination row, then press Launch.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `class` | `Satellite | Station core | Crewed mission | Rover` | The class picker - a selector: re-pressing the active class does nothing. Changing class clears the destination. |
+| `role` | `Comms | Navigation | Observation | Survey` | A satellite's role; a role not researched says so on hover. |
+| `node` | `orbital node` | A destination row: every node the class may go to (space_launch_legal_node), each with its free slots of capacity (a slot-holding class - satellite, station core - lists only nodes with a slot free), and the path's thrust cost and days from the home surface. Pressing the chosen row again un-chooses it. |
+
+**Valid when:**
+- A destination is chosen (Launch is disabled with 'Choose a destination first.' otherwise).
+- The quote (quote_space_launch; for a station core also quote_found_station) is clear. A refused quote disables Launch and prints the refusal beside it, in the seam's own reasons: not researched (Rocketry or the payload's key), no staffed Launchpad on the home body, every slot at the node held, no path, the home shelf cannot fill the goods, the treasury cannot pay, or for a core not enough astronauts.
+
+**Expected output.** The quote above the press: the whole cost; the spacecraft components and propellant the launch buys off the home shelf and their value; launch and thrust credits; travel in quarters and days; for a station core the crew drawn. Launch issues gameplay.space_launch (satellite, crewed mission, rover) or gameplay.space_found_station (station core). The press queues a space_command that app::render sends through apply_space_command (src/world/space_command.hpp) - the same seam an agent's command takes, with its full validation; not a second write path. The seam's answer is the ledger's message line under the tabs ('<verb>: done.', '<verb>: pending - no signal. It waits a quarter.', or '<verb>: refused - <why>').
+
+**Reason to select.** Put a satellite, a station core, a crew or a rover into space, knowing its price first.
+
+### `ledger.space_retask` — Space ledger (nav rail slot 9; docs/ui/ledgers/space.md), Assets view: a satellite row, expanded in place, and its Retask role presses.
+
+**Press.** Click a satellite row to expand it (click again to fold it), then click a role under 'Retask'.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `role` | `Comms | Navigation | Observation | Survey` | The role pressed. |
+
+**Valid when:**
+- The role is not the satellite's own (disabled: 'It already holds this role.') and its key is held (disabled: 'Not researched yet.').
+
+**Expected output.** Issues gameplay.space_retask_satellite. Outside comms coverage it waits a quarter as a pending order and the row shows 'pending - no signal'. The press queues a space_command that app::render sends through apply_space_command (src/world/space_command.hpp) - the same seam an agent's command takes, with its full validation; not a second write path. The seam's answer is the ledger's message line under the tabs ('<verb>: done.', '<verb>: pending - no signal. It waits a quarter.', or '<verb>: refused - <why>').
+
+**Reason to select.** Give a satellite the job its node needs now.
+
+### `ledger.space_designer_slot` — Space ledger (nav rail slot 9; docs/ui/ledgers/space.md), Stations view: the station picker and the designer grid - 5x3, 7x5 or 9x7 slots drawn as they are, the core ('Core') at the centre, each fitted module by its short tag, edge slots outlined, a module stopped by a shortfall outlined red, an edge-only module off the edge outlined amber; the budgets above it (Power, Crew room, Life support, Crew, each supply / demand, red when short).
+
+**Press.** Pick a station row (a selector), then click a grid slot. Click the picked slot again to un-pick it.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `slot` | `grid slot` | row * width + col; the core's centre slot does nothing. |
+
+**Valid when:**
+- You hold a station (the view says to launch a core otherwise).
+
+**Expected output.** An EMPTY slot lists the module kinds research has unlocked, each with its power, crew, life support, room, launch cost and whether it is edge-only (ledger.space_fit_module). A FILLED slot offers Remove and Move (ledger.space_remove_module, ledger.space_move_module). Hovering a slot names its module and state (working, stopped - a budget falls short, idle - needs an edge slot, refitting, in transit) and whether it is an edge slot.
+
+**Reason to select.** See the station as it is and choose what goes where.
+
+### `ledger.space_fit_module` — Space ledger (nav rail slot 9; docs/ui/ledgers/space.md), Stations view, an empty slot picked: the module list.
+
+**Press.** Click a module's name.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `module` | `station_module_kind` | The row pressed; only researched kinds are listed. |
+
+**Valid when:**
+- Disabled with its reason on hover: 'Needs an edge slot.' (Dock, Shipyard on an inner slot), 'Not enough astronauts to crew it.', or the module launch's refusal.
+
+**Expected output.** Issues gameplay.space_fit_module. The module launches to the station's node and takes the slot; it counts in the budgets once it arrives. The press queues a space_command that app::render sends through apply_space_command (src/world/space_command.hpp) - the same seam an agent's command takes, with its full validation; not a second write path. The seam's answer is the ledger's message line under the tabs ('<verb>: done.', '<verb>: pending - no signal. It waits a quarter.', or '<verb>: refused - <why>').
+
+**Reason to select.** Give a station power, crew room, research, a dock - whatever its role needs.
+
+### `ledger.space_remove_module` — Space ledger (nav rail slot 9; docs/ui/ledgers/space.md), Stations view, a filled slot picked: Remove.
+
+**Press.** Click Remove.
+
+**Valid when:**
+- A module (not the core) is in the picked slot.
+
+**Expected output.** Issues gameplay.space_remove_module: the slot frees, nothing is refunded. The press queues a space_command that app::render sends through apply_space_command (src/world/space_command.hpp) - the same seam an agent's command takes, with its full validation; not a second write path. The seam's answer is the ledger's message line under the tabs ('<verb>: done.', '<verb>: pending - no signal. It waits a quarter.', or '<verb>: refused - <why>').
+
+**Reason to select.** Free a slot for a module the station needs more.
+
+### `ledger.space_move_module` — Space ledger (nav rail slot 9; docs/ui/ledgers/space.md), Stations view, a filled slot picked: Move, then an empty slot.
+
+**Press.** Click Move (it reads 'Moving - press an empty slot'; click it again to disarm), then click an empty grid slot.
+
+**Valid when:**
+- The module has arrived.
+
+**Expected output.** Issues gameplay.space_refit_module from the picked slot to the pressed one: a launch-free refit, working again a quarter later. The press queues a space_command that app::render sends through apply_space_command (src/world/space_command.hpp) - the same seam an agent's command takes, with its full validation; not a second write path. The seam's answer is the ledger's message line under the tabs ('<verb>: done.', '<verb>: pending - no signal. It waits a quarter.', or '<verb>: refused - <why>').
+
+**Reason to select.** Put an edge module back on the edge after an upgrade, or rearrange a station.
+
+### `ledger.space_save_template` — Space ledger (nav rail slot 9; docs/ui/ledgers/space.md), Stations view, Templates: the name field and 'Save layout'.
+
+**Press.** Type a name, then click Save layout.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `name` | `string, 1..64 bytes` | The template's name; an existing name is overwritten. |
+
+**Valid when:**
+- A name is typed (Save is disabled with 'Name the template first.' otherwise).
+
+**Expected output.** Issues gameplay.space_save_template with the station's current layout (each slot's module kind, the centre empty) at its grid size. The template appears in the list below. The press queues a space_command that app::render sends through apply_space_command (src/world/space_command.hpp) - the same seam an agent's command takes, with its full validation; not a second write path. The seam's answer is the ledger's message line under the tabs ('<verb>: done.', '<verb>: pending - no signal. It waits a quarter.', or '<verb>: refused - <why>').
+
+**Reason to select.** Keep a working layout to repeat on the next station.
+
+### `ledger.space_apply_template` — Space ledger (nav rail slot 9; docs/ui/ledgers/space.md), Stations view, Templates: a saved template's Apply and Delete presses.
+
+**Press.** Click Apply (or Delete) beside a template.
+
+**Valid when:**
+- The template is yours.
+
+**Expected output.** Apply issues gameplay.space_apply_template on the shown station: a launch per slot not yet filled to match; the message says how many launched and how many were skipped. Delete issues gameplay.space_delete_template. The press queues a space_command that app::render sends through apply_space_command (src/world/space_command.hpp) - the same seam an agent's command takes, with its full validation; not a second write path. The seam's answer is the ledger's message line under the tabs ('<verb>: done.', '<verb>: pending - no signal. It waits a quarter.', or '<verb>: refused - <why>').
+
+**Reason to select.** Fit a station to a known layout in one press.
+
+### `ledger.space_upgrade` — Space ledger (nav rail slot 9; docs/ui/ledgers/space.md), Stations view: 'Upgrade to 7x5' / 'Upgrade to 9x7' with the truss launch's cost.
+
+**Press.** Click Upgrade.
+
+**Valid when:**
+- The grid is not at its largest; the upgrade's key is held ('Not researched yet.'); the truss launch's quote is clear (its refusal on hover).
+
+**Expected output.** Issues gameplay.space_upgrade_station: the grid grows one ring, the core still central and every module keeping its place; an edge module no longer on the edge goes idle. The press queues a space_command that app::render sends through apply_space_command (src/world/space_command.hpp) - the same seam an agent's command takes, with its full validation; not a second write path. The seam's answer is the ledger's message line under the tabs ('<verb>: done.', '<verb>: pending - no signal. It waits a quarter.', or '<verb>: refused - <why>').
+
+**Reason to select.** Room for more modules.
 
 ### `ledger.diplomacy_tab` — Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), the 'Nations' / 'Wars' tab strip.
 

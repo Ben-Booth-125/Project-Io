@@ -62,6 +62,7 @@ void close_all_panels(ui_state& state)
     state.show_convoys_ledger    = false; // Convoys ledger (BL-689), slot 6
     state.show_military_ledger   = false; // Military ledger, slot 7 (Ben, 2026-10-27)
     state.show_diplomacy_ledger  = false; // Diplomacy ledger, slot 8 (Ben, 2026-10-30)
+    state.show_space_ledger      = false; // Space ledger, slot 9 (ledgers/space.md)
     state.show_construction_panel = false;
     state.show_tile_ledger       = false;
     state.show_generation_ledger = false;
@@ -102,6 +103,7 @@ bool any_panel_open(const ui_state& state)
            state.show_balance_ledger    ||
            state.show_market_ledger     || state.show_convoys_ledger ||
            state.show_military_ledger   || state.show_diplomacy_ledger ||
+           state.show_space_ledger      ||
            state.show_construction_panel ||
            state.show_tile_ledger       ||
            state.show_generation_ledger || state.show_tech_tree ||
@@ -219,8 +221,15 @@ void draw_nav_pane(ui_state& state, float top_offset)
     // Diplomacy (now 8) stays as the dim reserved slot it was. Corp. Strategy
     // retired with the corporations; Military took slot 7 (Ben, 2026-10-27).
     //
-    // The rail is twelve slots: nine curated, plus the 10-12 developer tail.
-    constexpr int tab_count = 12;
+    //
+    // ── SPACE IN AT SLOT 9 (docs/ui/ledgers/space.md) ─────────────────────────
+    // An INSERTION, by MENU.md's rule: near space is a curated player system, so
+    // it sits among the curated slots rather than below the developer tail. It
+    // follows Diplomacy because it is the last system the campaign reaches.
+    // History moves to 10 and the developer tail to 11-13.
+    //
+    // The rail is thirteen slots: ten curated, plus the 11-13 developer tail.
+    constexpr int tab_count = 13;
 
     // Square slots; Selectable treats a nonzero size as literal, so derive the
     // rail width explicitly rather than passing -1.
@@ -377,7 +386,15 @@ void draw_nav_pane(ui_state& state, float top_offset)
             }
             slot_tooltip("Diplomacy", "Who you could fight, who might fight you, and what it would cost.", false);
             break;
-        case 9: // History (Tile Ledger lives here per MENU.md renaming)
+        case 9: // Space ledger (ledgers/space.md): Launch / Assets / Stations / Crew. No lens on open.
+            if (ImGui::Selectable(id, state.show_space_ledger, 0, {slot_size, slot_size})) {
+                const bool was_open = state.show_space_ledger;
+                close_all_panels(state);
+                state.show_space_ledger = !was_open;
+            }
+            slot_tooltip("Space", "What your nation has in space, and what it can launch next.", false);
+            break;
+        case 10: // History (Tile Ledger lives here per MENU.md renaming)
             if (ImGui::Selectable(id, state.show_tile_ledger, 0, {slot_size, slot_size})) {
                 const bool was_open = state.show_tile_ledger;
                 close_all_panels(state);
@@ -385,7 +402,7 @@ void draw_nav_pane(ui_state& state, float top_offset)
             }
             slot_tooltip("History", "How this world was generated - its biography and its numbers.", false);
             break;
-        case 10: // Generation Ledger (BL-303) — the developer tuning surface
+        case 11: // Generation Ledger (BL-303) — the developer tuning surface
             if (ImGui::Selectable(id, state.show_generation_ledger, 0, {slot_size, slot_size})) {
                 const bool was_open = state.show_generation_ledger;
                 close_all_panels(state);
@@ -393,7 +410,7 @@ void draw_nav_pane(ui_state& state, float top_offset)
             }
             slot_tooltip("Generation Ledger", "Why a tile generated as it did - the per-pass derivation and the body's histograms.", false);
             break;
-        case 11: // AI decisions (BL-407) — the scorer's rationale, finally readable
+        case 12: // AI decisions (BL-407) — the scorer's rationale, finally readable
             if (ImGui::Selectable(id, state.show_decision_feed, 0, {slot_size, slot_size})) {
                 const bool was_open = state.show_decision_feed;
                 close_all_panels(state);
@@ -401,7 +418,7 @@ void draw_nav_pane(ui_state& state, float top_offset)
             }
             slot_tooltip("AI decisions", "What the rival nations decided, and how close the call was.", false);
             break;
-        case 12: // Strategy readout (BL-411) — the shape of each corp's run
+        case 13: // Strategy readout (BL-411) — the shape of each corp's run
             if (ImGui::Selectable(id, state.show_strategy_readout, 0, {slot_size, slot_size})) {
                 const bool was_open = state.show_strategy_readout;
                 close_all_panels(state);
@@ -409,7 +426,7 @@ void draw_nav_pane(ui_state& state, float top_offset)
             }
             slot_tooltip("Strategy readout", "What strategy is emerging - each corporation's decision mix, spend priorities and reasons over the recent run.", false);
             break;
-        default: // Unreachable — tab_count is 12 and every slot is handled above.
+        default: // Unreachable — tab_count is 13 and every slot is handled above.
             break;
         }
 
@@ -453,20 +470,23 @@ void draw_nav_pane(ui_state& state, float top_offset)
         case 7: icons::building(dl, centre, r, building_type::military_base, resource_type::iron_ore,
                                 lit(state.show_military_ledger));                break;  // Military
         case 8: icons::diplomacy(dl, centre, r, lit(state.show_diplomacy_ledger)); break;  // Diplomacy
-        case 9: icons::history(dl, centre, r, lit(state.show_tile_ledger));            break;
+        // Slot 9 draws a satellite (body, boom, two panel wings, tilted): the
+        // thing the ledger launches, and no other slot's silhouette.
+        case 9: icons::satellite(dl, centre, r, lit(state.show_space_ledger));          break;  // Space
+        case 10: icons::history(dl, centre, r, lit(state.show_tile_ledger));            break;
         // The plate glyph: this ledger's subject is the generated ground itself,
         // and the Continent lens already teaches that shape as "how the surface
         // came to be" rather than as a live economic read.
-        case 10: icons::continent(dl, centre, r, lit(state.show_generation_ledger));   break;
+        case 11: icons::continent(dl, centre, r, lit(state.show_generation_ledger));   break;
         // Slot 11 draws the pennant the retired Corp. Strategy slot drew dim: its
         // subject is the strategic decision that slot was reserved for, read
         // rather than set. Slot 7 is Military now, with the shield.
-        case 11: icons::strategy(dl, centre, r, lit(state.show_decision_feed));        break;
+        case 12: icons::strategy(dl, centre, r, lit(state.show_decision_feed));        break;
         // The readout gets its OWN glyph (the axis-and-tally-bars readout mark)
         // rather than a third borrow of `strategy` — slot 11 already lights that
         // pennant, and two lit slots sharing a silhouette is exactly the
         // collision BL-174 exists to prevent.
-        case 12: icons::readout(dl, centre, r, lit(state.show_strategy_readout));      break;
+        case 13: icons::readout(dl, centre, r, lit(state.show_strategy_readout));      break;
         default: icons::placeholder(dl, centre, r, dim); break;
         }
     }
