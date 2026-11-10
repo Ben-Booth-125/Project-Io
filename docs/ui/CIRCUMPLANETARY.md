@@ -130,7 +130,29 @@ applicability holds the whole Lens × rung table, this rung's column included, a
 it is not restated here — a column copied into a rung doc drifts from the table it
 was copied out of.
 
-**Stations and orbital infrastructure** are post-prototype. So is a **true-scale
-or selectable orbit framing**: moon radii here use a visible offset rather than
-their real distances (§ Visual elements), and until the local view carries objects
-worth measuring against, true scale would cost legibility and buy nothing.
+A **true-scale or selectable orbit framing** stays out: moon radii here use a
+visible offset rather than their real distances (§ Visual elements), and the
+orbital nodes below are named places, not measured ones.
+
+---
+
+## Orbital nodes and what sits at them (Ben, 2026-11-10)
+
+The rung draws the anchor's part of the orbital graph
+(`../economy/SPACE_ASSETS.md` § The orbital graph):
+
+| Element | Description |
+|---|---|
+| Low and high orbit | Two thin rings around the anchor and around each moon, inside the moon-orbit spacing, the high ring wider. Structural colour, a touch brighter than the moon-orbit rings. |
+| Lagrange points | A small diamond at each L1, L2, L4 and L5 of every planet–moon pair shown, placed from the pair's live angles, so it moves with the moon. Labelled on hover. |
+| Slot occupancy | Beside each node, a row of small pips — one per slot, filled for a held slot in its holder's identity colour, hollow for a free one. |
+| Satellites | A small glyph at its node, in its owner's colour, with its role's icon. |
+| Stations | A larger glyph at its node, in its owner's colour, sized by its grid. |
+| In transit | A short dashed segment along the link the asset travels, with a marker at its share of the way. |
+
+**Hover** a node: its name, its free slots, and the thrust cost and days from the player's home
+surface. **Hover** a satellite or station: its owner, class or role, and state. **Press** a satellite
+or station: it becomes `selected_entity`, and the Selection band shows its card; double-press on a
+station opens the Space ledger's designer on it. A node is not a selectable entity.
+
+**Space units** draw at nodes and in transit in the same idiom (`../military/SPACE_FLEETS.md`).
