@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*50 entries — 43 open, 7 resolved.*
+*52 entries — 45 open, 7 resolved.*
 
 ---
 
@@ -444,6 +444,35 @@ Two calls. Income is the mean of the last four returns of income plus taxes less
 *decision taken on your behalf · raised 2026-11-09 · from MINOR_PLANT_FLOOR (BL-1616), GARRISON_INCOME (BL-1617)*
 
 Three calls. The plant floor visits every nation, because majors are not known until after the walk; the kit then replaces a major's floor firm. Garrisons are paid at the 0.50 force ceiling, not the threat-scaled share, so a minor is not stripped by its first reading. The opening chest cut now reserves only the 20-man token's pay. Measured on four seeds: 22 of 112 minors still open plantless, and 15 of the 23 broke rivals at tick 40 are among those. World digests moved and wait on the re-bless.
+
+### NR-1193 — Naval merge: an ended nation's fleet disbands with everyone aboard
+*decision taken on your behalf · raised 2026-11-10 · from naval merge fix-up 2de15672 (elimination predates ships)*
+
+When a nation ends (NATIONS.md Elimination), its ships are erased where they stand with everyone aboard, its sightings and every sighting of its ships go, and its ship designs clear. The save refuses an ended nation that still owns a ship, a sighting or a design.
+
+**Why it matters.** A transport at sea when its nation ends loses its embarked army outright.
+
+- Keep: the fleet ends with the nation
+- Ships pass to the conqueror like other property
+- Ships at sea return to the nearest friendly port first
+
+> **Recommendation:** Keep; it matches units disbanding where they stand.
+
+*Files: `src/world/war.cpp`, `docs/politics/NATIONS.md`*
+
+### NR-1194 — Naval merge: MILITARY.md domain rows reworded where both lines changed them
+*decision taken on your behalf · raised 2026-11-10 · from naval merge 62277745 (conflict in the MILITARY.md domain table)*
+
+Main's land-only march ruling (Ben, 2026-11-09) and the naval branch's transport rows met in one table. Merged wording: coastal_water "No, bridges excepted (Ben, 2026-11-09); crossed only aboard a transport"; open_ocean "Only aboard a transport".
+
+**Why it matters.** The table is the authority for where a land unit may stand.
+
+- Keep the merged wording
+- Reword
+
+> **Recommendation:** Keep.
+
+*Files: `docs/military/MILITARY.md`*
 
 ---
 
