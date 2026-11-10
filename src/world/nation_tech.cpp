@@ -502,6 +502,7 @@ bool parse_building(std::string_view s, building_type& out)
         { "airbase", building_type::airbase }, // BL-1449
         { "bunker", building_type::bunker }, // BL-1426
         { "astronaut_training_centre", building_type::astronaut_training_centre }, // BL-1585
+        { "orbital_defence_battery", building_type::orbital_defence_battery }, // BL-1599
         { "research_institute", building_type::research_institute },
         { "schooling", building_type::schooling },
         { "university", building_type::university },
@@ -1053,6 +1054,10 @@ bool structure_unlocked(const world& w, entity_id corp, building_type type)
     // gated by its MECHANIC key, which a structure unlock does not carry.
     if (type == building_type::astronaut_training_centre)
         return nation_has_mechanic(w, owner_home_nation(w, corp), space_keys::astronaut_training);
+    // BL-1599 (SPACE_FLEETS.md § Bombardment and fire at orbit; the Early Space tree's
+    // Orbital Defence Battery): the battery is gated by its mechanic key alike.
+    if (type == building_type::orbital_defence_battery)
+        return nation_has_mechanic(w, owner_home_nation(w, corp), space_keys::orbital_defence_battery);
     if (t.structure_unlocks.empty())
         return true;
     bool named = false;

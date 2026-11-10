@@ -1,6 +1,7 @@
 #include "economy_system.hpp"
 #include "space_units.hpp" // BL-1595: run_space_unit_day
 #include "space_battle.hpp" // BL-1597: run_space_battle_day
+#include "space_bombard.hpp" // BL-1599: run_space_strike_day
 #include "war.hpp" // BL-1428: note_war_battles, run_war_quarter
 #include "logistic_points.hpp"
 
@@ -5101,6 +5102,9 @@ int advance_quarter_to(world& w, const recipe_registry& reg, int day_in_quarter,
         // BL-1597 (SPACE_FLEETS.md § Battles): then the battles at the nodes - fought
         // after the day's arrivals, so a fleet that arrives joins the day's fire.
         run_space_battle_day(w, reg.space_units(), reg.stations(), reg.space_battles());
+        // BL-1599 (SPACE_FLEETS.md § Bombardment and fire at orbit): then the batteries
+        // fire at orbit and the standing bombard orders strike. No units, nothing.
+        run_space_strike_day(w, reg.space_battles());
         if (!military_active(w, reg, quarter_first_day_tick + d))
         {
             // The space units walk the days the skip below jumps, one at a time.
@@ -5109,6 +5113,7 @@ int advance_quarter_to(world& w, const recipe_registry& reg, int day_in_quarter,
             {
                 run_space_unit_day(w, reg.space_units(), reg.stations());
                 run_space_battle_day(w, reg.space_units(), reg.stations(), reg.space_battles());
+                run_space_strike_day(w, reg.space_battles()); // BL-1599
             }
             // Nothing military left to walk: construction takes the rest in one call,
             // which walks the identical days (advance_construction_to is days-outer).

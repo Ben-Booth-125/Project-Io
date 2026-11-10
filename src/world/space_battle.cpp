@@ -1,6 +1,7 @@
 #include "space_battle.hpp"
 
 #include "space_units.hpp"
+#include "space_bombard.hpp" // BL-1599: prune_space_bombard_orders
 #include "stance.hpp"   // is_hostile
 #include "stations.hpp"
 #include "world.hpp"
@@ -180,6 +181,30 @@ bool space_armed_at(const world& w, const station_params& stp, entity_id nation,
     return false;
 }
 
+uint32_t open_space_battle(world& w, entity_id a, entity_id b, orbital_node node, bool* opened)
+{
+    if (opened != nullptr)
+        *opened = false;
+    if (a == b || w.nations.count(a) == 0 || w.nations.count(b) == 0 || !space_hostile(w, a, b))
+        return 0;
+    if (b < a)
+        std::swap(a, b);
+    for (const auto& [id, bt] : w.space_battles) // ascending
+        if (bt.state == space_battle_state::open && bt.node == node && bt.sides[0].nation == a
+            && bt.sides[1].nation == b)
+            return id;
+    space_battle bt;
+    bt.id = w.next_space_battle_id++;
+    bt.node = node;
+    bt.sides[0].nation = a;
+    bt.sides[1].nation = b;
+    bt.opened_tick = w.current_econ_tick;
+    w.space_battles.emplace(bt.id, bt);
+    if (opened != nullptr)
+        *opened = true;
+    return bt.id;
+}
+
 const space_battle* space_battle_engaging(const world& w, entity_id nation, orbital_node node)
 {
     for (const auto& [id, b] : w.space_battles) // ascending
@@ -257,23 +282,10 @@ void run_space_battle_day(world& w, const space_unit_params& p, const station_pa
         for (std::size_t i = 0; i < armed.size(); ++i)
             for (std::size_t j = i + 1; j < armed.size(); ++j)
             {
-                const entity_id a = armed[i], c = armed[j];
-                if (!space_hostile(w, a, c))
-                    continue;
-                bool exists = false;
-                for (const auto& [id, b] : w.space_battles)
-                    exists = exists || (b.state == space_battle_state::open && b.node == node
-                                        && b.sides[0].nation == a && b.sides[1].nation == c);
-                if (exists)
-                    continue;
-                space_battle b;
-                b.id = w.next_space_battle_id++;
-                b.node = node;
-                b.sides[0].nation = a;
-                b.sides[1].nation = c;
-                b.opened_tick = w.current_econ_tick;
-                w.space_battles.emplace(b.id, b);
-                ++r.opened;
+                bool opened = false;
+                (void)open_space_battle(w, armed[i], armed[j], node, &opened);
+                if (opened)
+                    ++r.opened;
             }
     }
 
@@ -449,6 +461,8 @@ void run_space_battle_day(world& w, const space_unit_params& p, const station_pa
     }
     if (r.closed > 0)
         trim_history(w, bp);
+    if (r.units_lost > 0)
+        prune_space_bombard_orders(w); // BL-1599: a lost unit's standing order goes with it
     if (out != nullptr)
         *out = r;
 }

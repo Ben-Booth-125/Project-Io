@@ -3077,6 +3077,8 @@ std::string building_method_line(const world& w, const recipe_registry& reg,
             return "Bases air wings";
         case building_type::bunker: // BL-1426
             return "Its owner's defenders here gain defence and hardness";
+        case building_type::orbital_defence_battery: // BL-1599
+            return "Fires each day at hostile ships in this body's low orbit";
         case building_type::research_institute:
             return "Makes research points for its nation";
         case building_type::schooling:
@@ -4897,6 +4899,8 @@ std::string candidate_effect_line(const recipe_registry& reg, building_type type
             return "Bases air wings";
         case building_type::bunker: // BL-1426
             return "Its owner's defenders here gain defence and hardness";
+        case building_type::orbital_defence_battery: // BL-1599
+            return "Fires each day at hostile ships in this body's low orbit";
         case building_type::research_institute:
             return "Makes research points for its nation";
         case building_type::schooling:
@@ -5189,6 +5193,7 @@ void draw_construction_ledger_body(world& w, const recipe_registry& reg, ui_stat
     cands.push_back({building_type::military_base,        resource_type::iron_ore, "Military Base"});        // BL-325 S1
     cands.push_back({building_type::airbase,              resource_type::iron_ore, "Airbase"});              // BL-1450: the door to every wing
     cands.push_back({building_type::bunker,               resource_type::iron_ore, "Bunker"});               // BL-1426: cover for the units on the tile
+    cands.push_back({building_type::orbital_defence_battery, resource_type::iron_ore, "Orbital Defence Battery"}); // BL-1599: fire at hostile ships in low orbit
     cands.push_back({building_type::research_institute,   resource_type::iron_ore, "Research Institute"});   // BL-332
     cands.push_back({building_type::schooling,            resource_type::iron_ore, "Schooling"});            // Ben, 2026-11-07: any centre (the gate says where)
     cands.push_back({building_type::university,           resource_type::iron_ore, "University"});           // Ben, 2026-11-07: a City or above

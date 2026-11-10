@@ -75,6 +75,10 @@ struct space_battle_params
     float   defence_module_mass = 6.0f;  ///< Mass a lost module adds to `mass_destroyed`.
     float   station_core_mass   = 20.0f; ///< Mass a lost core adds.
     int32_t report_history      = 16;    ///< Closed reports kept; clamped into [0, k_space_battle_history_max].
+    // BL-1599 (space_bombard.hpp), first in-band cut:
+    float   battery_firepower   = 12.0f; ///< An orbital defence battery's fire a day at full condition (a Defence module's).
+    float   bombard_condition_per_firepower = 1.0f; ///< Condition per-mille a bombarding unit's firepower point takes a day (a missile frigate's 18 ~ a bomber's 12).
+    float   bombard_force_per_permille      = 0.1f; ///< `force_used` magnitude per per-mille of condition lost (battles pass men lost).
 };
 
 inline constexpr int32_t     k_space_battle_history_max = 256;
@@ -143,6 +147,14 @@ bool space_hostile(const world& w, entity_id a, entity_id b);
 /// Is @p nation armed at @p node (an armed unit not in transit, or a station with a
 /// working Defence module)?
 bool space_armed_at(const world& w, const station_params& stp, entity_id nation, orbital_node node);
+
+/// BL-1599: open the battle between @p a and @p b at @p node — the step-1 rule, callable
+/// where a meeting is found (a convoy's escort meeting a hostile fleet). Refused (0)
+/// when the pair is not two distinct nations hostile to each other (`space_hostile`);
+/// an open battle for (node, pair) already standing is returned as is. Otherwise a new
+/// record, sides ascending, with the next id; @p opened says which. Does not check that
+/// both are armed: the battle day closes a side that is not.
+uint32_t open_space_battle(world& w, entity_id a, entity_id b, orbital_node node, bool* opened = nullptr);
 
 /// The open battle at @p node with @p nation as a side (lowest id), or nullptr.
 const space_battle* space_battle_engaging(const world& w, entity_id nation, orbital_node node);

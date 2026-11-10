@@ -3,6 +3,8 @@
 #include "components.hpp"
 #include "orbital_graph.hpp"
 #include "war.hpp"   // at_war
+#include "space_battle.hpp"  // BL-1599: open_space_battle
+#include "space_bombard.hpp" // BL-1599: blockade
 #include "world.hpp"
 
 #include <algorithm>
@@ -134,6 +136,9 @@ space_haul_quote quote_space_haul(const world& w, const space_unit_params& p, en
         return q;
     q.pad = space_staffed_pad_on(w, nation, src_body);
     if (q.pad == null_entity || staffed_pad_any(w, dest_body) == null_entity)
+        return q;
+    // BL-1599 (SPACE_FLEETS.md § Blockade): a blockaded body's space trade stops.
+    if (space_trade_blockaded(w, nation, src_market, dest_market))
         return q;
     const entity_id pad_market = space_market_on_body(w, w.buildings.at(q.pad).tile, src_body);
     if (pad_market == null_entity)
@@ -346,6 +351,13 @@ space_unit_op load_space_cargo(world& w, const space_unit_params& p, entity_id n
         op.result = space_unit_result::rejected_no_market;
         return op;
     }
+    // BL-1599 (SPACE_FLEETS.md § Blockade): no load or unload at a blockaded body -
+    // blockaded for the acting nation, or for the nation whose ground the market is on.
+    if (space_blockaded(w, nation, u.node.body) || space_market_blockaded(w, market))
+    {
+        op.result = space_unit_result::rejected_blockaded;
+        return op;
+    }
     const float lift = climb_rate(w, p, u.node.body) * qty;
     if (!std::isfinite(lift))
         return op; // rejected_invalid
@@ -430,6 +442,13 @@ space_unit_op unload_space_cargo(world& w, const space_unit_params& p, entity_id
     if (market == null_entity)
     {
         op.result = space_unit_result::rejected_no_market;
+        return op;
+    }
+    // BL-1599 (SPACE_FLEETS.md § Blockade): no load or unload at a blockaded body -
+    // blockaded for the acting nation, or for the nation whose ground the market is on.
+    if (space_blockaded(w, nation, u.node.body) || space_market_blockaded(w, market))
+    {
+        op.result = space_unit_result::rejected_blockaded;
         return op;
     }
     const float drop = climb_rate(w, p, u.node.body) * u.cargo;
@@ -531,7 +550,24 @@ void run_space_convoy_day(world& w, const space_unit_params& p, const station_pa
         {
             if (!space_armed_units_at(w, h.owner, u.node).empty())
             {
-                ++r.stopped; // escorted: it waits there for the battle (SPACE_FLEETS.md § Battles)
+                // Escorted: the meeting OPENS the battle (BL-1599; SPACE_FLEETS.md
+                // § Battles) with every nation at war with the owner armed here,
+                // ascending, and the Hauler waits at the node until it is decided.
+                std::vector<entity_id> foes;
+                for (const auto& [oid, o] : w.space_units) // ascending
+                    if (o.owner != h.owner && o.node == u.node && o.state != space_unit_state::in_transit
+                        && space_unit_firepower(o) > 0.0f && at_war(w, h.owner, o.owner)
+                        && std::find(foes.begin(), foes.end(), o.owner) == foes.end())
+                        foes.push_back(o.owner);
+                std::sort(foes.begin(), foes.end());
+                for (const entity_id foe : foes)
+                {
+                    bool opened = false;
+                    (void)open_space_battle(w, h.owner, foe, u.node, &opened);
+                    if (opened)
+                        ++r.battles;
+                }
+                ++r.stopped;
                 continue;
             }
             ++r.lost;
@@ -562,7 +598,9 @@ void run_space_convoy_day(world& w, const space_unit_params& p, const station_pa
                 std::array<float, resource_count> lot{};
                 lot[PR] = std::isfinite(drop) ? drop : 0.0f;
                 float credits = 0.0f;
+                // BL-1599: a blockaded destination takes no unload; the Hauler waits.
                 const bool can = mit != w.markets.end() && std::isfinite(drop) && staffed_pad_any(w, body) != null_entity
+                              && !space_blockaded(w, h.owner, body) && !space_market_blockaded(w, h.dest_market)
                               && (!(drop > 0.0f) || space_quote_lot(w, p, h.dest_market, lot, &credits))
                               && w.nations.count(h.owner) != 0 && w.nations.at(h.owner).treasury >= credits;
                 if (!can)

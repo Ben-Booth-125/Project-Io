@@ -17,6 +17,7 @@
 #include "space_units.hpp"  // space_unit, space_design (BL-1594/BL-1595, below)
 #include "space_battle.hpp" // space_battle (BL-1597, below)
 #include "space_convoy.hpp" // space_haul (BL-1596, below)
+#include "space_bombard.hpp" // space_bombard_order (BL-1599, below)
 #include "war.hpp"          // war_record, peace_offer (BL-1459/BL-1428 wars, below)
 
 #include <atomic>
@@ -1093,6 +1094,10 @@ struct world
     /// Hauler's trip, keyed by the unit's id (space_convoy.hpp; SPACE_FLEETS.md
     /// § Space convoys). SERIALISED (world_save.hpp's BL-1596 block), hashed when non-empty.
     std::map<entity_id, space_haul> space_hauls;
+    /// BL-1599 — each space unit's standing bombard order, keyed by the unit's id
+    /// (space_bombard.hpp; SPACE_FLEETS.md § Bombardment and fire at orbit).
+    /// SERIALISED (world_save.hpp's BL-1599 block), hashed when non-empty.
+    std::map<entity_id, space_bombard_order> space_bombard_orders;
 
     /// Enacted and un-enacted laws (BL-343). A world-level list rather than a
     /// per-corp one: a law is enacted over the world and charged to whoever it

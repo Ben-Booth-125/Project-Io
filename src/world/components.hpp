@@ -706,6 +706,11 @@ enum class building_type : uint8_t
                                     ///< workforce into astronauts each quarter, into its owner's
                                     ///< pool up to a cap (stations.hpp, run_astronaut_training).
                                     ///< Produces no good; staffed at construction like the institute.
+    orbital_defence_battery = 15, ///< BL-1599 (SPACE_FLEETS.md § Bombardment and fire at orbit): fires
+                                  ///< each day at hostile units in its body's low orbit, scaled by its
+                                  ///< `condition_permille` (space_bombard.hpp). Produces nothing, staffs
+                                  ///< at zero, no supply anchor; opened by the `orbital_defence_battery`
+                                  ///< mechanic.
 };
 
 /// One past the last building type — the wire parser's range gate (BL-396:
@@ -715,7 +720,7 @@ enum class building_type : uint8_t
 /// enum's tail, the same way resource_count derives from resource_type::count:
 /// appending a type means moving this with it.
 static constexpr uint8_t building_type_count =
-    static_cast<uint8_t>(building_type::astronaut_training_centre) + 1;
+    static_cast<uint8_t>(building_type::orbital_defence_battery) + 1;
 
 /// Infrastructure is every building that is not a producer (PRODUCTION.md §
 /// Infrastructure buildings): ports, logistics hubs, railway stations, the

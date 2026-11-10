@@ -1012,6 +1012,10 @@
   [
    "gameplay.space_unload_cargo",
    "No UI surface yet (the circumplanetary canvas's fleet controls are the UI lane's). In-process: src/world/space_convoy.hpp, the space-unit seam beside order_space_unit / refuel_space_unit. Not on apply_space_command or the --serve / MCP transport yet (a SPACE line beside COMMAND is owed)."
+  ],
+  [
+   "gameplay.space_bombard",
+   "No UI surface yet (the circumplanetary canvas's fleet controls are the UI lane's). In-process: src/world/space_bombard.hpp, the space-unit seam beside order_space_unit / load_space_cargo. Not on apply_space_command or the --serve / MCP transport yet (a SPACE line beside COMMAND is owed)."
   ]
  ]
 }

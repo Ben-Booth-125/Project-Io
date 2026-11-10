@@ -47,7 +47,7 @@ constexpr auto max_cover      = terrain_cover::urban;
 constexpr auto max_landform   = terrain_landform::rift;
 constexpr auto max_body_type  = body_type::star;
 constexpr auto max_atmosphere = atmosphere_class::thick;
-constexpr auto max_building   = building_type::astronaut_training_centre; // BL-1585 (v81); BL-1426 (no bump: an older reader refuses the new type at this gate); BL-1449 (v65); BL-1255 (v49); BL-1266 (v46); BL-615 before it.
+constexpr auto max_building   = building_type::orbital_defence_battery; // BL-1599 (v88); BL-1585 (v81); BL-1426 (no bump: an older reader refuses the new type at this gate); BL-1449 (v65); BL-1255 (v49); BL-1266 (v46); BL-615 before it.
                                                            // A WIDENED range gate, not a format
                                                            // change: no serialised array is sized
                                                            // by building_type (unlike resource_
@@ -2385,6 +2385,18 @@ void write_world_snapshot_at(const world& w, std::ostream& out, uint32_t version
         }
     }
     // ===== END BL-1596 =====
+    // ===== BEGIN BL-1599 (v88): THE STANDING BOMBARD ORDERS, the last section =====
+    if (version >= k_world_save_version_space_bombard)
+    {
+        w_u32(out, static_cast<uint32_t>(w.space_bombard_orders.size()));
+        for (const auto& [uid, o] : w.space_bombard_orders) // ascending
+        {
+            w_id(out, uid);
+            w_enum(out, o.kind);
+            w_u32(out, o.target);
+        }
+    }
+    // ===== END BL-1599 =====
 }
 
 void write_world_snapshot_pre_space_battles(const world& w, std::ostream& out)
@@ -2413,6 +2425,17 @@ std::size_t world_save_prospecting_section_bytes(const world& w)
     for (const auto& [key, k] : w.survey_knowledge)
         n += 16 + k.prospected.size();
     return n;
+}
+
+void write_world_snapshot_pre_space_bombard(const world& w, std::ostream& out)
+{
+    // VERIFICATION ONLY (BL-1599): the v87 stream shape - no bombard-order section.
+    write_world_snapshot_at(w, out, k_world_save_version_pre_space_bombard);
+}
+
+std::size_t world_save_space_bombard_section_bytes(const world& w)
+{
+    return 4 + 9 * w.space_bombard_orders.size();
 }
 
 void write_world_snapshot_pre_space_convoys(const world& w, std::ostream& out)
@@ -2916,7 +2939,8 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
             && version != k_world_save_version_pre_space_units // BL-1594: v83, no space units
             && version != k_world_save_version_pre_space_battles // BL-1597: v84, no space battles
             && version != k_world_save_version_pre_prospecting // BL-1600: v85, nothing mapped off-world
-            && version != k_world_save_version_pre_space_convoys)) // BL-1596: v86, nothing aboard
+            && version != k_world_save_version_pre_space_convoys // BL-1596: v86, nothing aboard
+            && version != k_world_save_version_pre_space_bombard)) // BL-1599: v87, no bombard orders
         return false; // mismatched version -- refuse rather than misread
 
     // BL-1422: a stream before the kit goods carries every per-resource array 49 wide;
@@ -5320,6 +5344,30 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
         }
     }
     // ===== END BL-1596 =====
+    // ===== BEGIN BL-1599 (v88): the standing bombard orders. Untrusted, refused whole
+    // on any breach of world_save.hpp's v88 paragraph. A v87 (and older) stream ends
+    // before it: no orders. =====
+    if (version >= k_world_save_version_space_bombard)
+    {
+        uint32_t count = 0;
+        if (!r_u32(in, count) || count > s.space_units.size() || count > k_space_bombard_orders_max)
+            return false;
+        entity_id prev = null_entity;
+        for (uint32_t k = 0; k < count; ++k)
+        {
+            entity_id           uid = null_entity;
+            space_bombard_order o;
+            if (!r_id(in, uid) || uid == null_entity || (k > 0 && uid <= prev)
+                || !r_enum(in, o.kind, space_bombard_target::province) || !r_u32(in, o.target) || o.target == 0)
+                return false;
+            prev = uid;
+            const auto uit = s.space_units.find(uid);
+            if (uit == s.space_units.end() || s.nations.count(uit->second.owner) == 0)
+                return false;
+            s.space_bombard_orders.emplace_hint(s.space_bombard_orders.end(), uid, o);
+        }
+    }
+    // ===== END BL-1599 =====
 
     // BL-1266 (v46): every manual trade names a live owner and two distinct
     // standing markets, and holds an id below the next one to be issued, all

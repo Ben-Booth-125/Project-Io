@@ -165,6 +165,23 @@ body's low orbit and the holder has no armed unit there. A blockaded body's spac
 convoy loads or unloads there, and no launch from it reaches orbit. This is CONCEPT.md's "active
 conflict on a body cuts off all imports and exports", made positional.
 
+**The rules in full** (BL-1599 (blockade and bombardment), first cut, 2026-11-10):
+
+- **Derived, never stored.** A body is blockaded *for a nation* when an armed unit of a nation hostile
+  to it (either direction, as § Battles reads "at war") stands in the body's low orbit, not in
+  transit, and the nation has no armed unit there itself. An armed unit of its own **contests** the
+  orbit and lifts the blockade; the battle that follows is § Battles'.
+- **No launch.** The blockaded nation raises nothing at a Launchpad on the body, buys no propellant up
+  through it, and launches no asset from it.
+- **No load or unload.** A carrier loads or unloads through a pad on the body only when the body is
+  blockaded neither for its own nation nor for the nation whose ground the pad's market stands on. A
+  blockade stops the body's trade, whoever ships.
+- **No trade between bodies.** A trade is not priced — by Hauler or by the straight-line lane — out
+  of a body blockaded for the trader, or into or out of a market whose holder is blockaded there. A
+  trade Hauler at a blockaded destination waits in orbit.
+- **The escort's meeting.** An escorted trade Hauler that meets a hostile armed unit **opens the
+  battle** there that day, and waits at the node until it is decided.
+
 ## Bombardment and fire at orbit (Ben, 2026-11-10)
 
 **Orbit may strike the ground.** An armed unit in a body's low orbit may **bombard** a province or a
@@ -173,6 +190,25 @@ Alarm as a missile strike does (`../politics/RELATIONS.md` § 6).
 
 **The ground may fire at orbit.** An **orbital defence battery** — a building — fires each day at the
 hostile units in its body's low orbit, with a munition from its own stock.
+
+**The rules in full** (BL-1599 (blockade and bombardment), first cut, 2026-11-10):
+
+- **A standing order.** A bombard order names one unit and one target, a building or a province. The
+  unit must hold the Orbital Bombardment key, carry the orbital-missile armament (the munition), and
+  stand in the low orbit of the target's body. It fires **once a day** until its unit, its target or
+  the hostility is gone, or the unit leaves that orbit; then the order lapses. Peace lapses it.
+- **What a strike does.** A strike takes the unit's firepower, times a dial, off the building's
+  **condition** — the channel strategic bombing wears (`MILITARY.md` § Air): throughput scales with
+  it and the daily repair mends it. Only a building whose condition bites is a target. A province order
+  strikes the hostile building in best condition there, ties to the lowest id.
+- **The Alarm.** Each strike is **force used** (`../politics/RELATIONS.md` § Who emits each factor):
+  the struck building's owner observes the bomber, magnitude the condition lost times a dial.
+- **The battery** is a building, opened by the Orbital Defence Battery key. Each day it fires its
+  firepower, scaled by its condition, at the hostile units in its body's low orbit, in a battle's
+  target order — escorts, capital ships, unarmed hulls — armour first, then hull points. A unit at
+  zero is destroyed, with its cargo and any order it held. It is a daily strike, not a battle side.
+- **Simultaneous.** A day's strikes and a day's battery fire are fixed at the day's start, after the
+  day's battles: a bomber the battery destroys still lands that day's strike.
 
 ## Rivals
 

@@ -116,6 +116,9 @@ bool condition_bites(building_type t)
         // it"): a bunker's condition scales the cover it gives, so a strategic
         // mission may wear it down too.
         case building_type::bunker:
+        // BL-1599 (SPACE_FLEETS.md § Bombardment and fire at orbit): a battery's
+        // condition scales its fire, so a strike may wear it down too.
+        case building_type::orbital_defence_battery:
             return true;
         default:
             return false;

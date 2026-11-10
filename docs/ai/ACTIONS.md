@@ -24,7 +24,7 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 > **Generated file.** Produced by `node tools/session/render_actions.js`.
 > Edit the JSON, then re-run; hand edits here are overwritten.
 
-*253 entries — 67 gameplay · 41 canvas · 15 lens · 87 ledger · 43 chrome.*
+*254 entries — 68 gameplay · 41 canvas · 15 lens · 87 ledger · 43 chrome.*
 
 ---
 
@@ -1267,6 +1267,7 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 - The unit is a carrier (Hauler or Lander) with a cargo bay; any cargo already aboard is the same good, and what is aboard plus qty fits the bay (rejected_cargo). A trade's Hauler cannot be loaded by hand (rejected_cargo).
 - The unit is idle (rejected_busy) in a body's LOW ORBIT (rejected_wrong_node), and no armed unit of a nation at war with the owner stands at that node (rejected_hostile).
 - The nation holds a completed, staffed Launchpad on that body (rejected_no_pad); the pad tile's market shelf holds the goods and the lift's propellant - the body's climb Δv x launch_propellant_per_dv x qty - under the space ceiling (rejected_shelf_short / rejected_no_market), and the treasury pays both at the posted prices (rejected_insufficient_treasury).
+- BLOCKADE (SPACE_FLEETS.md § Blockade): refused (rejected_blockaded) when the body is blockaded for the acting nation - an armed unit of a nation hostile to it stands in that low orbit and it has none of its own there - or for the nation whose ground the pad's market stands on (space_bombard.hpp).
 
 **Expected output.** ok: the goods and the lift's propellant leave the pad's shelf, the treasury pays their value, and the cargo is aboard (space_unit::cargo, its good on the unit's space_haul record, held). Loaded is heavier: the unit's Δv falls. Saved (world_save_version 85).
 
@@ -1285,10 +1286,32 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 - Hand-loaded cargo is aboard (rejected_cargo: nothing aboard, or a trade's cargo, which its Hauler unloads itself).
 - The unit is idle (rejected_busy) in a body's LOW ORBIT (rejected_wrong_node), and no armed unit of a nation at war with the owner stands at that node (rejected_hostile).
 - A completed, staffed Launchpad of ANY nation stands on the body below (rejected_no_pad); its tile's market shelf holds the descent's propellant - the body's climb Δv x launch_propellant_per_dv x the cargo - under the space ceiling (rejected_shelf_short / rejected_no_market), and the treasury pays it (rejected_insufficient_treasury).
+- BLOCKADE (SPACE_FLEETS.md § Blockade): refused (rejected_blockaded) when the body is blockaded for the acting nation, or for the nation whose ground the pad's market stands on (space_bombard.hpp).
 
 **Expected output.** ok: the descent's propellant leaves that shelf, the treasury pays it, the hold empties, and the whole cargo LANDS on that market as an arrived space convoy: the next credit_arrived_convoys lands it and the clear sells it for the owner, with any import duty, as any convoy's cargo.
 
 **Reason to select.** Sell carried goods into another body's market, or bring them home.
+
+### `gameplay.space_bombard` — No UI surface yet (the circumplanetary canvas's fleet controls are the UI lane's). In-process: src/world/space_bombard.hpp, the space-unit seam beside order_space_unit / load_space_cargo. Not on apply_space_command or the --serve / MCP transport yet (a SPACE line beside COMMAND is owed).
+
+**Press.** In-process: order_space_bombard(world, nation, unit, kind, target, clear).
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `unit` | `entity_id (space unit)` | The nation's own warship carrying the orbital-missile armament (armament.missile) - the munition it fires. |
+| `kind` | `u8 (space_bombard_target)` | 0 a building, 1 a province; any other value is rejected_invalid before it is read as a kind. |
+| `target` | `u32` | The building id (kind 0) or the province id (kind 1); 0, or an id naming nothing, is rejected_invalid. |
+| `clear` | `bool` | true clears the unit's standing order instead (rejected_invalid when it has none); kind and target are then ignored. |
+
+**Valid when:**
+- The seam validates every field as the value that lands: the unit id must name a live space unit (rejected_unknown_unit) of the acting nation (rejected_not_owner); a refusal of any kind mutates nothing.
+- The nation holds the Early Space tree's Orbital Bombardment mechanic, orbital_bombardment (rejected_tech_locked).
+- The unit carries the orbital-missile armament (rejected_not_armed), is not in transit (rejected_busy), and stands in the LOW ORBIT of the body the target lies on (rejected_wrong_node).
+- There is something there it may strike (rejected_target): the building, or for a province the building in best condition there (ties to the lowest id), must be standing, completed, of a type whose condition bites (condition_bites - the strategic mission's targets: producers, the marketplace, ports, hubs, stations, research houses, bunkers, orbital defence batteries; NOT a Launchpad or a base) and owned by a nation the acting nation is hostile to, either direction.
+
+**Expected output.** ok: a STANDING order (world::space_bombard_orders, keyed by unit; saved, world_save_version 88). Each day, after the battle day, it fires once: the unit's firepower x bombard_condition_per_firepower (1.0) comes off the struck building's condition per-mille (its throughput scales with condition; the daily repair pass mends it), and the building's owner observes force_used toward the bomber, magnitude bombard_force_per_permille (0.1) x the condition lost - the Trust and Alarm a battle's force carries (RELATIONS.md § 6). A province order re-picks its building each day. The order is DROPPED the first day its unit, target or hostility is gone, or the unit has left that low orbit; peace drops it. The munition is not consumed (first cut). An enemy Orbital Defence Battery on the body fires back each day.
+
+**Reason to select.** Wear down a hostile nation's industry, trade or defences on a body your fleet holds the orbit of - at the price of Trust and Alarm in the nation struck.
 
 ---
 

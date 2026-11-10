@@ -291,6 +291,8 @@ enum class space_launch_result : uint8_t
     rejected_no_slot,              ///< The node's slots are all held.
     rejected_no_route,             ///< No orbital path from the home surface reaches the node.
     rejected_shelf,                ///< The home market's shelf cannot fill the whole goods lot.
+    // ---- BL-1599, appended ----
+    rejected_blockaded,            ///< The home body is blockaded (space_bombard.hpp): no launch reaches orbit.
 };
 
 struct space_launch_quote
