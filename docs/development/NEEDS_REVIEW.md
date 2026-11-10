@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*33 entries — 30 open, 3 resolved.*
+*37 entries — 34 open, 3 resolved.*
 
 ---
 
@@ -342,6 +342,62 @@ Ben asked to design elimination of a landless nation. Taken: wars close as white
 > **Recommendation:** Keep the defaults.
 
 *Files: `docs/politics/NATIONS.md`, `docs/politics/RELATIONS.md`*
+
+### NR-1160 — Near-space design filled in on your behalf: slot counts, signal delay of one quarter, data home only through coverage
+*decision taken on your behalf · raised 2026-11-10 · from space-mechanics session (worktree claude/space-mechanics-design), writing your form answers into SPACE_ASSETS.md*
+
+Your answers set the shape; I chose the rest. Nodes: surface, low, high per body, plus L1/L2/L4/L5 per pair (L3 left out). Slots: low 8 + 4 per Earth mass, high 4 (planet) or 2, L4/L5 3, L1/L2 2; first come, first held. Launch buys spacecraft_components + propellant off the home shelf. An order outside comms coverage waits one quarter; research, observation and survey data are earned only in coverage. An edge module (Dock, Shipyard) enclosed by a grid upgrade goes idle until refitted. Upgrades: 5x3 -> 7x5 -> 9x7. Budgets stop the newest module first. Solar power falls with the square of orbital radius.
+
+**Why it matters.** These are the numbers and rules a first playtest of v0.4.0 will feel.
+
+- Keep them
+- Name the ones to change
+
+> **Recommendation:** Keep them until the spectator run and your playtest say otherwise.
+
+*Files: `docs/economy/SPACE_ASSETS.md`*
+
+### NR-1161 — Far-space design written whole on your behalf (SPACE_FLEETS.md and six sibling sections)
+*decision taken on your behalf · raised 2026-11-10 · from space-mechanics session, designing v0.5.0 so its lanes can run while you are away*
+
+New doc docs/military/SPACE_FLEETS.md: five hull classes (Hauler, Lander, Tug, Frigate, Cruiser; Cruiser only from a Shipyard); a dv budget that refuses an unaffordable move, cargo adding mass; refuel at a Dock+Fuel depot or over an owned Launchpad; a Dock berths two; space convoys are Haulers on the cheapest path, interdicted by hostile armed fleets on it; daily deterministic battles at a node; blockade = hostile armed fleet in low orbit with none of the holder's; bombardment from low orbit and an orbital defence battery. Also: debris as wear and cascade (SPACE_ASSETS), mapping-then-prospecting (DISCOVERY), bases as capitals that partition a body into provinces on first landing (NATIONS), war across every body (MILITARY), war-placed front pins (LAYOUT), seeded solar storms (EVENTS), firsts with a research grant, the propellant loop and the next age's tree (ERAS).
+
+**Why it matters.** It is a large design taken without a form. Each piece is in its owning doc, so a change is an edit there.
+
+- Keep and build as written
+- Pause v0.5.0 lanes for a design form when you are back
+
+> **Recommendation:** Keep and build; your v0.6.0 playtest is the place to reshape it.
+
+*Files: `docs/military/SPACE_FLEETS.md`, `docs/economy/SPACE_ASSETS.md`, `docs/ui/DISCOVERY.md`, `docs/politics/NATIONS.md`, `docs/military/MILITARY.md`, `docs/ui/LAYOUT.md`, `docs/EVENTS.md`, `docs/economy/ERAS.md`*
+
+### NR-1162 — Space work is on its own branch, ids from BL-1580 and sprints 65 and 66
+*observation · raised 2026-11-10 · from space-mechanics session*
+
+All space work lands on branch claude/space-mechanics-design (worktree .claude/worktrees/space-mechanics-design), cut from local main and merged with main as it moves. It is not merged into main: main's checkout is shared, and other sessions commit there. Backlog ids start at BL-1580 (a gap above BL-1567) and NR ids at NR-1160, so a parallel session minting on main does not collide; sprints are numbered 65 (near space) and 66 (far space).
+
+**Why it matters.** Merging the branch into main, and whether 65/66 clash with a sprint another session opened, are yours to decide.
+
+- Merge into main when you are back
+- Keep it on the branch until v0.6.0
+
+> **Recommendation:** Merge at each version cut, after your look.
+
+*Files: `docs/development/sprints.json`, `docs/development/backlog.json`*
+
+### NR-1163 — v0.3.0 (military) is not cut and the naval branch is unmerged, while v0.5.0 builds space war
+*question · raised 2026-11-10 · from space-mechanics session, standing rule on milestone order*
+
+ROADMAP says the numbers are naming order, not build order, and you asked for v0.4.0 and v0.5.0 now. But space battles, blockade and war-on-every-body build on the campaign military, and sprint 64's naval system sits on claude/naval-warfare-system-b0d978, unmerged. Space combat is built standalone on the orbital graph, not on the sea theatre.
+
+**Why it matters.** If the naval branch merges later it may want to share interdiction rules with space convoys.
+
+- Fine as is
+- Merge naval first and reconcile interdiction
+
+> **Recommendation:** Fine as is; reconcile at v0.6.0.
+
+*Files: `docs/military/SPACE_FLEETS.md`*
 
 ---
 
