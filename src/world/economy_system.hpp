@@ -572,6 +572,11 @@ struct economy_report
     /// completed, and the modules working or stopped by a budget shortfall.
     station_step_report stations;
 
+    /// BL-1587 / BL-1588 (space_command.hpp): the pending near-space orders this
+    /// quarter's signal reached — applied, or dropped as no longer legal (each
+    /// dropped order's id and why).
+    space_orders_report space_orders;
+
     /// BL-1335 (NATIONS.md § Taxes and Discontent): each nation's tax quarter —
     /// tier, credits taken, Discontent before and after. Ascending nation id.
     std::vector<nation_tax_row> taxes;

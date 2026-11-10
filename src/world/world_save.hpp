@@ -735,7 +735,36 @@ inline constexpr uint32_t k_world_save_version_pre_recruits = 71;
 /// at that index; a live module or truss names a live station; refused whole otherwise.
 /// v80 is a STRICT PREFIX of v81 and is read too (`k_world_save_version_pre_stations`),
 /// as a world with no station, no template and empty pools.
-inline constexpr uint32_t world_save_version = 81;
+///
+/// **82 (BL-1581 orbital slots, BL-1586 satellite roles, BL-1587 signal delay;
+/// SPACE_ASSETS.md § The orbital graph, § Satellites, § Signal delay) — THE SPACE NODES
+/// AND THE PENDING ORDERS.** Appended last: (1) after a u32 count equal to the asset
+/// store's size, every asset ascending id as (id, node body, u8 node kind, u8 role); (2)
+/// u32 `next_space_order_id`, then after a u32 count every pending order in queue order as
+/// (u32 id, i32 due tick, nation, u8 verb, u8 cls, u8 role, node body, u8 node kind,
+/// subject, i32 slot, i32 slot_to, u8 module, str name, u8 layout level, u32 n, n x u8
+/// layout kind). Cross-checked whole: a node names the asset's own body and agrees with
+/// its legacy slot (surface node <-> surface slot); a live station part sits at its
+/// station's node; a role is in range and `none` for every non-satellite; an order's ids
+/// strictly ascend below `next_space_order_id`, its nation is a nation, its verb one the
+/// signal delays, every enum in range, its name at most 64 bytes, its layout at most a
+/// 9x7 grid, its due tick non-negative, at most `k_space_orders_max` orders. Refused whole
+/// otherwise. v81 is a STRICT PREFIX of v82 and is read too
+/// (`k_world_save_version_pre_space_nodes`), its nodes DERIVED (a station part at its
+/// station's node, a surface asset at its body's surface, any other at its body's low
+/// orbit), every role `none` and the queue empty.
+///
+/// ---- MERGE NOTE (sprint 65): the version number, its constants and the reader's
+/// accepted-version list are kept together here and in ONE comment-marked spot of
+/// world_save.cpp (`k_world_save_version_pre_space_nodes`). A parallel bump (BL-1612)
+/// renumbers by appending after this one.
+inline constexpr uint32_t world_save_version = 82;
+
+/// BL-1581: the first version carrying the space-node / pending-order section.
+inline constexpr uint32_t k_world_save_version_space_nodes = 82;
+
+/// BL-1581: v81, a strict prefix of v82.
+inline constexpr uint32_t k_world_save_version_pre_space_nodes = k_world_save_version_space_nodes - 1;
 
 /// BL-1583: the first version carrying the station section (see above).
 inline constexpr uint32_t k_world_save_version_stations = 81;
@@ -968,9 +997,13 @@ std::size_t world_save_defend_section_bytes(const world& w);
 /// 4 per return for each nation it lists. The LAST section of a v80 stream.
 std::size_t world_save_research_books_section_bytes(const world& w);
 
-/// BL-1583: the byte length of the v81 station section `w` writes. The LAST section
-/// of a v81 stream.
+/// BL-1583: the byte length of the v81 station section `w` writes. The last section
+/// of a v81 stream (v82's space-node section follows it).
 std::size_t world_save_station_section_bytes(const world& w);
+
+/// BL-1581: the byte length of the v82 space-node / pending-order section `w` writes.
+/// The LAST section of a v82 stream.
+std::size_t world_save_space_node_section_bytes(const world& w);
 
 /// BL-1422, widened by BL-1436: the bytes ALL SIX kit goods' extra elements add to
 /// every per-resource array of the stream `w` writes - the widening from 49 to today's
@@ -1103,6 +1136,9 @@ void write_world_snapshot_pre_research_books(const world& w, std::ostream& out);
 
 /// VERIFICATION ONLY (BL-1583): the v80 stream shape - no station section.
 void write_world_snapshot_pre_stations(const world& w, std::ostream& out);
+
+/// VERIFICATION ONLY (BL-1581): the v81 stream shape - no space-node section.
+void write_world_snapshot_pre_space_nodes(const world& w, std::ostream& out);
 
 /// BL-1453: the recon stock a battle loaded from a pre-v67 stream is given — enough to
 /// see every defending unit in full (twice the stealthiest defender's kit stealth, in

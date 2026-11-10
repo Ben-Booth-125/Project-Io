@@ -36,6 +36,20 @@
 //       a station_core is refused; tampered tails refuse the stream whole.
 //   S13 DETERMINISM: two fixtures driven identically end with equal hash and stream.
 //
+// BL-1581 / BL-1582 / BL-1587 (sprint 65): the fixture stages a nation that may
+// launch (space_fixture.hpp). S2 now refuses a core without its key and admits a
+// far L4; S6's overdraw is a Microgravity factory (the Shipyard's key is far
+// space's); S8's 9x7 ring is staged (its key is closed in Era 1). New rows:
+//   S14 KEYS: a module kind's key, the Shipyard's closed key, the 7x5 upgrade's
+//       key — each refused whole without it; the Astronaut Training Centre's
+//       construction opens only with astronaut_training.
+//   S15 SLOTS: a core holds one slot of its node; a second core to the full
+//       node is refused whole; a module rides inside the core's slot.
+//   S16 SIGNAL DELAY: station verbs in coverage land at once; outside it they
+//       queue, round-trip the save, wait exactly one quarter and land in issue
+//       order; a no-longer-legal order is dropped and reported; templates save
+//       at once; malformed commands refuse whole.
+//
 // Build: node tools/verify/build_harness.js station_harness
 // Run:   build_gen/verify/station_harness.exe
 // ---------------------------------------------------------------------------
@@ -43,10 +57,15 @@
 #include "world/economy_system.hpp"
 #include "world/nation_step.hpp"
 #include "world/recipe_registry.hpp"
+#include "world/nation_tech.hpp"
+#include "world/orbital_graph.hpp"
 #include "world/space_assets.hpp"
+#include "world/space_command.hpp"
+#include "world/space_tech_keys.hpp"
 #include "world/stations.hpp"
 #include "world/world.hpp"
 #include "world/world_save.hpp"
+#include "space_fixture.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -96,6 +115,7 @@ struct fixture
     world     w;
     entity_id star = null_entity, home = null_entity, moon = null_entity, far = null_entity;
     entity_id a = null_entity, b = null_entity;
+    entity_id market = null_entity; // the home shelf (BL-1582)
 };
 
 entity_id add_body(world& w, const char* name, body_type t, entity_id parent, float au)
@@ -134,29 +154,42 @@ void build(fixture& f)
     w.nations.at(f.b).treasury = 2000000.0f;
     w.nations.at(f.a).astronauts = 20;
     w.nations.at(f.b).astronauts = 0;
+    // BL-1581: a one-Earth-mass home under moderate air; a Luna-mass airless moon.
+    w.bodies.at(f.moon).mass_earths = 0.0123f;
+    w.bodies.at(f.moon).atmosphere  = atmosphere_class::none;
+    // BL-1582: both may launch — every node held, a staffed pad each, a stocked shelf.
+    space_fixture::hold_every_node(w, f.a);
+    space_fixture::hold_every_node(w, f.b);
+    const entity_id tile = space_fixture::add_tile(w, f.home);
+    space_fixture::add_pad(w, f.a, tile, 10.0f);
+    space_fixture::add_pad(w, f.b, tile, 10.0f);
+    f.market = space_fixture::add_shelf(w, f.home);
 }
 
 struct snap
 {
     std::uint64_t hash;
-    std::size_t   assets, stations, templates;
+    std::size_t   assets, stations, templates, orders;
     std::uint32_t cursor;
     float         ta, tb;
     int32_t       pa, pb;
+    float         comp, prop; // BL-1582: the home shelf's launch goods
 };
 
 snap take(const fixture& f)
 {
     return {f.w.state_hash(0), f.w.space_assets.size(), f.w.stations.size(), f.w.station_templates.size(),
-            f.w.next_entity_id(), f.w.nations.at(f.a).treasury, f.w.nations.at(f.b).treasury,
-            f.w.nations.at(f.a).astronauts, f.w.nations.at(f.b).astronauts};
+            f.w.space_orders.size(), f.w.next_entity_id(), f.w.nations.at(f.a).treasury,
+            f.w.nations.at(f.b).treasury, f.w.nations.at(f.a).astronauts, f.w.nations.at(f.b).astronauts,
+            space_fixture::shelf_of(f.w, f.market, resource_type::spacecraft_components),
+            space_fixture::shelf_of(f.w, f.market, resource_type::propellant)};
 }
 
 bool same(const snap& x, const snap& y)
 {
     return x.hash == y.hash && x.assets == y.assets && x.stations == y.stations
-        && x.templates == y.templates && x.cursor == y.cursor && x.ta == y.ta && x.tb == y.tb
-        && x.pa == y.pa && x.pb == y.pb;
+        && x.templates == y.templates && x.orders == y.orders && x.cursor == y.cursor && x.ta == y.ta
+        && x.tb == y.tb && x.pa == y.pa && x.pb == y.pb && x.comp == y.comp && x.prop == y.prop;
 }
 
 bool contains(const std::vector<entity_id>& v, entity_id e)
@@ -231,8 +264,7 @@ int main()
     world& w = f.w;
     w.current_econ_tick = 10;
     const orbital_node hi{f.home, orbital_node_kind::high_orbit};
-    const space_launch_quote cq = quote_space_launch(w, sp, f.a, space_asset_class::station_core,
-                                                     {f.home, space_slot::orbit});
+    const space_launch_quote cq = quote_space_launch(w, sp, f.a, space_asset_class::station_core, hi);
     const float t0 = w.nations.at(f.a).treasury;
     const station_op s1 = found_station(w, sp, stp, f.a, hi);
     entity_id st_id = s1.station;
@@ -270,10 +302,20 @@ int main()
         const station_op r2 = found_station(w, sp, stp, f.a, {f.home, orbital_node_kind::surface});
         check(r2.result == station_result::rejected_invalid && same(before, take(f)), "S2",
               "a surface node is refused whole");
-        const station_op r3 = found_station(w, sp, stp, f.a, {f.far, orbital_node_kind::low_orbit});
-        check(r3.result == station_result::rejected_launch
-                  && r3.launch == space_launch_result::rejected_illegal_destination && same(before, take(f)),
-              "S2", "a far orbit (illegal for a core today) is refused through the launch quote, whole");
+        {
+            // BL-1582: without the station core's key the core is refused through the
+            // launch quote, whole (a copy of the fixture, the key released).
+            fixture c = f;
+            space_fixture::drop_key(c.w, c.a, space_keys::station_core);
+            const snap cb = take(c);
+            const station_op r3 = found_station(c.w, sp, stp, c.a, hi);
+            check(r3.result == station_result::rejected_launch
+                      && r3.launch == space_launch_result::rejected_tech_locked && same(cb, take(c)),
+                  "S2", "a core without the station-core key is refused through the launch quote, whole");
+        }
+        const station_op q3 = quote_found_station(w, sp, stp, f.a, {f.far, orbital_node_kind::l4});
+        check(q3.result == station_result::ok && same(before, take(f)), "S2",
+              "BL-1581: a core may go to any orbital node — a far planet's L4 quotes");
         const station_op r4 = found_station(w, sp, stp, 999999u, hi);
         check(r4.result == station_result::rejected_unknown_nation && same(before, take(f)), "S2",
               "an unknown nation is refused whole");
@@ -429,7 +471,7 @@ int main()
         check(contains(b2.working, pw.asset) && contains(b2.working, research) && contains(b2.stopped, ob.asset),
               "S6", "with a newer Power module, crew room 2 < need 3: the newest CREWED module (observatory) stops; the power module, drawing on no short budget, is passed over");
         // Now the power module is newest. Remove the research so the observatory alone
-        // has room; then a newer Shipyard (draw 4, crew 2) overdraws and stops first.
+        // has room; then a newer Microgravity factory (draw 4, crew 2) overdraws and stops first.
         const station_op hab = fit_station_module(w, sp, stp, f.a, st_id, slot_of(0, 2, 0), station_module_kind::habitation);
         const station_op ls  = fit_station_module(w, sp, stp, f.a, st_id, slot_of(0, 2, 2), station_module_kind::life_support);
         quarter(w, sp, stp, 18);
@@ -441,11 +483,11 @@ int main()
         check(contains(b3.working, ob.asset) && contains(b3.working, hab.asset) && contains(b3.working, ls.asset)
                   && b3.stopped.empty(),
               "S6", "habitation + life support cover the crew and power covers the draw: everything works");
-        const station_op sy = fit_station_module(w, sp, stp, f.a, st_id, slot_of(0, 4, 0), station_module_kind::shipyard);
+        const station_op sy = fit_station_module(w, sp, stp, f.a, st_id, slot_of(0, 4, 0), station_module_kind::microgravity_factory); // BL-1582: the Shipyard is far space's (closed); the factory draws as much
         quarter(w, sp, stp, 19);
         const station_budget b4 = evaluate_station_budget(w, stp, st_id, 19);
         check(b4.stopped.size() == 1 && b4.stopped[0] == sy.asset && b4.working.size() == b3.working.size(),
-              "S6", fmt("a newer Shipyard overdraws power (%.0f > %.0f): it alone stops", 8.0 + 4.0,
+              "S6", fmt("a newer Microgravity factory overdraws power (%.0f > %.0f): it alone stops", 8.0 + 4.0,
                         static_cast<double>(b4.power_supply)));
         remove_station_module(w, f.a, st_id, slot_of(0, 4, 0));
     }
@@ -519,16 +561,37 @@ int main()
                   == station_result::rejected_edge_only,
               "S8", "a refit of the dock back into the interior is refused");
         g.w.current_econ_tick = 4;
+        const snap b9 = take(g);
         const station_op u2 = upgrade_station(g.w, sp, g.a, s.station);
+        check(u2.result == station_result::rejected_tech_locked && same(b9, take(g)), "S8",
+              "BL-1582: a second upgrade (7x5 -> 9x7) needs space_grid_9x7, far space's key: refused whole in Era 1");
+        {
+            // Stage the 9x7 ring as the verb would grow it, (c, r) -> (c + 1, r + 1), to
+            // hold the geometry and the level ceiling to account.
+            space_station& s2 = g.w.stations.at(s.station);
+            const int ow = s2.width();
+            s2.level = 2;
+            const int nw = s2.width();
+            std::vector<entity_id> grown(static_cast<std::size_t>(nw * s2.height()), null_entity);
+            for (int i = 0; i < static_cast<int>(s2.slots.size()); ++i)
+            {
+                const entity_id aid = s2.slots[static_cast<std::size_t>(i)];
+                if (aid == null_entity)
+                    continue;
+                const int ni = (i / ow + 1) * nw + (i % ow + 1);
+                grown[static_cast<std::size_t>(ni)] = aid;
+                g.w.space_assets.at(aid).station_slot = static_cast<int16_t>(ni);
+            }
+            s2.slots = std::move(grown);
+        }
         const space_station& st2 = g.w.stations.at(s.station);
-        check(u2.result == station_result::ok && st2.width() == 9 && st2.height() == 7 && st2.centre() == 31
+        check(st2.width() == 9 && st2.height() == 7 && st2.centre() == 31
                   && st2.slots[31] == s.station && st2.slots[static_cast<std::size_t>(slot_of(2, 2, 2))] == pw.asset,
-              "S8", "a second upgrade: 7x5 -> 9x7, core at 31, power at (2,2)");
+              "S8", "a 9x7 grid (staged): core at 31, power at (2,2)");
         const snap b = take(g);
         check(upgrade_station(g.w, sp, g.a, s.station).result == station_result::rejected_max_level && same(b, take(g)),
               "S8", "a third upgrade is refused whole");
     }
-
     // ---- S9 template ------------------------------------------------------
     std::printf("--- S9 templates ---\n");
     {
@@ -763,9 +826,9 @@ int main()
                         b81.size(), world_save_station_section_bytes(q.w), ok80 ? 1 : 0, diff);
         }
         check(ok80 && old.station_templates.empty() && old.nations.at(q.a).astronauts == 0
-                  && s80.size() + world_save_station_section_bytes(q.w) == b81.size()
+                  && s80.size() + world_save_station_section_bytes(q.w) + world_save_space_node_section_bytes(q.w) == b81.size()
                   && b81.compare(8, s80.size() - 8, s80, 8, s80.size() - 8) == 0,
-              "S12", "v80 is v81 less its last section: it reads as no templates and empty pools");
+              "S12", "v80 is v82 less its last two sections: it reads as no templates and empty pools");
         std::ostringstream o80s(std::ios::binary);
         write_world_snapshot_pre_stations(g.w, o80s);
         world old2;
@@ -773,7 +836,7 @@ int main()
 
         // Tamper the tail. Station record 0 starts the section: id 0, owner 4, core 8,
         // body 12, kind 16, level 17, count 18, slots 22.
-        const std::size_t sec = b.size() - world_save_station_section_bytes(w2);
+        const std::size_t sec = b.size() - world_save_station_section_bytes(w2) - world_save_space_node_section_bytes(w2); // BL-1581: v82 follows
         const std::size_t r0 = sec + 4;
         auto refused = [&](std::size_t off, const void* v, std::size_t n) {
             std::string tb = b;
@@ -820,8 +883,8 @@ int main()
         check(refused(a0 + 12, &mod_bad, 1), "S12", "a core carrying a module kind refuses the stream whole");
         // The astronaut part: the last 4 + 8n bytes; the last record's count.
         const std::int32_t over = k_astronaut_pool_max + 1, zero = 0;
-        check(refused(b.size() - 4, &over, 4), "S12", "a pool past the ceiling refuses the stream whole");
-        check(refused(b.size() - 4, &zero, 4), "S12", "a listed pool of 0 refuses the stream whole");
+        check(refused(b.size() - world_save_space_node_section_bytes(w2) - 4, &over, 4), "S12", "a pool past the ceiling refuses the stream whole");
+        check(refused(b.size() - world_save_space_node_section_bytes(w2) - 4, &zero, 4), "S12", "a listed pool of 0 refuses the stream whole");
         {
             // A template whose centre slot is filled: rebuild the stream from a world
             // whose template was written raw.
@@ -835,11 +898,202 @@ int main()
             check(!from_bytes(to_bytes(raw2), vv2), "S12", "a slotted module naming no station refuses the stream whole");
             // A satellite carrying crew: plant one.
             world raw4 = w2;
-            const space_launch_quote sq = launch_space_asset(raw4, sp, g.a, space_asset_class::satellite, {g.home, space_slot::orbit});
+            const space_launch_quote sq = launch_space_asset(raw4, sp, g.a, space_asset_class::satellite, {g.home, orbital_node_kind::low_orbit}, space_satellite_role::comms);
             raw4.space_assets.at(sq.asset).crew = 2;
             world vv4;
             check(!from_bytes(to_bytes(raw4), vv4), "S12", "a satellite carrying crew refuses the stream whole");
         }
+    }
+
+    // ---- S14 keys (BL-1582) -----------------------------------------------
+    std::printf("--- S14 module, upgrade and centre keys ---\n");
+    {
+        fixture g;
+        build(g);
+        g.w.current_econ_tick = 0;
+        const station_op s = found_station(g.w, sp, stp, g.a, hi);
+        space_fixture::drop_key(g.w, g.a, space_keys::module_research);
+        const snap b0 = take(g);
+        const station_op r = fit_station_module(g.w, sp, stp, g.a, s.station, 6, station_module_kind::research);
+        check(s.result == station_result::ok && r.result == station_result::rejected_tech_locked && same(b0, take(g)),
+              "S14", "a Research module without space_module_research: rejected_tech_locked, nothing moved");
+        const station_op pw = fit_station_module(g.w, sp, stp, g.a, s.station, 6, station_module_kind::power);
+        check(pw.result == station_result::ok, "S14", "a module whose key IS held still fits (power)");
+        const snap b1 = take(g);
+        const station_op sy = fit_station_module(g.w, sp, stp, g.a, s.station, 0, station_module_kind::shipyard);
+        check(sy.result == station_result::rejected_tech_locked && same(b1, take(g)), "S14",
+              "a Shipyard on the edge: its key is far space's, closed to every nation — refused whole");
+        space_fixture::drop_key(g.w, g.a, space_keys::grid_7x5);
+        const snap b2 = take(g);
+        check(upgrade_station(g.w, sp, g.a, s.station).result == station_result::rejected_tech_locked && same(b2, take(g)),
+              "S14", "the first upgrade without space_grid_7x5: refused whole");
+        // The Astronaut Training Centre's construction gate.
+        fixture h;
+        build(h);
+        const bool open_before = structure_unlocked(h.w, h.a, building_type::astronaut_training_centre);
+        space_fixture::drop_key(h.w, h.a, space_keys::astronaut_training);
+        const bool open_after = structure_unlocked(h.w, h.a, building_type::astronaut_training_centre);
+        const bool pad_open = structure_unlocked(h.w, h.a, building_type::launchpad);
+        check(open_before && !open_after && pad_open, "S14",
+              "the Astronaut Training Centre may be built only with astronaut_training held (other types unaffected)");
+    }
+
+    // ---- S15 slots (BL-1581) ----------------------------------------------
+    std::printf("--- S15 a core holds a slot ---\n");
+    {
+        fixture g;
+        build(g);
+        g.w.current_econ_tick = 0;
+        const int cap = orbital_slot_capacity(g.w, hi);
+        int sats = 0;
+        for (int i = 0; i < cap - 1; ++i)
+            sats += launch_space_asset(g.w, sp, g.a, space_asset_class::satellite, hi, space_satellite_role::comms).result
+                    == space_launch_result::launched ? 1 : 0;
+        const station_op s = found_station(g.w, sp, stp, g.a, hi);
+        check(sats == cap - 1 && s.result == station_result::ok && orbital_slots_held(g.w, hi) == cap, "S15",
+              fmt("%d satellites and a core fill the home high orbit (%d slots)", sats, cap));
+        g.w.nations.at(g.b).astronauts = 5;
+        const snap b0 = take(g);
+        const station_op s2 = found_station(g.w, sp, stp, g.b, hi);
+        check(s2.result == station_result::rejected_launch && s2.launch == space_launch_result::rejected_no_slot
+                  && same(b0, take(g)),
+              "S15", "a second core to the full node is refused through the launch quote, whole");
+        const station_op m = fit_station_module(g.w, sp, stp, g.a, s.station, 6, station_module_kind::power);
+        check(m.result == station_result::ok && orbital_slots_held(g.w, hi) == cap, "S15",
+              "a module rides inside its core's slot: it fits at the full node and holds none");
+        const space_asset& core = g.w.space_assets.at(s.station);
+        const space_asset& mod = g.w.space_assets.at(m.asset);
+        check(core.node == hi && mod.node == hi, "S15", "the core and its module sit at the station's node");
+    }
+
+    // ---- S16 signal delay (BL-1587) ----------------------------------------
+    std::printf("--- S16 signal delay on station orders ---\n");
+    {
+        fixture g;
+        build(g);
+        recipe_registry reg;
+        g.w.current_econ_tick = 0;
+        const station_op home = found_station(g.w, sp, stp, g.a, hi);                                  // covered
+        const station_op moon = found_station(g.w, sp, stp, g.a, {g.moon, orbital_node_kind::low_orbit}); // not covered
+        space_command fit;
+        fit.nation = g.a;
+        fit.verb   = static_cast<uint8_t>(space_verb::fit_module);
+        fit.subject = home.station;
+        fit.slot   = 6;
+        fit.module = static_cast<uint8_t>(station_module_kind::power);
+        const space_command_outcome fh = apply_space_command(g.w, reg, fit);
+        check(home.result == station_result::ok && fh.result == space_command_result::applied
+                  && g.w.stations.at(home.station).slots[6] == fh.asset && fh.asset != null_entity,
+              "S16", "a fit to a station in coverage (home high orbit) lands at once");
+
+        g.w.current_econ_tick = 3;
+        fit.subject = moon.station;
+        const snap b0 = take(g);
+        const space_command_outcome fm = apply_space_command(g.w, reg, fit);
+        const snap b1 = take(g);
+        check(moon.result == station_result::ok && fm.result == space_command_result::queued
+                  && g.w.stations.at(moon.station).slots[6] == null_entity && b1.assets == b0.assets
+                  && b1.ta == b0.ta && b1.comp == b0.comp && b1.orders == b0.orders + 1
+                  && g.w.space_orders.back().due_tick == 4,
+              "S16", "a fit to a station outside coverage (moon low orbit) is queued: nothing launched, nothing paid, due next quarter");
+        space_command up;
+        up.nation = g.a;
+        up.verb = static_cast<uint8_t>(space_verb::upgrade_station);
+        up.subject = moon.station;
+        const space_command_outcome um = apply_space_command(g.w, reg, up);
+        check(um.result == space_command_result::queued && g.w.stations.at(moon.station).level == 0, "S16",
+              "an upgrade outside coverage is queued too");
+        {
+            // The queue round-trips the save.
+            const std::string b = to_bytes(g.w);
+            world back;
+            check(from_bytes(b, back) && back.space_orders.size() == 2 && back.state_hash(0) == g.w.state_hash(0)
+                      && to_bytes(back) == b,
+                  "S16", "two pending station orders round-trip (equal hash, byte-identical)");
+        }
+        economy_report r3;
+        run_nation_step(g.w, reg, r3, 3);
+        check(g.w.stations.at(moon.station).slots[6] == null_entity && g.w.space_orders.size() == 2
+                  && r3.space_orders.applied == 0,
+              "S16", "the issuing quarter's nation step (3) leaves both waiting");
+        g.w.current_econ_tick = 4;
+        economy_report r4;
+        run_nation_step(g.w, reg, r4, 4);
+        const space_station& ms = g.w.stations.at(moon.station);
+        const entity_id landed = ms.level == 1 ? ms.slots[static_cast<std::size_t>(slot_of(1, 2, 2))] : null_entity;
+        check(g.w.space_orders.empty() && r4.space_orders.applied == 2 && ms.level == 1 && landed != null_entity
+                  && g.w.space_assets.at(landed).module == static_cast<uint8_t>(station_module_kind::power)
+                  && g.w.space_assets.at(landed).launch_tick == 4,
+              "S16", "exactly one quarter later (4) the fit and then the upgrade land, in issue order (the module keeps its place)");
+
+        // A pending order that is no longer legal is dropped and reported.
+        g.w.current_econ_tick = 5;
+        space_command f2 = fit;
+        f2.slot = 0;
+        const space_command_outcome q2 = apply_space_command(g.w, reg, f2);
+        fit_station_module(g.w, sp, stp, g.a, moon.station, 0, station_module_kind::cargo_hold); // the slot fills first (a direct, in-process fit)
+        g.w.current_econ_tick = 6;
+        economy_report r6;
+        run_nation_step(g.w, reg, r6, 6);
+        check(q2.result == space_command_result::queued && r6.space_orders.dropped == 1
+                  && r6.space_orders.dropped_orders.size() == 1
+                  && r6.space_orders.dropped_orders[0].second.station == station_result::rejected_slot_occupied
+                  && g.w.space_orders.empty(),
+              "S16", "a fit whose slot was filled before its signal is dropped and reported (rejected_slot_occupied)");
+
+        // Template verbs on the ground are never delayed; apply to a far station is.
+        space_command sv;
+        sv.nation = g.a;
+        sv.verb = static_cast<uint8_t>(space_verb::save_template);
+        sv.name = "Ring";
+        sv.layout.level = 0;
+        sv.layout.kinds.assign(15, k_no_station_module);
+        sv.layout.kinds[1] = static_cast<uint8_t>(station_module_kind::power);
+        const space_command_outcome so = apply_space_command(g.w, reg, sv);
+        space_command ap;
+        ap.nation = g.a;
+        ap.verb = static_cast<uint8_t>(space_verb::apply_template);
+        ap.subject = moon.station;
+        ap.name = "Ring";
+        const space_command_outcome ao = apply_space_command(g.w, reg, ap);
+        ap.subject = home.station;
+        const space_command_outcome ah = apply_space_command(g.w, reg, ap);
+        check(so.result == space_command_result::applied && ao.result == space_command_result::queued
+                  && ah.result == space_command_result::applied && ah.fitted == 1,
+              "S16", "saving a template applies at once; applying it waits outside coverage and lands at once inside");
+
+        // Validation on the station verbs: refused whole.
+        auto refused_whole = [&](space_command c, space_command_result want, const char* what) {
+            const snap s0 = take(g);
+            const space_command_outcome o = apply_space_command(g.w, reg, c);
+            check(o.result == want && same(s0, take(g)), "S16", fmt("%s: refused whole (code %d)", what, static_cast<int>(o.result)));
+        };
+        space_command c = fit;
+        c.slot = 99;
+        refused_whole(c, space_command_result::rejected_invalid, "a slot index past the grid");
+        c = fit;
+        c.slot = -1;
+        refused_whole(c, space_command_result::rejected_invalid, "slot -1");
+        c = fit;
+        c.module = static_cast<uint8_t>(station_module_kind::truss);
+        refused_whole(c, space_command_result::rejected_invalid, "a truss as a fitted module");
+        c = fit;
+        c.subject = 999999u;
+        refused_whole(c, space_command_result::rejected_invalid, "an unknown station");
+        c = fit;
+        c.nation = g.b;
+        refused_whole(c, space_command_result::rejected_not_owner, "another nation's station (not queued either)");
+        c = sv;
+        c.name = std::string(65, 'x');
+        refused_whole(c, space_command_result::rejected_invalid, "a 65-byte template name");
+        c = sv;
+        c.layout.kinds.pop_back();
+        refused_whole(c, space_command_result::rejected_invalid, "a layout one slot short");
+        c = fit;
+        c.verb = static_cast<uint8_t>(space_verb::refit_module);
+        c.slot = 6;
+        c.slot_to = 6;
+        refused_whole(c, space_command_result::rejected_invalid, "a refit onto its own slot");
     }
 
     // ---- S13 determinism --------------------------------------------------

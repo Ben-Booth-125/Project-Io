@@ -47,10 +47,16 @@ struct world;
 // crew — draws its crew from the pool and is refused whole when the pool is short.
 // Crew ride on the asset (`space_asset::crew`); crew on a lost asset are lost.
 //
+// BL-1581/1582: every station launch goes through ONE call, `station_launch` in
+// stations.cpp, onto `launch_space_asset` — so the slot check (a core holds one
+// slot of its node), the Rocketry/launchpad gate and the goods off the home shelf
+// are the space-asset layer's. The KEYS a module kind or an upgrade needs are
+// checked here, before the launch: each module kind its own key, the first
+// upgrade `space_grid_7x5`, the second `space_grid_9x7` (far space: closed).
+//
 // WHAT IS NOT HERE: module EFFECTS (research points, rations, the factory, the
-// observatory, the relay — BL-1584), slot capacities and goods-priced launches
-// (BL-1581/1582: the one launch call is `station_launch` in stations.cpp), signal
-// delay, any UI, any AI. The verbs are in-process; an agent seam over them must
+// observatory, the relay — BL-1584), signal delay (space_command.hpp queues an
+// order outside coverage), any UI, any AI. The verbs are in-process; an agent seam over them must
 // validate wire input as that seam's rule requires.
 //
 // DETERMINISM. Every store is a std::map / std::vector walked in key or index
@@ -164,6 +170,7 @@ enum class station_result : uint8_t
     rejected_not_in_place,     ///< refit: the module has not arrived, or is lost.
     rejected_unknown_template,
     rejected_template_full,    ///< save_station_template: the nation holds the most it may.
+    rejected_tech_locked,      ///< BL-1582: the module kind's or the upgrade's key is not held (space_tech_keys.hpp).
 };
 
 struct station_op
@@ -200,7 +207,7 @@ station_op refit_station_module(world& w, const station_params& stp, entity_id n
                                 entity_id station, int from, int to);
 
 /// Grow the grid one ring: a truss launch, the core still central, every module
-/// keeping its place relative to the core. (Research gating is owed: see report.)
+/// keeping its place relative to the core. BL-1582: the upgrade's key is held.
 station_op upgrade_station(world& w, const space_asset_params& sp, entity_id nation, entity_id station);
 
 /// Save (or overwrite) a nation's named template. Validated: a known nation, a

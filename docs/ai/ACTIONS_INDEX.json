@@ -904,6 +904,50 @@
   [
    "ledger.diplomacy_refuse_peace",
    "Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Wars tab, 'Refuse' under a peace offer the other party made."
+  ],
+  [
+   "gameplay.space_launch",
+   "No UI surface yet (the circumplanetary canvas's launch and station controls are the UI lane's). In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam — a sibling of corp_command, because the template verbs carry a name and a layout the fixed corp_command record cannot. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed)."
+  ],
+  [
+   "gameplay.space_found_station",
+   "No UI surface yet (the circumplanetary canvas's launch and station controls are the UI lane's). In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam — a sibling of corp_command, because the template verbs carry a name and a layout the fixed corp_command record cannot. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed)."
+  ],
+  [
+   "gameplay.space_fit_module",
+   "No UI surface yet (the circumplanetary canvas's launch and station controls are the UI lane's). In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam — a sibling of corp_command, because the template verbs carry a name and a layout the fixed corp_command record cannot. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed)."
+  ],
+  [
+   "gameplay.space_remove_module",
+   "No UI surface yet (the circumplanetary canvas's launch and station controls are the UI lane's). In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam — a sibling of corp_command, because the template verbs carry a name and a layout the fixed corp_command record cannot. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed)."
+  ],
+  [
+   "gameplay.space_refit_module",
+   "No UI surface yet (the circumplanetary canvas's launch and station controls are the UI lane's). In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam — a sibling of corp_command, because the template verbs carry a name and a layout the fixed corp_command record cannot. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed)."
+  ],
+  [
+   "gameplay.space_apply_template",
+   "No UI surface yet (the circumplanetary canvas's launch and station controls are the UI lane's). In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam — a sibling of corp_command, because the template verbs carry a name and a layout the fixed corp_command record cannot. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed)."
+  ],
+  [
+   "gameplay.space_save_template",
+   "No UI surface yet (the circumplanetary canvas's launch and station controls are the UI lane's). In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam — a sibling of corp_command, because the template verbs carry a name and a layout the fixed corp_command record cannot. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed)."
+  ],
+  [
+   "gameplay.space_delete_template",
+   "No UI surface yet (the circumplanetary canvas's launch and station controls are the UI lane's). In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam — a sibling of corp_command, because the template verbs carry a name and a layout the fixed corp_command record cannot. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed)."
+  ],
+  [
+   "gameplay.space_upgrade_station",
+   "No UI surface yet (the circumplanetary canvas's launch and station controls are the UI lane's). In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam — a sibling of corp_command, because the template verbs carry a name and a layout the fixed corp_command record cannot. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed)."
+  ],
+  [
+   "gameplay.space_retask_satellite",
+   "No UI surface yet (the circumplanetary canvas's launch and station controls are the UI lane's). In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam — a sibling of corp_command, because the template verbs carry a name and a layout the fixed corp_command record cannot. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed)."
+  ],
+  [
+   "gameplay.space_move_satellite",
+   "No UI surface yet (the circumplanetary canvas's launch and station controls are the UI lane's). In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam — a sibling of corp_command, because the template verbs carry a name and a layout the fixed corp_command record cannot. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed)."
   ]
  ]
 }

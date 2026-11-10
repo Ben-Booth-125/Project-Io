@@ -24,7 +24,7 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 > **Generated file.** Produced by `node tools/session/render_actions.js`.
 > Edit the JSON, then re-run; hand edits here are overwritten.
 
-*226 entries — 54 gameplay · 40 canvas · 15 lens · 76 ledger · 41 chrome.*
+*237 entries — 65 gameplay · 40 canvas · 15 lens · 76 ledger · 41 chrome.*
 
 ---
 
@@ -1039,6 +1039,218 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 **Expected output.** Enacted: the pair (actor, counterparty) joins world::nation_embargoes. From then no cargo counterparty owns lands in a market on the actor's ground: a shipment there is never bought, a manual trade naming such a market is refused (rejected_embargo), and cargo already in flight is refused at the border and destroyed. counterparty's sentiment toward the actor takes embargo_imposed (Access -, Trust -). It is one-way: the actor's goods still enter counterparty's markets. Repealed: the pair is erased and trade resumes; a repeal moves no sentiment.
 
 **Reason to select.** Shut a rival's goods out of your markets: protect your producers or punish its conduct, at the cost of its regard and of what its goods would have supplied.
+
+### `gameplay.space_launch` — No UI surface yet (the circumplanetary canvas's launch and station controls are the UI lane's). In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam — a sibling of corp_command, because the template verbs carry a name and a layout the fixed corp_command record cannot. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed).
+
+**Press.** In-process: apply_space_command({nation, verb=0 launch, cls, role, node_body, node_kind}).
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `cls` | `uint8 space_asset_class` | 0 satellite, 1 rover, 2 crewed mission. Station cores and modules go through space_found_station / space_fit_module (3 and 4 are rejected_invalid here). |
+| `role` | `uint8 space_satellite_role` | A satellite's role: 1 comms, 2 navigation, 3 observation, 4 survey (its key must be held). 0 for a rover or crewed mission. |
+| `node_body` | `entity_id (body)` | The body whose orbital node is named. Never the star. |
+| `node_kind` | `uint8 orbital_node_kind` | 0 surface, 1 low orbit, 2 high orbit, 3 L1, 4 L2, 5 L4, 6 L5 (an L-point keyed on the pair's smaller body). |
+
+**Valid when:**
+- The actor is a nation (rejected_unknown_nation otherwise). The seam validates every field as the value that lands — each enum range-checked as a raw byte, each entity id checked to exist and to be the nation's own, each slot index against the station's grid — and rejects the whole command on any violation (rejected_invalid / rejected_not_owner), mutating nothing.
+- The class may go to the node: a satellite any orbital node; a rover a surface node off the home body; a crewed mission that or any orbital node (rejected_illegal_destination).
+- A satellite's role key is held (space_role_comms / _navigation / _observation / _survey).
+- A satellite needs a free slot at the node (orbital_slot_capacity; rejected_no_slot).
+- The launch gate (BL-1582): the nation holds Rocketry (space_dispatch), owns a STAFFED Launchpad on its home body, and the home market's shelf holds the whole goods lot (spacecraft_components per class, propellant per Δv of the path) under the fair-price ceiling; the treasury pays the goods' value plus the class's base credits plus the path's thrust credits. Any shortfall refuses the launch whole (rejected_refused, with the launch result: rejected_tech_locked / rejected_no_launchpad / rejected_shelf / rejected_insufficient_treasury).
+- Never delayed: the ground stations see the pad.
+
+**Expected output.** applied: a space asset in transit to the node (arrival after the path's quarters, never sooner than the old per-reach floor), the goods gone from the home shelf, the cost gone from the treasury. A satellite holds one slot of its node while in transit or in place.
+
+**Reason to select.** Put a satellite where its role pays (comms coverage, navigation, observation, survey), or reach another body with a rover or a crew.
+
+### `gameplay.space_found_station` — No UI surface yet (the circumplanetary canvas's launch and station controls are the UI lane's). In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam — a sibling of corp_command, because the template verbs carry a name and a layout the fixed corp_command record cannot. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed).
+
+**Press.** In-process: apply_space_command({nation, verb=1 found_station, node_body, node_kind}).
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `node_body` | `entity_id (body)` | The body whose orbital node is named. Never the star. |
+| `node_kind` | `uint8 orbital_node_kind` | 0 surface, 1 low orbit, 2 high orbit, 3 L1, 4 L2, 5 L4, 6 L5 (an L-point keyed on the pair's smaller body). |
+
+**Valid when:**
+- The actor is a nation (rejected_unknown_nation otherwise). The seam validates every field as the value that lands — each enum range-checked as a raw byte, each entity id checked to exist and to be the nation's own, each slot index against the station's grid — and rejects the whole command on any violation (rejected_invalid / rejected_not_owner), mutating nothing.
+- The node is an orbital node (not a surface) with a free slot (the core holds one).
+- The nation holds space_station_core (Rocketry) and its astronaut pool can crew the core (rejected_no_crew).
+- The launch gate (BL-1582): the nation holds Rocketry (space_dispatch), owns a STAFFED Launchpad on its home body, and the home market's shelf holds the whole goods lot (spacecraft_components per class, propellant per Δv of the path) under the fair-price ceiling; the treasury pays the goods' value plus the class's base credits plus the path's thrust credits. Any shortfall refuses the launch whole (rejected_refused, with the launch result: rejected_tech_locked / rejected_no_launchpad / rejected_shelf / rejected_insufficient_treasury).
+- Never delayed.
+
+**Expected output.** applied: a station core in transit to the node, opening a 5x3 grid with the core central; its crew leave the pool.
+
+**Reason to select.** Open a crewed platform: the frame every module is fitted into.
+
+### `gameplay.space_fit_module` — No UI surface yet (the circumplanetary canvas's launch and station controls are the UI lane's). In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam — a sibling of corp_command, because the template verbs carry a name and a layout the fixed corp_command record cannot. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed).
+
+**Press.** In-process: apply_space_command({nation, verb=2 fit_module, subject=station, slot, module}).
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `subject` | `entity_id (station)` | The nation's own station (its core asset's id). |
+| `slot` | `int32 grid slot` | row * width + col of the station's grid; must be empty. |
+| `module` | `uint8 station_module_kind` | 0 research … 12 market (13 truss is refused). Dock and Shipyard only on the outer ring. |
+
+**Valid when:**
+- The actor is a nation (rejected_unknown_nation otherwise). The seam validates every field as the value that lands — each enum range-checked as a raw byte, each entity id checked to exist and to be the nation's own, each slot index against the station's grid — and rejects the whole command on any violation (rejected_invalid / rejected_not_owner), mutating nothing.
+- The slot is empty and in range; an edge-only module sits on the outer ring (rejected_edge_only).
+- The module kind's key is held (space_module_*; the Shipyard's is far space's and closed in Era 1) — rejected_tech_locked.
+- The astronaut pool crews the module.
+- The launch gate (BL-1582): the nation holds Rocketry (space_dispatch), owns a STAFFED Launchpad on its home body, and the home market's shelf holds the whole goods lot (spacecraft_components per class, propellant per Δv of the path) under the fair-price ceiling; the treasury pays the goods' value plus the class's base credits plus the path's thrust credits. Any shortfall refuses the launch whole (rejected_refused, with the launch result: rejected_tech_locked / rejected_no_launchpad / rejected_shelf / rejected_insufficient_treasury).
+- SIGNAL DELAY (SPACE_ASSETS.md § Signal delay): when the target's orbital node is outside the nation's comms coverage (space_node_covered), the command is stored as a pending order and answers `queued` with an order id; the world is otherwise untouched. It is applied at the next econ tick's nation step, re-validated as it lands, and dropped (reported on economy_report::space_orders) if no longer legal. Inside coverage it applies at once.
+
+**Expected output.** applied: a module launched into the slot (it rides inside the core's orbital slot); or queued outside coverage.
+
+**Reason to select.** Give a station power, crew room, research, a dock — whatever its role needs.
+
+### `gameplay.space_remove_module` — No UI surface yet (the circumplanetary canvas's launch and station controls are the UI lane's). In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam — a sibling of corp_command, because the template verbs carry a name and a layout the fixed corp_command record cannot. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed).
+
+**Press.** In-process: apply_space_command({nation, verb=3 remove_module, subject=station, slot}).
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `subject` | `entity_id (station)` | The nation's own station (its core asset's id). |
+| `slot` | `int32 grid slot` | A slot holding a module (never the core). |
+
+**Valid when:**
+- The actor is a nation (rejected_unknown_nation otherwise). The seam validates every field as the value that lands — each enum range-checked as a raw byte, each entity id checked to exist and to be the nation's own, each slot index against the station's grid — and rejects the whole command on any violation (rejected_invalid / rejected_not_owner), mutating nothing.
+- The slot holds a module (rejected_slot_empty otherwise).
+- SIGNAL DELAY (SPACE_ASSETS.md § Signal delay): when the target's orbital node is outside the nation's comms coverage (space_node_covered), the command is stored as a pending order and answers `queued` with an order id; the world is otherwise untouched. It is applied at the next econ tick's nation step, re-validated as it lands, and dropped (reported on economy_report::space_orders) if no longer legal. Inside coverage it applies at once.
+
+**Expected output.** applied: the module asset is removed and its slot freed; nothing is refunded; an arrived module's crew stay aboard on the core. Or queued outside coverage.
+
+**Reason to select.** Free a slot for a better module, or shed a module's upkeep.
+
+### `gameplay.space_refit_module` — No UI surface yet (the circumplanetary canvas's launch and station controls are the UI lane's). In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam — a sibling of corp_command, because the template verbs carry a name and a layout the fixed corp_command record cannot. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed).
+
+**Press.** In-process: apply_space_command({nation, verb=4 refit_module, subject=station, slot=from, slot_to=to}).
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `subject` | `entity_id (station)` | The nation's own station (its core asset's id). |
+| `slot` | `int32 grid slot` | The module's slot (in place, not the core). |
+| `slot_to` | `int32 grid slot` | An empty slot; an edge-only module's must be on the outer ring. |
+
+**Valid when:**
+- The actor is a nation (rejected_unknown_nation otherwise). The seam validates every field as the value that lands — each enum range-checked as a raw byte, each entity id checked to exist and to be the nation's own, each slot index against the station's grid — and rejects the whole command on any violation (rejected_invalid / rejected_not_owner), mutating nothing.
+- from != to, both in range; the module has arrived; the destination is empty.
+- SIGNAL DELAY (SPACE_ASSETS.md § Signal delay): when the target's orbital node is outside the nation's comms coverage (space_node_covered), the command is stored as a pending order and answers `queued` with an order id; the world is otherwise untouched. It is applied at the next econ tick's nation step, re-validated as it lands, and dropped (reported on economy_report::space_orders) if no longer legal. Inside coverage it applies at once.
+
+**Expected output.** applied: launch-free — the module moves and works again one quarter later. Or queued outside coverage.
+
+**Reason to select.** Bring an enclosed Dock back to the edge after an upgrade, or rearrange a layout.
+
+### `gameplay.space_apply_template` — No UI surface yet (the circumplanetary canvas's launch and station controls are the UI lane's). In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam — a sibling of corp_command, because the template verbs carry a name and a layout the fixed corp_command record cannot. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed).
+
+**Press.** In-process: apply_space_command({nation, verb=5 apply_template, subject=station, name}).
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `subject` | `entity_id (station)` | The nation's own station (its core asset's id). |
+| `name` | `string (1..64 bytes)` | One of the nation's saved templates. |
+
+**Valid when:**
+- The actor is a nation (rejected_unknown_nation otherwise). The seam validates every field as the value that lands — each enum range-checked as a raw byte, each entity id checked to exist and to be the nation's own, each slot index against the station's grid — and rejects the whole command on any violation (rejected_invalid / rejected_not_owner), mutating nothing.
+- The template exists (rejected_unknown_template).
+- SIGNAL DELAY (SPACE_ASSETS.md § Signal delay): when the target's orbital node is outside the nation's comms coverage (space_node_covered), the command is stored as a pending order and answers `queued` with an order id; the world is otherwise untouched. It is applied at the next econ tick's nation step, re-validated as it lands, and dropped (reported on economy_report::space_orders) if no longer legal. Inside coverage it applies at once.
+
+**Expected output.** applied: one fit per slot the station has not filled to match the template, each its own launch, ascending slot; slots that differ or cannot be filled are skipped and counted. Or queued outside coverage.
+
+**Reason to select.** Build a station out to a saved plan in one order.
+
+### `gameplay.space_save_template` — No UI surface yet (the circumplanetary canvas's launch and station controls are the UI lane's). In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam — a sibling of corp_command, because the template verbs carry a name and a layout the fixed corp_command record cannot. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed).
+
+**Press.** In-process: apply_space_command({nation, verb=6 save_template, name, layout}).
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `name` | `string (1..64 bytes)` | The template's name; an existing one is overwritten. |
+| `layout` | `station_template` | A grid level (0..2) and one module kind (or none) per slot, the centre empty. |
+
+**Valid when:**
+- The actor is a nation (rejected_unknown_nation otherwise). The seam validates every field as the value that lands — each enum range-checked as a raw byte, each entity id checked to exist and to be the nation's own, each slot index against the station's grid — and rejects the whole command on any violation (rejected_invalid / rejected_not_owner), mutating nothing.
+- At most 64 templates per nation (rejected_template_full).
+- Never delayed: a template is the nation's own record on the ground.
+
+**Expected output.** applied: the template is stored under its name.
+
+**Reason to select.** Keep a station layout to apply again.
+
+### `gameplay.space_delete_template` — No UI surface yet (the circumplanetary canvas's launch and station controls are the UI lane's). In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam — a sibling of corp_command, because the template verbs carry a name and a layout the fixed corp_command record cannot. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed).
+
+**Press.** In-process: apply_space_command({nation, verb=7 delete_template, name}).
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `name` | `string (1..64 bytes)` | A saved template. |
+
+**Valid when:**
+- The actor is a nation (rejected_unknown_nation otherwise). The seam validates every field as the value that lands — each enum range-checked as a raw byte, each entity id checked to exist and to be the nation's own, each slot index against the station's grid — and rejects the whole command on any violation (rejected_invalid / rejected_not_owner), mutating nothing.
+- The template exists (rejected_unknown_template).
+- Never delayed.
+
+**Expected output.** applied: the template is forgotten.
+
+**Reason to select.** Tidy away a layout no longer wanted.
+
+### `gameplay.space_upgrade_station` — No UI surface yet (the circumplanetary canvas's launch and station controls are the UI lane's). In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam — a sibling of corp_command, because the template verbs carry a name and a layout the fixed corp_command record cannot. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed).
+
+**Press.** In-process: apply_space_command({nation, verb=8 upgrade_station, subject=station}).
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `subject` | `entity_id (station)` | The nation's own station (its core asset's id). |
+
+**Valid when:**
+- The actor is a nation (rejected_unknown_nation otherwise). The seam validates every field as the value that lands — each enum range-checked as a raw byte, each entity id checked to exist and to be the nation's own, each slot index against the station's grid — and rejects the whole command on any violation (rejected_invalid / rejected_not_owner), mutating nothing.
+- Below the last level (rejected_max_level).
+- The upgrade's key is held: 5x3 -> 7x5 needs space_grid_7x5; 7x5 -> 9x7 needs space_grid_9x7, far space's (closed in Era 1).
+- The launch gate (BL-1582): the nation holds Rocketry (space_dispatch), owns a STAFFED Launchpad on its home body, and the home market's shelf holds the whole goods lot (spacecraft_components per class, propellant per Δv of the path) under the fair-price ceiling; the treasury pays the goods' value plus the class's base credits plus the path's thrust credits. Any shortfall refuses the launch whole (rejected_refused, with the launch result: rejected_tech_locked / rejected_no_launchpad / rejected_shelf / rejected_insufficient_treasury).
+- SIGNAL DELAY (SPACE_ASSETS.md § Signal delay): when the target's orbital node is outside the nation's comms coverage (space_node_covered), the command is stored as a pending order and answers `queued` with an order id; the world is otherwise untouched. It is applied at the next econ tick's nation step, re-validated as it lands, and dropped (reported on economy_report::space_orders) if no longer legal. Inside coverage it applies at once.
+
+**Expected output.** applied: a truss segment launches and the grid grows one ring, the core central and every module keeping its place. Or queued outside coverage.
+
+**Reason to select.** Make room for more modules.
+
+### `gameplay.space_retask_satellite` — No UI surface yet (the circumplanetary canvas's launch and station controls are the UI lane's). In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam — a sibling of corp_command, because the template verbs carry a name and a layout the fixed corp_command record cannot. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed).
+
+**Press.** In-process: apply_space_command({nation, verb=9 retask_satellite, subject=satellite, role}).
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `subject` | `entity_id (space asset)` | The nation's own satellite (not lost). |
+| `role` | `uint8 space_satellite_role` | 1 comms, 2 navigation, 3 observation, 4 survey; not its current role. |
+
+**Valid when:**
+- The actor is a nation (rejected_unknown_nation otherwise). The seam validates every field as the value that lands — each enum range-checked as a raw byte, each entity id checked to exist and to be the nation's own, each slot index against the station's grid — and rejects the whole command on any violation (rejected_invalid / rejected_not_owner), mutating nothing.
+- The role's key is held (rejected_tech_locked).
+- SIGNAL DELAY (SPACE_ASSETS.md § Signal delay): when the target's orbital node is outside the nation's comms coverage (space_node_covered), the command is stored as a pending order and answers `queued` with an order id; the world is otherwise untouched. It is applied at the next econ tick's nation step, re-validated as it lands, and dropped (reported on economy_report::space_orders) if no longer legal. Inside coverage it applies at once.
+
+**Expected output.** applied: the satellite's role changes, free. Or queued outside coverage.
+
+**Reason to select.** Repurpose a satellite already in a scarce slot.
+
+### `gameplay.space_move_satellite` — No UI surface yet (the circumplanetary canvas's launch and station controls are the UI lane's). In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam — a sibling of corp_command, because the template verbs carry a name and a layout the fixed corp_command record cannot. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed).
+
+**Press.** In-process: apply_space_command({nation, verb=10 move_satellite, subject=satellite, node_body, node_kind}).
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `subject` | `entity_id (space asset)` | The nation's own active satellite. |
+| `node_body` | `entity_id (body)` | The body whose orbital node is named. Never the star. |
+| `node_kind` | `uint8 orbital_node_kind` | 0 surface, 1 low orbit, 2 high orbit, 3 L1, 4 L2, 5 L4, 6 L5 (an L-point keyed on the pair's smaller body). |
+
+**Valid when:**
+- The actor is a nation (rejected_unknown_nation otherwise). The seam validates every field as the value that lands — each enum range-checked as a raw byte, each entity id checked to exist and to be the nation's own, each slot index against the station's grid — and rejects the whole command on any violation (rejected_invalid / rejected_not_owner), mutating nothing.
+- The satellite is active (in place and paid); the node is an orbital node other than its own, with a free slot.
+- Rocketry is held; the home shelf holds the path's propellant (from where the satellite sits) and the treasury pays it plus the thrust credits — no Launchpad, no components, no base credits.
+- SIGNAL DELAY (SPACE_ASSETS.md § Signal delay): when the target's orbital node is outside the nation's comms coverage (space_node_covered), the command is stored as a pending order and answers `queued` with an order id; the world is otherwise untouched. It is applied at the next econ tick's nation step, re-validated as it lands, and dropped (reported on economy_report::space_orders) if no longer legal. Inside coverage it applies at once.
+
+**Expected output.** applied: the satellite is in transit to the new node for the path's quarters; its old slot frees at once and the new one is held. Or queued outside coverage.
+
+**Reason to select.** Shift a satellite to a node where its role serves better, or out of a crowded orbit.
 
 ---
 

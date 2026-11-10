@@ -355,7 +355,9 @@ bool early_space_branch_keyed(const world& w, entity_id nation, int es_branch);
 /// nation. The single read point the placement check and the construction
 /// door share. No Digitisation node unlocks a structure the registry carries
 /// (the Nuclear Plant and the Container Port are unread), so every type is
-/// open to every nation. `null_entity` = open.
+/// open to every nation. `null_entity` = open. BL-1582: the one exception is
+/// the Astronaut Training Centre, which opens with the `astronaut_training`
+/// mechanic key (Mass Higher Education; `nation_has_mechanic`).
 bool structure_unlocked(const world& w, entity_id corp, building_type type);
 
 /// The recipes a read `unlock_recipe` effect names, in tree order. They are the ones
