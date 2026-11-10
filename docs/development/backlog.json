@@ -1319,8 +1319,8 @@
    "design": "Ben, 2026-11-10: model growth on Earth's history, with bonuses for consumer needs met. Design in POPULATION.md section Growth, decline and razing. Base 3.0%/yr falling to 0.3% with qualification; times one plus half the upper rungs' fill; staples and habitability floor, else 1.6%/yr decline. Dials are in-band calibration (targets: about 2%/yr pooled over the first decade, low-q near 3%, high-q under 1%). Likely moves the handoff digests: re-bless at sprint close on Ben's go."
   },
   {
-   "status": "designed",
-   "glyph": "○",
+   "status": "complete",
+   "glyph": "●",
    "sprint": 65,
    "version_goal": "v0.4.0",
    "written": "2026-11-10",

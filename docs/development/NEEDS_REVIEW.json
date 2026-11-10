@@ -616,6 +616,28 @@
    "files": [
     "docs/military/SPACE_FLEETS.md"
    ]
+  },
+  {
+   "raised": "2026-11-10",
+   "status": "open",
+   "resolution": null,
+   "id": "NR-1164",
+   "title": "Generated bodies other than the homeworld carry mass 1.0, so a moon's climb is cheap only because it has no air",
+   "kind": "question",
+   "source": "BL-1580 (orbital graph) lane report, confirmed by its harness WARN line on seed 20260911",
+   "what": "hard_coded_world.cpp sets mass_earths only on the homeworld; planetology's per-body masses are not copied onto body_component. On the generated world the moon climbs 8.0 dv against home's 12.16 (atmosphere does all the work), an asteroid climbs 8.0, and low-orbit slots read 12 for both instead of 8. Copying the masses fixes it but moves body_km_per_tile (logistics.cpp) and so very likely the digests.",
+   "why_it_matters": "Your item 7 wants smaller bodies cheaper to launch from; today the gap is half what it should be, and the asteroid is as heavy as the moon.",
+   "options": [
+    "Copy planetology masses in generation and re-bless the digests",
+    "Keep body_km_per_tile on the old value and give the graph its own mass read",
+    "Leave it until v0.6.0"
+   ],
+   "recommendation": "Copy the masses and re-bless at the v0.4.0 cut; you said continuity between releases is not a constraint.",
+   "files": [
+    "src/world/hard_coded_world.cpp",
+    "src/world/orbital_graph.cpp",
+    "src/world/logistics.cpp"
+   ]
   }
  ]
 }
