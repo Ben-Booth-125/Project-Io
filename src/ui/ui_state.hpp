@@ -504,6 +504,11 @@ struct space_fleet_ui_state
     entity_id dest_body     = null_entity;
     int       dest_kind     = 1;
     bool      bombard_armed = false; ///< Bombard is lit: the target list shows (a toggle).
+    // BL-1610 (NATIONS.md § Off-world bases): a Lander's two base orders.
+    bool      embark_armed  = false; ///< Embark colonists is lit: the count and its confirm show (a toggle).
+    int       embark_count  = 1;     ///< Thousands to board, held to the free berths.
+    bool      found_armed   = false; ///< Found base is lit: the site list shows (a toggle).
+    entity_id found_tile    = null_entity; ///< The site row chosen (a toggle), null none.
 
     /// The Design tab's Space theatre: the hull expanded in place (-1 none) and its draft.
     int design_hull = -1;
@@ -513,6 +518,23 @@ struct space_fleet_ui_state
     struct press { std::string name; float x = -1.0f, y = -1.0f; bool enabled = false; std::string reason; };
     std::vector<press> presses;        ///< move, dock / undock, refuel, bombard, confirm_move.
     std::vector<press> target_rows;    ///< Bombard's targets.
+    /// BL-1610: an armed Found base's site rows — one per province of the body with
+    /// ground the founding could take; `name` the row's label, `enabled` the chosen
+    /// row; `col`/`row` the site tile, `prospected` whether its deposits are read.
+    struct site_row
+    {
+        std::string name;
+        float x = -1.0f, y = -1.0f;
+        int   col = -1, row = -1;
+        bool  chosen = false, prospected = false;
+    };
+    std::vector<site_row> site_rows;
+    /// BL-1610: what the base orders drew — colonists aboard this unit and its free
+    /// berths; colonists and base kit aboard the nation's Landers landed at this body,
+    /// against what a founding needs. -1 when the card did not draw the line.
+    int   colonists_aboard = -1, free_berths = -1;
+    int   colonists_here = -1, colonists_need = -1;
+    float kit_here = -1.0f, kit_need = -1.0f;
     struct dest_row
     {
         std::string node;
@@ -2125,6 +2147,17 @@ struct ui_state
 
     /// BL-1609: the space-unit card and the Design tab's Space theatre.
     space_fleet_ui_state fleet;
+
+    /// BL-1610: the two-step survey mask as the Planetary canvas LAST DREW it —
+    /// how many tiles took the mapped-not-prospected wash this frame, and how many
+    /// goods the Resource lens's key offered (-1 before it first drew). Published
+    /// for the verify API; nothing reads it back.
+    struct prospect_drawn_state
+    {
+        int washed   = 0;
+        int key_rows = -1;
+    };
+    prospect_drawn_state prospect_drawn;
 
     /// Research-queue presses from the panel (queue a node, remove the last,
     /// clear), applied by `app::render` through `apply_corp_command` — the

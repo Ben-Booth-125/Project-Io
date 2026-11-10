@@ -40,6 +40,7 @@
 #include "world/settlement.hpp"      // BL-785: region_domain_of - the three-domain word for a water tile
 #include "world/recipe_registry.hpp" // recipe/economics lookups for the building element
 #include "world/survey_system.hpp"
+#include "prospect_view.hpp"      // BL-1610: deposits hidden until prospected
 #include "world/trade.hpp"           // building_trade_points — a trade building's method line (BL-1321)
 #include "player_side.hpp"          // BL-1406: is_player_side
 #include "world/nation_tech.hpp"     // BL-593: recipe_unlocked — the door filters what the gate would refuse
@@ -212,6 +213,43 @@ void draw_survey_section(const world& w, ui_state& ui, entity_id body_id)
             ImGui::Text("En route - ETA %d d", survey_eta_days(w, body_id));
             break;
         case survey_phase::scanning:
+            if (s.ticks_remaining == k_survey_ticks_orbit_mapped)
+            {
+                // BL-1610 (DISCOVERY.md § Mapping, then prospecting): mapped from
+                // orbit, prospected on the ground — both steps' progress, and what
+                // is prospecting now (one region a quarter each).
+                const body_survey_knowledge* k = survey_knowledge_of(w, player_nation(w), body_id);
+                int mapped = 0, total = s.regions_total, prospected = 0;
+                if (k != nullptr)
+                {
+                    mapped = k->regions_mapped;
+                    total  = k->regions_total;
+                    for (const uint8_t b : k->prospected)
+                        prospected += b != 0 ? 1 : 0;
+                }
+                ImGui::Text("Mapped %d/%d from orbit", mapped, total);
+                ImGui::Text("Prospected %d/%d on the ground", prospected, total);
+                // The prospectors space_effects.cpp steps: active rovers and landed
+                // Landers at this body's surface.
+                const entity_id me = player_nation(w);
+                int ground = 0;
+                for (const auto& [uid, u] : w.space_units)
+                    if (u.owner == me && u.hull == space_hull::lander && u.state == space_unit_state::landed
+                        && u.node.kind == orbital_node_kind::surface && u.node.body == body_id)
+                        ++ground;
+                for (const auto& [aid, a] : w.space_assets)
+                    if (a.owner == me && a.cls == space_asset_class::rover && a.state == space_asset_state::active
+                        && a.node.kind == orbital_node_kind::surface && a.node.body == body_id)
+                        ++ground;
+                if (prospected >= mapped)
+                    ImGui::TextDisabled("%s", mapped < total ? "Prospecting waits for mapping."
+                                                             : "Every region prospected.");
+                else if (ground > 0)
+                    ImGui::TextDisabled("Prospecting: %d on the ground, a region a quarter each.", ground);
+                else
+                    ImGui::TextDisabled("Land a Lander or a rover here to prospect.");
+                break;
+            }
             ImGui::Text("Surveying %d/%d - ETA %d d",
                         s.regions_done, s.regions_total, survey_eta_days(w, body_id));
             break;
@@ -350,9 +388,10 @@ province_build_table province_builds(const world& w, entity_id tile_id)
         const auto it = w.tiles.find(tid);
         if (it == w.tiles.end()) continue;
         const tile_component& tc = it->second;
+        const bool readable = tile_deposits_readable(w, tc); // BL-1610: prospected ground only
         for (std::size_t r = 0; r < resource_count; ++r)
         {
-            if (tc.resource_deposit[r] <= 0.0f) continue;
+            if (tc.resource_deposit[r] <= 0.0f || !readable) continue;
             dep[r] += tc.resource_deposit[r];
             const auto rt = static_cast<resource_type>(r);
             // placement_result converts to bool by design (BL-071), so the plain
@@ -2498,8 +2537,9 @@ std::vector<province_deposit_row> province_deposits(const world& w, entity_id ti
     {
         for (const entity_id tid : pr->tiles)
             if (const auto it = w.tiles.find(tid); it != w.tiles.end())
-                for (std::size_t r = 0; r < resource_count; ++r)
-                    dep[r] += it->second.resource_deposit[r];
+                if (tile_deposits_readable(w, it->second)) // BL-1610: prospected ground only
+                    for (std::size_t r = 0; r < resource_count; ++r)
+                        dep[r] += it->second.resource_deposit[r];
     }
     else if (const auto it = w.tiles.find(tile_id); it != w.tiles.end())
     {
@@ -2507,8 +2547,9 @@ std::vector<province_deposit_row> province_deposits(const world& w, entity_id ti
         // section still has to say something TRUE rather than read as "nothing
         // here": fall back to the tile's own deposits. The draw site says which
         // grain it is showing, so the number is never ambiguous.
-        for (std::size_t r = 0; r < resource_count; ++r)
-            dep[r] += it->second.resource_deposit[r];
+        if (tile_deposits_readable(w, it->second)) // BL-1610
+            for (std::size_t r = 0; r < resource_count; ++r)
+                dep[r] += it->second.resource_deposit[r];
     }
 
     std::vector<province_deposit_row> rows;
@@ -4353,9 +4394,11 @@ void draw_deposit_selection(const world& w, ui_state& ui)
     int   tiles = 0;
     float total = 0.0f;
     float best  = 0.0f;
+    // BL-1610: only prospected ground draws a deposit, so only it is counted.
+    const prospect_view pv = prospect_view_of(w, ui.active_body, ui.spectating && ui.god_view);
     for (const auto& [id, tile] : w.tiles)
     {
-        if (tile.body != ui.active_body)
+        if (tile.body != ui.active_body || !pv.readable(tile.grid_x, tile.grid_y))
             continue;
         const float d = tile.resource_deposit[static_cast<std::size_t>(ri)];
         if (d <= 0.0f)

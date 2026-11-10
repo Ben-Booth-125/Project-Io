@@ -158,6 +158,30 @@ const char* station_refusal(station_result r)
     return "Refused.";
 }
 
+/// BL-1610: why a founding or a boarding was refused (offworld_base.hpp).
+const char* base_refusal(offworld_base_result r)
+{
+    switch (r)
+    {
+        case offworld_base_result::ok:                      return "";
+        case offworld_base_result::rejected_invalid:        return "that ground cannot hold a base.";
+        case offworld_base_result::rejected_unknown_nation: return "you hold no nation.";
+        case offworld_base_result::rejected_tech_locked:    return "Off-World Bases is not researched.";
+        case offworld_base_result::rejected_unmapped:       return "that ground is not mapped.";
+        case offworld_base_result::rejected_claimed:        return "that ground or its province is held.";
+        case offworld_base_result::rejected_no_colonists:   return "too few colonists landed there.";
+        case offworld_base_result::rejected_no_kit:         return "too little base kit landed there.";
+        case offworld_base_result::rejected_unknown_unit:   return "that unit is gone.";
+        case offworld_base_result::rejected_not_owner:      return "that unit is not yours.";
+        case offworld_base_result::rejected_not_lander:     return "only a Lander with passenger berths boards colonists.";
+        case offworld_base_result::rejected_wrong_node:     return "board at your home body: idle in its low orbit, or landed.";
+        case offworld_base_result::rejected_no_pad:         return "no staffed Launchpad of yours on your home body.";
+        case offworld_base_result::rejected_no_berths:      return "not enough free berths.";
+        case offworld_base_result::rejected_no_people:      return "no home centre of yours can spare them.";
+    }
+    return "refused.";
+}
+
 const char* verb_name(uint8_t v)
 {
     switch (static_cast<space_verb>(v))
@@ -1067,6 +1091,8 @@ std::string space_outcome_text(const space_command& c, const space_command_outco
         return std::string(what) + ": refused - " + launch_refusal(o.launch);
     if (v == space_verb::retask_satellite || v == space_verb::move_satellite)
         return std::string(what) + ": refused.";
+    if (v == space_verb::found_base || v == space_verb::embark_colonists) // BL-1610
+        return std::string(what) + ": refused - " + base_refusal(o.base);
     if (o.station == station_result::rejected_launch)
         return std::string(what) + ": refused - " + launch_refusal(o.launch);
     return std::string(what) + ": refused - " + station_refusal(o.station);

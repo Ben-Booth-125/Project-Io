@@ -130,7 +130,7 @@ Each kind routes its 'go to' to the right place:
 | **Market** | **Go to** — locate on the canvas. | (none) | Canvas: `focus_on_surface`. |
 | **Nation** | None — **"Open its ledger via [>]."** | (none) | A ledger (no canvas of its own). |
 | **Space asset** (a satellite or a station) | None. | The shared space-asset summary, the same the hover card draws: owner, role (a satellite) or modules and crew (a station), node, state. | None: it is pressed on the Circumplanetary rung it is drawn on. A station is selected by its core's id; its modules are not selectable on their own. |
-| **Space unit** (a ship; its fleet) | The player's own: **Move**, **Dock** / **Undock**, **Refuel**, **Bombard** — § The space-unit element. A rival's: none. | The shared space-unit summary, the same the hover card draws: hull, owner, node or transit, Δv budget, propellant, hull points, cargo, firepower. | None: it is pressed on the Circumplanetary or Solar rung it is drawn on. |
+| **Space unit** (a ship; its fleet) | The player's own: **Move**, **Dock** / **Undock**, **Refuel**, **Bombard**; a Lander's **Embark colonists** and **Found base** — § The space-unit element. A rival's: none. | The shared space-unit summary, the same the hover card draws: hull, owner, node or transit, Δv budget, propellant, hull points, cargo, firepower. | None: it is pressed on the Circumplanetary or Solar rung it is drawn on. |
 
 So 'go to' is itself polymorphic: spatial entities navigate a canvas;
 non-spatial entities (a nation) open the relevant ledger.
@@ -596,6 +596,19 @@ the band's height rather than what the summary leaves below it.
 - **Bombard** is a toggle, open only to a unit with an orbital-missile armament in a low orbit. Lit,
   it lists the hostile ground below; a row sets the standing order. While an order stands the
   button stays lit, and pressing it lifts the order.
+- **Embark colonists** is a toggle on a Lander with passenger berths (`../politics/NATIONS.md`
+  § Off-world bases). It is open at the unit's home body — idle in its low orbit, or landed — with a
+  staffed Launchpad of the nation's there, and a free berth; otherwise it is greyed with the reason.
+  Lit, it shows the count, a thousand to a berth and every free berth by default, and **Confirm
+  embark** boards them from the most populous home centre. The summary reads the colonists aboard
+  against the berths.
+- **Found base** is a toggle on a Lander landed on another body's surface, open once the nation
+  holds Off-World Bases. A Lander lands at a body's surface, not on a tile, so the player picks the
+  site. Lit, it reads the colonists and the base kit aboard every Lander of the nation landed there
+  against what a founding needs, then lists the ground a founding could take: one row per province
+  with mapped, unclaimed land, at its most habitable such tile, most habitable first, each saying
+  whether its deposits are prospected. Picking a row (a toggle) shows **Confirm found base**, greyed
+  with the reason while the colonists or the kit fall short.
 
 A refused order answers on the card's message line with the seam's reason.
 
@@ -825,7 +838,11 @@ See [DISCOVERY.md](DISCOVERY.md) for the model authority (the geographic fog thi
   derived from size + distance). Affordability-gated against the player nation's treasury;
   disabled with an "Insufficient funds." reason when the player cannot pay.
 - **`in_transit`** — `En route — ETA <days> d`.
-- **`scanning`** — `Surveying <k>/<N> — ETA <days> d`.
+- **`scanning`** — `Surveying <k>/<N> — ETA <days> d` under a dispatched probe. A body the player
+  maps from orbit instead (DISCOVERY.md § Mapping, then prospecting) reads the two steps:
+  `Mapped <k>/<N> from orbit`, `Prospected <p>/<N> on the ground`, then what prospects it — the
+  player's landed Landers and active rovers there, a region a quarter each — or that prospecting
+  waits for mapping, or that nothing on the ground is prospecting yet.
 - **`surveyed`** — the hero action switches to **"Go to surface"**, which descends via
   `focus_on_entity` — surveying is done, the move now is to look.
 

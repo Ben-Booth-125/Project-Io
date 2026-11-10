@@ -1444,6 +1444,37 @@
     "src/ui/icons.cpp"
    ],
    "status": "drafted"
+  },
+  "space_unit_base_orders": {
+   "surface": "A Lander's base orders on the space-unit Selection element: Embark colonists (a toggle: the count in thousands, a berth each, and Confirm embark; greyed with its reason away from the home body, without a staffed Launchpad, or with no free berth) and Found base (a toggle on a Lander landed on another body: the colonists and base kit landed there against what a founding needs, a site list of one row per province with mapped, unclaimed land - its most habitable tile, its habitability, whether its deposits are prospected - and Confirm found base, greyed with the shortfall). The summary reads the colonists aboard against the berths.",
+   "answers": "Can I found a base here yet, where should it stand, and what is still missing?",
+   "because": "A base is the only way a nation holds ground on another body (NATIONS.md § Off-world bases), and the founding is refused whole unless colonists, the kit, the research and mapped, unclaimed ground all line up across several Landers. Reading each requirement against what is landed turns a silent refusal into a checklist. A Lander lands at a body's surface, not a tile, so the player must choose the site; a row per province - the founding claims the whole province - with its habitability and prospecting state is that choice at the grain it is made.",
+   "backlog_item": [
+    "BL-1610"
+   ],
+   "files": [
+    "src/ui/circum_units.cpp",
+    "src/ui/ui_state.hpp",
+    "src/ui/space_ledger.cpp"
+   ],
+   "status": "drafted"
+  },
+  "planetary_prospect_mask": {
+   "surface": "The second step of the Planetary canvas's survey mask off the home world: mapped ground the player's nation has not prospected draws its terrain under a cool slate wash and no deposits - not in the Resource lens or its key, the hover card, the tile summary, or the province's and deposit's tables; the title reads 'Mapped k/N - Prospected p/N', and the body's Selection card reads both counts and what is prospecting there.",
+   "answers": "What ground on this body do I know the terrain of, which of it have I actually prospected, and how far along is it?",
+   "because": "Off the home world a survey reveals in two steps (DISCOVERY.md § Mapping, then prospecting): orbit maps terrain, the ground reads deposits. A deposit drawn before it is prospected would tell the player what the system says they cannot yet know, and would hide why a Lander on the surface matters. The wash marks where the next landing earns its keep, and the counts say when the body will be read.",
+   "backlog_item": [
+    "BL-1610"
+   ],
+   "files": [
+    "src/ui/prospect_view.hpp",
+    "src/ui/body_surface_canvas.cpp",
+    "src/ui/hover_content.cpp",
+    "src/ui/entity_summary.cpp",
+    "src/ui/selection_panel.cpp",
+    "src/ui/presentation.hpp"
+   ],
+   "status": "drafted"
   }
  }
 }

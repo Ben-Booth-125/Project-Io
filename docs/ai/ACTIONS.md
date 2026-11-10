@@ -1352,9 +1352,9 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 
 **Reason to select.** Undo part of an Early Space plan without touching the Digitisation queue ahead of it.
 
-### `gameplay.space_embark_colonists` — In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam; the verb is offworld_base.hpp's. No UI surface yet. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed).
+### `gameplay.space_embark_colonists` — The Selection band's space-unit card for the player's own Lander with passenger berths (SELECTION.md § The space-unit element): the Embark colonists press, the count slider and Confirm embark. In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam; the verb is offworld_base.hpp's. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed).
 
-**Press.** In-process: apply_space_command({nation, verb=12 embark_colonists, subject=lander, slot=colonists}).
+**Press.** Press Embark colonists: a TOGGLE - lit, it shows the count (thousands, a berth each; every free berth by default) and Confirm embark <n> thousand; pressing it again while lit disarms it. Greyed with its reason where boarding cannot happen: not at the home body (idle in its low orbit, or landed), no staffed Launchpad there, or every berth taken. The summary reads 'Colonists: n thousand of b berths'. In-process: apply_space_command({nation, verb=12 embark_colonists, subject=lander, slot=colonists}). A refusal answers on the card's message line with the verb's reason.
 
 | Arg | Type | Meaning |
 |---|---|---|
@@ -1371,9 +1371,9 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 
 **Reason to select.** Carry the people a base is founded with (NATIONS.md § Off-world bases).
 
-### `gameplay.space_found_base` — In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam; the verb is offworld_base.hpp's. No UI surface yet. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed).
+### `gameplay.space_found_base` — The Selection band's space-unit card for the player's own Lander landed on another body's surface (SELECTION.md § The space-unit element): the Found base press, the colonists and base-kit lines, the site list and Confirm found base. In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam; the verb is offworld_base.hpp's. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed).
 
-**Press.** In-process: apply_space_command({nation, verb=11 found_base, subject=tile}).
+**Press.** Press Found base (open once Off-World Bases is held): a TOGGLE - lit, it reads 'Colonists landed here: n of 2 thousand' and 'Base kit landed here: k of 20 Machinery' (green when enough, red when short; every Lander of the nation landed on that body counts), then lists the ground a founding could take there: one row per province with mapped, unclaimed land - '(col, row)  habitability h  prospected | deposits unknown' - at its most habitable such tile, most habitable first. A Lander lands at the body's surface, not a tile, so the row IS the site pick. Press a row (a toggle: the chosen row un-picks), then Confirm found base, greyed with 'too few colonists landed here' or 'too little base kit landed here' while either falls short. In-process: apply_space_command({nation, verb=11 found_base, subject=tile}). A refusal answers on the card's message line with the verb's reason.
 
 | Arg | Type | Meaning |
 |---|---|---|

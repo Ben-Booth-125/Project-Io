@@ -427,15 +427,18 @@
    "parent": "UI-013",
    "source": [
     "docs/ui/PLANETARY.md § Visual elements (Survey region mask row)",
-    "docs/ui/DISCOVERY.md § Geographic fog"
+    "docs/ui/DISCOVERY.md § Geographic fog",
+    "docs/ui/DISCOVERY.md § Mapping, then prospecting",
+    "src/ui/prospect_view.hpp"
    ],
-   "summary": "Unrevealed survey regions render as a flat dark locked fill with no lens tint, borders, markers, or hit-testing; regions reveal in deterministic raster order as scanning proceeds.",
+   "summary": "Unrevealed survey regions render as a flat dark locked fill with no lens tint, borders, markers, or hit-testing; regions reveal in deterministic raster order as scanning proceeds. Off the home world, mapped regions the player has not prospected draw their terrain under a slate wash and no deposits on any surface.",
    "interesting_question": "n/a — a clean, deterministic mechanic with a direct visual rule.",
    "resolution": "n/a",
    "checks": [
     "survey",
     "visibility",
-    "survey_dispatch"
+    "survey_dispatch",
+    "base_prospect_ui"
    ]
   },
   {
@@ -803,12 +806,13 @@
     "docs/ui/SELECTION.md § The body element's action is the survey front door",
     "docs/ui/SELECTION.md § The body element's fact is its commercial activity pulse"
    ],
-   "summary": "A body's hero action switches on survey phase (Dispatch Survey → En route → Surveying k/N → Go to surface); its fact column shows the activity-fog commercial pulse, independent of survey state.",
+   "summary": "A body's hero action switches on survey phase (Dispatch Survey → En route → Surveying k/N → Go to surface); its fact column shows the activity-fog commercial pulse, independent of survey state. A body mapped from orbit reads Mapped k/N and Prospected p/N, and what is prospecting there.",
    "interesting_question": "n/a — the two fogs' independence is fully documented here already (see DISCOVERY.md entries above).",
    "resolution": "n/a",
    "checks": [
     "descend_into_selection",
-    "selection_go_to"
+    "selection_go_to",
+    "base_prospect_ui"
    ]
   },
   {
@@ -2406,6 +2410,23 @@
    "resolution": "The draw reports the flag per asset; the storm capture waits for a seed or a staging call that raises one.",
    "checks": [
     "space_fleets_ui"
+   ]
+  },
+  {
+   "id": "UI-154",
+   "name": "Base orders on the space-unit card (Selection)",
+   "kind": "sub-element",
+   "parent": "UI-151",
+   "source": [
+    "docs/ui/SELECTION.md § The space-unit element",
+    "docs/politics/NATIONS.md § Off-world bases",
+    "src/ui/circum_units.cpp"
+   ],
+   "summary": "A Lander's Embark colonists toggle (count, Confirm embark) and, landed on another body, its Found base toggle: colonists and kit landed there against the founding's needs, a site list of one row per province with mapped, unclaimed land, and Confirm found base greyed with the shortfall.",
+   "interesting_question": "A Lander lands at a body's surface node, not on a tile; who picks the site?",
+   "resolution": "The player, from a list: one row per province (the founding claims the province), at its most habitable eligible tile. A canvas pick can join it later.",
+   "checks": [
+    "base_prospect_ui"
    ]
   }
  ]
