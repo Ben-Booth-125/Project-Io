@@ -1418,7 +1418,11 @@ space_ai_pick choose_space_action(const world& w, const recipe_registry& reg, en
             quote_space_launch(w, sp, nation, space_asset_class::satellite, node, space_satellite_role::comms);
         const float up = sp.upkeep[static_cast<std::size_t>(space_asset_class::satellite)];
         if (q.result != space_launch_result::launched)
+        {
             note(space_ai_block::refused);
+            if (pick.quote == space_launch_result::launched)
+                pick.quote = q.result; // BL-1615: say which wall
+        }
         else if (!space_reserve_admits(w, nation, p, q.cost, up))
             note(space_ai_block::reserve);
         else
@@ -1456,7 +1460,11 @@ space_ai_pick choose_space_action(const world& w, const recipe_registry& reg, en
                 continue;
             const space_launch_quote q = quote_space_launch(w, sp, nation, space_asset_class::station_core, node);
             if (q.result != space_launch_result::launched)
+            {
+                if (pick.quote == space_launch_result::launched)
+                    pick.quote = q.result; // BL-1615: say which wall
                 continue;
+            }
             if (!found || q.cost < best_cost) // ties keep the earlier kind
             {
                 found     = true;
@@ -1529,6 +1537,8 @@ space_ai_pick choose_space_action(const world& w, const recipe_registry& reg, en
                 if (q.result != space_launch_result::launched)
                 {
                     note(space_ai_block::refused);
+                    if (pick.quote == space_launch_result::launched)
+                        pick.quote = q.result; // BL-1615: say which wall
                     break; // every module launch to this node quotes the same
                 }
                 if (!space_reserve_admits(w, nation, p, q.cost, up))

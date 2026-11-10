@@ -498,6 +498,9 @@ struct space_ai_pick
     uint8_t              module  = k_no_station_module;
     float                cost    = 0.0f;   ///< The quote's whole cost (credits).
     space_command_result result  = space_command_result::rejected_invalid; ///< When issued.
+    /// BL-1615: the first launch quote's own refusal met behind a wall (which
+    /// shelf, treasury or slot); `launched` when no quote refused.
+    space_launch_result  quote   = space_launch_result::launched;
 };
 
 /// The pick @p nation would make now — PURE (reads @p w, writes nothing).

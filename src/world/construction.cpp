@@ -251,8 +251,8 @@ construction_result construct_for(world& w, const recipe_registry& reg,
         // One site per tile (Ben, 2026-10-26): its own refusal, never "invalid tile".
         if (pr.reason == placement_rules::placement_reason::site_under_construction)
             return construction_result::site_busy;
-        if (type == building_type::launchpad)
-            return construction_result::slot_occupied;
+        if (pr.reason == placement_rules::placement_reason::launchpad_exists)
+            return construction_result::slot_occupied; // BL-1615: only the pad cap, not every pad refusal
         return construction_result::invalid_tile; // Port not coastal
     }
 

@@ -3243,7 +3243,7 @@ void app::render()
             case construction_result::insufficient_funds:
                 m_ui.construction.last_message = "Can't afford it."; break;
             case construction_result::slot_occupied:
-                m_ui.construction.last_message = "Already placed on this body."; break;
+                m_ui.construction.last_message = "Your nation already has a launchpad on this body."; break;
             case construction_result::insufficient_materials:
                 m_ui.construction.last_message = "Not enough materials."; break;
             case construction_result::tech_locked:

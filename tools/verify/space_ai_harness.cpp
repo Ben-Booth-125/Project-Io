@@ -26,10 +26,27 @@
 //       and byte-identical snapshots.
 //   P9  THROUGH THE STEP: run_nation_step files the picks on economy_report.
 //
+// BL-1615 (rival space groundwork), on a second fixture: three nations owning
+// roaded land on the home planet, no pads, no keys (score_nation_space_ground):
+//   G1  PAD: a rival with Rocketry and money builds a Launchpad on its own
+//       capital tile, paid, staffed; a pad still building counts (no second).
+//   G2  PER NATION: a second nation builds its own pad on the same body; a
+//       nation's second is refused launchpad_exists with the new wording.
+//   G3  NEVER THE PLAYER: the player's nation is never built for.
+//   G4  CENTRE: no centre without the astronaut-training key; with it and a
+//       completed pad, one centre follows, staffed, and no second.
+//   G5  A LAUNCH FOLLOWS: with its pad complete the rival's space pick launches
+//       a comms satellite; a nation whose pad still builds meets no_launchpad.
+//   G6  WALLS: no Rocketry, the settle, a treasury short of twice the capex -
+//       each builds nothing and leaves the hash alone.
+//   G7  DETERMINISM: two groundwork runs end byte-identical.
+//
 // Build: node tools/verify/build_harness.js space_ai_harness --run
 // ---------------------------------------------------------------------------
 
 #include "world/campaign_settle.hpp"
+#include "world/corp_ai.hpp"
+#include "world/placement_rules.hpp"
 #include "world/economy_system.hpp"
 #include "world/nation_ai.hpp"
 #include "world/nation_step.hpp"
@@ -157,6 +174,88 @@ const space_ai_pick* pick_for(const std::vector<space_ai_pick>& v, entity_id n)
         if (p.nation == n)
             return &p;
     return nullptr;
+}
+
+// ---- BL-1615 the groundwork fixture --------------------------------------------
+// The same star and home planet, three nations each owning three roaded land tiles
+// in a row (capital first), no pads, no keys and no shelf: what a rival meets the
+// quarter it first holds Rocketry.
+struct ground
+{
+    world     w;
+    entity_id star = null_entity, home = null_entity;
+    entity_id a = null_entity, b = null_entity, player = null_entity;
+    std::vector<entity_id> tiles_a, tiles_b, tiles_p;
+};
+
+void build_ground(ground& g)
+{
+    world& w = g.w;
+    g.star = add_body(w, "Star", body_type::star, null_entity, 0.0f);
+    g.home = add_body(w, "Home", body_type::planet, null_entity, 1.0f);
+    w.star_body = g.star;
+    w.home_body = g.home;
+    const char* names[3] = {"Alpha", "Beta", "Seat"};
+    entity_id* ids[3] = {&g.a, &g.b, &g.player};
+    std::vector<entity_id>* tiles[3] = {&g.tiles_a, &g.tiles_b, &g.tiles_p};
+    for (int i = 0; i < 3; ++i)
+    {
+        *ids[i] = w.create_entity();
+        nation_component nc;
+        nc.name = names[i];
+        nc.treasury = 2000000.0f;
+        for (int x = 0; x < 3; ++x)
+        {
+            const entity_id t = space_fixture::add_tile(w, g.home);
+            tile_component& tc = w.tiles.at(t);
+            tc.grid_x = x;
+            tc.grid_y = 5 * i;
+            tc.road_edges = 1; // a building needs a road
+            tiles[i]->push_back(t);
+            nc.tiles.push_back(t);
+            w.tile_to_nation[t] = *ids[i];
+        }
+        nc.capital_tile = (*tiles[i])[0];
+        w.nations.emplace(*ids[i], nc);
+    }
+    w.player_entity = g.player;
+    w.current_econ_tick = k_campaign_settle_ticks;
+}
+
+/// Hold only the nodes carrying Rocketry's launch key.
+void hold_dispatch_only(world& w, entity_id n)
+{
+    for (int i = 0; i < io::dg::node_count; ++i)
+        if (node_has_mechanic(i, space_keys::dispatch))
+            w.nation_tech[n].held.set(static_cast<std::size_t>(i));
+}
+
+/// The lowest-id building of @p type in @p n's assets, or null.
+entity_id own_of_type(const world& w, entity_id n, building_type type)
+{
+    entity_id best = null_entity;
+    for (const entity_id bid : w.nations.at(n).state_assets)
+        if (const auto it = w.buildings.find(bid); it != w.buildings.end() && it->second.type == type
+            && (best == null_entity || bid < best))
+            best = bid;
+    return best;
+}
+
+int count_of_type(const world& w, entity_id n, building_type type)
+{
+    int c = 0;
+    for (const entity_id bid : w.nations.at(n).state_assets)
+        if (const auto it = w.buildings.find(bid); it != w.buildings.end() && it->second.type == type)
+            ++c;
+    return c;
+}
+
+/// Complete a site by hand (the construction pass is not this harness's subject).
+void finish(world& w, entity_id bid)
+{
+    building_component& b = w.buildings.at(bid);
+    b.ticks_remaining = 0;
+    b.days_remaining = 0;
 }
 
 /// The scripted programme (P8 runs it twice): twenty quarters.
@@ -368,6 +467,172 @@ int main()
                   && rep.space_assets.launched >= 1,
               "P9", fmt("run_nation_step files the picks (%zu rows) and the launch reaches the asset step (%d launched)",
                         rep.space_picks.size(), rep.space_assets.launched));
+    }
+
+    // ---- G1..G7 BL-1615 the groundwork: pads and centres --------------------------------
+    // A registry with the two buildings priced and timed as scripts/economy.lua
+    // authors them (500 / 4 quarters; 300 / 3 quarters): the default one prices
+    // every build at zero and builds it instantly.
+    recipe_registry greg;
+    {
+        building_economics e = greg.economics(building_type::launchpad);
+        e.build_cost = 500.0f;
+        e.build_duration_ticks = 4.0f;
+        greg.set_economics(building_type::launchpad, e);
+        building_economics c = greg.economics(building_type::astronaut_training_centre);
+        c.build_cost = 300.0f;
+        c.build_duration_ticks = 3.0f;
+        greg.set_economics(building_type::astronaut_training_centre, c);
+    }
+    {
+        ground g;
+        build_ground(g);
+        world& w = g.w;
+        const int tick = k_campaign_settle_ticks;
+
+        // G6 first, on the fresh fixture: nothing is held yet.
+        {
+            const std::uint64_t h0 = w.state_hash(0);
+            const space_ground_pick k = score_nation_space_ground(w, greg, g.a, tick);
+            check(k.block == space_ground_block::no_rocketry && w.state_hash(0) == h0 && w.buildings.empty(),
+                  "G6", "no Rocketry: no_rocketry, nothing built, hash unchanged");
+        }
+        hold_dispatch_only(w, g.a);
+        hold_dispatch_only(w, g.b);
+        hold_dispatch_only(w, g.player);
+        {
+            const std::uint64_t h0 = w.state_hash(0);
+            const space_ground_pick k = score_nation_space_ground(w, greg, g.a, k_campaign_settle_ticks - 1);
+            check(k.block == space_ground_block::not_scored && w.state_hash(0) == h0,
+                  "G6", "in the settle the pass does nothing, Rocketry or not");
+        }
+        {
+            const float keep = w.nations.at(g.a).treasury;
+            w.nations.at(g.a).treasury = 10.0f;
+            const std::uint64_t h0 = w.state_hash(0);
+            const space_ground_pick k = score_nation_space_ground(w, greg, g.a, tick);
+            check(k.block == space_ground_block::treasury && k.type == building_type::launchpad
+                      && w.state_hash(0) == h0 && w.buildings.empty(),
+                  "G6", fmt("a treasury short of twice the capex (%.0f) builds nothing: treasury", k.cost));
+            w.nations.at(g.a).treasury = keep;
+        }
+
+        // G1: a rival with Rocketry and money builds its pad, on its own ground, nearest its capital.
+        const float ta0 = w.nations.at(g.a).treasury;
+        const space_ground_pick a1 = score_nation_space_ground(w, greg, g.a, tick);
+        const entity_id pad_a = own_of_type(w, g.a, building_type::launchpad);
+        check(a1.block == space_ground_block::none && a1.type == building_type::launchpad
+                  && pad_a != null_entity && w.buildings.at(pad_a).tile == g.tiles_a[0]
+                  && w.nations.at(g.a).treasury < ta0,
+              "G1", fmt("a rival with Rocketry builds a Launchpad on its own capital tile (capex %.0f; treasury %.0f -> %.0f)",
+                        a1.cost, ta0, w.nations.at(g.a).treasury));
+        check(w.buildings.at(pad_a).workforce_assigned > 0.0f, "G1",
+              fmt("the pad is staffed at placement (workforce %.2f), so it counts once complete",
+                  w.buildings.at(pad_a).workforce_assigned));
+        {
+            const space_ground_pick again = score_nation_space_ground(w, greg, g.a, tick + 1);
+            check(again.block == space_ground_block::nothing_wanted
+                      && count_of_type(w, g.a, building_type::launchpad) == 1,
+                  "G1", "a pad building counts: the next evaluation wants nothing (one pad)");
+        }
+
+        // G2: a second nation builds its own pad on the same body; a nation's second is refused.
+        const space_ground_pick b1 = score_nation_space_ground(w, greg, g.b, tick);
+        const entity_id pad_b = own_of_type(w, g.b, building_type::launchpad);
+        check(b1.block == space_ground_block::none && pad_b != null_entity && pad_b != pad_a
+                  && w.tiles.at(w.buildings.at(pad_b).tile).body == w.tiles.at(w.buildings.at(pad_a).tile).body,
+              "G2", "a second nation builds its own Launchpad on the same body");
+        {
+            const placement_rules::placement_result second =
+                placement_rules::can_place_in_world(w, g.tiles_a[1], building_type::launchpad,
+                                                    resource_type::iron_ore, -1.0f, g.a);
+            const placement_rules::placement_result third =
+                placement_rules::can_place_in_world(w, g.tiles_p[1], building_type::launchpad,
+                                                    resource_type::iron_ore, -1.0f, g.player);
+            check(second.reason == placement_rules::placement_reason::launchpad_exists
+                      && std::string(second.message())
+                             == "Your nation already has a launchpad on this body"
+                      && third.ok(),
+                  "G2", fmt("one pad per nation per body: A's second refused (\"%s\"); the player's first admitted",
+                            second.message()));
+        }
+
+        // G3: the player's nation is never built for, keyed and funded as it is.
+        {
+            const std::uint64_t h0 = w.state_hash(0);
+            const space_ground_pick k = score_nation_space_ground(w, greg, g.player, tick);
+            check(k.block == space_ground_block::not_scored && w.state_hash(0) == h0
+                      && own_of_type(w, g.player, building_type::launchpad) == null_entity,
+                  "G3", "the player's nation is never built for: not_scored, hash unchanged");
+        }
+
+        // G4: no centre without the key; then, key held and the pad complete, the centre follows.
+        finish(w, pad_a);
+        {
+            const space_ground_pick k = score_nation_space_ground(w, greg, g.a, tick + 2);
+            check(k.block == space_ground_block::nothing_wanted
+                      && own_of_type(w, g.a, building_type::astronaut_training_centre) == null_entity,
+                  "G4", "a completed pad but no astronaut-training key: no centre");
+        }
+        space_fixture::hold_every_node(w, g.a);
+        {
+            // The pad is complete, so one-site-per-tile does not hold the capital tile.
+            const space_ground_pick k = score_nation_space_ground(w, greg, g.a, tick + 3);
+            const entity_id c = own_of_type(w, g.a, building_type::astronaut_training_centre);
+            check(k.block == space_ground_block::none && k.type == building_type::astronaut_training_centre
+                      && c != null_entity && w.buildings.at(c).workforce_assigned > 0.0f,
+                  "G4", fmt("the key held: an Astronaut Training Centre follows (capex %.0f), staffed", k.cost));
+            const space_ground_pick k2 = score_nation_space_ground(w, greg, g.a, tick + 4);
+            check(k2.block == space_ground_block::nothing_wanted
+                      && count_of_type(w, g.a, building_type::astronaut_training_centre) == 1,
+                  "G4", "one centre: the next evaluation wants nothing");
+        }
+
+        // G5: the completed pad lets the space pick launch: a comms satellite within 4 quarters.
+        {
+            space_fixture::add_shelf(w, g.home);
+            const space_ai_pick pre = choose_space_action(w, greg, g.a, p);
+            std::printf("    rival A before: action %d block %d cost %.0f\n", static_cast<int>(pre.action),
+                        static_cast<int>(pre.block), pre.cost);
+            int launched_q = -1;
+            for (int q = 0; q < 4 && launched_q < 0; ++q)
+            {
+                const std::vector<space_ai_pick> picks = quarter(w, greg, tick + 5 + q);
+                const space_ai_pick* k = pick_for(picks, g.a);
+                if (k && k->action == space_ai_action::comms_satellite && k->result == space_command_result::applied)
+                    launched_q = q;
+            }
+            check(launched_q >= 0 && assets_of_nation(w, g.a) >= 1 && assets_of_nation(w, g.player) == 0,
+                  "G5", fmt("with its own pad complete, rival A launches a comms satellite (quarter %d after)",
+                            launched_q));
+            const space_ai_pick kb = choose_space_action(w, greg, g.b, p);
+            check(kb.block == space_ai_block::no_launchpad, "G5",
+                  "rival B's pad still building: no_launchpad, as the launch gate reads it");
+        }
+    }
+
+    // ---- G7 determinism of the groundwork ---------------------------------------------------
+    {
+        ground g1, g2;
+        build_ground(g1);
+        build_ground(g2);
+        for (ground* g : {&g1, &g2})
+        {
+            space_fixture::hold_every_node(g->w, g->a);
+            space_fixture::hold_every_node(g->w, g->b);
+            for (int t = 0; t < 3; ++t)
+            {
+                (void)score_nation_space_ground(g->w, greg, g->a, k_campaign_settle_ticks + t);
+                (void)score_nation_space_ground(g->w, greg, g->b, k_campaign_settle_ticks + t);
+                for (auto& [bid, b] : g->w.buildings)
+                    if (b.type == building_type::launchpad)
+                        finish(g->w, bid);
+            }
+        }
+        check(g1.w.state_hash(0) == g2.w.state_hash(0) && to_bytes(g1.w) == to_bytes(g2.w)
+                  && g1.w.buildings.size() == 4,
+              "G7", fmt("two groundwork runs end equal: %zu buildings, snapshots byte-identical",
+                        g1.w.buildings.size()));
     }
 
     std::printf("\nspace_ai_harness: %d passed, %d failed\n", g_pass, g_fail);

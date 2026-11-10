@@ -35,7 +35,7 @@ enum class placement_reason : uint8_t
     ocean,             ///< Tile is water — no building sits on water.
     no_deposit,        ///< Extraction site with no extractable deposit of the target.
     not_coastal,       ///< Port (or a coastal-only extraction target) must sit next to open water.
-    launchpad_exists,  ///< A launchpad already exists on this body (max 1).
+    launchpad_exists,  ///< The builder's nation already has a launchpad on this body (one per nation per body).
     occupied,          ///< Tile already carries a building (reserved vocabulary).
     outside_territory, ///< Tile is outside the player's territory (reserved).
     unsurveyed,        ///< Body not yet surveyed (reserved).

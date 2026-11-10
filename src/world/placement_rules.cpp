@@ -18,7 +18,7 @@ const char* placement_reason_text(placement_reason r)
         case placement_reason::ocean:             return "Cannot build on water";
         case placement_reason::no_deposit:        return "No extractable deposit here";
         case placement_reason::not_coastal:       return "A port must sit on the coast";
-        case placement_reason::launchpad_exists:  return "This body already has a launchpad";
+        case placement_reason::launchpad_exists:  return "Your nation already has a launchpad on this body";
         case placement_reason::occupied:          return "Tile already built on";
         case placement_reason::outside_territory: return "Outside your territory";
         case placement_reason::unsurveyed:        return "Body not yet surveyed";
@@ -556,15 +556,29 @@ placement_result can_place_in_world(const world& w, entity_id tile_id,
     }
     else if (type == building_type::launchpad)
     {
-        // Count launchpads already on this body.
+        // ONE LAUNCHPAD PER NATION PER BODY (BL-1615; SPACE_ASSETS.md § Launching):
+        // a launch needs a staffed pad of the NATION'S on its home body, so every
+        // nation may stand one there, and none a second. The builder's nation is the
+        // named builder's home, else the tile's holder (a generation stamp); a pad's
+        // nation is its owner, else its tile's holder. Any-of: walk order is moot.
         const entity_id body = tc_it->second.body;
+        const auto holder_of = [&](entity_id tile) {
+            const auto it = w.tile_to_nation.find(tile);
+            return it != w.tile_to_nation.end() ? it->second : null_entity;
+        };
+        const entity_id builder = corp != null_entity ? owner_home_nation(w, corp) : holder_of(tile_id);
         for (const auto& [bid, bc] : w.buildings)
         {
             if (bc.type != building_type::launchpad)
                 continue;
             const auto btc_it = w.tiles.find(bc.tile);
-            if (btc_it != w.tiles.end() && btc_it->second.body == body)
-                return placement_reason::launchpad_exists; // Already one on this body.
+            if (btc_it == w.tiles.end() || btc_it->second.body != body)
+                continue;
+            entity_id pad_nation = owner_nation_of(w, bid);
+            if (pad_nation == null_entity)
+                pad_nation = holder_of(bc.tile);
+            if (pad_nation == builder)
+                return placement_reason::launchpad_exists; // this nation already has one here
         }
     }
 
