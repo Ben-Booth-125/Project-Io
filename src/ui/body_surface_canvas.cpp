@@ -3084,8 +3084,17 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     std::unordered_set<entity_id> gliding;
     std::uint64_t glide_sig = 0; // order-independent: what the cached stacks exclude
     {
-        const float day_frac = static_cast<float>(
-            std::max(0.0, state.sim_now_days) - std::floor(std::max(0.0, state.sim_now_days)));
+        const double now_d    = std::max(0.0, state.sim_now_days);
+        const long long today = static_cast<long long>(std::floor(now_d));
+        const float day_frac  = static_cast<float>(now_d - std::floor(now_d));
+        // THE ORDER DAY (Ben, 2026-11-10: "assigning a unit to move to a tile jumps"). The
+        // day tick credits a whole day's walk however late in the day the order came, so
+        // a glide read at today's fraction opened partway along the hop the frame the
+        // order landed. The day an order lands, its glide maps the REST of the day onto
+        // the whole day's walk: it starts where the unit stands and reaches the tick's
+        // point as the tick lands. Keyed per unit, kept only while it marches.
+        static std::unordered_map<entity_id, std::pair<long long, float>> s_march_start;
+        std::unordered_map<entity_id, std::pair<long long, float>> march_start_now;
         std::vector<entity_id> marching;
         for (const auto& [uid, uc] : w.units)
             if (uc.count > 0 && uc.order.dest != null_entity)
@@ -3103,8 +3112,18 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 if (here == w.tiles.end() || here->second.body != state.active_body
                     || w.provinces.province_of(uc.position) == 0)
                     continue;
-                const float t = march_hop_fraction(w, reg, uc, day_frac);
-                if (t < 0.0f)
+                std::pair<long long, float> started{ today, day_frac };
+                if (const auto ms = s_march_start.find(uid); ms != s_march_start.end())
+                    started = ms->second;
+                march_start_now[uid] = started;
+                float eff = day_frac;
+                if (started.first == today)
+                    eff = started.second < 0.999f
+                        ? std::clamp((day_frac - started.second) / (1.0f - started.second), 0.0f, 1.0f)
+                        : 0.0f;
+                entity_id from = null_entity, to = null_entity;
+                float t = 0.0f;
+                if (!march_glide_point(w, reg, uc, eff, from, to, t))
                     continue;
                 const entity_id next = uc.order.path[uc.order.next_index];
                 gliding.insert(uid);
@@ -3113,7 +3132,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 constexpr float k_same_pace = 0.03f;
                 unit_glide* same = nullptr;
                 for (unit_glide& g : state.unit_glides)
-                    if (g.owner == uc.owner && g.from == uc.position && g.to == next
+                    if (g.owner == uc.owner && g.from == from && g.to == to
                         && std::fabs(g.t - t) <= k_same_pace)
                     { same = &g; break; }
                 if (same != nullptr)
@@ -3124,12 +3143,13 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 unit_glide g;
                 g.ids.push_back(uid);
                 g.owner = uc.owner;
-                g.from  = uc.position;
-                g.to    = next;
+                g.from  = from;
+                g.to    = to;
                 g.t     = t;
                 state.unit_glides.push_back(std::move(g));
             }
         }
+        s_march_start.swap(march_start_now);
     }
     static std::uint64_t s_glide_sig = 0;
 
@@ -6777,13 +6797,25 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     // marching unit now carries an opening weight that walks toward 1 (a stack behind)
     // or 0 (none) by a fixed share a frame, so the counter slides. View state only.
     static std::unordered_map<entity_id, float> s_glide_open;
+    // AND ITS TRAIL (Ben, 2026-11-10): where each marching unit was drawn and where its
+    // march put it last frame. A frame draws the march's point plus three quarters of
+    // last frame's offset from it, so a re-routed order or a corrected hop slides over a
+    // few frames, and a counter moving with its march carries no offset and no lag.
+    struct glide_trail { ImVec2 drawn{}, target{}; };
+    static std::unordered_map<entity_id, glide_trail> s_glide_trail;
     {
         std::unordered_map<entity_id, float> kept;
+        std::unordered_map<entity_id, glide_trail> kept_trail;
         for (const unit_glide& g : state.unit_glides)
             for (const entity_id uid : g.ids)
+            {
                 if (const auto it = s_glide_open.find(uid); it != s_glide_open.end())
                     kept.emplace(uid, it->second);
+                if (const auto it = s_glide_trail.find(uid); it != s_glide_trail.end())
+                    kept_trail.emplace(uid, it->second);
+            }
         s_glide_open.swap(kept); // a unit that stopped marching starts afresh next time
+        s_glide_trail.swap(kept_trail);
     }
     if (draw_r >= 6.0f)
     {
@@ -6815,7 +6847,21 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             // The hop across the seam goes the short way round the cylinder.
             if (b.x - a.x > local_period * 0.5f)       b.x -= local_period;
             else if (a.x - b.x > local_period * 0.5f)  b.x += local_period;
-            const ImVec2 sc = to_screen({ a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t });
+            const ImVec2 target{ a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t };
+            ImVec2 drawn = target;
+            if (const auto tr = s_glide_trail.find(g.ids.front()); tr != s_glide_trail.end())
+            {
+                ImVec2 pd = tr->second.drawn;
+                while (pd.x - tr->second.target.x > local_period * 0.5f) pd.x -= local_period;
+                while (tr->second.target.x - pd.x > local_period * 0.5f) pd.x += local_period;
+                const ImVec2 off{ (pd.x - tr->second.target.x) * 0.75f,
+                                  (pd.y - tr->second.target.y) * 0.75f };
+                if (off.x * off.x + off.y * off.y > 0.04f)
+                    drawn = { target.x + off.x, target.y + off.y };
+            }
+            for (const entity_id uid : g.ids)
+                s_glide_trail[uid] = { drawn, target };
+            const ImVec2 sc = to_screen(drawn);
             const float  uy = sc.y + draw_r * 0.50f;
             if (uy < grid_area_origin.y - ur * 2.0f
                 || uy > grid_area_origin.y + grid_area_size.y + ur * 2.0f)

@@ -933,6 +933,15 @@ float march_hop_cost(const world& w, const recipe_registry& reg, const unit_comp
 float march_hop_fraction(const world& w, const recipe_registry& reg, const unit_component& u,
                          float day_fraction);
 
+/// Where along its PATH @p u's march stands, for the canvas's glide: the bank plus
+/// @p day_fraction of today's movement, walked hop by hop at each hop's own price, so a
+/// unit that covers several tiles in a day is drawn travelling them rather than jumping
+/// them at the tick (Ben, 2026-11-10). Writes the hop it is on (@p from -> @p to) and the
+/// fraction @p t of it. False when it has no next hop on known ground, or its class cannot
+/// march. Presentation only: it reads and writes nothing else.
+bool march_glide_point(const world& w, const recipe_registry& reg, const unit_component& u,
+                       float day_fraction, entity_id& from, entity_id& to, float& t);
+
 /// ONE DAY of movement (BL-1445, move by days; MILITARY.md § Marching, "Units march by
 /// the day, at their class's speed"). Each marching unit gains 1 / its class's days per
 /// plains tile (`march_days_per_tile`) of movement, banked in `order.progress` in units
