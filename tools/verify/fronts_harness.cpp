@@ -903,7 +903,7 @@ int main()
                                      - world_save_alarm_section_bytes(f.w) // BL-1432 (v68)
                                      - world_save_war_section_bytes(f.w) // BL-1459 (v69)
                                      - world_save_embargo_section_bytes(f.w) - world_save_gen_capital_section_bytes(f.w) // BL-1418 (v70)
-                                     - world_save_recruits_section_bytes(f.w) - world_save_sea_recruits_section_bytes(f.w) - world_save_refusals_section_bytes(f.w) /* BL-1480 (v75) */ - world_save_contributors_section_bytes(f.w) /* BL-1470 (v77) */ - world_save_occupation_section_bytes(f.w) /* BL-1502 (v78) */ - world_save_defend_section_bytes(f.w) /* BL-1504 (v79) */ - world_save_research_books_section_bytes(f.w) - world_save_growth_carry_section_bytes(f.w) /* BL-1539 (v80), last */,
+                                     - world_save_recruits_section_bytes(f.w) - world_save_sea_recruits_section_bytes(f.w) - world_save_refusals_section_bytes(f.w) /* BL-1480 (v75) */ - world_save_contributors_section_bytes(f.w) /* BL-1470 (v77) */ - world_save_occupation_section_bytes(f.w) /* BL-1502 (v78) */ - world_save_defend_section_bytes(f.w) /* BL-1504 (v79) */ - world_save_research_books_section_bytes(f.w) - world_save_growth_carry_section_bytes(f.w) - world_save_ended_section_bytes(f.w) /* BL-1562 (v83) */ /* BL-1539 (v80), last */,
               "F7c a v61 stream (the section's 33 bytes, v63's 4-byte stack count and v64's 12-byte designs section shorter) reads as no fronts");
 
         // A row naming nothing: the first assignment's key -> a ghost tile.
@@ -913,7 +913,7 @@ int main()
                                + world_save_alarm_section_bytes(f.w)       // BL-1432: v68's Alarm, last
                                + world_save_war_section_bytes(f.w)          // BL-1459: v69's wars
                                + world_save_embargo_section_bytes(f.w) + world_save_gen_capital_section_bytes(f.w)     // BL-1418: v70's embargoes
-                               + world_save_recruits_section_bytes(f.w) + world_save_sea_recruits_section_bytes(f.w) + world_save_refusals_section_bytes(f.w) /* BL-1480 (v75) */ + world_save_contributors_section_bytes(f.w) /* BL-1470 (v77) */ + world_save_occupation_section_bytes(f.w) /* BL-1502 (v78) */ + world_save_defend_section_bytes(f.w) /* BL-1504 (v79) */ + world_save_research_books_section_bytes(f.w) + world_save_growth_carry_section_bytes(f.w) /* BL-1539 (v80), last */;
+                               + world_save_recruits_section_bytes(f.w) + world_save_sea_recruits_section_bytes(f.w) + world_save_refusals_section_bytes(f.w) /* BL-1480 (v75) */ + world_save_contributors_section_bytes(f.w) /* BL-1470 (v77) */ + world_save_occupation_section_bytes(f.w) /* BL-1502 (v78) */ + world_save_defend_section_bytes(f.w) /* BL-1504 (v79) */ + world_save_research_books_section_bytes(f.w) + world_save_growth_carry_section_bytes(f.w) + world_save_ended_section_bytes(f.w) /* BL-1562 (v83) */ /* BL-1539 (v80), last */;
         const std::size_t key0 = bytes.size() - tail - (4 + 9) - 2 * 8 + 4;
         const entity_id ghost = 0x7FFFFFF0u;
         std::memcpy(&bad[key0], &ghost, sizeof ghost);
@@ -1327,7 +1327,7 @@ int main()
         check(drop.state_hash(7) != f.w.state_hash(7), "F11j state_hash reads the layer");
         // Ghost rows are refused whole.
         {
-            const std::size_t at = b.size() - world_save_research_books_section_bytes(f.w) - world_save_growth_carry_section_bytes(f.w) - world_save_defend_section_bytes(f.w) - world_save_occupation_section_bytes(f.w) + 4;
+            const std::size_t at = b.size() - world_save_research_books_section_bytes(f.w) - world_save_growth_carry_section_bytes(f.w) - world_save_ended_section_bytes(f.w) /* BL-1562 (v83) */ - world_save_defend_section_bytes(f.w) - world_save_occupation_section_bytes(f.w) + 4;
             std::string ghost = b;
             const entity_id nobody = 0x7FFFFFF0u;
             std::memcpy(&ghost[at], &nobody, sizeof nobody);
@@ -1351,7 +1351,7 @@ int main()
             const std::string v77 = o.str();
             world old;
             check(from_bytes(v77, old) && old.tile_occupier.empty()
-                      && v77.size() + world_save_occupation_section_bytes(clean) + world_save_defend_section_bytes(clean) + world_save_research_books_section_bytes(clean) + world_save_growth_carry_section_bytes(clean) == to_bytes(clean).size(),
+                      && v77.size() + world_save_occupation_section_bytes(clean) + world_save_defend_section_bytes(clean) + world_save_research_books_section_bytes(clean) + world_save_growth_carry_section_bytes(clean) + world_save_ended_section_bytes(clean) /* BL-1562 (v83) */ == to_bytes(clean).size(),
                   "F11n a v77 stream reads as nothing occupied; v78 is v77 plus the section");
         }
         // A world saved on the day a tile fell replays as the unbroken one does.
@@ -1484,7 +1484,7 @@ int main()
         cleared.units.at(d).defend_post = null_entity;
         check(cleared.state_hash(4) != f.w.state_hash(4), "F12q state_hash reads the order");
         {
-            const std::size_t at = b.size() - world_save_research_books_section_bytes(f.w) - world_save_growth_carry_section_bytes(f.w) - world_save_defend_section_bytes(f.w) + 4;
+            const std::size_t at = b.size() - world_save_research_books_section_bytes(f.w) - world_save_growth_carry_section_bytes(f.w) - world_save_ended_section_bytes(f.w) /* BL-1562 (v83) */ - world_save_defend_section_bytes(f.w) + 4;
             std::string bad = b;
             const entity_id nobody = 0x7FFFFFF0u;
             std::memcpy(&bad[at], &nobody, sizeof nobody);
@@ -1500,7 +1500,7 @@ int main()
             write_world_snapshot_pre_defend(f.w, o);
             world old;
             check(from_bytes(o.str(), old) && old.units.at(d).defend_province == no_province
-                      && o.str().size() + world_save_defend_section_bytes(f.w) + world_save_research_books_section_bytes(f.w) + world_save_growth_carry_section_bytes(f.w) == b.size(),
+                      && o.str().size() + world_save_defend_section_bytes(f.w) + world_save_research_books_section_bytes(f.w) + world_save_growth_carry_section_bytes(f.w) + world_save_ended_section_bytes(f.w) /* BL-1562 (v83) */ == b.size(),
                   "F12u a v78 stream reads as nobody defending; v79 is v78 plus the section");
         }
 

@@ -119,7 +119,8 @@ void standing_body(const world& w, const recipe_registry& reg, const economy_rep
 
     std::vector<entity_id> nations;
     for (const auto& [id, n] : w.nations)
-        nations.push_back(id);
+        if (!n.ended) // BL-1562: an ended nation leaves every ledger
+            nations.push_back(id);
     std::sort(nations.begin(), nations.end());
 
     const auto standing_of = [&](entity_id n) -> const corp_standing* {

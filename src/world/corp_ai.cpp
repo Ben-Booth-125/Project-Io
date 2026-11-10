@@ -991,7 +991,9 @@ bool make_actor(const world& w, entity_id id, ai_actor& out)
     out = ai_actor{};
     out.id = id;
     // BL-1407: every actor is a nation (the corporation actor path is deleted).
-    if (const auto nit = w.nations.find(id); nit != w.nations.end())
+    // BL-1562 (NATIONS.md § Elimination): an ended nation drops out of every scorer. It
+    // keeps its slot in `sorted_actor_ids`, so the survivors' cadence never shifts.
+    if (const auto nit = w.nations.find(id); nit != w.nations.end() && !nit->second.ended)
     {
         out.is_nation   = true;
         out.home_nation = id;
@@ -2565,7 +2567,8 @@ void score_nation_war(world& w, const recipe_registry& reg, entity_id nation, in
     // spectate there is no seat to protect (BL-409; NR-1120), so no nation is the
     // player's here.
     const entity_id player = spectating ? null_entity : player_nation(w);
-    if (nation == null_entity || nation == player || w.nations.find(nation) == w.nations.end())
+    if (nation == null_entity || nation == player || w.nations.find(nation) == w.nations.end()
+        || w.nations.at(nation).ended) // BL-1562: an ended nation scores nothing
         return;
     if (!sentiment_conduct_live(w))
         return;
@@ -2718,7 +2721,10 @@ void score_nation_war(world& w, const recipe_registry& reg, entity_id nation, in
         if (war.declarer == nation || war.defender == nation)
             ++open_wars;
     // The third parties a declaration prices: every nation but the pair.
-    const std::size_t others = w.nations.size() >= 2 ? w.nations.size() - 2 : 0;
+    std::size_t live = 0; // BL-1562: an ended nation prices no declaration
+    for (const auto& [n, nc] : w.nations)
+        live += nc.ended ? 0u : 1u;
+    const std::size_t others = live >= 2 ? live - 2 : 0;
     const float base_trust = sp.factors[static_cast<std::size_t>(sentiment_factor_kind::war_declared)].trust;
 
     struct pick
@@ -2844,7 +2850,8 @@ float rival_embargo_utility(const world& w, const recipe_registry& reg, entity_i
 void score_nation_embargo(world& w, const recipe_registry& reg, entity_id nation, int tick, bool spectating)
 {
     const entity_id player = spectating ? null_entity : player_nation(w);
-    if (nation == null_entity || nation == player || w.nations.find(nation) == w.nations.end())
+    if (nation == null_entity || nation == player || w.nations.find(nation) == w.nations.end()
+        || w.nations.at(nation).ended) // BL-1562: an ended nation scores nothing
         return;
     if (!sentiment_conduct_live(w))
         return;
@@ -2852,7 +2859,7 @@ void score_nation_embargo(world& w, const recipe_registry& reg, entity_id nation
     std::vector<entity_id> others; // the nations map is unordered: walk sorted ids
     others.reserve(w.nations.size());
     for (const auto& [n, nc] : w.nations)
-        if (n != nation)
+        if (n != nation && !nc.ended) // BL-1562: no embargo names an ended nation
             others.push_back(n);
     std::sort(others.begin(), others.end());
 

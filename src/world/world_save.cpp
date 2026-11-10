@@ -2137,8 +2137,8 @@ void write_world_snapshot_at(const world& w, std::ostream& out, uint32_t version
         }
     }
 
-    // world_save_version 82 (POPULATION_GROWTH_RATE): THE GROWTH CARRY, the last
-    // section. Each centre's fractional thousand heads, only where non-zero.
+    // world_save_version 82 (POPULATION_GROWTH_RATE): THE GROWTH CARRY. Each centre's
+    // fractional thousand heads, only where non-zero.
     if (version >= k_world_save_version_growth_carry)
     {
         std::vector<entity_id> cids;
@@ -2152,6 +2152,20 @@ void write_world_snapshot_at(const world& w, std::ostream& out, uint32_t version
             w_id(out, cid);
             w_f32(out, w.population_centres.at(cid).growth_carry);
         }
+    }
+
+    // world_save_version 83 (BL-1562): THE ENDED NATIONS, the last section, after the
+    // v82 carry. Every ended nation, ascending id.
+    if (version >= k_world_save_version_ended)
+    {
+        std::vector<entity_id> ids;
+        for (const auto& [nid, nc] : w.nations)
+            if (nc.ended)
+                ids.push_back(nid);
+        std::sort(ids.begin(), ids.end());
+        w_u32(out, static_cast<uint32_t>(ids.size()));
+        for (const entity_id nid : ids)
+            w_id(out, nid);
     }
 }
 
@@ -2168,6 +2182,21 @@ std::size_t world_save_growth_carry_section_bytes(const world& w)
         if (pc.growth_carry != 0.0f)
             ++n;
     return 4 + 8 * n;
+}
+
+void write_world_snapshot_pre_ended(const world& w, std::ostream& out)
+{
+    // VERIFICATION ONLY (BL-1562): the v82 stream shape - no ended-nations section.
+    write_world_snapshot_at(w, out, k_world_save_version_pre_ended);
+}
+
+std::size_t world_save_ended_section_bytes(const world& w)
+{
+    std::size_t n = 4;
+    for (const auto& [nid, nc] : w.nations)
+        if (nc.ended)
+            n += 4;
+    return n;
 }
 
 void write_world_snapshot_pre_defend(const world& w, std::ostream& out)
@@ -2576,7 +2605,8 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
             && version != k_world_save_version_pre_occupation // BL-1502: v77, nothing occupied
             && version != k_world_save_version_pre_defend     // BL-1504: v78, no defend orders
             && version != k_world_save_version_pre_research_books // BL-1539: v79, nothing booked
-            && version != k_world_save_version_pre_growth_carry)) // v80: every growth carry 0
+            && version != k_world_save_version_pre_growth_carry // v80: every growth carry 0
+            && version != k_world_save_version_pre_ended))      // BL-1562: v82, no nation ended
         return false; // mismatched version -- refuse rather than misread
 
     // BL-1422: a stream before the kit goods carries every per-resource array 49 wide;
@@ -3939,6 +3969,23 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
             if (s.corp_hostile_pairs.count({ r.declarer, r.defender }) == 0
                 || (answered == 1 && s.corp_hostile_pairs.count({ r.defender, r.declarer }) == 0))
                 return false;
+            // BL-1562 (RELATIONS.md § 7, Ben 2026-11-09): a declaration of war makes BOTH
+            // sides hostile, so the defender's row stands whether or not it answered. A
+            // stream of that format must carry it: one without is refused. A stream
+            // written before that ruling carries an unanswered war with one row; it loads
+            // with both, and the defender's row is written as `write_hostility` writes it:
+            // a standing friendship offer between the pair drops either way. (The
+            // friendship itself the declarer's row already excludes.)
+            if (version >= k_world_save_version_ended)
+            {
+                if (s.corp_hostile_pairs.count({ r.defender, r.declarer }) == 0)
+                    return false;
+            }
+            else if (s.corp_hostile_pairs.insert({ r.defender, r.declarer }).second)
+            {
+                s.corp_friend_offers.erase({ r.defender, r.declarer });
+                s.corp_friend_offers.erase({ r.declarer, r.defender });
+            }
             r.answered = answered == 1;
             const std::pair<entity_id, entity_id> key{r.declarer, r.defender};
             if (!s.wars.empty() && !(s.wars.rbegin()->first < key))
@@ -4370,6 +4417,84 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
             if (cit == s.population_centres.end())
                 return false;
             cit->second.growth_carry = carry;
+        }
+    }
+
+    // v83 (BL-1562), after the v82 carry: the ended nations. Untrusted: each names a nation of the stream,
+    // strictly ascending, never null, that owns no tile, fields no unit and is party to
+    // no open war - what elimination leaves - and (fix round, cold review) that keeps
+    // nothing else elimination clears: no hostility, friendship, friendship-offer,
+    // embargo or peace-offer row and no sentiment row naming it; no law it enacted, no
+    // trade, convoy, wing, muster or front order of its own; no building or space asset;
+    // no positive treasury; no live capital. Refused whole otherwise (the scratch world
+    // is dropped, so nothing lands). A v82 (or v80, and older) stream ends before it: no
+    // nation has ended.
+    if (version >= k_world_save_version_ended)
+    {
+        uint32_t count = 0;
+        if (!r_u32(in, count) || count > s.nations.size())
+            return false;
+        entity_id prev = null_entity;
+        for (uint32_t k = 0; k < count; ++k)
+        {
+            entity_id nid = null_entity;
+            if (!r_id(in, nid) || nid == null_entity || (k > 0 && nid <= prev))
+                return false;
+            prev = nid;
+            const auto nit = s.nations.find(nid);
+            if (nit == s.nations.end() || !nit->second.tiles.empty())
+                return false;
+            for (const auto& [tile, owner] : s.tile_to_nation)
+                if (owner == nid)
+                    return false;
+            for (const auto& [uid, u] : s.units)
+                if (u.owner == nid)
+                    return false;
+            for (const auto& [key, war] : s.wars)
+                if (key.first == nid || key.second == nid)
+                    return false;
+            const auto names = [nid](const std::pair<entity_id, entity_id>& k) {
+                return k.first == nid || k.second == nid;
+            };
+            for (const auto* table : { &s.corp_hostile_pairs, &s.corp_friend_pairs, &s.corp_friend_offers,
+                                       &s.nation_embargoes })
+                for (const auto& k : *table)
+                    if (names(k))
+                        return false;
+            for (const auto& [k, o] : s.peace_offers)
+                if (names(k))
+                    return false;
+            for (const auto& [k, v] : s.sentiment.pairs)
+                if (names(k))
+                    return false;
+            for (const auto& [k, v] : s.sentiment.contributions)
+                if (names(k))
+                    return false;
+            for (const law& l : s.laws)
+                if (l.enacting_nation == nid)
+                    return false;
+            for (const standing_trade& t : s.trades)
+                if (t.owner == nid)
+                    return false;
+            for (const convoy_component& c : s.convoys)
+                if (c.corp == nid)
+                    return false;
+            for (const auto& [wid, wg] : s.wings)
+                if (wg.owner == nid)
+                    return false;
+            for (const muster_order& m : s.musters)
+                if (m.owner == nid)
+                    return false;
+            for (const front_order_entry& f : s.front_orders)
+                if (f.nation == nid)
+                    return false;
+            for (const auto& [aid, a] : s.space_assets)
+                if (a.owner == nid)
+                    return false;
+            const nation_component& enc = nit->second;
+            if (!enc.state_assets.empty() || enc.treasury > 0.0f || enc.capital_tile != null_entity)
+                return false;
+            nit->second.ended = true;
         }
     }
 

@@ -450,6 +450,12 @@ struct war_notice_state
     std::set<std::pair<entity_id, entity_id>>    seen;
     std::vector<std::pair<entity_id, entity_id>> open;
     bool armed = false;
+    /// BL-1562 (LAYOUT.md § War notice): every nation already ended as of the last
+    /// frame, and the undismissed notices of nations whose last war the player fought.
+    std::set<entity_id>    ended_seen;
+    std::vector<entity_id> ended_open;
+    /// The campaign-lost notice's "Return to menu" press, read and cleared by app::render.
+    bool request_menu = false;
 };
 
 struct diplomacy_ledger_state

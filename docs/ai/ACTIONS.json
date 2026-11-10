@@ -3360,7 +3360,7 @@
     "No war stands between the pair in either direction, and no truce (rejected_state). A refusal mutates nothing.",
     "Its price is previewable first (war.hpp declaration_price): which justifications hold and every nation's Trust delta."
    ],
-   "expected_output": "The actor's hostility row toward the defender is written (any friendship between them dissolves, pending offers withdrawn) and a war record opens (world::wars): goals, the opening tick and day, unanswered. The declaration is CONDUCT: hostility_declared on the defender's row toward the declarer, and war_declared on every other nation's — doubled for a nation bordering either party, +50% per goal past the first, halved when any justification holds (grievance: the declarer's Trust toward the defender is adverse; embargo: the defender embargoes the declarer; lost ground: a goal the declarer ceded to the defender at an earlier peace; a friend attacked: the defender declared war on the declarer's friend). Saved (world_save_version 69).",
+   "expected_output": "BOTH hostility rows are written, the actor's toward the defender and the defender's toward the actor (Ben, 2026-11-09: a declaration of war makes both sides hostile, so the defender may push, intercept and fight from the first day; any friendship between them dissolves, pending offers withdrawn), and a war record opens (world::wars): goals, the opening tick and day, unanswered. The declaration is CONDUCT: hostility_declared on the defender's row toward the declarer, and war_declared on every other nation's — doubled for a nation bordering either party, +50% per goal past the first, halved when any justification holds (grievance: the declarer's Trust toward the defender is adverse; embargo: the defender embargoes the declarer; lost ground: a goal the declarer ceded to the defender at an earlier peace; a friend attacked: the defender declared war on the declarer's friend). Saved (world_save_version 69).",
    "reason_to_select": "Go to war for named ground: the goals are what the war score counts and what a peace can cede."
   },
   {
@@ -3385,8 +3385,8 @@
     "1 to 3 distinct goals, each a land province the declarer owns (rejected_invalid).",
     "A war the counterparty declared on the actor stands, and the actor has not answered it (rejected_state). A refusal mutates nothing."
    ],
-   "expected_output": "Free: no sentiment moves. The actor's hostility row toward the declarer is written and the war records the defender's goals and that it answered. Until it answers, the defender is a victim, not a raider (RELATIONS.md § 1, interdiction).",
-   "reason_to_select": "Fight back for ground of your own once war is declared on you; until you answer you cannot attack."
+   "expected_output": "Free: no sentiment moves. The war records the defender's goals and that it answered. Its hostility row toward the declarer already stands (the declaration wrote both, Ben 2026-11-09), so answering adds goals, not the right to fight.",
+   "reason_to_select": "Name ground of your own once war is declared on you: an unanswered defender can fight and win its ground back, but takes none at a peace."
   },
   {
    "id": "gameplay.offer_peace",
@@ -3414,7 +3414,7 @@
     "The actor is the nation (corp == as_nation, or as_nation unnamed); on the wire `COMMAND corp=<nation> nation=<nation> ...`, any other actor rejected_not_owner (BL-1406).",
     "White peace names no province; a cession names 1 to 3 distinct provinces, a contiguous list (rejected_invalid otherwise, the whole command, before anything is read).",
     "A cession's provinces are each a goal of the GAINING side, held by it now (world::province_holder) and owned by the losing side (rejected_state otherwise).",
-    "A cession never takes the loser's last province (NR-1102: no nation leaves the map by war) (rejected_state).",
+    "A cession may take every province the loser owns, its last included (Ben, 2026-11-09, overturning NR-1102): the loser's nation then ends (NATIONS.md \u00a7 Elimination).",
     "A war stands between the pair and carries no pending offer (one per war) (rejected_state).",
     "The actor's last offer in this war was not refused within the last 4 economy ticks (k_war_offer_cooldown_ticks; Ben, 2026-11-03, NR-1120) (rejected_state). A refusal mutates nothing."
    ],
@@ -3436,9 +3436,9 @@
    "preconditions": [
     "The actor is the nation (corp == as_nation, or as_nation unnamed); on the wire `COMMAND corp=<nation> nation=<nation> ...`, any other actor rejected_not_owner (BL-1406).",
     "The counterparty has a pending offer on its war with the actor (rejected_state).",
-    "Its terms still hold now — every ceded province still held by the gainer and owned by the loser, never the loser's last (rejected_state, the offer kept). A refusal mutates nothing."
+    "Its terms still hold now — every ceded province still held by the gainer and owned by the loser (rejected_state, the offer kept). A refusal mutates nothing."
    ],
-   "expected_output": "The peace concludes: both hostility rows clear, the war record closes into world::war_history, any pending offer is erased, and a truce of 16 ticks (four years) bars either party declaring on the other. peace_concluded warms each party's row toward the other; a cession emits province_ceded on the loser's row toward the winner (magnitude = provinces ceded), records each province in world::province_cessions (a later LOST GROUND justification for the loser) and sets its holder to the gainer — the territorial move (tile_to_nation follows) is BL-1460's. A white peace hands every occupied goal's holder back to its owner. The loser's residual exhaustion carries out of the war and decays at peace. Saved (world_save_version 69).",
+   "expected_output": "The peace concludes: both hostility rows clear, the war record closes into world::war_history, any pending offer is erased, and a truce of 16 ticks (four years) bars either party declaring on the other. peace_concluded warms each party's row toward the other; a cession emits province_ceded on the loser's row toward the winner (magnitude = provinces ceded), records each province in world::province_cessions (a later LOST GROUND justification for the loser) and sets its holder to the gainer — the territorial move (tile_to_nation follows) is BL-1460's. A white peace hands every occupied goal's holder back to its owner. The loser's residual exhaustion carries out of the war and decays at peace. A cession that leaves the loser owning no land province ENDS its nation (war.hpp eliminate_nation; NATIONS.md § Elimination): its remaining ground (coastal water) passes to the gainer, its other wars close as white peace with no truce, its offers, hostility, friendship, embargo, sentiment rows and laws are removed, its units, wings, musters, convoys and trades end, a positive treasury passes to the gainer (a debt is written off), it is flagged ended (saved, world_save_version 81) and one history entry is written; an ended nation is refused as an actor by every verb (rejected_no_corp) and as a counterparty. Saved (world_save_version 69).",
    "reason_to_select": "Take the terms on the table."
   },
   {
@@ -3486,7 +3486,7 @@
     "The actor is the nation (corp == as_nation, or as_nation unnamed); on the wire `COMMAND corp=<nation> nation=<nation> ...`, any other actor rejected_not_owner (BL-1406).",
     "White peace names no province; a cession names 1 to 3 distinct provinces, a contiguous list (rejected_invalid otherwise, the whole command, before anything is read).",
     "A cession's provinces are each a goal of the GAINING side, held by it now (world::province_holder) and owned by the losing side (rejected_state otherwise).",
-    "A cession never takes the loser's last province (NR-1102: no nation leaves the map by war) (rejected_state).",
+    "A cession may take every province the loser owns, its last included (Ben, 2026-11-09, overturning NR-1102): the loser's nation then ends (NATIONS.md \u00a7 Elimination).",
     "A war stands between the pair and its score stands at 100 in the actor's favour (+100 for the declarer, -100 for the defender; war.hpp war_score) (rejected_state). A refusal mutates nothing."
    ],
    "expected_output": "As gameplay.accept_peace, without the other side's acceptance; any pending offer is erased.",
@@ -3979,7 +3979,7 @@
     "At least one goal (the picker's Answer is disabled otherwise)."
    ],
    "expected_output": "The first press opens the goal picker in place ('Answer <nation>', 'Answering is free.'); the second issues gameplay.answer_war with the goals. The press queues a corp_command that app::render sends at the frame's end through player_command - the same apply_corp_command an agent reaches, with its full re-validation; the result is the line at the ledger's head. Landed: 'You answered <nation>.'. Cancel or Escape closes the picker without effect.",
-   "reason_to_select": "Fight back for ground of your own: until you answer you have no goals and no hostility toward the declarer."
+   "reason_to_select": "Name ground of your own: until you answer you have no goals, so a peace can cede you nothing (you may already push and fight)."
   },
   {
    "id": "ledger.diplomacy_offer_peace",
@@ -3999,7 +3999,7 @@
     }
    ],
    "preconditions": [
-    "A province that would be the loser's last is disabled ('It would be the loser's last province: a last province is never ceded.').",
+    "A province that would be the loser's last stays enabled (Ben, 2026-11-09); its tooltip says ceding it ends the loser, and once the ticked terms take every province the loser owns the composer says so ('These terms cede <nation>'s last province: its nation ends.' / 'These terms cede your last province: your nation ends and the campaign is lost.'). A pending offer whose terms would end a nation says so beside Accept / Refuse.",
     "Offer cession is disabled until the ticked terms are legal (check_peace_terms; 'Tick the provinces to be ceded.' / 'Those terms are not legal now.').",
     "For 4 quarters after the other side refuses the player's offer, 'Offer peace' is disabled ('Your last offer was refused: you may offer again in N quarters.'; NR-1120)."
    ],

@@ -143,13 +143,19 @@ A nation that owns no province has **ended**. Its one cause is a peace that cede
 (`RELATIONS.md` § 7); nothing else takes a nation's last ground. Elimination runs once, at the end
 of that peace, after the ground has moved:
 
+- **Its property passes** (Ben, 2026-11-09). Every province it still owns — its coastal water —
+  passes to the conqueror as a cession does. A tile it owns inside another nation's province
+  passes alone: the province stays its owner's. Its buildings and its space assets pass too.
 - **Its wars close.** Every other war it is party to closes as a white peace, and its pending peace
   and friendship offers drop. No truce is written: there is nobody left to declare.
 - **Its relations clear.** Hostility, friendship, embargo and tariff rows to and from it are
   removed, and nobody's sentiment toward it is read again.
 - **Its force ends.** Its units disband where they stand, and its convoys and trades are cancelled.
+  A land unit of a nation at peace with the conqueror, left on the ground the conqueror just
+  gained, withdraws as at any peace.
 - **Its treasury passes to the conqueror.** A positive balance goes to the nation that took its
-  last province, an actor-to-actor transfer that conserves (§ 2 of the settled rulings). A debt is
+  last province, an actor-to-actor transfer that conserves (§ 2 of the settled rulings). The
+  conqueror's next return books it, so the return's net is still its balance change. A debt is
   written off, not inherited.
 - **It stays a record.** The nation keeps its id, name and history, flagged as ended, so saves and
   the history log stay readable. It drops out of every scorer, ledger, lens and picker. The history

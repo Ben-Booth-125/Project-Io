@@ -11,7 +11,8 @@ bool embargoes(const world& w, entity_id author, entity_id target)
 embargo_result set_embargo(world& w, entity_id author, entity_id target, bool on)
 {
     if (author == null_entity || target == null_entity || author == target
-        || w.nations.find(author) == w.nations.end() || w.nations.find(target) == w.nations.end())
+        || w.nations.find(author) == w.nations.end() || w.nations.find(target) == w.nations.end()
+        || w.nations.at(author).ended || w.nations.at(target).ended) // BL-1562: no embargo names an ended nation
         return embargo_result::rejected_invalid;
     const std::pair<entity_id, entity_id> key{ author, target };
     const bool held = w.nation_embargoes.count(key) != 0;

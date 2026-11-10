@@ -65,7 +65,7 @@ std::vector<entity_id> live_nations(const world& w)
 {
     std::vector<entity_id> out;
     for (const auto& [id, n] : w.nations)
-        if (!n.tiles.empty())
+        if (!n.tiles.empty() && !n.ended) // BL-1562: an ended nation leaves the ledger
             out.push_back(id);
     std::sort(out.begin(), out.end());
     return out;
@@ -96,6 +96,17 @@ void refresh_owners(const world& w, diplomacy_ledger_state& d)
         ++d.provinces_owned[o];
     }
     d.candidates_generation = ~std::uint64_t{0}; // the goal candidates follow the territory
+}
+
+/// LAND provinces @p n owns, off the owner cache: a peace that cedes every one of them
+/// ends the nation (Ben, 2026-11-09; NATIONS.md § Elimination). Water does not count.
+int land_provinces_owned(const world& w, const diplomacy_ledger_state& d, entity_id n)
+{
+    int k = 0;
+    for (const auto& [pid, o] : d.province_owners)
+        if (o == n && province_kind_of(w, pid) == province_kind::land)
+            ++k;
+    return k;
 }
 
 /// Where a province is, in the glossary's words: the population centre it holds
@@ -1140,6 +1151,15 @@ void draw_peace(const world& w, ui_state& s, const war_record& war, entity_id me
         if (o->second.offerer == other)
         {
             ImGui::TextWrapped("%s offers %s.", name_of(w, other), terms_line(w, o->second.terms).c_str());
+            // Terms that take every province the loser owns end its nation (Ben, 2026-11-09).
+            if (o->second.terms.kind == peace_kind::cession)
+            {
+                const entity_id loser = o->second.terms.gainer == me ? other : me;
+                if (land_provinces_owned(w, d, loser) <= static_cast<int>(o->second.terms.provinces.size()))
+                    ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::negative), "%s",
+                                       loser == me ? "Accepting cedes your last province: your nation ends."
+                                                   : "These terms end their nation.");
+            }
             if (press(d, "Accept", "accept_peace", other, true, {}, "Conclude the peace on their terms."))
                 d.pending.push_back(command_for(w, corp_verb::accept_peace, other));
             ImGui::SameLine();
@@ -1178,10 +1198,9 @@ void draw_peace(const world& w, ui_state& s, const war_record& war, entity_id me
     // or goals you would cede (theirs, held by them, still yours). One side at a time.
     const std::vector<uint32_t>& my_goals    = war.declarer == me ? war.declarer_goals : war.defender_goals;
     const std::vector<uint32_t>& their_goals = war.declarer == me ? war.defender_goals : war.declarer_goals;
-    const auto owned = [&](entity_id n) {
-        const auto it = d.provinces_owned.find(n);
-        return it == d.provinces_owned.end() ? 0 : it->second;
-    };
+    // Land provinces each side owns: a peace that cedes all of the loser's ends its
+    // nation (Ben, 2026-11-09; NATIONS.md § Elimination). Water does not count.
+    const auto owned = [&](entity_id n) { return land_provinces_owned(w, d, n); };
     const auto pick_list = [&](const char* head, const std::vector<uint32_t>& goals, entity_id gainer,
                                entity_id loser, std::vector<uint32_t>& chosen, std::vector<uint32_t>& other_side) {
         // A ticked province that no longer qualifies (retaken, or no longer the
@@ -1199,12 +1218,13 @@ void draw_peace(const world& w, ui_state& s, const war_record& war, entity_id me
                 continue;
             if (!any) { ImGui::TextDisabled("%s", head); any = true; }
             const bool on = std::binary_search(chosen.begin(), chosen.end(), pid);
-            // Never the loser's last province (RELATIONS.md § 7, NR-1102).
+            // A last province may be ceded (Ben, 2026-11-09): the box stays live and says
+            // what ticking it would do.
             const bool last = !on && owned(loser) <= static_cast<int>(chosen.size()) + 1;
             const bool full = !on && chosen.size() >= k_war_goals_max;
             ImGui::PushID(static_cast<int>(pid));
             bool v = on;
-            if (last || full) ImGui::BeginDisabled();
+            if (full) ImGui::BeginDisabled();
             if (ImGui::Checkbox(province_label(w, pid).c_str(), &v))
             {
                 other_side.clear();
@@ -1212,10 +1232,10 @@ void draw_peace(const world& w, ui_state& s, const war_record& war, entity_id me
                 else   chosen.erase(std::find(chosen.begin(), chosen.end(), pid));
                 std::sort(chosen.begin(), chosen.end());
             }
-            if (last || full) ImGui::EndDisabled();
+            if (full) ImGui::EndDisabled();
             if ((last || full) && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
-                ImGui::SetTooltip(last ? "It would be the loser's last province: a last province is never ceded."
-                                       : "At most three provinces.");
+                ImGui::SetTooltip(full ? "At most three provinces."
+                                       : "The loser's last province: ceding it ends %s.", name_of(w, loser));
             ImGui::PopID();
         }
         return any;
@@ -1224,13 +1244,26 @@ void draw_peace(const world& w, ui_state& s, const war_record& war, entity_id me
     const bool any_give = pick_list("You cede to them", their_goals, other, me, d.peace_give, d.peace_gain);
     if (!any_gain && !any_give)
         ImGui::TextDisabled("No goal is held: only a white peace.");
-    // Why the war cannot be simply won (Ben, 2026-11-09): every goal held is 50 of the score,
-    // and the rest is the battles; a last province is never ceded (RELATIONS.md § 7).
+    // What imposing takes (Ben, 2026-11-09): every goal held is 50 of the score, and the
+    // rest is the battles.
     if (!impose)
         ImGui::TextDisabled("Imposing terms takes a score of 100 (now %+d).", mine);
-    if (any_gain && owned(other) <= 1)
-        ImGui::TextWrapped("%s holds its last province: it cannot be ceded. A white peace returns what you occupy.",
-                           name_of(w, other));
+    // Terms that take every province the loser owns end its nation (Ben, 2026-11-09;
+    // NATIONS.md § Elimination): the composer marks it before the press.
+    {
+        const bool gain_side = !d.peace_gain.empty();
+        const std::vector<uint32_t>& ticked = gain_side ? d.peace_gain : d.peace_give;
+        const entity_id loser = gain_side ? other : me;
+        if (!ticked.empty() && owned(loser) <= static_cast<int>(ticked.size()))
+        {
+            ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(palette::negative));
+            if (loser == me)
+                ImGui::TextWrapped("These terms cede your last province: your nation ends and the campaign is lost.");
+            else
+                ImGui::TextWrapped("These terms cede %s's last province: its nation ends.", name_of(w, loser));
+            ImGui::PopStyleColor();
+        }
+    }
 
     const corp_verb verb = impose ? corp_verb::impose_peace : corp_verb::offer_peace;
     if (press(d, impose ? "Impose white peace" : "Offer white peace", impose ? "impose_white" : "offer_white",
@@ -1370,7 +1403,7 @@ void refresh_nation_gdp(const world& w, const recipe_registry& reg, const econom
 
 void navigate_diplomacy_to(const world& w, ui_state& s, entity_id nation)
 {
-    if (nation == me_of(w) || w.nations.count(nation) == 0
+    if (nation == me_of(w) || w.nations.count(nation) == 0 || w.nations.at(nation).ended
         || s.diplomacy.declare_target != null_entity)
         return;
     if (!s.show_diplomacy_ledger)

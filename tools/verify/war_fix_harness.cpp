@@ -290,6 +290,9 @@ void open_war(lanes& f)
     rec.declarer_goals = { 1u };
     f.w.wars[{ f.A, f.B }] = rec;
     (void)declare_hostile(f.w, f.A, f.B);
+    // BL-1562 (Ben, 2026-11-09): a war makes BOTH sides hostile, as declare_war writes
+    // it; a one-row war is what a pre-ruling save held, and the loader now adds the row.
+    (void)declare_hostile(f.w, f.B, f.A);
 }
 
 /// A convoy as the dispatch makes one: its speed is 1 / the priced leg's ticks.

@@ -4600,32 +4600,31 @@ bool draw_front_selection(const world& w, ui_state& ui)
         }
         ImGui::SameLine();
         const bool pushing = cur == front_order::push;
-        // Declared on and not yet answered (RELATIONS.md § 7): the war stands, but this
-        // nation has no hostility of its own until it answers, so the front says that
-        // and offers the free answer rather than reading "Not hostile" (Ben, 2026-11-09).
+        // A declaration of war makes BOTH sides hostile (Ben, 2026-11-09; RELATIONS.md
+        // § 7), so a nation declared on may push at once. Answering adds goals, not the
+        // right to fight: an unanswered war still offers the free answer here.
         const war_record* war = own ? war_between(w, nation, view.f.neighbour) : nullptr;
         const bool unanswered = war != nullptr && war->defender == nation && !war->answered;
         if (order_button("Push##front_push", pushing, own && (open || pushing),
-                         pushing     ? "Pushing - press to hold instead"
-                         : open      ? "Push - march into the neighbour's weakest province"
-                         : unanswered ? "Answer this war first: answering is free and opens the push"
-                                      : "Not hostile - a front can only hold toward this neighbour"))
+                         pushing ? "Pushing - press to hold instead"
+                         : open  ? "Push - march into the neighbour's weakest province"
+                                 : "Not hostile - a front can only hold toward this neighbour"))
         {
             ui.pending_front_order_tile  = view.f.key;
             ui.pending_front_order_value = pushing ? 0 : 1;
         }
-        if (!open && !pushing && unanswered)
+        if (!open && !pushing)
+            ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::negative), "Not hostile");
+        else
+            ImGui::TextDisabled(pushing ? "Pushing" : "Holding");
+        if (unanswered)
         {
             ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::negative), "War unanswered");
             if (ImGui::Button("Answer##front_answer", {ImGui::GetContentRegionAvail().x, 0.0f}))
                 open_declaration(w, ui, view.f.neighbour);
             if (ImGui::IsItemHovered())
-                ImGui::SetTooltip("Name goals among their provinces. Answering is free.");
+                ImGui::SetTooltip("Name goals among their provinces. Answering is free; without goals you can win back ground but take none at a peace.");
         }
-        else if (!open && !pushing)
-            ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::negative), "Not hostile");
-        else
-            ImGui::TextDisabled(pushing ? "Pushing" : "Holding");
     }
     ImGui::EndChild();
     return true;

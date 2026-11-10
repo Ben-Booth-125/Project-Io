@@ -722,19 +722,34 @@ inline constexpr uint32_t k_world_save_version_pre_recruits = 71;
 /// build days, so the reader rescales it (`rescale_site_days_to_research_books`).
 ///
 /// **82 (POPULATION_GROWTH_RATE, POPULATION.md § Growth, decline and razing) — THE GROWTH
-/// CARRY.** Appended last: after a u32 count, every population centre with a non-zero
-/// `growth_carry`, ascending id, as (id, f32 carry). Each names a centre of the stream; the
-/// carry finite and in (0, 1). Refused whole otherwise. v81 is reserved by the naval branch
-/// (BL-1527, ship kit) and is not on this line: v80 is the STRICT PREFIX read here
-/// (`k_world_save_version_pre_growth_carry`), as a world whose every carry is 0. Whoever
-/// stacks the two adds v81 to the accepted set beside it.
-inline constexpr uint32_t world_save_version = 82;
+/// CARRY.** Appended after v80's sections: after a u32 count, every population centre with a
+/// non-zero `growth_carry`, ascending id, as (id, f32 carry). Each names a centre of the
+/// stream; the carry finite and in (0, 1). Refused whole otherwise. v81 is reserved by the
+/// naval branch (BL-1527, ship kit) and is not on this line: v80 is the STRICT PREFIX read
+/// here (`k_world_save_version_pre_growth_carry`), as a world whose every carry is 0.
+/// Whoever stacks the two adds v81 to the accepted set beside it.
+///
+/// **83 (BL-1562, NATIONS.md § Elimination) — THE ENDED NATIONS.** Appended last, after the
+/// v82 growth carry: after a u32 count, every ended nation strictly ascending id, each a
+/// nation of the stream that owns no tile, fields no unit, holds no open war and keeps
+/// nothing elimination clears. Refused whole otherwise. v82 is a STRICT PREFIX of v83 and is
+/// read too (`k_world_save_version_pre_ended`), as a world in which no nation has ended; so
+/// is v80. From v83 a war's defender row toward its declarer must stand (RELATIONS.md § 7,
+/// Ben 2026-11-09: a declaration of war makes both sides hostile); an older stream's
+/// unanswered war loads with both rows.
+inline constexpr uint32_t world_save_version = 83;
 
 /// POPULATION_GROWTH_RATE: the first version carrying the growth-carry section.
 inline constexpr uint32_t k_world_save_version_growth_carry = 82;
 
 /// POPULATION_GROWTH_RATE: the version before it on this line, a strict prefix of it.
 inline constexpr uint32_t k_world_save_version_pre_growth_carry = 80;
+
+/// BL-1562: the first version carrying the ended-nations section (see above).
+inline constexpr uint32_t k_world_save_version_ended = 83;
+
+/// BL-1562: v82, a strict prefix of v83 (v81 is the naval branch's, not on this line).
+inline constexpr uint32_t k_world_save_version_pre_ended = k_world_save_version_growth_carry;
 
 /// BL-1539: the first version carrying the research-books section (see above).
 inline constexpr uint32_t k_world_save_version_research_books = 80;
@@ -1096,6 +1111,12 @@ void write_world_snapshot_pre_research_books(const world& w, std::ostream& out);
 
 /// VERIFICATION ONLY (POPULATION_GROWTH_RATE): the v80 stream shape - no growth-carry section.
 void write_world_snapshot_pre_growth_carry(const world& w, std::ostream& out);
+
+/// VERIFICATION ONLY (BL-1562): the v82 stream shape - no ended-nations section.
+void write_world_snapshot_pre_ended(const world& w, std::ostream& out);
+
+/// BL-1562: the bytes v83's ended-nations section takes for @p w: the count and 4 a nation.
+std::size_t world_save_ended_section_bytes(const world& w);
 
 /// BL-1453: the recon stock a battle loaded from a pre-v67 stream is given — enough to
 /// see every defending unit in full (twice the stealthiest defender's kit stealth, in

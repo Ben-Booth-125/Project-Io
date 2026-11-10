@@ -530,13 +530,13 @@ THE SEAM'S ANSWER IS SHOWN, because set_trade validates what the form cannot (bo
 
 *Demanded by BL-1443 · `src/ui/body_surface_canvas.cpp`, `src/ui/ui_state.hpp`, `src/ui/presentation.hpp`, `src/core/app.cpp` · id `unit_right_click_orders`*
 
-### War notice: top centre of the canvas area, below the alert strip; one per war the player's nation has become party to
+### War notice: top centre of the canvas area, below the alert strip; one per war the player's nation has become party to, and one per nation ended by a war the player fought (the player's own end reads 'The campaign is lost', with Spectate and Return to menu)
 
-**Answers:** Has a war just started that involves me, and with whom?
+**Answers:** Has a war just started that involves me, and with whom? Has a war I fought ended a nation, and is it mine?
 
-**Because:** Ben, 2026-11-09: a rival declared on him and he could not tell why his front read Not hostile. The alert strip names nobody and the chat line scrolls away at speed, so the one moment that changes what his fronts may do passed unmarked. The notice earns canvas space because it names both parties, waits to be dismissed, and is the door to the free answer. It is announced only for a war that opens in play, and it pauses nothing.
+**Because:** Ben, 2026-11-09: a rival declared on him and he could not tell why his front read Not hostile. The alert strip names nobody and the chat line scrolls away at speed, so the one moment that changes what his fronts may do passed unmarked. The notice earns canvas space because it names both parties, waits to be dismissed, and is the door to the free answer. It is announced only for a war that opens in play, and it pauses nothing. A nation's end (NATIONS.md § Elimination) is the largest thing a war can do, and the player's own end is the campaign's end: it has to be said where he is looking, with the two ways on.
 
-*Demanded by Ben's 2026-11-09 playtest · `src/ui/alerts.cpp`, `src/ui/ui_state.hpp`, `src/core/app.cpp` · id `war_notice`*
+*Demanded by Ben's 2026-11-09 playtest; BL-1562 (war both hostile, elimination) · `src/ui/alerts.cpp`, `src/ui/ui_state.hpp`, `src/core/app.cpp` · id `war_notice`*
 
 ### Selection band — the water tile variant (owner / domain centre column)
 

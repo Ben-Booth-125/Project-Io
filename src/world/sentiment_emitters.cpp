@@ -22,18 +22,23 @@
 
 namespace {
 
+/// A live nation: an ended one (BL-1562) is never an observer or a subject again.
 bool is_nation(const world& w, entity_id id)
 {
-    return id != null_entity && w.nations.count(id) != 0;
+    if (id == null_entity)
+        return false;
+    const auto it = w.nations.find(id);
+    return it != w.nations.end() && !it->second.ended;
 }
 
-/// Every nation, ascending id.
+/// Every live nation, ascending id.
 std::vector<entity_id> nation_ids(const world& w)
 {
     std::vector<entity_id> ids;
     ids.reserve(w.nations.size());
     for (const auto& [nid, nc] : w.nations)
-        ids.push_back(nid);
+        if (!nc.ended)
+            ids.push_back(nid);
     std::sort(ids.begin(), ids.end());
     return ids;
 }
@@ -64,6 +69,11 @@ void queue_conduct(world& w, entity_id observer, entity_id subject,
 {
     if (!sentiment_conduct_live(w))
         return;
+    // BL-1562 (NATIONS.md § Elimination): nobody's sentiment toward an ended nation is
+    // read again, so no conduct by or about one is gathered.
+    for (const entity_id n : { observer, subject })
+        if (const auto it = w.nations.find(n); it != w.nations.end() && it->second.ended)
+            return;
     w.sentiment_pending.push_back(sentiment_event{ observer, subject, kind, magnitude });
 }
 

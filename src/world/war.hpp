@@ -107,7 +107,8 @@ struct war_record
     /// The defender's goals: empty until it answers, then 1..3 of the declarer's
     /// provinces, ascending id.
     std::vector<uint32_t> defender_goals;
-    /// True once the defender has answered (its hostility row is written).
+    /// True once the defender has answered (named its goals). Its hostility row
+    /// stands from the declaration either way (Ben, 2026-11-09).
     bool answered = false;
 
     int32_t opened_tick = 0; ///< `world::current_econ_tick` at the declaration.
@@ -199,7 +200,7 @@ enum class war_result : uint8_t
     rejected_invalid, ///< Unknown or equal nations, a bad goal list, bad terms.
     rejected_state,   ///< Valid arguments the current state refuses (a war already
                       ///< stands, a truce, no such war, an offer already pending,
-                      ///< a score short of 100, the loser's last province...).
+                      ///< a score short of 100, a goal not held...).
 };
 
 // ---------------------------------------------------------------------------
@@ -327,8 +328,9 @@ int war_morale_ceiling(const world& w, entity_id nation);
 // Verbs — each validates everything first; a rejection mutates nothing
 // ---------------------------------------------------------------------------
 
-/// Opens a war: writes the declarer's hostility row (stance's internals —
-/// friendship and offers dissolve) and the record, and charges exactly
+/// Opens a war: writes BOTH hostility rows, declarer -> defender and defender ->
+/// declarer (Ben, 2026-11-09, RELATIONS.md § 7: a declaration of war makes both sides
+/// hostile; stance's internals — friendship and offers dissolve) and the record, and charges exactly
 /// `declaration_price`. The charge is GATHERED (`queue_conduct`, BL-1458) and lands
 /// at the tick's one sentiment fold (`fold_pending_sentiment`), with every other
 /// conduct of the tick. Refused on: declarer == defender or an unknown nation,
@@ -338,9 +340,10 @@ int war_morale_ceiling(const world& w, entity_id nation);
 war_result declare_war(world& w, const sentiment_params& p, entity_id declarer,
                        entity_id defender, const std::vector<uint32_t>& goals);
 
-/// The defender's answer — free: writes its hostility row and names 1..3 goals
-/// among the declarer's provinces. Refused on a bad goal list (rejected_invalid)
-/// or when no unanswered war (declarer, defender) stands (rejected_state).
+/// The defender's answer — free: names 1..3 goals among the declarer's provinces. Its
+/// hostility row already stands (the declaration wrote both, Ben 2026-11-09). Refused on
+/// a bad goal list (rejected_invalid) or when no unanswered war (declarer, defender)
+/// stands (rejected_state).
 war_result answer_war(world& w, entity_id defender, entity_id declarer,
                       const std::vector<uint32_t>& goals);
 
@@ -389,10 +392,34 @@ war_result impose_peace(world& w, const sentiment_params& p, entity_id imposer,
 /// (NR-1102). The logistics caches drop; @p from's units on the ceded ground
 /// withdraw by the retreat rule (`withdraw_units`); fronts re-anchor. Population
 /// centres and the jurisdiction of law read `tile_to_nation` live, so they follow
-/// with it. Called only by a concluded cession, whose terms already refused the
-/// loser's last province.
+/// with it. Called by a concluded cession (which may take the loser's last province,
+/// Ben 2026-11-09) and by `eliminate_nation` for the ended nation's residual ground.
 void cede_provinces(world& w, entity_id from, entity_id to,
                     const std::vector<uint32_t>& provinces);
+
+/// True iff @p nation is a known nation that has ENDED (NATIONS.md § Elimination).
+bool nation_ended(const world& w, entity_id nation);
+
+/// ELIMINATION (BL-1562, NATIONS.md § Elimination; Ben 2026-11-09). Run once, by a
+/// concluded cession that left @p ended owning no land province, after the ground moved;
+/// @p gainer took that last province (@p ceded: the provinces that peace ceded). In
+/// order: every province @p ended still OWNS (its coastal water) passes to @p gainer by
+/// `cede_provinces`; a tile it owns inside a province another nation owns passes alone
+/// (owner, tile lists, deposits, track), with no holder write and no cession record;
+/// its buildings and its space assets pass to @p gainer; its other wars close as white
+/// peace with NO truce; its peace and friendship offers drop; hostility, friendship,
+/// embargo rows, truces, refusals and sentiment rows to and from it are removed (and its
+/// queued conduct), and the laws it enacted (its tariffs) go; its units, wings, musters,
+/// front orders and battles end, its convoys and trades are cancelled; a land unit of a
+/// nation not at war with @p gainer left on the provinces @p gainer just gained
+/// (@p ceded and the residual ones) withdraws by the retreat rule; a positive treasury
+/// passes to @p gainer, BOOKED on its next return as a refund-style receipt (so a
+/// return's net still equals its balance change), and a debt is written off; it is
+/// flagged `ended`, its live capital cleared (the generation capital stays its
+/// identity); the history log writes one entry. A no-op for an unknown or already-ended
+/// nation.
+void eliminate_nation(world& w, const sentiment_params& p, entity_id ended, entity_id gainer,
+                      const std::vector<uint32_t>& ceded = {});
 
 // ---------------------------------------------------------------------------
 // Passes

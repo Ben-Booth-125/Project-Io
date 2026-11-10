@@ -123,7 +123,8 @@ void draw_chat_panel(const world& w, chat_state& chat, int day,
         chat.group_name[0] = '\0';
         chat.group_draft.clear();
         for (const auto& [id, nc] : w.nations) // BL-1407: the actors are nations
-            chat.group_draft.emplace_back(id, false);
+            if (!nc.ended) // BL-1562: an ended nation is in no picker
+                chat.group_draft.emplace_back(id, false);
         std::sort(chat.group_draft.begin(), chat.group_draft.end());
         ImGui::OpenPopup("new_group");
     }
