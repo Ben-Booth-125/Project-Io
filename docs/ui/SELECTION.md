@@ -563,9 +563,10 @@ selection holds. What the player may see of another nation's convoy follows the 
 
 **The marker's scale and count (Ben, 2026-11-09).** A convoy marker is a zoomed size: it grows with
 the map, at a quarter of the hex radius, with a floor so it stays legible zoomed out. Where several
-convoys share a tile the count sits **in a rectangle beside the circle**, sized from its own number
-and scaling with the marker, rather than floating behind it. The press answers on the whole of what
-is drawn, circle and rectangle alike.
+convoys share a tile **one rectangle holds the convoy glyph and the count together** (Ben,
+2026-11-09: *"make them larger so they cover the convoy icon as well"*), sized from the glyph and
+its own number and scaling with the marker, so the number reads as the marker's. The press answers
+on the whole of what is drawn: the circle alone, or the rectangle.
 
 ### The front element
 

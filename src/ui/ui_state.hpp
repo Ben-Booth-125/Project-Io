@@ -2077,7 +2077,7 @@ struct ui_state
         float         x = 0.0f, y = 0.0f;
         int           count = 1;
         bool          mine  = false;
-        ImVec2        box_min{}, box_max{}; ///< The count's rectangle; empty with no count drawn.
+        ImVec2        box_min{}, box_max{}; ///< The box holding glyph and count; empty with no count drawn.
     };
     std::vector<convoy_zone> convoy_zones;
     std::uint32_t hovered_convoy = 0; ///< The convoy the pointer's marker names; 0 none.

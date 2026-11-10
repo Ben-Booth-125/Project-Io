@@ -6545,7 +6545,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     // head, gliding with the beam's clock. A press selects it; markers do not outrank a
     // lens, so under one it takes no press (BL-664). A rival's draws only on ground the
     // player's own vision lights (DISCOVERY.md), with the Resource lens's lifted fog not
-    // counting. Several on one tile draw as ONE marker with a count in a box beside it, the
+    // counting. Several on one tile draw as ONE marker, its glyph and count in one box, the
     // clutter guard: the press walks them, as the wing marker walks its wings. The marker
     // and its box grow with the zoom (Ben, 2026-11-09). Off below the counters' zoom.
     state.convoy_zones.clear();
@@ -6635,29 +6635,33 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             for (int k = k_min; k <= k_max; ++k)
             {
                 const ImVec2 mp{ sc.x + static_cast<float>(k) * period_px, sc.y };
-                dl->AddCircleFilled(mp, cr, IM_COL32(14, 18, 26, 215));
-                if (selected || hovered)
-                    dl->AddCircle(mp, cr + 1.0f, selected ? palette::selection : palette::hover, 0, 2.0f);
-                else
-                    dl->AddCircle(mp, cr, col, 0, 1.0f);
-                icons::convoy(dl, mp, cr * 0.72f, col);
                 ui_state::convoy_zone z;
                 if (marks.size() > 1)
                 {
-                    // The count in its own box, against the circle's right edge, so
-                    // it reads as part of the marker rather than floating behind it.
+                    // One box holds the glyph and the count together (Ben, 2026-11-09), so
+                    // the number reads as the marker's and the press answers on all of it.
                     const float pad_x = std::max(3.0f, count_font * 0.3f);
                     const float pad_y = std::max(1.0f, count_font * 0.1f);
-                    const ImVec2 bmin{ mp.x + cr + 2.0f, mp.y - count_size.y * 0.5f - pad_y };
-                    const ImVec2 bmax{ bmin.x + count_size.x + pad_x * 2.0f,
-                                       mp.y + count_size.y * 0.5f + pad_y };
-                    dl->AddRectFilled(bmin, bmax, IM_COL32(14, 18, 26, 215), 2.0f);
-                    dl->AddRect(bmin, bmax, edge_col, 2.0f, 0, (selected || hovered) ? 2.0f : 1.0f);
+                    const float half_h = std::max(cr + 1.0f, count_size.y * 0.5f + pad_y);
+                    const ImVec2 bmin{ mp.x - cr - 2.0f, mp.y - half_h };
+                    const ImVec2 bmax{ mp.x + cr + 2.0f + count_size.x + pad_x, mp.y + half_h };
+                    dl->AddRectFilled(bmin, bmax, IM_COL32(14, 18, 26, 215), 3.0f);
+                    dl->AddRect(bmin, bmax, edge_col, 3.0f, 0, (selected || hovered) ? 2.0f : 1.0f);
+                    icons::convoy(dl, mp, cr * 0.72f, col);
                     dl->AddText(ImGui::GetFont(), count_font,
-                                { bmin.x + pad_x, bmin.y + pad_y },
+                                { mp.x + cr + 2.0f, mp.y - count_size.y * 0.5f },
                                 IM_COL32(236, 240, 248, 255), num); // fit-exempt: the box is measured from this text
                     z.box_min = bmin;
                     z.box_max = bmax;
+                }
+                else
+                {
+                    dl->AddCircleFilled(mp, cr, IM_COL32(14, 18, 26, 215));
+                    if (selected || hovered)
+                        dl->AddCircle(mp, cr + 1.0f, selected ? palette::selection : palette::hover, 0, 2.0f);
+                    else
+                        dl->AddCircle(mp, cr, col, 0, 1.0f);
+                    icons::convoy(dl, mp, cr * 0.72f, col);
                 }
                 z.id     = next;
                 z.centre = mp;
@@ -6681,7 +6685,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             {
                 const float dx = mouse_g.x - z.centre.x, dy = mouse_g.y - z.centre.y;
                 const float d2 = dx * dx + dy * dy;
-                // The press answers on everything drawn: the circle, and the count's box.
+                // The press answers on everything drawn: the circle, or the box that holds both.
                 const bool on_box = z.box_max.x > z.box_min.x
                     && mouse_g.x >= z.box_min.x && mouse_g.x <= z.box_max.x
                     && mouse_g.y >= z.box_min.y && mouse_g.y <= z.box_max.y;
