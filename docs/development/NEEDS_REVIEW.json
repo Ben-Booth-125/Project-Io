@@ -1067,6 +1067,46 @@
    "files": [
     "src/world/corp_ai.cpp"
    ]
+  },
+  {
+   "raised": "2026-11-10",
+   "status": "open",
+   "resolution": null,
+   "id": "NR-1197",
+   "title": "Grant reading: rivals building their own Launchpad and Training Centre",
+   "kind": "decision-taken",
+   "source": "BL-1615 lane report",
+   "what": "The lane read the 2026-11-10 space grant (which names astronaut training) together with the 2026-10-23 own-economy build grant as covering a rival building its own pad and centre, on its own ground, through the build verb, paid only with twice the capex uncommitted. Never for the player nation. Pads are placed nearest the capital.",
+   "why_it_matters": "A grant read as covering a new subject is the pattern AI_OPPONENT.md § 11 asks to be raised.",
+   "options": [
+    "Confirm the reading",
+    "Write it into § 11 as its own dated line"
+   ],
+   "recommendation": "Confirm, and add one line to § 11 so the reading is on record.",
+   "files": [
+    "src/world/corp_ai.cpp",
+    "docs/ai/AI_OPPONENT.md"
+   ]
+  },
+  {
+   "raised": "2026-11-10",
+   "status": "open",
+   "resolution": null,
+   "id": "NR-1198",
+   "title": "Branch ids collide with main: BL-1580..1618 and NR-1181..1183, save v83..v88",
+   "kind": "question",
+   "source": "main session, merge prep",
+   "what": "This branch minted BL-1580..1615 and NR-1181..1183; main now holds BL ids up to 1618 and NR-1181..1194 (the naval merge), plus world save v83 (BL-1562) and v88 (naval) and envelope v29. New ids on this branch start at BL-1630 and NR-1195. Merging the branch into main needs a renumber pass of ids and save versions.",
+   "why_it_matters": "The merge is yours (NR-1162); this is its cost.",
+   "options": [
+    "Renumber this branch at the merge",
+    "Renumber main's side"
+   ],
+   "recommendation": "Renumber this branch at the merge; its versions stack on top of main's.",
+   "files": [
+    "docs/development/backlog.json",
+    "src/world/world_save.hpp"
+   ]
   }
  ]
 }

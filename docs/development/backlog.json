@@ -2165,8 +2165,8 @@
    "design": "An in-transit satellite or station records only its destination and arrival tick, so the canvas draws it dimmed at the destination. Add origin node and departure tick (a save section), then draw the dashed segment and the share of the way travelled. Space units (space_units.hpp) already carry node and dest; reuse that shape."
   },
   {
-   "status": "designed",
-   "glyph": "○",
+   "status": "complete",
+   "glyph": "●",
    "sprint": 65,
    "version_goal": "v0.4.0",
    "written": "2026-11-10",
@@ -2188,7 +2188,33 @@
     "src/main.cpp"
    ],
    "title": "Rivals can launch: one Launchpad per nation per body, and rivals build a Launchpad and a Training Centre",
-   "design": "SPACE_ASSETS.md § Launching: a launch needs a staffed Launchpad on the nation home body. placement_rules allows one Launchpad per body world-wide; make it one per nation per body. The nation build scorer (2026-10-23 grant, own ground only) builds a Launchpad once the nation holds Rocketry and can afford it, and an Astronaut Training Centre once it holds the training key; never for the player. Done when a spectated run shows rivals launching (the spectate census reports launches)."
+   "design": "SPACE_ASSETS.md § Launching: a launch needs a staffed Launchpad on the nation home body. placement_rules allows one Launchpad per body world-wide; make it one per nation per body. The nation build scorer (2026-10-23 grant, own ground only) builds a Launchpad once the nation holds Rocketry and can afford it, and an Astronaut Training Centre once it holds the training key; never for the player. Done when a spectated run shows rivals launching (the spectate census reports launches). Outcome (lane Q, seed 0 to 1995): pads and centres built (first pad 1977, 4 staffed by 1995), but 0 launches: the launch lots are not on the home shelf (BL-1630, launch goods supply)."
+  },
+  {
+   "status": "designed",
+   "glyph": "○",
+   "sprint": 65,
+   "version_goal": "v0.4.0",
+   "written": "2026-11-10",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Claude (spectator finding, BL-1615)",
+   "requires": [
+    "BL-1615"
+   ],
+   "category": "Space",
+   "priority": "A",
+   "difficulty": 3,
+   "id": "BL-1630",
+   "short_name": "LAUNCH_GOODS_SUPPLY",
+   "authority_doc": "docs/economy/SPACE_ASSETS.md",
+   "files": [
+    "src/world/corp_ai.cpp",
+    "src/world/nation_ai.cpp",
+    "src/world/space_assets.cpp"
+   ],
+   "title": "Rivals with a staffed pad can buy a launch: spacecraft components and propellant reach the home shelf, and pads finish in reasonable time",
+   "design": "The BL-1615 spectate (seed 0 to 1995) ends with 4 staffed rival pads and 0 launches. Three padded nations are refused rejected_shelf: their home market holds no spacecraft_components or propellant lot (components_lump 25, propellant_lump 50), though treasuries are 50 to 88k. The plants exist (recipes spacecraft_components, spacecraft_components_heavy, propellant_atmospheric) but nothing builds them: no demand shows before a launch. Second gap: pads take 5 to 9 years, some sites at rate 0 for want of materials. Fix as an in-world force, not a term in the agent: the space programme demand must be visible to the nation build scorer (2026-10-23 grant, own ground only) so it builds the plants, or the launch buy must post a standing order the market and builders can see. Done when a spectated run shows rival launches before 2000."
   }
  ]
 }

@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*59 entries — 56 open, 3 resolved.*
+*61 entries — 58 open, 3 resolved.*
 
 ---
 
@@ -709,6 +709,34 @@ The bombard order and the battery are player-and-script only. Rival use belongs 
 > **Recommendation:** Leave it to BL-1608.
 
 *Files: `src/world/corp_ai.cpp`*
+
+### NR-1197 — Grant reading: rivals building their own Launchpad and Training Centre
+*decision taken on your behalf · raised 2026-11-10 · from BL-1615 lane report*
+
+The lane read the 2026-11-10 space grant (which names astronaut training) together with the 2026-10-23 own-economy build grant as covering a rival building its own pad and centre, on its own ground, through the build verb, paid only with twice the capex uncommitted. Never for the player nation. Pads are placed nearest the capital.
+
+**Why it matters.** A grant read as covering a new subject is the pattern AI_OPPONENT.md § 11 asks to be raised.
+
+- Confirm the reading
+- Write it into § 11 as its own dated line
+
+> **Recommendation:** Confirm, and add one line to § 11 so the reading is on record.
+
+*Files: `src/world/corp_ai.cpp`, `docs/ai/AI_OPPONENT.md`*
+
+### NR-1198 — Branch ids collide with main: BL-1580..1618 and NR-1181..1183, save v83..v88
+*question · raised 2026-11-10 · from main session, merge prep*
+
+This branch minted BL-1580..1615 and NR-1181..1183; main now holds BL ids up to 1618 and NR-1181..1194 (the naval merge), plus world save v83 (BL-1562) and v88 (naval) and envelope v29. New ids on this branch start at BL-1630 and NR-1195. Merging the branch into main needs a renumber pass of ids and save versions.
+
+**Why it matters.** The merge is yours (NR-1162); this is its cost.
+
+- Renumber this branch at the merge
+- Renumber main's side
+
+> **Recommendation:** Renumber this branch at the merge; its versions stack on top of main's.
+
+*Files: `docs/development/backlog.json`, `src/world/world_save.hpp`*
 
 ---
 
