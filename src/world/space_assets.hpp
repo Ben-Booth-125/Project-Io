@@ -185,7 +185,23 @@ struct space_asset
     // debris WEAR, in [0, 1); lost at 1 (debris.hpp). SERIALISED in the BL-1598
     // section only where above zero; folded into state_hash there.
     float wear = 0.0f;
+
+    // ---- BL-1614 (CIRCUMPLANETARY.md, the transit segment): where an IN-TRANSIT
+    // asset left from and the econ tick it left, so the canvas can draw the path
+    // and the share travelled. A launch records the home surface and its launch
+    // tick; a move the node it left and the tick of the order. Cleared (body
+    // null, tick 0) when the asset arrives — only a travelling asset carries it.
+    // SERIALISED in the BL-1614 section only where `transit_from.body` is set;
+    // folded into state_hash there.
+    orbital_node transit_from{};      ///< Origin of the current transit; body null when none.
+    int32_t      depart_tick = 0;     ///< Econ tick the current transit left; in [launch_tick, arrival_tick].
 };
+
+/// BL-1614: does @p a carry a recorded transit origin?
+inline bool space_asset_has_transit_origin(const space_asset& a)
+{
+    return a.transit_from.body != null_entity;
+}
 
 /// The hard ceiling on `space_asset_params::quarters_to_loss`. The step clamps
 /// the dial into [1, this]; the save reader, which cannot see the registry,

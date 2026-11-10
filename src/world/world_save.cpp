@@ -2432,6 +2432,23 @@ void write_world_snapshot_at(const world& w, std::ostream& out, uint32_t version
         }
     }
     // ===== END BL-1599 =====
+    // ===== BEGIN BL-1614 (v90): WHERE EACH TRANSIT LEFT FROM, the last section =====
+    if (version >= k_world_save_version_transit_origin)
+    {
+        uint32_t n = 0;
+        for (const auto& [aid, a] : w.space_assets)
+            n += space_asset_has_transit_origin(a) ? 1u : 0u;
+        w_u32(out, n);
+        for (const auto& [aid, a] : w.space_assets) // ascending
+            if (space_asset_has_transit_origin(a))
+            {
+                w_id(out, aid);
+                w_id(out, a.transit_from.body);
+                w_enum(out, a.transit_from.kind);
+                w_i32(out, a.depart_tick);
+            }
+    }
+    // ===== END BL-1614 =====
 }
 
 void write_world_snapshot_pre_space_battles(const world& w, std::ostream& out)
@@ -2471,6 +2488,20 @@ void write_world_snapshot_pre_space_bombard(const world& w, std::ostream& out)
 std::size_t world_save_space_bombard_section_bytes(const world& w)
 {
     return 4 + 9 * w.space_bombard_orders.size();
+}
+
+void write_world_snapshot_pre_transit_origin(const world& w, std::ostream& out)
+{
+    // VERIFICATION ONLY (BL-1614): the v89 stream shape - no transit-origin section.
+    write_world_snapshot_at(w, out, k_world_save_version_pre_transit_origin);
+}
+
+std::size_t world_save_transit_origin_section_bytes(const world& w)
+{
+    std::size_t n = 4;
+    for (const auto& [aid, a] : w.space_assets)
+        n += space_asset_has_transit_origin(a) ? 13 : 0;
+    return n;
 }
 
 void write_world_snapshot_pre_space_convoys(const world& w, std::ostream& out)
@@ -2992,7 +3023,8 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
             && version != k_world_save_version_pre_prospecting // BL-1600: v85, nothing mapped off-world
             && version != k_world_save_version_pre_space_convoys // BL-1596: v86, nothing aboard
             && version != k_world_save_version_pre_debris // BL-1598: v87, no debris, wear or quiet days
-            && version != k_world_save_version_pre_space_bombard)) // BL-1599: v88, no bombard orders
+            && version != k_world_save_version_pre_space_bombard // BL-1599: v88, no bombard orders
+            && version != k_world_save_version_pre_transit_origin)) // BL-1614: v89, no transit origins
         return false; // mismatched version -- refuse rather than misread
 
     // BL-1422: a stream before the kit goods carries every per-resource array 49 wide;
@@ -5478,6 +5510,43 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
         }
     }
     // ===== END BL-1599 =====
+    // ===== BEGIN BL-1614 (v90): where each transit left from. Untrusted, refused whole
+    // on any breach of world_save.hpp's v90 paragraph. A v89 (and older) stream ends
+    // before it: no origin recorded. Read into scratch, applied only when all pass. =====
+    if (version >= k_world_save_version_transit_origin)
+    {
+        uint32_t count = 0;
+        if (!r_u32(in, count) || count > s.space_assets.size())
+            return false;
+        struct origin_rec { entity_id aid; orbital_node from; int32_t tick; };
+        std::vector<origin_rec> recs;
+        recs.reserve(count);
+        entity_id prev = null_entity;
+        for (uint32_t k = 0; k < count; ++k)
+        {
+            origin_rec r{};
+            if (!r_id(in, r.aid) || r.aid == null_entity || (k > 0 && r.aid <= prev)
+                || !r_id(in, r.from.body) || !r_enum(in, r.from.kind, orbital_node_kind::l5)
+                || !r_i32(in, r.tick))
+                return false;
+            prev = r.aid;
+            const auto ait = s.space_assets.find(r.aid);
+            const auto bit = s.bodies.find(r.from.body);
+            if (ait == s.space_assets.end() || ait->second.state != space_asset_state::in_transit
+                || bit == s.bodies.end() || bit->second.type == body_type::star
+                || r.from == ait->second.node
+                || r.tick < ait->second.launch_tick || r.tick > ait->second.arrival_tick)
+                return false;
+            recs.push_back(r);
+        }
+        for (const origin_rec& r : recs)
+        {
+            space_asset& a = s.space_assets.at(r.aid);
+            a.transit_from = r.from;
+            a.depart_tick  = r.tick;
+        }
+    }
+    // ===== END BL-1614 =====
 
     // BL-1266 (v46): every manual trade names a live owner and two distinct
     // standing markets, and holds an id below the next one to be issued, all

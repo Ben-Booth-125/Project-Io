@@ -4067,14 +4067,35 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     v.set_function("circum_asset_hovered", [this]() -> unsigned {
         return static_cast<unsigned>(m_ui.circum_asset_hovered);
     });
+    // BL-1614: each transit segment as the rung LAST DREW it - the asset's id,
+    // the segment's two screen ends and the marker's share of the way. Only what
+    // the screen draws.
+    v.set_function("circum_transits", [this](sol::this_state ts) -> sol::table {
+        sol::state_view lua(ts);
+        sol::table out = lua.create_table();
+        int i = 1;
+        for (const auto& s : m_ui.circum_transits_drawn)
+        {
+            sol::table row = lua.create_table();
+            row["id"]    = static_cast<unsigned>(s.id);
+            row["x0"]    = s.x0;
+            row["y0"]    = s.y0;
+            row["x1"]    = s.x1;
+            row["y1"]    = s.y1;
+            row["share"] = s.share;
+            out[i++] = row;
+        }
+        return out;
+    });
     // BL-1590 part 2: a verify-only STAGING fixture for the near-space draw. It
     // writes straight into the stores (no launch verb: the gate, the shelf and
     // the treasury are not what the canvas check is about) and puts, at the home
     // body's nodes where a slot is free: two player satellites in low orbit
     // (observation, comms), a player station core in high orbit with one
     // research module, a rival nation's navigation satellite in high orbit, and
-    // a player survey satellite in transit to the first moon's L4 (two quarters
-    // out). Returns the counts it staged and nothing else.
+    // a player survey satellite in transit to the first moon's L4 (BL-1614: left
+    // the home low orbit a quarter ago, a quarter to go, its origin recorded).
+    // Returns the counts it staged and nothing else.
     v.set_function("near_space_fixture", [this](sol::this_state ts) -> sol::table {
         sol::state_view lua(ts);
         sol::table out = lua.create_table();
@@ -4108,6 +4129,15 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             a.state = transit ? space_asset_state::in_transit : space_asset_state::active;
             a.launch_tick  = m_world.current_econ_tick;
             a.arrival_tick = m_world.current_econ_tick + (transit ? 2 : 0);
+            if (transit)
+            {
+                // BL-1614: a move out of the home low orbit, one quarter gone of
+                // two, so the rung draws its segment with the marker half-way.
+                a.launch_tick  = m_world.current_econ_tick - 1;
+                a.depart_tick  = a.launch_tick;
+                a.arrival_tick = m_world.current_econ_tick + 1;
+                a.transit_from = {home, orbital_node_kind::low_orbit};
+            }
             const entity_id id = a.id;
             m_world.space_assets.emplace(id, a);
             return id;

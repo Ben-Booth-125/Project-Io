@@ -911,7 +911,6 @@ inline constexpr uint32_t k_world_save_version_pre_debris = k_world_save_version
 /// it; the BL-1426 precedent). MERGE NOTE: a parallel lane's bump renumbers this block (this
 /// paragraph, the three constants below, the accepted-version line in
 /// `read_world_snapshot`, and the one section at the end of the writer and reader).
-inline constexpr uint32_t world_save_version = 89;
 
 /// BL-1599: the first version carrying the bombard-order section (see above).
 inline constexpr uint32_t k_world_save_version_space_bombard = 89;
@@ -919,6 +918,27 @@ inline constexpr uint32_t k_world_save_version_space_bombard = 89;
 /// BL-1599: v88, a strict prefix of v89.
 inline constexpr uint32_t k_world_save_version_pre_space_bombard = k_world_save_version_space_bombard - 1;
 /// ===== END BL-1599 VERSION BUMP =================================================
+/// ===== BEGIN BL-1614 VERSION BUMP (space transit segment) — ONE BLOCK ===========
+/// **90 (BL-1614; CIRCUMPLANETARY.md, the transit segment) — WHERE A TRANSIT LEFT
+/// FROM.** Appended last, after a u32 count: every space asset with a recorded
+/// transit origin ascending id, as (id, origin body, u8 origin kind, i32 depart
+/// tick) — 13 bytes. Each names an asset IN TRANSIT; ids strictly ascending; the
+/// origin body a non-star body and its kind in range; the origin not the asset's
+/// own node; the depart tick in [launch_tick, arrival_tick]. Refused whole
+/// otherwise. v89 is a STRICT PREFIX of v90 and is read too
+/// (`k_world_save_version_pre_transit_origin`), as a world with no origins recorded
+/// (the canvas then draws a travelling asset dimmed at its destination, as before).
+/// MERGE NOTE: a parallel lane's bump renumbers this block (this paragraph, the
+/// three constants below, the accepted-version line in `read_world_snapshot`, and
+/// the one section at the end of the writer and reader).
+inline constexpr uint32_t world_save_version = 90;
+
+/// BL-1614: the first version carrying the transit-origin section (see above).
+inline constexpr uint32_t k_world_save_version_transit_origin = 90;
+
+/// BL-1614: v89, a strict prefix of v90.
+inline constexpr uint32_t k_world_save_version_pre_transit_origin = k_world_save_version_transit_origin - 1;
+/// ===== END BL-1614 VERSION BUMP =================================================
 
 /// BL-1612: the first version carrying the Early Space tree section (see above).
 inline constexpr uint32_t k_world_save_version_early_space = 82;
@@ -1191,6 +1211,12 @@ void write_world_snapshot_pre_space_bombard(const world& w, std::ostream& out);
 /// BL-1599: the byte length of the v88 bombard-order section `w` writes - 4 + 9 per
 /// order. The LAST section of a v88 stream.
 std::size_t world_save_space_bombard_section_bytes(const world& w);
+
+/// BL-1614: VERIFICATION ONLY - the v89 stream shape (no transit-origin section).
+void write_world_snapshot_pre_transit_origin(const world& w, std::ostream& out);
+/// BL-1614: the byte length of the v90 transit-origin section `w` writes - 4 + 13 per
+/// asset with a recorded origin. The LAST section of a v90 stream.
+std::size_t world_save_transit_origin_section_bytes(const world& w);
 
 /// BL-1422, widened by BL-1436: the bytes ALL SIX kit goods' extra elements add to
 /// every per-resource array of the stream `w` writes - the widening from 49 to today's

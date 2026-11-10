@@ -2031,6 +2031,17 @@ struct ui_state
     std::vector<circum_asset_drawn> circum_assets_drawn;
     entity_id                       circum_asset_hovered = null_entity;
 
+    /// BL-1614: each transit segment as the rung drew it this frame (primary view
+    /// only) — its asset, both ends and the marker's share, for
+    /// `verify.circum_transits()`. What the screen shows; nothing else.
+    struct circum_transit_drawn
+    {
+        entity_id id = null_entity;
+        float     x0 = 0.0f, y0 = 0.0f, x1 = 0.0f, y1 = 0.0f;
+        float     share = 0.0f;
+    };
+    std::vector<circum_transit_drawn> circum_transits_drawn;
+
     /// Research-queue presses from the panel (queue a node, remove the last,
     /// clear), applied by `app::render` through `apply_corp_command` — the
     /// panel holds a const world. Drained in order each frame.

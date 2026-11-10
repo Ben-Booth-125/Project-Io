@@ -288,9 +288,9 @@
     "src/ui/circumplanetary_canvas.cpp",
     "src/ui/icons.cpp"
    ],
-   "summary": "Every nation's satellites and stations at the node they occupy: a satellite as a round plate in its owner's colour with solar wings and its role's mark, a station as a larger square core on a truss between two panels, sized by its grid; one in transit draws at its destination at half strength. Held slot pips fill in the holder's colour. Hovering a mark opens the shared hover card (owner, role or modules and crew, node, state); a press selects it and the Selection band shows the same summary.",
+   "summary": "Every nation's satellites and stations at the node they occupy: a satellite as a round plate in its owner's colour with solar wings and its role's mark, a station as a larger square core on a truss between two panels, sized by its grid; one in transit draws at its destination at half strength, with a dashed segment back to the node it left and a solid marker at its share of the way. Held slot pips fill in the holder's colour. Hovering a mark opens the shared hover card (owner, role or modules and crew, node, state, and where a transit left from); a press selects it and the Selection band shows the same summary.",
    "interesting_question": "The world records an asset's destination and arrival tick but not where a move set out from or when, so the in-transit segment along the link cannot be placed; is the ghost at the destination enough?",
-   "resolution": "Open.",
+   "resolution": "Closed by BL-1614 (space transit segment): the asset records its transit's origin node and departure tick (saved, v90), and the rung draws the segment from the origin to the ghost with the marker at the quarters gone plus the day within the quarter. An origin off this rung, or a save from before the field, still draws the ghost alone.",
    "checks": [
     "near_space_assets"
    ]

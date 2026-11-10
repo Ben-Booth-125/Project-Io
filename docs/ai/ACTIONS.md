@@ -1422,7 +1422,7 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 
 **Reason to select.** Compare where around a planet there is room to place an orbital asset, and what reaching each place costs from home, before committing to one.
 
-### `canvas.space_asset_select` — The Circumplanetary canvas (primary view only): a satellite mark (a small round plate in its owner nation's colour, a solar wing out of each side, its role's mark on the plate) or a station mark (a larger square core on a truss between two solar panels, in its owner's colour, larger for a larger grid), drawn at the orbital node it occupies - down the side of a ring, or in a row under a diamond. One in transit draws at its destination at half strength (CIRCUMPLANETARY.md § Orbital nodes and what sits at them).
+### `canvas.space_asset_select` — The Circumplanetary canvas (primary view only): a satellite mark (a small round plate in its owner nation's colour, a solar wing out of each side, its role's mark on the plate) or a station mark (a larger square core on a truss between two solar panels, in its owner's colour, larger for a larger grid), drawn at the orbital node it occupies - down the side of a ring, or in a row under a diamond. One in transit draws at its destination at half strength, with a dashed segment back to the node it left and a solid marker at its share of the way when that node is on the rung (CIRCUMPLANETARY.md § Orbital nodes and what sits at them).
 
 **Press.** Hover a mark for its card; left-click it to select it.
 
@@ -1434,7 +1434,7 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 - The app is in-game with the Circumplanetary rung primary.
 - Every nation's satellites and stations at the rung's nodes draw, the player's and rivals' alike.
 
-**Expected output.** Hover: the shared hover card - the title ("Observation satellite", "Station"), the owner nation in its colour, the role (a satellite) or modules of the grid's slots and crew (a station), the node, and the state (in place; decaying with the unpaid quarters; in transit with the quarters to arrival). Press: the asset becomes the selection, its mark is ringed, and the Selection band shows the same summary. No world change.
+**Expected output.** Hover: the shared hover card - the title ("Observation satellite", "Station"), the owner nation in its colour, the role (a satellite) or modules of the grid's slots and crew (a station), the node, and the state (in place; decaying with the unpaid quarters; in transit with the node it left and the quarters to arrival). Press: the asset becomes the selection, its mark is ringed, and the Selection band shows the same summary. No world change.
 
 **Reason to select.** See who holds which place around a planet and what each satellite there does, before choosing where to launch or move your own.
 

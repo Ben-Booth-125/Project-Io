@@ -76,3 +76,32 @@ verify.capture("near_space_assets_station_selected")
 verify.click(s.x, s.y)
 verify.frames(1)
 verify.expect(verify.circum_selected() == s.id, "a press on a satellite selects it")
+
+-- BL-1614 (space transit segment): the in-transit satellite draws a dashed
+-- segment from its recorded origin (the home low orbit ring) to its ghost at
+-- the destination, with the marker at its share of the way.
+verify.mouse(-1, -1)
+verify.frames(2)
+local segs = verify.circum_transits()
+print(string.format("near_space_assets: %d transit segments drawn", #segs))
+for _, sg in ipairs(segs) do
+    print(string.format("  segment id=%-6d (%.1f,%.1f) -> (%.1f,%.1f) share=%.2f",
+        sg.id, sg.x0, sg.y0, sg.x1, sg.y1, sg.share))
+end
+if transit == 1 then
+    verify.expect(#segs == 1, "the in-transit satellite draws one segment")
+    if #segs == 1 then
+        local sg = segs[1]
+        local ghost = nil
+        for _, a in ipairs(assets) do if a.in_transit then ghost = a end end
+        verify.expect(ghost ~= nil and sg.id == ghost.id, "the segment belongs to the in-transit satellite")
+        if ghost ~= nil then
+            verify.expect(math.abs(sg.x1 - ghost.x) < 0.5 and math.abs(sg.y1 - ghost.y) < 0.5,
+                "the segment ends at the ghost mark")
+        end
+        local len = math.sqrt((sg.x1 - sg.x0) ^ 2 + (sg.y1 - sg.y0) ^ 2)
+        verify.expect(len > 4, "the segment has a visible length")
+        verify.expect(sg.share >= 0.45 and sg.share <= 1.0, "the marker sits at least half-way (one quarter of two gone)")
+    end
+end
+verify.capture("near_space_assets_transit")

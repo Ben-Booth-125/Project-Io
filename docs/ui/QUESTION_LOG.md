@@ -92,13 +92,13 @@ alphabetical order.
 
 *Demanded by BL-1590 · `src/ui/circum_nodes.hpp`, `src/ui/circum_nodes.cpp`, `src/ui/circumplanetary_canvas.cpp` · id `circumplanetary_orbital_nodes`*
 
-### Circumplanetary space assets: every nation's satellites (owner colour, role mark) and stations (a larger square-cored mark sized by its grid) drawn at the node they occupy, one in transit at half strength at its destination; slot pips filled in the holder's colour; a hover card and a Selection band card sharing one summary - owner, role or modules and crew, node, state
+### Circumplanetary space assets: every nation's satellites (owner colour, role mark) and stations (a larger square-cored mark sized by its grid) drawn at the node they occupy, one in transit at half strength at its destination with a dashed segment back to the node it left and a marker at its share of the way (BL-1614); slot pips filled in the holder's colour; a hover card and a Selection band card sharing one summary - owner, role or modules and crew, node, state, and for one in transit where it left from
 
 **Answers:** Who holds the places around this planet, what is each satellite there doing, and is my station there in working order?
 
-**Because:** Slots are scarce (SPACE_ASSETS.md § Orbital slots), so the question the node pips raise - how full is it - is followed at once by whose it is. A satellite's role decides what its owner gains on that body (comms coverage, cheaper logistics, lifted fog, a survey), so a rival's observation satellite over the home planet is a fact the player acts on; the role mark carries that at a glance and the card carries the rest. A station is the largest near-space investment and is told apart from a satellite by size and silhouette. The ghost at the destination shows a slot already spoken for by something not yet in place.
+**Because:** Slots are scarce (SPACE_ASSETS.md § Orbital slots), so the question the node pips raise - how full is it - is followed at once by whose it is. A satellite's role decides what its owner gains on that body (comms coverage, cheaper logistics, lifted fog, a survey), so a rival's observation satellite over the home planet is a fact the player acts on; the role mark carries that at a glance and the card carries the rest. A station is the largest near-space investment and is told apart from a satellite by size and silhouette. The ghost at the destination shows a slot already spoken for by something not yet in place; the segment back to its origin, with the marker at its share, answers how far along it is and where it came from - a satellite moved out of a contested orbit reads differently from a fresh launch.
 
-*Demanded by BL-1590 · `src/ui/circum_assets.hpp`, `src/ui/circum_assets.cpp`, `src/ui/circum_nodes.cpp`, `src/ui/circumplanetary_canvas.cpp`, `src/ui/icons.cpp`, `src/ui/selection_panel.cpp` · id `circumplanetary_space_assets`*
+*Demanded by BL-1590, BL-1614 · `src/ui/circum_assets.hpp`, `src/ui/circum_assets.cpp`, `src/ui/circum_nodes.cpp`, `src/ui/circumplanetary_canvas.cpp`, `src/ui/icons.cpp`, `src/ui/selection_panel.cpp` · id `circumplanetary_space_assets`*
 
 ### Construction ledger - Buildings view (the estate by type)
 

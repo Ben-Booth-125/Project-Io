@@ -205,6 +205,7 @@ void draw_circumplanetary_canvas(const world& w, ui_state& state, ImVec2 origin,
     // Primary view only — the minimap is too small for a legible pip row.
     std::vector<circum_node_mark>  node_marks;
     std::vector<circum_asset_mark> asset_marks;
+    std::vector<circum_transit_mark> transit_marks; // BL-1614
     if (apply_view)
     {
         std::vector<float> radii;
@@ -229,6 +230,10 @@ void draw_circumplanetary_canvas(const world& w, ui_state& state, ImVec2 origin,
                                                   m.pos.x, m.pos.y, m.r,
                                                   orbital_node_display_name(
                                                       w, node_marks[static_cast<std::size_t>(m.node_index)].node) });
+        transit_marks = layout_circum_transits(w, node_marks, asset_marks);
+        state.circum_transits_drawn.clear();
+        for (const circum_transit_mark& s : transit_marks)
+            state.circum_transits_drawn.push_back({ s.id, s.from.x, s.from.y, s.to.x, s.to.y, s.share });
         state.circum_node_hovered.clear();
         state.circum_asset_hovered = null_entity;
     }
@@ -299,6 +304,8 @@ void draw_circumplanetary_canvas(const world& w, ui_state& state, ImVec2 origin,
 
     // Diamonds and slot pips: over the rings and bodies, under the labels.
     draw_circum_node_marks(dl, node_marks);
+    // BL-1614: transit segments, under the asset marks (the ghost caps the run).
+    draw_circum_transits(dl, transit_marks);
     // Satellites and stations at their nodes: over the node marks.
     draw_circum_assets(dl, asset_marks, hovered_asset_id, state.selected_entity);
 

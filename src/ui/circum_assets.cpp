@@ -138,6 +138,114 @@ std::vector<circum_asset_mark> layout_circum_assets(const world& w,
     return out;
 }
 
+float space_transit_share(int depart_tick, int arrival_tick, int econ_tick, float quarter_frac)
+{
+    const int span = arrival_tick - depart_tick;
+    if (span <= 0)
+        return 1.0f;
+    const float q = std::clamp(quarter_frac, 0.0f, 1.0f);
+    const float done = static_cast<float>(econ_tick - depart_tick) + q;
+    return std::clamp(done / static_cast<float>(span), 0.0f, 1.0f);
+}
+
+float circum_quarter_fraction(const world& w)
+{
+    // The live day tick runs 90 days a quarter (the econ cadence); a harness world
+    // whose day tick stands still reads the quarter's start.
+    constexpr int k_days = 90;
+    const int d = ((w.current_day_tick % k_days) + k_days) % k_days;
+    return static_cast<float>(d) / static_cast<float>(k_days);
+}
+
+bool circum_node_endpoint(const std::vector<circum_node_mark>& nodes, orbital_node n, ImVec2 toward,
+                          ImVec2* out)
+{
+    for (const circum_node_mark& m : nodes)
+    {
+        if (n.kind == orbital_node_kind::surface)
+        {
+            // A body's surface has no mark of its own: its rings' centre is the body.
+            if (m.node.body == n.body && m.ring_r > 0.0f)
+            {
+                *out = m.pos;
+                return true;
+            }
+            continue;
+        }
+        if (!(m.node == n))
+            continue;
+        if (m.ring_r > 0.0f)
+        {
+            const float dx = toward.x - m.pos.x, dy = toward.y - m.pos.y;
+            const float len = std::sqrt(dx * dx + dy * dy);
+            *out = len > 1e-3f ? ImVec2{m.pos.x + dx / len * m.ring_r, m.pos.y + dy / len * m.ring_r}
+                               : ImVec2{m.pos.x + m.ring_r, m.pos.y};
+        }
+        else
+        {
+            *out = m.pos;
+        }
+        return true;
+    }
+    return false;
+}
+
+std::vector<circum_transit_mark> layout_circum_transits(const world& w,
+                                                        const std::vector<circum_node_mark>& nodes,
+                                                        const std::vector<circum_asset_mark>& marks)
+{
+    std::vector<circum_transit_mark> out;
+    const float qf = circum_quarter_fraction(w);
+    for (const circum_asset_mark& m : marks)
+    {
+        if (!m.in_transit)
+            continue;
+        const auto sit = w.stations.find(m.id);
+        const space_asset* a = find_asset(w, sit != w.stations.end() ? sit->second.core : m.id);
+        if (a == nullptr || !space_asset_has_transit_origin(*a))
+            continue;
+        ImVec2 from{};
+        if (!circum_node_endpoint(nodes, a->transit_from, m.pos, &from))
+            continue;
+        circum_transit_mark s;
+        s.id    = m.id;
+        s.owner = m.owner;
+        s.from  = from;
+        s.to    = m.pos;
+        s.share = space_transit_share(a->depart_tick, a->arrival_tick, w.current_econ_tick, qf);
+        s.marker = {from.x + (m.pos.x - from.x) * s.share, from.y + (m.pos.y - from.y) * s.share};
+        out.push_back(s);
+    }
+    return out;
+}
+
+void draw_space_transit(ImDrawList* dl, ImVec2 from, ImVec2 to, float share, ImU32 colour)
+{
+    constexpr float dash = 5.0f, gap = 4.0f, thick = 1.5f, dot_r = 3.0f;
+    const ImU32 faint = (colour & ~IM_COL32_A_MASK) | (static_cast<ImU32>(150) << IM_COL32_A_SHIFT);
+    const float dx = to.x - from.x, dy = to.y - from.y;
+    const float len = std::sqrt(dx * dx + dy * dy);
+    if (len > 1e-3f)
+    {
+        const float ux = dx / len, uy = dy / len;
+        for (float t = 0.0f; t < len; t += dash + gap)
+        {
+            const float e = std::min(len, t + dash);
+            dl->AddLine({from.x + ux * t, from.y + uy * t}, {from.x + ux * e, from.y + uy * e}, faint, thick);
+        }
+    }
+    const float s = std::clamp(share, 0.0f, 1.0f);
+    const ImVec2 at{from.x + dx * s, from.y + dy * s};
+    dl->AddCircleFilled(at, dot_r, colour);
+    dl->AddCircle(at, dot_r + 0.5f, IM_COL32(10, 12, 22, 255), 0, 1.0f);
+}
+
+void draw_circum_transits(ImDrawList* dl, const std::vector<circum_transit_mark>& segs)
+{
+    for (const circum_transit_mark& s : segs)
+        draw_space_transit(dl, s.from, s.to, s.share, palette::nation_colour(s.owner));
+}
+
 void draw_circum_assets(ImDrawList* dl, const std::vector<circum_asset_mark>& marks,
                         entity_id hovered, entity_id selected)
 {
@@ -227,6 +335,8 @@ void draw_space_asset_summary(const world& w, entity_id id)
         case space_asset_state::in_transit:
         {
             const int q = std::max(0, a->arrival_tick - w.current_econ_tick);
+            if (space_asset_has_transit_origin(*a)) // BL-1614
+                ImGui::Text("Left from: %s", node_name_or(w, a->transit_from).c_str());
             ImGui::Text("Bound for: %s", node.c_str());
             if (q == 0)
                 ImGui::TextUnformatted("State: in transit, arrives this quarter");
