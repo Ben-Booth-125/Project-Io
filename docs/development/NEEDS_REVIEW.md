@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*56 entries — 53 open, 3 resolved.*
+*57 entries — 54 open, 3 resolved.*
 
 ---
 
@@ -667,6 +667,20 @@ Space sits at rail slot 9 after Diplomacy, under MENU.md rule that curated syste
 > **Recommendation:** Accept; record the staging fixtures (this and near_space_fixture) as a dated verify grant if you want them listed.
 
 *Files: `src/ui/space_ledger.cpp`, `src/ui/nav_pane.cpp`, `docs/ui/MENU.md`, `src/core/verify_api.cpp`*
+
+### NR-1183 — Debris and the battle stall: a standoff after 10 quiet days, settled in SPACE_FLEETS.md by the lane
+*novel-work · raised 2026-11-10 · from BL-1598 lane report*
+
+Debris per node grows from every orbital loss (battle, upkeep, wear), wears assets (0.004 a quarter per unit of debris) and damages units daily (0.002 hp per debris), decays by drag in low orbit only (0.08 a quarter), and an idle Tug with a capture arm clears 6 a quarter at its node (no new verb: moving the Tug there is the order). The cascade is emergent (wear reaches 1, the wreck raises the level), with no separate threshold. The battle stall answers NR-1178: a battle with no damage landed for stall_days = 10 ends as a standoff, and that pair does not re-engage at the node until one side could land fire. No doc owned the stall, so the lane wrote it into SPACE_FLEETS.md § Battles as settled design. No UI reads debris yet.
+
+**Why it matters.** A rule written into an authority doc without a ruling.
+
+- Confirm the stall rule
+- Change the window or the re-engage condition
+
+> **Recommendation:** Confirm.
+
+*Files: `src/world/debris.cpp`, `src/world/space_battle.cpp`, `docs/military/SPACE_FLEETS.md`, `docs/economy/SPACE_ASSETS.md`*
 
 ---
 

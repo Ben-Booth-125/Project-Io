@@ -1006,6 +1006,28 @@
     "docs/ui/MENU.md",
     "src/core/verify_api.cpp"
    ]
+  },
+  {
+   "raised": "2026-11-10",
+   "status": "open",
+   "resolution": null,
+   "id": "NR-1183",
+   "title": "Debris and the battle stall: a standoff after 10 quiet days, settled in SPACE_FLEETS.md by the lane",
+   "kind": "novel-work",
+   "source": "BL-1598 lane report",
+   "what": "Debris per node grows from every orbital loss (battle, upkeep, wear), wears assets (0.004 a quarter per unit of debris) and damages units daily (0.002 hp per debris), decays by drag in low orbit only (0.08 a quarter), and an idle Tug with a capture arm clears 6 a quarter at its node (no new verb: moving the Tug there is the order). The cascade is emergent (wear reaches 1, the wreck raises the level), with no separate threshold. The battle stall answers NR-1178: a battle with no damage landed for stall_days = 10 ends as a standoff, and that pair does not re-engage at the node until one side could land fire. No doc owned the stall, so the lane wrote it into SPACE_FLEETS.md § Battles as settled design. No UI reads debris yet.",
+   "why_it_matters": "A rule written into an authority doc without a ruling.",
+   "options": [
+    "Confirm the stall rule",
+    "Change the window or the re-engage condition"
+   ],
+   "recommendation": "Confirm.",
+   "files": [
+    "src/world/debris.cpp",
+    "src/world/space_battle.cpp",
+    "docs/military/SPACE_FLEETS.md",
+    "docs/economy/SPACE_ASSETS.md"
+   ]
   }
  ]
 }
