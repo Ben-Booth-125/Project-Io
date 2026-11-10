@@ -12,6 +12,7 @@
 #include "province.hpp"     // province_partition (BL-466 province partition, below)
 #include "sentiment.hpp"    // sentiment_table (BL-545 relational substrate, below)
 #include "space_assets.hpp" // space_asset (BL-1327: nations' space assets, below)
+#include "stations.hpp"     // space_station, station_template (BL-1583, below)
 #include "war.hpp"          // war_record, peace_offer (BL-1459/BL-1428 wars, below)
 
 #include <atomic>
@@ -1042,6 +1043,16 @@ struct world
     /// v51 trailing section) and folded into `state_hash` when non-empty, so a
     /// world that never launched hashes as it did before this store existed.
     std::map<entity_id, space_asset> space_assets;
+
+    /// BL-1583 — every live station, keyed by its id (== its core asset's id;
+    /// stations.hpp). A station whose core is lost is erased by the station step.
+    /// SERIALISED (world_save.cpp, v81 station section) and folded into
+    /// `state_hash` when non-empty.
+    std::map<entity_id, space_station> stations;
+
+    /// BL-1583 — each nation's named station templates, nation then name ascending.
+    /// No empty inner map is kept. SERIALISED (v81) and hashed when non-empty.
+    std::map<entity_id, std::map<std::string, station_template>> station_templates;
 
     /// Enacted and un-enacted laws (BL-343). A world-level list rather than a
     /// per-corp one: a law is enacted over the world and charged to whoever it

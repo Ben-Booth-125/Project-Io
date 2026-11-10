@@ -835,6 +835,68 @@ uint64_t world::state_hash(int tick) const
                 fnv1a_f32(h, a.launch_cost);
             }
         }
+        // BL-1583 / BL-1585: the stations, their templates, the station fields on
+        // the assets and the astronaut pools — folded only when any is non-empty
+        // or non-default, so a world without them hashes as it did before.
+        bool any_station_field = false;
+        for (const auto& [aid, a] : space_assets)
+            if (a.station != null_entity || a.crew != 0 || a.module != k_no_station_module
+                || a.station_slot != -1 || a.refit_done_tick != -1)
+            {
+                any_station_field = true;
+                break;
+            }
+        bool any_astronauts = false;
+        for (const auto& [nid, nc] : nations)
+            if (nc.astronauts != 0) { any_astronauts = true; break; }
+        if (any_station_field || any_astronauts || !stations.empty() || !station_templates.empty())
+        {
+            fnv1a_u32(h, 0x57A7u); // tag: cannot alias the asset run above
+            for (const auto& [aid, a] : space_assets)
+                if (a.station != null_entity || a.crew != 0 || a.module != k_no_station_module
+                    || a.station_slot != -1 || a.refit_done_tick != -1)
+                {
+                    fnv1a_u32(h, aid);
+                    fnv1a_u32(h, a.station);
+                    fnv1a_i32(h, a.station_slot);
+                    fnv1a_u32(h, a.module);
+                    fnv1a_i32(h, a.crew);
+                    fnv1a_i32(h, a.refit_done_tick);
+                }
+            fnv1a_u32(h, static_cast<uint32_t>(stations.size()));
+            for (const auto& [sid, st] : stations)
+            {
+                fnv1a_u32(h, sid);
+                fnv1a_u32(h, st.owner);
+                fnv1a_u32(h, st.core);
+                fnv1a_u32(h, st.node.body);
+                fnv1a_u32(h, static_cast<uint32_t>(st.node.kind));
+                fnv1a_u32(h, st.level);
+                for (const entity_id s : st.slots)
+                    fnv1a_u32(h, s);
+            }
+            fnv1a_u32(h, static_cast<uint32_t>(station_templates.size()));
+            for (const auto& [nid, ts] : station_templates)
+            {
+                fnv1a_u32(h, nid);
+                fnv1a_u32(h, static_cast<uint32_t>(ts.size()));
+                for (const auto& [name, t] : ts)
+                {
+                    fnv1a_u32(h, static_cast<uint32_t>(name.size()));
+                    for (const char c : name)
+                        fnv1a_u32(h, static_cast<uint8_t>(c));
+                    fnv1a_u32(h, t.level);
+                    for (const uint8_t k : t.kinds)
+                        fnv1a_u32(h, k);
+                }
+            }
+            for (const auto& [nid, nc] : nations)
+                if (nc.astronauts != 0)
+                {
+                    fnv1a_u32(h, nid);
+                    fnv1a_i32(h, nc.astronauts);
+                }
+        }
     }
 
     // Province holder (BL-569). UNLIKE `provinces` itself (generation output,

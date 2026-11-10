@@ -349,6 +349,23 @@ economy = {
             build_duration_days = 240,
             resource_costs = { steel = 35.0 },
         },
+        -- BL-1585 (SPACE_ASSETS.md § Astronauts): Astronaut Training Centre —
+        -- turns its staffed workforce into astronauts each quarter, into its
+        -- owner's pool up to a cap (the rate and cap are station_params'
+        -- astronauts_per_centre / astronaut_cap_per_centre, stations.hpp).
+        -- Produces no good. Staffed at construction like the research institute
+        -- (construction_initial_workforce), counted only while staffed. A modest
+        -- first cut priced as the institute: a campus and a centrifuge, not a
+        -- launch site. Industrial: no astronaut exists in an ancient campaign.
+        astronaut_training_centre = {
+            era         = "industrial",
+            base_rate   = 0.0,
+            maintenance = 15.0,
+            base_wage   = 10.0,
+            build_cost  = 300.0,
+            build_duration_days = 240,
+            resource_costs = { steel = 35.0 },
+        },
         -- BL-615: Schooling — the education building any settlement can host.
         -- Same passive shape as research_institute (base_rate 0, staffs at
         -- zero); its qualification-raising effect is a separate seam

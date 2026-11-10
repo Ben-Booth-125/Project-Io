@@ -54,9 +54,38 @@ enum class space_asset_class : uint8_t
     satellite      = 0, ///< Uncrewed orbital instrument.
     rover          = 1, ///< Uncrewed surface unit landed on another body.
     crewed_mission = 2, ///< A crew sent to a body (return is not modelled here).
-    station_module = 3, ///< One launch of a crewed orbital platform.
+    station_module = 3, ///< One launch of a crewed orbital platform: a module or a truss (stations.hpp).
+    station_core   = 4, ///< BL-1583: a station's core — opens the grid (stations.hpp). Saved from v81.
 };
-inline constexpr std::size_t space_asset_class_count = 4;
+inline constexpr std::size_t space_asset_class_count = 5;
+
+/// BL-1583 (SPACE_ASSETS.md § Space stations): what a `station_module` asset
+/// is. The roster's thirteen fittable kinds, then `truss` — an upgrade's segment,
+/// which rides in no slot. Append-only: the value is written to the save (v81).
+/// The roster's dials are `station_params` (stations.hpp).
+enum class station_module_kind : uint8_t
+{
+    research             = 0,
+    defence              = 1,
+    power                = 2,
+    dock                 = 3, ///< Edge only.
+    habitation           = 4,
+    life_support         = 5,
+    fuel_depot           = 6,
+    shipyard             = 7, ///< Edge only.
+    microgravity_factory = 8,
+    observatory          = 9,
+    comms_relay          = 10,
+    cargo_hold           = 11,
+    market               = 12,
+    truss                = 13, ///< An upgrade's truss segment: no slot, never fitted.
+};
+/// Every kind, truss included (the dial table's width).
+inline constexpr std::size_t station_module_kind_count = 14;
+/// The kinds a slot may hold: every kind before `truss`.
+inline constexpr std::size_t station_fittable_kind_count = 13;
+/// "No module": a core, a non-station asset, or an empty template slot.
+inline constexpr uint8_t k_no_station_module = 0xFF;
 
 /// Which slot of a body a destination names. Append-only (saved).
 enum class space_slot : uint8_t
@@ -106,6 +135,15 @@ struct space_asset
     float             upkeep       = 0.0f; ///< Credits per quarter, fixed at launch.
     int32_t           unpaid_quarters = 0; ///< Consecutive unpaid quarters; 0 when paid.
     float             launch_cost  = 0.0f; ///< Credits the launch debited (the quote), for the quarter's report.
+
+    // ---- BL-1583 / BL-1585: the station fields (stations.hpp). SERIALISED in
+    // the v81 station section, only for an asset where any differs from these
+    // defaults; folded into state_hash in the station block.
+    entity_id station      = null_entity; ///< The station this core/module/truss belongs to (its core's id).
+    int16_t   station_slot = -1;          ///< Grid slot index (row * width + col); -1 for a truss.
+    uint8_t   module       = k_no_station_module; ///< A station_module's `station_module_kind`.
+    int32_t   crew         = 0;           ///< Astronauts aboard, drawn from the pool at launch (BL-1585).
+    int32_t   refit_done_tick = -1;       ///< A refit's first working econ tick; -1 when not refitting.
 };
 
 /// The hard ceiling on `space_asset_params::quarters_to_loss`. The step clamps
@@ -121,10 +159,11 @@ inline constexpr int32_t k_space_quarters_to_loss_ceiling = 64;
 struct space_asset_params
 {
     /// Per class: the payload's launch cost, before reach.
-    std::array<float, space_asset_class_count> launch_cost{10000.0f, 20000.0f, 60000.0f, 40000.0f};
+    /// BL-1583: the station core (index 4) is priced above a module — it opens the grid.
+    std::array<float, space_asset_class_count> launch_cost{10000.0f, 20000.0f, 60000.0f, 40000.0f, 50000.0f};
 
     /// Per class: quarterly upkeep, fixed onto the asset at launch.
-    std::array<float, space_asset_class_count> upkeep{500.0f, 1000.0f, 3000.0f, 2000.0f};
+    std::array<float, space_asset_class_count> upkeep{500.0f, 1000.0f, 3000.0f, 2000.0f, 2500.0f};
 
     /// Per reach tier: the cost to reach it (further = costlier).
     std::array<float, space_reach_count> reach_cost{0.0f, 8000.0f, 15000.0f, 30000.0f, 45000.0f};
@@ -154,6 +193,7 @@ struct space_asset_params
 ///   rover           a surface off the home body (moon, far)
 ///   crewed_mission  any destination off the home body (moon or far, either slot)
 ///   station_module  home orbit or moon orbit
+///   station_core    home orbit or moon orbit (BL-1583, as a module)
 bool space_launch_legal(space_asset_class cls, space_reach reach);
 
 /// The home-independent half of the table: may @p cls ever occupy @p slot?
@@ -180,6 +220,11 @@ struct space_launch_quote
     int32_t             travel_quarters = 0;
     entity_id           asset  = null_entity; ///< Set by a successful launch only.
 };
+
+/// A body's distance from the star in AU: its own orbital radius if it orbits
+/// the star, else its top-level ancestor's (a moon reads its planet's). 0 for an
+/// unknown body. Bounded walk. (BL-1583: the station's solar falloff reads it.)
+float space_heliocentric_au(const world& w, entity_id body);
 
 /// The owner's home body: its capital tile's body, else `w.home_body`.
 /// `null_entity` when neither resolves.

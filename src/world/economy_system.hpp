@@ -567,6 +567,11 @@ struct economy_report
     /// to nobody; this is the treasury ledger's line for them.
     space_asset_step_report space_assets;
 
+    /// What the station step did this quarter (BL-1583 / BL-1585; stations.hpp):
+    /// astronauts trained, stations and modules lost with their crew, refits
+    /// completed, and the modules working or stopped by a budget shortfall.
+    station_step_report stations;
+
     /// BL-1335 (NATIONS.md § Taxes and Discontent): each nation's tax quarter —
     /// tier, credits taken, Discontent before and after. Ascending nation id.
     std::vector<nation_tax_row> taxes;
