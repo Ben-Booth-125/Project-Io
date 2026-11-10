@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*67 entries — 64 open, 3 resolved.*
+*68 entries — 65 open, 3 resolved.*
 
 ---
 
@@ -794,20 +794,21 @@ Five home-body assumptions were widened to a base: labour and workforce read the
 
 *Files: `src/world/province.cpp`, `src/world/economy_system.cpp`, `src/world/logistic_points.cpp`*
 
-### NR-1203 — Launch goods sit on the wrong shelves: a short market's silenced bid cannot pull imports
+### NR-1203 — Launch goods sit on the wrong shelves: their trade routes rank too low to move (measured)
 *question · raised 2026-11-10 · from BL-1630 lane report*
 
-With a staffed pad now bidding for its launch lot, components and propellant plants appear (seed 0: 5 and 10 by 2000), but by 2015 market 47582 holds 1,468 components and 21 propellant while 47599 and 47665 hold 1,542 and 788 propellant and no components. Every padded rival is refused at the shelf; 0 launches through 2015. Trade moves none of it: a market short of a good prices it at the fair-price ceiling, the ceiling silences its bid, and auto trade sizes a delivery off posted demand (dispatch_absorbable), so it reads 0. Pad construction stalls the same way (refined fuel over its 31.2 ceiling; one pad sat at 360 days left). No doc owns movement under the ceiling. SPACE_ASSETS.md says a launch reads the home market's shelf.
+With a staffed pad bidding for its launch lot, plants appear (seed 0: 5 components, 10 propellant by 2000), but the goods pile on different markets of the one body: 2015, 47582 holds 1,468 components and 21 propellant; 47599 and 47665 hold 1,542 and 788 propellant. 0 launches through 2015. MEASURED (experiment lane, seed 0): the ceiling does silence some wants, but auto trade already sizes to them (BL-1547, dispatch_absorbable), and every route exists overland. What blocks is RANKING: auto trade ranks by margin per trade point, and launch goods move few units per point (components 0.13, propellant 0.6), so their routes rank #68-#141 of ~250 at the source and the points run out first (272 "no points left" against 3 sends in the sample). Logistic Points by value also bite: a component draws 77.9 LP, a propellant unit 16.1. EXPERIMENT (branch worktree-agent-a9f2b8a287ef3a8e6, 8aa5f49b, NOT merged): routes into a market with a silenced want rank first. Result: first rival launch 1992, 3 by 2005, 4 by 2015 (vs none). Cost: pads completed by 2000 fall 7 to 4; treasuries 2015 947k to 629k; market_viability quick G1 at tick 50 86.0 PASS to 80.8 FAIL (target 84). It moves every good from ~1970.
 
-**Why it matters.** This is the wall between rivals and space, and it also slows pad construction. It is a trade rule, not a space rule.
+**Why it matters.** The wall between rivals and space is a trade-ranking rule. The one lever tried works for space and hurts the wider economy.
 
-- A) Auto trade sizes a delivery off the silenced (hauler-only) want too
-- B) A launch may draw its lot from every market on the home body the nation reaches
-- C) Both
+- A) Ship the experiment (silenced-want routes first) and accept the G1t50 cost
+- B) Give dense goods more trade capacity per point (the capacity table, TRADE.md)
+- C) Relax the by-value Logistic Point draw at starved anchors
+- D) Let a launch draw its lot from every market on its home body (a space rule, not a trade rule; SPACE_ASSETS.md says the home market)
 
-> **Recommendation:** A, measured first: it fixes pads and launches alike, by an in-world force. An experiment lane measures it on its own branch; nothing merges without your call.
+> **Recommendation:** D is the narrowest and moves no other good; B is the systemic fix if you want space goods to trade like the rest. A fails a gate, so not as it stands.
 
-*Files: `src/world/trade.cpp`, `src/world/supply_system.cpp`, `docs/economy/TRADE.md`, `docs/economy/MARKETS.md`*
+*Files: `src/world/trade.cpp`, `docs/economy/TRADE.md`, `docs/economy/SPACE_ASSETS.md`*
 
 ### NR-1204 — The BL-644 space-programme lumps are retired by data (authored at zero)
 *decision taken on your behalf · raised 2026-11-10 · from BL-1630 lane report*
@@ -822,6 +823,20 @@ The lumps bought a whole launch lot off any shelf and consumed it with nothing l
 > **Recommendation:** Accept.
 
 *Files: `scripts/economy.lua`, `src/world/economy_system.cpp`, `docs/politics/NATIONS.md`*
+
+### NR-1205 — Experiment lane went past its brief: changed route ranking, not sizing
+*novel-work · raised 2026-11-10 · from NR-1203 experiment lane*
+
+Briefed to make auto trade size off the silenced want, the lane found that already built (BL-1547) and instead ranked silenced-want routes first, behind a tunable. It is on its own branch, unmerged.
+
+**Why it matters.** Recorded so the branch is not mistaken for a delivery.
+
+- Keep the branch for reference
+- Delete it
+
+> **Recommendation:** Keep until NR-1203 is ruled.
+
+*Files: `src/world/trade.cpp`*
 
 ---
 
