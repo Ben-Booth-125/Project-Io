@@ -1253,6 +1253,47 @@ std::pair<float, float> body_pos(const world& w, entity_id id)
 
 } // namespace
 
+namespace {
+
+/// BL-1586: the header-only twin of `space_comms_lifts_activity_fog`
+/// (space_effects.hpp) for the player's nation. world.cpp links alone in several
+/// hand-declared harness targets, so it cannot call into nation_tech.cpp or
+/// space_effects.cpp; this walks the same header data `nation_has_mechanic` does
+/// (a HELD node carrying the `space_role_comms` mechanic) and the asset store.
+/// space_effects_harness holds the two equal.
+bool player_comms_lift(const world& w)
+{
+    if (w.space_assets.empty())
+        return false;
+    const entity_id n = player_nation(w);
+    if (n == null_entity)
+        return false;
+    bool sat = false;
+    for (const auto& [id, a] : w.space_assets)
+    {
+        (void)id;
+        if (a.owner == n && a.cls == space_asset_class::satellite
+            && a.role == space_satellite_role::comms && a.state == space_asset_state::active)
+        {
+            sat = true;
+            break;
+        }
+    }
+    if (!sat)
+        return false;
+    const auto tit = w.nation_tech.find(n);
+    if (tit == w.nation_tech.end())
+        return false;
+    for (const io::dg::effect& e : io::dg::effects)
+        if (e.kind == io::dg::effect_kind::mechanic && std::strcmp(e.target, "space_role_comms") == 0
+            && e.node >= 0 && e.node < io::dg::node_count
+            && tit->second.held.test(static_cast<std::size_t>(e.node)))
+            return true;
+    return false;
+}
+
+} // namespace
+
 activity_vis body_activity_visibility(const world& w, entity_id body, int now_tick,
                                       int route_fresh_ticks, int glimpse_fresh_ticks)
 {
@@ -1288,6 +1329,12 @@ activity_vis body_activity_visibility(const world& w, entity_id body, int now_ti
         return activity_vis::unknown;
     }
 
+    // BL-1586 (SPACE_ASSETS.md § Satellites; DG-NE-MK-B1 Communication Satellites):
+    // with the technology and an ACTIVE Comms satellite, the activity fog lifts on
+    // every market the player trades with — a body its routes reach reads as the
+    // live feed, fresh or cold.
+    if (player_comms_lift(w))
+        return activity_vis::visible;
     return (now_tick - freshest <= route_fresh_ticks) ? activity_vis::known
                                                       : activity_vis::known_stale;
 }

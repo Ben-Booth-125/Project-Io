@@ -28,6 +28,7 @@
 #include "world/logistic_points.hpp" // BL-1352: the Throughput lens reads the REAL sources
 #include "world/market_clearing.hpp" // market_for_tile (Scarcity catchment, prices)
 #include "world/placement_rules.hpp"
+#include "world/space_effects.hpp"   // BL-1586: the Observation satellite's vision lift
 #include "wing_card.hpp"          // BL-1450: the wing right-click assignment
 #include "world/air_combat.hpp"     // BL-1450: wings, their airbase tile
 #include "world/stance.hpp"           // is_hostile: right-click attack vs declare (BL-1443)
@@ -2699,6 +2700,14 @@ void update_body_vision(world& w, ui_state& state, double now_days)
     // Layer 1 (permanent): radius-2 pockets around the player's own installations —
     // your buildings are always visible.
     flood(player_building_tiles, 2, state.permanent_vision);
+
+    // BL-1586 (SPACE_ASSETS.md § Satellites): an ACTIVE Observation satellite of the
+    // player's serving this body, its node in comms coverage, lifts the vision fog
+    // over the whole body. The survey fog is untouched; this is the reach fog only.
+    if (space_observation_lifts_vision(w, player_actor(w), body))
+        for (const entity_id t : grid)
+            if (t != null_entity)
+                state.permanent_vision.insert(t);
 
     // Layer 2 (permanent): 3-wide corridors from the corp centre of operation to each
     // market centre it operates in. A 3-wide corridor is the path tiles flooded one hop

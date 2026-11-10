@@ -6,6 +6,7 @@
 #include "market_clearing.hpp" // processor_reservation (BL-995)
 #include "nation_tech.hpp"     // nation_scalar: logistics_cost (BL-1274)
 #include "orbital_system.hpp"
+#include "space_effects.hpp"    // BL-1586: the Navigation satellite's haul factor
 #include "stance.hpp"
 #include "sentiment_emitters.hpp" // BL-1458: trade_conducted at landing
 
@@ -1174,8 +1175,12 @@ convoy_leg price_trade_leg(world& w, const recipe_registry& reg,
         // only the haul part carries the trader's nation's logistics_cost
         // modifiers (BL-1274) — identity for a nation holding none.
         // BL-1505: a trader at war routes round its fronts; the leg it is refused is refused here.
+        // BL-1586: an ACTIVE Navigation satellite of the trader's nation serving
+        // this body cuts the haul part again (SPACE_ASSETS.md § Satellites);
+        // 1 with none, so a world without one prices as before.
+        const float nav = space_navigation_factor(w, home, src_body);
         leg = market_leg_with_haul(w, reg, nodes, lane_party(w, corp_id), src_market, dest_market_id,
-                                   qty, nation_haul);
+                                   qty, [&](float haul) { return nation_haul(haul) * nav; });
         return leg;
     }
 
