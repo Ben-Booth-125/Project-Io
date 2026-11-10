@@ -5,6 +5,7 @@
 #include "world/corp_command.hpp" // corp_command — the seam the ledger presses queue onto
 #include "world/entity.hpp"
 #include "world/sentiment.hpp"    // sentiment_value — the Diplomacy ledger's trend samples
+#include "world/space_command.hpp" // space_command — the Space ledger's presses queue onto it
 
 #include <imgui.h>
 #include <array>
@@ -483,6 +484,105 @@ struct pinned_items_state
     /// element sets it to its tile column's heading (selection_panel.cpp); the toggle
     /// reads and clears it. -1 = the default, the header row's end.
     float header_anchor_x = -1.0f, header_anchor_y = -1.0f;
+/// The Space ledger's view state (rail slot 9; docs/ui/ledgers/space.md), plus
+/// where its controls landed this frame so a verify script presses the REAL
+/// control. VIEW state, not serialised. Every press queues a `space_command` on
+/// `pending`, which app::render sends through `apply_space_command` — the one
+/// near-space seam an agent's command takes too.
+struct space_ledger_state
+{
+    /// 0 = Launch (default), 1 = Assets, 2 = Stations, 3 = Crew.
+    int view = 0;
+
+    // ── Launch ───────────────────────────────────────────────────────────────
+    /// The class picker: 0 satellite, 1 station core, 2 crewed mission, 3 rover.
+    /// A SELECTOR (exempt from the toggle rule): it switches the launch's subject.
+    int       launch_class = 0;
+    /// The satellite's role (a space_satellite_role, 1..4). A selector too.
+    int       launch_role  = 1;
+    /// The destination node; `launch_node_set` false = none chosen.
+    entity_id launch_body = null_entity;
+    int       launch_kind = 1;
+    bool      launch_node_set = false;
+
+    // ── Assets ───────────────────────────────────────────────────────────────
+    /// The satellite row expanded in place (its Retask presses); null = none.
+    entity_id expanded = null_entity;
+
+    // ── Stations / the designer ──────────────────────────────────────────────
+    /// The station the designer shows (a station id); re-validated each frame,
+    /// falling back to the player's lowest-id station.
+    entity_id station = null_entity;
+    /// The pressed slot (-1 none). Pressing it again un-picks it (a toggle).
+    int       slot = -1;
+    /// A Move press armed on `slot`: the next empty-slot press refits there.
+    bool      moving = false;
+    /// The template name being typed for Save.
+    char      template_name[65] = "";
+
+    /// Presses queued this frame, sent by app::render through apply_space_command.
+    std::vector<space_command> pending;
+    /// The seam's answer to the last press (app writes it).
+    std::string message;
+
+    // ── Published each frame the ledger draws; x < 0 = absent. ───────────────
+    float tab_x[4] = {-1.0f, -1.0f, -1.0f, -1.0f};
+    float tab_y[4] = {-1.0f, -1.0f, -1.0f, -1.0f};
+    struct drawn_press { float x = -1.0f, y = -1.0f; bool enabled = false; std::string reason; int id = 0; };
+    std::vector<drawn_press> class_presses;  ///< id = class index.
+    std::vector<drawn_press> role_presses;   ///< id = role.
+    struct drawn_node
+    {
+        entity_id body = null_entity;
+        int   kind = 0;
+        float x = -1.0f, y = -1.0f;
+        int   free = 0, capacity = 0;
+        bool  chosen = false;
+    };
+    std::vector<drawn_node> node_rows;
+    drawn_press launch_press;               ///< The Launch press; reason = the quote's refusal.
+    float       launch_cost = 0.0f;         ///< The quote's whole cost (credits).
+    struct drawn_asset
+    {
+        entity_id id = null_entity;
+        int   cls = 0, role = 0, state = 0;
+        bool  covered = false, pending = false;
+        float x = -1.0f, y = -1.0f;
+    };
+    std::vector<drawn_asset> asset_rows;
+    std::vector<drawn_press> retask_presses; ///< id = role (the expanded satellite's).
+    std::vector<drawn_press> station_rows;   ///< id = station id.
+    struct drawn_slot
+    {
+        int   idx = 0;
+        int   kind = -1;          ///< A station_module_kind, -1 empty.
+        bool  core = false, edge = false;
+        std::string state;        ///< "", "working", "stopped", "idle_edge", "refitting", "not_ready".
+        float x = -1.0f, y = -1.0f;
+    };
+    std::vector<drawn_slot>  slots;          ///< The designer grid, slot order.
+    int grid_w = 0, grid_h = 0;
+    std::vector<drawn_press> module_presses; ///< id = module kind (an empty slot's module list).
+    drawn_press remove_press, move_press, save_press, upgrade_press;
+    std::vector<drawn_press> template_presses; ///< Apply presses; reason = the template's name.
+    struct drawn_budget
+    {
+        bool  drawn = false;
+        float power_supply = 0.0f, power_draw = 0.0f;
+        int   crew_room = 0, life_support = 0, crew_aboard = 0, crew_needed = 0;
+        int   working = 0, stopped = 0, idle_edge = 0;
+    };
+    drawn_budget budget;
+    struct drawn_crew
+    {
+        bool drawn = false;
+        int  pool = 0, cap = 0, centres = 0, running = 0, rate = 0, needed = 0, aboard = 0;
+    };
+    drawn_crew crew;
+    int pending_orders = 0;                  ///< Orders waiting on a signal (the pending line's count).
+    /// The ledger window's visible screen span this frame, so a script can tell a
+    /// press scrolled out of the column from one on screen. < 0 = not drawn.
+    float view_top = -1.0f, view_bottom = -1.0f;
 };
 
 struct diplomacy_ledger_state
@@ -1240,6 +1340,10 @@ struct ui_state
     /// docs/ui/ledgers/diplomacy.md). Nations and Wars tabs.
     bool show_diplomacy_ledger = false;
 
+    /// Whether the Space ledger is open — nav-rail slot 9 (docs/ui/ledgers/space.md).
+    /// Launch, Assets, Stations and Crew tabs.
+    bool show_space_ledger = false;
+
     // BL-1406: the Company ledger, its firm payload and the corporations table's
     // aimed row retired with the company and the corporation (Ben, 2026-10-23).
     bool show_balance_ledger = false; ///< Whether the Balance Ledger is open.
@@ -1261,6 +1365,7 @@ struct ui_state
     /// See `military_ledger_state`.
     military_ledger_state military;
     diplomacy_ledger_state diplomacy; ///< The Diplomacy ledger (rail slot 8; ledgers/diplomacy.md).
+    space_ledger_state     space;     ///< The Space ledger (rail slot 9; ledgers/space.md).
     unit_designer_state   designer; ///< The full-canvas unit designer (military.md § The designer).
     wing_ui_state         wing;         ///< BL-1450: the wing card and the canvas right-click assignment.
 

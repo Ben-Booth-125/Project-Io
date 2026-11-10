@@ -476,6 +476,16 @@ void readout(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
 /// @param colour Stroke colour of both outlines.
 void diplomacy(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
 
+/// Draw the Space nav-rail glyph — a satellite: a small filled body between two
+/// outlined solar-panel wings on a thin boom, tilted 30 degrees so it never reads
+/// as the level Market bars or the History hourglass at rail radius.
+///
+/// @param dl     Draw list to render into.
+/// @param centre Glyph centre, screen pixels.
+/// @param r      Half-extent of the glyph, screen pixels.
+/// @param colour Stroke and fill colour.
+void satellite(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
+
 /// Draw the Contracts nav-rail glyph — a page with its top-right corner cut
 /// away (a dog-ear fold) plus a short check mark near the bottom (a signed
 /// document motif) — in @p colour. Distinct from `ledger` (a plain ruled

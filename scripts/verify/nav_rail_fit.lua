@@ -22,7 +22,7 @@ verify.frames(2)
 
 -- The rail's own slot count. Kept here rather than read from the code so that
 -- ADDING a slot without widening the rail's budget fails this check loudly.
-local RAIL_SLOTS = 12
+local RAIL_SLOTS = 13
 
 for _, res in ipairs({ {1280, 720}, {1920, 1080} }) do
     local w, h = res[1], res[2]

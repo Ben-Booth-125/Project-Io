@@ -1488,7 +1488,7 @@
   {
    "id": "ledger.nav_generation",
    "family": "ledger",
-   "surface": "Nav rail, slot 10 (plate/continent glyph)",
+   "surface": "Nav rail, slot 11 (plate/continent glyph)",
    "press": "Click the plate glyph in the developer tail of the left icon rail",
    "args": [],
    "preconditions": [
@@ -1721,7 +1721,7 @@
   {
    "id": "ledger.nav_history",
    "family": "ledger",
-   "surface": "Nav rail, slot 9 (History icon)",
+   "surface": "Nav rail, slot 10 (History icon)",
    "press": "Click the history glyph on the left icon rail",
    "args": [],
    "preconditions": [
@@ -2348,8 +2348,8 @@
   {
    "id": "ledger.decision_feed_open",
    "family": "ledger",
-   "surface": "Navigation rail slot 11, \"AI decisions\"",
-   "press": "Click nav rail slot 11 to open the AI decision feed; click it again to close",
+   "surface": "Navigation rail slot 12, \"AI decisions\"",
+   "press": "Click nav rail slot 12 to open the AI decision feed; click it again to close",
    "args": [],
    "preconditions": [
     "In game (not the menu or the generation screen)"
@@ -2550,8 +2550,8 @@
   {
    "id": "ledger.strategy_readout_open",
    "family": "ledger",
-   "surface": "Navigation rail slot 12, \"Strategy readout\"",
-   "press": "Click nav rail slot 12 to open the Strategy readout; click it again to close",
+   "surface": "Navigation rail slot 13, \"Strategy readout\"",
+   "press": "Click nav rail slot 13 to open the Strategy readout; click it again to close",
    "args": [],
    "preconditions": [
     "In game (not the menu or the generation screen)"
@@ -3818,6 +3818,179 @@
    "reason_to_select": "Answers 'who could I fight, who might fight me, and what would it cost?'. Read it before declaring war, and to see who is alarmed by you."
   },
   {
+   "family": "ledger",
+   "args": [],
+   "id": "ledger.nav_space",
+   "surface": "Nav rail, slot 9 (the satellite glyph), after Diplomacy.",
+   "press": "Click the satellite glyph on the left icon rail.",
+   "preconditions": [
+    "In-game"
+   ],
+   "expected_output": "Toggles the Space ledger open in the fold-out column; re-click closes; opening closes any other ledger. No lens on open. Four tabs - Launch (default), Assets, Stations, Crew; re-clicking the ACTIVE tab closes the ledger (toggle rule), another tab is a view change (ledger.space_tab). Under the tabs on every view, the pending line: 'No orders waiting on a signal.' or 'N orders pending - no signal', its tooltip listing each order and the quarter it is due.",
+   "reason_to_select": "Answers 'what does my nation have in space, and what can it launch next?'."
+  },
+  {
+   "family": "ledger",
+   "args": [],
+   "id": "ledger.space_tab",
+   "surface": "Space ledger (nav rail slot 9; docs/ui/ledgers/space.md), the Launch / Assets / Stations / Crew tab strip.",
+   "press": "Click a tab.",
+   "preconditions": [
+    "The Space ledger is open."
+   ],
+   "expected_output": "Shows that view. Re-clicking the active tab closes the ledger. LAUNCH: the class picker, the destination picker and the quote (ledger.space_launch). ASSETS: one row per satellite, station core, crewed mission and rover of yours that is not lost - class (and a satellite's role), node, state (in transit with its arrival quarter / active / decaying), upkeep per quarter, 'in coverage' or 'no signal', and 'pending - no signal (N)' when an order to it waits. A station row opens the Stations view on that station; a satellite row expands in place (ledger.space_retask). STATIONS: the station picker and the designer (ledger.space_designer_slot). CREW: the astronaut pool, its cap (per running Astronaut Training Centre), the centres built and running, astronauts trained per quarter (0 at the cap), then each station's crew aboard against crew needed and each crewed mission's crew.",
+   "reason_to_select": "Move between the four questions the ledger answers."
+  },
+  {
+   "family": "ledger",
+   "args": [
+    {
+     "name": "class",
+     "type": "Satellite | Station core | Crewed mission | Rover",
+     "meaning": "The class picker - a selector: re-pressing the active class does nothing. Changing class clears the destination."
+    },
+    {
+     "name": "role",
+     "type": "Comms | Navigation | Observation | Survey",
+     "meaning": "A satellite's role; a role not researched says so on hover."
+    },
+    {
+     "name": "node",
+     "type": "orbital node",
+     "meaning": "A destination row: every node the class may go to (space_launch_legal_node), each with its free slots of capacity (a slot-holding class - satellite, station core - lists only nodes with a slot free), and the path's thrust cost and days from the home surface. Pressing the chosen row again un-chooses it."
+    }
+   ],
+   "id": "ledger.space_launch",
+   "surface": "Space ledger (nav rail slot 9; docs/ui/ledgers/space.md), Launch view: the class picker (Satellite, Station core, Crewed mission, Rover), the satellite's Role picker (Comms, Navigation, Observation, Survey), the destination list, the quote and the Launch press.",
+   "press": "Pick a class (and a role for a satellite), press a destination row, then press Launch.",
+   "preconditions": [
+    "A destination is chosen (Launch is disabled with 'Choose a destination first.' otherwise).",
+    "The quote (quote_space_launch; for a station core also quote_found_station) is clear. A refused quote disables Launch and prints the refusal beside it, in the seam's own reasons: not researched (Rocketry or the payload's key), no staffed Launchpad on the home body, every slot at the node held, no path, the home shelf cannot fill the goods, the treasury cannot pay, or for a core not enough astronauts."
+   ],
+   "expected_output": "The quote above the press: the whole cost; the spacecraft components and propellant the launch buys off the home shelf and their value; launch and thrust credits; travel in quarters and days; for a station core the crew drawn. Launch issues gameplay.space_launch (satellite, crewed mission, rover) or gameplay.space_found_station (station core). The press queues a space_command that app::render sends through apply_space_command (src/world/space_command.hpp) - the same seam an agent's command takes, with its full validation; not a second write path. The seam's answer is the ledger's message line under the tabs ('<verb>: done.', '<verb>: pending - no signal. It waits a quarter.', or '<verb>: refused - <why>').",
+   "reason_to_select": "Put a satellite, a station core, a crew or a rover into space, knowing its price first."
+  },
+  {
+   "family": "ledger",
+   "args": [
+    {
+     "name": "role",
+     "type": "Comms | Navigation | Observation | Survey",
+     "meaning": "The role pressed."
+    }
+   ],
+   "id": "ledger.space_retask",
+   "surface": "Space ledger (nav rail slot 9; docs/ui/ledgers/space.md), Assets view: a satellite row, expanded in place, and its Retask role presses.",
+   "press": "Click a satellite row to expand it (click again to fold it), then click a role under 'Retask'.",
+   "preconditions": [
+    "The role is not the satellite's own (disabled: 'It already holds this role.') and its key is held (disabled: 'Not researched yet.')."
+   ],
+   "expected_output": "Issues gameplay.space_retask_satellite. Outside comms coverage it waits a quarter as a pending order and the row shows 'pending - no signal'. The press queues a space_command that app::render sends through apply_space_command (src/world/space_command.hpp) - the same seam an agent's command takes, with its full validation; not a second write path. The seam's answer is the ledger's message line under the tabs ('<verb>: done.', '<verb>: pending - no signal. It waits a quarter.', or '<verb>: refused - <why>').",
+   "reason_to_select": "Give a satellite the job its node needs now."
+  },
+  {
+   "family": "ledger",
+   "args": [
+    {
+     "name": "slot",
+     "type": "grid slot",
+     "meaning": "row * width + col; the core's centre slot does nothing."
+    }
+   ],
+   "id": "ledger.space_designer_slot",
+   "surface": "Space ledger (nav rail slot 9; docs/ui/ledgers/space.md), Stations view: the station picker and the designer grid - 5x3, 7x5 or 9x7 slots drawn as they are, the core ('Core') at the centre, each fitted module by its short tag, edge slots outlined, a module stopped by a shortfall outlined red, an edge-only module off the edge outlined amber; the budgets above it (Power, Crew room, Life support, Crew, each supply / demand, red when short).",
+   "press": "Pick a station row (a selector), then click a grid slot. Click the picked slot again to un-pick it.",
+   "preconditions": [
+    "You hold a station (the view says to launch a core otherwise)."
+   ],
+   "expected_output": "An EMPTY slot lists the module kinds research has unlocked, each with its power, crew, life support, room, launch cost and whether it is edge-only (ledger.space_fit_module). A FILLED slot offers Remove and Move (ledger.space_remove_module, ledger.space_move_module). Hovering a slot names its module and state (working, stopped - a budget falls short, idle - needs an edge slot, refitting, in transit) and whether it is an edge slot.",
+   "reason_to_select": "See the station as it is and choose what goes where."
+  },
+  {
+   "family": "ledger",
+   "args": [
+    {
+     "name": "module",
+     "type": "station_module_kind",
+     "meaning": "The row pressed; only researched kinds are listed."
+    }
+   ],
+   "id": "ledger.space_fit_module",
+   "surface": "Space ledger (nav rail slot 9; docs/ui/ledgers/space.md), Stations view, an empty slot picked: the module list.",
+   "press": "Click a module's name.",
+   "preconditions": [
+    "Disabled with its reason on hover: 'Needs an edge slot.' (Dock, Shipyard on an inner slot), 'Not enough astronauts to crew it.', or the module launch's refusal."
+   ],
+   "expected_output": "Issues gameplay.space_fit_module. The module launches to the station's node and takes the slot; it counts in the budgets once it arrives. The press queues a space_command that app::render sends through apply_space_command (src/world/space_command.hpp) - the same seam an agent's command takes, with its full validation; not a second write path. The seam's answer is the ledger's message line under the tabs ('<verb>: done.', '<verb>: pending - no signal. It waits a quarter.', or '<verb>: refused - <why>').",
+   "reason_to_select": "Give a station power, crew room, research, a dock - whatever its role needs."
+  },
+  {
+   "family": "ledger",
+   "args": [],
+   "id": "ledger.space_remove_module",
+   "surface": "Space ledger (nav rail slot 9; docs/ui/ledgers/space.md), Stations view, a filled slot picked: Remove.",
+   "press": "Click Remove.",
+   "preconditions": [
+    "A module (not the core) is in the picked slot."
+   ],
+   "expected_output": "Issues gameplay.space_remove_module: the slot frees, nothing is refunded. The press queues a space_command that app::render sends through apply_space_command (src/world/space_command.hpp) - the same seam an agent's command takes, with its full validation; not a second write path. The seam's answer is the ledger's message line under the tabs ('<verb>: done.', '<verb>: pending - no signal. It waits a quarter.', or '<verb>: refused - <why>').",
+   "reason_to_select": "Free a slot for a module the station needs more."
+  },
+  {
+   "family": "ledger",
+   "args": [],
+   "id": "ledger.space_move_module",
+   "surface": "Space ledger (nav rail slot 9; docs/ui/ledgers/space.md), Stations view, a filled slot picked: Move, then an empty slot.",
+   "press": "Click Move (it reads 'Moving - press an empty slot'; click it again to disarm), then click an empty grid slot.",
+   "preconditions": [
+    "The module has arrived."
+   ],
+   "expected_output": "Issues gameplay.space_refit_module from the picked slot to the pressed one: a launch-free refit, working again a quarter later. The press queues a space_command that app::render sends through apply_space_command (src/world/space_command.hpp) - the same seam an agent's command takes, with its full validation; not a second write path. The seam's answer is the ledger's message line under the tabs ('<verb>: done.', '<verb>: pending - no signal. It waits a quarter.', or '<verb>: refused - <why>').",
+   "reason_to_select": "Put an edge module back on the edge after an upgrade, or rearrange a station."
+  },
+  {
+   "family": "ledger",
+   "args": [
+    {
+     "name": "name",
+     "type": "string, 1..64 bytes",
+     "meaning": "The template's name; an existing name is overwritten."
+    }
+   ],
+   "id": "ledger.space_save_template",
+   "surface": "Space ledger (nav rail slot 9; docs/ui/ledgers/space.md), Stations view, Templates: the name field and 'Save layout'.",
+   "press": "Type a name, then click Save layout.",
+   "preconditions": [
+    "A name is typed (Save is disabled with 'Name the template first.' otherwise)."
+   ],
+   "expected_output": "Issues gameplay.space_save_template with the station's current layout (each slot's module kind, the centre empty) at its grid size. The template appears in the list below. The press queues a space_command that app::render sends through apply_space_command (src/world/space_command.hpp) - the same seam an agent's command takes, with its full validation; not a second write path. The seam's answer is the ledger's message line under the tabs ('<verb>: done.', '<verb>: pending - no signal. It waits a quarter.', or '<verb>: refused - <why>').",
+   "reason_to_select": "Keep a working layout to repeat on the next station."
+  },
+  {
+   "family": "ledger",
+   "args": [],
+   "id": "ledger.space_apply_template",
+   "surface": "Space ledger (nav rail slot 9; docs/ui/ledgers/space.md), Stations view, Templates: a saved template's Apply and Delete presses.",
+   "press": "Click Apply (or Delete) beside a template.",
+   "preconditions": [
+    "The template is yours."
+   ],
+   "expected_output": "Apply issues gameplay.space_apply_template on the shown station: a launch per slot not yet filled to match; the message says how many launched and how many were skipped. Delete issues gameplay.space_delete_template. The press queues a space_command that app::render sends through apply_space_command (src/world/space_command.hpp) - the same seam an agent's command takes, with its full validation; not a second write path. The seam's answer is the ledger's message line under the tabs ('<verb>: done.', '<verb>: pending - no signal. It waits a quarter.', or '<verb>: refused - <why>').",
+   "reason_to_select": "Fit a station to a known layout in one press."
+  },
+  {
+   "family": "ledger",
+   "args": [],
+   "id": "ledger.space_upgrade",
+   "surface": "Space ledger (nav rail slot 9; docs/ui/ledgers/space.md), Stations view: 'Upgrade to 7x5' / 'Upgrade to 9x7' with the truss launch's cost.",
+   "press": "Click Upgrade.",
+   "preconditions": [
+    "The grid is not at its largest; the upgrade's key is held ('Not researched yet.'); the truss launch's quote is clear (its refusal on hover)."
+   ],
+   "expected_output": "Issues gameplay.space_upgrade_station: the grid grows one ring, the core still central and every module keeping its place; an edge module no longer on the edge goes idle. The press queues a space_command that app::render sends through apply_space_command (src/world/space_command.hpp) - the same seam an agent's command takes, with its full validation; not a second write path. The seam's answer is the ledger's message line under the tabs ('<verb>: done.', '<verb>: pending - no signal. It waits a quarter.', or '<verb>: refused - <why>').",
+   "reason_to_select": "Room for more modules."
+  },
+  {
    "id": "ledger.diplomacy_tab",
    "family": "ledger",
    "surface": "Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), the 'Nations' / 'Wars' tab strip.",
@@ -4112,7 +4285,7 @@
   {
    "id": "gameplay.space_launch",
    "family": "gameplay",
-   "surface": "No UI surface yet (the circumplanetary canvas's launch and station controls are the UI lane's). In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam — a sibling of corp_command, because the template verbs carry a name and a layout the fixed corp_command record cannot. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed).",
+   "surface": "The Space ledger (nav rail slot 9): ledger.space_launch. In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam — a sibling of corp_command, because the template verbs carry a name and a layout the fixed corp_command record cannot. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed).",
    "press": "In-process: apply_space_command({nation, verb=0 launch, cls, role, node_body, node_kind}).",
    "args": [
     {
@@ -4150,7 +4323,7 @@
   {
    "id": "gameplay.space_found_station",
    "family": "gameplay",
-   "surface": "No UI surface yet (the circumplanetary canvas's launch and station controls are the UI lane's). In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam — a sibling of corp_command, because the template verbs carry a name and a layout the fixed corp_command record cannot. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed).",
+   "surface": "The Space ledger (nav rail slot 9): ledger.space_launch (class Station core). In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam — a sibling of corp_command, because the template verbs carry a name and a layout the fixed corp_command record cannot. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed).",
    "press": "In-process: apply_space_command({nation, verb=1 found_station, node_body, node_kind}).",
    "args": [
     {
@@ -4177,7 +4350,7 @@
   {
    "id": "gameplay.space_fit_module",
    "family": "gameplay",
-   "surface": "No UI surface yet (the circumplanetary canvas's launch and station controls are the UI lane's). In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam — a sibling of corp_command, because the template verbs carry a name and a layout the fixed corp_command record cannot. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed).",
+   "surface": "The Space ledger (nav rail slot 9): ledger.space_fit_module. In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam — a sibling of corp_command, because the template verbs carry a name and a layout the fixed corp_command record cannot. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed).",
    "press": "In-process: apply_space_command({nation, verb=2 fit_module, subject=station, slot, module}).",
    "args": [
     {
@@ -4210,7 +4383,7 @@
   {
    "id": "gameplay.space_remove_module",
    "family": "gameplay",
-   "surface": "No UI surface yet (the circumplanetary canvas's launch and station controls are the UI lane's). In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam — a sibling of corp_command, because the template verbs carry a name and a layout the fixed corp_command record cannot. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed).",
+   "surface": "The Space ledger (nav rail slot 9): ledger.space_remove_module. In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam — a sibling of corp_command, because the template verbs carry a name and a layout the fixed corp_command record cannot. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed).",
    "press": "In-process: apply_space_command({nation, verb=3 remove_module, subject=station, slot}).",
    "args": [
     {
@@ -4235,7 +4408,7 @@
   {
    "id": "gameplay.space_refit_module",
    "family": "gameplay",
-   "surface": "No UI surface yet (the circumplanetary canvas's launch and station controls are the UI lane's). In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam — a sibling of corp_command, because the template verbs carry a name and a layout the fixed corp_command record cannot. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed).",
+   "surface": "The Space ledger (nav rail slot 9): ledger.space_move_module. In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam — a sibling of corp_command, because the template verbs carry a name and a layout the fixed corp_command record cannot. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed).",
    "press": "In-process: apply_space_command({nation, verb=4 refit_module, subject=station, slot=from, slot_to=to}).",
    "args": [
     {
@@ -4265,7 +4438,7 @@
   {
    "id": "gameplay.space_apply_template",
    "family": "gameplay",
-   "surface": "No UI surface yet (the circumplanetary canvas's launch and station controls are the UI lane's). In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam — a sibling of corp_command, because the template verbs carry a name and a layout the fixed corp_command record cannot. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed).",
+   "surface": "The Space ledger (nav rail slot 9): ledger.space_apply_template. In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam — a sibling of corp_command, because the template verbs carry a name and a layout the fixed corp_command record cannot. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed).",
    "press": "In-process: apply_space_command({nation, verb=5 apply_template, subject=station, name}).",
    "args": [
     {
@@ -4290,7 +4463,7 @@
   {
    "id": "gameplay.space_save_template",
    "family": "gameplay",
-   "surface": "No UI surface yet (the circumplanetary canvas's launch and station controls are the UI lane's). In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam — a sibling of corp_command, because the template verbs carry a name and a layout the fixed corp_command record cannot. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed).",
+   "surface": "The Space ledger (nav rail slot 9): ledger.space_save_template. In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam — a sibling of corp_command, because the template verbs carry a name and a layout the fixed corp_command record cannot. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed).",
    "press": "In-process: apply_space_command({nation, verb=6 save_template, name, layout}).",
    "args": [
     {
@@ -4315,7 +4488,7 @@
   {
    "id": "gameplay.space_delete_template",
    "family": "gameplay",
-   "surface": "No UI surface yet (the circumplanetary canvas's launch and station controls are the UI lane's). In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam — a sibling of corp_command, because the template verbs carry a name and a layout the fixed corp_command record cannot. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed).",
+   "surface": "The Space ledger (nav rail slot 9): ledger.space_apply_template (Delete). In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam — a sibling of corp_command, because the template verbs carry a name and a layout the fixed corp_command record cannot. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed).",
    "press": "In-process: apply_space_command({nation, verb=7 delete_template, name}).",
    "args": [
     {
@@ -4335,7 +4508,7 @@
   {
    "id": "gameplay.space_upgrade_station",
    "family": "gameplay",
-   "surface": "No UI surface yet (the circumplanetary canvas's launch and station controls are the UI lane's). In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam — a sibling of corp_command, because the template verbs carry a name and a layout the fixed corp_command record cannot. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed).",
+   "surface": "The Space ledger (nav rail slot 9): ledger.space_upgrade. In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam — a sibling of corp_command, because the template verbs carry a name and a layout the fixed corp_command record cannot. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed).",
    "press": "In-process: apply_space_command({nation, verb=8 upgrade_station, subject=station}).",
    "args": [
     {
@@ -4357,7 +4530,7 @@
   {
    "id": "gameplay.space_retask_satellite",
    "family": "gameplay",
-   "surface": "No UI surface yet (the circumplanetary canvas's launch and station controls are the UI lane's). In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam — a sibling of corp_command, because the template verbs carry a name and a layout the fixed corp_command record cannot. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed).",
+   "surface": "The Space ledger (nav rail slot 9): ledger.space_retask. In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam — a sibling of corp_command, because the template verbs carry a name and a layout the fixed corp_command record cannot. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed).",
    "press": "In-process: apply_space_command({nation, verb=9 retask_satellite, subject=satellite, role}).",
    "args": [
     {
@@ -4382,7 +4555,7 @@
   {
    "id": "gameplay.space_move_satellite",
    "family": "gameplay",
-   "surface": "No UI surface yet (the circumplanetary canvas's launch and station controls are the UI lane's). In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam — a sibling of corp_command, because the template verbs carry a name and a layout the fixed corp_command record cannot. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed).",
+   "surface": "No UI surface yet: the Space ledger offers no satellite Move. In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam — a sibling of corp_command, because the template verbs carry a name and a layout the fixed corp_command record cannot. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed).",
    "press": "In-process: apply_space_command({nation, verb=10 move_satellite, subject=satellite, node_body, node_kind}).",
    "args": [
     {

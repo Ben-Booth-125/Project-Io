@@ -8,16 +8,16 @@
 
 ## Headline
 
-**126 elements. 2 committed goldens in the whole repo** (icon_silhouettes_overview.png, icon_silhouettes_supply_lens.png).
+**128 elements. 2 committed goldens in the whole repo** (icon_silhouettes_overview.png, icon_silhouettes_supply_lens.png).
 
-**57 of 126 elements can be changed without any check going red.**
+**57 of 128 elements can be changed without any check going red.**
 That is the number that matters to a UI pass: the re-verification cost is near zero,
 and so is the safety net.
 
 | Class | Count | What green means |
 |---|---|---|
 | **GOLDEN** | 3 | A committed `scripts/verify/golden/*.png` diffs this element on every run. It fails by itself. |
-| **ASSERTED** | 66 | No golden, but a covering check calls `verify.expect` on real content. It fails by itself. |
+| **ASSERTED** | 68 | No golden, but a covering check calls `verify.expect` on real content. It fails by itself. |
 | **CLIP-ONLY** | 12 | The only assertion reaching it is `expect_no_clipping`. Green means "no string overran its box", not "this element is right". |
 | **CAPTURE-ONLY** | 37 | A check frames it and saves a PNG. Nothing fails. A human eye is the entire check. |
 | **NONE** | 8 | No verify script drives this element at all. |
@@ -30,7 +30,7 @@ and so is the safety net.
 | `UI-040` Lens system (overlay_mode family) > Supply lens | sub-element | `supply_lens`, `lens_modes`, `icon_silhouettes`, `lens_strip_and_fields` | 6 | 0 | 2 |
 | `UI-063` Icon vocabulary | element | `icon_silhouettes` | 0 | 0 | 0 |
 
-## ASSERTED (66)
+## ASSERTED (68)
 
 | Element | Kind | Covering checks | expect | clip | clicks |
 |---|---|---|---|---|---|
@@ -99,7 +99,9 @@ and so is the safety net.
 | `UI-138` Nation overview Standing | sub-element | `corp_dashboard` | 17 | 1 | 0 |
 | `UI-140` Construction Ledger > Site Finder tab (Construction ledger) | sub-element | `site_grid`, `site_picker_glyphs`, `construction_sites` | 74 | 0 | 10 |
 | `UI-143` Pinned items panel | panel | `pinned_panel` | 17 | 0 | 6 |
+| `UI-146` Space ledger | ledger | `space_ledger` | 1 | 0 | 1 |
 | `UI-144` Selection band > Pin toggle | control | `pinned_panel` | 17 | 0 | 6 |
+| `UI-147` Space ledger > Station designer (Space ledger) | sub-element | `space_ledger` | 1 | 0 | 1 |
 
 ## CLIP-ONLY (12)
 

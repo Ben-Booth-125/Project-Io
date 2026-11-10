@@ -997,7 +997,7 @@
     "docs/ui/LAYOUT.md § Navigation pane",
     "src/ui/nav_pane.cpp"
    ],
-   "summary": "A fixed 56px-wide, full-height icon rail of twelve square slots, each toggling a fold-out ledger open/closed, accordion-style: nine curated player slots (Nation overview, Budget, Construction, Research, Market, Convoys, Military 7, Diplomacy 8, History) and the three-slot developer tail. The retired Acquisitions slot left the rail and every later slot moved up one (Ben, 2026-10-24).",
+   "summary": "A fixed 56px-wide, full-height icon rail of thirteen square slots, each toggling a fold-out ledger open/closed, accordion-style: ten curated player slots (Nation overview, Budget, Construction, Research, Market, Convoys, Military 7, Diplomacy 8, Space 9, History 10) and the three-slot developer tail (11-13). The retired Acquisitions slot left the rail and every later slot moved up one (Ben, 2026-10-24); Space was inserted after Diplomacy.",
    "interesting_question": "The doc states a standalone buildings-overview ledger was dropped as a rail slot because it 'proved more good-to-know than goal-driving' — what is the actual test the doc applies to decide any future slot?",
    "resolution": "Stated as an explicit test: MENU.md § Menus are broad ledgers gives it directly — 'is this a broad overview, or a targeted action? Broad → a ledger with a slot. Targeted → the Selection element / a popup, no slot.'",
    "checks": [
@@ -2246,6 +2246,23 @@
    ]
   },
   {
+   "id": "UI-146",
+   "name": "Space ledger",
+   "kind": "ledger",
+   "parent": null,
+   "source": [
+    "docs/ui/ledgers/space.md",
+    "docs/economy/SPACE_ASSETS.md",
+    "src/ui/space_ledger.cpp"
+   ],
+   "summary": "Rail slot 9. Four tabs - Launch (default: class and role picker, the destination list with free slots and thrust cost, the quote with the seam's refusal, Launch), Assets (each satellite, station and mission with node, state, upkeep and coverage; a satellite expands to Retask), Stations (the picker and the designer), Crew (pool, cap, centres, rate, need against aboard). The pending line - orders waiting on a signal - sits under the tabs on every view. Every press goes through apply_space_command.",
+   "interesting_question": "A launch can be refused for nine reasons. Does the player learn which before pressing, or after?",
+   "resolution": "Before: the quote is the seam's own pure quote, so the disabled Launch carries the exact refusal the press would get, printed beside it.",
+   "checks": [
+    "space_ledger"
+   ]
+  },
+  {
    "id": "UI-144",
    "name": "Pin toggle",
    "kind": "control",
@@ -2259,6 +2276,23 @@
    "resolution": "It is its own small window at the band's top-right corner, drawn after the band (app.cpp, draw_pin_toggle), so it sits over whichever layout drew; it shows only when the band shows an entity (pin_subject), never on the resting state or a non-entity selection.",
    "checks": [
     "pinned_panel"
+   ]
+  },
+  {
+   "id": "UI-147",
+   "name": "Station designer (Space ledger)",
+   "kind": "sub-element",
+   "parent": "UI-146",
+   "source": [
+    "docs/ui/ledgers/space.md § The station designer",
+    "docs/economy/SPACE_ASSETS.md § Space stations",
+    "src/ui/space_ledger.cpp"
+   ],
+   "summary": "The Stations view's grid drawn as it is (5x3, 7x5, 9x7), core at the centre, edge slots outlined, stopped modules red, idle edge modules amber; the power, crew room, life support and crew budgets above it as supply / demand; an empty slot's researched module list, a filled slot's Remove and Move; templates (save, apply, delete); Upgrade with the truss launch's cost.",
+   "interesting_question": "A module fitted into a slot is in transit for a quarter or more. Should the budget count it?",
+   "resolution": "No: the budget is evaluate_station_budget's, which counts only modules in place; an in-transit module draws dim in its slot so the fit is visible before it counts.",
+   "checks": [
+    "space_ledger"
    ]
   }
  ]

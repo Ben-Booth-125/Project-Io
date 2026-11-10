@@ -75,6 +75,9 @@
 #include "world/stockpile_budget.hpp" // BL-1042: the budget this search-less path states
 #include "world/resource_names.hpp" // resource_from_name(name, ok): the air-gate / sea-lane fixtures
 #include "world/supply_system.hpp"  // price_convoy_leg: the sea-lane fixture prices as the dispatch does
+#include "world/digitisation_tree_data.hpp" // space_ledger_fixture: hold every Digitisation node
+#include "world/space_tech_keys.hpp"        // space_ledger_fixture: keep far-space keys closed
+#include "world/stations.hpp"               // space_ledger(): the designer's slot kinds
 
 #include <algorithm>
 #include <array>
@@ -1877,6 +1880,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             else if (m_ui.show_convoys_ledger)      panel = "convoys";
             else if (m_ui.show_military_ledger)     panel = "military"; // slot 7
             else if (m_ui.show_diplomacy_ledger)    panel = "diplomacy"; // slot 8
+            else if (m_ui.show_space_ledger)        panel = "space";     // slot 9
             else if (m_ui.show_generation_ledger)   panel = "generation_ledger";
             else if (m_ui.show_decision_feed)       panel = "decisions";
             else if (m_ui.show_strategy_readout)    panel = "strategy";
@@ -3033,6 +3037,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         else if (name == "convoys")      m_ui.show_convoys_ledger = open;
         else if (name == "military")     m_ui.show_military_ledger = open; // slot 7
         else if (name == "diplomacy")    m_ui.show_diplomacy_ledger = open; // slot 8
+        else if (name == "space")        m_ui.show_space_ledger = open; // slot 9
         else if (name == "balance")      m_ui.show_balance_ledger = open;
         else if (name == "corporation")  m_ui.show_corporation_panel = open;
         // "build" is the tile-selection BUILD BAR, which is a section of the
@@ -3158,6 +3163,194 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             presses[++k] = e;
         }
         out["presses"] = presses;
+        return out;
+    });
+
+    // THE SPACE LEDGER (rail slot 9; docs/ui/ledgers/space.md): what it drew this
+    // frame and nothing else — the open view, every tab's press, the launch class
+    // and role presses, the destination rows (node, free slots, press), the Launch
+    // press with its refusal and quote, the asset rows, the station rows, the
+    // designer's grid (each slot's module kind, edge mark and state), the module
+    // list's presses, the budgets as drawn, the template presses, Upgrade, the
+    // crew read and the pending line's count. Verify-only, behind --verify.
+    v.set_function("space_ledger", [this]() {
+        sol::state& st = m_lua.state();
+        const auto& m = m_ui.space;
+        sol::table out = st.create_table();
+        const auto press_t = [&st](const space_ledger_state::drawn_press& p) {
+            sol::table e = st.create_table();
+            e["x"] = p.x; e["y"] = p.y; e["enabled"] = p.enabled; e["reason"] = p.reason; e["id"] = p.id;
+            return e;
+        };
+        const auto presses_t = [&](const std::vector<space_ledger_state::drawn_press>& v) {
+            sol::table t = st.create_table();
+            int k = 0;
+            for (const auto& p : v)
+                t[++k] = press_t(p);
+            return t;
+        };
+        out["open"]    = m_ui.show_space_ledger;
+        out["view"]    = m.view;
+        out["message"] = m.message;
+        out["pending_orders"] = m.pending_orders;
+        out["view_top"]       = m.view_top;
+        out["view_bottom"]    = m.view_bottom;
+        sol::table tabs = st.create_table();
+        for (int i = 0; i < 4; ++i)
+        {
+            sol::table e = st.create_table();
+            e["x"] = m.tab_x[i]; e["y"] = m.tab_y[i];
+            tabs[i + 1] = e;
+        }
+        out["tabs"] = tabs;
+        out["launch_class"]  = m.launch_class;
+        out["launch_role"]   = m.launch_role;
+        out["class_presses"] = presses_t(m.class_presses);
+        out["role_presses"]  = presses_t(m.role_presses);
+        sol::table nodes = st.create_table();
+        int k = 0;
+        for (const auto& n : m.node_rows)
+        {
+            sol::table e = st.create_table();
+            e["body"] = static_cast<unsigned>(n.body); e["kind"] = n.kind;
+            e["x"] = n.x; e["y"] = n.y; e["free"] = n.free; e["capacity"] = n.capacity; e["chosen"] = n.chosen;
+            nodes[++k] = e;
+        }
+        out["node_rows"]   = nodes;
+        out["launch"]      = press_t(m.launch_press);
+        out["launch_cost"] = m.launch_cost;
+        sol::table assets = st.create_table();
+        k = 0;
+        for (const auto& a : m.asset_rows)
+        {
+            sol::table e = st.create_table();
+            e["id"] = static_cast<unsigned>(a.id); e["cls"] = a.cls; e["role"] = a.role; e["state"] = a.state;
+            e["covered"] = a.covered; e["pending"] = a.pending; e["x"] = a.x; e["y"] = a.y;
+            assets[++k] = e;
+        }
+        out["asset_rows"]     = assets;
+        out["retask_presses"] = presses_t(m.retask_presses);
+        out["station_rows"]   = presses_t(m.station_rows);
+        out["station"]        = static_cast<unsigned>(m.station);
+        out["slot"]           = m.slot;
+        out["moving"]         = m.moving;
+        out["grid_w"]         = m.grid_w;
+        out["grid_h"]         = m.grid_h;
+        sol::table slots = st.create_table();
+        k = 0;
+        for (const auto& s : m.slots)
+        {
+            sol::table e = st.create_table();
+            e["idx"] = s.idx; e["kind"] = s.kind; e["core"] = s.core; e["edge"] = s.edge;
+            e["state"] = s.state; e["x"] = s.x; e["y"] = s.y;
+            slots[++k] = e;
+        }
+        out["slots"]            = slots;
+        out["module_presses"]   = presses_t(m.module_presses);
+        out["remove"]           = press_t(m.remove_press);
+        out["move"]             = press_t(m.move_press);
+        out["save"]             = press_t(m.save_press);
+        out["upgrade"]          = press_t(m.upgrade_press);
+        out["template_presses"] = presses_t(m.template_presses);
+        sol::table b = st.create_table();
+        b["drawn"] = m.budget.drawn;
+        b["power_supply"] = m.budget.power_supply; b["power_draw"] = m.budget.power_draw;
+        b["crew_room"] = m.budget.crew_room; b["life_support"] = m.budget.life_support;
+        b["crew_aboard"] = m.budget.crew_aboard; b["crew_needed"] = m.budget.crew_needed;
+        b["working"] = m.budget.working; b["stopped"] = m.budget.stopped; b["idle_edge"] = m.budget.idle_edge;
+        out["budget"] = b;
+        sol::table c = st.create_table();
+        c["drawn"] = m.crew.drawn; c["pool"] = m.crew.pool; c["cap"] = m.crew.cap;
+        c["centres"] = m.crew.centres; c["running"] = m.crew.running; c["rate"] = m.crew.rate;
+        c["needed"] = m.crew.needed; c["aboard"] = m.crew.aboard;
+        out["crew"] = c;
+        return out;
+    });
+
+    // Type the Space ledger's template name (the InputText a player types into).
+    // Verify-only: a script cannot type into an ImGui field. Clipped to 64 bytes.
+    v.set_function("space_template_name", [this](const std::string& name) {
+        std::snprintf(m_ui.space.template_name, sizeof(m_ui.space.template_name), "%s", name.c_str());
+    });
+
+    // THE SPACE LEDGER'S STAGING FIXTURE. Gives the player nation what a launch
+    // needs, so the ledger's presses can be made through the real seam: every
+    // Digitisation node held (less one side of each pick-one pair - the side that
+    // carries no near-space key goes; far-space keys stay closed by construction),
+    // a completed, staffed Launchpad and Astronaut Training Centre on its capital
+    // tile, 40 astronauts, a treasury of at least 5M, and the home market's shelf
+    // stocked with spacecraft components and propellant. Founds NO station: the
+    // script launches the core through the ledger. Returns whether it staged and
+    // counts only - no position, no tile. Verify-only, behind --verify.
+    v.set_function("space_ledger_fixture", [this]() {
+        sol::state& st = m_lua.state();
+        sol::table out = st.create_table();
+        out["ok"] = false;
+        const entity_id nation = player_nation(m_world);
+        const auto nit = m_world.nations.find(nation);
+        if (nit == m_world.nations.end())
+            return out;
+        nation_component& nc = nit->second;
+        // Every node, less the non-space side of each exclusive pair.
+        const auto carries_space_key = [](int n) {
+            for (const std::string_view key : space_keys::near_space)
+                if (node_has_mechanic(n, key))
+                    return true;
+            return false;
+        };
+        auto& held = m_world.nation_tech[nation].held;
+        held.set();
+        for (int n = 0; n < io::dg::node_count; ++n)
+        {
+            const int ex = io::dg::nodes[static_cast<std::size_t>(n)].excludes;
+            if (ex < 0 || !held.test(static_cast<std::size_t>(n)) || !held.test(static_cast<std::size_t>(ex)))
+                continue;
+            held.reset(static_cast<std::size_t>(carries_space_key(n) ? ex : n));
+        }
+        nc.astronauts = std::max(nc.astronauts, 40);
+        nc.treasury   = std::max(nc.treasury, 5.0e6f);
+        // The pad and the centre stand on the capital tile, when it is on the home body.
+        const entity_id home = space_home_body_of(m_world, nation);
+        entity_id tile = nc.capital_tile;
+        if (const auto tit = m_world.tiles.find(tile); tit == m_world.tiles.end() || tit->second.body != home)
+            tile = null_entity;
+        int staged = 0;
+        const auto stage = [&](building_type type) {
+            building_component bc{};
+            bc.tile = tile;
+            bc.type = type;
+            bc.workforce_assigned = 1.0f;
+            bc.ticks_remaining = 0;
+            const entity_id id = m_world.create_entity();
+            m_world.buildings[id]  = bc;
+            m_world.stockpiles[id] = stockpile_component{};
+            nc.state_assets.push_back(id);
+            ++staged;
+        };
+        if (tile != null_entity)
+        {
+            if (!space_has_staffed_pad(m_world, nation, home))
+                stage(building_type::launchpad);
+            stage(building_type::astronaut_training_centre);
+        }
+        out["staged"] = staged;
+        bool shelf = false;
+        if (const auto mit = m_world.markets.find(space_home_market(m_world, nation)); mit != m_world.markets.end())
+        {
+            for (const resource_type r : {resource_type::spacecraft_components, resource_type::propellant})
+            {
+                const std::size_t i = static_cast<std::size_t>(r);
+                mit->second.inventory[i] = std::max(mit->second.inventory[i], 100000.0f);
+                if (!(mit->second.price[i] > 0.0f))
+                    mit->second.price[i] = mit->second.base_price[i] > 0.0f ? mit->second.base_price[i] : 100.0f;
+            }
+            shelf = true;
+        }
+        out["shelf"]      = shelf;
+        out["pad"]        = space_has_staffed_pad(m_world, nation, home);
+        out["astronauts"] = nc.astronauts;
+        out["home_body"]  = static_cast<unsigned>(home); // the body whose node rows the script presses
+        out["ok"]         = shelf && space_has_staffed_pad(m_world, nation, home);
         return out;
     });
 
@@ -4076,6 +4269,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         // above made the names worth checking against the actual call sites.
         else if (name == "construction")         target = "Construction";
         else if (name == "military")             target = "Military"; // slot 7: foldout_begin("Military")
+        else if (name == "space")                target = "Space";    // slot 9: foldout_begin("Space")
         else if (name == "diplomacy")            target = "##diplomacy_body"; // slot 8: its body scrolls in this child
         // The tile's building list scrolls in its own child (BL-1255: the rail
         // rows sit at the road ladder's foot and inside Infrastructure).

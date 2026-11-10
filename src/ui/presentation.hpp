@@ -159,6 +159,17 @@ inline constexpr ImU32 site_valid        = IM_COL32( 96, 210, 120, 255); ///< A 
 inline constexpr ImU32 site_no_logistics = IM_COL32(236, 168,  56, 255); ///< Accepted, but no Logistic Points reach it.
 inline constexpr ImU32 site_dim          = IM_COL32(  0,   0,   0, 255); ///< Every other tile, darkened toward this.
 
+// --- the station designer's grid (Space ledger; docs/ui/ledgers/space.md) ---
+// An empty slot, a fitted module, the core, the outer-ring (edge) mark, and the
+// two states a fitted module can be stopped in: by a shortfall (red) or because
+// an edge-only module no longer sits on the edge (amber).
+inline constexpr ImU32 station_slot    = IM_COL32( 40,  44,  54, 255); ///< An empty slot.
+inline constexpr ImU32 station_module  = IM_COL32( 64,  82, 108, 255); ///< A fitted module.
+inline constexpr ImU32 station_core    = IM_COL32(120, 190, 255, 255); ///< The core, centre slot.
+inline constexpr ImU32 station_edge    = IM_COL32(150, 156, 170, 255); ///< An edge slot's outer mark.
+inline constexpr ImU32 station_stopped = IM_COL32(216, 100,  96, 255); ///< Stopped by a shortfall.
+inline constexpr ImU32 station_idle    = IM_COL32(236, 168,  56, 255); ///< Idle: needs an edge slot.
+
 // --- interaction states (the shared selection / hover / pinned convention) ---
 inline constexpr ImU32 selection = IM_COL32(255, 255, 255, 255); ///< The selected entity.
 inline constexpr ImU32 hover     = IM_COL32(120, 190, 255, 255); ///< The entity under the cursor.
