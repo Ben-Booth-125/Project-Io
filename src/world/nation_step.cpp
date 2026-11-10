@@ -200,6 +200,13 @@ void run_nation_step(world& w, const recipe_registry& reg, economy_report& repor
     advance_research(w, reg.research(), &report.research);
     run_nation_research_repick(w, reg, spectating, &report.research_picks);
 
+    // ---- 6a. The space pick (BL-1589, AI_OPPONENT.md § 11, Ben 2026-11-10) —
+    // every non-player nation takes at most one near-space action through the
+    // command seam, after research (so a key completed this quarter is usable)
+    // and before the order queue and the asset step (so a launch is this
+    // quarter's). Never the player's nation; nothing in the settle.
+    run_nation_space_ai(w, reg, &report.space_picks);
+
     // ---- 6b. Pending near-space orders (BL-1587, SPACE_ASSETS.md § Signal delay) —
     // an order issued outside comms coverage last quarter reaches its station or
     // satellite now: re-validated, then applied or dropped. Before the asset step,

@@ -6,8 +6,13 @@
 #include "hex_neighbors.hpp"
 #include "nation_tech.hpp"     // BL-1275: the research pick's verb and reads
 #include "placement_rules.hpp" // BL-1275: is_depositless_site (the named-site scope)
+#include "orbital_graph.hpp"   // BL-1589: orbital_node_valid (the space pick's nodes)
 #include "recipe_registry.hpp"
+#include "space_assets.hpp"    // BL-1589: the launch quote
+#include "space_command.hpp"   // BL-1589: the one seam the space pick issues through
+#include "space_tech_keys.hpp" // BL-1589: the near-space keys
 #include "stance.hpp"
+#include "stations.hpp"        // BL-1589: the station quote and budget
 #include "world.hpp"
 
 #include <algorithm>
@@ -748,7 +753,8 @@ std::map<entity_id, nation_budget> score_national_budgets(const world& w,
 //                       University-scoped share x the staffed Universities on its ground
 //     unlocks           research_unlock_relief per thing the node unlocks — a recipe
 //                       (x E(proc)), a building or a placement (x E(works)), the space
-//                       gate (x E(space)) — read from the node's effects, read or
+//                       gate (x E(space)); research_space_key_relief per other
+//                       near-space mechanic key (x E(space), BL-1589) — read from the node's effects, read or
 //                       declared unread (an unlock is worth its promise to the scorer)
 //     kit               research_kit_relief per kit item the node opens (one
 //                       `unlock_kit` row each) x the KIT WEIGHT — BL-1486 (Ben,
@@ -903,7 +909,7 @@ line_emphasis emphasis_for(const world& w, entity_id nation)
 }
 
 /// What an effect row unlocks, for the scorer: 0 nothing, 1 a recipe, 2 a
-/// building or placement, 3 the space gate. Read from the store's own kinds;
+/// building or placement, 3 the space gate, 4 a near-space key (BL-1589). Read from the store's own kinds;
 /// an unread row unlocks when it waits on a recipe and says "unlock", or waits
 /// on a building or a placement the campaign does not yet carry.
 int unlock_class(const io::dg::effect& ef)
@@ -915,7 +921,18 @@ int unlock_class(const io::dg::effect& ef)
     {
         case effect_kind::unlock_recipe:    return 1;
         case effect_kind::unlock_structure: return 2;
-        case effect_kind::mechanic:         return std::string_view(ef.target) == "space_dispatch" ? 3 : 0;
+        case effect_kind::mechanic:
+        {
+            // BL-1589: Rocketry's dispatch key is the space gate (3); every other
+            // near-space key is a space verb's promise (4); any other key, 0.
+            const std::string_view key = ef.target;
+            if (key == space_keys::dispatch)
+                return 3;
+            for (const std::string_view k : space_keys::near_space)
+                if (key == k)
+                    return 4;
+            return 0;
+        }
         case effect_kind::unread:
         {
             static constexpr std::string_view k_recipes[]   = { "fertiliser recipe", "plastics recipe", "microchip recipe" };
@@ -1011,6 +1028,7 @@ double direct_relief(const scorer_ctx& c, int n)
             case 1: relief += c.p.research_unlock_relief * e.proc;  break;
             case 2: relief += c.p.research_unlock_relief * e.works; break;
             case 3: relief += c.p.research_unlock_relief * e.space; break;
+            case 4: relief += c.p.research_space_key_relief * e.space; break; // BL-1589
             default: break;
         }
 
@@ -1249,6 +1267,343 @@ int run_nation_research_repick(world& w, const recipe_registry& reg, bool specta
         }
     }
     return queued;
+}
+
+// ---------------------------------------------------------------------------
+// BL-1589 — the space pick. Contract in nation_ai.hpp.
+// ---------------------------------------------------------------------------
+
+namespace {
+
+/// The key a fittable module kind needs (stations.cpp's own table, which is
+/// file-local there). Truss and out-of-range: none.
+std::string_view space_module_key(uint8_t kind)
+{
+    switch (static_cast<station_module_kind>(kind))
+    {
+        case station_module_kind::research:             return space_keys::module_research;
+        case station_module_kind::defence:              return space_keys::module_defence;
+        case station_module_kind::power:                return space_keys::module_power;
+        case station_module_kind::dock:                 return space_keys::module_dock;
+        case station_module_kind::habitation:           return space_keys::module_habitation;
+        case station_module_kind::life_support:         return space_keys::module_life_support;
+        case station_module_kind::fuel_depot:           return space_keys::module_fuel_depot;
+        case station_module_kind::shipyard:             return space_keys::module_shipyard;
+        case station_module_kind::microgravity_factory: return space_keys::module_microgravity_factory;
+        case station_module_kind::observatory:          return space_keys::module_observatory;
+        case station_module_kind::comms_relay:          return space_keys::module_comms_relay;
+        case station_module_kind::cargo_hold:           return space_keys::module_cargo_hold;
+        case station_module_kind::market:               return space_keys::module_market;
+        case station_module_kind::truss:                break;
+    }
+    return {};
+}
+
+/// The nation's space upkeep a quarter: every own asset not lost, ascending id.
+float space_upkeep_of(const world& w, entity_id nation)
+{
+    float sum = 0.0f;
+    for (const auto& [id, a] : w.space_assets)
+        if (a.owner == nation && a.state != space_asset_state::lost)
+            sum += a.upkeep;
+    return sum;
+}
+
+/// Does the reserve rule admit spending @p cost on an asset of @p new_upkeep?
+bool space_reserve_admits(const world& w, entity_id nation, const nation_ai_params& p,
+                          float cost, float new_upkeep)
+{
+    const auto nit = w.nations.find(nation);
+    if (nit == w.nations.end())
+        return false;
+    const float upkeep  = space_upkeep_of(w, nation) + new_upkeep;
+    const float treasury = nit->second.treasury;
+    const float reserve  = std::clamp(p.space_reserve_share, 0.0f, 1.0f) * std::max(0.0f, treasury)
+                         + static_cast<float>(std::max(0, p.space_reserve_upkeep_quarters)) * upkeep;
+    return std::isfinite(cost) && nit->second.treasury - cost >= reserve;
+}
+
+/// The station's covers if every fitted part (in transit or in place, not lost)
+/// worked, plus one more module of @p kind: can power, crew room and life
+/// support all carry it?
+bool station_would_cover(const world& w, const station_params& stp, const space_station& st,
+                         float solar, uint8_t kind)
+{
+    float supply = stp.core_power_supply * solar, draw = 0.0f;
+    int   room = stp.core_crew_room, life = stp.core_life_support, crew = stp.core_crew_needed;
+    const auto add = [&](uint8_t k) {
+        if (k >= station_fittable_kind_count)
+            return;
+        const station_module_spec& m = stp.modules[k];
+        supply += m.power_supply * solar;
+        draw   += m.power_draw;
+        room   += m.crew_room;
+        life   += m.life_support;
+        crew   += m.crew_needed;
+    };
+    for (const entity_id part : st.slots) // slot order: deterministic
+    {
+        if (part == null_entity || part == st.core)
+            continue;
+        const auto it = w.space_assets.find(part);
+        if (it == w.space_assets.end() || it->second.state == space_asset_state::lost)
+            continue;
+        add(it->second.module);
+    }
+    add(kind);
+    return supply >= draw && room >= crew && life >= crew;
+}
+
+} // namespace
+
+space_ai_pick choose_space_action(const world& w, const recipe_registry& reg, entity_id nation,
+                                  const nation_ai_params& p)
+{
+    space_ai_pick pick;
+    pick.nation = nation;
+    const auto nit = w.nations.find(nation);
+    if (nit == w.nations.end())
+        return pick;
+    const nation_component& nc = nit->second;
+    // The seam's own params: the registry's, with the fair-price ceiling copied
+    // in (space_command.cpp does the same), so a quote here is the launch's.
+    space_asset_params sp = reg.space_assets();
+    sp.reservation_mult   = reg.price_band().reservation_mult;
+    const station_params& stp = reg.stations();
+
+    if (!nation_has_mechanic(w, nation, space_keys::dispatch))
+    {
+        pick.block = space_ai_block::no_rocketry;
+        return pick;
+    }
+    const entity_id home = space_home_body_of(w, nation);
+    if (home == null_entity || !space_has_staffed_pad(w, nation, home))
+    {
+        pick.block = space_ai_block::no_launchpad;
+        return pick;
+    }
+    for (const space_order& o : w.space_orders)
+        if (o.cmd.nation == nation)
+        {
+            pick.block = space_ai_block::pending_order;
+            return pick;
+        }
+
+    // What it already holds, ascending id.
+    bool      has_comms = false;
+    entity_id station   = null_entity;
+    for (const auto& [id, a] : w.space_assets)
+        if (a.owner == nation && a.state != space_asset_state::lost && a.cls == space_asset_class::satellite
+            && a.role == space_satellite_role::comms)
+            has_comms = true;
+    for (const auto& [id, st] : w.stations)
+        if (st.owner == nation)
+        {
+            station = id;
+            break;
+        }
+
+    // The first wall a wanted-but-not-taken action met, reported if nothing is taken.
+    space_ai_block wall = space_ai_block::nothing_wanted;
+    const auto note = [&](space_ai_block b) {
+        if (wall == space_ai_block::nothing_wanted)
+            wall = b;
+    };
+
+    // ---- 1. a comms satellite to the home low orbit -----------------------
+    if (!has_comms && nation_has_mechanic(w, nation, space_keys::role_comms))
+    {
+        const orbital_node node{home, orbital_node_kind::low_orbit};
+        const space_launch_quote q =
+            quote_space_launch(w, sp, nation, space_asset_class::satellite, node, space_satellite_role::comms);
+        const float up = sp.upkeep[static_cast<std::size_t>(space_asset_class::satellite)];
+        if (q.result != space_launch_result::launched)
+            note(space_ai_block::refused);
+        else if (!space_reserve_admits(w, nation, p, q.cost, up))
+            note(space_ai_block::reserve);
+        else
+        {
+            pick.action = space_ai_action::comms_satellite;
+            pick.block  = space_ai_block::none;
+            pick.node   = node;
+            pick.cost   = q.cost;
+            return pick;
+        }
+    }
+
+    // ---- 2. a station core at the cheapest free home node ------------------
+    if (station == null_entity && nation_has_mechanic(w, nation, space_keys::station_core))
+    {
+        static constexpr orbital_node_kind k_kinds[] = {
+            orbital_node_kind::low_orbit, orbital_node_kind::high_orbit, orbital_node_kind::l1,
+            orbital_node_kind::l2,        orbital_node_kind::l4,         orbital_node_kind::l5,
+        };
+        bool         found = false, crew_short = false;
+        orbital_node best{};
+        float        best_cost = 0.0f;
+        for (const orbital_node_kind k : k_kinds)
+        {
+            const orbital_node node{home, k};
+            if (!orbital_node_valid(w, node))
+                continue;
+            const station_op op = quote_found_station(w, sp, stp, nation, node);
+            if (op.result == station_result::rejected_no_crew)
+            {
+                crew_short = true;
+                continue;
+            }
+            if (op.result != station_result::ok)
+                continue;
+            const space_launch_quote q = quote_space_launch(w, sp, nation, space_asset_class::station_core, node);
+            if (q.result != space_launch_result::launched)
+                continue;
+            if (!found || q.cost < best_cost) // ties keep the earlier kind
+            {
+                found     = true;
+                best      = node;
+                best_cost = q.cost;
+            }
+        }
+        const float up = sp.upkeep[static_cast<std::size_t>(space_asset_class::station_core)];
+        if (!found)
+            note(crew_short ? space_ai_block::crew_short : space_ai_block::refused);
+        else if (!space_reserve_admits(w, nation, p, best_cost, up))
+            note(space_ai_block::reserve);
+        else
+        {
+            pick.action = space_ai_action::station_core;
+            pick.block  = space_ai_block::none;
+            pick.node   = best;
+            pick.cost   = best_cost;
+            return pick;
+        }
+    }
+
+    // ---- 3. the next module toward the target layout ----------------------
+    if (station != null_entity)
+    {
+        const space_station& st = w.stations.at(station);
+        int empty = -1;
+        for (int i = 0; i < static_cast<int>(st.slots.size()); ++i)
+            if (st.slots[static_cast<std::size_t>(i)] == null_entity && i != st.centre())
+            {
+                empty = i;
+                break;
+            }
+        std::array<int, station_fittable_kind_count> have{};
+        for (const entity_id part : st.slots)
+        {
+            if (part == null_entity || part == st.core)
+                continue;
+            const auto it = w.space_assets.find(part);
+            if (it != w.space_assets.end() && it->second.state != space_asset_state::lost
+                && it->second.module < station_fittable_kind_count)
+                ++have[it->second.module];
+        }
+        if (empty >= 0)
+        {
+            const float solar = evaluate_station_budget(w, stp, station, w.current_econ_tick).solar_factor;
+            std::array<int, station_fittable_kind_count> wanted{};
+            for (const uint8_t kind : p.space_station_target)
+            {
+                if (kind >= station_fittable_kind_count)
+                    break;
+                ++wanted[kind];
+                if (have[kind] >= wanted[kind])
+                    continue; // this entry is already met
+                const station_module_spec& spec = stp.modules[kind];
+                if (spec.edge_only && !station_slot_on_edge(st.level, empty))
+                    continue;
+                if (!nation_has_mechanic(w, nation, space_module_key(kind)))
+                    continue;
+                if (spec.crew_needed > nc.astronauts)
+                {
+                    note(space_ai_block::crew_short);
+                    continue;
+                }
+                if (!station_would_cover(w, stp, st, solar, kind))
+                    continue;
+                const space_launch_quote q =
+                    quote_space_launch(w, sp, nation, space_asset_class::station_module, st.node);
+                const float up = sp.upkeep[static_cast<std::size_t>(space_asset_class::station_module)];
+                if (q.result != space_launch_result::launched)
+                {
+                    note(space_ai_block::refused);
+                    break; // every module launch to this node quotes the same
+                }
+                if (!space_reserve_admits(w, nation, p, q.cost, up))
+                {
+                    note(space_ai_block::reserve);
+                    break;
+                }
+                pick.action  = space_ai_action::station_module;
+                pick.block   = space_ai_block::none;
+                pick.node    = st.node;
+                pick.station = station;
+                pick.slot    = empty;
+                pick.module  = kind;
+                pick.cost    = q.cost;
+                return pick;
+            }
+        }
+    }
+
+    pick.block = wall;
+    return pick;
+}
+
+int run_nation_space_ai(world& w, const recipe_registry& reg, std::vector<space_ai_pick>* out)
+{
+    if (w.nations.empty() || !research_age_open(w))
+        return 0;
+    const nation_ai_params& p = reg.nation_ai();
+    // The player's nation is never acted on, spectated or not (the grant's
+    // "Not admitted"). Ascending id.
+    const entity_id seat = player_nation(w);
+    int issued = 0;
+    for (const entity_id n : sorted_nation_ids(w))
+    {
+        if (n == seat)
+            continue;
+        space_ai_pick pick = choose_space_action(w, reg, n, p);
+        if (pick.action != space_ai_action::none)
+        {
+            space_command c;
+            c.nation = n;
+            if (pick.action != space_ai_action::station_module)
+            {
+                c.node_body = pick.node.body;
+                c.node_kind = static_cast<uint8_t>(pick.node.kind);
+            }
+            switch (pick.action)
+            {
+                case space_ai_action::comms_satellite:
+                    c.verb = static_cast<uint8_t>(space_verb::launch);
+                    c.cls  = static_cast<uint8_t>(space_asset_class::satellite);
+                    c.role = static_cast<uint8_t>(space_satellite_role::comms);
+                    break;
+                case space_ai_action::station_core:
+                    c.verb = static_cast<uint8_t>(space_verb::found_station);
+                    break;
+                case space_ai_action::station_module:
+                    c.verb    = static_cast<uint8_t>(space_verb::fit_module);
+                    c.subject = pick.station;
+                    c.slot    = pick.slot;
+                    c.module  = pick.module;
+                    break;
+                case space_ai_action::none:
+                    break;
+            }
+            pick.result = apply_space_command(w, reg, c).result;
+            if (pick.result == space_command_result::applied || pick.result == space_command_result::queued)
+                ++issued;
+            else
+                pick.block = space_ai_block::refused;
+        }
+        if (out)
+            out->push_back(pick);
+    }
+    return issued;
 }
 
 // ---------------------------------------------------------------------------
