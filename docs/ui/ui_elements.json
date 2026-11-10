@@ -256,6 +256,25 @@
    "checks": []
   },
   {
+   "id": "UI-142",
+   "name": "Orbital nodes (Circumplanetary)",
+   "kind": "sub-element",
+   "parent": "UI-009",
+   "source": [
+    "docs/ui/CIRCUMPLANETARY.md § Orbital nodes and what sits at them",
+    "docs/economy/SPACE_ASSETS.md § The orbital graph",
+    "src/ui/circum_nodes.hpp",
+    "src/ui/circum_nodes.cpp",
+    "src/ui/circumplanetary_canvas.cpp"
+   ],
+   "summary": "The anchor's part of the orbital graph: a low and a high orbit ring around the anchor and each moon, a diamond at each L1/L2/L4/L5 of every anchor–moon pair moving with the moon, and a row of slot pips beside every node (hollow = free). Hovering a node opens the shared hover card: its name, free slots, and the thrust cost and days from the home surface.",
+   "interesting_question": "The rings are not positions in the graph — a low and a high orbit sit at the body itself — so their radii are chosen to read, while the L-points are mapped from the graph's AU positions; does a player read a ring's size as a distance?",
+   "resolution": "Open — the rung already uses a visible offset for moons (CIRCUMPLANETARY.md § Visual elements), and the hover card's thrust cost and days are the measured fact surface; a node is not a selectable entity, so a press on one changes nothing.",
+   "checks": [
+    "near_space_nodes"
+   ]
+  },
+  {
    "id": "UI-013",
    "name": "Planetary Canvas",
    "kind": "canvas",

@@ -1,6 +1,7 @@
 #include "circumplanetary_canvas.hpp"
 
 #include "canvas_scale.hpp"
+#include "circum_nodes.hpp"
 #include "highlight.hpp"
 #include "nav_pane.hpp"
 #include "presentation.hpp"
@@ -192,16 +193,38 @@ void draw_circumplanetary_canvas(const world& w, ui_state& state, ImVec2 origin,
         return std::max(floor, s.base_radius * element_scale * mult);
     };
 
+    const ImVec2 mouse = state.mouse.active
+                         ? ImVec2{state.mouse.x, state.mouse.y}
+                         : ImVec2{-1.0f, -1.0f};
+
+    // Orbital nodes (CIRCUMPLANETARY.md § Orbital nodes and what sits at them):
+    // laid out from the live angles, on the moons' own visible-offset frame.
+    // Primary view only — the minimap is too small for a legible pip row.
+    std::vector<circum_node_mark> node_marks;
+    if (apply_view)
+    {
+        std::vector<float> radii;
+        radii.reserve(moons.size() + 1);
+        radii.push_back(body_radius(anchor, true));
+        for (entity_id id : moons)
+            radii.push_back(body_radius(id, false));
+        node_marks = layout_circum_nodes(w, anchor, moons, radii, {view_origin, zoom, scale});
+        state.circum_nodes_drawn.clear();
+        for (const circum_node_mark& m : node_marks)
+            state.circum_nodes_drawn.push_back({ orbital_node_display_name(w, m.node), m.pos.x,
+                                                 m.pos.y, m.ring_r, m.capacity,
+                                                 m.capacity - m.held });
+        state.circum_node_hovered.clear();
+    }
+
     // Moon orbital rings, centred on the anchor.
     for (entity_id id : moons)
     {
         const float r = w.bodies.at(id).orbital_radius_au * scale * zoom;
         dl->AddCircle(to_screen({0.0f, 0.0f}), r, IM_COL32(38, 42, 52, 255), 0, 1.0f);
     }
-
-    const ImVec2 mouse = state.mouse.active
-                         ? ImVec2{state.mouse.x, state.mouse.y}
-                         : ImVec2{-1.0f, -1.0f};
+    // Low and high orbit rings: under the bodies.
+    draw_circum_node_rings(dl, node_marks);
 
     // Draw the anchor first, then the moons on top. Each entry is (id, is_anchor).
     std::vector<std::pair<entity_id, bool>> draw_list;
@@ -248,9 +271,18 @@ void draw_circumplanetary_canvas(const world& w, ui_state& state, ImVec2 origin,
         // Shared selection / hover / pinned ring (pinning not yet wired).
         draw_body_highlight(dl, pos, radius,
             resolve_highlight(id == state.selected_entity, this_hovered, /*pinned=*/false));
+    }
 
-        if (draw_labels)
+    // Diamonds and slot pips: over the rings and bodies, under the labels.
+    draw_circum_node_marks(dl, node_marks);
+
+    if (draw_labels)
+    {
+        for (const auto& [id, is_anchor] : draw_list)
         {
+            const body_component& body = w.bodies.at(id);
+            const float  radius = body_radius(id, is_anchor);
+            const ImVec2 pos    = to_screen(local_pos(id, is_anchor));
             const ImVec2 ts = ImGui::CalcTextSize(body.name.c_str());
             dl->AddText({pos.x - ts.x * 0.5f, pos.y + radius + 2.0f}, // fit-exempt: on-canvas label; panel/box sized from measured entries
                         IM_COL32(255, 255, 255, 255), body.name.c_str());
@@ -318,6 +350,17 @@ void draw_circumplanetary_canvas(const world& w, ui_state& state, ImVec2 origin,
             body.name.c_str(), body_type_name(body.type), body.orbital_radius_au);
     }
 
+    // A node answers hover only where no body does: body hover and selection win.
+    int hovered_node = -1;
+    if (hovered_body == null_entity && !node_marks.empty())
+        hovered_node = hit_circum_node(node_marks, mouse);
+    if (hovered_node >= 0)
+    {
+        const circum_node_mark& m = node_marks[static_cast<std::size_t>(hovered_node)];
+        state.circum_node_hovered = orbital_node_display_name(w, m.node);
+        draw_circum_node_card(w, m, mouse);
+    }
+
     // Click handling. Single-click selects (no view change); double-click
     // navigates (descend to the body's surface). On the minimap a single click
     // ascends. See SELECTION.md / CANVASES.md.
@@ -329,7 +372,8 @@ void draw_circumplanetary_canvas(const world& w, ui_state& state, ImVec2 origin,
     }
     else
     {
-        if (ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+        // A node is not a selectable entity: a press on one changes nothing.
+        if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) && hovered_node < 0)
         {
             state.selected_entity = hovered_body;
         }

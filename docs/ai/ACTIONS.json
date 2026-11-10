@@ -699,6 +699,25 @@
    "reason_to_select": "Read a thing before committing a click — check a tile's landform and movement cost, a deposit's richness, or a price signal, and learn the glyph vocabulary at the point of looking."
   },
   {
+   "id": "canvas.hover_orbital_node",
+   "family": "canvas",
+   "surface": "The Circumplanetary canvas (primary view only): the low and high orbit rings around the anchor and each moon, the L1/L2/L4/L5 diamonds of every anchor-moon pair, and the slot-pip row beside each node (CIRCUMPLANETARY.md § Orbital nodes and what sits at them).",
+   "press": "Hold the pointer over a node: on a diamond, on a ring's line, or on a node's row of slot pips. A body under the pointer wins: over a planet or moon disc the body's own tooltip shows instead.",
+   "args": [
+    {
+     "name": "node",
+     "type": "orbital_node",
+     "meaning": "The hovered node: a body's low or high orbit, or an L1/L2/L4/L5 of an anchor-moon pair, named \"<body> low orbit\", \"<moon> L4\"."
+    }
+   ],
+   "preconditions": [
+    "The app is in-game with the Circumplanetary rung primary.",
+    "No body disc is under the pointer."
+   ],
+   "expected_output": "The shared hover card appears at once, beside the cursor: the node's name, its free slots out of its capacity, and the thrust cost (∆v) and travel days from the player's home surface along the cheapest route. A press on a node changes nothing: a node is not a selectable entity, so the selection is kept rather than cleared. Pips are hollow for a free slot and filled for a held one.",
+   "reason_to_select": "Compare where around a planet there is room to place an orbital asset, and what reaching each place costs from home, before committing to one."
+  },
+  {
    "id": "canvas.construction_site_card",
    "family": "canvas",
    "surface": "Planetary canvas: the build-progress circle drawn over each of the player's sites under construction.",

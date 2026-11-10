@@ -126,6 +126,10 @@
    "The Planetary surface canvas (tiles and buildings; a market centre has no hover target of its own since its glyph retired, (Ben, 2026-10-10: 'We should remove the HQ glyph and market center glyphs')). The Solar and Circumplanetary rungs still use a lightweight ad-hoc tooltip (name, type, orbital radius) — the full card has not migrated there yet."
   ],
   [
+   "canvas.hover_orbital_node",
+   "The Circumplanetary canvas (primary view only): the low and high orbit rings around the anchor and each moon, the L1/L2/L4/L5 diamonds of every anchor-moon pair, and the slot-pip row beside each node (CIRCUMPLANETARY.md § Orbital nodes and what sits at them)."
+  ],
+  [
    "canvas.construction_site_card",
    "Planetary canvas: the build-progress circle drawn over each of the player's sites under construction."
   ],

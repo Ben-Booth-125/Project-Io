@@ -1312,6 +1312,18 @@
     "src/ui/icons.cpp"
    ],
    "status": "drafted"
+  },
+  "circumplanetary_orbital_nodes": {
+   "surface": "Circumplanetary orbital nodes: low and high orbit rings around the anchor and each moon, a diamond at each L1/L2/L4/L5 of every anchor-moon pair, a row of slot pips beside every node, and a hover card naming the node with its free slots and the thrust cost and days from the home surface",
+   "answers": "Where around this planet can I put something, how much room is left there, and what does it cost to get there from home?",
+   "because": "Near space is a graph of named nodes (SPACE_ASSETS.md § The orbital graph), and every space decision the player makes - where a satellite sits, where a station goes, whether a slot is still free - is a choice between those nodes. Without them on the rung the graph is invisible and its costs are a number the player can only meet after committing. The rings and diamonds say which places exist; the pips say how full each is at a glance, so the scarce L-points read as scarce; the hover card carries the cost and days, because those are the figures a choice between two nodes turns on, and a press does nothing because a node is a place, not a thing to select.",
+   "backlog_item": "BL-1590",
+   "files": [
+    "src/ui/circum_nodes.hpp",
+    "src/ui/circum_nodes.cpp",
+    "src/ui/circumplanetary_canvas.cpp"
+   ],
+   "status": "drafted"
   }
  }
 }

@@ -1861,6 +1861,20 @@ struct ui_state
     /// id rather than re-deriving the ring's layout in Lua.
     std::vector<float> tech_tree_node_screen;
 
+    /// BL-1590: the Circumplanetary rung's orbital nodes as drawn this frame
+    /// (primary view only), and the one hovered — what the screen shows, for
+    /// `verify.circum_nodes()` to aim a hover at a node by name.
+    struct circum_node_drawn
+    {
+        std::string name;        ///< "Vother L4", "Rivekhaik high orbit".
+        float       x = 0.0f, y = 0.0f; ///< Diamond centre; for a ring, its body's centre.
+        float       ring_r = 0.0f;      ///< 0 for a diamond.
+        int         capacity = 0;
+        int         free     = 0;
+    };
+    std::vector<circum_node_drawn> circum_nodes_drawn;
+    std::string                    circum_node_hovered; ///< Empty when none.
+
     /// Research-queue presses from the panel (queue a node, remove the last,
     /// clear), applied by `app::render` through `apply_corp_command` — the
     /// panel holds a const world. Drained in order each frame.

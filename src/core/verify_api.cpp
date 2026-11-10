@@ -3780,6 +3780,37 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         else if (name == "diplomacy")     m_ui.diplomacy.view = view;   // 0 = Nations, 1 = Wars
     });
 
+    // The Circumplanetary rung's orbital nodes (BL-1590): each node as the rung
+    // LAST DREW it — name, screen centre, ring radius (0 for a diamond), slot
+    // capacity and free slots — so a script aims verify.hover at "<moon> L4"
+    // by name. Only what the screen draws; no tile data. Render a frame on the
+    // rung before asking. `circum_node_hovered()` names the hovered node, or "".
+    v.set_function("circum_nodes", [this](sol::this_state ts) -> sol::table {
+        sol::state_view lua(ts);
+        sol::table out = lua.create_table();
+        int i = 1;
+        for (const auto& n : m_ui.circum_nodes_drawn)
+        {
+            sol::table row = lua.create_table();
+            row["name"]     = n.name;
+            row["x"]        = n.x;
+            row["y"]        = n.y;
+            row["ring_r"]   = n.ring_r;
+            row["capacity"] = n.capacity;
+            row["free"]     = n.free;
+            out[i++] = row;
+        }
+        return out;
+    });
+    v.set_function("circum_node_hovered", [this]() -> std::string {
+        return m_ui.circum_node_hovered;
+    });
+    // The selected entity's id (0 = none), so a check can prove a press on a
+    // node leaves the selection as it was.
+    v.set_function("circum_selected", [this]() -> unsigned {
+        return static_cast<unsigned>(m_ui.selected_entity);
+    });
+
     // The research panel (BL-1276). `tech_tree_node(id)` answers the screen
     // centre of a Digitisation node as the ring LAST DREW it (x, y), or
     // (-1, -1) for an unknown id or a ring not on screen — so a script aims
