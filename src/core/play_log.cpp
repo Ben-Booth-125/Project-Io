@@ -234,6 +234,8 @@ const char* play_log::verb_name(corp_verb v)
         case corp_verb::refuse_peace:         return "refuse_peace";       // BL-1428
         case corp_verb::impose_peace:         return "impose_peace";       // BL-1428
         case corp_verb::set_embargo:          return "set_embargo";        // BL-1418
+        case corp_verb::queue_space_research:   return "queue_space_research";   // BL-1613
+        case corp_verb::unqueue_space_research: return "unqueue_space_research"; // BL-1613
     }
     return "verb?";
 }
@@ -418,6 +420,13 @@ void play_log::command(const world& w, const corp_command& cmd, corp_command_res
         && cmd.order < static_cast<std::uint32_t>(io::dg::node_count))
     {
         const io::dg::node& n = io::dg::nodes[cmd.order];
+        kv_str(o, "node_id", n.id);
+        kv_str(o, "node_name", n.name);
+    }
+    if ((cmd.verb == corp_verb::queue_space_research || cmd.verb == corp_verb::unqueue_space_research)
+        && cmd.order < static_cast<std::uint32_t>(io::es::node_count))
+    {
+        const io::es::node& n = io::es::nodes[cmd.order];
         kv_str(o, "node_id", n.id);
         kv_str(o, "node_name", n.name);
     }
@@ -615,12 +624,14 @@ void play_log::snapshot(const world& w, const economy_report& report, std::uint6
         key(o, "ai_picks");
         o += '[';
         for (const research_ai_pick& p : report.research_picks)
-            if (p.nation == id && p.node >= 0 && p.node < io::dg::node_count)
+            if (p.nation == id && p.node >= 0
+                && p.node < (p.early_space ? io::es::node_count : io::dg::node_count))
             {
                 elem(o);
                 o += '{';
-                kv_str(o, "id", io::dg::nodes[p.node].id);
-                kv_str(o, "name", io::dg::nodes[p.node].name);
+                // BL-1613: a pick names its tree's node.
+                kv_str(o, "id", p.early_space ? io::es::nodes[p.node].id : io::dg::nodes[p.node].id);
+                kv_str(o, "name", p.early_space ? io::es::nodes[p.node].name : io::dg::nodes[p.node].name);
                 kv_bool(o, "queued", p.queued);
                 kv_num(o, "score_rp", static_cast<double>(p.score_milli) / 1000.0);
                 o += '}';

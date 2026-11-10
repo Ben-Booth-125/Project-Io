@@ -595,7 +595,19 @@ struct effect_tables
     std::vector<resolved_unlock>   recipe_unlocks;
     std::vector<resolved_unlock>   structure_unlocks;
     std::vector<resolved_mechanic> mechanics;
+    // BL-1613: the Early Space tree's read modifiers, per subject, in ES node-index
+    // order. `node` is an `io::es` index here.
+    std::vector<resolved_modifier> es_by_subject[static_cast<std::size_t>(modifier_subject::alarm_decay) + 1];
 };
+
+/// An Early Space effect row in the Digitisation row's shape: the two generated
+/// structs and their enums are field-for-field the same, so one classifier
+/// judges both (the store's grammar is one, RESEARCH.md).
+io::dg::effect as_dg_effect(const io::es::effect& e)
+{
+    return io::dg::effect{ e.node, static_cast<io::dg::effect_kind>(e.kind), e.subject, e.scope,
+                           static_cast<io::dg::effect_op>(e.op), e.value, e.target, e.what, e.waits_on };
+}
 
 const effect_tables& tables()
 {
@@ -629,6 +641,24 @@ const effect_tables& tables()
             }
             else if (e.kind == io::dg::effect_kind::mechanic)
                 out.mechanics.push_back({ node, e.target });
+        }
+        // BL-1613: the Early Space tree's modifier rows fold beside them. Its
+        // mechanic keys are answered from the ES held set (nation_has_mechanic).
+        for (const io::es::effect& ee : io::es::effects)
+        {
+            if (ee.kind != io::es::effect_kind::modifier || ee.node < 0 || ee.node >= io::es::node_count)
+                continue;
+            const io::dg::effect e = as_dg_effect(ee);
+            if (classify_effect(e) != effect_reading::read)
+                continue;
+            resolved_modifier r;
+            r.node = static_cast<std::size_t>(ee.node);
+            parse_subject(e.subject, r.subject);
+            parse_scope(e.scope, r);
+            r.mod.subject   = r.subject;
+            r.mod.op        = e.op == io::dg::effect_op::add ? modifier_op::add : modifier_op::multiply;
+            r.mod.magnitude = e.value;
+            out.es_by_subject[static_cast<std::size_t>(r.subject)].push_back(r);
         }
         return out;
     }();
@@ -730,7 +760,7 @@ float nation_scalar(const world& w, entity_id nation, modifier_subject subject,
                     const effect_target& target, float base)
 {
     const nation_tech_state* st = state_of(w, nation);
-    if (st == nullptr || st->held.none())
+    if (st == nullptr || (st->held.none() && st->es_held.none()))
         return base; // holding nothing: the same bits back, no arithmetic
     const std::size_t si = static_cast<std::size_t>(subject);
     const effect_tables& t = tables();
@@ -739,6 +769,27 @@ float nation_scalar(const world& w, entity_id nation, modifier_subject subject,
     // Node-index order: the held set has no earn order, and needs none saved.
     for (const resolved_modifier& r : t.by_subject[si])
         if (st->held.test(r.node) && scope_matches(r, target))
+            base = apply_scalar_modifier(base, r.mod);
+    // BL-1613: then the Early Space tree's, in its own node-index order. Nothing
+    // runs for an empty ES held set, so a world without one folds as before.
+    if (st->es_held.any())
+        for (const resolved_modifier& r : t.es_by_subject[si])
+            if (st->es_held.test(r.node) && scope_matches(r, target))
+                base = apply_scalar_modifier(base, r.mod);
+    return base;
+}
+
+float early_space_node_scalar_at(int es_node, modifier_subject subject, const effect_target& target,
+                                 float base)
+{
+    if (es_node < 0 || es_node >= io::es::node_count)
+        return base;
+    const std::size_t si = static_cast<std::size_t>(subject);
+    const effect_tables& t = tables();
+    if (si >= std::size(t.es_by_subject))
+        return base;
+    for (const resolved_modifier& r : t.es_by_subject[si])
+        if (r.node == static_cast<std::size_t>(es_node) && scope_matches(r, target))
             base = apply_scalar_modifier(base, r.mod);
     return base;
 }
@@ -898,12 +949,15 @@ bool holds_rocketry(const std::bitset<io::dg::node_count>& held)
 }
 
 /// The gate's ground half (ERAS.md conditions 2 and 3): a staffed Launchpad of the
-/// nation's on its home body, and propellant on a home-body market's shelf.
-bool space_gate_ground_met(const world& w, entity_id nation, const research_params& p)
+/// nation's on its home body, and propellant on a home-body market's shelf. Each
+/// half is reported (BL-1613: the research panel names the one that is missing).
+void space_gate_ground(const world& w, entity_id nation, const research_params& p,
+                       bool& pad_out, bool& propellant_out)
 {
+    pad_out = propellant_out = false;
     const entity_id body = space_home_body_of(w, nation);
     if (body == null_entity)
-        return false;
+        return;
 
     bool pad = false;
     if (const std::vector<entity_id>* assets = assets_of(w, nation))
@@ -923,8 +977,7 @@ bool space_gate_ground_met(const world& w, entity_id nation, const research_para
                 break;
             }
         }
-    if (!pad)
-        return false;
+    pad_out = pad;
 
     // Any market on the body: an any-of, so the walk order cannot move the answer.
     const float need = std::isfinite(p.space_gate_min_propellant)
@@ -932,8 +985,17 @@ bool space_gate_ground_met(const world& w, entity_id nation, const research_para
     const std::size_t pr = static_cast<std::size_t>(resource_type::propellant);
     for (const auto& [mid, m] : w.markets)
         if (m.body == body && std::isfinite(m.inventory[pr]) && m.inventory[pr] >= need)
-            return true;
-    return false;
+        {
+            propellant_out = true;
+            return;
+        }
+}
+
+bool space_gate_ground_met(const world& w, entity_id nation, const research_params& p)
+{
+    bool pad = false, prop = false;
+    space_gate_ground(w, nation, p, pad, prop);
+    return pad && prop;
 }
 
 /// Whether Early Space node @p n is available against state @p st with the gate
@@ -968,6 +1030,17 @@ bool nation_meets_space_gate(const world& w, entity_id nation, const research_pa
     return st != nullptr && gate_for(w, nation, *st, p);
 }
 
+space_gate_status nation_space_gate_status(const world& w, entity_id nation, const research_params& p)
+{
+    space_gate_status g;
+    if (w.nations.find(nation) == w.nations.end())
+        return g;
+    const nation_tech_state* st = state_of(w, nation);
+    g.rocketry = st != nullptr && holds_rocketry(st->held);
+    space_gate_ground(w, nation, p, g.launchpad, g.propellant);
+    return g;
+}
+
 bool nation_holds_early_space(const world& w, entity_id nation, int es_node)
 {
     if (!es_valid(es_node))
@@ -984,8 +1057,11 @@ bool early_space_node_available(const world& w, entity_id nation, int es_node, c
     return st != nullptr && es_available_in(*st, gate_for(w, nation, *st, p), es_node);
 }
 
-enqueue_result enqueue_early_space_node(world& w, entity_id nation, int es_node, const research_params& p)
+enqueue_result preview_enqueue_early_space(const world& w, entity_id nation, int es_node,
+                                          std::vector<std::uint16_t>* plan_out, const research_params& p)
 {
+    if (plan_out != nullptr)
+        plan_out->clear();
     if (!es_valid(es_node) || w.nations.find(nation) == w.nations.end())
         return enqueue_result::invalid;
     const nation_tech_state* existing = state_of(w, nation);
@@ -1036,7 +1112,19 @@ enqueue_result enqueue_early_space_node(world& w, entity_id nation, int es_node,
     expand(expand, es_node, 0);
     if (!ok || plan.empty())
         return enqueue_result::invalid;
+    if (plan_out != nullptr)
+        *plan_out = std::move(plan);
+    return enqueue_result::queued;
+}
 
+enqueue_result enqueue_early_space_node(world& w, entity_id nation, int es_node, const research_params& p)
+{
+    // The one planner the preview runs, so the panel's preview cannot disagree
+    // with the press; a refusal returns before anything is touched.
+    std::vector<std::uint16_t> plan;
+    const enqueue_result r = preview_enqueue_early_space(w, nation, es_node, &plan, p);
+    if (r != enqueue_result::queued)
+        return r;
     nation_tech_state& dst = w.nation_tech[nation];
     for (const std::uint16_t n : plan)
         dst.es_queue.push_back(n);
@@ -1474,9 +1562,11 @@ std::vector<int> project_queue_arrivals(const world& w, entity_id nation,
                                         const research_params& p, int horizon_quarters)
 {
     const nation_tech_state* existing = state_of(w, nation);
-    if (existing == nullptr || existing->queue.empty())
+    if (existing == nullptr || (existing->queue.empty() && existing->es_queue.empty()))
         return {};
-    std::vector<int> arrival(existing->queue.size(), -1);
+    // BL-1613: one logical queue - the Digitisation entries, then the Early Space tail.
+    const std::size_t dg_n = existing->queue.size();
+    std::vector<int> arrival(dg_n + existing->es_queue.size(), -1);
     const auto nit = w.nations.find(nation);
     if (nit == w.nations.end())
         return arrival;
@@ -1494,7 +1584,7 @@ std::vector<int> project_queue_arrivals(const world& w, entity_id nation,
     // Unclamped, so a projection read mid-settle still opens at the right quarter.
     int          age   = w.current_econ_tick + 1 - k_campaign_settle_ticks;
     std::int64_t price = research_price_ppm_at(research_next_age_quarter(w), p);
-    for (int q = 1; q <= horizon_quarters && !sim.queue.empty(); ++q)
+    for (int q = 1; q <= horizon_quarters && !(sim.queue.empty() && sim.es_queue.empty()); ++q)
     {
         if (q > 1)
         {
@@ -1507,9 +1597,12 @@ std::vector<int> project_queue_arrivals(const world& w, entity_id nation,
             break;
         sim.pool_milli += row.rp_milli;
         flow_state(w, nation, sim, p, price);
-        for (std::size_t i = 0; i < existing->queue.size(); ++i)
+        for (std::size_t i = 0; i < dg_n; ++i)
             if (arrival[i] < 0 && sim.held.test(existing->queue[i]))
                 arrival[i] = q;
+        for (std::size_t i = 0; i < existing->es_queue.size(); ++i)
+            if (arrival[dg_n + i] < 0 && sim.es_held.test(existing->es_queue[i]))
+                arrival[dg_n + i] = q;
 
         // Every remaining entry passed over (a quest waiting on its deed, or an
         // entry behind one): no later quarter moves the queue either.
@@ -1520,6 +1613,14 @@ std::vector<int> project_queue_arrivals(const world& w, entity_id nation,
                 any_open = true;
                 break;
             }
+        // An Early Space entry is open while its branch is keyed and it is not a
+        // quest (every Early Space deed is unread); its requirements flow ahead of it.
+        // The ground is held where it stands; the research half reads the copy, so
+        // Rocketry completing in the projection opens the tail as the pass would.
+        const bool gate = !any_open && !sim.es_queue.empty() && gate_for(w, nation, sim, p);
+        for (std::size_t i = 0; !any_open && gate && i < sim.es_queue.size(); ++i)
+            if (es_deed_met(sim.es_queue[i]) && branch_keyed_in(sim.held, es_branch_of(sim.es_queue[i])))
+                any_open = true;
         if (!any_open)
             break;
     }
@@ -1529,7 +1630,16 @@ std::vector<int> project_queue_arrivals(const world& w, entity_id nation,
 bool remove_last_queued(world& w, entity_id nation)
 {
     const auto it = w.nation_tech.find(nation);
-    if (it == w.nation_tech.end() || it->second.queue.empty())
+    if (it == w.nation_tech.end())
+        return false;
+    // BL-1613: the last entry of the ONE logical queue - the Early Space tail's
+    // when it has one, since that tail stands behind every Digitisation entry.
+    if (!it->second.es_queue.empty())
+    {
+        it->second.es_queue.pop_back();
+        return true;
+    }
+    if (it->second.queue.empty())
         return false;
     it->second.queue.pop_back();
     return true;
@@ -1597,8 +1707,67 @@ int unqueue_with_dependents(world& w, entity_id nation, int node)
 bool clear_research_queue(world& w, entity_id nation)
 {
     const auto it = w.nation_tech.find(nation);
-    if (it == w.nation_tech.end() || it->second.queue.empty())
+    if (it == w.nation_tech.end() || (it->second.queue.empty() && it->second.es_queue.empty()))
         return false;
     it->second.queue.clear();
+    it->second.es_queue.clear(); // BL-1613: one logical queue; the pool stays
     return true;
+}
+
+std::vector<std::uint16_t> queued_early_space_dependents(const world& w, entity_id nation, int es_node)
+{
+    std::vector<std::uint16_t> removed;
+    const nation_tech_state* st = state_of(w, nation);
+    if (st == nullptr || !es_valid(es_node))
+        return removed;
+    const auto at = std::find(st->es_queue.begin(), st->es_queue.end(), static_cast<std::uint16_t>(es_node));
+    if (at == st->es_queue.end())
+        return removed;
+
+    // queued_dependents' rule over the Early Space tail: a later entry goes when one
+    // of its requirement groups touches a removed entry and no member of that group
+    // is held or still queued ahead of it.
+    std::bitset<io::es::node_count> kept = st->es_held;
+    for (auto it = st->es_queue.begin(); it != at; ++it)
+        kept.set(*it);
+    std::bitset<io::es::node_count> gone;
+    gone.set(static_cast<std::size_t>(es_node));
+    removed.push_back(static_cast<std::uint16_t>(es_node));
+    for (auto it = at + 1; it != st->es_queue.end(); ++it)
+    {
+        const io::es::node& n = es_node_at(*it);
+        bool needs = false;
+        for (int g = 0; g < n.group_count && !needs; ++g)
+        {
+            bool touches_gone = false, still_met = false;
+            for (const std::int16_t m : n.groups[static_cast<std::size_t>(g)])
+            {
+                if (m < 0 || m >= io::es::node_count)
+                    continue;
+                touches_gone = touches_gone || gone.test(static_cast<std::size_t>(m));
+                still_met    = still_met || kept.test(static_cast<std::size_t>(m));
+            }
+            needs = touches_gone && !still_met;
+        }
+        if (needs)
+        {
+            gone.set(*it);
+            removed.push_back(*it);
+        }
+        else
+            kept.set(*it);
+    }
+    return removed;
+}
+
+int unqueue_early_space_with_dependents(world& w, entity_id nation, int es_node)
+{
+    const std::vector<std::uint16_t> removed = queued_early_space_dependents(w, nation, es_node);
+    if (removed.empty())
+        return 0;
+    std::vector<std::uint16_t>& q = w.nation_tech.at(nation).es_queue;
+    q.erase(std::remove_if(q.begin(), q.end(),
+                           [&](std::uint16_t n) { return in_list(removed, n); }),
+            q.end());
+    return static_cast<int>(removed.size());
 }

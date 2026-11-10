@@ -1367,6 +1367,21 @@
     "src/ui/icons.cpp"
    ],
    "status": "drafted"
+  },
+  "tech_tree_early_space": {
+   "surface": "Research panel, Early Space tab (top-right age switch): the next age's tree as three branch columns on the canvas, its entries on the one queue in the column",
+   "answers": "What does reaching space open next, what keys each branch of it, and is my nation through the gate yet?",
+   "because": "RESEARCH.md gives a nation one pool and one queue, and Quests key the next age: the Early Space tree is researchable once the gate into space is met (ERAS.md § Era 1 -> Era 2 gate) and a branch is keyed. A tree the player cannot see is a research line that silently stops paying - the queue would hold far-space entries with no place to plan them, and the gate would be a rule only the sim knew. It earns the canvas the ring already holds by a tab rather than a second panel: the same glyphs, links, hover card and shift-click press, so nothing new is learned. Three branches read as columns, not a ring - one per tree is too few to make a sector shape mean anything. Before the gate the tree stays readable (every node, every link, by hover) but draws locked, and the caption names exactly which of the three gate conditions is missing, so the player learns what to build, not just that a door is shut. Each column header says what keys its branch, so the Digitisation quest that opens it is named where it matters. The column lists the Early Space tail after the Digitisation entries, numbered on, with arrival quarters from the same projection, because it is one queue and the pool reaches the tail last.",
+   "backlog_item": [
+    "BL-1613",
+    "BL-1612"
+   ],
+   "files": [
+    "src/ui/tech_tree_panel.cpp",
+    "src/world/nation_tech.cpp",
+    "src/world/corp_command.cpp"
+   ],
+   "status": "drafted"
   }
  }
 }

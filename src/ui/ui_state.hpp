@@ -2002,6 +2002,23 @@ struct ui_state
     /// id rather than re-deriving the ring's layout in Lua.
     std::vector<float> tech_tree_node_screen;
 
+    /// BL-1613: which age's tree the research canvas shows - 0 the Digitisation
+    /// ring, 1 the Early Space tree (RESEARCH.md: Quests key the next age). The
+    /// switch's two tabs sit top-right of the canvas. The toggle rule holds: a
+    /// press on the tab already shown closes the research panel, as re-clicking
+    /// an active sub-view tab closes its ledger. View state, not saved.
+    int tech_tree_age = 0;
+    /// The two tabs' centres as last drawn (x, y per age), for the verify API to
+    /// press one through the real hit-test. Empty when the canvas is not on screen.
+    std::vector<float> tech_tree_age_tab_screen;
+    /// Each Early Space node's screen centre as last drawn, (x, y) per `io::es`
+    /// index; empty unless the Early Space tree is on screen.
+    std::vector<float> tech_tree_es_node_screen;
+    /// Whether the Early Space tree was drawn LOCKED (the gate into space unmet)
+    /// on the last frame, and the reason line it showed. For the verify API.
+    bool        tech_tree_es_locked = false;
+    std::string tech_tree_es_lock_reason;
+
     /// BL-1590: the Circumplanetary rung's orbital nodes as drawn this frame
     /// (primary view only), and the one hovered — what the screen shows, for
     /// `verify.circum_nodes()` to aim a hover at a node by name.

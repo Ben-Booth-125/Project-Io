@@ -1076,6 +1076,48 @@ double direct_relief(const scorer_ctx& c, int n)
     return std::isfinite(relief) ? relief : 0.0;
 }
 
+/// BL-1613: direct(n) for EARLY SPACE node @p n, in relief units - the same rule
+/// as `direct_relief`, over the Early Space tree's own rows. Its read modifiers
+/// are processing_yield on propellant (priced over the nation's own processing
+/// facilities, exactly as above); each far-space mechanic key is a space verb's
+/// promise (research_space_key_relief x E(space), the near-space keys' rate); a
+/// major is the cluster it closes (research_major_relief x E(space) x its cost
+/// units - the space line, not the academic one, is what this tree serves). An
+/// unread row relieves nothing.
+double es_direct_relief(const scorer_ctx& c, int n)
+{
+    const line_emphasis& e = c.e;
+    double relief = 0.0;
+    for (const auto& [rid, count] : c.hp.proc)
+    {
+        const recipe* rc = c.reg.get_recipe(rid);
+        if (rc == nullptr)
+            continue;
+        double yield = 0.0;
+        int    nout  = 0;
+        for (std::size_t r = 0; r < resource_count; ++r)
+        {
+            if (!(rc->outputs[r] > 0.0f))
+                continue;
+            effect_target at;
+            at.group    = rc->group;
+            at.recipe   = rc->name;
+            at.resource = static_cast<int>(r);
+            yield += static_cast<double>(early_space_node_scalar_at(n, modifier_subject::processing_yield, at)) - 1.0;
+            ++nout;
+        }
+        if (nout > 0)
+            relief += count * yield * e.proc / nout;
+    }
+    const io::es::node& nd = io::es::nodes[static_cast<std::size_t>(n)];
+    for (std::uint16_t i = nd.effect_begin; i < nd.effect_end; ++i)
+        if (io::es::effects[i].kind == io::es::effect_kind::mechanic)
+            relief += c.p.research_space_key_relief * e.space;
+    if (nd.t == io::es::tier::major)
+        relief += c.p.research_major_relief * nd.cost_units * e.space;
+    return std::isfinite(relief) ? relief : 0.0;
+}
+
 /// Deterministic per-nation bit for a pair tie: FNV-1a over the nation's
 /// generated name and id.
 bool pair_tie_prefers_higher(const world& w, entity_id nation)
@@ -1094,13 +1136,27 @@ bool pair_tie_prefers_higher(const world& w, entity_id nation)
 
 bool research_queue_idle(const world& w, entity_id nation)
 {
+    return research_queue_idle(w, nation, research_params{});
+}
+
+bool research_queue_idle(const world& w, entity_id nation, const research_params& rp)
+{
     const auto it = w.nation_tech.find(nation);
     if (it == w.nation_tech.end())
         return true;
     for (const std::uint16_t q : it->second.queue)
         if (deed_met(w, nation, q))
             return false;
-    return true;
+    // BL-1613: the Early Space tail. Read only when the Digitisation queue is idle,
+    // so a nation with no tail answers exactly as before.
+    bool any_tail = false;
+    for (const std::uint16_t q : it->second.es_queue)
+        if (q < io::es::node_count && !io::es::nodes[q].is_quest)
+        {
+            any_tail = true;
+            break;
+        }
+    return !(any_tail && nation_meets_space_gate(w, nation, rp));
 }
 
 research_ai_pick choose_research_node(const world& w, const recipe_registry& reg,
@@ -1189,8 +1245,80 @@ research_ai_pick choose_research_node(const world& w, const recipe_registry& reg
             pick.score_milli  = score;
         }
     }
+
+    // BL-1613: the Early Space tree, once the nation meets the gate into space.
+    // The same rule over its own rows and routes: direct, plus each open major's
+    // worth shared over its route by cost units. The tree has no pick-one pair
+    // and every deed is unread, so a quest is never a candidate or a route. A
+    // score must BEAT the best Digitisation node: a tie keeps the earlier tree.
+    if (!nation_meets_space_gate(w, nation, rp))
+        return pick;
+    static const std::bitset<io::es::node_count> k_es_none{};
+    const std::bitset<io::es::node_count>& es_held = tit != w.nation_tech.end() ? tit->second.es_held : k_es_none;
+    std::array<double, io::es::node_count> es_direct{};
+    std::array<bool, io::es::node_count>   es_have{};
+    const auto es_direct_of = [&](int n) {
+        if (!es_have[static_cast<std::size_t>(n)])
+        {
+            es_direct[static_cast<std::size_t>(n)] = es_direct_relief(c, n);
+            es_have[static_cast<std::size_t>(n)]   = true;
+        }
+        return es_direct[static_cast<std::size_t>(n)];
+    };
+    std::array<double, io::es::node_count> es_reach{};
+    for (int m = 0; m < io::es::node_count; ++m)
+    {
+        const io::es::node& md = io::es::nodes[static_cast<std::size_t>(m)];
+        if (md.t != io::es::tier::major || md.is_quest || es_held.test(static_cast<std::size_t>(m)))
+            continue;
+        plan.clear();
+        if (preview_enqueue_early_space(w, nation, m, &plan, rp) != enqueue_result::queued || plan.empty())
+            continue;
+        double units = 0.0;
+        for (const std::uint16_t k : plan)
+            units += io::es::nodes[k].cost_units;
+        const double v = es_direct_of(m);
+        if (!(units > 0.0) || !(v > 0.0))
+            continue;
+        for (const std::uint16_t k : plan)
+            if (k != m)
+                es_reach[k] += v * io::es::nodes[k].cost_units / units;
+    }
+    for (int n = 0; n < io::es::node_count; ++n)
+    {
+        if (io::es::nodes[static_cast<std::size_t>(n)].is_quest || !early_space_node_available(w, nation, n, rp))
+            continue;
+        plan.clear();
+        if (preview_enqueue_early_space(w, nation, n, &plan, rp) != enqueue_result::queued || plan.size() != 1)
+            continue; // queued already
+        ++pick.candidates;
+        const std::int64_t relief_milli =
+            relief_to_milli(es_direct_of(n) + es_reach[static_cast<std::size_t>(n)], p.research_relief_rp);
+        const std::int64_t cost_milli = early_space_node_cost_milli(n, rp, price);
+        const std::int64_t score      = sat_sub(relief_milli, cost_milli);
+        if (pick.node < 0 || score > pick.score_milli)
+        {
+            pick.node         = n;
+            pick.early_space  = true;
+            pick.relief_milli = relief_milli;
+            pick.cost_milli   = cost_milli;
+            pick.score_milli  = score;
+        }
+    }
     return pick;
 }
+
+namespace {
+
+/// BL-1613: queue a pick on the tree it names.
+bool enqueue_pick(world& w, const recipe_registry& reg, entity_id n, const research_ai_pick& pick)
+{
+    return (pick.early_space ? enqueue_early_space_node(w, n, pick.node, reg.research())
+                             : enqueue_node(w, n, pick.node))
+           == enqueue_result::queued;
+}
+
+} // namespace
 
 namespace {
 
@@ -1222,12 +1350,12 @@ int run_nation_research_ai(world& w, const recipe_registry& reg, bool spectating
     int queued = 0;
     for (const entity_id n : research_ai_nations(w, spectating))
     {
-        if (!research_queue_idle(w, n))
+        if (!research_queue_idle(w, n, reg.research()))
             continue;
         research_ai_pick pick = choose_research_node(w, reg, n, reg.nation_ai());
         if (pick.node >= 0)
         {
-            pick.queued = enqueue_node(w, n, pick.node) == enqueue_result::queued;
+            pick.queued = enqueue_pick(w, reg, n, pick);
             if (pick.queued)
                 ++queued;
         }
@@ -1248,7 +1376,7 @@ int run_nation_research_repick(world& w, const recipe_registry& reg, bool specta
         // the pool already holds the next pick's whole cost, so it completes
         // now from RP in hand. No treasury is spent here (the line paid only
         // what the queue owed in advance_research).
-        for (int k = 0; k < p.research_repicks_per_quarter && research_queue_idle(w, n); ++k)
+        for (int k = 0; k < p.research_repicks_per_quarter && research_queue_idle(w, n, reg.research()); ++k)
         {
             const auto tit = w.nation_tech.find(n);
             if (tit == w.nation_tech.end())
@@ -1256,7 +1384,7 @@ int run_nation_research_repick(world& w, const recipe_registry& reg, bool specta
             research_ai_pick pick = choose_research_node(w, reg, n, p);
             if (pick.node < 0 || tit->second.pool_milli < pick.cost_milli)
                 break;
-            pick.queued = enqueue_node(w, n, pick.node) == enqueue_result::queued;
+            pick.queued = enqueue_pick(w, reg, n, pick);
             if (out)
                 out->push_back(pick);
             if (!pick.queued)

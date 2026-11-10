@@ -9,7 +9,7 @@ space**, with the backlog item that demanded it. The pair is required. Enforceme
 authorship, not machinery — there is deliberately no audit check against this file
 (BL-260, Ben 2026-08-01: *"the docs are the audit"*).
 
-**84 surfaces** — 4 settled, 80 awaiting Ben's wording.
+**85 surfaces** — 4 settled, 81 awaiting Ben's wording.
 
 ---
 
@@ -497,6 +497,14 @@ THE SEAM'S ANSWER IS SHOWN, because set_trade validates what the form cannot (bo
 **Because:** The decision feed (BL-407) shows the moves; nothing showed the SHAPE across a run — the thing Ben asked for (2026-08-14: watch AI play "and discover what strategies emerge"). The scorer has no strategy object, so an emergent strategy IS a distribution over decisions: the verb mix separates an expander from a consolidator; the must/should/nice bucket split is the most legible health signal in the stream; the reason tally is where a pathology like § 10h's idle/resume oscillation shows as two reciprocal codes. Score/margin figures deliberately absent (NR-226); no strategy is ever named (STRATEGIES.md's discovered-not-authored position).
 
 *Demanded by BL-411 · `src/ui/strategy_readout.cpp` · id `strategy_readout`*
+
+### Research panel, Early Space tab (top-right age switch): the next age's tree as three branch columns on the canvas, its entries on the one queue in the column
+
+**Answers:** What does reaching space open next, what keys each branch of it, and is my nation through the gate yet?
+
+**Because:** RESEARCH.md gives a nation one pool and one queue, and Quests key the next age: the Early Space tree is researchable once the gate into space is met (ERAS.md § Era 1 -> Era 2 gate) and a branch is keyed. A tree the player cannot see is a research line that silently stops paying - the queue would hold far-space entries with no place to plan them, and the gate would be a rule only the sim knew. It earns the canvas the ring already holds by a tab rather than a second panel: the same glyphs, links, hover card and shift-click press, so nothing new is learned. Three branches read as columns, not a ring - one per tree is too few to make a sector shape mean anything. Before the gate the tree stays readable (every node, every link, by hover) but draws locked, and the caption names exactly which of the three gate conditions is missing, so the player learns what to build, not just that a door is shut. Each column header says what keys its branch, so the Digitisation quest that opens it is named where it matters. The column lists the Early Space tail after the Digitisation entries, numbered on, with arrival quarters from the same projection, because it is one queue and the pool reaches the tail last.
+
+*Demanded by BL-1613, BL-1612 · `src/ui/tech_tree_panel.cpp`, `src/world/nation_tech.cpp`, `src/world/corp_command.cpp` · id `tech_tree_early_space`*
 
 ### Research panel (nav slot 4 / F9): the Digitisation ring on the canvas, the queue in the column; shift-click on a node queues it
 

@@ -76,6 +76,7 @@
 #include "world/resource_names.hpp" // resource_from_name(name, ok): the air-gate / sea-lane fixtures
 #include "world/supply_system.hpp"  // price_convoy_leg: the sea-lane fixture prices as the dispatch does
 #include "world/digitisation_tree_data.hpp" // space_ledger_fixture: hold every Digitisation node
+#include "world/early_space_tree_data.hpp" // BL-1613: tech_tree_node / tech_tree_queue name Early Space ids
 #include "world/space_tech_keys.hpp"        // space_ledger_fixture: keep far-space keys closed
 #include "world/stations.hpp"               // space_ledger(): the designer's slot kinds
 
@@ -4161,6 +4162,16 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     // as store ids, head first; `research_message()` the panel's last press
     // outcome (a refusal's reason).
     v.set_function("tech_tree_node", [this](const std::string& id) -> std::tuple<float, float> {
+        // BL-1613: an Early Space id ("ES-...") answers from the Early Space tree
+        // as last drawn - (-1, -1) unless that tree is on screen.
+        if (const int e = io::es::find_node(id); e >= 0)
+        {
+            const std::size_t need = static_cast<std::size_t>(io::es::node_count) * 2;
+            if (m_ui.tech_tree_es_node_screen.size() < need)
+                return {-1.0f, -1.0f};
+            return {m_ui.tech_tree_es_node_screen[static_cast<std::size_t>(e) * 2],
+                    m_ui.tech_tree_es_node_screen[static_cast<std::size_t>(e) * 2 + 1]};
+        }
         const int i = io::dg::find_node(id);
         const std::size_t need = static_cast<std::size_t>(io::dg::node_count) * 2;
         if (i < 0 || m_ui.tech_tree_node_screen.size() < need)
@@ -4179,6 +4190,33 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         for (const std::uint16_t n : it->second.queue)
             if (n < io::dg::node_count)
                 out[k++] = std::string(io::dg::nodes[n].id);
+        // BL-1613: then the Early Space tail - one logical queue, as the column lists it.
+        for (const std::uint16_t n : it->second.es_queue)
+            if (n < io::es::node_count)
+                out[k++] = std::string(io::es::nodes[n].id);
+        return out;
+    });
+
+    // BL-1613: the research canvas's age switch. `tech_tree_age()` reads which
+    // tree is shown (0 Digitisation, 1 Early Space), whether the Early Space tree
+    // was drawn locked (the gate into space unmet) and the lock line it showed,
+    // and each tab's centre as last drawn, so a script presses a tab through the
+    // real hit-test. What the screen shows, nothing more. Verify-only.
+    v.set_function("tech_tree_age", [this](sol::this_state ts) -> sol::table {
+        sol::state_view lua(ts);
+        sol::table out = lua.create_table();
+        out["age"]         = m_ui.tech_tree_age;
+        out["locked"]      = m_ui.tech_tree_es_locked;
+        out["lock_reason"] = m_ui.tech_tree_es_lock_reason;
+        const std::vector<float>& t = m_ui.tech_tree_age_tab_screen;
+        out["drawn"] = t.size() >= 4;
+        if (t.size() >= 4)
+        {
+            out["dg_x"] = t[0];
+            out["dg_y"] = t[1];
+            out["es_x"] = t[2];
+            out["es_y"] = t[3];
+        }
         return out;
     });
     v.set_function("research_message", [this]() -> std::string { return m_ui.research_message; });
