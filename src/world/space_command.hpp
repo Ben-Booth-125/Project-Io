@@ -1,6 +1,7 @@
 #pragma once
 
 #include "entity.hpp"
+#include "offworld_base.hpp" // BL-1601: offworld_base_result
 #include "orbital_node.hpp"
 #include "space_assets.hpp"
 #include "stations.hpp"
@@ -63,8 +64,11 @@ enum class space_verb : uint8_t
     upgrade_station  = 8,  ///< subject = station.
     retask_satellite = 9,  ///< subject = satellite asset, role.
     move_satellite   = 10, ///< subject = satellite asset, node.
+    // BL-1601 (NATIONS.md § Off-world bases), appended:
+    found_base       = 11, ///< subject = the TILE the base is founded on (offworld_base.hpp).
+    embark_colonists = 12, ///< subject = the nation's Lander, slot = colonists (thousands) to board.
 };
-inline constexpr uint8_t space_verb_count = static_cast<uint8_t>(space_verb::move_satellite) + 1;
+inline constexpr uint8_t space_verb_count = static_cast<uint8_t>(space_verb::embark_colonists) + 1;
 
 /// Does @p v wait for a signal outside coverage?
 inline bool space_verb_delayed(space_verb v)
@@ -136,6 +140,8 @@ struct space_command_outcome
     uint32_t               order_id  = 0;           ///< When queued.
     int                    fitted    = 0;           ///< apply_template: slots launched into.
     int                    skipped   = 0;           ///< apply_template: slots skipped.
+    offworld_base_result   base      = offworld_base_result::rejected_invalid; ///< BL-1601: found_base / embark_colonists.
+    entity_id              base_centre = null_entity; ///< BL-1601: found_base: the base's population centre.
 };
 
 /// PURE. Validate @p c field by field as the value that lands (see the file

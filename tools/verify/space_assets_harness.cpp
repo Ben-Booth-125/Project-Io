@@ -541,7 +541,7 @@ int main()
                                + world_save_contributors_section_bytes(w) + world_save_occupation_section_bytes(w) // v77, v78
                                + world_save_defend_section_bytes(w) + world_save_research_books_section_bytes(w)   // v79, v80
                                + world_save_station_section_bytes(w) + world_save_early_space_section_bytes(w) // BL-1583 (v81), BL-1612 (v82)
-                               + (world_save_space_node_section_bytes(w) + (world_save_space_unit_section_bytes(w) + (world_save_space_battle_section_bytes(w) + (world_save_prospecting_section_bytes(w) + world_save_space_convoy_section_bytes(w))))); // BL-1581 (v83), last
+                               + (world_save_space_node_section_bytes(w) + (world_save_space_unit_section_bytes(w) + (world_save_space_battle_section_bytes(w) + (world_save_prospecting_section_bytes(w) + (world_save_space_convoy_section_bytes(w) + world_save_offworld_base_section_bytes(w) /* BL-1601 (v88) */))))); // BL-1581 (v83), last
         // BL-1582: the launch-gate staging (a gridless tile, its pad, the shelf) predates
         // v53 tiles; the v50 rows read the world without it.
         const auto unstaged = [](world x) {
@@ -812,7 +812,7 @@ int main()
                       && back.space_orders[0].cmd.role == retask.role && back.next_space_order_id == kw.next_space_order_id
                       && back.state_hash(0) == kw.state_hash(0) && to_bytes(back) == b,
                   "A14", "a pending order round-trips (fields, equal state_hash, byte-identical re-serialise)");
-            const std::size_t sec = b.size() - (world_save_space_node_section_bytes(kw) + (world_save_space_unit_section_bytes(kw) + (world_save_space_battle_section_bytes(kw) + (world_save_prospecting_section_bytes(kw) + world_save_space_convoy_section_bytes(kw)))));
+            const std::size_t sec = b.size() - (world_save_space_node_section_bytes(kw) + (world_save_space_unit_section_bytes(kw) + (world_save_space_battle_section_bytes(kw) + (world_save_prospecting_section_bytes(kw) + (world_save_space_convoy_section_bytes(kw) + world_save_offworld_base_section_bytes(kw) /* BL-1601 (v88) */)))));
             const std::size_t ord = sec + 4 + kw.space_assets.size() * 10 + 4 + 4; // the first order
             auto refused = [&](std::size_t off, const void* v, std::size_t n) {
                 std::string t = b;
@@ -840,7 +840,7 @@ int main()
             write_world_snapshot_pre_space_nodes(kw, o81);
             world old;
             const bool ok81 = from_bytes(o81.str(), old);
-            check(ok81 && o81.str().size() + (world_save_space_node_section_bytes(kw) + (world_save_space_unit_section_bytes(kw) + (world_save_space_battle_section_bytes(kw) + (world_save_prospecting_section_bytes(kw) + world_save_space_convoy_section_bytes(kw))))) == b.size()
+            check(ok81 && o81.str().size() + (world_save_space_node_section_bytes(kw) + (world_save_space_unit_section_bytes(kw) + (world_save_space_battle_section_bytes(kw) + (world_save_prospecting_section_bytes(kw) + (world_save_space_convoy_section_bytes(kw) + world_save_offworld_base_section_bytes(kw) /* BL-1601 (v88) */))))) == b.size()
                       && old.space_orders.empty() && old.space_assets.at(lm.asset).node == LO(k.moon)
                       && old.space_assets.at(lm.asset).role == space_satellite_role::none,
                   "A14", "a v82 stream (the v83 prefix) reads: nodes derived (moon low orbit), roles none, no pending orders");

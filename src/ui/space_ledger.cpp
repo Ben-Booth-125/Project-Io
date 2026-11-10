@@ -172,6 +172,8 @@ const char* verb_name(uint8_t v)
         case space_verb::upgrade_station:  return "Upgrade station";
         case space_verb::retask_satellite: return "Retask satellite";
         case space_verb::move_satellite:   return "Move satellite";
+        case space_verb::found_base:       return "Found base";       // BL-1601
+        case space_verb::embark_colonists: return "Embark colonists"; // BL-1601
     }
     return "Order";
 }

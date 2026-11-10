@@ -1077,6 +1077,31 @@ uint64_t world::state_hash(int tick) const
                 fnv1a_u32(h, static_cast<uint32_t>(sh.home.kind));
             }
         }
+        // BL-1601: the off-world bases and the colonists aboard — folded only when
+        // either is held, so a world without them hashes as before. Colonists count
+        // on live units only, as the save writes them: colonists aboard a lost unit
+        // are gone with it (pruned at the quarter).
+        uint32_t live_colonists = 0;
+        for (const auto& [uid, n] : space_colonists)
+            live_colonists += space_units.count(uid) != 0 ? 1u : 0u;
+        if (!offworld_bases.empty() || live_colonists != 0)
+        {
+            fnv1a_u32(h, 0x5F19u); // tag
+            fnv1a_u32(h, static_cast<uint32_t>(offworld_bases.size()));
+            for (const auto& [cid, b] : offworld_bases)
+            {
+                fnv1a_u32(h, cid);
+                fnv1a_u32(h, static_cast<uint32_t>(b.founded_tick));
+                fnv1a_u32(h, static_cast<uint32_t>(b.unfed_quarters));
+            }
+            fnv1a_u32(h, live_colonists);
+            for (const auto& [uid, n] : space_colonists)
+                if (space_units.count(uid) != 0)
+                {
+                    fnv1a_u32(h, uid);
+                    fnv1a_u32(h, static_cast<uint32_t>(n));
+                }
+        }
     }
 
     // Province holder (BL-569). UNLIKE `provinces` itself (generation output,

@@ -864,8 +864,8 @@ inline constexpr uint32_t k_world_save_version_pre_prospecting = k_world_save_ve
 /// (`k_world_save_version_pre_space_convoys`), as a world with nothing aboard.
 /// MERGE NOTE: a parallel lane's bump renumbers this block (this paragraph, the three
 /// constants below, the accepted-version line in `read_world_snapshot`, and the one
-/// section at the end of the writer and reader).
-inline constexpr uint32_t world_save_version = 87;
+/// section at the end of the writer and reader). `world_save_version` moved to the
+/// BL-1601 block below, the newest.
 
 /// BL-1596: the first version carrying the space-convoy section (see above).
 inline constexpr uint32_t k_world_save_version_space_convoys = 87;
@@ -873,6 +873,29 @@ inline constexpr uint32_t k_world_save_version_space_convoys = 87;
 /// BL-1596: v86, a strict prefix of v87.
 inline constexpr uint32_t k_world_save_version_pre_space_convoys = k_world_save_version_space_convoys - 1;
 /// ===== END BL-1596 VERSION BUMP =================================================
+/// ===== BEGIN BL-1601 VERSION BUMP (off-world bases) — ONE BLOCK =================
+/// **88 (BL-1601; NATIONS.md § Off-world bases) — BASES AND COLONISTS.** Appended
+/// last: a u32 count, then every `world::offworld_bases` record ascending centre id
+/// as (centre, i32 founded_tick, i32 unfed_quarters) — 12 bytes; then a u32 count,
+/// then every `world::space_colonists` entry of a LIVE unit ascending unit id as
+/// (unit, i32 colonists) — 8 bytes. A base names a live population centre on a
+/// tile of a non-star body other than the home world; founded_tick >= 0;
+/// unfed_quarters in [0, k_offworld_unfed_max]. A colonist entry names a live
+/// Lander, carrying 1 .. its design's passenger berths. Refused whole otherwise.
+/// Everything else a base is — its ground, its centre, its market, its provinces —
+/// rides the stores that already carry them. v87 is a STRICT PREFIX of v88 and is
+/// read too (`k_world_save_version_pre_offworld_bases`), as a world with no base and
+/// nobody aboard. MERGE NOTE: a parallel lane's bump renumbers this block (this
+/// paragraph, the three constants below, the accepted-version line in
+/// `read_world_snapshot`, and the one section at the end of the writer and reader).
+inline constexpr uint32_t world_save_version = 88;
+
+/// BL-1601: the first version carrying the off-world base section (see above).
+inline constexpr uint32_t k_world_save_version_offworld_bases = 88;
+
+/// BL-1601: v87, a strict prefix of v88.
+inline constexpr uint32_t k_world_save_version_pre_offworld_bases = k_world_save_version_offworld_bases - 1;
+/// ===== END BL-1601 VERSION BUMP =================================================
 
 /// BL-1612: the first version carrying the Early Space tree section (see above).
 inline constexpr uint32_t k_world_save_version_early_space = 82;
@@ -1139,6 +1162,9 @@ std::size_t world_save_prospecting_section_bytes(const world& w);
 /// BL-1596: the byte length of the v87 space-convoy section `w` writes - 4 + 32 per
 /// record. The LAST section of a v87 stream.
 std::size_t world_save_space_convoy_section_bytes(const world& w);
+/// BL-1601: the byte length of the v88 off-world base section `w` writes - 4 + 12 per
+/// base, 4 + 8 per colonist entry of a live unit. The LAST section of a v88 stream.
+std::size_t world_save_offworld_base_section_bytes(const world& w);
 
 /// BL-1422, widened by BL-1436: the bytes ALL SIX kit goods' extra elements add to
 /// every per-resource array of the stream `w` writes - the widening from 49 to today's
@@ -1290,6 +1316,8 @@ std::size_t world_save_space_battle_section_bytes(const world& w);
 void write_world_snapshot_pre_prospecting(const world& w, std::ostream& out);
 /// VERIFICATION ONLY (BL-1596): the v86 stream shape - no space-convoy section.
 void write_world_snapshot_pre_space_convoys(const world& w, std::ostream& out);
+/// VERIFICATION ONLY (BL-1601): the v87 stream shape - no off-world base section.
+void write_world_snapshot_pre_offworld_bases(const world& w, std::ostream& out);
 
 /// BL-1453: the recon stock a battle loaded from a pre-v67 stream is given — enough to
 /// see every defending unit in full (twice the stealthiest defender's kit stealth, in

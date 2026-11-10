@@ -847,7 +847,7 @@ entity_id chain_anchor(const world& w, entity_id nation, entity_id body)
         return null_entity;
     const auto tit = w.tiles.find(nit->second.capital_tile);
     if (tit == w.tiles.end() || tit->second.body != body)
-        return null_entity;
+        return offworld_base_capital(w, nation, body); // BL-1601: a base is its capital there
     return nit->second.capital_tile;
 }
 

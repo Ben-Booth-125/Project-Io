@@ -1012,6 +1012,14 @@
   [
    "gameplay.space_unload_cargo",
    "No UI surface yet (the circumplanetary canvas's fleet controls are the UI lane's). In-process: src/world/space_convoy.hpp, the space-unit seam beside order_space_unit / refuel_space_unit. Not on apply_space_command or the --serve / MCP transport yet (a SPACE line beside COMMAND is owed)."
+  ],
+  [
+   "gameplay.space_embark_colonists",
+   "In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam; the verb is offworld_base.hpp's. No UI surface yet. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed)."
+  ],
+  [
+   "gameplay.space_found_base",
+   "In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam; the verb is offworld_base.hpp's. No UI surface yet. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed)."
   ]
  ]
 }

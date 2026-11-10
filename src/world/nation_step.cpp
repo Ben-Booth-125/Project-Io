@@ -241,6 +241,16 @@ void run_nation_step(world& w, const recipe_registry& reg, economy_report& repor
     // home shelf. Empty stores do nothing, so a world without them ticks as before.
     run_space_unit_quarter(w, reg.space_units(), reg.stations(), econ_tick);
 
+    // ---- 7e. Off-world bases (BL-1601, NATIONS.md § Off-world bases) — after the
+    // unit step, so colonists aboard a unit lost there are dropped: each base buys
+    // its life support off its own market, or shrinks. No base and no colonist does
+    // nothing, so a world without them ticks as before.
+    {
+        offworld_base_params bp;
+        bp.reservation_mult = reg.price_band().reservation_mult;
+        run_offworld_base_quarter(w, bp);
+    }
+
     // ---- 8. The tax tier (BL-1335) — LAST, so the scorer reads this quarter's
     // whole budget (rationed lines, the research line) and the Discontent the
     // quarter left. The tier it picks taxes from the next quarter. Never the

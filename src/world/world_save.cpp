@@ -2385,6 +2385,28 @@ void write_world_snapshot_at(const world& w, std::ostream& out, uint32_t version
         }
     }
     // ===== END BL-1596 =====
+    // ===== BEGIN BL-1601 (v88): OFF-WORLD BASES AND COLONISTS, the last section =====
+    if (version >= k_world_save_version_offworld_bases)
+    {
+        w_u32(out, static_cast<uint32_t>(w.offworld_bases.size()));
+        for (const auto& [cid, b] : w.offworld_bases) // ascending
+        {
+            w_id(out, cid);
+            w_i32(out, b.founded_tick);
+            w_i32(out, b.unfed_quarters);
+        }
+        uint32_t live = 0;
+        for (const auto& [uid, n] : w.space_colonists)
+            live += w.space_units.count(uid) != 0 ? 1u : 0u;
+        w_u32(out, live);
+        for (const auto& [uid, n] : w.space_colonists) // ascending; a lost unit's are gone
+            if (w.space_units.count(uid) != 0)
+            {
+                w_id(out, uid);
+                w_i32(out, n);
+            }
+    }
+    // ===== END BL-1601 =====
 }
 
 void write_world_snapshot_pre_space_battles(const world& w, std::ostream& out)
@@ -2424,6 +2446,20 @@ void write_world_snapshot_pre_space_convoys(const world& w, std::ostream& out)
 std::size_t world_save_space_convoy_section_bytes(const world& w)
 {
     return 4 + 32 * w.space_hauls.size();
+}
+
+void write_world_snapshot_pre_offworld_bases(const world& w, std::ostream& out)
+{
+    // VERIFICATION ONLY (BL-1601): the v87 stream shape - no off-world base section.
+    write_world_snapshot_at(w, out, k_world_save_version_pre_offworld_bases);
+}
+
+std::size_t world_save_offworld_base_section_bytes(const world& w)
+{
+    std::size_t n = 8 + 12 * w.offworld_bases.size();
+    for (const auto& [uid, c] : w.space_colonists)
+        n += w.space_units.count(uid) != 0 ? 8 : 0;
+    return n;
 }
 
 void write_world_snapshot_pre_space_units(const world& w, std::ostream& out)
@@ -2916,7 +2952,8 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
             && version != k_world_save_version_pre_space_units // BL-1594: v83, no space units
             && version != k_world_save_version_pre_space_battles // BL-1597: v84, no space battles
             && version != k_world_save_version_pre_prospecting // BL-1600: v85, nothing mapped off-world
-            && version != k_world_save_version_pre_space_convoys)) // BL-1596: v86, nothing aboard
+            && version != k_world_save_version_pre_space_convoys  // BL-1596: v86, nothing aboard
+            && version != k_world_save_version_pre_offworld_bases)) // BL-1601: v87, no base, nobody aboard
         return false; // mismatched version -- refuse rather than misread
 
     // BL-1422: a stream before the kit goods carries every per-resource array 49 wide;
@@ -5320,6 +5357,53 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
         }
     }
     // ===== END BL-1596 =====
+    // ===== BEGIN BL-1601 (v88): off-world bases and colonists. Untrusted, refused
+    // whole on any breach of world_save.hpp's v88 paragraph. A v87 (and older)
+    // stream ends before it: no base, nobody aboard. =====
+    if (version >= k_world_save_version_offworld_bases)
+    {
+        uint32_t count = 0;
+        if (!r_u32(in, count) || count > s.population_centres.size() || count > k_offworld_bases_max)
+            return false;
+        entity_id prev = null_entity;
+        for (uint32_t k = 0; k < count; ++k)
+        {
+            entity_id     cid = null_entity;
+            offworld_base b;
+            if (!r_id(in, cid) || cid == null_entity || (k > 0 && cid <= prev) || !r_i32(in, b.founded_tick)
+                || !r_i32(in, b.unfed_quarters) || b.founded_tick < 0 || b.unfed_quarters < 0
+                || b.unfed_quarters > k_offworld_unfed_max)
+                return false;
+            prev = cid;
+            const auto ct = s.population_centre_tile.find(cid);
+            if (s.population_centres.count(cid) == 0 || ct == s.population_centre_tile.end())
+                return false;
+            const auto tit = s.tiles.find(ct->second);
+            if (tit == s.tiles.end())
+                return false;
+            const auto bit = s.bodies.find(tit->second.body);
+            if (bit == s.bodies.end() || bit->second.type == body_type::star || tit->second.body == s.home_body)
+                return false;
+            s.offworld_bases.emplace_hint(s.offworld_bases.end(), cid, b);
+        }
+        if (!r_u32(in, count) || count > s.space_units.size())
+            return false;
+        prev = null_entity;
+        for (uint32_t k = 0; k < count; ++k)
+        {
+            entity_id uid = null_entity;
+            int32_t   n   = 0;
+            if (!r_id(in, uid) || uid == null_entity || (k > 0 && uid <= prev) || !r_i32(in, n) || n < 1)
+                return false;
+            prev = uid;
+            const auto uit = s.space_units.find(uid);
+            if (uit == s.space_units.end() || uit->second.hull != space_hull::lander
+                || n > evaluate_space_design(uit->second.hull, uit->second.design).passengers)
+                return false;
+            s.space_colonists.emplace_hint(s.space_colonists.end(), uid, n);
+        }
+    }
+    // ===== END BL-1601 =====
 
     // BL-1266 (v46): every manual trade names a live owner and two distinct
     // standing markets, and holds an id below the next one to be issued, all

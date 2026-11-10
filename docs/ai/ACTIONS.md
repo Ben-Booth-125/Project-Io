@@ -24,7 +24,7 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 > **Generated file.** Produced by `node tools/session/render_actions.js`.
 > Edit the JSON, then re-run; hand edits here are overwritten.
 
-*253 entries — 67 gameplay · 41 canvas · 15 lens · 87 ledger · 43 chrome.*
+*255 entries — 69 gameplay · 41 canvas · 15 lens · 87 ledger · 43 chrome.*
 
 ---
 
@@ -1289,6 +1289,45 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 **Expected output.** ok: the descent's propellant leaves that shelf, the treasury pays it, the hold empties, and the whole cargo LANDS on that market as an arrived space convoy: the next credit_arrived_convoys lands it and the clear sells it for the owner, with any import duty, as any convoy's cargo.
 
 **Reason to select.** Sell carried goods into another body's market, or bring them home.
+
+### `gameplay.space_embark_colonists` — In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam; the verb is offworld_base.hpp's. No UI surface yet. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed).
+
+**Press.** In-process: apply_space_command({nation, verb=12 embark_colonists, subject=lander, slot=colonists}).
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `subject` | `entity_id (space unit)` | The nation's own Lander with a passenger bay. |
+| `slot` | `int32` | Colonists to board, in thousands of heads (one passenger berth each); 1 .. 65536 at the seam, and no more than the free berths. |
+
+**Valid when:**
+- The actor is a nation (rejected_unknown_nation otherwise). The seam validates every field as the value that lands - each enum range-checked as a raw byte, each entity id checked to exist and to be the nation's own - and rejects the whole command on any violation (rejected_invalid / rejected_not_owner), mutating nothing. A refusal by the verb itself is rejected_refused, with `base` naming the reason; it too mutates nothing.
+- The unit is a Lander with passenger berths (rejected_not_lander), idle in its nation's home body's low orbit or landed on its surface (rejected_wrong_node), and the nation holds a completed, staffed Launchpad on that body (rejected_no_pad).
+- The colonists fit the berths left free (rejected_no_berths), and one of the nation's centres on its home body can spare them and keep a thousand (rejected_no_people); the most populous is drawn from, ties to the lower id.
+- Never delayed.
+
+**Expected output.** applied: the heads leave that home population centre and ride aboard the Lander (world::space_colonists, saved at world_save_version 88). A unit lost with colonists aboard loses them.
+
+**Reason to select.** Carry the people a base is founded with (NATIONS.md § Off-world bases).
+
+### `gameplay.space_found_base` — In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam; the verb is offworld_base.hpp's. No UI surface yet. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed).
+
+**Press.** In-process: apply_space_command({nation, verb=11 found_base, subject=tile}).
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `subject` | `entity_id (tile)` | The tile the base stands on: land on another body's surface. |
+
+**Valid when:**
+- The actor is a nation (rejected_unknown_nation otherwise). The seam validates every field as the value that lands - each enum range-checked as a raw byte, each entity id checked to exist and to be the nation's own - and rejects the whole command on any violation (rejected_invalid / rejected_not_owner), mutating nothing. A refusal by the verb itself is rejected_refused, with `base` naming the reason; it too mutates nothing.
+- The nation holds base_founding (the Early Space tree's Off-World Bases) - rejected_tech_locked.
+- The tile is land on a gridded body other than the star and the nation's home body (rejected_invalid), and the nation has MAPPED it (rejected_unmapped; DISCOVERY.md § Mapping, then prospecting).
+- Nobody owns the tile, no centre or building stands on it, and no nation holds its province (rejected_claimed).
+- The nation's Landers landed on that body's surface carry, between them, at least 2 colonists (thousands; rejected_no_colonists) and 20 machinery held as cargo, the base kit (rejected_no_kit). Both are first-cut stand-ins, not yet authored by a doc.
+- Never delayed.
+
+**Expected output.** applied: a body with no provinces is partitioned; the base's province becomes the nation's (every unowned tile, and the holder); a population centre with every landed colonist stands on the tile; the body's market is founded there if it had none; a Track is laid from the tile; the colonists and the kit are spent. From then on the base buys its life support (water and food rations per thousand, by the habitability its tile lacks) off its own market each quarter, or shrinks. Saved (world_save_version 88).
+
+**Reason to select.** Open ground on another body: build, extract and trade there as at home.
 
 ---
 
