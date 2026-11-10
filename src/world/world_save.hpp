@@ -720,7 +720,21 @@ inline constexpr uint32_t k_world_save_version_pre_recruits = 71;
 /// PREFIX of v80 and is read too (`k_world_save_version_pre_research_books`), as a world
 /// whose returns booked none. Below v80 a building site's `days_remaining` is on the old
 /// build days, so the reader rescales it (`rescale_site_days_to_research_books`).
-inline constexpr uint32_t world_save_version = 80;
+///
+/// **81 (BL-1562, NATIONS.md § Elimination) — THE ENDED NATIONS.** Appended last: after a
+/// u32 count, every ended nation strictly ascending id, each a nation of the stream that
+/// owns no tile, fields no unit and holds no open war. Refused whole otherwise. v80 is a
+/// STRICT PREFIX of v81 and is read too (`k_world_save_version_pre_ended`), as a world in
+/// which no nation has ended. Every version also reads a war's defender row toward its
+/// declarer as standing (RELATIONS.md § 7, Ben 2026-11-09: a declaration of war makes both
+/// sides hostile), so an older stream's unanswered war loads with both rows.
+inline constexpr uint32_t world_save_version = 81;
+
+/// BL-1562: the first version carrying the ended-nations section (see above).
+inline constexpr uint32_t k_world_save_version_ended = 81;
+
+/// BL-1562: v80, a strict prefix of v81.
+inline constexpr uint32_t k_world_save_version_pre_ended = k_world_save_version_ended - 1;
 
 /// BL-1539: the first version carrying the research-books section (see above).
 inline constexpr uint32_t k_world_save_version_research_books = 80;
@@ -1075,6 +1089,12 @@ void write_world_snapshot_pre_defend(const world& w, std::ostream& out);
 
 /// VERIFICATION ONLY (BL-1539): the v79 stream shape - no research-books section.
 void write_world_snapshot_pre_research_books(const world& w, std::ostream& out);
+
+/// VERIFICATION ONLY (BL-1562): the v80 stream shape - no ended-nations section.
+void write_world_snapshot_pre_ended(const world& w, std::ostream& out);
+
+/// BL-1562: the bytes v81's ended-nations section takes for @p w: the count and 4 a nation.
+std::size_t world_save_ended_section_bytes(const world& w);
 
 /// BL-1453: the recon stock a battle loaded from a pre-v67 stream is given — enough to
 /// see every defending unit in full (twice the stealthiest defender's kit stealth, in

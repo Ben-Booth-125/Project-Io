@@ -34,11 +34,12 @@ bool valid_pair(const world& w, entity_id a, entity_id b)
 {
     if (a == b)
         return false;
-    if (w.nations.find(a) == w.nations.end())
+    const auto ia = w.nations.find(a);
+    const auto ib = w.nations.find(b);
+    if (ia == w.nations.end() || ib == w.nations.end())
         return false;
-    if (w.nations.find(b) == w.nations.end())
-        return false;
-    return true;
+    // BL-1562 (NATIONS.md § Elimination): an ended nation holds no stance, either way.
+    return !ia->second.ended && !ib->second.ended;
 }
 } // namespace
 

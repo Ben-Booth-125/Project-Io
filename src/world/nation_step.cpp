@@ -246,7 +246,8 @@ void run_nation_taxes(world& w, const tax_params& p, economy_report& report)
     std::vector<entity_id> ids;
     ids.reserve(w.nations.size());
     for (const auto& kv : w.nations)
-        ids.push_back(kv.first);
+        if (!kv.second.ended) // BL-1562: an ended nation governs nobody
+            ids.push_back(kv.first);
     std::sort(ids.begin(), ids.end());
     for (const entity_id n : ids)
     {

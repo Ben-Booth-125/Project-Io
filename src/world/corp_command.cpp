@@ -975,8 +975,8 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
     // unnamed). A nation never acts for another (the champion's seat retired with
     // the champion), and the three verbs that must NAME the nation (track, the
     // share rule, the tax tier) are refused unnamed, as they always were.
-    if (w.nations.find(cmd.corp) == w.nations.end())
-        return corp_command_result::rejected_no_corp;
+    if (const auto nit = w.nations.find(cmd.corp); nit == w.nations.end() || nit->second.ended)
+        return corp_command_result::rejected_no_corp; // BL-1562: an ended nation is no actor
     if (cmd.as_nation != null_entity && cmd.as_nation != cmd.corp)
         return corp_command_result::rejected_not_owner;
     if (cmd.as_nation == null_entity
@@ -1308,8 +1308,8 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
         case corp_verb::declare_hostile:
         {
             // BL-1459: between a war's parties hostility is written by the war's
-            // own verbs — the declarer's by declare_war, the defender's by
-            // answer_war, which names its goals. A bare declare is refused there.
+            // own verb — declare_war writes both rows (Ben, 2026-11-09). A bare
+            // declare is refused there.
             if (at_war(w, cmd.corp, cmd.counterparty))
                 return corp_command_result::rejected_state;
             // BL-1428 (RELATIONS.md § 7): a truce bars either party declaring on the

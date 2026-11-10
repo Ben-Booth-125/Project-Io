@@ -1190,7 +1190,7 @@ std::vector<entity_id> research_ai_nations(const world& w, bool spectating)
     // 2026-10-15, AI_OPPONENT.md § 11).
     const entity_id seated = spectating ? null_entity : player_nation(w);
     for (const auto& kv : w.nations)
-        if (kv.first != seated)
+        if (kv.first != seated && !kv.second.ended) // BL-1562: an ended nation researches nothing
             ids.push_back(kv.first);
     std::sort(ids.begin(), ids.end());
     return ids;
@@ -1305,7 +1305,7 @@ int run_nation_tax_ai(world& w, const recipe_registry& reg, const economy_report
     for (std::size_t index = 0; index < ids.size(); ++index)
     {
         const entity_id n = ids[index];
-        if (n == seated)
+        if (n == seated || w.nations.at(n).ended) // BL-1562: an ended nation sets no rate
             continue;
         if ((econ_tick % k) != (static_cast<int>(index) % k)) // nation_is_due's stagger
             continue;

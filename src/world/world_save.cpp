@@ -2136,6 +2136,35 @@ void write_world_snapshot_at(const world& w, std::ostream& out, uint32_t version
                 w_f32(out, q.research);
         }
     }
+
+    // world_save_version 81 (BL-1562): THE ENDED NATIONS, the last section. Every
+    // ended nation, ascending id.
+    if (version >= k_world_save_version_ended)
+    {
+        std::vector<entity_id> ids;
+        for (const auto& [nid, nc] : w.nations)
+            if (nc.ended)
+                ids.push_back(nid);
+        std::sort(ids.begin(), ids.end());
+        w_u32(out, static_cast<uint32_t>(ids.size()));
+        for (const entity_id nid : ids)
+            w_id(out, nid);
+    }
+}
+
+void write_world_snapshot_pre_ended(const world& w, std::ostream& out)
+{
+    // VERIFICATION ONLY (BL-1562): the v80 stream shape - no ended-nations section.
+    write_world_snapshot_at(w, out, k_world_save_version_pre_ended);
+}
+
+std::size_t world_save_ended_section_bytes(const world& w)
+{
+    std::size_t n = 4;
+    for (const auto& [nid, nc] : w.nations)
+        if (nc.ended)
+            n += 4;
+    return n;
 }
 
 void write_world_snapshot_pre_defend(const world& w, std::ostream& out)
@@ -2543,7 +2572,8 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
             && version != k_world_save_version_pre_contributors // BL-1470: v76, no provenance
             && version != k_world_save_version_pre_occupation // BL-1502: v77, nothing occupied
             && version != k_world_save_version_pre_defend     // BL-1504: v78, no defend orders
-            && version != k_world_save_version_pre_research_books)) // BL-1539: v79, nothing booked
+            && version != k_world_save_version_pre_research_books // BL-1539: v79, nothing booked
+            && version != k_world_save_version_pre_ended))        // BL-1562: v80, no nation ended
         return false; // mismatched version -- refuse rather than misread
 
     // BL-1422: a stream before the kit goods carries every per-resource array 49 wide;
@@ -3906,6 +3936,11 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
             if (s.corp_hostile_pairs.count({ r.declarer, r.defender }) == 0
                 || (answered == 1 && s.corp_hostile_pairs.count({ r.defender, r.declarer }) == 0))
                 return false;
+            // BL-1562 (RELATIONS.md § 7, Ben 2026-11-09): a declaration of war makes BOTH
+            // sides hostile, so the defender's row stands whether or not it answered. A
+            // stream written before that ruling carries an unanswered war with one row;
+            // it loads with both. (The friendship the declarer's row already excludes.)
+            s.corp_hostile_pairs.insert({ r.defender, r.declarer });
             r.answered = answered == 1;
             const std::pair<entity_id, entity_id> key{r.declarer, r.defender};
             if (!s.wars.empty() && !(s.wars.rbegin()->first < key))
@@ -4312,6 +4347,38 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
     else
     {
         rescale_site_days_to_research_books(s);
+    }
+
+    // v81 (BL-1562): the ended nations. Untrusted: each names a nation of the stream,
+    // strictly ascending, never null, that owns no tile, fields no unit and is party to
+    // no open war - what elimination leaves. Refused whole otherwise. A v80 (and older)
+    // stream ends before it: no nation has ended.
+    if (version >= k_world_save_version_ended)
+    {
+        uint32_t count = 0;
+        if (!r_u32(in, count) || count > s.nations.size())
+            return false;
+        entity_id prev = null_entity;
+        for (uint32_t k = 0; k < count; ++k)
+        {
+            entity_id nid = null_entity;
+            if (!r_id(in, nid) || nid == null_entity || (k > 0 && nid <= prev))
+                return false;
+            prev = nid;
+            const auto nit = s.nations.find(nid);
+            if (nit == s.nations.end() || !nit->second.tiles.empty())
+                return false;
+            for (const auto& [tile, owner] : s.tile_to_nation)
+                if (owner == nid)
+                    return false;
+            for (const auto& [uid, u] : s.units)
+                if (u.owner == nid)
+                    return false;
+            for (const auto& [key, war] : s.wars)
+                if (key.first == nid || key.second == nid)
+                    return false;
+            nit->second.ended = true;
+        }
     }
 
     // BL-1266 (v46): every manual trade names a live owner and two distinct

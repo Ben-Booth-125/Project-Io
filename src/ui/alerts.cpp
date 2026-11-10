@@ -284,11 +284,17 @@ void draw_war_notices(const world& w, ui_state& ui, float left, float right)
         return; // nobody seated (spectating): no war is the player's
     if (!ns.armed)
     {
-        // The wars already standing on a new world or a load are not news.
+        // The wars already standing on a new world or a load are not news; nor is a
+        // nation already ended there.
         ns.seen.clear();
         ns.open.clear();
+        ns.ended_seen.clear();
+        ns.ended_open.clear();
         for (const auto& [key, war] : w.wars)
             ns.seen.insert(key);
+        for (const auto& [nid, nc] : w.nations)
+            if (nc.ended)
+                ns.ended_seen.insert(nid);
         ns.armed = true;
         return;
     }
@@ -298,13 +304,33 @@ void draw_war_notices(const world& w, ui_state& ui, float left, float right)
         if (ns.seen.insert(key).second && mine)
             ns.open.push_back(key);
     }
+    // A nation's end raises the notice when the player's nation took part in its last
+    // war, or is the nation that ended (Ben, 2026-11-09; LAYOUT.md § War notice). Its last
+    // war is the latest closed war it was party to (the cession that ended it).
+    for (const auto& [nid, nc] : w.nations)
+    {
+        if (!nc.ended || !ns.ended_seen.insert(nid).second)
+            continue;
+        bool took_part = nid == me;
+        for (auto it = w.war_history.rbegin(); it != w.war_history.rend() && !took_part; ++it)
+            if (it->declarer == nid || it->defender == nid)
+            {
+                if (it->gainer != null_entity) // the cession that took its last province
+                {
+                    took_part = it->declarer == me || it->defender == me;
+                    break;
+                }
+            }
+        if (took_part)
+            ns.ended_open.push_back(nid);
+    }
     // A war that ended leaves nothing to notice, and may be declared afresh.
     for (auto it = ns.seen.begin(); it != ns.seen.end();)
         it = w.wars.count(*it) == 0 ? ns.seen.erase(it) : std::next(it);
     ns.open.erase(std::remove_if(ns.open.begin(), ns.open.end(),
                                  [&](const std::pair<entity_id, entity_id>& k) { return w.wars.count(k) == 0; }),
                   ns.open.end());
-    if (ns.open.empty())
+    if (ns.open.empty() && ns.ended_open.empty())
         return;
 
     const auto name_of = [&](entity_id n) {
@@ -322,6 +348,45 @@ void draw_war_notices(const world& w, ui_state& ui, float left, float right)
                                        ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing |
                                        ImGuiWindowFlags_NoNav | ImGuiWindowFlags_AlwaysAutoResize;
     ImGui::Begin("##war_notice", nullptr, flags);
+    // A nation's end (Ben, 2026-11-09). The player's own: the campaign is lost, and the
+    // session goes on as a spectator or returns to the menu.
+    entity_id ended_dismissed = null_entity;
+    for (std::size_t i = 0; i < ns.ended_open.size(); ++i)
+    {
+        const entity_id nid = ns.ended_open[i];
+        ImGui::PushID(static_cast<int>(10000 + i));
+        if (nid == me)
+        {
+            ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::front_hostile), "The campaign is lost");
+            ImGui::TextWrapped("%s has ceded its last province and ended.", name_of(nid).c_str());
+            if (ImGui::Button("Spectate"))
+            {
+                ui.spectating   = true; // nobody holds the seat: every nation is scored as a rival
+                ended_dismissed = nid;
+            }
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("Watch the rest of the campaign. The rivals play on.");
+            ImGui::SameLine();
+            if (ImGui::Button("Return to menu"))
+            {
+                ns.request_menu = true;
+                ended_dismissed = nid;
+            }
+        }
+        else
+        {
+            ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::front_hostile), "A nation has ended");
+            ImGui::TextWrapped("%s has ceded its last province and ended.", name_of(nid).c_str());
+            if (ImGui::Button("Dismiss"))
+                ended_dismissed = nid;
+        }
+        if (i + 1 < ns.ended_open.size() || !ns.open.empty())
+            ImGui::Separator();
+        ImGui::PopID();
+    }
+    if (ended_dismissed != null_entity)
+        ns.ended_open.erase(std::remove(ns.ended_open.begin(), ns.ended_open.end(), ended_dismissed),
+                            ns.ended_open.end());
     std::pair<entity_id, entity_id> dismissed{null_entity, null_entity};
     for (std::size_t i = 0; i < ns.open.size(); ++i)
     {
@@ -345,7 +410,7 @@ void draw_war_notices(const world& w, ui_state& ui, float left, float right)
             dismissed = key;
         }
         if (ImGui::IsItemHovered())
-            ImGui::SetTooltip(to_answer ? "Name goals among their provinces. Answering is free, and opens your fronts to push."
+            ImGui::SetTooltip(to_answer ? "Name goals among their provinces. Answering is free; your fronts may push already."
                                         : "Opens the Wars tab.");
         ImGui::SameLine();
         if (ImGui::Button("Dismiss"))

@@ -222,7 +222,8 @@ void apply_budget(world& w,
     {
         std::vector<entity_id> nation_ids;
         for (const auto& kv : w.nations)
-            nation_ids.push_back(kv.first);
+            if (!kv.second.ended) // BL-1562: an ended nation files no return
+                nation_ids.push_back(kv.first);
         std::sort(nation_ids.begin(), nation_ids.end());
         for (const entity_id nid : nation_ids)
         {

@@ -2728,6 +2728,14 @@ struct nation_component
     /// ports (`run_recruitment`) up to 15 quarters of their output. Nothing spends it
     /// until ships are raised. Saved (world_save_version 73) and hashed only when non-zero.
     int32_t sea_recruits  = 0;
+
+    /// BL-1562 (NATIONS.md § Elimination, Ben 2026-11-09): this nation has ENDED — a
+    /// peace ceded its last land province (`eliminate_nation`, war.hpp). It keeps its id,
+    /// name and history as a record, and drops out of every scorer, ledger, lens and
+    /// picker; `apply_corp_command` refuses it as an actor. Never cleared. Saved
+    /// (world_save_version 81; an older stream reads every nation as not ended) and
+    /// hashed only when set.
+    bool ended = false;
 };
 
 /// BL-1460 fix round: the capital a nation's generated identity reads —

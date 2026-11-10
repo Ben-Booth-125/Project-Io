@@ -28,9 +28,14 @@
 namespace
 {
 
+/// A live nation: known and not ended (BL-1562, NATIONS.md § Elimination). Every verb
+/// below refuses an ended nation as either party.
 bool is_nation(const world& w, entity_id n)
 {
-    return n != null_entity && w.nations.find(n) != w.nations.end();
+    if (n == null_entity)
+        return false;
+    const auto it = w.nations.find(n);
+    return it != w.nations.end() && !it->second.ended;
 }
 
 std::string nation_label(const world& w, entity_id n)
@@ -388,7 +393,7 @@ war_price declaration_price(const world& w, const sentiment_params& p, entity_id
     std::vector<entity_id> others;
     others.reserve(w.nations.size());
     for (const auto& [nid, nc] : w.nations)
-        if (nid != declarer && nid != defender)
+        if (nid != declarer && nid != defender && !nc.ended) // BL-1562: an ended nation watches nothing
             others.push_back(nid);
     std::sort(others.begin(), others.end());
     for (const entity_id o : others)
@@ -431,7 +436,12 @@ war_result declare_war(world& w, const sentiment_params& p, entity_id declarer,
     rec.opened_day     = w.construction_quarter_day;
 
     // Validation is complete; everything below is unconditional.
+    // BOTH ROWS (Ben, 2026-11-09; RELATIONS.md § 7): a declaration of war makes both
+    // sides hostile, so the defender can push, intercept and fight from the first day
+    // without answering. Answering only names its goals. (A bare `declare_hostile`
+    // stays directed.)
     write_hostility(w, declarer, defender);
+    write_hostility(w, defender, declarer);
     w.wars[{declarer, defender}] = std::move(rec);
 
     // Gathered, not written: the tick's one fold canonicalises it with the rest.
@@ -461,7 +471,7 @@ war_result answer_war(world& w, entity_id defender, entity_id declarer,
         return war_result::rejected_state;
 
     bool distinct = true;
-    write_hostility(w, defender, declarer);
+    write_hostility(w, defender, declarer); // standing since the declaration; kept idempotent
     it->second.defender_goals = sorted_goals(goals, distinct);
     it->second.answered       = true;
     return war_result::applied;
@@ -753,9 +763,11 @@ void set_holder(world& w, uint32_t pid, entity_id holder)
         w.province_holder[i] = holder;
 }
 
-/// Closes the war under @p key on @p terms (already validated). One mutation.
+/// Closes the war under @p key on @p terms (already validated). One mutation. @p truce
+/// is false only for a war closed by a party's elimination (NATIONS.md § Elimination:
+/// "No truce is written: there is nobody left to declare").
 void conclude_peace(world& w, const sentiment_params& p, std::pair<entity_id, entity_id> key,
-                    const peace_terms& terms, bool imposed)
+                    const peace_terms& terms, bool imposed, bool truce = true)
 {
     const war_record war = w.wars.at(key);
     war_history_entry h;
@@ -872,10 +884,20 @@ void conclude_peace(world& w, const sentiment_params& p, std::pair<entity_id, en
     // BL-1502 (MILITARY.md § Occupation): occupation clears at peace. A ceded province
     // keeps its new owner (done above); every other tile returns to its owner.
     clear_occupation_at_peace(w);
-    w.truces[canonical_pair(war.declarer, war.defender)] = w.current_econ_tick + k_war_truce_ticks;
+    if (truce)
+        w.truces[canonical_pair(war.declarer, war.defender)] = w.current_econ_tick + k_war_truce_ticks;
     for (const sentiment_event& e : events)
         queue_conduct(w, e.observer, e.subject, e.kind, e.magnitude);
     (void)p; // the weights are the fold's, read when the queue folds
+
+    // A LAST PROVINCE CEDED ENDS THE LOSER (Ben, 2026-11-09; NATIONS.md § Elimination):
+    // once the ground has moved, a loser left owning no land province is eliminated.
+    if (terms.kind == peace_kind::cession)
+    {
+        const entity_id loser = terms.gainer == war.declarer ? war.defender : war.declarer;
+        if (provinces_owned(w, loser) == 0)
+            eliminate_nation(w, p, loser, terms.gainer);
+    }
 }
 
 war_result pair_check(const world& w, entity_id a, entity_id b)
@@ -914,10 +936,174 @@ war_result check_peace_terms(const world& w, const war_record& war, const peace_
         if (province_owner(w, pid) != loser)
             return war_result::rejected_state; // still the loser's to cede
     }
-    // Never the loser's last province (Ben, 2026-10-30, NR-1102).
-    if (provinces_owned(w, loser) <= terms.provinces.size())
-        return war_result::rejected_state;
+    // A peace may cede the loser's LAST province (Ben, 2026-11-09, overturning NR-1102's
+    // refusal): the loser's nation then ends (`eliminate_nation`).
     return war_result::applied;
+}
+
+bool nation_ended(const world& w, entity_id nation)
+{
+    const auto it = w.nations.find(nation);
+    return it != w.nations.end() && it->second.ended;
+}
+
+void eliminate_nation(world& w, const sentiment_params& p, entity_id ended, entity_id gainer)
+{
+    const auto eit = w.nations.find(ended);
+    if (eit == w.nations.end() || eit->second.ended || ended == gainer)
+        return;
+    const bool has_gainer = gainer != null_entity && w.nations.count(gainer) != 0;
+
+    // 0. ITS LAST GROUND. A nation owns its coastal water as well as its land; with its
+    //    last land province gone, every province it still holds a tile of passes to the
+    //    conqueror with it (by the cession path, so buildings, track and units follow), and
+    //    a tile in no province passes alone. Ascending province, then ascending tile.
+    if (has_gainer)
+    {
+        std::set<uint32_t> residual;
+        std::vector<entity_id> loose;
+        for (const entity_id t : eit->second.tiles)
+            if (const auto o = w.tile_to_nation.find(t); o != w.tile_to_nation.end() && o->second == ended)
+            {
+                const uint32_t pid = w.provinces.province_of(t);
+                if (pid != 0 && pid != no_province)
+                    residual.insert(pid);
+                else
+                    loose.push_back(t);
+            }
+        if (!residual.empty())
+            cede_provinces(w, ended, gainer, std::vector<uint32_t>(residual.begin(), residual.end()));
+        std::sort(loose.begin(), loose.end());
+        nation_component& loser = w.nations.at(ended);
+        nation_component& to    = w.nations.at(gainer);
+        for (const entity_id t : loose)
+        {
+            w.set_tile_nation(t, gainer);
+            to.tiles.push_back(t);
+        }
+        loser.tiles.erase(std::remove_if(loser.tiles.begin(), loser.tiles.end(),
+                                         [&](entity_id t) {
+                                             const auto o = w.tile_to_nation.find(t);
+                                             return o == w.tile_to_nation.end() || o->second != ended;
+                                         }),
+                          loser.tiles.end());
+        // Whatever it still owns off its ground (nothing, on a generated world) passes too.
+        to.state_assets.insert(to.state_assets.end(), loser.state_assets.begin(), loser.state_assets.end());
+        loser.state_assets.clear();
+    }
+
+    // 1. ITS WARS CLOSE: every other war it is party to, as a white peace with no truce.
+    {
+        std::vector<std::pair<entity_id, entity_id>> keys;
+        for (const auto& [key, war] : w.wars) // ascending
+            if (key.first == ended || key.second == ended)
+                keys.push_back(key);
+        for (const auto& key : keys)
+            if (w.wars.count(key) != 0)
+                conclude_peace(w, p, key, peace_terms{}, false, /*truce=*/false);
+    }
+
+    // 2. ITS RELATIONS CLEAR: offers, hostility, friendship, embargo, its own laws (the
+    //    tariffs it levied), truces and refusals naming it, and every sentiment row to or
+    //    from it, with the conduct still queued about it.
+    const auto names = [ended](const std::pair<entity_id, entity_id>& k) {
+        return k.first == ended || k.second == ended;
+    };
+    const auto erase_pairs = [&](auto& table) {
+        for (auto it = table.begin(); it != table.end();)
+            it = names(*it) ? table.erase(it) : std::next(it);
+    };
+    const auto erase_keyed = [&](auto& table) {
+        for (auto it = table.begin(); it != table.end();)
+            it = names(it->first) ? table.erase(it) : std::next(it);
+    };
+    erase_pairs(w.corp_hostile_pairs);
+    erase_pairs(w.corp_friend_pairs);
+    erase_pairs(w.corp_friend_offers);
+    erase_pairs(w.nation_embargoes);
+    erase_keyed(w.peace_offers);
+    erase_keyed(w.peace_refusals);
+    erase_keyed(w.truces);
+    erase_keyed(w.sentiment.pairs);
+    erase_keyed(w.sentiment.contributions);
+    erase_keyed(w.sentiment_trade_landed);
+    erase_keyed(w.sentiment_trade_streaks);
+    w.sentiment_pending.erase(
+        std::remove_if(w.sentiment_pending.begin(), w.sentiment_pending.end(),
+                       [&](const sentiment_event& e) { return e.observer == ended || e.subject == ended; }),
+        w.sentiment_pending.end());
+    w.laws.erase(std::remove_if(w.laws.begin(), w.laws.end(),
+                                [&](const law& l) { return l.enacting_nation == ended; }),
+                 w.laws.end());
+    if (auto rit = w.war_exhaustion_residual.find(ended); rit != w.war_exhaustion_residual.end())
+        w.war_exhaustion_residual.erase(rit);
+
+    // 3. ITS FORCE ENDS: units disband where they stand, with its wings, musters, front
+    //    orders and any fight it is still in; its convoys and trades are cancelled.
+    w.battles.erase(std::remove_if(w.battles.begin(), w.battles.end(),
+                                   [&](const active_battle& b) { return b.attacker == ended || b.defender == ended; }),
+                    w.battles.end());
+    {
+        std::vector<entity_id> gone;
+        for (const auto& [uid, u] : w.units)
+            if (u.owner == ended)
+                gone.push_back(uid);
+        std::sort(gone.begin(), gone.end());
+        for (const entity_id uid : gone)
+        {
+            w.units.erase(uid);
+            w.forget_air_unit(uid);
+        }
+    }
+    for (auto it = w.wings.begin(); it != w.wings.end();)
+        it = it->second.owner == ended ? w.wings.erase(it) : std::next(it);
+    w.musters.erase(std::remove_if(w.musters.begin(), w.musters.end(),
+                                   [&](const muster_order& m) { return m.owner == ended; }),
+                    w.musters.end());
+    w.front_orders.erase(std::remove_if(w.front_orders.begin(), w.front_orders.end(),
+                                        [&](const front_order_entry& f) { return f.nation == ended; }),
+                         w.front_orders.end());
+    for (auto it = w.air_superiority.begin(); it != w.air_superiority.end();)
+        it = it->first.second == ended ? w.air_superiority.erase(it) : std::next(it);
+    for (auto it = w.air_revealed.begin(); it != w.air_revealed.end();)
+        it = it->first == ended ? w.air_revealed.erase(it) : std::next(it);
+    for (auto it = w.tile_occupier.begin(); it != w.tile_occupier.end();)
+        it = it->second == ended ? w.tile_occupier.erase(it) : std::next(it);
+    w.convoys.erase(std::remove_if(w.convoys.begin(), w.convoys.end(),
+                                   [&](const convoy_component& c) { return c.corp == ended; }),
+                    w.convoys.end());
+    w.trades.erase(std::remove_if(w.trades.begin(), w.trades.end(),
+                                  [&](const standing_trade& t) { return t.owner == ended; }),
+                   w.trades.end());
+
+    // 4. ITS TREASURY PASSES TO THE CONQUEROR: a positive balance is an actor-to-actor
+    //    transfer that conserves; a debt is written off, not inherited.
+    nation_component& nc = w.nations.at(ended);
+    if (has_gainer && nc.treasury > 0.0f)
+        w.nations.at(gainer).treasury += nc.treasury;
+    nc.treasury      = 0.0f;
+    nc.trade_reserve = 0.0f;
+    nc.trade_points  = 0.0f;
+
+    // 5. IT STAYS A RECORD: id, name and history kept, flagged ended. Its generated
+    //    capital stays its identity; its live capital names no tile it owns.
+    if (nc.generation_capital_tile == null_entity)
+        nc.generation_capital_tile = nc.capital_tile;
+    nc.capital_tile = null_entity;
+    nc.ended        = true;
+
+    invalidate_logistics_caches(w);
+    reanchor_fronts(w);
+
+    // The history log writes ONE entry, tagged by the ended nation; every nation reads
+    // the log, so it is a public event.
+    world_history_entry e;
+    e.timestamp   = w.current_day_tick;
+    e.topic       = history_topic::war;
+    e.corp        = ended;
+    e.event       = nation_label(w, ended) + " has ended";
+    e.consequence = has_gainer ? "its last province passed to " + nation_label(w, gainer) : std::string();
+    w.history_log.push_back(std::move(e));
 }
 
 bool peace_offer_cooling(const world& w, entity_id offerer, entity_id other)

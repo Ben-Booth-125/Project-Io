@@ -20,6 +20,7 @@
 #include "world/corp_ai.hpp"      // BL-1461: score_nation_war, war_ai_trace_sink
 #include "world/corp_command.hpp"
 #include "world/economy_system.hpp"
+#include "world/embargo.hpp"      // BL-1562: set_embargo refuses an ended nation
 #include "world/fronts.hpp"       // BL-1461: derive_fronts (where the RW rows stand a unit)
 #include "world/province.hpp"
 #include "world/recipe_registry.hpp"
@@ -173,6 +174,36 @@ corp_command war_cmd(corp_verb v, entity_id actor, entity_id other, std::vector<
     return c;
 }
 
+/// The bytes of every section the writer appends AFTER the v75 peace refusals (v77
+/// provenance, v78 occupation, v79 defend orders, v80 research books, v81 ended
+/// nations). The offset rows below count back from the stream's end and must step over
+/// these; they had gone stale as each section landed (BL-1562 brought them current).
+std::size_t tail_after_refusals(const world& w)
+{
+    return world_save_contributors_section_bytes(w) + world_save_occupation_section_bytes(w)
+         + world_save_defend_section_bytes(w) + world_save_research_books_section_bytes(w)
+         + world_save_ended_section_bytes(w);
+}
+
+/// BL-1562: whether @p nation may order a PUSH on its front toward @p neighbour through
+/// the command seam (`set_front_order`, the front card's press), tried on a COPY so the
+/// fixture is untouched.
+bool front_push_allowed_unanswered(const world& w, entity_id nation, entity_id neighbour)
+{
+    world c = w;
+    const std::vector<front> fr = current_fronts(c, nation);
+    for (const front& f : fr)
+        if (f.neighbour == neighbour)
+        {
+            corp_command cmd;
+            cmd.corp = nation; cmd.as_nation = nation; cmd.verb = corp_verb::set_front_order;
+            cmd.tile = f.key; cmd.order = 1;
+            recipe_registry reg;
+            return apply_corp_command(c, reg, cmd) == corp_command_result::applied;
+        }
+    return false;
+}
+
 float trust_of(const world& w, entity_id o, entity_id s) { return sentiment_toward(w.sentiment, o, s).trust; }
 float access_of(const world& w, entity_id o, entity_id s) { return sentiment_toward(w.sentiment, o, s).access; }
 float alarm_of(const world& w, entity_id o, entity_id s) { return sentiment_toward(w.sentiment, o, s).alarm; }
@@ -217,8 +248,10 @@ int main()
         w.current_econ_tick = 7; w.construction_quarter_day = 33;
         const war_result r = declare_war(w, sp, f.A, f.B, goals);
         const war_record* rec = war_between(w, f.A, f.B);
-        check(r == war_result::applied && is_hostile(w, f.A, f.B) && !is_hostile(w, f.B, f.A),
-              "R1a declare_war applies: the declarer's hostility row is written, the defender's is not");
+        check(r == war_result::applied && is_hostile(w, f.A, f.B) && is_hostile(w, f.B, f.A),
+              "R1a declare_war applies: BOTH hostility rows are written, declarer's and defender's (Ben, 2026-11-09)");
+        check(front_push_allowed_unanswered(w, f.B, f.A),
+              "R1a2 the defender may push at once, unanswered: the front's gate (is_hostile defender->declarer) is open");
         check(rec != nullptr && rec->declarer == f.A && rec->defender == f.B && !rec->answered
                   && rec->declarer_goals == std::vector<uint32_t>({ f.provs[f.B][0], f.provs[f.B][2] })
                   && rec->defender_goals.empty() && rec->opened_tick == 7 && rec->opened_day == 33,
@@ -417,7 +450,7 @@ int main()
         const war_record* rec = war_between(w, f.A, f.B);
         check(rec && rec->answered && is_hostile(w, f.B, f.A)
                   && rec->defender_goals == std::vector<uint32_t>({ f.provs[f.A][1], f.provs[f.A][3] }),
-              "R3f it writes the defender's hostility row and names its goals (ascending)");
+              "R3f the defender's hostility row stands and the answer names its goals (ascending)");
         check(before.pairs == w.sentiment.pairs && w.sentiment_pending.size() == queued,
               "R3g it costs nothing: no sentiment row moves and nothing is queued");
         s = take(w);
@@ -484,12 +517,12 @@ int main()
         check(from_bytes(b67, old) && old.wars.empty() && old.truces.empty() && old.peace_offers.empty()
                   && old.war_history.empty() && old.province_cessions.empty()
                   && b67.size() == b.size() - world_save_war_section_bytes(w)
-                                              - world_save_embargo_section_bytes(w) - world_save_gen_capital_section_bytes(w) - world_save_recruits_section_bytes(w) - world_save_sea_recruits_section_bytes(w) - world_save_refusals_section_bytes(w) /* BL-1480 (v75), last */ // BL-1418 (v70)
+                                              - world_save_embargo_section_bytes(w) - world_save_gen_capital_section_bytes(w) - world_save_recruits_section_bytes(w) - world_save_sea_recruits_section_bytes(w) - world_save_refusals_section_bytes(w) /* BL-1480 (v75) */ - tail_after_refusals(w) /* v77..v81 */ // BL-1418 (v70)
                                               - world_save_kit_goods_bytes(w), // BL-1422: arrays 49 wide before v74
               "R4l a v68 stream (today's less the war and embargo sections) loads with no wars");
         // Untrusted: an answered byte of 2 is refused whole.
         std::string bad = b;
-        const std::size_t war0 = b.size() - world_save_embargo_section_bytes(w) - world_save_gen_capital_section_bytes(w) - world_save_recruits_section_bytes(w) - world_save_sea_recruits_section_bytes(w) - world_save_refusals_section_bytes(w) /* BL-1480 (v75), last */ // BL-1418 (v70), last
+        const std::size_t war0 = b.size() - world_save_embargo_section_bytes(w) - world_save_gen_capital_section_bytes(w) - world_save_recruits_section_bytes(w) - world_save_sea_recruits_section_bytes(w) - world_save_refusals_section_bytes(w) /* BL-1480 (v75) */ - tail_after_refusals(w) /* v77..v81 */ // BL-1418 (v70), last
                                - world_save_war_section_bytes(w) + 4; // past the war count
         bad[war0 + 8] = 2;
         world untouched;
@@ -868,7 +901,7 @@ int main()
               "P3x at -100 the defender imposes its cession of the declarer's provinces without acceptance");
     }
     {
-        // Never the loser's last province.
+        // A last province MAY be ceded (Ben, 2026-11-09, overturning NR-1102).
         fixture f; build(f);
         world& w = f.w;
         // Give all but one of B's provinces to C on the territorial map, leaving B one.
@@ -879,11 +912,14 @@ int main()
         w.province_holder[holder_index(w, bp[0])] = f.A;
         w.wars.at({ f.A, f.B }).defender_men_lost = 10;
         peace_terms cede; cede.kind = peace_kind::cession; cede.gainer = f.A; cede.provinces = { bp[0] };
-        const snap s = take(w);
+        world offered = w;
         check(war_score(w, *war_between(w, f.A, f.B)) == 100
-                  && offer_peace(w, f.A, f.B, cede) == war_result::rejected_state
-                  && impose_peace(w, sp, f.A, f.B, cede) == war_result::rejected_state && same(s, w),
-              "P3v a cession of the loser's last province is refused, offered or imposed, mutating nothing (NR-1102)");
+                  && check_peace_terms(w, *war_between(w, f.A, f.B), cede) == war_result::applied
+                  && offer_peace(offered, f.A, f.B, cede) == war_result::applied,
+              "P3v a cession of the loser's last province is LEGAL: the terms check and the offer applies (2026-11-09)");
+        check(impose_peace(w, sp, f.A, f.B, cede) == war_result::applied && province_owner(w, bp[0]) == f.A
+                  && nation_ended(w, f.B),
+              "P3v' imposed, it moves the province and ends the loser");
     }
 
     {
@@ -914,8 +950,8 @@ int main()
               "P3z LOST GROUND holds through the real flow: B declares on A naming a province it ceded, "
               "the preview shows the justification, and the declaration is accepted (it was refused while "
               "the ground stayed B's)");
-        // The floor across wars: whittle B down to one province by successive real
-        // cessions to other declarers, then the last one is refused.
+        // Across wars: whittle B down to one province by successive real cessions to
+        // other declarers; then the last one is ceded too, and B ends.
         const entity_id takers[4] = { f.C, f.D, f.E, f.F };
         std::size_t left = keep, taker = 0;
         bool whittled = true;
@@ -943,12 +979,213 @@ int main()
         w.province_holder[holder_index(w, last)] = t;
         peace_terms c; c.kind = peace_kind::cession; c.gainer = t; c.provinces = { last };
         w.wars.at({ t, f.B }).defender_men_lost = 10; // score 100: impose is reachable
+        check(declared && offer_peace(w, t, f.B, c) == war_result::applied
+                  && accept_peace(w, sp, f.B, t) == war_result::applied
+                  && province_owner(w, last) == t && nation_ended(w, f.B),
+              "P3v2 ACROSS wars: after earlier peaces ceded the rest, a cession of B's last province is "
+              "offered and accepted, and B ends (2026-11-09)");
+    }
+
+    // =====================================================================
+    // BL-1562 (WAR_BOTH_HOSTILE_ELIMINATION; RELATIONS.md § 7, NATIONS.md § Elimination,
+    // Ben 2026-11-09): a declaration makes both sides hostile, a last province may be
+    // ceded, and the loser then ends.
+    std::printf("\nW-E - both sides hostile at the declaration; a last province ends the nation\n");
+    {
+        fixture f; build(f);
+        world& w = f.w;
+        check(!front_push_allowed_unanswered(w, f.B, f.A),
+              "E0 control: before any declaration B may not push toward A (no hostility)");
+        (void)declare_war(w, sp, f.A, f.B, { f.provs[f.B][0] });
+        check(!war_between(w, f.A, f.B)->answered && front_push_allowed_unanswered(w, f.B, f.A)
+                  && front_push_allowed_unanswered(w, f.A, f.B),
+              "E0b declared on and UNANSWERED, B may push toward A through set_front_order at once");
+        // A bare declare_hostile stays directed.
+        check(declare_hostile(w, f.C, f.D) == stance_result::applied && is_hostile(w, f.C, f.D)
+                  && !is_hostile(w, f.D, f.C),
+              "E0c a bare declare_hostile, with no war, stays directed");
+        // A peace clears both rows of an unanswered war.
+        check(impose_peace(w, sp, f.A, f.B, peace_terms{}) == war_result::rejected_state, "E0d (no impose short of 100)");
+        (void)offer_peace(w, f.A, f.B, peace_terms{});
+        check(accept_peace(w, sp, f.B, f.A) == war_result::applied && !is_hostile(w, f.A, f.B)
+                  && !is_hostile(w, f.B, f.A),
+              "E0e a peace on an unanswered war clears both hostility rows");
+    }
+    {
+        // The elimination, every effect checked. B keeps ONE province (the rest moved to C
+        // on the territorial map); A takes it by an imposed cession.
+        fixture f; build(f);
+        world& w = f.w;
+        const std::vector<uint32_t> bp = f.provs[f.B];
+        for (std::size_t i = 1; i < bp.size(); ++i)
+            for (const entity_id t : w.provinces.find(bp[i])->tiles) w.set_tile_nation(t, f.C);
+        const uint32_t last = bp[0];
+        check(declare_war(w, sp, f.A, f.B, { last }) == war_result::applied
+                  && declare_war(w, sp, f.D, f.B, { last }) == war_result::applied
+                  && declare_war(w, sp, f.B, f.E, { f.provs[f.E][0] }) == war_result::applied,
+              "E1 (B is at war with A, D and E)");
+        check(offer_peace(w, f.B, f.D, peace_terms{}) == war_result::applied, "E1 (B has a pending peace offer to D)");
+        w.corp_friend_pairs.insert(canonical_pair(f.B, f.C));
+        w.corp_friend_offers.insert({ f.B, f.F });
+        w.corp_friend_offers.insert({ f.F, f.B });
+        w.nation_embargoes.insert({ f.B, f.C });
+        w.nation_embargoes.insert({ f.C, f.B });
+        w.corp_hostile_pairs.insert({ f.F, f.B }); // a bare hostility toward it
+        { law l; l.id = "LAW-B-TARIFF"; l.name = "B tariff"; l.effect = law_effect_kind::import_tariff;
+          l.enacted = true; l.enacting_nation = f.B; l.rate = 0.1f; w.laws.push_back(l); }
+        { law l; l.id = "LAW-C-TARIFF"; l.name = "C tariff"; l.effect = law_effect_kind::import_tariff;
+          l.enacted = true; l.enacting_nation = f.C; l.rate = 0.1f; w.laws.push_back(l); }
+        w.sentiment.pairs[{ f.C, f.B }] = sentiment_value{ 0.0f, -10.0f, 5.0f };
+        w.sentiment.pairs[{ f.B, f.C }] = sentiment_value{ 0.0f, 10.0f, 0.0f };
+        w.sentiment.pairs[{ f.C, f.D }] = sentiment_value{ 0.0f, 4.0f, 0.0f };
+        const entity_id last_tile = w.provinces.find(last)->tiles.front();
+        entity_id bu = w.create_entity();
+        { unit_component uc{}; uc.position = last_tile; uc.owner = f.B; uc.count = 400; uc.establishment = 400; w.units[bu] = uc; }
+        entity_id au = w.create_entity();
+        { unit_component uc{}; uc.position = f.w.provinces.find(f.provs[f.A][0])->tiles.front(); uc.owner = f.A;
+          uc.count = 400; uc.establishment = 400; w.units[au] = uc; }
+        { convoy_component c{}; c.corp = f.B; c.id = w.allocate_convoy_id(); w.convoys.push_back(c); }
+        { convoy_component c{}; c.corp = f.A; c.id = w.allocate_convoy_id(); w.convoys.push_back(c); }
+        { standing_trade t{}; t.owner = f.B; t.id = w.allocate_trade_id(); w.trades.push_back(t); }
+        { standing_trade t{}; t.owner = f.A; t.id = w.allocate_trade_id(); w.trades.push_back(t); }
+        w.nations.at(f.B).treasury = 5000.0f;
+        const float a_before = w.nations.at(f.A).treasury;
+        w.province_holder[holder_index(w, last)] = f.A;
+        w.wars.at({ f.A, f.B }).defender_men_lost = 10; // score 100
+        const std::size_t hist_before = w.history_log.size();
+        peace_terms cede; cede.kind = peace_kind::cession; cede.gainer = f.A; cede.provinces = { last };
+        check(impose_peace(w, sp, f.A, f.B, cede) == war_result::applied, "E2 A imposes the cession of B's last province");
+
+        bool no_ground = w.nations.at(f.B).tiles.empty();
+        for (const auto& [t, o] : w.tile_to_nation) no_ground = no_ground && o != f.B;
+        check(nation_ended(w, f.B) && no_ground && province_owner(w, last) == f.A
+                  && w.nations.count(f.B) == 1 && w.nations.at(f.B).name == "Brael",
+              "E3 B has ENDED: it owns no tile, its last province is A's, and it keeps its id and name");
+        bool no_war = true;
+        for (const auto& [k, war] : w.wars) no_war = no_war && k.first != f.B && k.second != f.B;
+        int white = 0;
+        for (const war_history_entry& h : w.war_history)
+            if ((h.declarer == f.D && h.defender == f.B) || (h.declarer == f.B && h.defender == f.E))
+                white += h.end == war_end::white_peace ? 1 : 0;
+        bool no_truce = true;
+        for (const auto& [k, e] : w.truces) no_truce = no_truce && k.first != f.B && k.second != f.B;
+        check(no_war && white == 2 && no_truce,
+              "E4 its other wars (with D, with E) close as WHITE PEACE, and no truce names it");
+        bool rel_clear = true;
+        for (const auto& k : w.corp_hostile_pairs) rel_clear = rel_clear && k.first != f.B && k.second != f.B;
+        for (const auto& k : w.corp_friend_pairs)  rel_clear = rel_clear && k.first != f.B && k.second != f.B;
+        for (const auto& k : w.corp_friend_offers) rel_clear = rel_clear && k.first != f.B && k.second != f.B;
+        for (const auto& k : w.nation_embargoes)   rel_clear = rel_clear && k.first != f.B && k.second != f.B;
+        for (const auto& [k, o] : w.peace_offers)  rel_clear = rel_clear && k.first != f.B && k.second != f.B;
+        check(rel_clear, "E5 its pending peace and friendship offers drop; hostility, friendship and embargo rows to and from it are removed");
+        bool laws_ok = w.laws.size() == 1 && w.laws[0].enacting_nation == f.C;
+        check(laws_ok, "E5b the tariff it levied is removed; another nation's stays");
+        bool sent_clear = w.sentiment.pairs.count({ f.C, f.D }) == 1;
+        for (const auto& [k, v] : w.sentiment.pairs) sent_clear = sent_clear && k.first != f.B && k.second != f.B;
+        for (const sentiment_event& e : w.sentiment_pending) sent_clear = sent_clear && e.observer != f.B && e.subject != f.B;
+        check(sent_clear, "E5c every sentiment row to or from it, and conduct queued about it, is gone; others stay");
+        bool force_gone = w.units.count(bu) == 0 && w.units.count(au) == 1;
+        for (const auto& [uid, u] : w.units) force_gone = force_gone && u.owner != f.B;
+        bool convoys_ok = w.convoys.size() == 1 && w.convoys[0].corp == f.A;
+        bool trades_ok  = w.trades.size() == 1 && w.trades[0].owner == f.A;
+        check(force_gone && convoys_ok && trades_ok,
+              "E6 its units disband where they stand; its convoys and trades are cancelled; A's stand");
+        check(w.nations.at(f.B).treasury == 0.0f && w.nations.at(f.A).treasury == a_before + 5000.0f,
+              "E7 its positive treasury (5000) passes to the conqueror, exactly");
+        // A's stub convoy and trade were controls for E6 only: they name no market, which
+        // the loader (rightly) refuses, so they go before the save rows below.
+        w.convoys.clear();
+        w.trades.clear();
+        int ended_entries = 0;
+        for (std::size_t i = hist_before; i < w.history_log.size(); ++i)
+            if (w.history_log[i].corp == f.B && w.history_log[i].event.find("has ended") != std::string::npos)
+                ++ended_entries;
+        check(ended_entries == 1, "E8 the history log writes ONE entry for its end");
         const snap s = take(w);
-        check(declared && offer_peace(w, t, f.B, c) == war_result::rejected_state
-                  && impose_peace(w, sp, t, f.B, c) == war_result::rejected_state && same(s, w)
-                  && province_owner(w, last) == f.B,
-              "P3v2 the last-province floor counts ACROSS wars: after earlier peaces ceded the rest, a "
-              "cession of B's last province is refused, offered or imposed, mutating nothing (NR-1102)");
+        corp_command act = war_cmd(corp_verb::declare_war, f.B, f.C, { f.provs[f.C][0] });
+        check(apply_corp_command(w, reg, act) == corp_command_result::rejected_no_corp
+                  && declare_war(w, sp, f.C, f.B, { last }) != war_result::applied
+                  && declare_hostile(w, f.C, f.B) != stance_result::applied
+                  && offer_friendship(w, f.C, f.B) != stance_result::applied
+                  && set_embargo(w, f.C, f.B, true) != embargo_result::applied
+                  && same(s, w),
+              "E9 an ended nation is no actor (rejected_no_corp) and no counterparty: every verb refuses, mutating nothing");
+        w.settle_build_gate = false;
+        score_nation_war(w, reg, f.B, 40, true);
+        check(same(s, w), "E10 the war scorer skips it, even under spectate");
+        const war_price pr = declaration_price(w, sp, f.A, f.C, { f.provs[f.C][0] });
+        bool watches = false;
+        for (const war_price_row& r : pr.rows) watches = watches || r.observer == f.B;
+        check(pr.valid && !watches, "E10b an ended nation prices no declaration (no row observes for it)");
+        queue_conduct(w, f.C, f.B, sentiment_factor_kind::war_declared, 1.0f);
+        check(same(s, w), "E10c conduct about an ended nation is never gathered");
+
+        // Save / load: the flag travels and hashes.
+        world back;
+        check(from_bytes(to_bytes(w), back) && back.nations.at(f.B).ended && !back.nations.at(f.A).ended
+                  && back.state_hash(0) == w.state_hash(0) && to_bytes(back) == to_bytes(w),
+              "E11 save/load round-trips the ended flag byte-for-byte, state_hash equal");
+        world cleared = w;
+        cleared.nations.at(f.B).ended = false;
+        check(cleared.state_hash(0) != w.state_hash(0), "E11b state_hash moves with the ended flag");
+        {
+            std::ostringstream o(std::ios::binary);
+            write_world_snapshot_pre_ended(w, o);
+            const std::string v80 = o.str();
+            world old;
+            std::istringstream in(v80, std::ios::binary);
+            check(read_world_snapshot(old, in) && !old.nations.at(f.B).ended
+                      && to_bytes(w).size() == v80.size() + world_save_ended_section_bytes(w)
+                      && cleared.state_hash(0) == old.state_hash(0),
+                  "E12 a v80 stream (before the flag) loads with every nation not ended, and is the v81 stream less the section");
+        }
+        {
+            world bad = w;
+            bad.nations.at(f.C).ended = true; // a nation with ground marked ended
+            world back2;
+            check(!from_bytes(to_bytes(bad), back2) && back2.nations.empty(),
+                  "E13 a stream marking a nation with ground ended is refused whole on load");
+        }
+    }
+    {
+        // An old save's unanswered war (one row) loads with both rows.
+        fixture f; build(f);
+        world& w = f.w;
+        (void)declare_war(w, sp, f.A, f.B, { f.provs[f.B][0] });
+        w.corp_hostile_pairs.erase({ f.B, f.A }); // what a pre-ruling declaration wrote
+        std::ostringstream o(std::ios::binary);
+        write_world_snapshot_pre_ended(w, o);
+        world old;
+        std::istringstream in(o.str(), std::ios::binary);
+        check(read_world_snapshot(old, in) && is_hostile(old, f.A, f.B) && is_hostile(old, f.B, f.A)
+                  && !old.wars.at({ f.A, f.B }).answered,
+              "E14 an old save's unanswered war (one hostility row) loads with both rows, still unanswered");
+    }
+    {
+        // A debt is written off, not inherited.
+        fixture f; build(f);
+        world& w = f.w;
+        const std::vector<uint32_t> bp = f.provs[f.B];
+        for (std::size_t i = 1; i < bp.size(); ++i)
+            for (const entity_id t : w.provinces.find(bp[i])->tiles) w.set_tile_nation(t, f.C);
+        (void)declare_war(w, sp, f.A, f.B, { bp[0] });
+        w.province_holder[holder_index(w, bp[0])] = f.A;
+        w.nations.at(f.B).treasury = -300.0f;
+        const float a_before = w.nations.at(f.A).treasury;
+        peace_terms cede; cede.kind = peace_kind::cession; cede.gainer = f.A; cede.provinces = { bp[0] };
+        (void)offer_peace(w, f.A, f.B, cede);
+        check(accept_peace(w, sp, f.B, f.A) == war_result::applied && nation_ended(w, f.B)
+                  && w.nations.at(f.B).treasury == 0.0f && w.nations.at(f.A).treasury == a_before,
+              "E15 a debt (-300) is written off at the end: the conqueror's treasury is untouched");
+        // A cession that leaves the loser ground does NOT end it.
+        fixture g; build(g);
+        (void)declare_war(g.w, sp, g.A, g.B, { g.provs[g.B][0] });
+        g.w.province_holder[holder_index(g.w, g.provs[g.B][0])] = g.A;
+        peace_terms c2; c2.kind = peace_kind::cession; c2.gainer = g.A; c2.provinces = { g.provs[g.B][0] };
+        (void)offer_peace(g.w, g.A, g.B, c2);
+        check(accept_peace(g.w, sp, g.B, g.A) == war_result::applied && !nation_ended(g.w, g.B)
+                  && !g.w.nations.at(g.B).tiles.empty(),
+              "E16 control: a cession that leaves the loser a province does not end it");
     }
 
     // =====================================================================
@@ -1004,7 +1241,7 @@ int main()
         std::string bad2 = b2;
         // The offer sits after the war count + one war record + the truce table.
         const war_record& wr = w.wars.begin()->second;
-        const std::size_t off = b2.size() - world_save_embargo_section_bytes(w) - world_save_gen_capital_section_bytes(w) - world_save_recruits_section_bytes(w) - world_save_sea_recruits_section_bytes(w) - world_save_refusals_section_bytes(w) /* BL-1480 (v75), last */ - world_save_war_section_bytes(w) + 4
+        const std::size_t off = b2.size() - world_save_embargo_section_bytes(w) - world_save_gen_capital_section_bytes(w) - world_save_recruits_section_bytes(w) - world_save_sea_recruits_section_bytes(w) - world_save_refusals_section_bytes(w) /* BL-1480 (v75) */ - tail_after_refusals(w) /* v77..v81 */ - world_save_war_section_bytes(w) + 4
                               + (4 + 4 + 1 + 4 + 4 + 8 + 8 + 4 + 4 + 4 + 4 + 4 + 4 * wr.declarer_goals.size() + 4 + 4 * wr.defender_goals.size())
                               + 4 + 12 * w.truces.size() + 4 + 4 + 4 + 4 + 4; // to the kind byte
         bad2[off] = 7;
@@ -1331,7 +1568,7 @@ int main()
                          && rec->declarer_goals.size() <= 3;
             if (rec != nullptr)
                 for (const uint32_t g : rec->declarer_goals) goals_ok = goals_ok && province_owner(w, g) == f.B;
-            check(goals_ok && is_hostile(w, f.A, f.B) && !is_hostile(w, f.B, f.A)
+            check(goals_ok && is_hostile(w, f.A, f.B) && is_hostile(w, f.B, f.A) // both rows (2026-11-09)
                       && did(war_ai_choice::declare, f.A, f.B) && w.wars.size() == 1,
                   "RW7 with a motive and an edge a rival declares through declare_war: 1..3 goals among the target's provinces");
             trace.clear();
@@ -1548,23 +1785,23 @@ int main()
         world back;
         // BL-1436 (Ben, 2026-11-03, ruling 6): v76 widens the resource arrays for airframes;
         // the refusals section rides on unchanged.
-        check(ver == 76 && ver == world_save_version && from_bytes(b, back) && to_bytes(back) == b
+        check(ver >= 76 && ver == world_save_version && from_bytes(b, back) && to_bytes(back) == b
                   && back.peace_refusals == w.peace_refusals && back.state_hash(0) == w.state_hash(0),
-              "RF1 the stream is v76 and the refusal round-trips byte for byte, its hash equal");
+              "RF1 the stream is today's (v76 or later) and the refusal round-trips byte for byte, its hash equal");
         check(w.state_hash(0) != [&] { world z = w; z.peace_refusals.clear(); return z.state_hash(0); }(),
               "RF2 the refusal is in the state hash");
         std::ostringstream o74(std::ios::binary);
         write_world_snapshot_pre_refusals(w, o74);
         const std::string b74 = o74.str();
         world old;
-        check(world_save_refusals_section_bytes(w) == 4 + 12 && b74.size() + 16 + world_save_airframes_bytes(w) /* BL-1436: v74 is 54 wide */ == b.size()
+        check(world_save_refusals_section_bytes(w) == 4 + 12 && b74.size() + 16 + world_save_airframes_bytes(w) /* BL-1436: v74 is 54 wide */ + tail_after_refusals(w) == b.size()
                   && from_bytes(b74, old) && old.peace_refusals.empty() && old.wars.size() == 1,
               "RF3 a v74 stream (today's less the 16-byte refusals section) reads as a world with no refusals");
         const auto refused = [&](std::string bad, const char* what) {
             world untouched;
             check(!from_bytes(bad, untouched) && untouched.nations.empty(), what);
         };
-        const std::size_t sec = b.size() - world_save_refusals_section_bytes(w);
+        const std::size_t sec = b.size() - tail_after_refusals(w) - world_save_refusals_section_bytes(w);
         {
             std::string bad = b;
             std::memcpy(&bad[sec + 8], &bad[sec + 4], 4); // (A, A)

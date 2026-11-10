@@ -1068,7 +1068,8 @@ void advance_research(world& w, const research_params& p, std::vector<research_a
     std::vector<entity_id> ids;
     ids.reserve(w.nations.size());
     for (const auto& kv : w.nations)
-        ids.push_back(kv.first);
+        if (!kv.second.ended) // BL-1562: an ended nation researches nothing
+            ids.push_back(kv.first);
     std::sort(ids.begin(), ids.end());
 
     for (const entity_id nid : ids)

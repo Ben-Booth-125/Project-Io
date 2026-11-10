@@ -585,6 +585,23 @@ uint64_t world::state_hash(int tick) const
         }
     }
 
+    // BL-1562 (NATIONS.md § Elimination): every ended nation, folded only where one
+    // exists (sorted walk), so a world in which no nation ended hashes as it did.
+    {
+        std::vector<entity_id> ended;
+        for (const auto& [nid, nc] : nations)
+            if (nc.ended)
+                ended.push_back(nid);
+        if (!ended.empty())
+        {
+            std::sort(ended.begin(), ended.end());
+            fnv1a_u32(h, 0x454E4444u); // "ENDD"
+            fnv1a_u32(h, static_cast<uint32_t>(ended.size()));
+            for (const entity_id nid : ended)
+                fnv1a_u32(h, nid);
+        }
+    }
+
     // BL-1434 (unit designs): each nation's live designs (its non-base kit ids),
     // folded only for a nation that has any (sorted walk; nations is unordered), so
     // a world where every nation fields base kit hashes as it did.

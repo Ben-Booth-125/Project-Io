@@ -3017,6 +3017,12 @@ void app::render()
         ui::draw_alert_strip(m_world, m_registry, m_balance_history, m_last_econ_report, m_ui,
                              header_left, header_right);
         ui::draw_war_notices(m_world, m_ui, header_left, header_right); // LAYOUT.md § War notice
+        // BL-1562: the campaign-lost notice's "Return to menu", by the escape menu's path.
+        if (m_ui.war_notices.request_menu)
+        {
+            m_ui.war_notices.request_menu = false;
+            m_exit_to_menu_requested      = true;
+        }
     }
 
     // Comms chat log (BL-205) — BL-227 re-homed it from the right chrome column
