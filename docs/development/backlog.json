@@ -1317,6 +1317,365 @@
    ],
    "title": "Population grows at a historical rate with a consumer bonus",
    "design": "Ben, 2026-11-10: model growth on Earth's history, with bonuses for consumer needs met. Design in POPULATION.md section Growth, decline and razing. Base 3.0%/yr falling to 0.3% with qualification; times one plus half the upper rungs' fill; staples and habitability floor, else 1.6%/yr decline. Dials are in-band calibration (targets: about 2%/yr pooled over the first decade, low-q near 3%, high-q under 1%). Likely moves the handoff digests: re-bless at sprint close on Ben's go."
+  },
+  {
+   "status": "designed",
+   "glyph": "○",
+   "sprint": 65,
+   "version_goal": "v0.4.0",
+   "written": "2026-11-10",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-11-10, space form); filed by Claude",
+   "category": "Space",
+   "priority": "A",
+   "requires": [],
+   "difficulty": 3,
+   "id": "BL-1580",
+   "short_name": "ORBITAL_GRAPH",
+   "authority_doc": "docs/economy/SPACE_ASSETS.md",
+   "files": [
+    "src/world/orbital_graph.hpp",
+    "src/world/orbital_graph.cpp",
+    "tools/verify/orbital_graph_harness.cpp"
+   ],
+   "title": "The orbital node graph: nodes, Lagrange points, links, thrust cost, travel days",
+   "design": "SPACE_ASSETS.md § The orbital graph. Pure function of the bodies, never saved. Done when: every non-star body has surface/low/high nodes; every planet-moon and star-planet pair has L1/L2/L4/L5 with live positions; cheapest-path cost and travel days are deterministic and a harness proves a small airless body is cheaper to leave than the home world."
+  },
+  {
+   "status": "designed",
+   "glyph": "○",
+   "sprint": 65,
+   "version_goal": "v0.4.0",
+   "written": "2026-11-10",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-11-10, space form); filed by Claude",
+   "category": "Space",
+   "priority": "A",
+   "requires": [
+    "BL-1580"
+   ],
+   "difficulty": 2,
+   "id": "BL-1581",
+   "short_name": "ORBITAL_SLOTS",
+   "authority_doc": "docs/economy/SPACE_ASSETS.md",
+   "files": [
+    "src/world/space_assets.hpp",
+    "src/world/space_assets.cpp"
+   ],
+   "title": "Orbital slots: fixed capacity per node, first come first held",
+   "design": "SPACE_ASSETS.md § Orbital slots. A space asset destination becomes an orbital node; a full node refuses a launch whole; a lost asset frees its slot. Done when a harness fills a node and the next launch is refused with nothing touched."
+  },
+  {
+   "status": "designed",
+   "glyph": "○",
+   "sprint": 65,
+   "version_goal": "v0.4.0",
+   "written": "2026-11-10",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-11-10, space form); filed by Claude",
+   "category": "Space",
+   "priority": "A",
+   "requires": [
+    "BL-1581"
+   ],
+   "difficulty": 3,
+   "id": "BL-1582",
+   "short_name": "LAUNCH_GATE_AND_GOODS",
+   "authority_doc": "docs/economy/SPACE_ASSETS.md",
+   "files": [
+    "src/world/space_assets.cpp",
+    "src/world/nation_step.cpp"
+   ],
+   "title": "A launch needs a staffed pad and Rocketry, and buys its goods off the home shelf",
+   "design": "SPACE_ASSETS.md § Launching. Replaces the credits-only launch cost: spacecraft_components and propellant bought from the home market at its price, lot scaled by class and path thrust cost. Refused whole on any shortfall. Done when a harness shows the shelf drawn down and the treasury debited by the same priced lot."
+  },
+  {
+   "status": "designed",
+   "glyph": "○",
+   "sprint": 65,
+   "version_goal": "v0.4.0",
+   "written": "2026-11-10",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-11-10, space form); filed by Claude",
+   "category": "Space",
+   "priority": "A",
+   "requires": [
+    "BL-1580"
+   ],
+   "difficulty": 4,
+   "id": "BL-1583",
+   "short_name": "STATION_MODEL",
+   "authority_doc": "docs/economy/SPACE_ASSETS.md",
+   "files": [
+    "src/world/stations.hpp",
+    "src/world/stations.cpp",
+    "src/world/world_save.cpp",
+    "tools/verify/station_harness.cpp"
+   ],
+   "title": "Stations: core, 5x3 grid, modules, templates, outward upgrades, edge modules, power and crew budgets",
+   "design": "SPACE_ASSETS.md § Space stations. A station is not a body. Fit/remove/refit verbs, templates as saved layouts queuing one launch per unfilled slot, upgrades 5x3 -> 7x5 -> 9x7, Dock and Shipyard edge-only and idle when enclosed, budgets stop the newest module first, solar falloff by square of orbital radius. Saved. Done when a harness covers each rule and a save round-trips a fitted station."
+  },
+  {
+   "status": "designed",
+   "glyph": "○",
+   "sprint": 65,
+   "version_goal": "v0.4.0",
+   "written": "2026-11-10",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-11-10, space form); filed by Claude",
+   "category": "Space",
+   "priority": "A",
+   "requires": [
+    "BL-1583",
+    "BL-1587"
+   ],
+   "difficulty": 3,
+   "id": "BL-1584",
+   "short_name": "STATION_MODULE_EFFECTS",
+   "authority_doc": "docs/economy/SPACE_ASSETS.md",
+   "files": [
+    "src/world/stations.cpp",
+    "src/world/nation_step.cpp",
+    "scripts/economy.lua"
+   ],
+   "title": "What each module does each quarter: research, life support, factory, observatory, relay",
+   "design": "SPACE_ASSETS.md § Space stations, the module roster. Research points to the owner, rations bought off the home shelf, the microgravity factory turning shelf goods into an orbit-only good, the observatory shortening surveys in coverage. Defence, Dock, Fuel depot, Shipyard, Cargo hold and Market wait on v0.5.0 space units and say so on their card. Done when a harness reads each working effect over several quarters."
+  },
+  {
+   "status": "designed",
+   "glyph": "○",
+   "sprint": 65,
+   "version_goal": "v0.4.0",
+   "written": "2026-11-10",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-11-10, space form); filed by Claude",
+   "category": "Space",
+   "priority": "A",
+   "requires": [
+    "BL-1583"
+   ],
+   "difficulty": 3,
+   "id": "BL-1585",
+   "short_name": "ASTRONAUTS",
+   "authority_doc": "docs/economy/SPACE_ASSETS.md",
+   "files": [
+    "src/world/stations.cpp",
+    "scripts/economy.lua",
+    "src/world/components.hpp"
+   ],
+   "title": "Astronauts: a trained pool from a ground training centre, drawn as crew at launch",
+   "design": "SPACE_ASSETS.md § Astronauts. Astronaut Training Centre building turns staffed workforce into astronauts per quarter up to a cap; crewed launches draw crew and are refused when short; crew are lost with their asset. Done when a harness trains, launches and loses crew."
+  },
+  {
+   "status": "designed",
+   "glyph": "○",
+   "sprint": 65,
+   "version_goal": "v0.4.0",
+   "written": "2026-11-10",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-11-10, space form); filed by Claude",
+   "category": "Space",
+   "priority": "A",
+   "requires": [
+    "BL-1581",
+    "BL-1587"
+   ],
+   "difficulty": 3,
+   "id": "BL-1586",
+   "short_name": "SATELLITE_ROLES",
+   "authority_doc": "docs/economy/SPACE_ASSETS.md",
+   "files": [
+    "src/world/space_assets.cpp",
+    "src/world/logistics.cpp",
+    "src/world/survey_system.cpp"
+   ],
+   "title": "Satellite roles: comms, navigation, observation, survey, and what each does",
+   "design": "SPACE_ASSETS.md § Satellites. A role chosen at launch and saved. Comms puts its body in coverage and (with Communication Satellites) lifts activity fog on traded markets; Navigation cuts logistics cost on its body; Observation lifts vision fog there; Survey surveys its body. Done when a harness shows each effect on and off with the satellite."
+  },
+  {
+   "status": "designed",
+   "glyph": "○",
+   "sprint": 65,
+   "version_goal": "v0.4.0",
+   "written": "2026-11-10",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-11-10, space form); filed by Claude",
+   "category": "Space",
+   "priority": "A",
+   "requires": [
+    "BL-1580"
+   ],
+   "difficulty": 3,
+   "id": "BL-1587",
+   "short_name": "SIGNAL_DELAY",
+   "authority_doc": "docs/economy/SPACE_ASSETS.md",
+   "files": [
+    "src/world/space_coverage.hpp",
+    "src/world/space_coverage.cpp"
+   ],
+   "title": "Comms coverage and signal delay: orders outside coverage wait a quarter, data comes home only through it",
+   "design": "SPACE_ASSETS.md § Signal delay. Coverage set per nation from home orbits, comms satellites and relay modules; a pending-order queue for out-of-coverage space orders, saved; research, observation and survey data earned only in coverage. Done when a harness shows an order waiting one quarter outside coverage and landing at once inside it."
+  },
+  {
+   "status": "designed",
+   "glyph": "○",
+   "sprint": 65,
+   "version_goal": "v0.4.0",
+   "written": "2026-11-10",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-11-10, space form); filed by Claude",
+   "category": "Space",
+   "priority": "A",
+   "requires": [
+    "BL-1582",
+    "BL-1583",
+    "BL-1586"
+   ],
+   "difficulty": 2,
+   "id": "BL-1588",
+   "short_name": "SPACE_VERBS_SEAM",
+   "authority_doc": "docs/economy/SPACE_ASSETS.md",
+   "files": [
+    "src/world/corp_command.hpp",
+    "docs/ai/ACTIONS.json"
+   ],
+   "title": "The space verbs on the command seam and in the action dictionary",
+   "design": "Every near-space verb (launch to node, fit, remove, refit, apply template, upgrade, retask) as a legal command, validated as an untrusted input where the seam takes wire input, with an ACTIONS.json entry each."
+  },
+  {
+   "status": "designed",
+   "glyph": "○",
+   "sprint": 65,
+   "version_goal": "v0.4.0",
+   "written": "2026-11-10",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-11-10, space form); filed by Claude",
+   "category": "Space",
+   "priority": "A",
+   "requires": [
+    "BL-1588"
+   ],
+   "difficulty": 4,
+   "id": "BL-1589",
+   "short_name": "RIVAL_SPACE_AI",
+   "authority_doc": "docs/economy/SPACE_ASSETS.md",
+   "files": [
+    "src/world/nation_ai.cpp"
+   ],
+   "title": "Rival nations go to space: the scored-utility space layer",
+   "design": "AI_OPPONENT.md § 11, the 2026-11-10 grant. One space action per quarter at most, scored: a comms satellite first, then a station core at a free node, then modules toward its template, astronaut training when crew is short. Never for the player. Done when a spectated run shows rivals launching in a seeded, replayable order."
+  },
+  {
+   "status": "designed",
+   "glyph": "○",
+   "sprint": 65,
+   "version_goal": "v0.4.0",
+   "written": "2026-11-10",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-11-10, space form); filed by Claude",
+   "category": "Space",
+   "priority": "A",
+   "requires": [
+    "BL-1581",
+    "BL-1583"
+   ],
+   "difficulty": 3,
+   "id": "BL-1590",
+   "short_name": "CIRCUMPLANETARY_SPACE_DRAW",
+   "authority_doc": "docs/economy/SPACE_ASSETS.md",
+   "files": [
+    "src/ui/circumplanetary_canvas.cpp",
+    "docs/ui/CIRCUMPLANETARY.md"
+   ],
+   "title": "The Circumplanetary canvas draws nodes, Lagrange points, slots, satellites and stations",
+   "design": "CIRCUMPLANETARY.md. Low and high orbit rings, L-point markers moving with the pair, slot occupancy, owner-coloured satellites and stations, hover and select. Needs a live click."
+  },
+  {
+   "status": "designed",
+   "glyph": "○",
+   "sprint": 65,
+   "version_goal": "v0.4.0",
+   "written": "2026-11-10",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-11-10, space form); filed by Claude",
+   "category": "Space",
+   "priority": "A",
+   "requires": [
+    "BL-1588"
+   ],
+   "difficulty": 4,
+   "id": "BL-1591",
+   "short_name": "SPACE_LEDGER_AND_DESIGNER",
+   "authority_doc": "docs/economy/SPACE_ASSETS.md",
+   "files": [
+    "src/ui/space_ledger.cpp",
+    "docs/ui/ledgers/space.md"
+   ],
+   "title": "The Space ledger: launch form, asset list, astronaut pool, coverage, and the station designer",
+   "design": "A fold-out ledger. The station designer shows the grid with the core at the centre, picks a module per slot, saves and applies templates, upgrades the grid, marks edge slots and idle modules, and shows power, crew and life support budgets. Needs a live click."
+  },
+  {
+   "status": "designed",
+   "glyph": "○",
+   "sprint": 65,
+   "version_goal": "v0.4.0",
+   "written": "2026-11-10",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-11-10, space form); filed by Claude",
+   "category": "Space",
+   "priority": "A",
+   "requires": [
+    "BL-1583"
+   ],
+   "difficulty": 2,
+   "id": "BL-1592",
+   "short_name": "SPACE_UNLOCKS",
+   "authority_doc": "docs/economy/SPACE_ASSETS.md",
+   "files": [
+    "src/world/nation_tech.cpp",
+    "docs/economy/tech/digitisation_tree.json"
+   ],
+   "title": "Which technology unlocks each space class, role, module and upgrade",
+   "design": "Keyed to existing Digitisation nodes where one fits (Rocketry, Communication Satellites, Satellite Navigation, Guidance Systems); the rest are named in RESEARCH and the tree. In-band mapping, logged."
+  },
+  {
+   "status": "designed",
+   "glyph": "○",
+   "sprint": 65,
+   "version_goal": "v0.4.0",
+   "written": "2026-11-10",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-11-10, space form); filed by Claude",
+   "category": "Space",
+   "priority": "A",
+   "requires": [
+    "BL-1589",
+    "BL-1590",
+    "BL-1591"
+   ],
+   "difficulty": 2,
+   "id": "BL-1593",
+   "short_name": "SPACE_SPECTATOR_CHECK",
+   "authority_doc": "docs/economy/SPACE_ASSETS.md",
+   "files": [
+    "scripts/verify/near_space.lua"
+   ],
+   "title": "Spectate rivals going to space, and a visual check of the near-space surfaces",
+   "design": "A verify script captures the Circumplanetary canvas and the Space ledger; a spectated run is watched for how rivals approach space. The finding is Ben's first hurdle before playtesting."
   }
  ]
 }

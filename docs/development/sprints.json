@@ -88,6 +88,33 @@
     "UI AND ART, parallel: BL-1519 (escape menu), BL-1520 (escape queue), BL-1515 (alert strip), BL-1506 (convoys on map), BL-1507 (unit smooth march), BL-1508 (drag select units), BL-1509 (nation standing bars), BL-1510 (finder building glyphs), BL-1511 (diplomacy nation selector), BL-1512 (header net brackets), BL-1513 (construction folds), BL-1514 (building recipe rows), BL-1516 (trade offers sourced), BL-1517 (goods table stock sort), BL-1518 (resource glyphs), BL-1523 (tile res 96), BL-1524 (pointed trees), BL-1525 (playtest doc drift), BL-1538 (shelf runway warning), BL-1537 (tileset lighter)."
    ],
    "notes": "Build under test: build_rel at 8af285f7. A UI item needs a live click before it is complete. BL-1522 (offshore drilling) is filed but parked for the naval system. Re-bless 2026-11-08 (Ben: \"Yes, re-pin\"), main 6575f882 against f5cd40c9: D_search unmoved on 16; player balance 399,625 -> 72,861 and nation treasury -31% (the flat 4,500 chest); processing +38, under construction -22 (cost curve, build days, steel trade rulings); centres re-tier on 4 seeds (cities -187, total unchanged); every history and unit count unmoved."
+  },
+  {
+   "id": 65,
+   "theme": "Near space (v0.4.0)",
+   "state": "open",
+   "status_line": "open",
+   "opened_date": "2026-11-10",
+   "closed_date": null,
+   "author": "Claude (Ben, 2026-11-10: deliver v0.4.0 and v0.5.0 in lanes)",
+   "goal": "A nation reaches orbit and works the bodies near its home world: the orbital graph and slots, stations fitted like a design, satellites with roles, astronauts and signal delay; and rivals do it too. Cuts v0.4.0.",
+   "planned": [
+    "BL-1580 (ORBITAL_GRAPH)",
+    "BL-1581 (ORBITAL_SLOTS)",
+    "BL-1582 (LAUNCH_GATE_AND_GOODS)",
+    "BL-1583 (STATION_MODEL)",
+    "BL-1584 (STATION_MODULE_EFFECTS)",
+    "BL-1585 (ASTRONAUTS)",
+    "BL-1586 (SATELLITE_ROLES)",
+    "BL-1587 (SIGNAL_DELAY)",
+    "BL-1588 (SPACE_VERBS_SEAM)",
+    "BL-1589 (RIVAL_SPACE_AI)",
+    "BL-1590 (CIRCUMPLANETARY_SPACE_DRAW)",
+    "BL-1591 (SPACE_LEDGER_AND_DESIGNER)",
+    "BL-1592 (SPACE_UNLOCKS)",
+    "BL-1593 (SPACE_SPECTATOR_CHECK)"
+   ],
+   "notes": []
   }
  ],
  "next_up": "SPRINT 61 CLOSED 2026-11-05 (no version cut). v0.3.0 needs the naval system and a playtest with a few wars. BL-1470 (sentiment contributors) passed its live click 2026-11-05; BL-1490 (province resource clip) waits on BL-1495 (UI scale down); BL-1494 (new-library tick-50 stall) leads the economy work. SPRINT 63 (UI, QOL and the opening) OPEN 2026-11-05: Ben's playtest list is filed; the payback census has read: research is the missing money and the door quotes mirages on scarce goods.",

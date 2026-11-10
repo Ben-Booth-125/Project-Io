@@ -2350,6 +2350,18 @@ boilerplate: pure, seeded, deterministic, replayable, legal verbs only, never a 
   for the player's nation; any corporation owning a space asset; a mission sequence planned ahead
   of the next launch. Pure, seeded, deterministic, replayable, legal verbs only, never a planner.
 
+  **Rival nations go to space as the player does — granted (Ben, 2026-11-10; `../economy/SPACE_ASSETS.md`,
+  `../military/SPACE_FLEETS.md`).** Widens the 2026-10-15 grant from its four classes to every space
+  verb the player holds: station cores and modules placed in slots, templates, grid upgrades,
+  satellite roles, astronaut training, space-unit designs, fleets and their moves, space convoys,
+  off-world bases and space combat. Each is chosen one at a time by the scored-utility nation layer,
+  paid from the treasury, over the same legal verbs. A rival may hold **one live design per
+  space-unit class**, picked from what it has researched — the land designer's restriction (no rival
+  designs) does not carry to space, because a hull with no design cannot be raised at all. **Not
+  admitted:** any space verb for the player's nation; a sequence of launches planned ahead of the
+  next one (a template is a target the scorer fills one launch at a time, not a plan it commits
+  to). Pure, seeded, deterministic, replayable, legal verbs only, never a planner.
+
   **Every AI nation builds its own economy — granted (Ben, 2026-10-23; `../politics/NATIONS.md`
   § What a nation owns).** A new actor grain, and the largest widening in this register: the
   corporations and companies are retired, and **every non-player nation, major and minor alike**,
