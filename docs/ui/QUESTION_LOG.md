@@ -9,7 +9,7 @@ space**, with the backlog item that demanded it. The pair is required. Enforceme
 authorship, not machinery — there is deliberately no audit check against this file
 (BL-260, Ben 2026-08-01: *"the docs are the audit"*).
 
-**80 surfaces** — 4 settled, 76 awaiting Ben's wording.
+**81 surfaces** — 4 settled, 77 awaiting Ben's wording.
 
 ---
 
@@ -83,6 +83,14 @@ alphabetical order.
 **Because:** The simulation runs while the player is looking elsewhere. Without a log, events are only discoverable by noticing a changed number, which is the failure mode the alerts work (BL-261) also targets.
 
 *Demanded by BL-212, BL-216 · `src/ui/chat_panel.cpp` · id `chat_panel`*
+
+### Circumplanetary orbital nodes: low and high orbit rings around the anchor and each moon, a diamond at each L1/L2/L4/L5 of every anchor-moon pair, a row of slot pips beside every node, and a hover card naming the node with its free slots and the thrust cost and days from the home surface
+
+**Answers:** Where around this planet can I put something, how much room is left there, and what does it cost to get there from home?
+
+**Because:** Near space is a graph of named nodes (SPACE_ASSETS.md § The orbital graph), and every space decision the player makes - where a satellite sits, where a station goes, whether a slot is still free - is a choice between those nodes. Without them on the rung the graph is invisible and its costs are a number the player can only meet after committing. The rings and diamonds say which places exist; the pips say how full each is at a glance, so the scarce L-points read as scarce; the hover card carries the cost and days, because those are the figures a choice between two nodes turns on, and a press does nothing because a node is a place, not a thing to select.
+
+*Demanded by BL-1590 · `src/ui/circum_nodes.hpp`, `src/ui/circum_nodes.cpp`, `src/ui/circumplanetary_canvas.cpp` · id `circumplanetary_orbital_nodes`*
 
 ### Construction ledger - Buildings view (the estate by type)
 

@@ -24,7 +24,7 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 > **Generated file.** Produced by `node tools/session/render_actions.js`.
 > Edit the JSON, then re-run; hand edits here are overwritten.
 
-*225 entries — 54 gameplay · 39 canvas · 15 lens · 76 ledger · 41 chrome.*
+*226 entries — 54 gameplay · 40 canvas · 15 lens · 76 ledger · 41 chrome.*
 
 ---
 
@@ -1132,6 +1132,22 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 **Expected output.** Glance phase: after ~0.5 s a small chrome-free card appears above the cursor and tracks it like a tooltip; leaving the entity dismisses it. Stick phase: after ~2.5 s total the card freezes in place and is dismissed only when the cursor leaves the card's rect plus a 26 px pad, so long lines can be read to the end. Content is keyed on the active lens (e.g. terrain header + habitability by default; deposit richness under Resource; rival buildings show type + owner only). The card never captures the pointer, never opens the Selection band (clicking is the only opener), and changes no selection or view state. UNDER A LENS (BL-664, Ben 2026-08-28) the card is gated by the same one-tier rule the click obeys: a marker takes no part, the card's subject is the ground, and where the active lens has NO structure for that ground NO CARD APPEARS AT ALL. Population and Industry have no structure grain, so the card is absent across the whole body while one of them is active; Logistics resolves its own nation's ground to the GROUND and shows a card, though a press there is still inert (Ben, 2026-10-20, BL-1353 (LP lens rework)). Note the card's content still describes the TILE rather than the structure the click would select — draw_hover_content has no branch for a corporation, company, catchment or plate (NR-701).
 
 **Reason to select.** Read a thing before committing a click — check a tile's landform and movement cost, a deposit's richness, or a price signal, and learn the glyph vocabulary at the point of looking.
+
+### `canvas.hover_orbital_node` — The Circumplanetary canvas (primary view only): the low and high orbit rings around the anchor and each moon, the L1/L2/L4/L5 diamonds of every anchor-moon pair, and the slot-pip row beside each node (CIRCUMPLANETARY.md § Orbital nodes and what sits at them).
+
+**Press.** Hold the pointer over a node: on a diamond, on a ring's line, or on a node's row of slot pips. A body under the pointer wins: over a planet or moon disc the body's own tooltip shows instead.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `node` | `orbital_node` | The hovered node: a body's low or high orbit, or an L1/L2/L4/L5 of an anchor-moon pair, named "<body> low orbit", "<moon> L4". |
+
+**Valid when:**
+- The app is in-game with the Circumplanetary rung primary.
+- No body disc is under the pointer.
+
+**Expected output.** The shared hover card appears at once, beside the cursor: the node's name, its free slots out of its capacity, and the thrust cost (∆v) and travel days from the player's home surface along the cheapest route. A press on a node changes nothing: a node is not a selectable entity, so the selection is kept rather than cleared. Pips are hollow for a free slot and filled for a held one.
+
+**Reason to select.** Compare where around a planet there is room to place an orbital asset, and what reaching each place costs from home, before committing to one.
 
 ### `canvas.construction_site_card` — Planetary canvas: the build-progress circle drawn over each of the player's sites under construction.
 
