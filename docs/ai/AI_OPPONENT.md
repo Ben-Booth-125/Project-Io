@@ -2402,6 +2402,41 @@ boilerplate: pure, seeded, deterministic, replayable, legal verbs only, never a 
   declaring the hostility a bombing mission needs (that stays the stance scorer's, BL-450); a
   campaign of missions planned beyond the next assignment. Pure, seeded, deterministic, replayable,
   legal verbs only, never a planner.
+  **Rival nations sail fleets — granted (Ben, 2026-11-05; `../military/MILITARY.md` § Sea).** A new
+  subject: a rival nation's scorer may hire ships at its own ports, design them as the player's designer
+  does, assign each of its OWN ships a patrol, escort, raid or blockade mission over sea provinces in
+  range, embark its OWN land units, and land them, by scored utility over the same legal verbs the player
+  presses. Raids, blockades and opposed landings target only a nation the rival is already hostile to. A
+  raid is scored on the prize taken and on the loss to the hostile owner, so a submarine's sunk cargo scores
+  above zero. **Not admitted:** any ship, port or unit of another nation, the player's included; declaring
+  the hostility a mission needs; reading a ship the rival has not detected; an invasion planned beyond the
+  next verb. Pure, seeded, deterministic, replayable, legal verbs only, never a planner.
+  **Read and bounded (Ben, 2026-11-08, four calls).** (1) The research scorer may read a nation's
+  OWN ports and ships: ship kit is worth nothing to a nation with no standing port of its own, and
+  is weighted by its own ships as land kit is by its own units. (2) A rival designs: the design
+  door admits any nation for its own designs, not the seat's alone. (3) "Detected" means the
+  nation's own **sightings** (`../military/MILITARY.md` § Sea), a saved per-nation record; the
+  scorer reads no other ship of another nation. (4) A rival assigns only while mobilised (hiring is
+  force sizing's, below); it lands only on a hostile coast whose water it holds. A raid zone is scored on the
+  hostile cargo whose sea legs cross it — the prize and the owner's loss, so a submarine, which
+  sinks what it takes, scores half a surface raider's and never zero.
+  **The landing force and the goods (Ben, 2026-11-08, two calls).** (5) A transport with a target
+  and room aboard raises its own landing force: it counts its own units already marching to its home
+  port and its own musters under way, marches idle own units there, and past those hires ONE land
+  unit an evaluation at its own military base — a row that may stand on the target, of the highest
+  power, with twice the price and the goods' price bound in its treasury. It sails once full, or
+  once nothing more is on its way. The sea pass runs before defence and the fronts, so a unit it
+  marches is not idle when they look. (6) The scorer checks goods: a ship or land hire is scored only
+  when the seam's own goods reading says the shelves hold its hull or row goods with its live
+  design's kit. The economy is unchanged; a nation that cannot buy them hires nothing.
+  **Rival nations size their forces to income and threat — granted (Ben, 2026-11-08;
+  `../military/MILITARY.md` § Force sizing).** A new subject, a relation rather than an action: the
+  soft caps of three (land, wings, ships) are replaced by a target share of the nation's own income.
+  A rival nation's scorer may hire land units, wings and ships in peace as in war up to that target,
+  and **may read one number about another nation: the force value of each neighbour** (a nation that
+  borders it or is hostile to it), through fog, with no position, type or count. **Not admitted:** any
+  other read of another nation's force; disbanding to meet the target; sizing the player's nation;
+  a plan beyond the next hire. Pure, seeded, deterministic, replayable, legal verbs only, never a planner.
   **Rival nations wage war whole — granted (Ben, 2026-10-30, resolving NR-1100;
   `../politics/RELATIONS.md` § 7).** The stance grant (BL-450) already covers a rival declaring
   war, and Ben confirmed it does, goals included. The rest of a war is a new subject — territory,

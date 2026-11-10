@@ -343,7 +343,7 @@ tab (`../ui/ledgers/military.md`).
   side are a later step. A nation's design is its own: the seat sets it (`set_unit_design`), and
   rival nations field base kit, since no AI grant lets a rival design.
 - **The kit catalogue.** Every slot of every class lists its items: the **base item** first — the
-  1960 standard, adding nothing and costing no goods — then **two to four later items**. A later
+  1960 standard, adding nothing beyond its class's equipment (§ What a force costs) — then **two to four later items**. A later
   item carries a **stat delta** (soft attack, hard attack, hardness, defence, breakthrough, recon, stealth), its
   **goods** and the **research node** that opens it. A design's stats are its class's plus its
   kit's deltas, before the roster row's quality scale; hardness stays inside 0..1000. The catalogue
@@ -451,7 +451,7 @@ conscript or professional choice (BL-1424 (soldiers from labour) is superseded).
 - **Ports make sea recruits (Ben, 2026-11-02).** A completed `port` makes **sea recruits** at a fixed
   number per quarter (`economy.military.recruits`), taken from its province's centres as a base's are,
   into the nation's one **sea pool**, capped at fifteen quarters of its ports' output. Nothing spends
-  the sea pool until ships are raised (the naval system); until then it fills to its cap and stops.
+  the sea pool but a ship's hire (§ Sea).
 - **Seen in the header (Ben, 2026-11-02).** The header's top right shows each theatre's pool - land,
   air and sea - as an icon, recruits held against the cap, and a bar of the pool's fill beneath
   (`../ui/HEADER.md`).
@@ -685,10 +685,149 @@ refits HP, so a bombed economy rebuilds at a cost and an unbuildable repair stay
 
 ### Sea
 
-Sea units operate on coast and ocean tiles, on **patrol**, **escort** and **convoy raiding**.
-They carry HP, morale and **one attack** straight to HP, plus a **detection** value and a **target
-mask** (which classes they can hit). A unit is engaged only once detected, which is a submarine's
-whole value. Classes: submarines, destroyers and capital ships. A raided convoy is SUPPLY's convoy.
+**Ships fight for what crosses the water, and for the right to cross it (Ben, 2026-11-05).** A ship is
+raised at a port, sails to a mission zone, and works it. Three missions fight over convoys: **patrol**,
+**escort** and **raid**. Two things project power onto a shore: the **blockade** and the **landing**. A
+ship's attack reaches ships and convoys only; it does not bombard the shore, and a missile it fires is
+§ Missiles'.
+
+**Four classes (Ben, 2026-11-05).**
+
+| Class | Missions | Character |
+|---|---|---|
+| **Submarine** | Raid | High stealth, so hard to engage. Hits convoys, transports and capital ships. Holds no water. |
+| **Destroyer** | Patrol, escort, raid, blockade | High detection. The class that hits submarines. Cheap, thin hull. |
+| **Capital ship** | Patrol, escort, raid, blockade | The heaviest attack and HP. Cannot hit a submarine, and sees poorly. Most of a fleet's sea control. |
+| **Transport** | Carries land units (below) | No attack and no mission. It is the prize target. |
+
+A sea unit carries HP, morale, **one attack** straight to HP, **detection**, **stealth** and a **target
+mask** (which classes it can hit). There is no hardness and no terrain: water gives 0 defence.
+
+**A port is the one door (Ben, 2026-11-02).** A ship is hired at a completed port on the nation's own
+ground, for credits, its kit and sea recruits from the sea pool, and it records that port as its home.
+The orphan rule is the wing's, by water: a ship whose home port is torn down takes up the nearest other
+own port it can sail to, and disbands with none. A lake is not sea: no ship stands on or crosses one. Its quarterly supply is drawn at its home port (§ Upkeep), and HP is refit there by drawing
+goods, so a damaged ship goes home to mend. A dropped hire refunds its recruits as a land hire does.
+
+**The kit is the designer's (Ben, 2026-11-05).** Upgrades are designs, not purchases per ship: one live
+design per class (§ The kit), refitting at the home port as kit arrives. The slots are **hull, armament
+and sensors**, and a transport has no armament. Hull sets HP, speed, stealth and a transport's capacity,
+and draws ship hulls (`../economy/RESOURCES.md` § The kit goods). Armament sets attack and target mask,
+and draws artillery pieces or guided weapons. Sensors set detection, and draw electronics. Ship kit opens
+in the **Naval** research branch (`../economy/tech/DIGITISATION_TREE.md` § Naval). Armament may widen a
+class's mask, never so far that a capital ship can hit a submarine. Base kit draws nothing beyond the
+class's hire goods. A ship keeps the kit it recorded until it **refits**: lying at its home port with no
+mission, it buys each changed slot's goods and is out of action for its class's muster days. Its hull
+share is kept, so a ship refitted while damaged is still damaged. In refit it is in dock: it neither
+fights nor can be hit, still draws its quarterly supply, and does not mend. It is a fielded ship, not a
+hire: lose its port and it takes up another by the rule above, finishing the refit before it sails.
+
+**A ship sails, then works a zone (Ben, 2026-11-05).** A ship stands on one water tile, on coast and
+ocean alike, and moves tile by tile at its class's pace on the same day step as the march. It is drawn
+and can be caught in transit, in whatever province it is crossing. The player assigns a mission and a set
+of **sea provinces** (`../generation/PROVINCES.md` § Three domains) by **right-clicking a sea province
+with the ship selected**. The ship sails there and works the zone with no further orders, and a recalled
+ship sails home. A zone must lie within the class's range of an own port, measured over water, so a
+far ocean is worked only from a port near it.
+
+**The daily pass: detect, then hit.** Sea missions run **daily**, seeded from the world seed, the day and
+the province, so they replay. A side's **detection** in a province is the sum of its ships there, raised
+by a patrol, and by any recon wing flying over it (§ Air). It is compared with each hostile ship's
+stealth, and **a ship is engaged only once detected**, which is a submarine's whole value. A detected
+ship takes hits that day from each hostile ship whose mask allows it, scaled per day as a land round is.
+There is no battle record, and no withdrawal is priced: a ship past its class's HP or morale floor breaks
+off and sails home. A sunk ship is gone. Hostility gates all of it, as on land. Tactical bombing reaches a
+detected ship in the province as it reaches a land unit (§ Air), and a ship cannot shoot back.
+
+**A side's sightings (Ben, 2026-11-08).** What each nation found on the last sea day is kept as its
+**sightings**: every hostile ship its side detected, or revealed by holding the water. They are a
+fact of the world, saved and replayed, and rewritten each sea day. A sighting is what a nation may
+know of another's ships; a ship it did not find, it does not know is there.
+
+**Sea control is a share (Ben, 2026-11-05).** In a sea province it is each hostile side's share of the
+surface attack on patrol, escort or blockade there, as air superiority is a share of air attack. An
+uncontested side holds all of it. Submarines and transports count for nothing, so submarines deny water
+without ever holding it. A side is one nation: allies do not pool. The side at or past the authored bar **holds** the province. Holding it reveals
+hostile surface ships there, and it is what a blockade and a landing read.
+
+**Patrol** raises its side's detection in the zone, engages whatever it finds, and counts for sea control.
+
+**Escort covers the lanes through its zone (Ben, 2026-11-05).** An escort guards no named convoy, since
+trades dispatch their own shipments. Every sea leg of its own nation's cargo crossing the zone is covered.
+It counts for sea control, and engages a raider it has detected.
+
+**Raid (Ben, 2026-11-05).** A raider acts on a convoy (`../economy/SUPPLY.md`) whose sea leg crosses its
+zone and whose owner its nation has declared hostile; a friend is never raided
+(`../economy/LOGISTICS.md` § 7). On each day of that crossing each raider takes the cargo at a seeded chance set
+by its attack against the attack of the escorts in the province **that have detected it and whose mask
+reaches its class**, and scaled by its share of its zone. An unescorted convoy is the easy kill, and a
+submarine no escort has found is not slowed at all, so a capital escort never slows one.
+**A submarine sinks what it takes. A surface raider takes a prize:** the cargo lands on the market at its
+nearest own port in range and is sold there for its nation, and with no such port it is sunk. Either way
+the goods were committed when the shipment left, so the owner has lost them, and either way it is announced
+(`../economy/LOGISTICS.md` § 7). A raider the owner has not detected is named as **an unseen raider**, so
+the loss has a stated cause without revealing a ship no one has seen.
+
+**Blockade (Ben, 2026-11-05).** A destroyer or capital ship may blockade a port of a nation its nation has
+declared hostile, on the sea province at the port's mouth. **While its side holds that province the port
+loads and unloads no sea leg for anyone, and makes no trade points** (`../economy/TRADE.md`). The route
+pricer reads the closed port as it reads a lost one, so trade reroutes or stops, and the cost lands on the
+blockaded market's prices. A convoy already at sea finishes its leg, and a blockading ship may raid its
+hostile cargo as a raider does. A cargo not yet at sea, bound through a closed port, waits at its loading
+port. A closed port makes no Logistic Points either. Lose the province and the port reopens that day.
+
+**A blockade moves prices both ways (Ben, 2026-11-10, NR-1156).** No extra price rule is laid on a closed
+port; its bite is what the closure does to the trade through it. What the market **imports** through the
+port stops landing, so a good it cannot replace climbs. What the market **re-ships** through the port is no
+longer bought for the voyage out, so that buying leaves the market's demand faster than its landings leave
+its supply, and the good gluts and falls. A blockaded entrepôt therefore reads both at once: dear on what it
+lacks, cheap on what it can no longer send. One closed port among several mostly reroutes; the cost lands
+hardest where a market has no other way in or out.
+
+**Landings carry armies over the ocean (Ben, 2026-11-05).** Open ocean bars a land unit except aboard a
+transport (§ Domains and traversal). A land unit standing on or beside an own open port
+**embarks** on a transport lying at that port's mouth, up to the transport's capacity: two land units at
+base, and more by its hull. Its order, front and post end at the gangway.
+Aboard, it neither marches nor fights, it keeps the carried supplies it boarded with (§ Carried supplies),
+it draws no goods and its wage is still paid, and **it goes down with a sunk transport**. A transport **lands** its units on a coast tile touching a
+sea province, in its class's range of an own port, on own, friend's, hostile or no one's ground and never on a neutral's. On hostile ground the landing
+needs its side to hold that province, so a fleet must win the water first: it may be ordered before then,
+and the transport lies off the coast until the water is held. Landing takes authored days, which start
+over whenever the water is lost. A coast held by a stack that is not hostile bars the landing until it moves.
+
+**A landing met by a defender on the tile** opens the ordinary campaign battle, fought from **the surf**,
+the water beside the coast. Its first days are at an authored penalty to the units still in the surf, on
+what they deal and what they absorb, and it opens blind (§ Recon). A second transport's units join the same
+fight. Winning brings the units ashore, unless a beaten defender with nowhere to go still stands there. A unit
+in the surf takes no march and does not fall back along the shore: repulsed or withdrawn, it goes back
+aboard, and once none of its units is left fighting the transport sails home. It is lost if the transport is
+sunk, or has broken off and left it there.
+
+A unit that has sailed answers to no muster base it left behind. A transport with no own port left to call
+home is disbanded by the orphan rule above, and everyone aboard and in the surf goes with it.
+
+**Ashore the army lives on carried supplies** until its network reaches it, so it must
+take a port or lose its strength, and overseas supply works through the port it takes (§ Domains and
+traversal): a lane lands no points on a port of a nation hostile to the army's, so a hostile port that
+still stands feeds no army camped beside it, and a port it occupies does (`../economy/LOGISTICS.md`
+§ A unit draws off the road). A blockade reads a port's holder, its occupier where it has one, so the
+occupier's fleet does not close it and its former owner's may.
+
+**A major's opening fleet is fixed (Ben, 2026-11-07).** As its army is (§ Nation garrisons), every
+major opens with the same fleet, authored with its kit (`../generation/CORPORATION_GENERATION.md`
+§ A major's opening kit), and no history decides it. The fleet holds **all four classes in fixed
+shares**: the Standard kit's is two destroyers, one capital ship, one submarine and one transport,
+each raised on its class's base kit. The ships lie at the **capital port** first: the major's own
+port with a sea mouth in the capital's province, or failing one, its sea-mouthed port nearest the
+capital. Each port takes three opening ships before the rest spill to the next-nearest sea-mouthed
+port; with too few ports the spill wraps round, so a major with one sea port berths the whole fleet
+there. **The transport berths first (Ben, 2026-11-08)**, so it always lies at the capital port:
+a spilled transport could lie at an island port no land unit can reach, where it could never be
+boarded. A major with no sea-mouthed port opens with no ship. Every major's sea pool opens holding
+**100 recruits**, ships or none. Minors open with no ship. The kit's port cap keeps a sea-mouthed
+port where one stands, so a lake port never leaves a major without a berth
+(`../generation/CORPORATION_GENERATION.md` § A major's opening kit).
+**Rival nations sail fleets** under the grant in `../ai/AI_OPPONENT.md` § 11.
 
 ### Missiles
 
@@ -710,7 +849,8 @@ satellite lifts fog over enemy ground and reveals unit stacks; the satellite cla
 
 *Owners: BL-1421 (soft hard resolver), BL-1422 (land classes and kit), BL-1423 (refit and
 retreat), BL-1424 (soldiers from labour), BL-1425 (unit counter render), BL-1426 (bunkers),
-BL-1427 (fronts), BL-1449 (air combat core), BL-1430 (sea theatre), BL-1431 (missiles and
+BL-1427 (fronts), BL-1449 (air combat core), BL-1430 (sea theatre), BL-1527 (ship kit), BL-1529 (patrol escort
+raid), BL-1530 (sea control and blockade), BL-1531 (troop landings), BL-1431 (missiles and
 satellites).*
 
 ---
@@ -907,8 +1047,7 @@ Era −1's too.
 `military_strength` (summed derived strengths, an integer sum) — in `src/world/condition_set.cpp`,
 available to laws, techs and quests. The Selection element's unit card (Strength / Roster pages)
 and the hover summary in `src/ui/entity_summary.cpp`, both printing the derived strength with its
-`count × quality × supply` derivation. A rival nation's build scorer, counting its own units against a soft cap of
-three. The battle pass, the march pass, the upkeep pass and the budget's `upkeep` term. The
+`count × quality × supply` derivation. A rival nation's force sizing, counting its own units' running cost. The battle pass, the march pass, the upkeep pass and the budget's `upkeep` term. The
 blackboard export, for a nation's own units.
 
 **The unit on the canvas.** A unit has its own marker and command surface — BL-471 (unit marker
@@ -925,8 +1064,8 @@ units are land-bound, and it is what makes water a place rather than a wall.
 | Domain | Land classes | Coastal/naval classes |
 |---|---|---|
 | `land` | Yes | No |
-| `coastal_water` | **No, bridges excepted** | Yes |
-| `open_ocean` | No | Yes |
+| `coastal_water` | **No, bridges excepted** (Ben, 2026-11-09, below); crossed only aboard a transport (§ Sea) | Yes |
+| `open_ocean` | **Only aboard a transport** (§ Sea) | Yes |
 
 **A land unit marches on land (Ben, 2026-11-09).** It stays off every coast and lake tile, its own
 included, and a roaded water tile counts as land because a bridge is a road. A right-click on water
@@ -1025,7 +1164,7 @@ ledger's **Recruit** tab (rail slot 7, `../ui/ledgers/military.md`) shows the qu
 door to every hire. A muster takes **90 days** for infantry, motorised infantry and light armour,
 **135** for artillery and air defence, and **180** for mechanised infantry and armour — a quarter
 a tick, so one, two or two ticks (`muster_days_for`). A hire still mustering counts against a
-rival nation's soft cap of three units. An order whose base is demolished or decommissioned is
+rival nation's force sizing (§ What a force costs). An order whose base is demolished or decommissioned is
 dropped with no unit, as a unit whose base is torn down is disbanded. On completion: a new unit entity at the muster tile with
 `count = hire_batch_manpower`, returned through `apply_corp_command`'s out-param. The verb records the base it was raised at as the unit's
 `muster_base`; where the tile carries more than one qualifying base, the **lowest entity id**
@@ -1040,8 +1179,7 @@ carried to the nation unchanged, Ben 2026-10-23; `../ai/AI_OPPONENT.md` § 11). 
 (`src/world/corp_ai.cpp`) scores hiring alongside build, demolish, survey and road. Every nation
 opens with a completed base at its capital (Ben, 2026-10-27; § Nation garrisons); a nation that has
 lost it has no muster tile and must build one first on its own ground, priced by the ordinary
-build-candidate machinery. A soft cap of three units per nation keeps hiring from becoming an
-unconditional extra action every evaluation. Availability is decided by the stock on the shelves of
+build-candidate machinery. How many units it hires is § Force sizing's. Availability is decided by the stock on the shelves of
 the markets the nation's buildings sit in alone; the credit cost is subject to the solvency gate like every other spend
 (Ben, 2026-08-13, NR-218).
 
@@ -1232,7 +1370,8 @@ its tile, blocking a step, until the quarter ends.
 The days are authored data: `economy.military.march_days_per_tile`, keyed by land class, and
 `economy.military.march_days_per_tile_by_cls` for a **pre-modern row**, which declares no land
 class and marches by its `cls` — infantry 3, cavalry 1.5, ranged 3, siege 3 (foot pace for a siege
-train); naval has no entry, so a naval row cannot march on this table. The loader rejects any entry
+train); naval has no entry, so a naval row cannot march on this table. A campaign ship sails on its
+class's own pace (§ Sea). The loader rejects any entry
 that is not a positive, finite number, and any key that names no class. A day's movement is
 1 / the class's days, banked in `order.progress` in units of traversal cost — the unit the field
 always had, so a saved part-tile reads as the same part-tile — and the unit steps whenever the bank
@@ -1485,10 +1624,16 @@ never raised at a base. So the player's major opens on the same eight as every r
 seat neither takes a major's units nor arms the nation it leaves. A seat move takes a force only
 from a nation holding one raised at a base, and only then arms the nation it leaves.
 
-**A minor's sizing is treasury-scaled against the value anchor.** BL-543's (value anchor) unit-equipment-
-costs-twice-annual-salary anchor prices a garrison's count off the nation's own
-`nation_component::treasury`, so a rich minor fields a bigger standing force and a poor one a
-token one — no separate garrison-strength dial. A garrison holds its seeded tile until it is
+**A minor's garrisons are seeded on its treasury and sized to its income (Ben, 2026-11-09).**
+Generation has no income to read, so BL-543's (value anchor) unit-equipment-costs-twice-annual-salary
+anchor prices each garrison's count off the nation's own `nation_component::treasury`, as a ceiling.
+At the handoff, once the settle's returns are filed, the garrisons are cut to what income pays: the
+nation's operating surplus (§ Force sizing) at the force ceiling share pays the men. The capital
+garrison is served first and never falls below the **20-man token**, so a minor with no income keeps
+one token garrison at its capital. The rest is split evenly across the border posts, and a post that
+cannot keep 20 men stands down. This only ever shrinks a garrison; a minor grows past it by hiring
+under § Force sizing. The opening chest is asked to carry only the token's pay.
+A garrison holds its seeded tile until it is
 assigned to a front (§ Fronts). A rival assigns its border garrisons and keeps its capital's home.
 
 **No unit is assigned to a front by default (Ben, 2026-10-29).** Generation and the settle assign
@@ -1513,13 +1658,71 @@ a garrison is drawn into battle whenever its nation is the target of a directed 
 province. Hostility is a state a party opts into (Ben, 2026-08-17), which is exactly the shape the
 retired trigger bypassed.
 
-**Upkeep is a budget claim, not the hired-unit vector.** A garrison does not draw the credits+goods
-vector `run_unit_upkeep` charges hired units (§ Upkeep, below) — its upkeep is a `military_research`
-line claim in the nation's own budget pass ([`../politics/NATIONS.md`](../politics/NATIONS.md) § A
-budget), paid the same way every other priority line is. A garrison whose nation cannot fund the
-line weakens by the ordinary budget-shortfall reading; there is no second mechanism.
+**A garrison is paid as every force is (Ben, 2026-11-08):** by the flat wage bill on the treasury
+(§ What a force costs). A garrison whose nation cannot pay weakens by § Upkeep's one rule; there is no
+second mechanism.
 
 *Owner: BL-571 (nation garrisons).*
+
+---
+
+## What a force costs and how large it grows (Ben, 2026-11-08)
+
+A force is paid for three times: its **equipment** when it is raised, the **equipment** of every
+man or crew that replaces a loss, and its **wages** for as long as it stands. How large a nation's
+force grows follows from what it earns and whom it lives beside, not from a fixed count.
+
+**Wages are a flat bill on the treasury.** Every land unit, wing and ship is paid the one wage per
+head per tick (`credits_per_head`, § Upkeep), a crew member the same as a soldier. The bill is
+owed whatever the budget weights say, and it is not a share of any line. A nation that cannot pay
+the whole bill pays what it holds; every unit, wing and ship of that nation then weakens by § Upkeep's
+one decay rule. A unit aboard a transport and a force still mustering are not exempt once they stand.
+
+**Every class has equipment.** Base kit stays the 1960 standard and adds no stats, but it is not
+free. Each land class names the goods a unit of it is raised with, by kind: infantry small arms;
+motorised infantry small arms and armoured vehicles; mechanised infantry and armour armoured
+vehicles; light armour armoured vehicles; artillery and air defence artillery pieces. Ships and
+wings already name theirs (§ Sea, § Air). A later kit item's goods are added on top. A hire takes
+them off the shelves as it takes any kit (§ The muster interface); a hire the shelves cannot equip
+is refused.
+
+**A loss is replaced with equipment.** Each man a land unit regains brings his share of what the
+unit was raised with (§ Land — equipment, refit and manpower). A wing's recruit brings the same
+share of its class's hire goods and kit, over its crew. A ship's HP mends at its home port by the
+same share of its hull's goods. What the shelves cannot equip stays lost.
+
+**Arms have a maker on day one.** A major opens with Arms Works for small arms, armoured vehicles
+and artillery pieces (`../generation/CORPORATION_GENERATION.md` § A major's opening kit). Every
+nation, major or minor, opens with a reserve of those goods on its shelves. A minor with no works
+imports once its reserve is spent, so arms are real trade.
+
+### Force sizing (a rival nation's)
+
+A rival nation grows its forces until their **running cost** reaches a **target share of its
+income**. The player's nation is never sized; the player reads the same numbers and decides.
+
+- **The running cost** is the wages of every unit, wing and ship it holds or has mustering, plus
+  their running goods at posted prices.
+- **Income** is the nation's operating surplus over its last four returns: income and taxes less
+  expenditure, maintenance and wages, never below zero (`../economy/FINANCE.md`
+  § The quarterly return). A good or bad quarter does not swing the army.
+- **The target share** is a base share raised by threat. **Threat** is the largest **force value**
+  among its neighbours over its own. Below 1 it adds nothing: a nation does not shrink its share
+  for being the strongest. Above 1 the share climbs, to a ceiling.
+- **Force value** is what a force would cost to hire: every unit, wing and ship at its hire price.
+  A **neighbour** is a nation that shares a border with it, or that is hostile to it. A scorer
+  reads one total per neighbour and nothing more: no position, no type, no count.
+- **Building against arming.** The further the running cost is below target, the larger the part of
+  its uncommitted treasury that may arm: nothing at target, all of it at no force at all. What is
+  not armed is left for the build pass. It hires only what keeps the running cost within target.
+- **Peace and war alike.** Hiring follows the target whether or not it is mobilised, one hire in
+  each theatre an evaluation at most. Missions stay as they were: only while mobilised.
+- **Over target it stops hiring and disbands nothing.** Its wages squeeze it until income catches up.
+- **Split by position.** The target divides across land, air and sea. Sea is worth nothing without
+  a standing port of its own, and grows with its ports and with the cargo it sends over water. Air
+  needs a standing airbase of its own. Land takes the rest. A theatre under its part hires first.
+- **The goods door binds.** A nation that cannot equip a hire does not make it, however far below
+  target it stands (`../ai/AI_OPPONENT.md` § 11).
 
 ---
 
@@ -1538,17 +1741,14 @@ The authored table, `scripts/economy.lua` § `economy.military.unit_upkeep`:
 
 | Rate | Authored | Meaning |
 |---|---|---|
-| `credits_per_head` | `0.0` | Flat wage per head per tick |
-| `credits_per_head_per_power` | `0.0` | Wage scaled by the roster row's `power_mod` |
-| `goods_per_head.ordnance` | `0.0` | The **ordnance** draw |
-| `goods_per_head.food_rations` | `0.0` | The sanctioned second line |
-| `supply_decay_permille` | `0` | The one decay subtraction, per tick |
-| `supply_recovery_permille` | `0` | Regained per tick while supplied |
-| `out_of_supply_reach` | `0.0` | Reach cost past which a unit is out of supply; ≤ 0 disables the trigger |
+| `credits_per_head` | `0.1041` | Flat wage per head per tick |
+| `credits_per_head_per_power` | `0.00007` | Wage scaled by the roster row's `power_mod` |
+| `goods_per_head.ordnance` | `0.000875` | The **ordnance** draw |
+| `goods_per_head.food_rations` | `0.00625` | The sanctioned second line |
+| `supply_decay_permille` | `50` | The one decay subtraction, per tick |
+| `supply_recovery_permille` | `100` | Regained per tick while supplied |
+| `out_of_supply_reach` | `24.0` | Reach cost past which a unit is out of supply; ≤ 0 disables the trigger |
 
-**Every rate is authored at zero, deliberately**, so the pricing is tuned by playtest against a
-measured baseline rather than guessed. At zero nothing is charged, no shelf is drawn, no draw can go
-unmet, and no supply factor moves; turning upkeep on is editing this table, not a code change.
 The numbers are anchored by BL-543 (value anchor) — a unit's annual equipment costs twice its
 annual salary (Ben, 2026-08-22, [`NATIONS.md`](../politics/NATIONS.md)) — and the ordnance rate
 rides battle consumption (BL-496, ordnance rate; NR-321). `tools/verify/unit_upkeep_rates.cpp`

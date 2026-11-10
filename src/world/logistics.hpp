@@ -560,6 +560,12 @@ struct convoy_route
     std::vector<float>     at;
     /// BL-1505: the whole lane's time, the days `at` divides up. 0 on a body with no scale.
     float                  days = 0.0f;
+    /// BL-1529: the sea leg's span in `tiles`, both end ports included; -1 with no sea leg.
+    /// A land leg can cross water by a bridge, so the substrate alone cannot say which leg a
+    /// tile is on. `on_sea_leg` is the one test.
+    int                    sea_first = -1;
+    int                    sea_last  = -1;
+    bool on_sea_leg(int li) const { return sea_first >= 0 && li >= sea_first && li <= sea_last; }
 };
 
 /// Derive @p cv's lane, oriented source->destination. Non-const `w` because

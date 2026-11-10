@@ -114,3 +114,6 @@
 {"id":"BL-1565","name":"SPRINT63_FORM_1109","ts":"2026-11-09T22:04:33.238Z","branch":"main"}
 {"id":"BL-1566","name":"SAVE_BUILDING_REPORT","ts":"2026-11-10T00:12:57.105Z","branch":"main"}
 {"id":"BL-1567","name":"POPULATION_GROWTH_RATE","ts":"2026-11-10T00:49:00.749Z","branch":"main"}
+{"id":"BL-1616","name":"MINOR_PLANT_FLOOR (renumbered from the naval branch BL-1554 at its merge)","ts":"2026-11-10T12:00:00.000Z","branch":"worktree-agent-a1300c3a0aca23713"}
+{"id":"BL-1617","name":"GARRISON_INCOME (renumbered from the naval branch BL-1555 at its merge)","ts":"2026-11-10T12:00:00.000Z","branch":"worktree-agent-a1300c3a0aca23713"}
+{"id":"BL-1618","name":"PRICE_FALLS_AS_SUPPLY_VANISHES (renumbered from the naval branch BL-1615 at its merge)","ts":"2026-11-10T12:00:00.000Z","branch":"worktree-agent-a1300c3a0aca23713"}

@@ -29,7 +29,7 @@ Two views behind a `nav_button` strip, inside `foldout_begin("Military")`.
 
 | View | Answers (one question) | Content |
 |---|---|---|
-| **Recruit** *(default)* | "What can I raise, where, and what will it cost?" | A **base picker** — the nation's completed military bases, each with its province and the units standing there. Below it, the **roster**: one row per unit type the nation may field (`available_rows`), each carrying its land class, its numbers (soft, hard, hardness, defence), its hire price in credits and the kit it buys off the shelf, and a **Raise** press that hires at the chosen base. A type the nation cannot field yet is listed dimmed, its Raise disabled, and **why** (the missing good, or the technology it waits on) is the Raise press's tooltip, so the roster shows the ladder, not only the rungs in reach. |
+| **Recruit** *(default)* | "What can I raise, where, and what will it cost?" | A **base picker** — the nation's completed military bases, each with its province and the units standing there. Below it, the **roster**: one row per unit type the nation may field (`available_rows`), each one line: its name, its hire price in credits, and a **Raise** press that hires at the chosen base. The row's numbers are its **card**, the name's hover (§ A row's card). What the hire takes is the Raise press's hover (§ What a Raise takes). A type the nation cannot field yet is listed dimmed, its Raise disabled, and **why** (the missing good, or the technology it waits on) is the Raise press's tooltip, so the roster shows the ladder, not only the rungs in reach. |
 | **Design** | "What is each kind of unit raised with?" | **Designs, one per land class to start** (Ben, 2026-10-27): each class's **kit slots** with the researched choice in each — infantry's rifles or anti-tank launchers, artillery's guns with drones or anti-armour alongside — what the kit costs per unit, and what the design gives (its soft, hard and hardness). A slot offers only researched kit; a class with nothing researched for a slot fields its base kit. Saving a design makes it the one Recruit raises; units in the field refit to it as kit arrives (BL-1423). Kit opens by military research. |
 
 **Why Recruit is the default.** It is the act the ledger exists for; Design is set once and
@@ -45,6 +45,11 @@ explains, never wrapped text in the column.
   the shelf.", "No military base to raise it at.", "The treasury cannot cover it.") shows on hover
   over the disabled press. When the seam refuses a live press ("Can't afford or supply it."), the
   answer is that row's Raise tooltip too.
+- **A row whose goods are short is dimmed (Ben, 2026-11-07).** The Raise press checks the hire's
+  goods as its verb plans them, after its credits, so a row the press would refuse never looks live.
+  Its tooltip names each short good with what is held and what is needed ("Short of steel (0 of 6)
+  and machinery (0 of 2)."). Where the goods' price would take the treasury past its room, it says
+  "The treasury cannot cover it and its goods."
 - **A result stays a line.** The seam's answer to a press that landed ("Unit mustering.",
   "Wing mustering.") is shown above the theatres, where it was.
 - **The empty states' explanation** is the tooltip of their heading and of the site-finder press.
@@ -52,21 +57,74 @@ explains, never wrapped text in the column.
   for … Kit choices open as military research lands."); the obsolete toggles' explanation is the
   tooltip of the "Unit types" heading and of each toggle.
 
+### What a Raise takes (Ben, 2026-11-07)
+
+**Hovering a Raise press shows what the hire takes against what the nation holds.** It answers
+"can I raise this, and what is short?" A small table: credits, then each good the hire buys off the
+shelves (its row's goods and its live design's kit), each with the amount needed and the amount
+held, a short one in the loss colour. Above it, when there is one, the reason the press is off or
+why its last press was refused. Every theatre's rows carry it, because every hire buys goods.
+
+### A row's card (Ben, 2026-11-07)
+
+**A row's numbers are the card on its name's hover, not a second line of text.** Hovering the name
+of a Recruit row, or a Design tab class row, shows the type, what it is (its land class, or the
+missions an air or sea class flies), and the stat grid (§ The stat grid) of what the row raises:
+its type with its class's live design kit. A Design row adds that its press opens the designer.
+The card is a **freezable tooltip** (`../TOOLTIP.md` § The freezable tooltip): two seconds on, it
+freezes and takes the pointer, so each cell's glyph can be hovered for its name. The grid is the
+unit card's, because a player choosing what to raise compares by the numbers it will fight with.
+
 ### Grouped by theatre (Ben, 2026-10-28; tabs, Ben, 2026-11-02)
 
 **Recruit and Design group their rows by theatre** — **Land**, **Air** and **Sea** (and Space as it
 arrives) — as a row of **theatre tabs** under the Recruit / Design tabs, one theatre shown at a time,
 each tab carrying the theatre's name and its count. A theatre tab switches what the view lists, so it
 is a selector, not a toggle: re-pressing the active one does nothing (the Recruit / Design tabs keep
-the toggle rule). The **Sea** tab is a stub: it reads that ships are not raised yet, and lists the
-nation's ports under a base picker, the sea pool showing in the header as the other two do. On Recruit the base picker lists military bases
-under Land and airbases under Air, and a row raises at a base of its own theatre only. Design lists
-the air classes beside the land ones; each opens the same full-canvas designer with its own slots
-(airframe, armament, avionics).
+the toggle rule). The **Sea** tab lists the four ship classes, the sea pool showing in the header as the
+other two do. On Recruit the base picker lists military bases under Land, airbases under Air and ports
+under Sea, and a row raises at a base of its own theatre only. Design lists the air and ship classes
+beside the land ones; each opens the same full-canvas designer with its own slots (airframe, armament,
+avionics; hull, armament, sensors).
 
 **A wing is ordered from the canvas.** With a wing selected, right-clicking a province assigns the
 wing there on its current mission; a province out of range is refused with its distance and the
 wing's range. The wing card on the Selection band sets the mission and lists the provinces assigned.
+
+### Ships on the map
+
+**A ship is ordered from the canvas, as a wing is, and stands on it, as a wing does not.** It draws where
+it is, a diamond on its water tile with its class's silhouette in its owner's colour and a count where
+several share the tile. A press selects a ship and a repeat press walks the ships there. Mustering at
+its port's mouth, it is already drawn. **Only what the player's side has found is drawn:** its own ships,
+and another nation's on a day its detection finds it (`../../military/MILITARY.md` § Sea, the daily pass)
+or on water it holds, so a submarine no one has found is not on the map, and a side with no ship and no
+recon wing near sees none there.
+
+**The ship card on the Selection band gives its orders.** Three columns, the wing card's shape: the stat
+grid and a line saying what it is doing; the missions its class works; its zone. A mission with no zone is
+held on the card until a right-click names one, and the lit mission's press recalls the ship. A rival's
+ship shows its class and owner, with every cell a dash.
+
+- **A warship's right-click is a zone.** With a warship selected, right-clicking water adds that sea
+  province on its current mission; the hover line says so first, or why not. Land does nothing, so the line
+  stays silent over it. The card's list carries each province's x, and "held" where its side holds it.
+- **A transport's right-click is a landing.** It has no mission. Right-clicking land orders its landing on
+  that tile, the line saying so first, or why not, and that on hostile ground it waits off the coast until
+  its side holds the water. Water does nothing. The ordered coast is ringed. **Recall** calls it off, until
+  its units are in the surf.
+- **The transport's card lists who is aboard, and who may board.** Each land unit the seam would take
+  now has a **Board** press beside it, so standing a unit at the port and selecting the transport is the
+  whole of it. Why no unit is listed is the tooltip of "Ready to board". Units in the surf are listed under
+  aboard, marked.
+- **Refit is on the card of any ship.** Enabled lying at the home port with no mission, on an older design.
+  The goods it buys are its tooltip, and why it is off when it is.
+
+**A closed port is marked on the map** with a no-entry sign on the port's hex, for anyone's port: a
+blockade is public, as the port's trade stopping is.
+
+**A port on a lake raises no ship.** A ship needs sea at the port's mouth, so the Sea tab's rows say
+"This port opens on no sea." under that port.
 
 ### The empty states
 

@@ -86,6 +86,8 @@ const std::unordered_map<std::string, resource_type>& name_table()
         { "drones",                resource_type::drones },
         // BL-1436 — the sixth kit good (Ben, 2026-11-03). Same rule.
         { "airframes",             resource_type::airframes },
+        // BL-1527 — the seventh kit good (Ben, 2026-11-05). Same rule.
+        { "ship_hulls",            resource_type::ship_hulls },
     };
     return table;
 }

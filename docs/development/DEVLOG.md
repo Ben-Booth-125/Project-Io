@@ -10,6 +10,177 @@ sessions can be scoped and paced with less waste.
 
 ---
 
+## 2026-11-08 — BL-1532 (opening fleets): a major opens with the fleet of its kit
+
+**Runtime:** one session, Delivery Full on the naval worktree, across a crash.
+
+**What was built.** Ben's form overturned "fleets from history": every major opens with a fixed fleet authored
+with its kit (`scripts/world_gen.lua`, `fleet = { ships, per_port, sea_recruits }`), two destroyers, a capital
+ship, a submarine and a transport, raised, at the capital port first and three a port after. Minors open with
+none. `seed_major_opening_fleets` (sea_combat.cpp) runs before the settle, in finish_campaign_world and in the
+harness mirror (harness_params.hpp, which is a second copy of the start pipeline: the first census read no ships
+because only one copy had it). The kit's port cap now keeps its last port slot for a sea-mouthed port.
+
+**Measured.** `port_mouth_census` (new), 16 seeds: majors with only lake ports 4 -> 1, with no port 11 -> 8; 425
+ships on 85 of 94 majors; kit cover after the cap 76 -> 76 uncovered. `opening_fleet_settle` (new): class, berth,
+pool and minor checks, the settle, a save round-trip and a two-build determinism check, 0 failures.
+
+**Review.** The cold review caught the first cap rule forcing the nearest sea port into the one slot before kit
+cover chose, costing cover (77 uncovered); it also asked for the assertions the first harness lacked.
+
+**Left open.** The live click (R5). Calls in NR-1187, notably docked ships fighting from day one. Ships are hashed,
+so every digest pin moves: held for the sprint's one re-bless in BL-1535 (naval war reading).
+
+---
+
+## 2026-11-07 — BL-1534 (sea UI): ships on the map, and a card to order them
+
+**Runtime:** one session, Delivery Full on the naval worktree.
+
+**What was built.** Recruit's and Design's Sea tabs replace the stub. Ships draw on the water as a class diamond with a
+stack count; a new card (`src/ui/ship_card.*`) holds missions, zone, passengers, Board, Recall and Refit. A right-click
+on water assigns and on a coast lands, both previewed on the hover line from the seam's own checks. The closed-port and
+interception marks draw on the map, and the Convoys ledger gains a Lost section. The designer takes ship classes. Rim
+labels on the research ring now clear each other.
+
+**Review.** The cold review caught the map re-rolling detection on post-pass state with a different day stamp, so the
+player would have seen a different sea from the one the pass fought on: the pass now records what it found. Also a cargo
+that came home whole listed as lost, a verify read leaking a rival's orders, a script that walked tiles without a grant,
+silent skips in the check, and stale stub wording in the question log and the action dictionary.
+
+**Left open.** The live click: access was declined on 2026-11-07, so R10 is pending, with BL-1531 (troop landings) R8.
+Nine calls in NR-1186, including lake ports that can raise nothing. Shape identical to base.
+
+---
+
+## 2026-11-06 — BL-1531 (troop landings): armies cross the water
+
+**Runtime:** one session, Delivery Full on the naval worktree.
+
+**What was built.** Two verbs, `embark_unit` and `land_units`. A unit aboard leaves `world::units` for
+`sea_ship::aboard`, so no land pass can see it; its wage is still billed. A transport sails to the water beside a coast,
+runs its landing days (on hostile ground only while its side holds the water), and lands. A hostile stack on the tile opens
+the ordinary battle with the units on the water, marked by `unit_component::landing_ship`, at a penalty for its first
+days. A lane now lands no points on a hostile port, and a port the army occupies serves it.
+
+**Review.** The cold review caught the first Logistic Point filter moving peacetime worlds; a spent unit sending the
+transport home and killing the rest; a second transport bounced off a contested shore; a blockade reading the port's
+owner rather than its holder; stale muster bases; and vacuous wage, march and supply checks. All fixed.
+
+**Left open.** Nine calls in NR-1185. BL-1534 (sea UI) owes the presses and the live click. BL-1535 (naval war reading)
+owes a landed army on a real seed. Shape identical to base.
+
+---
+
+## 2026-11-06 — BL-1530 (sea control and blockade): water can be held, and a port closed
+
+**Runtime:** one session, Delivery Full on the naval worktree.
+
+**What was built.** A side's share of surface attack per sea province, and the bar that makes it a hold. Holding
+reveals hostile surface ships. A blockader holding a port's mouth closes the port: `world::closed_ports`, rewritten
+at the end of each sea day, dropping the logistics caches on both edges. The pricer, sea lanes, trade points and
+Logistic Points all read it. A cargo not yet at sea waits at its quay. A blockader raids as a raider does. Saved
+inside v81, which has not left this branch.
+
+**Review.** The cold review caught a save its own loader refused, when a closed port was idled before the next day; a
+port shut forever once the last ship was gone, since no military day ran; cargo still sailing through a closed port
+from its land leg; points still made by a closed port; the raid ignoring the reveal; and blockade legal anywhere, so
+it dominated raid. All fixed.
+
+**Left open.** Seven calls in NR-1184. BL-1535 (naval war reading) owes the price actually moving on a real seed: the
+fixture shows only the route and points gone. Shape identical to base.
+
+---
+
+## 2026-11-06 — BL-1529 (patrol escort raid): raiders take cargo off the sea legs
+
+**Runtime:** one session, Delivery Full on the naval worktree.
+
+**What was built.** `raid_convoys` runs between the convoys' advance and their arrivals, over the sea tiles
+of the tick's sweep, a day's rolls per province. A submarine sinks; a surface raider lands a prize at its
+nearest own port in range. A land unit no longer cuts a sea leg. `convoy_route` reports its sea span. The tick
+report now carries interceptions, and `post_interceptions` voices them on the Field channel. Patrol's raised
+detection and the daily engagement were already in the sea pass.
+
+**Found on the way.** The live tick dropped every interception record, so LOGISTICS.md § 7's announcement
+never fired, on land either. It does now. `embargo_harness` R9c and R9e were stale on the save's tail, missing
+four later sections; fixed.
+
+**Review.** The cold review caught a bridge on a land leg read as sea by the substrate alone, which let a raid sink
+cargo on a road and let a port convoy pass a held bridge. Hence the span. It also caught a raid beating an
+earlier land cut in the same sweep, a friend raided through a hole in the stance verbs, a prize ignoring
+the embargo, and checks with no control. All fixed, with checks except the embargo filter and a bridge fixture.
+
+**Left open.** Eight calls in NR-1183. The ledger's stated cause and the tile mark go with BL-1534 (sea UI). The
+reading BL-1526 (sea trade reading) was to precede this waits on sprint 63's wave, so the take chance is a first cut;
+one raider takes about 97% of whole crossings in the harness field. No rival raids until BL-1533 (rival fleets).
+
+---
+
+## 2026-11-06 — BL-1528 (naval branch): State's fourth research branch
+
+**Runtime:** one session, Delivery Full on the naval worktree.
+
+**What was built.** Eighteen nodes appended to the store: Naval's seventeen and the joint Coastal Security.
+Nine kit nodes open the ships' 22 later items. The tree is 211 nodes in ten branches. The panel's ring lays
+out three, three and four branches rather than assuming three per tree. `ship_first_error` now refuses a
+node the tree does not hold.
+
+**Review.** The cold review caught the MCP server's literal node count of 160, which refused every kit and
+Naval node; it now reads the store. It also moved the joint off Force | Naval, so Force's espionage arm
+keeps its empty boundary, and caught glyph collisions from the arm offset.
+
+**Left open.** The panel's live click is owed and carried on BL-1534 (sea UI), with the rim label overlaps.
+Every Naval travel effect waits on ship strength, unread so far. BL-1533 (rival fleets) must raise whether
+the scorer may read its own ships and ports. Shape is identical to base; nation_tech R0h/R0i stay red as on base.
+
+---
+
+## 2026-11-06 — BL-1527 (ship kit): ship designs and the ship hulls good
+
+**Runtime:** one session, Delivery Full on the naval worktree.
+
+**What was built.** One live design per class on hull, armament and sensors: 33 catalogue items checked
+at compile time. Ship hulls, the seventh kit good, made at the Arms Works and priced by the margin
+anchor at 179.8. `ship_stats` puts kit on the class numbers for the daily pass. Verbs
+`set_ship_design` and `refit_ship`. Save v81, envelope v26.
+
+**Decisions.** Four refit calls logged as NR-1182. Later kit stays locked until BL-1528 (naval branch)
+adds its research nodes.
+
+**Review.** The cold review caught a real ship-destroying bug: a refit reused the muster clock, so a lost
+port erased a refitting ship as a dropped hire. Hence `sea_ship::refitting`, saved and validated. It also
+caught the envelope harness no longer compiling and so proving nothing, a refit on a broken-off ship, a
+refit on a port no longer standing, and a v80 reader weakened by the new rule. All fixed, with checks.
+
+**Left open.** Capacity has no reader until BL-1531 (troop landings). The designer and refit press belong to
+BL-1534 (sea UI), noted on that item. Not changed: a free refit on a negative purse is refused, as a land
+design refit is. `chain_depth` stays on its known red and `nation_tech_harness` R0h/R0i on pacing, both
+equally on base. Digest pins stay stale for the wave's one re-bless; shape is identical to base.
+
+---
+
+## 2026-11-06 — BL-1430 (sea theatre): ships exist
+
+**Runtime:** one session, Delivery Full on the naval worktree, after the sprint 64 design form.
+
+**What was built.** The four classes on `world::ships`, invisible to the land passes. The port door
+(`hire_ship`), the mission door (`assign_sea_mission`), sailing by water, the daily detect-and-hit
+pass, break-off, refit and the orphan rule. Save v80 with a strict reader. Numbers in Lua
+`economy.military.sea`, checked equal to the C++ defaults.
+
+**Decisions.** Seven sea-day details taken inside the core, logged as NR-1181. A lake is not sea.
+
+**Review.** The cold review's thirteen findings were all real and all fixed, with checks added:
+save pruning, lake mouths, bombing parity, stranded re-homing, reader strictness, vacuous tests,
+untested wiring and patrol bonuses in transit among them.
+
+**Left open.** The sixteen digest pins were already stale on base after sprint 63's merges, and v80
+moves the snapshot-byte digests again. Shape is identical to base on seeds 0, 46 and 28, so the
+re-pin waits for the wave's one re-bless.
+
+---
+
 ## 2026-11-05 — Sprint 61: diplomacy and war
 
 **Runtime:** seven days (opened 2026-10-30). Design from Ben's 2026-10-30 form, then Delivery Full in

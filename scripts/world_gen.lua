@@ -194,6 +194,9 @@ world_gen = {
             -- BL-1436, the sixth kit good, derived the same way: airframes
             -- 2 x (85 + 30.5 + 20.8 + 0.75) + 0.1.
             airframes              = 274.2,
+            -- BL-1527, the seventh kit good, derived the same way: ship hulls
+            -- 2 x (16.1 + 42.5 + 30.5 + 0.75) + 0.1.
+            ship_hulls             = 179.8,
         },
 
         -- Nation tradeable-resource concentration gates (BL-096): a nation
@@ -276,6 +279,13 @@ world_gen = {
                     border  = { "motorised", "infantry", "infantry", "infantry" },
                     men = 50, land_recruits = 200,
                 },
+                -- The fixed fleet (Ben, 2026-11-07; MILITARY.md § Sea): all four classes in
+                -- fixed shares, raised on base kit, three to a port from the capital port out;
+                -- the sea pool opens on 100 recruits.
+                fleet = {
+                    ships = { "transport", "destroyer", "destroyer", "capital", "submarine" },
+                    per_port = 3, sea_recruits = 100,
+                },
                 extraction = {
                     "agricultural_produce", "agricultural_produce", "agricultural_produce",
                     "agricultural_produce", "agricultural_produce", "water", "coal",
@@ -311,6 +321,13 @@ world_gen = {
                     border  = { "motorised", "infantry", "infantry", "infantry" },
                     men = 50, land_recruits = 200,
                 },
+                -- The fixed fleet (Ben, 2026-11-07; MILITARY.md § Sea): all four classes in
+                -- fixed shares, raised on base kit, three to a port from the capital port out;
+                -- the sea pool opens on 100 recruits.
+                fleet = {
+                    ships = { "transport", "destroyer", "destroyer", "capital", "submarine" },
+                    per_port = 3, sea_recruits = 100,
+                },
                 extraction = {
                     "agricultural_produce", "agricultural_produce", "agricultural_produce",
                     "agricultural_produce", "agricultural_produce", "agricultural_produce",
@@ -330,6 +347,10 @@ world_gen = {
                     { good = "food_rations",   recipes = { "food_rations" } },
                     { good = "silicon",        recipes = { "silicon" } },           -- Refinery, from silica
                     { good = "steel",          recipes = { "steel" } },
+                    -- BL-1551 (Ben, 2026-11-08): every class is raised and refilled with its arms.
+                    { good = "small_arms",        recipes = { "small_arms" } },        -- Arms Works
+                    { good = "armoured_vehicles", recipes = { "armoured_vehicles" } }, -- Arms Works
+                    { good = "artillery_pieces",  recipes = { "artillery_pieces" } },  -- Arms Works
                 },
                 civic = {
                     "planetary_marketplace", "research_institute", "research_institute",

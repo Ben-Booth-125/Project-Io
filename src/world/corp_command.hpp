@@ -236,6 +236,17 @@ enum class corp_verb : uint8_t
     // Appended after set_embargo, same append-only rule. Any nation on its OWN unit; a
     // rival's scorer issues it by the grant in AI_OPPONENT.md § 11.
     defend_province,      ///< Order unit `subject` to defend province `province` (`no_province` clears the order); the unit stores it and its post, and leaves any front. The post is the tile it stands on when inside the province, else the nearest tile of the province the actor owns that a march reaches. rejected_invalid (no such unit or province, a unit no land class, a province with no land the actor owns, no reachable post) / rejected_not_owner (not the actor's unit) / rejected_state (already so).
+    // --- BL-1430: ships (MILITARY.md § Sea, Ben 2026-11-05) ---
+    // Appended after defend_province, same append-only rule. A nation on its OWN port and
+    // ships. No scorer issues them until the fleet grant's item (AI_OPPONENT.md § 11).
+    hire_ship,            ///< Raise a ship of sea roster row `unit_type` (ship_roster_table) at the actor's own completed port on `tile`. Pays the class's hire credits and goods off the shelves, both legs checked first, and its crew from the sea pool; the ship is created at once, with the class's muster days to run, at the port's mouth, and returned through `out_building`. rejected_invalid (unknown row, a row the nation's shelves cannot field, unknown tile) / rejected_placement (no such port, or no water at its mouth) / rejected_no_recruits / rejected_funds — see `hire_ship_check`.
+    assign_sea_mission,   ///< Assign ship `subject` mission `order` (0 none, 1 patrol, 2 escort, 3 raid, 4 blockade) over the sea provinces in `air_provinces` (unused slots `no_province`; any order). It sails there and works the zone; `none` recalls it home. rejected_invalid (no such ship, a mission its class does not work, none with provinces or a mission with none, an unknown or repeated province) / rejected_not_owner / rejected_placement (a province that is land, out of range over water of an own port, or that this ship cannot reach) / rejected_state (no change) — see `sea_mission_check`.
+    set_ship_design,      ///< BL-1527: a nation (BL-1533: any, for its own) fits ship kit item `unit_type` (a ship kit id, unit_designs.hpp) into slot `recipe` (0 hull, 1 armament, 2 sensors) of ship class `order`; its slot's base item puts it back to base kit. Ships already at sea keep their kit until refitted.
+    refit_ship,           ///< BL-1527: ship `subject`, lying at its home port with no mission, refits to the live design of its class: buys the goods of each changed slot and is out of action for its class's muster days.
+    // Appended after refit_ship, same append-only rule. No scorer issues them until the fleet
+    // grant's item (AI_OPPONENT.md § 11).
+    embark_unit,          ///< BL-1531: land unit `subject`, on or beside the actor's own open port, boards transport `order` (a ship id) lying at that port's mouth, up to its capacity.
+    land_units,           ///< BL-1531: transport `subject` sails for the sea beside coast tile `tile` and lands everyone aboard; a null `tile` recalls it home.
 };
 
 /// One past the highest verb — the wire parser's range gate (BL-396: run_serve
@@ -245,7 +256,7 @@ enum class corp_verb : uint8_t
 /// appending a verb means moving this with it — and only this, since existing
 /// values never renumber.
 inline constexpr uint8_t corp_verb_count =
-    static_cast<uint8_t>(corp_verb::defend_province) + 1;
+    static_cast<uint8_t>(corp_verb::land_units) + 1;
 
 /// `unqueue_research`'s "the last entry" sentinel for `corp_command::order`
 /// (the MCP boundary's -1). UINT32_MAX, never a node index.
@@ -477,6 +488,34 @@ corp_command_result unit_design_check(const world& w, entity_id nation, uint32_t
 /// follow in the seam. @p base_out receives the base (the lowest id on the tile).
 corp_command_result hire_unit_check(const world& w, const recipe_registry& reg, entity_id nation,
                                     entity_id tile, uint16_t row, entity_id* base_out = nullptr);
+
+/// One good a hire draws off @p nation's shelves: how much the hire takes, and how much
+/// the nation holds now.
+struct hire_goods_line
+{
+    resource_type res  = resource_type{};
+    float         need = 0.0f;
+    float         have = 0.0f;
+};
+
+/// The goods leg of a hire, READ-ONLY, planned as its verb plans it — so a Raise row
+/// can dim, and name what is short, with the seam's own answer rather than a guess.
+struct hire_goods_reading
+{
+    std::vector<hire_goods_line> lines; ///< Ascending resource; only goods the hire takes.
+    bool  goods_ok    = true;  ///< The shelves hold every line: the verb's quantity gate passes.
+    float price_bound = 0.0f;  ///< Upper bound on what buying them costs (`hire_goods_price_bound`).
+};
+
+/// `hire_unit`'s goods: the row's gated axes plus its class's live design kit. Where an
+/// axis has no candidate the shelves cover, its first candidate is listed, short.
+hire_goods_reading read_land_hire_goods(const world& w, entity_id nation, uint16_t row);
+/// `hire_wing`'s goods: the class's hire goods plus its live air design's kit.
+hire_goods_reading read_air_hire_goods(const world& w, const recipe_registry& reg, entity_id nation,
+                                       uint16_t row);
+/// `hire_ship`'s goods: the class's hire goods plus its live ship design's kit.
+hire_goods_reading read_ship_hire_goods(const world& w, const recipe_registry& reg, entity_id nation,
+                                        uint16_t row);
 
 /// Every check `march_unit` makes, READ-ONLY save for the logistics path cache the
 /// route search warms, in its order — so a caller can ask before it acts (the

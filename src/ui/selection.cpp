@@ -16,6 +16,7 @@ selection_kind selection_kind_of(const world& w, entity_id e)
     if (w.bodies.count(e))       return selection_kind::body;
     if (w.nations.count(e))      return selection_kind::nation;
     if (w.wings.count(e))        return selection_kind::wing; // BL-1450
+    if (w.ships.count(e))        return selection_kind::ship; // BL-1534
     // BL-1407: no corporation exists to select (`selection_kind::corporation`
     // stays in the enum, never returned).
 
@@ -37,6 +38,7 @@ const char* selection_kind_name(selection_kind k)
         case selection_kind::battle:      return "Battle";
         case selection_kind::contract:    return "Contract";
         case selection_kind::wing:        return "Wing";
+        case selection_kind::ship:        return "Ship";
     }
     return "?";
 }

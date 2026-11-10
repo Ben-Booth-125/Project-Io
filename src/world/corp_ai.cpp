@@ -12,6 +12,8 @@
 #include "carried_supplies.hpp" // BL-1540: what a march's supply does to the men
 #include "nation_generation.hpp" // BL-1540: unit_tile_cover_permille, the claim's own read
 #include "air_combat.hpp"      // BL-1451: a rival flies air wings
+#include "sea_combat.hpp"      // BL-1533: a rival sails its fleet
+#include "unit_designs.hpp"    // BL-1533: the ship kit a rival designs with
 #include "campaign_settle.hpp" // BL-1452: k_campaign_settle_ticks - the settle assigns no fronts
 #include "stance.hpp"          // is_hostile (BL-1451)
 #include "war.hpp"             // BL-1461: declaration_price, war_score, the war verbs' reads
@@ -19,12 +21,14 @@
 #include "input_reach.hpp"     // BL-1187: obtainable inputs (the BL-1185 reach)
 #include "logistics.hpp"       // body_reach_field (BL-379: warm before the reach-checked muster scan)
 #include "market_clearing.hpp" // market_for_tile
+#include "nation_ai.hpp"       // BL-1552: nation_land_borders
 #include "nation_budget.hpp"   // budget_claim (Sprint N3 T5: the cash-gated survey asks its nation)
 #include "placement_rules.hpp"
 #include "province.hpp"        // province_ceiling_scope (BL-1079: the muster scan's memo)
 #include "recipe_registry.hpp"
 #include "supply_system.hpp"   // price_convoy_leg / commit_convoy (BL-600, the shared dispatch seam)
 #include "survey_system.hpp"
+#include "recruits.hpp"        // BL-1552: wing_crew
 #include "nation_tech.hpp"     // recipe_unlocked, nation_scalar (BL-1273; BL-588 before it)
 #include "state_industry.hpp"  // state_uncommitted_treasury (BL-1401: a nation actor's money)
 #include "embargo.hpp"         // BL-1418: embargo_refuses (a dead pin is unpinned, earns no reserve)
@@ -456,6 +460,10 @@ const char* corp_verb_label(corp_verb v)
         case corp_verb::set_unit_design: return "unit design";    // BL-1434: never issued by a rival
         case corp_verb::hire_wing:       return "hire wing";      // BL-1449
         case corp_verb::assign_air_mission: return "air mission"; // BL-1449
+        case corp_verb::hire_ship:       return "hire ship";      // BL-1430
+        case corp_verb::assign_sea_mission: return "sea mission"; // BL-1430
+        case corp_verb::set_ship_design: return "ship design";    // BL-1527; BL-1533: a rival designs
+        case corp_verb::refit_ship:      return "ship refit";     // BL-1527
         case corp_verb::set_air_design:  return "air design";     // BL-1449: never issued by a rival
         case corp_verb::declare_war:     return "war declaration"; // BL-1459
         case corp_verb::answer_war:      return "war answer";      // BL-1459
@@ -1928,7 +1936,6 @@ void score_nation_fronts(world& w, const recipe_registry& reg, entity_id nation,
 //   nothing scoring above 0, a wing whose mission went illegal is grounded.
 // ---------------------------------------------------------------------------
 
-constexpr int     k_rival_wing_cap      = 3;
 constexpr int64_t k_rival_air_switch    = 1250; ///< per-mille: a 25 % better target to switch
 
 namespace {
@@ -2084,76 +2091,7 @@ void score_nation_air(world& w, const recipe_registry& reg, entity_id nation, in
     }
 
     // --- HIRE -------------------------------------------------------------------
-    if (mobilised && base != null_entity)
-    {
-        int owned = 0;
-        bool hostile_air = false;
-        for (const auto& [wid, wg] : w.wings)
-        {
-            if (wg.owner == nation)
-                ++owned;
-            else if (is_hostile(w, nation, wg.owner) || is_hostile(w, wg.owner, nation))
-                hostile_air = true;
-        }
-        if (owned < k_rival_wing_cap)
-        {
-            const entity_id base_tile = w.buildings.at(base).tile;
-            // The farthest a hostile-held province lies from the base, for the
-            // range-gated values.
-            int nearest_hostile = -1;
-            for (const ::province& p : w.provinces.provinces)
-            {
-                const entity_id holder = province_holder_for(w, p.id);
-                if (holder == null_entity || holder == nation || !is_hostile(w, nation, holder))
-                    continue;
-                const int d = air_province_distance(w, base_tile, p.id);
-                if (d >= 0 && (nearest_hostile < 0 || d < nearest_hostile))
-                    nearest_hostile = d;
-            }
-            const air_params& ap = reg.military().air;
-            const auto in_reach = [&](air_class c) {
-                return nearest_hostile >= 0
-                    && nearest_hostile <= ap.cls[static_cast<std::size_t>(c)].range;
-            };
-            int    best_row = -1;
-            double best = 0.0;
-            for (const uint16_t row : available_air_rows(w, nation)) // ascending
-            {
-                // BL-1463: a row the seam would refuse before money moves - its crew more
-                // than the air pool holds (MILITARY.md § Recruits) - is not a candidate.
-                if (hire_wing_check(w, reg, nation, base_tile, row) != corp_command_result::applied)
-                    continue;
-                const air_class c = air_roster_table()[row].cls;
-                double value = 0.0;
-                switch (c)
-                {
-                    case air_class::fighter:    value = hostile_air ? 3.0 : 1.0; break;
-                    case air_class::multirole:  value = 2.0; break;
-                    case air_class::bomber:     value = in_reach(c) ? 1.5 : 0.0; break;
-                    case air_class::helicopter: value = in_reach(c) ? 1.0 : 0.0; break;
-                    case air_class::drone:      value = 1.0; break;
-                    case air_class::recon:      value = 0.5; break;
-                }
-                const float price = ap.cls[static_cast<std::size_t>(c)].hire_cost;
-                if (value <= 0.0 || price <= 0.0f || state_uncommitted_treasury(w, nation) < 2.0f * price)
-                    continue;
-                const double score = value / static_cast<double>(price);
-                if (score > best)
-                {
-                    best = score;
-                    best_row = row;
-                }
-            }
-            if (best_row >= 0)
-            {
-                corp_command cmd;
-                cmd.tick = tick; cmd.corp = nation; cmd.as_nation = nation;
-                cmd.verb = corp_verb::hire_wing; cmd.tile = base_tile;
-                cmd.unit_type = static_cast<uint16_t>(best_row);
-                (void)apply_corp_command(w, reg, cmd);
-            }
-        }
-    }
+    // Wings are hired by force sizing (score_nation_force, Ben 2026-11-08).
 
     // --- MISSION ------------------------------------------------------------------
     std::vector<entity_id> mine;
@@ -2220,6 +2158,857 @@ void score_nation_air(world& w, const recipe_registry& reg, entity_id nation, in
         {
             cmd.order = static_cast<uint32_t>(air_mission::none); // ground it
             (void)apply_corp_command(w, reg, cmd);
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// BL-1533 — a rival nation sails its own fleet (AI_OPPONENT.md § 11, "Rival nations
+// sail fleets", Ben 2026-11-05, read and bounded 2026-11-08; MILITARY.md § Sea). The
+// grant and nothing wider: ships hired at its OWN ports to its OWN design, each of its
+// OWN raised warships given one mission over sea provinces in range, its OWN idle
+// units embarked and landed, all through the verbs the player presses (set_ship_design,
+// hire_ship, assign_sea_mission, embark_unit, land_units). Raids and blockades only
+// against a nation it is ALREADY hostile to; it never declares. Of another nation's
+// ships it reads only its OWN SIGHTINGS (`world::sea_sightings`); ports, cargo lanes
+// and ground are the map's. It plans nothing past the next verb: each evaluation
+// scores each ship's one best move as the sea stands now. Never the player's nation.
+// Pure integer arithmetic on ordered ids; no RNG.
+//
+//   GATE. Only while mobilised (`corp_is_mobilised`); out of a war, a ship holding a
+//   mission is recalled to port.
+//   DESIGN + HIRE. Under the soft cap of `k_rival_ship_cap` own ships (mustering ones
+//   count), ONE hire an evaluation: the row of best value / hire cost, ties to the
+//   lowest row, only while its uncommitted treasury holds twice the price, at its
+//   lowest-id port the door admits. Value: destroyer 2; capital ship 1.5; submarine
+//   1.5 while hostile cargo crosses water in its reach, else 0; transport 1 while it
+//   owns none, else 0. Before the hire it fits, per slot of that class, the latest
+//   researched item whose goods (with the class's hire goods) its shelves hold.
+//   MISSION. Each raised, unbroken warship, ascending id, scores every province in its
+//   class's reach for every mission its class works: patrol 50 a sighted hostile ship
+//   there, plus 25 if an own port's mouth lies there; escort its own cargo (whole
+//   units) whose sea legs cross it; raid hostile cargo crossing it, x2 for a surface
+//   raider (the prize and the owner's loss) and x1 for a submarine, which sinks what it
+//   takes; blockade 100 a hostile standing port whose mouth lies there. The best
+//   (score, then lowest province, then mission order) the door admits is assigned when
+//   it beats the current zone's own score by `k_rival_sea_switch` per-mille; with
+//   nothing above 0, a ship whose zone left its reach is recalled.
+//   LAND. A transport lying at its home port first commits to ONE target - the best hostile
+//   coast tile beside water it HOLDS (`held_water_hostile_coast`): 2000 a tile no hostile
+//   unit stands on, else 500, ties to the lowest id - that the landing door's placement
+//   legs admit from where it lies. Only then does it take aboard, one verb each, its idle
+//   own units (no front, no defend order) that may stand on that target, and land them
+//   there. No verb but a landing takes a unit off a ship, so a transport holding units
+//   with no target - its water lost, or the war over - lands them on its own ground.
+// ---------------------------------------------------------------------------
+
+constexpr int64_t k_rival_sea_switch = 1250; ///< per-mille: a 25 % better zone to switch
+
+namespace {
+
+/// What the rival sea scorer may see of the water, per province, read once an evaluation.
+struct rival_sea_view
+{
+    std::map<uint32_t, int64_t> hostile_cargo;  ///< whole units of hostile cargo whose sea legs cross it
+    std::map<uint32_t, int64_t> own_cargo;      ///< whole units of its own
+    std::map<uint32_t, int64_t> sighted;        ///< ships in its OWN sightings standing there
+    std::map<uint32_t, int64_t> hostile_mouths; ///< hostile standing ports whose mouth lies there
+    std::set<uint32_t>          own_mouths;     ///< provinces holding an own port's mouth
+};
+
+rival_sea_view read_rival_sea(world& w, entity_id nation)
+{
+    rival_sea_view v;
+    for (const convoy_component& cv : w.convoys) // a vector: its own fixed order
+    {
+        if (cv.port_a == null_entity || cv.port_b == null_entity || cv.corp == null_entity
+            || !std::isfinite(cv.cargo_qty) || cv.cargo_qty <= 0.0f)
+            continue;
+        const bool own = cv.corp == nation;
+        const bool hostile = !own && is_hostile(w, nation, cv.corp) && !are_friends(w, nation, cv.corp);
+        if (!own && !hostile)
+            continue;
+        const convoy_route lane = convoy_route_tiles(w, cv);
+        std::set<uint32_t> crossed;
+        for (int li = 0; li < static_cast<int>(lane.tiles.size()); ++li)
+        {
+            if (!lane.on_sea_leg(li))
+                continue;
+            const uint32_t p = w.provinces.province_of(lane.tiles[static_cast<std::size_t>(li)]);
+            if (p != 0 && province_kind_of(w, p) != province_kind::land)
+                crossed.insert(p);
+        }
+        const int64_t qty = static_cast<int64_t>(std::llround(std::min(cv.cargo_qty, 1.0e9f)));
+        for (const uint32_t p : crossed)
+            (own ? v.own_cargo : v.hostile_cargo)[p] += qty;
+    }
+    for (auto it = w.sea_sightings.lower_bound({nation, null_entity});
+         it != w.sea_sightings.end() && it->first == nation; ++it)
+    {
+        const auto sit = w.ships.find(it->second);
+        if (sit == w.ships.end() || sit->second.tile == null_entity)
+            continue;
+        if (const uint32_t p = w.provinces.province_of(sit->second.tile); p != 0)
+            v.sighted[p] += 1;
+    }
+    for (const auto& [nid, nc] : w.nations)
+    {
+        const bool mine = nid == nation;
+        if (!mine && !is_hostile(w, nation, nid))
+            continue;
+        for (const entity_id port : own_standing_ports(w, nid))
+        {
+            const entity_id mouth = port_mouth_tile(w, port);
+            const uint32_t p = mouth == null_entity ? 0 : w.provinces.province_of(mouth);
+            if (p == 0)
+                continue;
+            if (mine)
+                v.own_mouths.insert(p);
+            else
+                v.hostile_mouths[p] += 1;
+        }
+    }
+    return v;
+}
+
+int64_t rival_sea_score(const rival_sea_view& v, ship_class c, sea_mission m, uint32_t p)
+{
+    const auto at = [p](const std::map<uint32_t, int64_t>& mp) {
+        const auto it = mp.find(p);
+        return it == mp.end() ? int64_t{0} : it->second;
+    };
+    switch (m)
+    {
+        case sea_mission::patrol:   return 50 * at(v.sighted) + (v.own_mouths.count(p) != 0 ? 25 : 0);
+        case sea_mission::escort:   return at(v.own_cargo);
+        case sea_mission::raid:     return at(v.hostile_cargo) * (c == ship_class::submarine ? 1 : 2);
+        case sea_mission::blockade: return 100 * at(v.hostile_mouths);
+        default:                    return 0;
+    }
+}
+
+/// Fit, per slot of class @p c, the latest researched item whose goods (with the class's
+/// hire goods) @p nation's shelves hold. One verb per slot that changes; a refusal
+/// mutates nothing.
+void rival_fit_ship_design(world& w, const recipe_registry& reg, entity_id nation, ship_class c, int tick)
+{
+    const std::vector<ship_kit_item>& cat = ship_kit_catalogue();
+    const ship_class_stats& cs = reg.military().sea.cls[static_cast<std::size_t>(c)];
+    for (int slot = 0; slot < static_cast<int>(k_ship_kit_slot_count); ++slot)
+    {
+        const uint16_t fitted = ship_design_fitted(w, nation, c, slot);
+        uint16_t best = k_no_kit_item;
+        for (uint16_t id = 0; id < cat.size(); ++id)
+        {
+            if (cat[id].cls != c || cat[id].slot != slot || !ship_kit_item_researched(w, nation, id))
+                continue;
+            unit_design d = ship_design_of(w, nation, c);
+            d.fit[static_cast<std::size_t>(slot)] = static_cast<uint8_t>(ship_kit_variant_of(id));
+            const std::array<float, resource_count> goods = ship_kit_goods(c, d);
+            bool held = true;
+            for (std::size_t g = 0; g < resource_count && held; ++g)
+            {
+                const float need = goods[g] + cs.hire_goods[g];
+                held = !(need > 0.0f) || corp_stockpile_total(w, nation, static_cast<resource_type>(g)) >= need;
+            }
+            if (held)
+                best = id; // ascending: the last that holds is the latest
+        }
+        if (best == k_no_kit_item || best == fitted)
+            continue;
+        corp_command cmd;
+        cmd.tick = tick; cmd.corp = nation; cmd.as_nation = nation;
+        cmd.verb = corp_verb::set_ship_design;
+        cmd.order = static_cast<uint32_t>(c);
+        cmd.recipe = static_cast<decltype(cmd.recipe)>(slot);
+        cmd.unit_type = best;
+        (void)apply_corp_command(w, reg, cmd);
+    }
+}
+
+/// Land @p ship's units on its OWN ground: its home port's tile, else any of its own standing
+/// ports' tiles, ascending, the first the door admits. A landing on own ground is the one way
+/// a unit leaves a ship, so a transport whose target is gone is never left holding them.
+void rival_land_home(world& w, const recipe_registry& reg, entity_id nation, entity_id ship, int tick)
+{
+    std::vector<entity_id> tiles;
+    if (const auto hp = w.buildings.find(w.ships.at(ship).home_port); hp != w.buildings.end())
+        tiles.push_back(hp->second.tile);
+    for (const entity_id port : own_standing_ports(w, nation))
+        tiles.push_back(w.buildings.at(port).tile);
+    for (const entity_id t : tiles)
+        if (land_units_check(w, reg, nation, ship, t) == corp_command_result::applied)
+        {
+            corp_command cmd;
+            cmd.tick = tick; cmd.corp = nation; cmd.as_nation = nation;
+            cmd.verb = corp_verb::land_units; cmd.subject = ship; cmd.tile = t;
+            (void)apply_corp_command(w, reg, cmd);
+            return;
+        }
+}
+
+/// The landing force's hire (Ben, 2026-11-08; MILITARY.md § The muster interface: rival
+/// nations hire through the same verb): ONE land unit at the nation's lowest-id completed
+/// military base, of the available, non-obsolete row of highest power that may stand on
+/// @p target, ties to the lowest row, while its uncommitted treasury holds twice the price.
+/// The door (hire_unit_check, then the payment legs) refuses anything else and mutates nothing.
+void rival_hire_landing_unit(world& w, const recipe_registry& reg, entity_id nation, entity_id ship,
+                             entity_id target, int tick)
+{
+    entity_id base_tile = null_entity, base_id = null_entity;
+    const std::vector<entity_id>* assets = assets_of(w, nation);
+    if (assets == nullptr)
+        return;
+    for (const entity_id bid : *assets)
+    {
+        const auto bit = w.buildings.find(bid);
+        if (bit != w.buildings.end() && bit->second.type == building_type::military_base
+            && bit->second.ticks_remaining <= 0 && !bit->second.decommissioned
+            && (base_id == null_entity || bid < base_id))
+        {
+            base_id = bid;
+            base_tile = bit->second.tile;
+        }
+    }
+    if (base_tile == null_entity)
+        return;
+    const military_capability_params& mil = reg.military();
+    const auto& table = unit_roster_table();
+    int best = -1, best_power = std::numeric_limits<int>::min();
+    for (const roster_row* row : available_rows(w, nation, campaign_roster_band_for(reg.era())))
+    {
+        const auto idx = static_cast<uint16_t>(row - table.data());
+        if (roster_row_obsolete(w, nation, idx) || (row->domains & domain_bit(traversal_domain::land)) == 0
+            || hire_unit_check(w, reg, nation, base_tile, idx) != corp_command_result::applied
+            || landing_would_admit(w, reg, nation, ship, target, idx) != corp_command_result::applied)
+            continue;
+        const float price = mil.hire_base_cost + mil.hire_cost_per_power * static_cast<float>(row->power_mod);
+        const hire_goods_reading g = read_land_hire_goods(w, nation, idx);
+        if (!g.goods_ok || state_uncommitted_treasury(w, nation) < 2.0f * price + g.price_bound)
+            continue;
+        if (row->power_mod > best_power || (row->power_mod == best_power && idx < best))
+        {
+            best = idx;
+            best_power = row->power_mod;
+        }
+    }
+    if (best < 0)
+        return;
+    corp_command cmd;
+    cmd.tick = tick; cmd.corp = nation; cmd.as_nation = nation;
+    cmd.verb = corp_verb::hire_unit; cmd.tile = base_tile; cmd.unit_type = static_cast<uint16_t>(best);
+    (void)apply_corp_command(w, reg, cmd);
+}
+
+} // namespace
+
+void score_nation_sea(world& w, const recipe_registry& reg, entity_id nation, int tick)
+{
+    // Never the player's nation (AI_OPPONENT.md § 11: "Not admitted: any ship, port or
+    // unit of another nation, the player's included").
+    if (nation == null_entity || nation == player_nation(w) || w.nations.find(nation) == w.nations.end())
+        return;
+    const std::vector<entity_id> ports = own_standing_ports(w, nation);
+    std::vector<entity_id> mine;
+    for (const auto& [sid, s] : w.ships)
+        if (s.owner == nation)
+            mine.push_back(sid); // std::map: ascending
+    if (ports.empty() && mine.empty())
+        return;
+    const sea_params& sp = reg.military().sea;
+
+    if (!corp_is_mobilised(w, nation))
+    {
+        // Out of a war: a ship still holding a mission comes home, and a transport lying at
+        // home with units aboard puts them ashore on its own ground.
+        for (const entity_id sid : mine)
+        {
+            const sea_ship& s = w.ships.at(sid);
+            if (ship_class_of(s) == ship_class::transport && !s.aboard.empty() && s.landing_tile == null_entity
+                && s.route.empty() && s.tile == port_mouth_tile(w, s.home_port))
+                rival_land_home(w, reg, nation, sid, tick);
+            if (w.ships.at(sid).mission == sea_mission::none)
+                continue;
+            corp_command cmd;
+            cmd.tick = tick; cmd.corp = nation; cmd.as_nation = nation;
+            cmd.verb = corp_verb::assign_sea_mission; cmd.subject = sid;
+            cmd.order = static_cast<uint32_t>(sea_mission::none);
+            cmd.air_provinces.fill(no_province);
+            (void)apply_corp_command(w, reg, cmd);
+        }
+        return;
+    }
+
+    const rival_sea_view view = read_rival_sea(w, nation);
+
+    // Ships are hired by force sizing (score_nation_force, Ben 2026-11-08).
+
+    // --- MISSION -------------------------------------------------------------------
+    std::map<int, std::set<uint32_t>> reach_by_range; // one walk per range
+    for (const entity_id sid : mine)
+    {
+        const auto sit = w.ships.find(sid);
+        if (sit == w.ships.end())
+            continue;
+        const sea_ship s = sit->second; // a copy: the verb below writes the live one
+        const ship_class c = ship_class_of(s);
+        if (c == ship_class::transport || s.muster_days > 0 || s.returning)
+            continue;
+        const int range = sp.cls[static_cast<std::size_t>(c)].range;
+        if (reach_by_range.find(range) == reach_by_range.end())
+            reach_by_range[range] = sea_provinces_in_range(w, nation, range);
+        const std::set<uint32_t>& reach = reach_by_range.at(range);
+
+        struct cand { int64_t score; uint32_t province; int mission; };
+        std::vector<cand> cands;
+        for (int mi = 1; mi < sea_mission_count; ++mi)
+        {
+            const sea_mission m = static_cast<sea_mission>(mi);
+            if (!ship_class_works(reg, c, m))
+                continue;
+            for (const uint32_t p : reach) // ascending
+            {
+                if (province_kind_of(w, p) == province_kind::land)
+                    continue;
+                const int64_t sc = rival_sea_score(view, c, m, p);
+                if (sc > 0)
+                    cands.push_back({sc, p, mi});
+            }
+        }
+        std::sort(cands.begin(), cands.end(), [](const cand& a, const cand& b) {
+            return a.score != b.score ? a.score > b.score
+                 : a.province != b.province ? a.province < b.province : a.mission < b.mission;
+        });
+
+        int64_t cur_s = 0;
+        bool cur_legal = s.mission == sea_mission::none;
+        if (s.mission != sea_mission::none)
+        {
+            cur_legal = true;
+            for (const uint32_t p : s.provinces)
+            {
+                cur_s += rival_sea_score(view, c, s.mission, p);
+                if (reach.count(p) == 0)
+                    cur_legal = false;
+            }
+        }
+        corp_command cmd;
+        cmd.tick = tick; cmd.corp = nation; cmd.as_nation = nation;
+        cmd.verb = corp_verb::assign_sea_mission; cmd.subject = sid;
+        cmd.air_provinces.fill(no_province);
+        bool assigned = false;
+        for (const cand& k : cands)
+        {
+            if (cur_legal && s.mission != sea_mission::none && k.score * 1000 <= cur_s * k_rival_sea_switch)
+                break; // the current zone is good enough: no thrash
+            if (static_cast<int>(s.mission) == k.mission && s.provinces.size() == 1 && s.provinces[0] == k.province)
+                break;
+            const uint32_t one[1] = {k.province};
+            if (sea_mission_check(w, reg, nation, sid, static_cast<uint32_t>(k.mission), one, 1)
+                != corp_command_result::applied)
+                continue; // unreachable from here: the next best
+            cmd.order = static_cast<uint32_t>(k.mission);
+            cmd.air_provinces[0] = k.province;
+            (void)apply_corp_command(w, reg, cmd);
+            assigned = true;
+            break;
+        }
+        if (!assigned && !cur_legal)
+        {
+            cmd.order = static_cast<uint32_t>(sea_mission::none); // recall it
+            (void)apply_corp_command(w, reg, cmd);
+        }
+    }
+
+    // --- EMBARK + LAND ---------------------------------------------------------------
+    std::vector<entity_id> targets;
+    bool targets_read = false;
+    for (const entity_id sid : mine)
+    {
+        const auto sit = w.ships.find(sid);
+        if (sit == w.ships.end() || ship_class_of(sit->second) != ship_class::transport)
+            continue;
+        const sea_ship& s0 = sit->second;
+        if (s0.muster_days > 0 || s0.returning || !s0.route.empty() || s0.landing_tile != null_entity
+            || s0.tile != port_mouth_tile(w, s0.home_port))
+            continue;
+        if (!targets_read)
+        {
+            targets = held_water_hostile_coast(w, reg, nation,
+                                               sp.cls[static_cast<std::size_t>(ship_class::transport)].range);
+            targets_read = true;
+        }
+        // The ONE target this transport commits to before anything boards (cold review: no
+        // verb but a landing takes a unit off a ship, so a unit boarded for a landing the
+        // door then refuses would be stranded): the best whose placement legs admit it.
+        std::set<entity_id> hostile_stood;
+        for (const auto& [uid, u] : w.units)
+            if (u.count > 0 && u.owner != nation && u.position != null_entity && is_hostile(w, nation, u.owner))
+                hostile_stood.insert(u.position);
+        std::vector<std::pair<int, entity_id>> ranked;
+        for (const entity_id t : targets)
+            ranked.push_back({hostile_stood.count(t) != 0 ? 500 : 2000, t});
+        std::sort(ranked.begin(), ranked.end(), [](const auto& a, const auto& b) {
+            return a.first != b.first ? a.first > b.first : a.second < b.second;
+        });
+        entity_id target = null_entity;
+        for (const auto& rk : ranked)
+            if (landing_would_admit(w, reg, nation, sid, rk.second, -1) == corp_command_result::applied)
+            {
+                target = rk.second;
+                break;
+            }
+        if (target == null_entity)
+        {
+            if (!s0.aboard.empty())
+                rival_land_home(w, reg, nation, sid, tick); // nothing to take: put them back ashore
+            continue;
+        }
+        // Its idle own units, ascending id: no front, no defend order, no march, out of battle.
+        const auto idle_units = [&]() {
+            std::vector<entity_id> v;
+            for (const auto& [uid, u] : w.units)
+                if (u.owner == nation && u.count > 0 && u.position != null_entity && u.front == null_entity
+                    && u.defend_province == no_province && u.order.dest == null_entity
+                    && !unit_refitting(u) && !unit_in_battle(w, uid))
+                    v.push_back(uid);
+            std::sort(v.begin(), v.end());
+            return v;
+        };
+        const auto may_land = [&](uint16_t type) {
+            return landing_would_admit(w, reg, nation, sid, target, type) == corp_command_result::applied;
+        };
+        // Board those beside the port that may stand on that target, one verb each.
+        for (const entity_id uid : idle_units())
+        {
+            const auto uit = w.units.find(uid);
+            if (uit == w.units.end() || !may_land(uit->second.type)
+                || embark_check(w, reg, nation, uid, sid) != corp_command_result::applied)
+                continue;
+            corp_command cmd;
+            cmd.tick = tick; cmd.corp = nation; cmd.as_nation = nation;
+            cmd.verb = corp_verb::embark_unit; cmd.subject = uid;
+            cmd.order = static_cast<uint32_t>(sid);
+            (void)apply_corp_command(w, reg, cmd);
+        }
+        // THE LANDING FORCE (Ben, 2026-11-08: "hire a landing force at the port"). Room still
+        // aboard is filled by units already marching to the port, then by the nation's musters
+        // under way, then by idle units marched to it, and last by ONE hire an evaluation at
+        // its own base. Each is its own verb; a marching unit is not idle, so no front takes it.
+        const sea_ship& s1 = w.ships.at(sid);
+        const auto hp = w.buildings.find(s1.home_port);
+        const entity_id port_tile = hp != w.buildings.end() ? hp->second.tile : null_entity;
+        int room = std::max(0, ship_stats(reg, s1).capacity - static_cast<int>(s1.aboard.size()));
+        int inbound = 0;
+        for (const auto& [uid, u] : w.units)
+            if (u.owner == nation && u.count > 0 && port_tile != null_entity && u.order.dest == port_tile)
+                ++inbound;
+        int mustering = 0;
+        for (const muster_order& m : w.musters)
+            mustering += m.owner == nation ? 1 : 0;
+        int need = room - inbound - mustering;
+        if (need > 0 && port_tile != null_entity)
+            for (const entity_id uid : idle_units())
+            {
+                if (need <= 0)
+                    break;
+                const auto uit = w.units.find(uid);
+                if (uit == w.units.end() || uit->second.position == port_tile || !may_land(uit->second.type))
+                    continue;
+                corp_command cmd;
+                cmd.tick = tick; cmd.corp = nation; cmd.as_nation = nation;
+                cmd.verb = corp_verb::march_unit; cmd.subject = uid; cmd.tile = port_tile;
+                if (apply_corp_command(w, reg, cmd) == corp_command_result::applied)
+                {
+                    --need;
+                    ++inbound;
+                }
+            }
+        if (need > 0)
+            rival_hire_landing_unit(w, reg, nation, sid, target, tick);
+        if (w.ships.at(sid).aboard.empty())
+            continue;
+        // Sail once full, or once nothing more is on its way.
+        if (std::max(0, ship_stats(reg, w.ships.at(sid)).capacity - static_cast<int>(w.ships.at(sid).aboard.size())) > 0
+            && inbound + mustering > 0)
+            continue;
+        corp_command cmd;
+        cmd.tick = tick; cmd.corp = nation; cmd.as_nation = nation;
+        cmd.verb = corp_verb::land_units; cmd.subject = sid; cmd.tile = target;
+        (void)apply_corp_command(w, reg, cmd);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// BL-1552 - force sizing (MILITARY.md § Force sizing; AI_OPPONENT.md § 11, Ben 2026-11-08)
+// ---------------------------------------------------------------------------
+namespace {
+
+constexpr float k_force_base_share = 0.20f;  ///< Of income, with no neighbour stronger. First cut.
+constexpr float k_force_threat_span = 3.0f;  ///< Threat over 1 that reaches the ceiling. First cut.
+constexpr int   k_force_income_returns = 4;  ///< Returns averaged: a year.
+
+float land_row_price(const recipe_registry& reg, uint16_t type)
+{
+    const military_capability_params& mil = reg.military();
+    const auto& table = unit_roster_table();
+    return type < table.size() ? mil.hire_base_cost + mil.hire_cost_per_power * static_cast<float>(table[type].power_mod) : 0.0f;
+}
+
+float nation_good_price(const world& w, entity_id nation, std::size_t r)
+{
+    float px = 0.0f;
+    for (const entity_id mid : corp_markets(w, nation))
+        if (const auto mit = w.markets.find(mid); mit != w.markets.end())
+            px = std::max(px, posted_price(mit->second, r));
+    return px;
+}
+
+float goods_at_price(const world& w, entity_id nation, const std::array<float, resource_count>& goods)
+{
+    float total = 0.0f;
+    for (std::size_t g = 0; g < resource_count; ++g)
+        if (goods[g] > 0.0f)
+            total += goods[g] * nation_good_price(w, nation, g);
+    return total;
+}
+
+/// The running cost of ONE land unit of @p heads men: its wage and its goods at posted prices.
+float land_unit_running(const world& w, const recipe_registry& reg, entity_id nation, uint16_t type, int heads)
+{
+    const unit_upkeep_params& up = reg.military().upkeep;
+    const auto& table = unit_roster_table();
+    const float power = type < table.size() ? static_cast<float>(table[type].power_mod) : 0.0f;
+    float per_head = up.credits_per_head + up.credits_per_head_per_power * power;
+    for (std::size_t g = 0; g < resource_count; ++g)
+        if (up.goods_per_head[g] > 0.0f)
+            per_head += up.goods_per_head[g] * nation_good_price(w, nation, g);
+    return per_head * static_cast<float>(heads);
+}
+
+float wing_running(const world& w, const recipe_registry& reg, entity_id nation, uint16_t type)
+{
+    return reg.military().upkeep.credits_per_head * static_cast<float>(wing_crew(reg, type))
+        + goods_at_price(w, nation, reg.military().air.wing_upkeep_goods);
+}
+
+float ship_running(const world& w, const recipe_registry& reg, entity_id nation, uint16_t type)
+{
+    return reg.military().upkeep.credits_per_head * static_cast<float>(ship_crew(reg, type))
+        + goods_at_price(w, nation, reg.military().sea.ship_upkeep_goods);
+}
+
+struct theatre_cost { float land = 0.0f, air = 0.0f, sea = 0.0f; };
+
+theatre_cost nation_running_by_theatre(const world& w, const recipe_registry& reg, entity_id nation)
+{
+    theatre_cost c;
+    for (const auto& [uid, u] : w.units)
+        if (u.owner == nation && u.count > 0)
+            c.land += land_unit_running(w, reg, nation, u.type, u.count);
+    for (const muster_order& m : w.musters)
+        if (m.owner == nation)
+            c.land += land_unit_running(w, reg, nation, m.unit_type, hire_batch_manpower);
+    for (const auto& [wid, wg] : w.wings)
+        if (wg.owner == nation)
+            c.air += wing_running(w, reg, nation, wg.type);
+    for (const auto& [sid, s] : w.ships)
+        if (s.owner == nation)
+        {
+            c.sea += ship_running(w, reg, nation, s.type);
+            for (const auto& [uid, u] : s.aboard)
+                c.land += land_unit_running(w, reg, nation, u.type, u.count);
+        }
+    return c;
+}
+
+/// A theatre's part of the target, by the nation's position.
+struct theatre_parts { float land = 1.0f, air = 0.0f, sea = 0.0f; };
+
+theatre_parts nation_theatre_parts(world& w, entity_id nation, entity_id airbase)
+{
+    theatre_parts t;
+    const int ports = static_cast<int>(own_standing_ports(w, nation).size());
+    if (ports > 0)
+    {
+        const rival_sea_view view = read_rival_sea(w, nation);
+        t.sea = std::min(0.60f, 0.15f + 0.05f * static_cast<float>(ports) + 0.05f * static_cast<float>(view.own_cargo.size()));
+    }
+    if (airbase != null_entity)
+        t.air = 0.20f;
+    t.land = 1.0f - t.sea - t.air;
+    return t;
+}
+
+bool rival_hire_wing(world& w, const recipe_registry& reg, entity_id nation, entity_id base, float budget, int tick)
+{
+    const entity_id base_tile = w.buildings.at(base).tile;
+    bool hostile_air = false;
+    for (const auto& [wid, wg] : w.wings)
+        if (wg.owner != nation && (is_hostile(w, nation, wg.owner) || is_hostile(w, wg.owner, nation)))
+            hostile_air = true;
+    int nearest_hostile = -1;
+    for (const ::province& p : w.provinces.provinces)
+    {
+        const entity_id holder = province_holder_for(w, p.id);
+        if (holder == null_entity || holder == nation || !is_hostile(w, nation, holder))
+            continue;
+        const int d = air_province_distance(w, base_tile, p.id);
+        if (d >= 0 && (nearest_hostile < 0 || d < nearest_hostile))
+            nearest_hostile = d;
+    }
+    const air_params& ap = reg.military().air;
+    const auto in_reach = [&](air_class c) {
+        return nearest_hostile >= 0 && nearest_hostile <= ap.cls[static_cast<std::size_t>(c)].range;
+    };
+    int best_row = -1;
+    double best = 0.0;
+    for (const uint16_t row : available_air_rows(w, nation)) // ascending
+    {
+        if (hire_wing_check(w, reg, nation, base_tile, row) != corp_command_result::applied)
+            continue;
+        const air_class c = air_roster_table()[row].cls;
+        double value = 0.0;
+        switch (c)
+        {
+            case air_class::fighter:    value = hostile_air ? 3.0 : 1.0; break;
+            case air_class::multirole:  value = 2.0; break;
+            case air_class::bomber:     value = in_reach(c) ? 1.5 : 0.0; break;
+            case air_class::helicopter: value = in_reach(c) ? 1.0 : 0.0; break;
+            case air_class::drone:      value = 1.0; break;
+            case air_class::recon:      value = 0.5; break;
+        }
+        const float price = ap.cls[static_cast<std::size_t>(c)].hire_cost;
+        const hire_goods_reading g = read_air_hire_goods(w, reg, nation, row);
+        if (value <= 0.0 || price <= 0.0f || !g.goods_ok || budget < price + g.price_bound)
+            continue;
+        const double score = value / static_cast<double>(price);
+        if (score > best)
+        {
+            best = score;
+            best_row = row;
+        }
+    }
+    if (best_row < 0)
+        return false;
+    corp_command cmd;
+    cmd.tick = tick; cmd.corp = nation; cmd.as_nation = nation;
+    cmd.verb = corp_verb::hire_wing; cmd.tile = base_tile;
+    cmd.unit_type = static_cast<uint16_t>(best_row);
+    return apply_corp_command(w, reg, cmd) == corp_command_result::applied;
+}
+
+bool rival_hire_ship(world& w, const recipe_registry& reg, entity_id nation, const std::vector<entity_id>& ports, float budget, int tick)
+{
+    const sea_params& sp = reg.military().sea;
+    const rival_sea_view view = read_rival_sea(w, nation);
+    bool owns_transport = false;
+    for (const auto& [sid, s] : w.ships)
+        owns_transport |= s.owner == nation && ship_class_of(s) == ship_class::transport;
+    bool cargo_in_reach = false;
+    for (const uint32_t p : sea_provinces_in_range(w, nation, sp.cls[static_cast<std::size_t>(ship_class::submarine)].range))
+        cargo_in_reach |= view.hostile_cargo.count(p) != 0;
+    int       best_row  = -1;
+    double    best      = 0.0;
+    entity_id best_tile = null_entity;
+    for (const uint16_t row : available_ship_rows(w, nation)) // ascending
+    {
+        const ship_class c = ship_roster_table()[row].cls;
+        double value = 0.0;
+        switch (c)
+        {
+            case ship_class::destroyer: value = 2.0; break;
+            case ship_class::capital:   value = 1.5; break;
+            case ship_class::submarine: value = cargo_in_reach ? 1.5 : 0.0; break;
+            case ship_class::transport: value = owns_transport ? 0.0 : 1.0; break;
+            default: break;
+        }
+        const float price = sp.cls[static_cast<std::size_t>(c)].hire_cost;
+        const hire_goods_reading g = read_ship_hire_goods(w, reg, nation, row);
+        if (value <= 0.0 || price <= 0.0f || !g.goods_ok || budget < price + g.price_bound)
+            continue;
+        entity_id tile = null_entity;
+        for (const entity_id port : ports) // ascending: the lowest the door admits
+            if (hire_ship_check(w, reg, nation, w.buildings.at(port).tile, row) == corp_command_result::applied)
+            {
+                tile = w.buildings.at(port).tile;
+                break;
+            }
+        if (tile == null_entity)
+            continue;
+        const double score = value / static_cast<double>(price);
+        if (score > best)
+        {
+            best = score; best_row = row; best_tile = tile;
+        }
+    }
+    if (best_row < 0)
+        return false;
+    rival_fit_ship_design(w, reg, nation, ship_roster_table()[static_cast<std::size_t>(best_row)].cls, tick);
+    corp_command cmd;
+    cmd.tick = tick; cmd.corp = nation; cmd.as_nation = nation;
+    cmd.verb = corp_verb::hire_ship; cmd.tile = best_tile;
+    cmd.unit_type = static_cast<uint16_t>(best_row);
+    return apply_corp_command(w, reg, cmd) == corp_command_result::applied;
+}
+
+/// The land hire: the row of best power per credit the base door and the goods admit.
+bool rival_hire_land(world& w, const recipe_registry& reg, entity_id nation, entity_id base_tile, float budget, int tick)
+{
+    const auto& table = unit_roster_table();
+    int best = -1;
+    double best_score = 0.0;
+    for (const roster_row* row : available_rows(w, nation, campaign_roster_band_for(reg.era())))
+    {
+        const auto idx = static_cast<uint16_t>(row - table.data());
+        if (roster_row_obsolete(w, nation, idx) || (row->domains & domain_bit(traversal_domain::land)) == 0
+            || hire_unit_check(w, reg, nation, base_tile, idx) != corp_command_result::applied)
+            continue;
+        const float price = land_row_price(reg, idx);
+        const hire_goods_reading g = read_land_hire_goods(w, nation, idx);
+        const float all_in = price + g.price_bound;
+        if (!g.goods_ok || all_in <= 0.0f || budget < all_in)
+            continue;
+        const double score = static_cast<double>(std::max(1, static_cast<int>(row->power_mod))) / static_cast<double>(all_in);
+        if (score > best_score)
+        {
+            best_score = score;
+            best = idx;
+        }
+    }
+    if (best < 0)
+        return false;
+    corp_command cmd;
+    cmd.tick = tick; cmd.corp = nation; cmd.as_nation = nation;
+    cmd.verb = corp_verb::hire_unit; cmd.tile = base_tile; cmd.unit_type = static_cast<uint16_t>(best);
+    return apply_corp_command(w, reg, cmd) == corp_command_result::applied;
+}
+
+} // namespace
+
+float nation_force_value(const world& w, const recipe_registry& reg, entity_id nation)
+{
+    float v = 0.0f;
+    for (const auto& [uid, u] : w.units)
+        if (u.owner == nation && u.count > 0)
+            v += land_row_price(reg, u.type);
+    for (const muster_order& m : w.musters)
+        if (m.owner == nation)
+            v += land_row_price(reg, m.unit_type);
+    for (const auto& [wid, wg] : w.wings)
+        if (wg.owner == nation)
+            v += reg.military().air.cls[static_cast<std::size_t>(air_roster_table()[wg.type].cls)].hire_cost;
+    for (const auto& [sid, s] : w.ships)
+        if (s.owner == nation)
+        {
+            v += reg.military().sea.cls[static_cast<std::size_t>(ship_class_of(s))].hire_cost;
+            for (const auto& [uid, u] : s.aboard)
+                v += land_row_price(reg, u.type);
+        }
+    return v;
+}
+
+float nation_force_income(const nation_component& nc)
+{
+    const auto& returns = nc.returns;
+    const int n = std::min<int>(k_force_income_returns, static_cast<int>(returns.size()));
+    float sum = 0.0f;
+    for (int i = 0; i < n; ++i)
+    {
+        const quarterly_return& q = returns[returns.size() - 1 - static_cast<std::size_t>(i)];
+        sum += q.income + q.taxes - q.expenditure - q.maintenance - q.wages;
+    }
+    return n > 0 ? std::max(0.0f, sum / static_cast<float>(n)) : 0.0f;
+}
+
+force_reading read_nation_force(const world& w, const recipe_registry& reg, entity_id nation,
+                                const std::map<entity_id, std::set<entity_id>>& borders)
+{
+    force_reading r;
+    const auto nit = w.nations.find(nation);
+    if (nit == w.nations.end())
+        return r;
+    r.income = nation_force_income(nit->second);
+    const theatre_cost c = nation_running_by_theatre(w, reg, nation);
+    r.running = c.land + c.air + c.sea;
+    r.own_value = nation_force_value(w, reg, nation);
+    std::set<entity_id> neighbours;
+    if (const auto bit = borders.find(nation); bit != borders.end())
+        neighbours = bit->second;
+    for (const auto& [a, b] : w.corp_hostile_pairs)
+    {
+        if (a == nation) neighbours.insert(b);
+        if (b == nation) neighbours.insert(a);
+    }
+    float largest = 0.0f;
+    for (const entity_id other : neighbours) // the one read of another nation: its total
+        if (other != nation && w.nations.find(other) != w.nations.end())
+            largest = std::max(largest, nation_force_value(w, reg, other));
+    r.threat = largest / std::max(1.0f, r.own_value);
+    const float climb = std::clamp((r.threat - 1.0f) / k_force_threat_span, 0.0f, 1.0f);
+    r.share = k_force_base_share + (k_force_max_share - k_force_base_share) * climb;
+    r.target = r.income * r.share;
+    return r;
+}
+
+void score_nation_force(world& w, const recipe_registry& reg, entity_id nation, int tick,
+                        const std::map<entity_id, std::set<entity_id>>& borders)
+{
+    if (nation == null_entity || nation == player_nation(w) || w.nations.find(nation) == w.nations.end())
+        return;
+    const force_reading r = read_nation_force(w, reg, nation, borders);
+    if (!(r.target > 0.0f) || r.running >= r.target)
+        return; // at or over target it hires nothing and disbands nothing
+    // The shortfall sets how much of the uncommitted treasury may arm; the rest builds.
+    float budget = (1.0f - r.running / r.target) * state_uncommitted_treasury(w, nation);
+    float room   = r.target - r.running;
+
+    // What it has to hire at.
+    entity_id airbase = null_entity, base_tile = null_entity, base_id = null_entity;
+    if (const std::vector<entity_id>* assets = assets_of(w, nation))
+        for (const entity_id bid : *assets)
+        {
+            const auto bit = w.buildings.find(bid);
+            if (bit == w.buildings.end() || bit->second.ticks_remaining > 0 || bit->second.decommissioned)
+                continue;
+            if (bit->second.type == building_type::airbase && (airbase == null_entity || bid < airbase))
+                airbase = bid;
+            if (bit->second.type == building_type::military_base && (base_id == null_entity || bid < base_id))
+            {
+                base_id = bid;
+                base_tile = bit->second.tile;
+            }
+        }
+    const std::vector<entity_id> ports = own_standing_ports(w, nation);
+    const theatre_parts parts = nation_theatre_parts(w, nation, airbase);
+    const theatre_cost held = nation_running_by_theatre(w, reg, nation);
+
+    // A theatre under its part hires first: the largest fraction still unfilled.
+    std::array<std::pair<float, int>, 3> order{{
+        {parts.land > 0.0f ? held.land / (r.target * parts.land) : 2.0f, 0},
+        {parts.air > 0.0f ? held.air / (r.target * parts.air) : 2.0f, 1},
+        {parts.sea > 0.0f ? held.sea / (r.target * parts.sea) : 2.0f, 2},
+    }};
+    std::sort(order.begin(), order.end());
+    for (const auto& [filled, theatre] : order)
+    {
+        if (filled >= 1.0f || budget <= 0.0f || room <= 0.0f)
+            continue;
+        const float before = state_uncommitted_treasury(w, nation);
+        const float running_before = nation_running_by_theatre(w, reg, nation).land
+            + nation_running_by_theatre(w, reg, nation).air + nation_running_by_theatre(w, reg, nation).sea;
+        bool hired = false;
+        if (theatre == 0 && base_tile != null_entity)
+            hired = rival_hire_land(w, reg, nation, base_tile, budget, tick);
+        else if (theatre == 1 && airbase != null_entity)
+            hired = rival_hire_wing(w, reg, nation, airbase, budget, tick);
+        else if (theatre == 2 && !ports.empty())
+            hired = rival_hire_ship(w, reg, nation, ports, budget, tick);
+        if (hired)
+        {
+            budget -= before - state_uncommitted_treasury(w, nation);
+            const theatre_cost now = nation_running_by_theatre(w, reg, nation);
+            room -= now.land + now.air + now.sea - running_before;
         }
     }
 }
@@ -2992,6 +3781,7 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
         return *pending_ctx;
     };
 
+    std::optional<std::map<entity_id, std::set<entity_id>>> force_borders; // BL-1552: built once a step, if any nation is due
     for (std::size_t index = 0; index < corp_ids.size(); ++index)
     {
         const entity_id corp = corp_ids[index];
@@ -3070,6 +3860,20 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
         // spectate), and score_nation_embargo refuses the seated player's nation itself.
         if (actor.is_nation && tick >= k_campaign_settle_ticks)
             score_nation_embargo(w, reg, corp, tick, p.spectating);
+
+        // BL-1533 (AI_OPPONENT.md § 11, "Rival nations sail fleets", Ben 2026-11-05,
+        // read 2026-11-08): its own ports, ships and landings. Past the player guard
+        // above, and score_nation_sea refuses the player's nation itself as well.
+        // BEFORE defence and the fronts (Ben, 2026-11-08: a landing force): a unit
+        // it marches to a ready transport is no longer idle when they look.
+        if (actor.is_nation && tick >= k_campaign_settle_ticks) // BL-1552: live play only, as the fronts
+        {
+            if (!force_borders.has_value())
+                force_borders = nation_land_borders(w);
+            score_nation_force(w, reg, corp, tick, *force_borders);
+        }
+        if (actor.is_nation)
+            score_nation_sea(w, reg, corp, tick);
 
         if (actor.is_nation && tick >= k_campaign_settle_ticks)
             score_nation_defence(w, reg, corp, tick); // BL-1504: before the front's assign

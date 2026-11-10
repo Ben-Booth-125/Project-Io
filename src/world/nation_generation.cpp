@@ -4,6 +4,8 @@
 #include "hex_neighbors.hpp"    // BL-571: garrison border-tile adjacency
 #include "logistic_points.hpp"  // BL-1452: lp_coverage_at - a garrison is posted where its network covers
 #include "battle_system.hpp"    // BL-1452: class_wall, unit_in_battle - the repost respects walls and fights
+#include "corp_ai.hpp"          // BL-1617: nation_force_income, k_force_max_share
+#include "nation_step.hpp"      // BL-1617: nation_wage_bill
 #include "recipe_registry.hpp"  // military_capability_params
 #include "logistics.hpp"        // BL-571: body_tile_grid, for the same
 #include "nation_ai.hpp"        // BL-571: nation_grudge, the highest-grudge pick
@@ -2591,6 +2593,93 @@ int unit_tile_cover_permille(world& w, unit_draw_memo& memo, entity_id nation, e
     }
     memo.cover.emplace(std::make_pair(nation, tile), cover);
     return cover;
+}
+
+garrison_income_report size_garrisons_to_income(world& w, const recipe_registry& reg,
+                                                const nation_garrison_params& p)
+{
+    garrison_income_report rep;
+    const unit_upkeep_params& up = reg.military().upkeep;
+
+    // Per minor, ascending: the capital post first, then the border posts by unit id.
+    std::map<entity_id, std::vector<world::generated_garrison>> posts;
+    for (const world::generated_garrison& g : w.gen_garrisons)
+        if (const auto n = w.nations.find(g.nation); n != w.nations.end() && !n->second.is_major)
+            posts[g.nation].push_back(g);
+
+    std::set<entity_id> removed;
+    for (auto& [nation, list] : posts)
+    {
+        std::sort(list.begin(), list.end(),
+                  [](const world::generated_garrison& a, const world::generated_garrison& b) {
+                      const bool ac = a.guarded == null_entity, bc = b.guarded == null_entity;
+                      return ac != bc ? ac : a.unit < b.unit;
+                  });
+        ++rep.nations;
+
+        // What its income pays, less any force that is not one of these garrisons.
+        float garrison_bill = 0.0f;
+        int   men = 0;
+        for (const world::generated_garrison& g : list)
+            if (const auto u = w.units.find(g.unit); u != w.units.end())
+            {
+                garrison_bill += resolve_unit_upkeep(u->second, up).credits;
+                men += u->second.count;
+            }
+        if (men <= 0)
+            continue;
+        const float per_head = garrison_bill / static_cast<float>(men);
+        const float others   = std::max(0.0f, nation_wage_bill(w, reg, nation) - garrison_bill);
+        const float pay      = std::max(0.0f, nation_force_income(w.nations.at(nation)) * k_force_max_share - others);
+        int men_left = per_head > 0.0f ? static_cast<int>(pay / per_head) : men;
+
+        bool first = true;
+        int  posts_left = static_cast<int>(list.size());
+        for (const world::generated_garrison& g : list)
+        {
+            const auto uit = w.units.find(g.unit);
+            if (uit == w.units.end())
+            {
+                --posts_left;
+                continue;
+            }
+            unit_component& u = uit->second;
+            rep.men_before += u.count;
+            int keep = first ? std::max(men_left, p.min_count) : men_left / posts_left;
+            keep = std::min(keep, u.count);
+            if (!first && keep < p.min_count)
+            {
+                if (u.front == null_entity && u.order.dest == null_entity && !unit_in_battle(w, g.unit))
+                {
+                    w.units.erase(uit);
+                    w.forget_air_unit(g.unit);
+                    removed.insert(g.unit);
+                    ++rep.dropped;
+                    --posts_left;
+                    continue;
+                }
+                keep = u.count; // the front or the fight holds it
+            }
+            if (keep < u.count)
+                ++rep.trimmed;
+            u.count = keep;
+            rep.men_after += keep;
+            men_left = std::max(0, men_left - keep);
+            --posts_left;
+            first = false;
+        }
+    }
+    w.gen_garrisons.erase(std::remove_if(w.gen_garrisons.begin(), w.gen_garrisons.end(),
+                                         [&](const world::generated_garrison& g) { return removed.count(g.unit) != 0; }),
+                          w.gen_garrisons.end());
+    return rep;
+}
+
+void print_garrison_income(const garrison_income_report& r)
+{
+    std::printf("[garrisons to income] %d minor(s): %d trimmed, %d border garrison(s) stood down; men %d -> %d\n",
+                r.nations, r.trimmed, r.dropped, r.men_before, r.men_after);
+    std::fflush(stdout);
 }
 
 garrison_repost_report repost_garrisons_on_cover(world& w, const military_capability_params* mil)

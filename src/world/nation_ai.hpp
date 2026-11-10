@@ -7,6 +7,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <map>
+#include <set>
 #include <vector>
 
 struct world;
@@ -371,6 +372,9 @@ research_ai_pick choose_research_node(const world& w, const recipe_registry& reg
 /// Whether @p nation's queue holds no entry research can flow into — empty, or
 /// only quests waiting on unmet deeds. The pick runs only then.
 bool research_queue_idle(const world& w, entity_id nation);
+
+/// BL-1552: each nation's land neighbours, by shared tile edges. Ascending at both levels.
+std::map<entity_id, std::set<entity_id>> nation_land_borders(const world& w);
 
 /// The quarterly pass: for every nation (ascending id) whose queue is idle,
 /// queue `choose_research_node`'s pick through `enqueue_node`. NEVER the

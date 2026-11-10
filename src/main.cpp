@@ -195,6 +195,7 @@ int run_serve(int ticks, long long as_corp, bool as_any)
         // queue" finding. Local to this tick; never persisted.
         // BL-1266: advance -> arrivals -> economy -> trade -> clearing (app.cpp's order).
         advance_convoys(w);
+        raid_convoys(w, reg, t); // BL-1529: reads the sweep the arrivals spend
         credit_arrived_convoys(w, t);
         economy_report report = run_economy_step(w, reg, /*spectating=*/false);
         run_trades(w, reg, report); // BL-1266: trade, before the clear
@@ -320,6 +321,7 @@ int run_blackboard_export(const std::string& which, const std::string& out_dir, 
         // per tick for both the passive (convoy) and active (march) draws.
         // BL-1266: advance -> arrivals -> economy -> trade -> clearing (app.cpp's order).
         advance_convoys(w);
+        raid_convoys(w, reg, t); // BL-1529: reads the sweep the arrivals spend
         credit_arrived_convoys(w, t);
         economy_report report = run_economy_step(w, reg, /*spectating=*/false);
         run_trades(w, reg, report); // BL-1266: trade, before the clear

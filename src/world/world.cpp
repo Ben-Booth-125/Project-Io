@@ -456,6 +456,11 @@ uint64_t world::state_hash(int tick) const
                 fnv1a_u32(h, 0x524B4954u); // "RKIT"
                 for (const uint8_t v : u.refit_kit.fit) fnv1a_u32(h, v);
             }
+            if (u.landing_ship != null_entity) // BL-1531: only in a contested landing
+            {
+                fnv1a_u32(h, 0x53555246u); // "SURF"
+                fnv1a_u32(h, u.landing_ship);
+            }
         }
     }
 
@@ -668,6 +673,77 @@ uint64_t world::state_hash(int tick) const
             for (const uint32_t p : wg.provinces) fnv1a_u32(h, p);
         }
     }
+    // BL-1430 (MILITARY.md § Sea): folded only when non-empty, so a world with no ship
+    // hashes exactly as before.
+    if (!ships.empty())
+    {
+        fnv1a_u32(h, 0x53484950u); // "SHIP"
+        fnv1a_u32(h, static_cast<uint32_t>(ships.size()));
+        for (const auto& [sid, s] : ships) // std::map: ascending id
+        {
+            fnv1a_u32(h, sid);
+            fnv1a_u32(h, s.owner);
+            fnv1a_u32(h, s.home_port);
+            fnv1a_u32(h, s.tile);
+            fnv1a_u32(h, s.type);
+            fnv1a_i32(h, s.hp_ppm);
+            fnv1a_i32(h, s.morale_permille);
+            fnv1a_i32(h, s.supply_factor_permille);
+            fnv1a_i32(h, s.muster_days);
+            fnv1a_u32(h, s.refitting ? 1u : 0u);
+            fnv1a_i32(h, s.sail_bank_permille);
+            fnv1a_u32(h, s.returning ? 1u : 0u);
+            for (const uint8_t v : s.kit.fit) fnv1a_u32(h, v);
+            fnv1a_u32(h, static_cast<uint32_t>(s.mission));
+            fnv1a_u32(h, static_cast<uint32_t>(s.provinces.size()));
+            for (const uint32_t p : s.provinces) fnv1a_u32(h, p);
+            fnv1a_u32(h, static_cast<uint32_t>(s.route.size()));
+            for (const entity_id t : s.route) fnv1a_u32(h, t);
+            if (s.landing_tile != null_entity || !s.aboard.empty()) // BL-1531
+            {
+                fnv1a_u32(h, 0x4C414E44u); // "LAND"
+                fnv1a_u32(h, s.landing_tile);
+                fnv1a_i32(h, s.landing_days);
+                fnv1a_u32(h, static_cast<uint32_t>(s.aboard.size()));
+                for (const auto& [uid, u] : s.aboard)
+                {
+                    fnv1a_u32(h, uid);
+                    fnv1a_u32(h, u.owner);
+                    fnv1a_i32(h, u.count);
+                    fnv1a_u32(h, u.type);
+                    fnv1a_i32(h, u.supply_factor_permille);
+                    fnv1a_u32(h, u.muster_base);
+                    fnv1a_i32(h, u.establishment);
+                    fnv1a_i32(h, u.readiness_permille);
+                    fnv1a_i32(h, u.morale_permille);
+                    for (const uint8_t v : u.kit.fit) fnv1a_u32(h, v);
+                    fnv1a_i32(h, u.food_permille);
+                    fnv1a_i32(h, u.ammo_permille);
+                    fnv1a_i32(h, u.equipment_permille);
+                    fnv1a_i32(h, u.starvation_carry);
+                    fnv1a_i32(h, u.food_remainder);
+                    fnv1a_i32(h, u.ammo_remainder);
+                    fnv1a_i32(h, u.equipment_remainder);
+                    fnv1a_i32(h, u.lp_share_permille);
+                }
+            }
+        }
+    }
+    if (!closed_ports.empty()) // BL-1530: only when non-empty, as the ships are
+    {
+        fnv1a_u32(h, 0x43504F52u); // "CPOR"
+        for (const entity_id t : closed_ports) // std::set: ascending
+            fnv1a_u32(h, t);
+    }
+    if (!sea_sightings.empty()) // BL-1533: only when non-empty, as the ships are
+    {
+        fnv1a_u32(h, 0x53534545u); // "SSEE"
+        for (const auto& [viewer, ship] : sea_sightings) // std::set: ascending pairs
+        {
+            fnv1a_u32(h, viewer);
+            fnv1a_u32(h, ship);
+        }
+    }
     if (!air_superiority.empty())
     {
         fnv1a_u32(h, 0x41535550u); // "ASUP"
@@ -709,6 +785,25 @@ uint64_t world::state_hash(int tick) const
             for (const entity_id nid : designed)
             {
                 const std::vector<uint16_t>& v = nations.at(nid).air_design_kit;
+                fnv1a_u32(h, nid);
+                fnv1a_u32(h, static_cast<uint32_t>(v.size()));
+                for (const uint16_t r : v) fnv1a_u32(h, r);
+            }
+        }
+    }
+    {
+        // BL-1527: folded only when a nation holds one, as the air designs are.
+        std::vector<entity_id> designed;
+        for (const auto& [nid, nc] : nations)
+            if (!nc.ship_design_kit.empty())
+                designed.push_back(nid);
+        if (!designed.empty())
+        {
+            std::sort(designed.begin(), designed.end());
+            fnv1a_u32(h, 0x53445347u); // "SDSG"
+            for (const entity_id nid : designed)
+            {
+                const std::vector<uint16_t>& v = nations.at(nid).ship_design_kit;
                 fnv1a_u32(h, nid);
                 fnv1a_u32(h, static_cast<uint32_t>(v.size()));
                 for (const uint16_t r : v) fnv1a_u32(h, r);

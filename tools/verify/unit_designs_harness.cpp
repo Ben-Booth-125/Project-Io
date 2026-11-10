@@ -290,13 +290,17 @@ int main()
                 const char* nid = io::dg::nodes[static_cast<std::size_t>(e.node)].id;
                 const uint16_t li = kit_item_by_id(e.target);
                 const uint16_t ai = air_kit_item_by_id(e.target);
+                const uint16_t si = ship_kit_item_by_id(e.target); // BL-1528 (naval branch)
                 const char* named = li != k_no_kit_item ? cat[li].research_node
-                                  : ai != k_no_kit_item ? air_kit_catalogue()[ai].research_node : nullptr;
+                                  : ai != k_no_kit_item ? air_kit_catalogue()[ai].research_node
+                                  : si != k_no_kit_item ? ship_kit_catalogue()[si].research_node : nullptr;
                 if (named == nullptr || std::strcmp(named, nid) != 0) ++bad;
             }
             int air_later = 0;
             for (const air_kit_item& it : air_kit_catalogue()) if (it.research_node != nullptr) ++air_later;
-            check(bad == 0 && rows == later + air_later,
+            int ship_later = 0;
+            for (const ship_kit_item& it : ship_kit_catalogue()) if (it.research_node != nullptr) ++ship_later;
+            check(bad == 0 && rows == later + air_later + ship_later && ship_later == 22,
                   "U1h the tree's " + std::to_string(rows) + " unlock_kit rows are exactly the catalogue's later items, each on its own node");
         }
         check(cat.size() < k_no_kit_item && kit_item_by_id("inf.weapon.assault_rifle") != k_no_kit_item
@@ -390,12 +394,12 @@ int main()
         check(r == corp_command_result::applied && f.w.musters.size() == 1 && f.w.musters[0].kit == d,
               "U4a the hire applies and its muster carries the live design");
         // BL-1422: assault rifle 2 small arms; flak vest 1 small arms.
-        check(near(shelf(f, resource_type::small_arms), 97.0f) && near(shelf(f, resource_type::steel), 100.0f)
+        check(near(shelf(f, resource_type::small_arms), 95.0f) && near(shelf(f, resource_type::steel), 100.0f)
                   && near(shelf(f, resource_type::alloys), 100.0f) && near(shelf(f, resource_type::electronics), 100.0f),
-              "U4b it buys the kit's goods: 3 small arms, and no raw steel or alloys");
+              "U4b it buys its class's 2 small arms and the kit's 3, and no raw steel or alloys");
         const float hire_cost = reg.military().hire_base_cost
             + reg.military().hire_cost_per_power * static_cast<float>(unit_roster_table()[rifle].power_mod);
-        check(near(tre - f.w.nations.at(f.nation).treasury, hire_cost + 3.0f * 10.0f),
+        check(near(tre - f.w.nations.at(f.nation).treasury, hire_cost + 5.0f * 10.0f),
               "U4c and pays the hire price plus the goods (" + std::to_string(tre - f.w.nations.at(f.nation).treasury) + " cr)");
         f.w.musters[0].days_remaining = 0;
         advance_musters(f.w);
@@ -418,8 +422,13 @@ int main()
               "U4f a hire whose kit the shelves cannot supply is refused rejected_funds, nothing changed");
         fixture k;
         build(k, /*shelf=*/1.0f);
-        check(hire(k, reg, rifle) == corp_command_result::applied && k.w.musters[0].kit.is_base(),
-              "U4g the same shelves raise a base-kit hire (base kit buys no goods)");
+        check(hire(k, reg, rifle) == corp_command_result::rejected_funds,
+              "U4g a base-kit hire is refused on a shelf short of its class's equipment (BL-1551)");
+        fixture k2;
+        build(k2, /*shelf=*/2.0f);
+        check(hire(k2, reg, rifle) == corp_command_result::applied && k2.w.musters[0].kit.is_base()
+                  && near(shelf(k2, resource_type::small_arms), 0.0f),
+              "U4h its class's 2 small arms on the shelf raise it, and it takes them");
     }
 
     std::printf("\nU5p - a design refit pays its kit goods' price (BL-1447)\n");

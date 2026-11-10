@@ -28,6 +28,7 @@
 
 #include "world/battle_system.hpp"
 #include "world/nation_step.hpp" // BL-577: contract_dispatch — the mercenary-contract sibling below
+#include "world/supply_system.hpp" // BL-1529: interception_record
 
 #include <string>
 
@@ -40,6 +41,11 @@ struct world;
 /// dispatch with a hole in it reads as a bug and this layer must never be the
 /// thing that looks broken.
 std::string battle_dispatch_line(const world& w, const battle_dispatch& d);
+
+/// BL-1529 (LOGISTICS.md § 7): the line one interception reads as to @p me, its owner or
+/// its taker, and empty to anyone else: a rival's loss to a rival is not the player's news.
+/// A raider the owner has not detected is named as "an unseen raider".
+std::string interception_line(const world& w, const interception_record& r, entity_id me);
 
 /// The phase word both surfaces share (BL-468's "the same vocabulary keys the
 /// battle card's phase readout, so the two surfaces never disagree").

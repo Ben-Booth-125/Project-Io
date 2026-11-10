@@ -1,5 +1,37 @@
 # REFINED — active worklist
 
+## Sprint 64 — the war at sea (opened 2026-11-06)
+
+Runs beside sprint 63. The core has no money dependency; the sea trade reading and the tuning wait on
+63's economy wave.
+
+### BL-1533 (rival fleets)
+
+- [x] Sightings: per-nation found set, written by the sea day, saved in the v81 tail, hashed.
+- [x] Design door open to any nation for its own designs; rival kit pick.
+- [x] `score_nation_sea`: hire, missions, embark, land; wired after the air pass.
+- [x] Research scorer: ship kit weighted by own ports and ships.
+- [x] Harness `rival_fleet_census`: who raises, assigns, embarks, lands, over the library.
+- [x] Cold review; fix round (no unit stranded aboard); ACTIONS.json / docs.
+- [x] Ben's census calls (2026-11-08): the landing force (march, then one hire at the base); the scorer checks goods.
+- [x] The ship cap: replaced by force sizing (Ben, 2026-11-08).
+
+### BL-1550 (force pay)
+
+- [x] Flat wage bill on the treasury; crews paid at the same wage; short payment weakens all.
+
+### BL-1551 (force equipment)
+
+- [x] Base-kit equipment per land class, drawn at hire and on refill.
+- [x] A wing's recruit brings its equipment; check a ship's mend draws its share.
+- [x] Majors open with three Arms Works; every nation opens with a reserve.
+
+### BL-1552 (force sizing)
+
+- [x] Running cost, income, threat, target share, shortfall share, split by position.
+- [x] Hire one per theatre an evaluation; land hire restored; retire the caps.
+- [x] Census: force against income and neighbours over the library; settle the numbers.
+
 ## Sprint 63 — UI, QOL and the opening (opened 2026-11-05)
 
 Scoped by Ben's 24-item playtest. The opening climb leads. Seven lanes run in worktrees; the main

@@ -368,21 +368,34 @@ inline constexpr uint32_t save_game_magic =
 /// so every resource_count-wide envelope array is one element longer. v24 stays readable
 /// with every such array read 54 wide (`k_resource_count_pre_airframes`), airframes empty;
 /// v23 and v22 still 49 wide.
+///
+/// LAYOUT 26 (BL-1527, the seventh kit good, ship hulls; written on the naval branch):
+/// `resource_count` moved 55 -> 56, so every resource_count-wide envelope array is one element
+/// longer. No report tail. Read with every such array 56 wide.
+///
 /// LAYOUT 27 (SAVE_BUILDING_REPORT, Ben 2026-11-09) = LAYOUT 25 PLUS ONE RECORD AT THE
-/// ENVELOPE'S TAIL, after the nation targets. 27 and not 26 because an unmerged branch
-/// (claude/naval-warfare-system-b0d978, BL-1527 ship kit) already carries a v26 layout
-/// of its own (the v6 note above: two layouts never share a number); whoever merges
-/// second stacks the two. The tail: the last economy report's read slice and
+/// ENVELOPE'S TAIL, after the nation targets: the last economy report's read slice and
 /// the corp standings (part 5 above), written by `w_last_report` / read by
-/// `r_last_report`. At the tail so v25 is a strict prefix: a v25 (or older accepted)
-/// stream ends before it and opens with an empty report, exactly as every load did
-/// before v27. The rebuilt indices (`building_row`, `logistic_points.fraction` and
-/// `.supply_share`) are never on disk.
-inline constexpr uint32_t save_game_version = 27; // SAVE_BUILDING_REPORT: the last report at the tail
-/// The first layout carrying the last economy report (part 5).
+/// `r_last_report`. 55 wide (it was written off v25, beside the naval branch's v26). At the
+/// tail so v25 is a strict prefix: a v25 (or v26, or older accepted) stream ends before it
+/// and opens with an empty report, exactly as every load did before v27. The rebuilt indices
+/// (`building_row`, `logistic_points.fraction` and `.supply_share`) are never on disk.
+///
+/// LAYOUT 29 (the naval merge; 28 is held by the in-flight space-mechanics branch) = v26's
+/// width with v27's tail: every resource_count-wide array 56 wide, and the last report at the
+/// tail. The reader takes v25 (55, no report), v26 (56, no report), v27 (55, report) and v29
+/// (56, report), each at its own width (`envelope_resource_width`).
+inline constexpr uint32_t save_game_version = 29; // the naval merge: 56 wide plus the report tail
+/// The first layout carrying the last economy report (part 5); every later layout carries it.
 inline constexpr uint32_t save_game_version_econ_report = 27;
 /// v25: the v27 layout without the last-report tail.
 inline constexpr uint32_t save_game_version_pre_econ_report = 25;
+/// BL-1527: the naval branch's layout, market history 56 series wide, no report tail.
+inline constexpr uint32_t save_game_version_ship_hulls = 26;
+/// BL-1527: v25, the v26 layout with the market history 55 series wide.
+inline constexpr uint32_t save_game_version_pre_ship_hulls = 25;
+/// The naval merge: the first layout both 56 wide and carrying the report.
+inline constexpr uint32_t save_game_version_stacked = 29;
 /// BL-1436: the first layout whose market history is 55 series wide.
 inline constexpr uint32_t save_game_version_airframes = 25;
 /// BL-1436: v24, the v25 layout with the market history 54 series wide.

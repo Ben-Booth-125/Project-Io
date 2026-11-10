@@ -5,6 +5,9 @@
 #include "icons.hpp"
 #include "presentation.hpp"
 #include "wing_card.hpp"      // BL-1450: the wing marker's card
+#include "ship_card.hpp"      // BL-1534: the ship marker's card
+#include "player_side.hpp"    // owner_display_name
+#include "world/sea_combat.hpp"
 #include "world/air_combat.hpp"
 #include "world/components.hpp"
 #include "world/logistics.hpp" // landform_logistics_cost — the landform's real cost (BL-232)
@@ -373,6 +376,23 @@ void draw_hover_content(const world& w, const ui_state& ui, entity_id eid,
     // No market dispatch: the Planetary canvas's market-centre marker and its
     // hover target retired (Ben, 2026-10-10), so a market never reaches here —
     // under the Market lens the card's subject is the tile (BL-664).
+
+    // BL-1534: a ship's marker. What it is and what it does; a rival's ship names its class
+    // and owner only (BL-068).
+    if (const auto sit = w.ships.find(eid); sit != w.ships.end())
+    {
+        ImGui::TextUnformatted(ship_display_name(w, eid));
+        ImGui::TextDisabled("%s", ship_class_label(ship_class_of(sit->second)));
+        if (ship_is_players(w, eid))
+        {
+            if (reg != nullptr)
+                ImGui::TextDisabled("%s", ship_status_text(w, *reg, eid).c_str());
+            ImGui::TextDisabled("Press to select the ship");
+        }
+        else if (const char* who = owner_display_name(w, sit->second.owner))
+            ImGui::TextDisabled("%s", who);
+        return;
+    }
 
     // BL-1450: an air wing's marker at its airbase. What it is and what it flies;
     // a rival's wing names its class only (BL-068: internals stay private).

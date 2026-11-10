@@ -408,6 +408,31 @@ struct world
     /// wing never stands on a tile, and no land pass may see it. Saved (v65).
     std::map<entity_id, air_wing> wings;
 
+    /// BL-1430 (MILITARY.md § Sea): every ship, keyed by its entity id. ORDERED, so every
+    /// walk is ascending id. Deliberately NOT in `units`: no land pass may see a ship.
+    /// Saved (v80).
+    std::map<entity_id, sea_ship> ships;
+
+    /// BL-1530 (MILITARY.md § Sea, Blockade): the tiles of the ports a blockade has closed.
+    /// Rewritten at the end of each sea day, and the logistics caches dropped whenever it
+    /// changes, on both edges. Derived from the ships, but only with the recipe registry
+    /// their kit is read through, which a load does not have: so it is SAVED (v81), or a
+    /// loaded world would price routes through a closed port until the next day.
+    std::set<entity_id> closed_ports;
+
+    /// BL-1534: the other nations' ships the player's side found on the last sea day, as the
+    /// pass rolled them: what the map draws. A READ FOR THE UI ONLY: nothing in the simulation
+    /// reads it, so it is neither hashed nor saved, and a loaded world draws none until its
+    /// next day.
+    std::set<entity_id> ships_found_by_player;
+
+    /// BL-1533 (MILITARY.md § Sea, "A side's sightings"; Ben, 2026-11-08): (viewer nation,
+    /// ship) for every HOSTILE ship the viewer's side found on the last sea day, rolled or
+    /// revealed by held water. Rewritten each sea day; a sunk or dropped ship leaves it at
+    /// once. The one read of another nation's ships the rival sea scorer is granted, so
+    /// unlike the map's set above it is SIMULATION state: hashed, and saved (v81 tail).
+    std::set<std::pair<entity_id, entity_id>> sea_sightings;
+
     /// BL-1449: each nation's AIR SUPERIORITY power over each province as the last
     /// air day flew it, keyed (province, nation), milli-HP of air attack a day. The
     /// share it gives (`air_share_permille`) scales a side's bombing, slows its

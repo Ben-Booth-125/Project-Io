@@ -768,14 +768,21 @@ player did it. **Capture gives the scorer a number.**
 It also earns BL-315's (armed house conflict spine) third name. Army, mercenary and pirate are three
 *derived* readings of one company; taking cargo is what makes "pirate" the honest one.
 
-**An interception is announced in the same change that resolves it.** A comms message names the
-lane and the interceptor, the convoy's row leaves the Convoys ledger (BL-453, convoys ledger) with
+**An interception is announced in the same change that resolves it.** A comms message on the Field
+channel names the cargo and the interceptor, the convoy's row leaves the Convoys ledger (BL-453, convoys ledger) with
 a stated cause, and the tile is marked for a few ticks. An interception is the most consequential
 thing that can happen to a player's economy without them pressing anything, so silence is the
 wrong default (NR-407).
 
-**A convoy is cargo and cannot be defended.** Assigning a unit to a convoy — turning interception
-into a real battle — is named in BL-458's design and deliberately excluded from it.
+**On land a convoy is cargo and cannot be defended.** Assigning a unit to a convoy — turning
+interception into a real battle — is named in BL-458's design and deliberately excluded from it.
+
+**On the water a raid decides instead (Ben, 2026-11-05).** A ship takes a sea leg by the **raid** mission,
+never by standing on its tile, and an **escort** in the province can stop it; detection decides whether it
+does. A submarine sinks what it takes and a surface raider takes a prize to its nearest own port, so a
+raided cargo does not land under the tile. The friend's immunity, the declared-hostility gate and the
+announcement above all hold. A hostile fleet may also close a port by **blockade**. The rules are
+`../military/MILITARY.md` § Sea's.
 
 **A front at war closes the lanes across it (Ben, 2026-11-05).** Interdiction above is a unit on a
 tile; this is the front itself. Convoys of the nations at war route around it, a neutral third
@@ -1040,6 +1047,8 @@ building's request. Guns, butter and freight still compete in one currency. **Th
 others** — Ben's 2026-09-24 ruling (NR-917), kept with its original subject: the front is supplied,
 and the trade and the factories behind it wait. A campaign visibly starving its own industry is the
 intended, legible cost of keeping an army in the field.
+
+**A lane lands no points on a hostile port (Ben, 2026-11-05; `../military/MILITARY.md` § Sea, landings).** A nation's lane lands no points on a port held by a nation hostile to it, declared either way, so an army that has landed must take a port, and a port it occupies serves it as its own.
 
 **A unit draws off the road, up to 8 tiles from it (Ben, 2026-10-29).** A unit need not stand on
 the network to be supplied. Its request is **paid at the closest road** of its nation's network —

@@ -623,6 +623,28 @@ bool unit_tile_fully_fed(world& w, unit_draw_memo& memo, entity_id nation, entit
 /// 0 past its roads, with the resolver's truncation and its tolerance. The pool is not read:
 /// this is the cover, what the claim is granted while the pool lasts. Memoised in @p memo.
 int unit_tile_cover_permille(world& w, unit_draw_memo& memo, entity_id nation, entity_id tile);
+/// What `size_garrisons_to_income` did, for the finish log and the harnesses.
+struct garrison_income_report
+{
+    int nations = 0;      ///< Minors with generated garrisons.
+    int trimmed = 0;      ///< Garrisons that stand smaller.
+    int dropped = 0;      ///< Border garrisons income could not keep at the minimum.
+    int men_before = 0;
+    int men_after  = 0;
+};
+
+/// BL-1617 (Ben, 2026-11-09; MILITARY.md § Nation garrisons): A MINOR'S GARRISONS ARE
+/// SIZED TO ITS INCOME, at the handoff, once the settle's returns are filed. Income
+/// (`nation_force_income`) times the force ceiling pays the men; the capital garrison is
+/// served first and never falls below @p p.min_count, so a minor with no income keeps one
+/// token garrison; the rest is split evenly over the border posts, and a post that cannot
+/// keep `min_count` men is removed. Only ever shrinks. Majors are fixed by their kit. Runs
+/// before `repost_garrisons_on_cover`, and edits `world::gen_garrisons` in step.
+garrison_income_report size_garrisons_to_income(world& w, const recipe_registry& reg,
+                                                const nation_garrison_params& p = {});
+
+/// One `[garrisons to income]` line for @p r (stdout, flushed).
+void print_garrison_income(const garrison_income_report& r);
 
 /// What `repost_garrisons_on_cover` did, for the finish log and the harnesses.
 struct garrison_repost_report

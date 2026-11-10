@@ -9,6 +9,7 @@
 #include "state_industry.hpp"
 #include "unit_designs.hpp" // BL-1434: the designs section's range checks
 #include "air_combat.hpp"   // BL-1449: air_roster_table — the air section's range checks
+#include "sea_combat.hpp"   // BL-1430: ship_roster_table, the ship section's bound
 #include "carried_supplies.hpp" // BL-1452: k_starvation_days — the stocks section's range check
 #include "war.hpp"         // BL-1459: the war section
 #include "hex_neighbors.hpp" // BL-1502: a front key across the line
@@ -1053,6 +1054,20 @@ void w_id_pair(std::ostream& o, const std::pair<entity_id, entity_id>& k)
 bool r_id_pair(std::istream& i, std::pair<entity_id, entity_id>& k)
 {
     return r_id(i, k.first) && r_id(i, k.second);
+}
+
+/// BL-1533: the sightings the stream carries: a nation's, of a ship the stream writes (one
+/// whose owner is a nation). Ascending, as the set is.
+std::vector<std::pair<entity_id, entity_id>> saved_sightings(const world& w)
+{
+    std::vector<std::pair<entity_id, entity_id>> v;
+    for (const auto& k : w.sea_sightings)
+    {
+        const auto sit = w.ships.find(k.second);
+        if (w.nations.count(k.first) != 0 && sit != w.ships.end() && w.nations.count(sit->second.owner) != 0)
+            v.push_back(k);
+    }
+    return v;
 }
 
 } // namespace
@@ -2115,9 +2130,9 @@ void write_world_snapshot_at(const world& w, std::ostream& out, uint32_t version
             }
     }
 
-    // world_save_version 80 (BL-1539): THE RESEARCH BOOKS, the last section. What the
+    // world_save_version 80 (BL-1539): THE RESEARCH BOOKS (not in the naval branch's v81). What the
     // nation step debited that no return has booked, and each return's booked research.
-    if (version >= k_world_save_version_research_books)
+    if (world_stream_has_research_books(version))
     {
         std::vector<entity_id> ids;
         for (const auto& [nid, nc] : w.nations)
@@ -2137,9 +2152,117 @@ void write_world_snapshot_at(const world& w, std::ostream& out, uint32_t version
         }
     }
 
-    // world_save_version 82 (POPULATION_GROWTH_RATE): THE GROWTH CARRY. Each centre's
-    // fractional thousand heads, only where non-zero.
-    if (version >= k_world_save_version_growth_carry)
+    // world_save_version 81 (BL-1430, MILITARY.md § Sea): THE SHIPS, in v81 and v88 on; after
+    // the research books in a v88 stream. Every ship ascending id. NOT pruned on a lost home port, unlike a wing: a wing with no base
+    // is disbanded anyway, but the upkeep pass re-homes a ship or refunds its hire, so a
+    // prune here would change the game between an erase and the next quarter.
+    if (world_stream_has_naval(version))
+    {
+        const auto ship_ok = [&](const sea_ship& s) { return w.nations.count(s.owner) != 0; };
+        uint32_t live = 0;
+        for (const auto& [sid, s] : w.ships)
+            live += ship_ok(s) ? 1u : 0u;
+        w_u32(out, live);
+        for (const auto& [sid, s] : w.ships)
+        {
+            if (!ship_ok(s))
+                continue;
+            w_id(out, sid);
+            w_id(out, s.owner);
+            w_id(out, s.home_port);
+            w_id(out, s.tile);
+            w_u16(out, s.type);
+            w_i32(out, s.hp_ppm);
+            w_i32(out, s.morale_permille);
+            w_i32(out, s.supply_factor_permille);
+            w_i32(out, s.muster_days);
+            w_i32(out, s.sail_bank_permille);
+            w_u8(out, s.returning ? 1 : 0);
+            // BL-1527: a stream from before ship designs holds base kit, whatever the ship has.
+            for (const uint8_t v : s.kit.fit) w_u8(out, version >= k_world_save_version_ship_kit ? v : uint8_t{0});
+            w_u8(out, static_cast<uint8_t>(s.mission));
+            w_u32(out, static_cast<uint32_t>(s.provinces.size()));
+            for (const uint32_t p : s.provinces) w_u32(out, p);
+            w_u32(out, static_cast<uint32_t>(s.route.size()));
+            for (const entity_id t : s.route) w_id(out, t);
+            if (version >= k_world_save_version_ship_kit) // BL-1527
+                w_u8(out, s.refitting ? 1 : 0);
+            if (version >= k_world_save_version_ship_kit) // BL-1531: the landing, and who is aboard
+            {
+                w_id(out, s.landing_tile);
+                w_i32(out, s.landing_days);
+                w_u32(out, static_cast<uint32_t>(s.aboard.size()));
+                // Embarking cleared the order, front, post, refit and battle carries, and a
+                // unit aboard has no tile, so none of those is written.
+                for (const auto& [uid, u] : s.aboard)
+                {
+                    w_id(out, uid);
+                    w_i32(out, u.count);
+                    w_u16(out, u.type);
+                    w_i32(out, u.supply_factor_permille);
+                    w_id(out, u.muster_base);
+                    w_i32(out, u.establishment);
+                    w_i32(out, u.readiness_permille);
+                    w_i32(out, u.morale_permille);
+                    for (const uint8_t v : u.kit.fit) w_u8(out, v);
+                    w_i32(out, u.food_permille);
+                    w_i32(out, u.ammo_permille);
+                    w_i32(out, u.equipment_permille);
+                    w_i32(out, u.starvation_carry);
+                    w_i32(out, u.food_remainder);
+                    w_i32(out, u.ammo_remainder);
+                    w_i32(out, u.equipment_remainder);
+                    w_i32(out, u.lp_share_permille);
+                }
+            }
+        }
+    }
+
+    // world_save_version 81 (BL-1527, MILITARY.md § Sea): the live ship designs, then the closed
+    // ports (BL-1530), the surf and the sightings; the growth carry follows in a v88 stream. Each designed nation ascending id; the default (base kit) is stored as nothing.
+    if (world_stream_has_naval(version))
+    {
+        std::vector<entity_id> nids;
+        for (const auto& [nid, nc] : w.nations)
+            if (!nc.ship_design_kit.empty())
+                nids.push_back(nid);
+        std::sort(nids.begin(), nids.end());
+        w_u32(out, static_cast<uint32_t>(nids.size()));
+        for (const entity_id nid : nids)
+        {
+            const std::vector<uint16_t>& v = w.nations.at(nid).ship_design_kit;
+            w_id(out, nid);
+            w_u32(out, static_cast<uint32_t>(v.size()));
+            for (const uint16_t id : v) w_u16(out, id);
+        }
+        // BL-1530: the ports a blockade has closed, ascending tile ids.
+        w_u32(out, static_cast<uint32_t>(w.closed_ports.size()));
+        for (const entity_id t : w.closed_ports) w_id(out, t);
+        // BL-1531: the units in the surf, ascending id, each with its transport.
+        std::vector<entity_id> surf;
+        for (const auto& [uid, u] : w.units)
+            if (u.landing_ship != null_entity)
+                surf.push_back(uid);
+        std::sort(surf.begin(), surf.end());
+        w_u32(out, static_cast<uint32_t>(surf.size()));
+        for (const entity_id uid : surf)
+        {
+            w_id(out, uid);
+            w_id(out, w.units.at(uid).landing_ship);
+        }
+        // BL-1533: the sides' sightings, ascending (viewer, ship), closing the section.
+        const std::vector<std::pair<entity_id, entity_id>> seen = saved_sightings(w);
+        w_u32(out, static_cast<uint32_t>(seen.size()));
+        for (const auto& [viewer, ship] : seen)
+        {
+            w_id(out, viewer);
+            w_id(out, ship);
+        }
+    }
+
+    // world_save_version 82 (POPULATION_GROWTH_RATE): THE GROWTH CARRY, after the naval
+    // sections in a v88 stream. Each centre's fractional thousand heads, only where non-zero.
+    if (world_stream_has_growth_carry(version))
     {
         std::vector<entity_id> cids;
         for (const auto& [cid, pc] : w.population_centres)
@@ -2156,7 +2279,7 @@ void write_world_snapshot_at(const world& w, std::ostream& out, uint32_t version
 
     // world_save_version 83 (BL-1562): THE ENDED NATIONS, the last section, after the
     // v82 carry. Every ended nation, ascending id.
-    if (version >= k_world_save_version_ended)
+    if (world_stream_has_ended(version))
     {
         std::vector<entity_id> ids;
         for (const auto& [nid, nc] : w.nations)
@@ -2196,6 +2319,88 @@ std::size_t world_save_ended_section_bytes(const world& w)
     for (const auto& [nid, nc] : w.nations)
         if (nc.ended)
             n += 4;
+    return n;
+}
+
+void write_world_snapshot_pre_ship_kit(const world& w, std::ostream& out)
+{
+    // VERIFICATION ONLY (BL-1527): the v80 stream shape - arrays 55 wide, no naval section.
+    write_world_snapshot_at(w, out, k_world_save_version_pre_ship_kit);
+}
+
+void write_world_snapshot_naval_v81(const world& w, std::ostream& out)
+{
+    // VERIFICATION ONLY (the naval merge): the naval branch's v81 shape - 56 wide, the naval
+    // sections after v79's, no research books, growth carry or ended nations.
+    write_world_snapshot_at(w, out, k_world_save_version_ship_kit);
+}
+
+void write_world_snapshot_pre_stacked(const world& w, std::ostream& out)
+{
+    // VERIFICATION ONLY (the naval merge): the v83 shape - 55 wide, no naval section.
+    write_world_snapshot_at(w, out, k_world_save_version_ended);
+}
+
+namespace {
+/// BL-1531: what a ship's record carries for its landing, in the v81 stream.
+std::size_t ship_landing_bytes(const sea_ship& s)
+{
+    return 4 + 4 + 4 + s.aboard.size() * (4 + 4 + 2 + 4 + 4 + 4 + 4 + 4 + k_kit_slot_max + 4 * 8);
+}
+
+/// BL-1531: the surf list, which closes the v81 section.
+std::size_t surf_section_bytes(const world& w)
+{
+    std::size_t n = 4;
+    for (const auto& [uid, u] : w.units)
+        n += u.landing_ship != null_entity ? 8u : 0u;
+    return n;
+}
+
+/// BL-1533: the sightings section, which closes the v81 tail.
+std::size_t sightings_section_bytes(const world& w)
+{
+    return 4 + 8 * saved_sightings(w).size();
+}
+
+std::size_t ship_design_section_bytes(const world& w)
+{
+    std::size_t n = 4;
+    for (const auto& [nid, nc] : w.nations)
+        if (!nc.ship_design_kit.empty())
+            n += 4 + 4 + 2 * nc.ship_design_kit.size();
+    return n;
+}
+} // namespace
+
+std::size_t world_save_ship_hulls_bytes(const world& w)
+{
+    // The v83 stream (55 wide, no naval section) against today's v88: they differ by the
+    // column and the naval sections, nothing else.
+    std::ostringstream wide(std::ios::binary), narrow(std::ios::binary);
+    write_world_snapshot(w, wide);
+    write_world_snapshot_pre_stacked(w, narrow);
+    return wide.str().size() - narrow.str().size() - world_save_ships_section_bytes(w);
+}
+
+void write_world_snapshot_pre_ships(const world& w, std::ostream& out)
+{
+    // VERIFICATION ONLY (BL-1430): the v79 stream shape - no ship section.
+    write_world_snapshot_at(w, out, k_world_save_version_pre_ships);
+}
+
+// BL-1527: the naval sections whole, from the ship count to the sightings.
+std::size_t world_save_ships_section_bytes(const world& w)
+{
+    std::size_t n = 4 + ship_design_section_bytes(w) + 4 + 4 * w.closed_ports.size() + surf_section_bytes(w)
+                  + sightings_section_bytes(w);
+    for (const auto& [sid, s] : w.ships)
+    {
+        if (w.nations.count(s.owner) == 0)
+            continue;
+        n += 4 * 3 + 2 + 4 * 5 + 1 + sizeof(s.kit.fit) + 1
+             + 4 + 4 * s.provinces.size() + 4 + 4 * s.route.size() + 4 + 1 + ship_landing_bytes(s);
+    }
     return n;
 }
 
@@ -2321,8 +2526,10 @@ std::size_t world_save_kit_goods_bytes(const world& w)
     std::ostringstream wide(std::ios::binary), narrow(std::ios::binary);
     write_world_snapshot_pre_refusals(w, wide); // BL-1480: v74 against v73, nothing else between
     write_world_snapshot_pre_kit_goods(w, narrow);
-    // BL-1436: plus airframes' column, so the figure is the whole widening 49 -> today.
-    return wide.str().size() - narrow.str().size() + world_save_airframes_bytes(w);
+    // BL-1436: plus airframes' column, BL-1527: plus ship hulls', so the figure is the whole
+    // widening 49 -> today.
+    return wide.str().size() - narrow.str().size() + world_save_airframes_bytes(w)
+         + world_save_ship_hulls_bytes(w);
 }
 
 std::size_t world_save_airframes_bytes(const world& w)
@@ -2605,8 +2812,10 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
             && version != k_world_save_version_pre_occupation // BL-1502: v77, nothing occupied
             && version != k_world_save_version_pre_defend     // BL-1504: v78, no defend orders
             && version != k_world_save_version_pre_research_books // BL-1539: v79, nothing booked
-            && version != k_world_save_version_pre_growth_carry // v80: every growth carry 0
-            && version != k_world_save_version_pre_ended))      // BL-1562: v82, no nation ended
+            && version != k_world_save_version_pre_growth_carry // v80: every growth carry 0, no naval
+            && version != k_world_save_version_ship_kit         // BL-1527: v81, the naval branch's (no books)
+            && version != k_world_save_version_pre_ended        // BL-1562: v82, no nation ended
+            && version != k_world_save_version_ended))          // the naval merge: v83, 55 wide, no naval
         return false; // mismatched version -- refuse rather than misread
 
     // BL-1422: a stream before the kit goods carries every per-resource array 49 wide;
@@ -4358,8 +4567,9 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
     // stream, strictly ascending, never null; its unbooked debits and booked research
     // finite, never negative, inside float range; its count exactly the returns the
     // stream gave that nation. Refused whole otherwise. A v79 (and older) stream ends
-    // before it: nothing unbooked, and no return booked research.
-    if (version >= k_world_save_version_research_books)
+    // before it, and the naval branch's v81 never held it: nothing unbooked, and no
+    // return booked research.
+    if (world_stream_has_research_books(version))
     {
         const auto debit_ok = [](double v) {
             return std::isfinite(v) && v >= 0.0
@@ -4394,11 +4604,256 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
         rescale_site_days_to_research_books(s);
     }
 
-    // v82 (POPULATION_GROWTH_RATE): the growth carry. Untrusted: rows strictly
+    // v81 and v88 on (BL-1430): the ships, after the research books in v88. Untrusted: ids strictly ascending and no other entity's; the
+    // owner a nation; the home a port of the stream, or an id it no longer holds (torn down
+    // since, for the upkeep pass to resolve) but never another kind of building; the tile
+    // sea; the route a contiguous sea path from it; the zone non-land provinces ascending;
+    // the mission one the class works; every number in its domain. Refused whole otherwise.
+    // A stream without the naval sections (v80, v82, v83 and older): no ship.
+    if (world_stream_has_naval(version))
+    {
+        uint32_t count = 0;
+        if (!r_u32(in, count) || count > 1000000u)
+            return false;
+        entity_id prev = null_entity;
+        const auto water = [&](entity_id t) {
+            const auto it = s.tiles.find(t);
+            return it != s.tiles.end() && is_sea(it->second.substrate);
+        };
+        const auto adjacent = [&](entity_id from, entity_id to) {
+            const tile_component& a = s.tiles.at(from);
+            const tile_component& b = s.tiles.at(to);
+            const auto bit = s.bodies.find(a.body);
+            if (a.body != b.body || bit == s.bodies.end())
+                return false;
+            const int gw = bit->second.grid_width;
+            if (gw <= 0)
+                return false;
+            for (int side = 0; side < 6; ++side)
+            {
+                const hex_neighbors::coord n = hex_neighbors::neighbour(a.grid_x, a.grid_y, side);
+                if (n.gy == b.grid_y && ((n.gx % gw) + gw) % gw == b.grid_x)
+                    return true;
+            }
+            return false;
+        };
+        const sea_params ship_rules = mil != nullptr ? mil->sea : default_sea_params();
+        std::set<entity_id> aboard_seen; // BL-1531: no unit is aboard two ships
+        for (uint32_t k = 0; k < count; ++k)
+        {
+            entity_id sid = null_entity;
+            sea_ship sh;
+            uint8_t returning = 0, mission = 0;
+            uint32_t n = 0, steps = 0;
+            if (!r_id(in, sid) || (k > 0 && sid <= prev)
+                || !r_id(in, sh.owner) || !r_id(in, sh.home_port) || !r_id(in, sh.tile)
+                || !r_u16(in, sh.type) || !r_i32(in, sh.hp_ppm) || !r_i32(in, sh.morale_permille)
+                || !r_i32(in, sh.supply_factor_permille) || !r_i32(in, sh.muster_days)
+                || !r_i32(in, sh.sail_bank_permille) || !r_u8(in, returning))
+                return false;
+            for (uint8_t& v : sh.kit.fit)
+                if (!r_u8(in, v))
+                    return false;
+            // BL-1527: the design must be one its class can hold, and v80 held base kit only.
+            if (sh.type >= ship_roster_table().size()
+                || !ship_design_valid(ship_roster_table()[sh.type].cls, sh.kit))
+                return false;
+            if (version < k_world_save_version_ship_kit)
+                for (const uint8_t v : sh.kit.fit)
+                    if (v != 0)
+                        return false;
+            if (!r_u8(in, mission) || !r_u32(in, n))
+                return false;
+            prev = sid;
+            const auto port = s.buildings.find(sh.home_port);
+            if (sid == null_entity || sid >= next_entity || s.units.count(sid) != 0 || s.buildings.count(sid) != 0
+                || s.nations.count(sid) != 0 || s.tiles.count(sid) != 0 || s.markets.count(sid) != 0
+                || s.bodies.count(sid) != 0 || s.wings.count(sid) != 0
+                || s.nations.count(sh.owner) == 0
+                || sh.home_port == null_entity || sh.home_port >= next_entity
+                || (port != s.buildings.end() && port->second.type != building_type::port)
+                || !water(sh.tile)
+                || sh.type >= ship_roster_table().size()
+                || sh.hp_ppm <= 0 || sh.hp_ppm > k_ship_hp_full
+                || sh.morale_permille < 0 || sh.morale_permille > 1000
+                || sh.supply_factor_permille < 0 || sh.supply_factor_permille > 1000
+                || sh.muster_days < 0 || sh.muster_days > 3650
+                || sh.sail_bank_permille < 0 || sh.sail_bank_permille > 100000
+                || returning > 1 || mission >= static_cast<uint8_t>(sea_mission_count)
+                || n > k_sea_mission_provinces_max || ((mission == 0) != (n == 0)))
+                return false;
+            if (mission != 0
+                && (ship_rules.cls[static_cast<std::size_t>(ship_roster_table()[sh.type].cls)].missions
+                    & sea_mission_bit(static_cast<sea_mission>(mission))) == 0)
+                return false;
+            sh.returning = returning != 0;
+            sh.mission   = static_cast<sea_mission>(mission);
+            sh.provinces.resize(n);
+            for (uint32_t i = 0; i < n; ++i)
+                if (!r_u32(in, sh.provinces[i]) || s.provinces.find(sh.provinces[i]) == nullptr
+                    || province_kind_of(s, sh.provinces[i]) == province_kind::land
+                    || (i > 0 && sh.provinces[i] <= sh.provinces[i - 1]))
+                    return false;
+            if (!r_u32(in, steps) || steps > s.tiles.size())
+                return false;
+            sh.route.resize(steps);
+            for (uint32_t i = 0; i < steps; ++i)
+                if (!r_id(in, sh.route[i]) || !water(sh.route[i])
+                    || !adjacent(i == 0 ? sh.tile : sh.route[i - 1], sh.route[i]))
+                    return false;
+            if (version >= k_world_save_version_ship_kit) // BL-1527: a refit is a muster with no mission
+            {
+                uint8_t refitting = 0;
+                if (!r_u8(in, refitting) || refitting > 1
+                    || (refitting != 0 && (sh.muster_days <= 0 || mission != 0)))
+                    return false;
+                sh.refitting = refitting != 0;
+                // BL-1531: a transport's landing and its passengers, each no other entity's and
+                // a land row with every number in its domain. Refused whole otherwise.
+                uint32_t carried = 0;
+                if (!r_id(in, sh.landing_tile) || !r_i32(in, sh.landing_days) || !r_u32(in, carried)
+                    || sh.landing_days < 0 || sh.landing_days > 3650 || carried > 1000u)
+                    return false;
+                const bool is_transport = ship_roster_table()[sh.type].cls == ship_class::transport;
+                if (sh.landing_tile != null_entity)
+                {
+                    const auto lt = s.tiles.find(sh.landing_tile);
+                    if (!is_transport || lt == s.tiles.end() || is_water(lt->second.substrate))
+                        return false;
+                }
+                if (carried != 0 && !is_transport)
+                    return false;
+                const auto per_mille = [](int32_t v) { return v >= 0 && v <= 1000; };
+                entity_id prev_aboard = null_entity;
+                for (uint32_t c = 0; c < carried; ++c)
+                {
+                    entity_id uid = null_entity;
+                    unit_component u;
+                    u.owner = sh.owner;
+                    u.position = null_entity;
+                    if (!r_id(in, uid) || !r_i32(in, u.count) || !r_u16(in, u.type)
+                        || !r_i32(in, u.supply_factor_permille) || !r_id(in, u.muster_base)
+                        || !r_i32(in, u.establishment) || !r_i32(in, u.readiness_permille)
+                        || !r_i32(in, u.morale_permille))
+                        return false;
+                    for (uint8_t& v : u.kit.fit)
+                        if (!r_u8(in, v))
+                            return false;
+                    if (!r_i32(in, u.food_permille) || !r_i32(in, u.ammo_permille)
+                        || !r_i32(in, u.equipment_permille) || !r_i32(in, u.starvation_carry)
+                        || !r_i32(in, u.food_remainder) || !r_i32(in, u.ammo_remainder)
+                        || !r_i32(in, u.equipment_remainder) || !r_i32(in, u.lp_share_permille))
+                        return false;
+                    const auto& land_rows = unit_roster_table();
+                    if (uid == null_entity || uid >= next_entity || (c > 0 && uid <= prev_aboard)
+                        || s.units.count(uid) != 0 || s.buildings.count(uid) != 0 || s.ships.count(uid) != 0
+                        || uid == sid || !aboard_seen.insert(uid).second
+                        || u.count <= 0 || u.type >= land_rows.size()
+                        || (land_rows[u.type].domains & domain_bit(traversal_domain::land)) == 0
+                        || !design_valid(land_class_for(land_rows[u.type]), u.kit)
+                        || u.muster_base >= next_entity || u.establishment < 0
+                        || !per_mille(u.supply_factor_permille) || !per_mille(u.readiness_permille)
+                        || !per_mille(u.morale_permille) || !per_mille(u.food_permille)
+                        || !per_mille(u.ammo_permille) || !per_mille(u.equipment_permille)
+                        || !per_mille(u.lp_share_permille) || u.starvation_carry < 0
+                        || u.food_remainder < 0 || u.ammo_remainder < 0 || u.equipment_remainder < 0)
+                        return false;
+                    prev_aboard = uid;
+                    sh.aboard.emplace_back(uid, std::move(u));
+                }
+            }
+            s.ships.emplace(sid, std::move(sh));
+        }
+    }
+
+    // v81 (BL-1527): the live ship designs. Untrusted: nations ascending and of the stream;
+    // ids ascending, non-base, at most one per (class, slot). A stream without the naval sections has none.
+    if (world_stream_has_naval(version))
+    {
+        uint32_t count = 0;
+        if (!r_u32(in, count) || count > s.nations.size())
+            return false;
+        const std::vector<ship_kit_item>& scat = ship_kit_catalogue();
+        entity_id prev = null_entity;
+        for (uint32_t k = 0; k < count; ++k)
+        {
+            entity_id nid = null_entity;
+            uint32_t n = 0;
+            if (!r_id(in, nid) || nid == null_entity || (k > 0 && nid <= prev) || !r_u32(in, n)
+                || n == 0 || n > scat.size())
+                return false;
+            prev = nid;
+            const auto nit = s.nations.find(nid);
+            if (nit == s.nations.end())
+                return false;
+            std::vector<uint16_t> v(n);
+            std::set<std::pair<int, int>> slots;
+            for (uint32_t i = 0; i < n; ++i)
+                if (!r_u16(in, v[i]) || v[i] >= scat.size() || (i > 0 && v[i] <= v[i - 1])
+                    || ship_kit_variant_of(v[i]) == 0
+                    || !slots.insert({static_cast<int>(scat[v[i]].cls), scat[v[i]].slot}).second)
+                    return false;
+            nit->second.ship_design_kit = std::move(v);
+        }
+        // BL-1530. Untrusted: ascending, each a tile of the stream. Not refused for holding no
+        // standing port: one idled or torn down since the last sea day is a legal state, the
+        // set is read per port and re-derived that next day.
+        uint32_t closed = 0;
+        if (!r_u32(in, closed) || closed > s.tiles.size())
+            return false;
+        s.closed_ports.clear();
+        entity_id prev_tile = null_entity;
+        for (uint32_t k = 0; k < closed; ++k)
+        {
+            entity_id t = null_entity;
+            if (!r_id(in, t) || (k > 0 && t <= prev_tile) || s.tiles.count(t) == 0)
+                return false;
+            prev_tile = t;
+            s.closed_ports.insert(t);
+        }
+        // BL-1531: the surf. A transport the writer dropped leaves its name here for the sea day
+        // to read as gone.
+        uint32_t surf = 0;
+        if (!r_u32(in, surf) || surf > s.units.size())
+            return false;
+        entity_id prev_surf = null_entity;
+        for (uint32_t k = 0; k < surf; ++k)
+        {
+            entity_id uid = null_entity, ship = null_entity;
+            if (!r_id(in, uid) || !r_id(in, ship) || (k > 0 && uid <= prev_surf)
+                || ship == null_entity || ship >= next_entity)
+                return false;
+            const auto it = s.units.find(uid);
+            if (it == s.units.end())
+                return false;
+            prev_surf = uid;
+            it->second.landing_ship = ship;
+        }
+        // BL-1533: the sightings. Untrusted: strictly ascending pairs, each a nation of the
+        // stream and a ship of the stream that is not its own.
+        uint32_t sightings = 0;
+        if (!r_u32(in, sightings) || sightings > s.nations.size() * std::max<std::size_t>(1, s.ships.size()))
+            return false;
+        s.sea_sightings.clear();
+        std::pair<entity_id, entity_id> prev_seen{null_entity, null_entity};
+        for (uint32_t k = 0; k < sightings; ++k)
+        {
+            std::pair<entity_id, entity_id> p{null_entity, null_entity};
+            if (!r_id_pair(in, p) || (k > 0 && p <= prev_seen) || s.nations.count(p.first) == 0)
+                return false;
+            const auto sit = s.ships.find(p.second);
+            if (sit == s.ships.end() || sit->second.owner == p.first)
+                return false;
+            prev_seen = p;
+            s.sea_sightings.insert(p);
+        }
+    }
+
+    // v82 (POPULATION_GROWTH_RATE): the growth carry, after the naval sections in v88. Untrusted: rows strictly
     // ascending, each a centre of the stream, the carry finite and in (0, 1).
-    // Refused whole otherwise. A v80 (and older) stream ends before it: every
+    // Refused whole otherwise. A v80 or v81 (and older) stream lacks it: every
     // carry 0, which is what a centre that never grew at a rate holds.
-    if (version >= k_world_save_version_growth_carry)
+    if (world_stream_has_growth_carry(version))
     {
         uint32_t count = 0;
         if (!r_u32(in, count) || count > s.population_centres.size())
@@ -4429,7 +4884,7 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
     // no positive treasury; no live capital. Refused whole otherwise (the scratch world
     // is dropped, so nothing lands). A v82 (or v80, and older) stream ends before it: no
     // nation has ended.
-    if (version >= k_world_save_version_ended)
+    if (world_stream_has_ended(version))
     {
         uint32_t count = 0;
         if (!r_u32(in, count) || count > s.nations.size())
@@ -4491,8 +4946,17 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
             for (const auto& [aid, a] : s.space_assets)
                 if (a.owner == nid)
                     return false;
+            // The naval merge: no ship, sighting or ship design of its own (the naval
+            // sections precede this one in a v88 stream).
+            for (const auto& [sid, sh] : s.ships)
+                if (sh.owner == nid)
+                    return false;
+            for (const auto& seen : s.sea_sightings)
+                if (seen.first == nid)
+                    return false;
             const nation_component& enc = nit->second;
-            if (!enc.state_assets.empty() || enc.treasury > 0.0f || enc.capital_tile != null_entity)
+            if (!enc.state_assets.empty() || enc.treasury > 0.0f || enc.capital_tile != null_entity
+                || !enc.ship_design_kit.empty())
                 return false;
             nit->second.ended = true;
         }
@@ -4549,8 +5013,9 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
 
     // BL-1422: a stream before v74 predates the kit goods - its markets hold them at base
     // price 0 (unbuyable). Priced from the authored table, as generation prices them.
-    // BL-1436: a v74/v75 stream lacks airframes alike; the reauthor touches only a 0 price.
-    if (version < k_world_save_version_airframes && base_price != nullptr)
+    // BL-1436: a v74/v75 stream lacks airframes alike; BL-1527: a 55-wide stream (v76..v80, v82,
+    // v83) lacks ship hulls alike. The reauthor touches only a 0 price.
+    if (world_stream_resource_width(version) < resource_count && base_price != nullptr)
         reauthor_kit_goods_prices(s, *base_price);
 
     clear_derived_state(s);

@@ -166,6 +166,23 @@ void advance_convoys(world& w)
             convoy.progress = 1.0f;
             convoy.arrived  = true;
         }
+        // BL-1530 (MILITARY.md § Sea, Blockade): a closed port loads no sea leg and unloads
+        // none. A cargo not yet at sea, bound through one, waits at its loading port and costs
+        // nothing further; one already at sea finishes its leg.
+        if (!w.closed_ports.empty() && convoy.port_a != null_entity
+            && (w.closed_ports.count(convoy.port_a) != 0 || w.closed_ports.count(convoy.port_b) != 0))
+        {
+            const convoy_route lane = convoy_route_tiles(w, convoy);
+            if (lane.sea_first >= 0 && static_cast<std::size_t>(lane.sea_first) < lane.at.size())
+            {
+                const float quay = lane.at[static_cast<std::size_t>(lane.sea_first)];
+                if (convoy.progress_before <= quay && convoy.progress > quay)
+                {
+                    convoy.progress = quay;
+                    convoy.arrived  = false;
+                }
+            }
+        }
     }
     note_lane_heads(w);
 }
@@ -242,6 +259,11 @@ std::vector<interception_record> intercept_convoys(world& w, int tick)
         const auto occ = units_on_tile.find(tile);
         if (occ == units_on_tile.end())
             continue;
+        // BL-1529 (LOGISTICS.md § 7): on the water a raid decides, never a unit on the tile.
+        // A bridge on a land leg stays land, so this reads the leg as well as the substrate.
+        if (lane.on_sea_leg(li))
+            if (const auto ot = w.tiles.find(tile); ot != w.tiles.end() && is_sea(ot->second.substrate))
+                continue;
         for (const entity_id uid : occ->second)
         {
             const unit_component& uc = w.units.at(uid);

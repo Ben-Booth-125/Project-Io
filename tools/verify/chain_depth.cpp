@@ -319,6 +319,11 @@ bool injector_moves(const recipe_registry& reg, injector i, std::size_t r)
                 for (std::size_t g = 0; g < it.goods_count; ++g)
                     if (static_cast<std::size_t>(it.goods[g].res) == r && it.goods[g].qty > 0.0f)
                         return true;
+            // BL-1527: the SHIP kit catalogue too; ship hulls is drawn only here.
+            for (const ship_kit_item& it : ship_kit_catalogue())
+                for (std::size_t g = 0; g < it.goods_count; ++g)
+                    if (static_cast<std::size_t>(it.goods[g].res) == r && it.goods[g].qty > 0.0f)
+                        return true;
             return false;
         case injector::construction_material_draw:
         {
@@ -407,6 +412,8 @@ const exemption k_actor_consumed[] = {
       "BL-1422 kit goods: FPV and loitering drones" },
     { resource_type::airframes, injector::kit_draw,
       "BL-1436 the sixth kit good: manned aircraft airframes (the air kit draw)" },
+    { resource_type::ship_hulls, injector::kit_draw,
+      "BL-1527 the seventh kit good: later ship hulls (the ship kit draw)" },
 
     // BL-708. Power is produced by the two generation recipes and consumed by
     // NO recipe, so it reads as terminal — but it is not an orphan, and this row

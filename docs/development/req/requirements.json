@@ -7814,6 +7814,487 @@
      "kind": "measured",
      "status": "complete",
      "evidence": "Merge commit on main, 2026-11-06; failures on record are the ones the base carries."
+    },
+    {
+     "id": "R3",
+     "text": "Live click: a starved row names its good, a scarce good stops reading as a fortune.",
+     "kind": "visual",
+     "status": "pending",
+     "evidence": "Owed to Ben: access for the driven click was declined 2026-11-06."
+    }
+   ]
+  },
+  {
+   "brief": "sea-theatre",
+   "title": "BL-1430 - Ships exist: the four classes, the port door, sailing, the daily detect-and-hit pass",
+   "difficulty": 5,
+   "importance": "S",
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "promoted_from": "backlog.json BL-1430 - sprint 64 (Ben, 2026-11-06)",
+   "batch": "sprint-64",
+   "requirements": [
+    {
+     "id": "R1",
+     "text": "End to end through the seam: a nation hires each class at its port, spending credits, goods and sea recruits; a ship musters, sails tile by tile over water to a zone, works it, is recalled and sails home.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "sea_theatre_harness R1 and R7: each class hired through the seam, mustered, sailed by water, worked, recalled, home; wired through run_military_day and run_economy_step. 117 checks, 0 failures."
+    },
+    {
+     "id": "R2",
+     "text": "Hostile ships fight only once detected, by the target mask: a capital ship cannot hit a submarine, a submarine no destroyer has found is never hit, and hostility gates all of it.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "sea_theatre_harness R2 series: target mask, detection, directed hostility, recon and air share. 117 checks, 0 failures."
+    },
+    {
+     "id": "R3",
+     "text": "A ship breaks off past its floors, sails home, refits by drawing goods and sails again; a sunk ship is gone; the orphan and dropped-hire rules hold.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "sea_theatre_harness R3 series: floors, sail home, refit by goods, sinking, orphan re-home by water or disband, dropped hire refund, no mending on station."
+    },
+    {
+     "id": "R4",
+     "text": "Replay determinism: the same world run twice is digest-identical, and a world with no ship hashes and plays exactly as before.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "Replay digests equal in sea_theatre_harness; world_determinism ALL PASS. rebless_shape_probe on seeds 0, 46, 28: every ROW and MIX line identical to base e53fefd2. Snapshot-byte digests move with the v80 stream, as a new section must; D_search unmoved."
+    },
+    {
+     "id": "R5",
+     "text": "Save round trip at v80; v79 reads as no ship; the reader refuses a ship outside its domain, whole.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "save_roundtrip OK; sea_theatre_harness R5 series refuses each out-of-domain ship whole; v79 reads as no ship; the end-offset harnesses (fronts, recruits, save_roundtrip) pass on the new tail."
+    },
+    {
+     "id": "R6",
+     "text": "Every illegal hire and assignment is refused and mutates nothing, on the seam the wire uses; the app builds with the Lua numbers equal to the C++ defaults.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "sea_theatre_harness refusal table mutates nothing; agent_seam_harness 23, 0 failures; app BUILD_OK; recruits_harness R0 asserts the Lua sea table equals default_sea_params field by field."
+    }
+   ],
+   "resolved": "2026-11-06"
+  },
+  {
+   "brief": "ship-kit",
+   "title": "BL-1527 - Ship designs: hull, armament and sensor slots, the ship hulls good, refit at the home port",
+   "difficulty": 3,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "promoted_from": "backlog.json BL-1527 - sprint 64 (Ben, 2026-11-06)",
+   "batch": "sprint-64",
+   "requirements": [
+    {
+     "id": "R1",
+     "text": "One live design per class on hull, armament and sensor slots; a transport has no armament, no capital item hits a submarine; the catalogue is checked at compile time.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "sea_theatre_harness K1 series, K2 refusals, K11; ship_first_error is a static_assert over the 33 items. 170 checks, 0 failures."
+    },
+    {
+     "id": "R2",
+     "text": "Ship hulls is a seventh kit good made at the Arms Works, priced by the margin anchor, drawn only by later ship kit; recipe_margin and chain_depth accept it.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "recipe_margin ALL PASS at 179.8. chain_depth: ship_hulls passes; its one failure is the known-red exemption guard on trade_goods_misc, tools and rigging, and is the same failure on base 298dfc7a."
+    },
+    {
+     "id": "R3",
+     "text": "A hire records the live design and buys its kit goods; kit moves HP, pace, stealth, attack, the target mask and detection in the daily pass and carries capacity for landings; base kit fights exactly on the class numbers.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "K4 hire records and draws; K5 base kit on all class numbers; K5b, K11b, K12 stats; K11c mask, K13 pace, K13b HP in run_sea_day. Text narrowed at close: capacity is carried, BL-1531 (troop landings) is its first reader."
+    },
+    {
+     "id": "R4",
+     "text": "A ship keeps its kit until a refit at its home port with no mission, which buys the changed slots, stands it out for its muster days and keeps its hull share. Every refusal mutates nothing, on the seam the wire uses.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "K6, K7 series through apply_corp_command with the mutate-nothing table, K7d2 broken-off, K7g port not standing, K8 series, K8f in dock, K8g lost port re-homes with no refund, K8h ends. agent_seam_harness 23, 0 failures."
+    },
+    {
+     "id": "R5",
+     "text": "Save v81: the resource arrays 56 wide and the designs as a last section, refused whole out of domain; v76..v80 read 55 wide with no design; envelope v26 reads v25.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "K9 series, K9g, K9h, K10, K10b, K10c; save_roundtrip OK; save_envelope_roundtrip S9d v25 reads whole and a 55-wide file stamped v26 is refused; fronts 140, war 172, air 86, recruits 116, all 0 failures."
+    },
+    {
+     "id": "R6",
+     "text": "A world with no ship and no design plays as before: shape identical to base on seeds 0, 46 and 28, given a recipe appended that nothing asks for.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "rebless_shape_probe seeds 0, 46, 28: every ROW and MIX line identical to base 298dfc7a. world_determinism ALL PASS."
+    }
+   ],
+   "resolved": "2026-11-06"
+  },
+  {
+   "brief": "naval-branch",
+   "title": "BL-1528 - The Naval research branch: State's fourth, authored in the store",
+   "difficulty": 3,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "promoted_from": "backlog.json BL-1528 - sprint 64 (Ben, 2026-11-06)",
+   "batch": "sprint-64",
+   "requirements": [
+    {
+     "id": "R1",
+     "text": "The eighteen nodes are appended, no existing index moves, the grammar holds, and the store, header and doc tables agree.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "tech_tree_store.js --check clean; nation_tech_harness T1 series including T1g ten quests."
+    },
+    {
+     "id": "R2",
+     "text": "Nine kit nodes open the ships' 22 later items, one node each way, checked at compile time and by the store tool; a held node opens its item with no waiver.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "ship_first_error refuses a node the tree does not hold; unit_designs_harness U1h, 50/50; sea_theatre_harness K14, K14b, 172 checks, 0 failures."
+    },
+    {
+     "id": "R3",
+     "text": "An older held set reads its tail as unheld, with no save version move.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "save_roundtrip OK. The held set carries a count prefix; no version bump in this diff."
+    },
+    {
+     "id": "R4",
+     "text": "The research panel draws ten branches in three sectors, and a press on a Naval node is reachable in the live app.",
+     "kind": "visual",
+     "status": "pending",
+     "evidence": "Capture only: tech_tree_panel.lua 0 failures, tech_tree_hover_naval reads Reactor Propulsion. Live click owed, carried on BL-1534 (sea UI)."
+    },
+    {
+     "id": "R5",
+     "text": "Research plays on with the new nodes and world shape does not move.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "world_determinism ALL PASS; rebless_shape_probe seeds 0, 46, 28 identical; nation_tech_harness fails only R0h and R0i pacing, equally on base."
+    }
+   ],
+   "resolved": "2026-11-06"
+  },
+  {
+   "brief": "patrol-escort-raid",
+   "title": "BL-1529 - Patrol, escort and raid: the sea leg stops being cut by a unit on its tile",
+   "difficulty": 5,
+   "importance": "S",
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "promoted_from": "backlog.json BL-1529 - sprint 64 (Ben, 2026-11-06)",
+   "batch": "sprint-64",
+   "requirements": [
+    {
+     "id": "R1",
+     "text": "A raider on station takes hostile cargo crossing its zone at a seeded daily chance, directed hostility only, never a friend, and replays.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "sea_theatre_harness P1, P1b, P1c (the friend-and-declared sequence), P2, P3, P5 with its control, P12, P17. 208 checks, 0 failures."
+    },
+    {
+     "id": "R2",
+     "text": "Only escorts whose side detected the raider and whose mask reaches its class slow it; an undetected submarine is not slowed.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "P9, P10 capital escort, P11, P11b, P11c roll by roll on one cargo."
+    },
+    {
+     "id": "R3",
+     "text": "A submarine sinks; a surface raider lands a prize at its nearest own port in range that will take its goods, and sinks it with none. Goods conserve through the real pass order.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "P6, P6b, P7, P7a, P7b, P8; P16 advance, raid, arrivals: 291 prizes and 9 arrivals, each landing exactly once. The embargo filter on the prize port has no check of its own."
+    },
+    {
+     "id": "R4",
+     "text": "On a sea leg a land unit on the tile cuts nothing; a land leg, bridges included, is cut as before, and lane order decides between a land cut and a raid.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "P13, P13a, P13b, P15, P15b; interdiction_harness ALL PASS, convoy_fronts 25, convoy_command 61. A bridged land leg is covered by the span test, not by its own fixture."
+    },
+    {
+     "id": "R5",
+     "text": "Every interception reaches the tick report and a Field line; an undetected raider reads as an unseen raider.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "P14 series on the text, P18 off real takes, P19 through run_settle_tick; the app compiles the post. The line has not been seen live: no rival raids until BL-1533 (rival fleets)."
+    },
+    {
+     "id": "R6",
+     "text": "With no ship on a raid the world does not move.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "rebless_shape_probe seeds 0, 46, 28 identical; world_determinism ALL PASS; save_roundtrip OK."
+    }
+   ],
+   "resolved": "2026-11-06"
+  },
+  {
+   "brief": "sea-control-blockade",
+   "title": "BL-1530 - Sea control per sea province, and the blockade that closes a port",
+   "difficulty": 4,
+   "importance": "S",
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "promoted_from": "backlog.json BL-1530 - sprint 64 (Ben, 2026-11-06)",
+   "batch": "sprint-64",
+   "requirements": [
+    {
+     "id": "R1",
+     "text": "Sea control is each side's share of surface attack on patrol, escort or blockade; submarines and transports count for nothing; a side at the bar holds, and holding reveals hostile surface ships, in the daily pass and the raid.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "sea_theatre_harness C1-C5, C6 every day of 20 with a sliver of detection, C6b never a submarine, C6c. 242 checks, 0 failures. The reveal in the raid pass has no check of its own."
+    },
+    {
+     "id": "R2",
+     "text": "A blockade is assigned only at the mouth of a port of a declared-hostile nation. While its side holds the province the port loads no sea leg, makes no trade points and no Logistic Points, and the pricer reads it as lost.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "C7, C7b, C8, C8b no route on an island pair, C8c, C12 series, C14, C14b. The Logistic Point gate is two inert-when-empty tests with no check of its own."
+    },
+    {
+     "id": "R3",
+     "text": "A cargo at sea finishes its leg; one not yet at sea waits at its loading port.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "C9, C9b, C9c through advance and arrivals."
+    },
+    {
+     "id": "R4",
+     "text": "Lose the province, or peace, and the port reopens; a closed port with no ship left still opens through the real military day.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "C11, C11b, C11c, C11d, C11e through run_military_day."
+    },
+    {
+     "id": "R5",
+     "text": "A closed port saves and loads, prices the same loaded, and a port taken out of service while closed does not make a save unloadable.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "C10, C10a, C10b, C10c; save_roundtrip OK; save_envelope_roundtrip PASS."
+    },
+    {
+     "id": "R6",
+     "text": "Prices move at the blockaded market.",
+     "kind": "headless",
+     "status": "pending",
+     "evidence": "Not measured: the fixture shows the route gone and the points gone, not a clearing price moving. Owed by BL-1535 (naval war reading), which now names it."
+    },
+    {
+     "id": "R7",
+     "text": "With no blockade the world does not move.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "rebless_shape_probe seeds 0, 46, 28 identical; world_determinism ALL PASS."
+    }
+   ],
+   "resolved": "2026-11-06"
+  },
+  {
+   "brief": "troop-landings",
+   "title": "BL-1531 - Transports embark land units and land them on a coast, gated by sea control",
+   "difficulty": 5,
+   "importance": "S",
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "promoted_from": "backlog.json BL-1531 - sprint 64 (Ben, 2026-11-06)",
+   "batch": "sprint-64",
+   "requirements": [
+    {
+     "id": "R1",
+     "text": "A land unit on or beside an own open port boards a transport at its mouth, up to capacity: two at base, more by hull.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "sea_theatre_harness L1-L3e, L23. 373 checks, 0 failures."
+    },
+    {
+     "id": "R2",
+     "text": "Aboard it neither marches nor fights, keeps its carried supplies, draws no goods, is still paid, and goes down with a sunk transport.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "L4-L4c with carried supplies live and a land control; L13; L19 at non-zero wage rates."
+    },
+    {
+     "id": "R3",
+     "text": "A transport lands on a coast tile touching the sea, in range, on own, friend's, hostile or no one's ground, never a neutral's. Hostile ground needs its side to hold the province, and the days start over if the water is lost.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "L5-L12b, L24 series."
+    },
+    {
+     "id": "R4",
+     "text": "A landing met by a defender opens the ordinary battle from the surf, its first days at a penalty. Won, it comes ashore; repulsed or withdrawn, it goes back aboard; a second load joins; a sunk or departed transport loses those in the surf.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "L14-L18, L25-L28b; battle_engagement_harness 97 checks, 0 failures."
+    },
+    {
+     "id": "R5",
+     "text": "Ashore it lives on carried supplies until it takes a port: a lane lands no points on a hostile port, and one it occupies serves it. A blockade reads the holder.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "L21-L22. The chain from no draw to a starving unit over months on a real seed is not run: BL-1535 (naval war reading) owes it."
+    },
+    {
+     "id": "R6",
+     "text": "Passengers, a landing order and the surf save, load and replay the same; a malformed stream is refused whole.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "L20-L20k; save_roundtrip OK; save_envelope_roundtrip PASS."
+    },
+    {
+     "id": "R7",
+     "text": "A world with no ship and no hostile pair does not move.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "rebless_shape_probe seeds 0, 46, 28 identical; world_determinism ALL PASS; L21h."
+    },
+    {
+     "id": "R8",
+     "text": "Live click: embark and land from the app.",
+     "kind": "visual",
+     "status": "complete",
+     "evidence": "No press exists yet. BL-1534 (sea UI) owns the embark and land presses and their live click. 2026-11-08: embark passed live (Unit aboard); the land press queued nothing though its hover offered the landing - see sea-ui R10. 2026-11-08 later, Ben by hand on the Dahi seat (play log 20261108-031442_seed3309661932.jsonl): boarded units at the port and landed them on another tile, twice; the log records embark_unit applied then land_units applied each time. The earlier failed presses never reached the seam (no land_units in that session log); the likeliest cause is the cursor resting on the tile hover card, unconfirmed."
+    }
+   ],
+   "resolved": "2026-11-06"
+  },
+  {
+   "brief": "sea-ui",
+   "title": "BL-1534 - The sea UI: ships on the map, their card, the Sea tabs, the marks and the Lost rows",
+   "difficulty": 5,
+   "importance": "S",
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "promoted_from": "backlog.json BL-1534 - sprint 64 (Ben, 2026-11-06)",
+   "batch": "sprint-64",
+   "requirements": [
+    {
+     "id": "R1",
+     "text": "Recruit's Sea tab holds the port picker, the four ship rows each with a Raise press whose dimmed form says why, and the player's ships. A press raises through hire_ship.",
+     "kind": "visual",
+     "status": "failed",
+     "evidence": "scripts/verify/sea_ui.lua section 1-2: a real Raise row 0 -> Ship mustering, Your ships lists it. Capture sea_recruit. LIVE 2026-11-07, Quick Start, Khebokhon Deiszei: every Raise press is refused \"Can't afford or supply it.\" with Cr 19.5k in hand, on day 2 and again a year on - the nation holds no steel or machinery, which every ship's hire goods need. The row does not dim for the goods leg, so four enabled presses all refuse. The script passed because its world held the goods."
+    },
+    {
+     "id": "R2",
+     "text": "A ship draws on water with class and owner, only where the last sea day found it unless it is the player's own; its marker selects it and a stack cycles.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "sea_theatre_harness F1-F4c; sea_ui.lua section 3b, 4b: hidden until found, on the stack when found, gone when not."
+    },
+    {
+     "id": "R3",
+     "text": "The card lists only the missions a class works; a held mission plus a right-click on water assigns; the x takes a province off; the lit mission stands down.",
+     "kind": "visual",
+     "status": "complete",
+     "evidence": "sea_ui.lua section 3-4, 0 failures. Capture sea_zone_assigned."
+    },
+    {
+     "id": "R4",
+     "text": "A transport has no mission; a unit at the port boards through its press; a right-click on a coast orders the landing; Recall calls it off.",
+     "kind": "visual",
+     "status": "complete",
+     "evidence": "sea_ui.lua section 5. Capture sea_landing_ordered."
+    },
+    {
+     "id": "R5",
+     "text": "A rival's card offers no mission and states no orders, on screen and in the verify read.",
+     "kind": "visual",
+     "status": "complete",
+     "evidence": "sea_ui.lua section 4b. Capture sea_card_rival."
+    },
+    {
+     "id": "R6",
+     "text": "Ship classes join the unit designer through set_ship_design; a transport has no armament box; refit at the home port through refit_ship.",
+     "kind": "visual",
+     "status": "complete",
+     "evidence": "sea_ui.lua section 6. Capture sea_designer_transport. The refit press drew; its verb is sea_theatre_harness's."
+    },
+    {
+     "id": "R7",
+     "text": "A closed port and a taken cargo are marked on the map, and the Convoys ledger states each lost cargo's cause for a few ticks, both from economy_report::interceptions. A cargo that came home whole is not lost.",
+     "kind": "visual",
+     "status": "complete",
+     "evidence": "sea_ui.lua section 7. Capture sea_marks_and_lost. The whole-cargo skip is by reading, not exercised."
+    },
+    {
+     "id": "R8",
+     "text": "The rim labels of the ten-branch ring print clear of each other.",
+     "kind": "visual",
+     "status": "complete",
+     "evidence": "tech_tree_panel capture tech_tree_inspect, looked at: Order, Naval and Signal and Orbit clusters clear."
+    },
+    {
+     "id": "R9",
+     "text": "The map record is a read: no hash, no save, no move. A world with no ship does not move.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "F4, F4b; rebless_shape_probe seeds 0, 46, 28 identical; world_determinism ALL PASS; save_roundtrip OK."
+    },
+    {
+     "id": "R10",
+     "text": "Live click in the built app: Sea tab, Raise, card, right-click, board, land, a contested landing, the off-road dash on a landed unit by a hostile port, and shift-clicking a Naval node in the research panel. Also the per-frame cost of the preview line.",
+     "kind": "visual",
+     "status": "pending",
+     "evidence": "PARTLY DONE 2026-11-07 in the built app. PASSED: the Sea tab opens with two ports and four rows; the ring's rim labels print clear; a Naval node's hover reads. NOT REACHABLE: card, zone right-click, board, land, contested landing and the landed unit's dash, since no ship could be raised (R1). INCONCLUSIVE: shift-click queued no node at all, Naval or otherwise, which points at the input tool's shift rather than the panel; Ben to try by hand. Preview per-frame cost not measured. 2026-11-08 in the built app, transport-first seat: PASSED card (destroyer and transport), board (Unit aboard, Aboard 1 of 2), zone right-click (destroyer on Patrol: right-click a sea province -> Mission assigned, Zone 1 of 8, Sailing to its zone). FAILED land: the coast hover reads Right-click: land 1 unit at Tukornom, but three right-clicks on it queued nothing - no answer line, the transport stays Lying at its home port. The same right-click works for a warship zone, so the defect is in the transport press path. 2026-11-08 later, Ben by hand on the Dahi seat (play log 20261108-031442_seed3309661932.jsonl): boarded units at the port and landed them on another tile, twice; the log records embark_unit applied then land_units applied each time. The earlier failed presses never reached the seam (no land_units in that session log); the likeliest cause is the cursor resting on the tile hover card, unconfirmed. Land now PASSED; still owed: a contested landing, the off-road dash on a landed unit, and shift-click."
+    }
+   ],
+   "resolved": "2026-11-07"
+  },
+  {
+   "brief": "opening-fleets",
+   "title": "BL-1532 - A major opens with the fixed fleet of its kit, berthed from its capital port",
+   "difficulty": 3,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "promoted_from": "backlog.json BL-1532 - sprint 64 (Ben, 2026-11-07 form)",
+   "batch": "sprint-64",
+   "requirements": [
+    {
+     "id": "R1",
+     "text": "Every major holding a sea-mouthed port opens with the kit fleet: two destroyers, one capital ship, one submarine, one transport, raised (muster 0), on its live base design, at port mouths. Every major's sea pool opens on 100. Minors open with no ship.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "tools/verify/opening_fleet_settle F0-F3, 16 library seeds, 0 failures: 85 of 94 majors open with the five kit ships, raised on the live design at their home port mouth; 9 hold no sea-mouthed port and open with none; every major's pool is 100; no minor has a ship."
+    },
+    {
+     "id": "R2",
+     "text": "The ships berth at the capital port first (own sea-mouthed port in the capital province, else nearest), three to a port, spilling to the next-nearest and wrapping.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "opening_fleet_settle F4 re-derives the berthing order (capital province, distance, tile, id; three a port, wrapping) for every ship: 0 failures over 16 seeds."
+    },
+    {
+     "id": "R3",
+     "text": "The kit cap's last port slot admits only a sea-mouthed port while one stands and none is kept, kit cover still choosing which; no major whose ground has a sea port opens with only a lake port. Cover lost after the cap is measured before and after.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "tools/verify/port_mouth_census, 16 seeds, before -> after: majors with no port 11 -> 8, with only lake ports 4 -> 1 (seed 54, whose ground keeps no sea port), kit buildings uncovered after the cap 76 -> 76. A first cut that forced the berth before cover cost one (77); cold review caught it, and the rule became \"the last port slot admits only a sea port\"."
+    },
+    {
+     "id": "R4",
+     "text": "Deterministic: two builds of one seed lay byte-identical ships; the fleet survives the settle and a save round-trip.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "opening_fleet_settle D1 (two builds of seed 0: equal hash and ships), S1 (every ship survives the 12-tick settle; none lost HP, 16 seeds), S2 (snapshot round-trip keeps every ship field and the state hash)."
+    },
+    {
+     "id": "R5",
+     "text": "Live: on a fresh seat the Sea tab lists the five opening ships and a ship card opens; a transport can take a unit aboard.",
+     "kind": "visual",
+     "status": "complete",
+     "evidence": "2026-11-08 live click, fresh Quick Start seat Keitoheim Meido after the transport-first ruling (NR-1188): the Sea tab lists Tukornom 3 ships and Dutum 2, Fleet Transport first, all five lying at their home port; the card reads Transport, home at Tukornom; Ready to board lists seven units with Board; pressing Board on a Rifle Infantry answered Unit aboard and Aboard (1 of 2). Earlier the same day the old order berthed the transport on the island port Dutum, where no unit could reach it."
     }
    ]
   },
@@ -7840,6 +8321,297 @@
      "kind": "visual",
      "status": "pending",
      "evidence": "Owed to Ben: access for the driven click was declined 2026-11-06."
+    },
+    {
+     "id": "R5",
+     "text": "Live: on a fresh seat the Sea tab lists the five opening ships and a ship card opens; a transport can take a unit aboard.",
+     "kind": "visual",
+     "status": "complete",
+     "evidence": "2026-11-08 live click, fresh Quick Start seat Keitoheim Meido after the transport-first ruling (NR-1188): the Sea tab lists Tukornom 3 ships and Dutum 2, Fleet Transport first, all five lying at their home port; the card reads Transport, home at Tukornom; Ready to board lists seven units with Board; pressing Board on a Rifle Infantry answered Unit aboard and Aboard (1 of 2). Earlier the same day the old order berthed the transport on the island port Dutum, where no unit could reach it."
+    }
+   ]
+  },
+  {
+   "brief": "rival-fleets",
+   "title": "BL-1533 - A rival nation hires, designs, assigns and lands with its own fleet (AI_OPPONENT.md § 11, the fleet grant, read 2026-11-08)",
+   "difficulty": 4,
+   "importance": "S",
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "promoted_from": "backlog.json BL-1533 - sprint 64 (Ben, 2026-11-08 form: own ports+ships, rivals design, saved sightings, air gating)",
+   "batch": "sprint-64",
+   "requirements": [
+    {
+     "id": "R1",
+     "text": "Sightings: each sea day writes, per viewer nation, every hostile ship its side found (rolled, or revealed by held water). Saved (v81 tail) and hashed; a save round-trips them; a malformed stream is refused whole. The player map keeps reading its own UI set unchanged.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "2026-11-08 sea_theatre_harness V1..V1f: a patrolling side sights a hostile capital ship on 23 of 30 days, never its own; round-trips byte-identically; hashed; a self-sighting stream is refused whole; a ship leaving the world leaves every sighting. save_roundtrip and world_determinism PASS."
+    },
+    {
+     "id": "R2",
+     "text": "The design door admits any nation for its own designs (ship_design_check no longer seat-only). A rival fits, per slot of a class it is about to hire, the latest researched item whose goods its shelves cover; a no-op press is refused (rejected_state) and mutates nothing.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "2026-11-08 sea_theatre_harness K2b/K2b' (a rival designs its own; the same fit again is rejected_state and mutates nothing), V2f (designs before it hires; the hire carries the design), V2g (the player design untouched). ACTIONS.json gameplay.set_ship_design updated."
+    },
+    {
+     "id": "R3",
+     "text": "score_nation_sea never acts for the player nation (nor under spectate beyond the standing rule), acts only while mobilised, hires at most one ship an evaluation under a soft cap of 3 own ships with treasury >= 2x price, every action through apply_corp_command as the nation.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "2026-11-08 sea_theatre_harness V2..V2e: at peace hires nothing; never acts for the player; mobilised, one destroyer an evaluation at its own port; stops at 3. rival_fleet_census I1 PASS on all 16 library seeds (no hand but the player moves a player ship)."
+    },
+    {
+     "id": "R4",
+     "text": "Missions: each raised warship gets the best (patrol, escort, raid, blockade) zone its class works by: patrol 50 per ship in its own sightings there (any class: a destroyer hunts submarines) + 25 an own port mouth; escort its own cargo (whole units) whose sea legs cross it; raid hostile cargo crossing it x2 surface / x1 submarine; blockade 100 per hostile standing port mouth there. Switch only past 1250 per-mille; a zone out of reach is recalled. Raids and blockades only against nations already hostile. (Weights recalibrated 2026-11-08 from a 1000/500/2000 draft so cargo and ports trade at one scale; in-band call, logged.)",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "2026-11-08 sea_theatre_harness V3..V3h: raid over blockade, a submarine raids, a transport takes none, no thrash, recalled at peace, blockade or own-mouth patrol with no cargo, a sighting draws a patrol and an unsighted ship draws none. Census: 33 rival ship-missions over 7 seeds (patrol 17, escort 3, raid 3, blockade 13 summed per-seed rows); I2 PASS on 16 seeds."
+    },
+    {
+     "id": "R5",
+     "text": "Landing: a rival transport at its port commits to ONE hostile-held coast tile beside water it holds (sea_holds) whose landing legs admit it from where it lies, boards only own idle units that may stand there, and lands them; with no target (water lost, or peace) units aboard land on its own ground - nothing is ever stranded aboard. Measured over the seed library: report how many rivals raise, assign, embark and land.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "2026-11-08 sea_theatre_harness V4..V4f (no boarding unheld; boards and lands blockading A's islet port; never a non-hostile coast; never a defender; with no target or at peace units aboard land at home). MEASURED, rival_fleet_census 16 seeds to tick 40: 0 hires, 0 boardings, 0 landings. The chain stops at idle units: 42 transport-ticks ready with a held-water target, 0 with an idle unit (every rival unit on a front or defend order). Minors' hires all rejected_funds on hull goods (seed 25: 79 of 79). Majors open over the cap. Calls raised to Ben 2026-11-08."
+    },
+    {
+     "id": "R6",
+     "text": "Research: ship kit items are worth 0 to a nation with no own standing port; otherwise weighted 0.5 x military share + 0.5 x own ships/(ships+half), as land kit by units. Never reads another nation.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "2026-11-08 code: a ship kit row (ship_kit_item_by_id) is weighted by own ships and is 0 with no own standing port (nation_ai.cpp). Census: 349 landlocked rival nation-ends over 16 seeds hold 0 ship kit items beyond base. No before-reading was taken."
+    },
+    {
+     "id": "R7",
+     "text": "Determinism: two runs of the same seed produce identical digests with the scorer live; the harness gates (history_sim_harness, determinism) pass apart from the expected digest movement, which waits for the sprint re-bless.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "2026-11-08 rival_fleet_census --replay I3 PASS on seeds 46, 28, 11, 31 (hash equal); world_determinism ALL PASS; history_sim_harness red only on R3a2/R3a3, identical on a clean 2911972c checkout (pre-existing). Digest movement waits for the sprint re-bless (Ben's go)."
+    },
+    {
+     "id": "R8",
+     "text": "The landing force (Ben, 2026-11-08): a rival transport with a target and room aboard counts its units marching to its home port and its musters under way, marches idle own units there, then hires ONE land unit an evaluation at its own base; it sails once full or once nothing more is inbound. The sea pass runs before defence and the fronts. Never for the player.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "2026-11-08 sea_theatre_harness V5-V5g PASS (420 of 420): an idle unit away from the port is marched to it and the transport waits; the unit inbound is counted; with none, one land unit is hired at its own base, one an evaluation, stopping at the room aboard (2 of 2); nothing for the player. 16-seed rival_fleet_census at tick 40: 3 rival landings ordered (seeds 63, 31, 29), from 0 before. --replay I3 PASS on 63 and 29; world_determinism ALL PASS; history_sim_harness red only on the pre-existing R3a2/R3a3."
+    },
+    {
+     "id": "R9",
+     "text": "The goods check (Ben, 2026-11-08): a rival scores a ship or land hire only when the seam's own goods reading (read_ship_hire_goods / read_land_hire_goods) holds, with the goods' price bound inside its treasury slack. The economy is unchanged.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "2026-11-08 sea_theatre_harness V5h PASS: with bare shelves no ship is hired though the credits are there; V2c still hires with stocked shelves. The census I2 is split: 0 assignments while not mobilised on all 16 seeds; seed 54 carries 12 ship-ticks of a mission lingering to the next staggered evaluation, which the sea day works against no one (is_hostile at the roll and the closed-port pass)."
+    }
+   ]
+  },
+  {
+   "brief": "force-pay",
+   "title": "BL-1550 - Wages are a flat bill on the treasury, crews included (MILITARY.md § What a force costs)",
+   "difficulty": 3,
+   "importance": "A",
+   "evaluated_difficulty": 3,
+   "status": "complete",
+   "promoted_from": "BL-1550",
+   "batch": "sprint-64",
+   "requirements": [
+    {
+     "id": "R1",
+     "text": "The whole wage bill is owed whatever the budget weights say; the treasury pays what it holds.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "2026-11-08 sea_theatre_harness W1, W5 PASS (425 of 425)."
+    },
+    {
+     "id": "R2",
+     "text": "A standing wing or ship crew draws the same wage per head; one still mustering draws none.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "2026-11-08 sea_theatre_harness W2, W3 PASS. Wing path shares nation_crew_wage_bill; not separately fixtured."
+    },
+    {
+     "id": "R3",
+     "text": "A short payment weakens every unit, wing and ship by the one decay rule.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "2026-11-08 sea_theatre_harness W4, W5 PASS for land; wings and ships read nation_wages_short in their own pass. unit_upkeep 60 of 60, move_by_days 45 of 45."
+    }
+   ]
+  },
+  {
+   "brief": "force-equipment",
+   "title": "BL-1551 - Every class is raised and refilled with its equipment, and arms have a maker on day one (MILITARY.md § What a force costs)",
+   "difficulty": 4,
+   "importance": "A",
+   "evaluated_difficulty": 4,
+   "status": "complete",
+   "promoted_from": "BL-1551",
+   "batch": "sprint-64",
+   "requirements": [
+    {
+     "id": "R1",
+     "text": "A land unit is raised and refilled with its class equipment, on top of its kit.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "2026-11-08 unit_designs_harness U4b/c/g/h PASS (51 of 51); recruits_harness R5b/h/l PASS (116 of 116)."
+    },
+    {
+     "id": "R2",
+     "text": "A wing recruit brings its share of the goods; a ship repair draws its refit goods.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "2026-11-08 recruits_harness PASS for the wing path. Ship repair already drew refit_goods (sea_combat.cpp step 5); no change needed."
+    },
+    {
+     "id": "R3",
+     "text": "Majors open with an Arms Works per good, and every nation with a reserve at its capital market.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "2026-11-08 rival_fleet_census over 16 seeds: [arms reserve] printed on every seed, 14 to 41 nations stocked; arms works 4 to 43 per seed."
+    }
+   ]
+  },
+  {
+   "brief": "force-sizing",
+   "title": "BL-1552 - Rival nations size their forces to income and threat (MILITARY.md § Force sizing)",
+   "difficulty": 4,
+   "importance": "A",
+   "evaluated_difficulty": 4,
+   "status": "complete",
+   "promoted_from": "BL-1552",
+   "batch": "sprint-64",
+   "requirements": [
+    {
+     "id": "R1",
+     "text": "A rival with income hires until running cost meets target; more income fields more; over target hires nothing and disbands nothing.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "2026-11-08 sea_theatre_harness V2, F1, F5, F6 PASS (431 of 431)."
+    },
+    {
+     "id": "R2",
+     "text": "A neighbour with a larger force raises the share; a hostile nation counts as a neighbour; the player is never sized.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "2026-11-08 sea_theatre_harness F2, F3, F4, V2b, V2e PASS."
+    },
+    {
+     "id": "R3",
+     "text": "Forces read against income over the seed library, deterministically.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "2026-11-08 rival_fleet_census 16 seeds at tick 40: mean share 0.30 to 0.39, all seeds field land and 15 of 16 sea, air 0 everywhere. world_determinism PASS."
+    }
+   ]
+  },
+  {
+   "brief": "minor-plant-floor",
+   "title": "BL-1616 - Every nation opens with a plant (CORPORATION_GENERATION.md § Pass 6)",
+   "difficulty": 3,
+   "importance": "A",
+   "evaluated_difficulty": 3,
+   "status": "complete",
+   "requirements": [
+    {
+     "id": "R1",
+     "text": "Before the walk proper each nation buys one firm from its own richest placeable centre.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "2026-11-09 rival_fleet_census seeds 0,13,17,29, tick 40, against the 2026-11-08 A/B: minors with no extractor or processor at handoff 66 of 112 to 22; minors with income 46 to 91."
+    },
+    {
+     "id": "R2",
+     "text": "The walk stays conservative and deterministic.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "2026-11-09 landscape_search_harness and world_determinism PASS."
+    }
+   ]
+  },
+  {
+   "brief": "garrison-income",
+   "title": "BL-1617 - A minor's garrisons are sized to its income (MILITARY.md § Nation garrisons)",
+   "difficulty": 3,
+   "importance": "A",
+   "evaluated_difficulty": 3,
+   "status": "complete",
+   "requirements": [
+    {
+     "id": "R1",
+     "text": "At the handoff income pays the men; the capital keeps a 20-man token; border posts that cannot keep 20 stand down.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "2026-11-09 rival_fleet_census seeds 0,13,17,29, tick 40, against the 2026-11-08 A/B: [garrisons to income] 112 minors, 60 trimmed, 57 stood down, men 27599 to 16516."
+    },
+    {
+     "id": "R2",
+     "text": "Broke rivals fall, with no new harness failure.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "2026-11-09 rival_fleet_census seeds 0,13,17,29, tick 40, against the 2026-11-08 A/B: broke at tick 40 55 to 23 of 129; earning 104 of 129. Gate 2026-11-09: only the known reds; nation_tech_harness timed out with no FAIL."
+    }
+   ]
+  },
+  {
+   "brief": "sea-trade-reading",
+   "title": "BL-1526 - What crosses the water (MILITARY.md § Sea)",
+   "difficulty": 2,
+   "importance": "A",
+   "evaluated_difficulty": 2,
+   "status": "complete",
+   "requirements": [
+    {
+     "id": "R1",
+     "text": "Per library seed and per major: the sea share of landed cargo value, imports and exports, and the ports carrying it.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "2026-11-10 naval_reading, sixteen library seeds, 40 ticks, after the re-bless (f48be3f6): Sea legs carry 58.7% of landed cargo value pooled (17.5% seed 22 to 96.3% seed 7); per major, median 82% of imports and 82% of exports by value go by sea (n=54 / 45; 3 and 2 majors under 10%); 7 to 31 ports carry it a seed."
+    }
+   ]
+  },
+  {
+   "brief": "naval-war-reading",
+   "title": "BL-1535 - The naval war on the library (MILITARY.md § Sea)",
+   "difficulty": 3,
+   "importance": "A",
+   "evaluated_difficulty": 3,
+   "status": "open",
+   "requirements": [
+    {
+     "id": "R1",
+     "text": "Sweep the library: fleets raised, raids landed, ports closed, landings made, fleet upkeep.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "2026-11-10 naval_reading, sixteen library seeds, 40 ticks, after the re-bless (f48be3f6): Raids material on two seeds only (seed 54 4.1% of sea value, seed 0 2.0%); a blockade ran on seeds 0, 31, 60, one port closed each; 5 units landed (seeds 31, 60), all at full LP share, so food held at 1000; 7 rival ship hires on 4 seeds; crew wages 42 to 210 a tick against fleet treasuries 21k to 286k."
+    },
+    {
+     "id": "R2",
+     "text": "A blockade moves prices at the blockaded market on a real seed, as MILITARY.md § Blockade says.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "naval_reading closure lines, seeds 31 and 60, 40 ticks, 2026-11-10: one port of 5 closed for 16 ticks; seed 31 landings -67%, steel demand 73 -> 21 (construction/upkeep/trade channel) against supply 27 -> 11, steel -20% against +8% elsewhere; seed 60 tobacco +88% against +53% elsewhere. Settled both ways (Ben, 2026-11-10, NR-1156)."
+    },
+    {
+     "id": "R3",
+     "text": "The sprint re-bless, described by the shape probe.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "f48be3f6: 64 digests moved, 16/16 confirmed by --digest-check; shape probe on seeds 46, 28, 11, 31, 40, 12, 37 against bc7ac30f."
+    },
+    {
+     "id": "R4",
+     "text": "A landed army on a real seed runs its stocks down with no port, and holds once it takes one.",
+     "kind": "headless",
+     "status": "pending",
+     "evidence": "No landing arose uncovered on the library: all 5 landed units stood at LP share 1000. Needs a staged landing."
+    },
+    {
+     "id": "R5",
+     "text": "A live war played to a landing.",
+     "kind": "visual",
+     "status": "pending",
+     "evidence": ""
     }
    ]
   }

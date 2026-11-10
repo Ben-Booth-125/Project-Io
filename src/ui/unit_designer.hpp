@@ -42,6 +42,11 @@ void draw_unit_designer(const world& w, const recipe_registry& reg, ui_state& s)
 /// The Military ledger Design tab's Air rows use this.
 void toggle_air_designer(ui_state& s, air_class c);
 
+/// BL-1534: the designer on a SHIP class (`detail_surface::ship_designer`, key = ship_class;
+/// slots hull / armament / sensors). The toggle rule: a press on the open class folds it.
+void toggle_ship_designer(ui_state& s, ship_class c);
+bool ship_designer_open_on(const ui_state& s, ship_class c);
+
 /// Whether the designer is open on air class @p c.
 bool air_designer_open_on(const ui_state& s, air_class c);
 

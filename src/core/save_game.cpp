@@ -1197,12 +1197,15 @@ bool r_last_report(std::istream& i, save_envelope& e, std::uint64_t entity_cap)
 // ---------------------------------------------------------------------------
 
 /// The resource_count-wide array width an envelope of @p version carries: 49 before
-/// v24 (BL-1422), 54 at v24 (BL-1436: before airframes), resource_count from v25.
+/// v24 (BL-1422), 54 at v24 (BL-1436: before airframes), 55 at v25 and v27 (the report
+/// layout was written off v25), 56 at v26 (BL-1527) and from v29 (the naval merge).
 std::size_t envelope_resource_width(uint32_t version)
 {
     return version < save_game_version_kit_goods    ? k_resource_count_pre_kit_goods
          : version < save_game_version_airframes    ? k_resource_count_pre_airframes
-                                                    : resource_count;
+         : version == save_game_version_ship_hulls || version >= save_game_version_stacked
+                                                    ? resource_count
+                                                    : k_resource_count_pre_ship_hulls;
 }
 
 void w_envelope(std::ostream& o, const save_envelope& e, uint32_t version = save_game_version)
@@ -1350,7 +1353,9 @@ bool write_save_game_at(const std::string& path, const world& w, const save_enve
     // the matching shape - for v23/v22, a v73 world snapshot (every per-resource array 49
     // wide) and an envelope whose endowments and market history are 49 wide (and, for
     // v22, no nation targets). The game writes only `write_save_game`.
-    if (version != save_game_version && version != save_game_version_pre_econ_report
+    if (version != save_game_version && version != save_game_version_econ_report
+        && version != save_game_version_ship_hulls
+        && version != save_game_version_pre_ship_hulls
         && version != save_game_version_pre_airframes
         && version != save_game_version_pre_kit_goods
         && version != save_game_version_prefix_compatible)
@@ -1364,6 +1369,12 @@ bool write_save_game_at(const std::string& path, const world& w, const save_enve
         write_world_snapshot_pre_kit_goods(w, out);
     else if (version < save_game_version_airframes)
         write_world_snapshot_pre_airframes(w, out); // BL-1436: v24 carries a v75 world
+    else if (version < save_game_version_ship_hulls)
+        write_world_snapshot_pre_ship_kit(w, out); // BL-1527: v25 carries a v80 world
+    else if (version == save_game_version_ship_hulls)
+        write_world_snapshot_naval_v81(w, out); // the naval merge: v26 carries the branch's v81
+    else if (version == save_game_version_econ_report)
+        write_world_snapshot_pre_stacked(w, out); // the naval merge: v27 carries a v83 world
     else
         write_world_snapshot(w, out);
     w_envelope(out, env, version);
@@ -1385,11 +1396,13 @@ bool read_save_game(const std::string& path, world& w, save_envelope& env,
 
     uint32_t version = 0;
     if (!r_u32(in, version)
-        || (version != save_game_version && version != save_game_version_pre_econ_report
+        || (version != save_game_version && version != save_game_version_econ_report
+            && version != save_game_version_ship_hulls
+            && version != save_game_version_pre_ship_hulls
             && version != save_game_version_pre_airframes
             && version != save_game_version_pre_kit_goods
             && version != save_game_version_prefix_compatible))
-        return false; // LAYOUT 27: v25 has no report tail; v24 reads 54 wide (BL-1436); v23 and v22 49 wide (BL-1422)
+        return false; // LAYOUT 29: v27 is 55 wide, v26 has no report tail, v25 neither; v24 reads 54 wide (BL-1436); v23 and v22 49 wide (BL-1422)
 
     // Both halves build into scratch. `read_world_snapshot` already guarantees
     // this for the world; doing the same for the envelope is what lets a caller

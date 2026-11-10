@@ -721,13 +721,24 @@ inline constexpr uint32_t k_world_save_version_pre_recruits = 71;
 /// whose returns booked none. Below v80 a building site's `days_remaining` is on the old
 /// build days, so the reader rescales it (`rescale_site_days_to_research_books`).
 ///
+/// **81 (BL-1430 sea theatre + BL-1527 ship kit, MILITARY.md § Sea) — THE NAVAL STREAM, written
+/// on the naval branch off v79 and NOT on the line above: it carries no research books.**
+/// `resource_type` gains `ship_hulls` at the enum's tail, so `resource_count` moves 55 -> 56 and
+/// every per-resource array is one element longer. After the v79 sections: THE SHIPS (a u32
+/// count, every ship ascending id; refused whole unless each names a nation, a port and a water
+/// tile of the stream and every field is in its domain), then the live ship designs (a u32
+/// count, each designed nation ascending as id, u32 n, n ascending u16 ship kit ids), the tiles
+/// of the ports a blockade has closed (BL-1530: a u32 count, ascending ids, each a tile of the
+/// stream), the surf (BL-1531) and last the sides' sightings (BL-1533: a u32 count, ascending
+/// (viewer, ship) id pairs, each a nation of the stream and a ship of the stream it does not
+/// own). The branch's own interim v80 (ships, 55 wide) collides with the v80 above and is NOT
+/// read: it never left the branch.
+///
 /// **82 (POPULATION_GROWTH_RATE, POPULATION.md § Growth, decline and razing) — THE GROWTH
 /// CARRY.** Appended after v80's sections: after a u32 count, every population centre with a
 /// non-zero `growth_carry`, ascending id, as (id, f32 carry). Each names a centre of the
-/// stream; the carry finite and in (0, 1). Refused whole otherwise. v81 is reserved by the
-/// naval branch (BL-1527, ship kit) and is not on this line: v80 is the STRICT PREFIX read
-/// here (`k_world_save_version_pre_growth_carry`), as a world whose every carry is 0.
-/// Whoever stacks the two adds v81 to the accepted set beside it.
+/// stream; the carry finite and in (0, 1). Refused whole otherwise. v80 is the STRICT PREFIX
+/// read here (`k_world_save_version_pre_growth_carry`), as a world whose every carry is 0.
 ///
 /// **83 (BL-1562, NATIONS.md § Elimination) — THE ENDED NATIONS.** Appended last, after the
 /// v82 growth carry: after a u32 count, every ended nation strictly ascending id, each a
@@ -737,7 +748,18 @@ inline constexpr uint32_t k_world_save_version_pre_recruits = 71;
 /// is v80. From v83 a war's defender row toward its declarer must stand (RELATIONS.md § 7,
 /// Ben 2026-11-09: a declaration of war makes both sides hostile); an older stream's
 /// unanswered war loads with both rows.
-inline constexpr uint32_t world_save_version = 83;
+///
+/// **88 (the naval merge) — EVERYTHING STACKED.** (84..87 are held by the in-flight
+/// space-mechanics branch, which stacks on this when it merges.) Every per-resource array 56 wide; after the
+/// v79 sections: v80's research books, then v81's naval sections (ships, ship designs, closed
+/// ports, surf, sightings), then v82's growth carry, then v83's ended nations. The reader
+/// accepts v80 (55 wide, none of the three), v81 (naval only), v82 (55 wide, carry), v83 (55
+/// wide, carry, ended) and v88; each section a stream lacks reads as empty. The section
+/// predicates below (`world_stream_has_*`) are the one place that says which stream holds what.
+inline constexpr uint32_t world_save_version = 88;
+
+/// The naval merge: the first version stacking every section, 56 wide.
+inline constexpr uint32_t k_world_save_version_stacked = 88;
 
 /// POPULATION_GROWTH_RATE: the first version carrying the growth-carry section.
 inline constexpr uint32_t k_world_save_version_growth_carry = 82;
@@ -748,7 +770,7 @@ inline constexpr uint32_t k_world_save_version_pre_growth_carry = 80;
 /// BL-1562: the first version carrying the ended-nations section (see above).
 inline constexpr uint32_t k_world_save_version_ended = 83;
 
-/// BL-1562: v82, a strict prefix of v83 (v81 is the naval branch's, not on this line).
+/// BL-1562: v82, a strict prefix of v83.
 inline constexpr uint32_t k_world_save_version_pre_ended = k_world_save_version_growth_carry;
 
 /// BL-1539: the first version carrying the research-books section (see above).
@@ -757,6 +779,44 @@ inline constexpr uint32_t k_world_save_version_research_books = 80;
 /// BL-1539: the version before it, a strict prefix of it.
 inline constexpr uint32_t k_world_save_version_pre_research_books =
     k_world_save_version_research_books - 1;
+
+/// BL-1527: the naval stream - ship hulls' column, the ships and the ship design section.
+inline constexpr uint32_t k_world_save_version_ship_kit = 81;
+
+/// BL-1527: v80, one column narrower and no naval section.
+inline constexpr uint32_t k_world_save_version_pre_ship_kit = 80;
+
+/// BL-1430: the first version carrying the ship section (the naval stream, v81).
+inline constexpr uint32_t k_world_save_version_ships = k_world_save_version_ship_kit;
+
+/// BL-1430: v79, the stream the naval branch wrote its sections after.
+inline constexpr uint32_t k_world_save_version_pre_ships = 79;
+
+/// Does a world stream of @p version carry the v80 research-books section? Every version from
+/// v80 on except the naval branch's v81, which was written off v79.
+inline constexpr bool world_stream_has_research_books(uint32_t version)
+{
+    return version >= k_world_save_version_research_books && version != k_world_save_version_ship_kit;
+}
+
+/// Does a world stream of @p version carry the naval sections (ships, designs, closed ports,
+/// surf, sightings) and ship hulls' column? v81 and v88 on; v82 and v83 do not.
+inline constexpr bool world_stream_has_naval(uint32_t version)
+{
+    return version == k_world_save_version_ship_kit || version >= k_world_save_version_stacked;
+}
+
+/// Does a world stream of @p version carry the v82 growth carry? v82 on (v81 is below it).
+inline constexpr bool world_stream_has_growth_carry(uint32_t version)
+{
+    return version >= k_world_save_version_growth_carry;
+}
+
+/// Does a world stream of @p version carry the v83 ended nations? v83 on.
+inline constexpr bool world_stream_has_ended(uint32_t version)
+{
+    return version >= k_world_save_version_ended;
+}
 
 /// BL-1504: the first version carrying the defend-order section.
 inline constexpr uint32_t k_world_save_version_defend = 79;
@@ -787,7 +847,8 @@ inline constexpr std::size_t world_stream_resource_width(uint32_t version)
 {
     return version < 74 ? k_resource_count_pre_kit_goods
          : version < 76 ? k_resource_count_pre_airframes
-                        : resource_count;
+         : world_stream_has_naval(version) ? resource_count // v81, v88 on: 56 wide
+                        : k_resource_count_pre_ship_hulls; // v76..v80, v82, v83: 55
 }
 
 /// BL-1480: the first version carrying the peace-refusals section (see above).
@@ -973,17 +1034,17 @@ std::size_t world_save_occupation_section_bytes(const world& w);
 std::size_t world_save_defend_section_bytes(const world& w);
 
 /// BL-1539: the byte length of the v80 research-books section `w` writes - 4, plus 24 +
-/// 4 per return for each nation it lists. The LAST section of a v80 stream.
+/// 4 per return for each nation it lists.
 std::size_t world_save_research_books_section_bytes(const world& w);
 
 /// POPULATION_GROWTH_RATE: the byte length of the v82 growth-carry section `w` writes -
-/// 4, plus 8 for each centre with a non-zero carry. The LAST section of a v82 stream.
+/// 4, plus 8 for each centre with a non-zero carry.
 std::size_t world_save_growth_carry_section_bytes(const world& w);
 
-/// BL-1422, widened by BL-1436: the bytes ALL SIX kit goods' extra elements add to
+/// BL-1422, widened by BL-1436: the bytes ALL SEVEN kit goods' extra elements add to
 /// every per-resource array of the stream `w` writes - the widening from 49 to today's
 /// width: (the v74 stream less the v73 stream, the five goods) plus
-/// `world_save_airframes_bytes` (airframes). A harness comparing a pre-v74 stream's
+/// `world_save_airframes_bytes` and `world_save_ship_hulls_bytes`. A harness comparing a pre-v74 stream's
 /// length against today's adds it.
 std::size_t world_save_kit_goods_bytes(const world& w);
 
@@ -1117,6 +1178,27 @@ void write_world_snapshot_pre_ended(const world& w, std::ostream& out);
 
 /// BL-1562: the bytes v83's ended-nations section takes for @p w: the count and 4 a nation.
 std::size_t world_save_ended_section_bytes(const world& w);
+/// VERIFICATION ONLY (BL-1430): the v79 stream shape - no ship section.
+void write_world_snapshot_pre_ships(const world& w, std::ostream& out);
+
+/// BL-1430: the bytes the naval sections take (ships through sightings) - the v81 tail, and in a
+/// v88 stream the run between the research books and the growth carry.
+std::size_t world_save_ships_section_bytes(const world& w);
+
+/// VERIFICATION ONLY (BL-1527): the v80 stream shape - every per-resource array 55 wide, no
+/// naval section (and no carry or ended section) - so the narrowed reader has a producer.
+void write_world_snapshot_pre_ship_kit(const world& w, std::ostream& out);
+
+/// VERIFICATION ONLY (the naval merge): the naval branch's v81 stream shape - 56 wide, the
+/// naval sections after v79's, no research books, carry or ended section.
+void write_world_snapshot_naval_v81(const world& w, std::ostream& out);
+
+/// VERIFICATION ONLY (the naval merge): the v83 stream shape - 55 wide, no naval section.
+void write_world_snapshot_pre_stacked(const world& w, std::ostream& out);
+
+/// BL-1527: the bytes ship hulls' one extra element adds to every per-resource array of the
+/// stream `w` writes. A harness comparing a pre-v81 stream's length against today's adds it.
+std::size_t world_save_ship_hulls_bytes(const world& w);
 
 /// BL-1453: the recon stock a battle loaded from a pre-v67 stream is given — enough to
 /// see every defending unit in full (twice the stealthiest defender's kit stealth, in
@@ -1154,15 +1236,16 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
                          const std::array<float, resource_count>* base_price = nullptr);
 
 /// BL-1422: the kit goods (small arms ... drones), in enum order; BL-1436 appends the
-/// sixth, airframes.
+/// sixth, airframes; BL-1527 the seventh, ship hulls.
 inline constexpr resource_type k_kit_goods[] = {
     resource_type::small_arms, resource_type::armoured_vehicles, resource_type::artillery_pieces,
     resource_type::guided_weapons, resource_type::drones, resource_type::airframes,
+    resource_type::ship_hulls,
 };
 
 /// BL-1422: set every market's kit-goods base price (and a zero resolved price) from
 /// @p base_price, where the stream left it 0. What `read_world_snapshot` does for a
-/// pre-v76 stream (a pre-v74 stream lacks all six; a v74/v75 one lacks airframes).
+/// pre-v81 stream (a pre-v74 stream lacks all seven; a v74/v75 one lacks two; a v76..v80 one lacks ship hulls).
 void reauthor_kit_goods_prices(world& w, const std::array<float, resource_count>& base_price);
 
 /// Drop every derived cache on @p w so the next read of each rebuilds.

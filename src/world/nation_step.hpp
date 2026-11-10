@@ -177,3 +177,12 @@ void record_market_wants(world& w, const std::vector<market_want>& wants);
 // unit ids ascending.
 void run_nation_garrison_upkeep(world& w, const recipe_registry& reg,
                                 const lp_tick* lp = nullptr);
+
+/// BL-1550 (MILITARY.md § What a force costs): the wages of @p nation's standing wings and
+/// ships, at the one wage per head.
+float nation_crew_wage_bill(const world& w, const recipe_registry& reg, entity_id nation);
+/// Its whole wage bill: land units (aboard ship too), wings and ships.
+float nation_wage_bill(const world& w, const recipe_registry& reg, entity_id nation);
+/// True when its treasury cannot pay that bill: the trigger of the one decay rule, read
+/// by the wing and ship passes as the land pass reads its own short payment.
+bool nation_wages_short(const world& w, const recipe_registry& reg, entity_id nation);

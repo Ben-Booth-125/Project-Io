@@ -64,6 +64,17 @@ const spec k_air_strat   {stat_glyph::strategic, "Strategic", "Condition a day o
 const spec k_air_recon   {stat_glyph::recon, "Recon", "Added to its side's hits over the provinces it is assigned.", fmt_kind::whole, 0};
 const spec k_air_range   {stat_glyph::range, "Range", "Tiles from its airbase to the farthest province it can be assigned.", fmt_kind::whole, 0};
 
+// The sea stats (MILITARY.md § Sea).
+const spec k_sea_hp     {stat_glyph::hp, "HP", "The hull. It mends at the home port, drawing goods. At none the ship is sunk.", fmt_kind::whole, palette::unit_hp};
+const spec k_sea_morale {stat_glyph::morale, "Morale", "The crew's will to fight. Scales its attack; below its floor the ship breaks off.", fmt_kind::permille, palette::unit_morale};
+const spec k_sea_supply {stat_glyph::supply, "Supply", "How well its upkeep is met at its home port. Scales its strength.", fmt_kind::permille, palette::unit_supply};
+const spec k_sea_attack {stat_glyph::soft_attack, "Attack", "Damage a day across the hostile ships its side has found and its class can hit.", fmt_kind::whole, 0};
+const spec k_sea_detect {stat_glyph::recon, "Detection", "Added to its side's detection where it is. A ship is engaged only once found.", fmt_kind::whole, 0};
+const spec k_sea_stealth{stat_glyph::stealth, "Stealth", "What a hostile side's detection is rolled against to find this ship.", fmt_kind::whole, 0};
+const spec k_sea_speed  {stat_glyph::speed, "Speed", "Days to sail one tile.", fmt_kind::days, 0};
+const spec k_sea_range  {stat_glyph::range, "Range", "Tiles over water from an own port to the farthest zone it can be given.", fmt_kind::whole, 0};
+const spec k_sea_cap    {stat_glyph::capacity, "Capacity", "Land units it carries.", fmt_kind::whole, 0};
+
 std::string fmt_value(fmt_kind f, double v)
 {
     char buf[32];
@@ -490,6 +501,59 @@ stat_bands wing_stat_bands(const world& w, const recipe_registry& reg, entity_id
     out.push_back({"Combat", {cell(k_air_air, st.air), cell(k_air_soft, st.soft), cell(k_air_hard, st.hard),
                               cell(k_air_strat, st.strategic)}});
     out.push_back({"Field", {cell(k_air_recon, st.recon), cell(k_air_range, st.range)}});
+    return out;
+}
+
+stat_bands ship_stat_bands(const world& w, const recipe_registry& reg, entity_id ship)
+{
+    stat_bands out;
+    const auto it = w.ships.find(ship);
+    const bool mine = it != w.ships.end() && is_player_side(w, it->second.owner);
+    if (!mine)
+    {
+        // A rival's ship (BL-068): nothing of its condition, and no mechanism reads its design.
+        out.push_back({"Condition", {hidden(k_sea_hp, k_private), hidden(k_sea_morale, k_private),
+                                     hidden(k_sea_supply, k_private)}});
+        out.push_back({"Combat", {hidden(k_sea_attack, k_unseen), hidden(k_sea_detect, k_unseen),
+                                  hidden(k_sea_stealth, k_unseen)}});
+        out.push_back({"Field", {hidden(k_sea_speed, k_unseen), hidden(k_sea_range, k_unseen)}});
+        return out;
+    }
+    const sea_ship&       s  = it->second;
+    const ship_live_stats st = ship_stats(reg, s);
+    const float hp_share = static_cast<float>(s.hp_ppm) / static_cast<float>(k_ship_hp_full);
+    stat_cell hp = cell(k_sea_hp, static_cast<double>(st.hp) * hp_share, hp_share);
+    {
+        char buf[48];
+        std::snprintf(buf, sizeof buf, "%d of %d at full", static_cast<int>(std::lround(st.hp * hp_share)), st.hp);
+        hp.detail = buf;
+    }
+    out.push_back({"Condition", {std::move(hp), cell(k_sea_morale, s.morale_permille, share_of(s.morale_permille)),
+                                 cell(k_sea_supply, s.supply_factor_permille, share_of(s.supply_factor_permille))}});
+    out.push_back({"Combat", {cell(k_sea_attack, st.attack), cell(k_sea_detect, st.detection), cell(k_sea_stealth, st.stealth)}});
+    const ship_class cls = ship_class_of(s);
+    std::vector<stat_cell> field{cell(k_sea_speed, st.days_per_tile_permille / 1000.0),
+                                 cell(k_sea_range, reg.military().sea.cls[static_cast<std::size_t>(cls)].range)};
+    if (cls == ship_class::transport)
+        field.push_back(cell(k_sea_cap, st.capacity));
+    out.push_back({"Field", std::move(field)});
+    return out;
+}
+
+stat_bands ship_design_stat_bands(const ship_live_stats& shown, const ship_live_stats& live, int range)
+{
+    stat_bands out;
+    stat_cell hp = design_cell(k_sea_hp, shown.hp, live.hp);
+    hp.detail = "At full strength.";
+    out.push_back({"Condition", {std::move(hp)}});
+    out.push_back({"Combat", {design_cell(k_sea_attack, shown.attack, live.attack),
+                              design_cell(k_sea_detect, shown.detection, live.detection),
+                              design_cell(k_sea_stealth, shown.stealth, live.stealth)}});
+    stat_cell spd = cell(k_sea_speed, shown.days_per_tile_permille / 1000.0);
+    std::vector<stat_cell> field{std::move(spd), cell(k_sea_range, range)};
+    if (shown.capacity > 0 || live.capacity > 0)
+        field.push_back(design_cell(k_sea_cap, shown.capacity, live.capacity));
+    out.push_back({"Field", std::move(field)});
     return out;
 }
 

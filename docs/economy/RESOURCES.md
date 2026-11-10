@@ -339,6 +339,7 @@ Products are the highest-value goods and the primary driver of market price dive
 | Guided weapons | Electronics + ordnance | Arms Works | 240.6 |
 | Drones | Electronics + alloys | Arms Works | 169.8 |
 | Airframes | Alloys + machinery + electronics | Arms Works | 274.2 |
+| Ship hulls | Steel + alloys + machinery | Arms Works | 179.8 |
 
 The margin ladder widens up the tiers — spacecraft components sits 123× iron ore — which is the
 value gradient the space-equipment premise rests on. Propellant and spacecraft components are the
@@ -381,8 +382,9 @@ consumer can also be made wherever it is drawn.
 
 A unit's equipment is goods on the shelf, **by kind, not by generation** (Ben, 2026-10-27;
 `docs/military/MILITARY.md` § Land — equipment, refit and manpower): **small arms, armoured
-vehicles, artillery pieces, guided weapons, drones and airframes**, with the existing electronics
-(airframes, Ben, 2026-11-03: every manned aircraft's hull; a drone's airframe is drones'). A kit
+vehicles, artillery pieces, guided weapons, drones, airframes and ship hulls**, with the existing
+electronics (airframes, Ben, 2026-11-03: every manned aircraft's hull; a drone's airframe is drones'.
+Ship hulls, Ben, 2026-11-05: every ship's hull, `docs/military/MILITARY.md` § Sea). A kit
 item names how many of each it takes; a later item takes more and adds electronics, so the
 economy feels each generation without a good for every rung. A hire, a refit and a wounded
 unit's refill buy them off the shelf. They are terminal: no recipe takes them in.

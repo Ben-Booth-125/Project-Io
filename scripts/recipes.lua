@@ -929,6 +929,19 @@ recipes = {
         outputs      = { power = 2.0 },
         research_opened = true,
     },
+    -- BL-1527 (MILITARY.md § Sea, Ben 2026-11-05): THE SEVENTH KIT GOOD, ship hulls -
+    -- what every later ship hull item draws. From steel, alloys and machinery.
+    -- APPENDED, as the six before it, after main's wind turbine (the naval merge: a recipe's
+    -- id is its index, and the turbine was on main first); same Arms Works group and tier.
+    {
+        name         = "ship_hulls",
+        display_name = "Arms Works (ship hulls)",
+        era          = "industrial",
+        group        = "Arms Works",
+        inputs       = { steel = 1.0, alloys = 0.5, machinery = 0.5 },
+        outputs      = { ship_hulls = 1.0 },
+        qualified_workforce = 0.25,
+    },
 }
 
 print(string.format("[Lua] recipes.lua loaded  recipe_count=%d", #recipes))

@@ -280,7 +280,14 @@ enum class resource_type : uint8_t
     // widens 54 -> 55, and a v74/v75 stream is read 54 wide
     // (`k_resource_count_pre_airframes`), an older one 49 wide, the new good zero.
     airframes              = 54, ///< Arms Works, from alloys + machinery + electronics. Manned airframes.
-    count                  = 55
+
+    // --- The seventh kit good (BL-1527; Ben, 2026-11-05, MILITARY.md § Sea) ---
+    //
+    // Ship hulls: what every later ship hull item draws. Made from steel, alloys and
+    // machinery at the Arms Works. world_save_version bumped 80 -> 81 for this append: a
+    // v76..v80 stream is read 55 wide (`k_resource_count_pre_ship_hulls`), the new good zero.
+    ship_hulls             = 55, ///< Arms Works, from steel + alloys + machinery. Later ship hulls.
+    count                  = 56
 };
 
 static constexpr std::size_t resource_count = static_cast<std::size_t>(resource_type::count);
@@ -292,6 +299,10 @@ static constexpr std::size_t k_resource_count_pre_kit_goods = 49;
 /// BL-1436: the roster's width before airframes was appended (v74 and v75 streams carry
 /// per-resource arrays this wide).
 static constexpr std::size_t k_resource_count_pre_airframes = 54;
+
+/// BL-1527: the roster's width before ship hulls was appended (v76..v80 streams carry
+/// per-resource arrays this wide).
+static constexpr std::size_t k_resource_count_pre_ship_hulls = 55;
 
 // ===========================================================================
 // BL-762 — where a resource CAME FROM
@@ -407,6 +418,7 @@ constexpr resource_origin resource_origin_of(resource_type r)
         case resource_type::guided_weapons:
         case resource_type::drones:
         case resource_type::airframes:
+        case resource_type::ship_hulls:
             return resource_origin::manufactured;
 
         case resource_type::count:
@@ -2071,6 +2083,11 @@ struct unit_component
     /// upkeep). It — not `supply_factor_permille`, which an unpaid wage or an unmet
     /// goods draw also lowers — is the share that resupplies the three stocks.
     int32_t   lp_share_permille = 1000;
+
+    /// BL-1531 (MILITARY.md § Sea, landings): THE SURF. The transport a unit is landing from,
+    /// while it fights for the shore from the water beside it; null otherwise, which is every
+    /// unit that is not in a contested landing. Saved (the v81 section) and hashed only when set.
+    entity_id landing_ship = null_entity;
 };
 
 /// True when a unit's carried supplies are all full with nothing carried and its road
@@ -2160,6 +2177,67 @@ struct air_wing
     unit_design kit{};               ///< The air design it was raised to (airframe/armament/avionics).
     air_mission mission = air_mission::none;
     std::vector<uint32_t> provinces; ///< Assigned provinces, ascending, <= k_air_mission_provinces_max.
+};
+
+// ---------------------------------------------------------------------------
+// BL-1430 — ships (MILITARY.md § Sea, Ben 2026-11-05)
+// ---------------------------------------------------------------------------
+// A ship stands on a water tile and sails, so it has a position a wing does not; but it
+// is NOT a unit_component and lives in its own container (`world::ships`) for the reason
+// a wing does: no land pass can see it. sea_combat.hpp owns everything a ship does.
+
+/// The four ship classes. APPEND-ONLY: a ship's roster row names one.
+enum class ship_class : uint8_t
+{
+    submarine = 0, ///< Raids. High stealth; hits capital ships and transports.
+    destroyer = 1, ///< High detection; the class that hits submarines.
+    capital   = 2, ///< The heaviest attack and HP; cannot hit a submarine.
+    transport = 3, ///< No attack and no mission; carries land units.
+};
+inline constexpr int ship_class_count = 4;
+
+/// A ship's mission. APPEND-ONLY (saved, and carried in `corp_command::order`).
+enum class sea_mission : uint8_t
+{
+    none     = 0, ///< Unassigned: lies at its home port.
+    patrol   = 1, ///< Raises its side's detection in the zone; engages what it finds.
+    escort   = 2, ///< Covers its nation's sea legs through the zone.
+    raid     = 3, ///< Takes hostile sea legs through the zone.
+    blockade = 4, ///< Holds the water at a hostile port's mouth.
+};
+inline constexpr int sea_mission_count = 5;
+
+/// The most provinces one assignment may name (the verb's fixed-size field).
+inline constexpr std::size_t k_sea_mission_provinces_max = 8;
+
+/// A ship's HP is held in parts per million of its full HP, as a wing's is.
+inline constexpr int32_t k_ship_hp_full = 1000000;
+
+struct sea_ship
+{
+    entity_id owner     = null_entity; ///< The nation that sails it.
+    entity_id home_port = null_entity; ///< Its port: raised at, supplied and refit at.
+    entity_id tile      = null_entity; ///< The water tile it stands on.
+    uint16_t  type      = 0;           ///< Sea roster row (sea_combat.hpp `ship_roster_table`).
+    int32_t   hp_ppm    = k_ship_hp_full; ///< HP, ppm of full. At 0 the ship is sunk.
+    int32_t   morale_permille        = 1000; ///< Scales its attack.
+    int32_t   supply_factor_permille = 1000; ///< Steered by its upkeep draw, as a unit's.
+    int32_t   muster_days = 0;         ///< Days left raising it; it does nothing until 0.
+    bool      refitting = false;       ///< Those days are a refit's: a fielded ship, not a hire.
+    int32_t   sail_bank_permille = 0;  ///< Part of a tile sailed, per-mille of a day.
+    bool      returning = false;       ///< Broken off: making for home until mended.
+    unit_design kit{};                 ///< The design it was raised to (hull/armament/sensors).
+    sea_mission mission = sea_mission::none;
+    std::vector<uint32_t>  provinces;  ///< The zone, ascending, <= k_sea_mission_provinces_max.
+    std::vector<entity_id> route;      ///< Water tiles still to sail, next first.
+    /// BL-1531: the coast tile a transport is ordered to land on, or null.
+    entity_id landing_tile = null_entity;
+    /// BL-1531: days of the landing still to run, once it lies off that coast.
+    int32_t   landing_days = 0;
+    /// BL-1531: the land units aboard, ascending id. They are OUT of `world::units` while here,
+    /// for the reason a ship is not a unit: no land pass walks them, so none can march, fight,
+    /// feed or starve one. They go down with the ship.
+    std::vector<std::pair<entity_id, unit_component>> aboard;
 };
 
 /// BL-1427 (fronts; MILITARY.md § Fronts): a front's order. Hold is the default and
@@ -2724,6 +2802,10 @@ struct nation_component
     /// of every non-base item fitted, at most one per (air class, slot), ascending.
     /// Written only by `set_air_design`. Saved (world_save_version 65).
     std::vector<uint16_t> air_design_kit;
+    /// BL-1527 (MILITARY.md § Sea): the ship kit catalogue ids of the NON-BASE items of
+    /// this nation's live ship designs (unit_designs.hpp `ship_kit_catalogue`), ascending,
+    /// at most one per (class, slot). Written only by `set_ship_design`. Saved (v81).
+    std::vector<uint16_t> ship_design_kit;
 
     /// BL-1463 (MILITARY.md § Recruits, Ben 2026-10-30): the nation's ONE land pool and
     /// ONE air pool of recruits, in heads. Filled each quarter by its bases

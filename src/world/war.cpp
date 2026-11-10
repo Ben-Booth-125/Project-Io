@@ -1080,6 +1080,14 @@ void eliminate_nation(world& w, const sentiment_params& p, entity_id ended, enti
     }
     for (auto it = w.wings.begin(); it != w.wings.end();)
         it = it->second.owner == ended ? w.wings.erase(it) : std::next(it);
+    // The naval merge: its fleet ends with its army. Each of its ships leaves the world with
+    // everyone aboard, and every side's sighting of it; its own sightings and its ship
+    // designs clear (what the v88 loader refuses on an ended nation).
+    for (auto it = w.ships.begin(); it != w.ships.end();)
+        it = it->second.owner == ended ? w.ships.erase(it) : std::next(it);
+    for (auto it = w.sea_sightings.begin(); it != w.sea_sightings.end();)
+        it = (it->first == ended || w.ships.count(it->second) == 0) ? w.sea_sightings.erase(it) : std::next(it);
+    w.nations.at(ended).ship_design_kit.clear();
     w.musters.erase(std::remove_if(w.musters.begin(), w.musters.end(),
                                    [&](const muster_order& m) { return m.owner == ended; }),
                     w.musters.end());

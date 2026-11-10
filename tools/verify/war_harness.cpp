@@ -184,6 +184,7 @@ std::size_t tail_after_refusals(const world& w)
 {
     return world_save_contributors_section_bytes(w) + world_save_occupation_section_bytes(w)
          + world_save_defend_section_bytes(w) + world_save_research_books_section_bytes(w)
+         + world_save_ships_section_bytes(w) // the naval merge: v88 stacks the naval sections here
          + world_save_growth_carry_section_bytes(w) + world_save_ended_section_bytes(w);
 }
 
@@ -1163,8 +1164,9 @@ int main()
             std::istringstream in(v80, std::ios::binary);
             check(read_world_snapshot(old, in) && !old.nations.at(f.B).ended
                       && to_bytes(w).size() == v80.size() + world_save_ended_section_bytes(w)
+                                                 + world_save_ship_hulls_bytes(w) + world_save_ships_section_bytes(w) // the naval merge (v88)
                       && cleared.state_hash(0) == old.state_hash(0),
-                  "E12 a v82 stream (before the flag) loads with every nation not ended, and is the v83 stream less the section");
+                  "E12 a v82 stream (before the flag) loads with every nation not ended, and is the v88 stream less the section, the ship-hulls column and the naval sections");
         }
         {
             world bad = w;
@@ -1919,7 +1921,7 @@ int main()
         write_world_snapshot_pre_refusals(w, o74);
         const std::string b74 = o74.str();
         world old;
-        check(world_save_refusals_section_bytes(w) == 4 + 12 && b74.size() + 16 + world_save_airframes_bytes(w) /* BL-1436: v74 is 54 wide */ + tail_after_refusals(w) == b.size()
+        check(world_save_refusals_section_bytes(w) == 4 + 12 && b74.size() + 16 + world_save_airframes_bytes(w) /* BL-1436: v74 is 54 wide */ + world_save_ship_hulls_bytes(w) /* BL-1527 */ + tail_after_refusals(w) == b.size()
                   && from_bytes(b74, old) && old.peace_refusals.empty() && old.wars.size() == 1,
               "RF3 a v74 stream (today's less the 16-byte refusals section) reads as a world with no refusals");
         const auto refused = [&](std::string bad, const char* what) {

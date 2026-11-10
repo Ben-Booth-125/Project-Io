@@ -8,6 +8,8 @@
 #include "world/history_log.hpp"            // seed_genesis_history
 #include "world/nation_generation.hpp"      // BL-1474: seed_major_opening_armies
 #include "world/recipe_registry.hpp"
+#include "world/sea_combat.hpp"            // BL-1532: seed_major_opening_fleets
+#include "world/market_clearing.hpp"       // BL-1551: market_for_tile
 #include "world/road_generation.hpp"        // BL-1347: lay_site_roads, after the stampers
 #include "world/survey_system.hpp"          // init_survey_states
 #include "world/world.hpp"
@@ -159,6 +161,24 @@ std::int64_t finish_campaign_weight_ms(const world_params& params)
 {
     return generation_step_cost_ms(k_label_search, params)
          + generation_step_cost_ms(k_label_settle, params);
+}
+
+void seed_arms_reserve(world& w)
+{
+    int stocked = 0;
+    for (const auto& [nid, nc] : w.nations)
+    {
+        (void)nid;
+        const entity_id mid = nc.capital_tile != null_entity ? market_for_tile(w, nc.capital_tile) : null_entity;
+        const auto mit = w.markets.find(mid);
+        if (mit == w.markets.end())
+            continue;
+        mit->second.inventory[static_cast<std::size_t>(resource_type::small_arms)]        += 12.0f;
+        mit->second.inventory[static_cast<std::size_t>(resource_type::armoured_vehicles)] += 8.0f;
+        mit->second.inventory[static_cast<std::size_t>(resource_type::artillery_pieces)]  += 6.0f;
+        ++stocked;
+    }
+    std::printf("[arms reserve] %d nation(s) stocked at their capital market\n", stocked);
 }
 
 finish_campaign_result finish_campaign_world(world& w, generation_report& report,
@@ -547,6 +567,13 @@ finish_campaign_result finish_campaign_world(world& w, generation_report& report
                     s.sites_roadless, s.sites_joined, s.sites_failed, s.crossings_laid);
         std::fflush(stdout);
     }
+    // BL-1532 (MILITARY.md § Sea, "A major's opening fleet is fixed", Ben 2026-11-07): the
+    // kit's ships at each major's ports. After every step that places or removes a port (the
+    // seeding, the stacked hubs, the cut), before the settle, so the settle's upkeep draws on
+    // the fleet the handoff carries.
+    if (kit != nullptr && kit->has_fleet())
+        print_opening_fleets(seed_major_opening_fleets(w, kit->fleet, kit->fleet_per_port, kit->sea_recruits));
+    seed_arms_reserve(w);
     out.ms_search = ms_between(t_search, fin_clock::now());
     report_step_ms(progress, k_label_search, out.ms_search);
 

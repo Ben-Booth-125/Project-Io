@@ -281,6 +281,14 @@ buildings carry their nation.
 The walk fills the home economy: centre by centre, it spends each charter budget on charters, each
 placed under Pass 3's rules on its nation's ground. Every building it places is the nation's.
 
+**The plant floor: every nation opens with a plant (Ben, 2026-11-09).** The walk spends from the
+richest centres down and fills the body's gaps, so a poor nation's centres would find the gaps
+already served and open with no plant, and so with no income. So before the walk proper every
+budgeted centre is visited once in the same order, and each buys **one firm** for a nation that
+has not yet had its floor: the nation's richest centre first, the next if that one finds no ground.
+The firm is chosen and placed by the walk's own rules and paid from the centre's own firm budget. A
+nation none of whose centres can afford a firm or place one still opens without a plant.
+
 **The legacy per-resource cap retires with the legacy path (Ben, 2026-10-23).** It capped a body at 8
 firms per demanded good, which made density a function of the basket's breadth (Ben, 2026-09-06;
 no 0.90 production-to-demand ratio ever bound). On the one path that remains, the per-good cap
@@ -413,9 +421,11 @@ credits (`NATION_GENERATION.md` § Pass 7).
 **Why these processors.** Each one runs on day one, which the hard rules of § Pass 3 require. The
 steel, copper and machinery slots are one chain: iron ore and coal make steel, copper ore makes
 refined copper, and the two make machinery. Ordnance, which every unit draws, is machinery and steel,
-so a major can make it as its first build. **No Arms Works is in the kit:** each class opens on its base kit, which costs no
-goods (`../military/MILITARY.md` § Land — the classes), so nothing would buy its output until kit is
-researched, and an idle plant the player inherits reads as a broken economy (§ Pass 3).
+so a major can make it as its first build. **Arms Works are in the kit (Ben, 2026-11-08):** one each for small arms, armoured vehicles and
+artillery pieces, since every class is raised and refilled with its equipment. A works whose inputs are out of reach still opens, idle until they arrive
+(`../military/MILITARY.md` § What a force costs). **Every nation, major or minor, opens with a reserve
+of those three goods on its shelves**, so a nation can raise its first force before its works or its
+imports arrive.
 
 **Every kit placement passes § Pass 3's rules, with want read at the major's own markets (Ben,
 2026-11-03).** Own ground, `can_place`, chain-feasible and sized to spare input bind a kit building
@@ -457,7 +467,10 @@ is kept, again and again while one adds any. Cover is read over the kept nodes a
 the capital. A kit building the cap strands has no cover, so it runs at zero output and idles. The
 remaining slots fill in the order the Logistic Point seeding lays them out from the capital
 (`../economy/LOGISTICS.md` § Where generation puts the sources). The seeding lays any slot still
-open, and a node beyond the slot count is taken up.
+open, and a node beyond the slot count is taken up. **The last port slot is a sea berth (Ben,
+2026-11-07).** The kit's fleet lies at a port with a sea mouth, and a lake's shore is none. While a
+sea-mouthed port stands on the major's ground and none is kept, the last open port slot takes only a
+sea-mouthed port; kit cover still decides which one.
 
 **The kit stands within the capped network's reach (Ben, 2026-11-04).** A kit extractor or processor
 the cap leaves without cover is laid again on covered ground of the major's. An extractor digs the
@@ -485,15 +498,16 @@ go on the shelf of its own market. A fresh chain otherwise starts empty-shelved 
 before its feeders deliver; the reflex then idles the processor, and with it the feeder that had no
 buyer.
 
-**The kit opens with its own treasury and army.** The flat treasury is `NATION_GENERATION.md`
-§ Pass 7's, and the fixed army is `../military/MILITARY.md` § Nation garrisons'. The settle then runs as
-it does for every nation, on a chest the table authors for it, and at the handoff every major is set to
-the same credits (Ben, 2026-11-05): the treasury is equal there, where the rest of parity is measured.
+**The kit opens with its own treasury, army and fleet.** The flat treasury is `NATION_GENERATION.md`
+§ Pass 7's, the fixed army is `../military/MILITARY.md` § Nation garrisons', and the fixed fleet is
+`../military/MILITARY.md` § Sea's. The settle then runs as it does for every nation, on a chest the
+table authors for it, and at the handoff every major is set to the same credits (Ben, 2026-11-05):
+the treasury is equal there, where the rest of parity is measured.
 **Construction prices never shrink a kit (Ben, 2026-11-07):** the kit is not bought, and foundings and
 the settle's sites stay on the authored bills (`../economy/PRODUCTION.md` § What construction costs at
 the opening).
 
-**The kit is data.** Its slots, counts, treasury and army are one authored table, so a configuration
+**The kit is data.** Its slots, counts, treasury, army and fleet are one authored table, so a configuration
 under test is an edit, not a code change. Standard (27 buildings) is the comparison point Rich-core
 was chosen over (Ben, 2026-11-03).
 
