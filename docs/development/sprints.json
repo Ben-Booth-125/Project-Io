@@ -121,7 +121,7 @@
    "id": 66,
    "theme": "Far space (v0.5.0)",
    "state": "open",
-   "status_line": "open: every item built except BL-1611 (far-space spectator check), gated on NR-1203, and BL-1635 (ownerless harness failures); four live clicks owed (NEXT_SESSION.md)",
+   "status_line": "open: every item built except BL-1611 (far-space spectator check), gated on NR-1203; four live clicks owed (NEXT_SESSION.md)",
    "opened_date": "2026-11-10",
    "closed_date": null,
    "author": "Claude (Ben, 2026-11-10: deliver v0.4.0 and v0.5.0 in lanes)",

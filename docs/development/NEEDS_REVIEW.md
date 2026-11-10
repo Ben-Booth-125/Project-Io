@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*76 entries — 73 open, 3 resolved.*
+*77 entries — 74 open, 3 resolved.*
 
 ---
 
@@ -950,6 +950,20 @@ BL-1634 (garrison chase loop): units on a defend order now step last in the dail
 > **Recommendation:** Accept: one sentence, deterministic, reuses the existing targeting.
 
 *Files: `src/world/economy_system.cpp`, `docs/military/MILITARY.md`, `src/world/world_save.cpp`*
+
+### NR-1214 — Research pacing has drifted out of its pin (first research comes sooner and less evenly): re-pin, or treat it as a fold defect
+*question · raised 2026-11-10 · from BL-1635 lane report*
+
+nation_tech_harness R0h pins median quarters-to-first-research in [16,24]; R0i pins p10 >= 8. Pooled over the 16 library seeds: 10-15 db77bdde 20/11; 10-23 17/9; 10-24 17/7 (R0i first fails, the nations-own-everything wave); 10-25 15/5 (R0h first fails); 11-01 19/6; 11-03 15/5; HEAD 15/6. The largest single step on a two-seed probe (46/28) is f1d05dfc BL-1402 (fold to ground): 15/15 to 12/12, then small drops at the road-join, site-days and port-links commits. The seed re-curation is not the cause. Not re-pinned. Also from the same lane: well_gate shields its fixture from the rival dial with ai_cooldown = 8 (seating the player conflicts with the harness's seat move); railway R7/D now compares against a twin world with the track erased, since a nation may briefly run a negative treasury (BL-1482).
+
+**Why it matters.** Research is reached faster and more unevenly than the pacing band intends; either the band or the fold is wrong.
+
+- Re-pin the band to the post-fold reading (median 15, p10 6)
+- Treat it as a fold defect and file the work
+
+> **Recommendation:** Your call: the drift is the cost of nations owning their ground, and it is not obviously wrong.
+
+*Files: `tools/verify/nation_tech_harness.cpp`, `src/world/state_industry.cpp`*
 
 ---
 

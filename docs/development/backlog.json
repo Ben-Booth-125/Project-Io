@@ -2307,8 +2307,8 @@
    "design": "Seen on any body: the lower-id attacker steps first each day, the push prefers empty tiles, and the defender walks onto the tile the attacker just left, so they never meet. war_bodies_harness clears the defend order before its battle to avoid it. Diagnose the step order and fix so a defender closing on a pusher meets it."
   },
   {
-   "status": "designed",
-   "glyph": "○",
+   "status": "complete",
+   "glyph": "●",
    "version_goal": "v0.5.0",
    "written": "2026-11-10",
    "parked": false,
@@ -2331,7 +2331,31 @@
     "tools/verify/tax_discontent_harness.cpp"
    ],
    "title": "Three harnesses fail with or without the space work: construction (8), well_gate (5), nation_tech pacing R0h/R0i",
-   "design": "Confirmed by rebuilding with the lane's files reverted: construction_harness C.R2/R3/R4/R8 (8 rows), well_gate E1/W5/W7 (5 rows), nation_tech_harness R0h/R0i (research pacing, median 14, p10 6). Find which commit broke each; fix or re-pin with a cause comment (pacing re-pins are Ben's). Also left by BL-1632 (not tail-offset problems): railway_harness R6 relabels a v55 body as v48 although the tile record changed at v53 (use the pre-edge writer lp_pool uses), R4 and R7/D (rail logic); lp_pool \"M seed 0: every consumer reached after seeding\" (logistics reach); tax_discontent T6 (the v51 hash compares with a hand-zeroed world that misses later state)."
+   "design": "Confirmed by rebuilding with the lane's files reverted: construction_harness C.R2/R3/R4/R8 (8 rows), well_gate E1/W5/W7 (5 rows), nation_tech_harness R0h/R0i (research pacing, median 14, p10 6). Find which commit broke each; fix or re-pin with a cause comment (pacing re-pins are Ben's). Also left by BL-1632 (not tail-offset problems): railway_harness R6 relabels a v55 body as v48 although the tile record changed at v53 (use the pre-edge writer lp_pool uses), R4 and R7/D (rail logic); lp_pool \"M seed 0: every consumer reached after seeding\" (logistics reach); tax_discontent T6 (the v51 hash compares with a hand-zeroed world that misses later state). Outcome: construction, well_gate, railway R4/R6/R7, tax_discontent T6 fixed as harness defects (9b2f436d). nation_tech R0h/R0i is a world drift left for Ben (NR-1214). lp_pool M seed 0 is a real regression, filed as BL-1636 (lp seeding coverage gap)."
+  },
+  {
+   "status": "designed",
+   "glyph": "○",
+   "version_goal": "v0.6.0",
+   "written": "2026-11-10",
+   "parked": false,
+   "blocked_on": null,
+   "requires": [],
+   "sprint": null,
+   "author": "Claude (BL-1635 lane report)",
+   "category": "Economy",
+   "priority": "B",
+   "difficulty": 2,
+   "id": "BL-1636",
+   "short_name": "LP_SEEDING_COVERAGE_GAP",
+   "authority_doc": "docs/economy/LOGISTICS.md",
+   "files": [
+    "src/world/logistic_points.cpp",
+    "src/world/opening_kit.cpp",
+    "tools/verify/lp_pool_harness.cpp"
+   ],
+   "title": "Logistic Point seeding reports every hub connected, yet a few consumers on a nation's ground stay uncovered",
+   "design": "lp_pool_harness \"M seed 0: every consumer on a nation's ground is reached after seeding\" passes at 61aaa8e7 (306 of 306) and fails from merge d9996661 BL-1473 (major opening kit): 7 of 290 uncovered then, 3 of 365 at the space branch tip, while the seeding log says \"0 no hub could connect, 0 cut off\". The retry loop (logistic_points.cpp ~2326) and the coverage read (lp_seed_read ~2555) disagree. Suspects: dcc117ee (own-market want, calibrated feed, logistics cap) and the kit logistics cap in opening_kit.cpp, which NR-1128 says keeps capital-stacked hubs out of the hub slots. Fix so seeding and coverage agree; a world-mover, so digests may move."
   }
  ]
 }

@@ -15,7 +15,8 @@ is on branch **`claude/space-mechanics-design`** (worktree `.claude/worktrees/sp
     draw, the Space ledger and designer.
 - **Sprint 66, far space (v0.5.0):** every item complete except BL-1611 (far-space spectator
   check), blocked on NR-1203. BL-1632 (stale tail harnesses) and BL-1634 (garrison chase loop) are
-  done; BL-1635 (ownerless harness failures) is open.
+  done. BL-1635 (ownerless harness failures) fixed six harnesses and left two: research pacing
+  (NR-1214) and a Logistic Point seeding gap, filed as BL-1636 (lp seeding coverage gap).
   - space unit designs and movement, Haulers, battles, debris, blockade and bombardment, mapping
     then prospecting, off-world bases, war across bodies, front pins, the propellant loop, solar
     storms, space firsts, the Early Space tree (researchable, with its surfaces), the transit
@@ -60,10 +61,13 @@ It is the economy that refuses the goods, not the agent that fails to ask.
 - **NR-1203** (the trade wall). Everything in § 2 waits on it.
 - **Verify-read grants:** NR-1208 (seven fleet reads) and NR-1211 (four base and prospect reads).
   Both would become scoped exceptions in `.claude/rules/io-standing-rules.md`.
-- **Calls taken on your behalf:** NR-1195 through NR-1213; `docs/development/NEEDS_REVIEW.md`.
-- **Digest re-pin (NR-1167):** on your go only.
+- **Calls taken on your behalf:** NR-1195 through NR-1214; `docs/development/NEEDS_REVIEW.md`.
+- **Digest re-pin (NR-1167):** on your go only. BL-1634 (garrison chase loop) moves the campaign
+  march too (NR-1213).
+- **Research pacing (NR-1214):** nation_tech R0h/R0i read median 15, p10 6 against a pin of 16-24
+  and 8. Re-pin or treat as a fold defect.
 - **Ids that collide with main (NR-1198):** main holds BL up to 1618, NR-1181..1194 and save v88
-  (naval). This branch uses BL-1580..1635, NR-1195..1213 and saves v81..v92. A renumber pass is due
+  (naval). This branch uses BL-1580..1636, NR-1195..1214 and saves v81..v92. A renumber pass is due
   at the merge.
 
 ## 4. Live clicks owed
@@ -84,5 +88,7 @@ It is the economy that refuses the goods, not the agent that fails to ask.
 - **Two hunks ending before a shared closing tail lose a brace** when both sides are kept.
 - **The worktree guard refuses complex inline shell** (variables, loops, awk). Write a script.
 - **market_viability quick ends about 1972**, before Rocketry. It cannot see a space change.
+- **A leftover bisect worktree** sits at `.claude/worktrees/agent-a5cf6fdf02ee72311/build_gen/bisect_wt`
+  (detached at 7820944c, scratch only). Remove it with `git worktree remove` from the main checkout.
 - Older traps still stand: shell heredocs eat `\n`; `sed -i` rewrites CRLF as LF; never `taskkill`
   cl.exe; NR ids mint across hot and cold; background build exit codes are the echo's.
