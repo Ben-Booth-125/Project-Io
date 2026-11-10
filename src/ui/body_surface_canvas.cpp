@@ -6585,6 +6585,13 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             }
             by_tile[ht].push_back({ &m, p });
         }
+        // THE MARKER KEEPS ITS CONVOY (Ben, 2026-11-09: the jitter on stacking). A tile's
+        // one marker is drawn at its lead convoy's point; the lead was the lowest id, so a
+        // lower-id convoy catching another up on its tile moved the marker from one point
+        // to the other in a frame. The convoy a tile's marker drew last frame stays its
+        // lead while it is still there; the lowest id leads a tile only when none does.
+        static std::unordered_map<entity_id, std::uint32_t> s_convoy_lead;
+        std::unordered_map<entity_id, std::uint32_t> convoy_lead_now;
         const float cr = std::max(6.0f, draw_r * 0.24f);
         // The count reads at the marker's scale, and never below legible.
         const float count_font = std::max(ImGui::GetFontSize() * 0.75f, cr * 1.1f);
@@ -6606,6 +6613,12 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 }
                 hovered = hovered || marks[i].m->id == state.hovered_convoy;
             }
+            if (!selected)
+                if (const auto pl = s_convoy_lead.find(tile); pl != s_convoy_lead.end())
+                    for (std::size_t i = 0; i < marks.size(); ++i)
+                        if (marks[i].m->id == pl->second)
+                            lead = i;
+            convoy_lead_now[tile] = marks[lead].m->id;
             const ui_state::convoy_marker& m = *marks[lead].m;
             // The point along the lane: between the two tiles whose clock brackets p.
             const std::size_t n = m.path.size();
@@ -6682,6 +6695,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 state.convoy_zones.push_back(z);
             }
         }
+        s_convoy_lead.swap(convoy_lead_now);
     }
     {
         // Hover: the nearest marker under the pointer, with no lens (BL-664). One frame
@@ -6712,6 +6726,22 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     // on the spot a standing counter holds. The hit zone follows the drawn point. A march
     // past the survey is not drawn. Where its own side still stands on the tile it left,
     // the counter opens a third of a hop ahead so the two never sit one on the other.
+    //
+    // THE OPENING EASES (Ben, 2026-11-09: "jitter ... when stacking / unstacking"). It
+    // was a step: a third of a hop added the frame a stack stood behind and taken away
+    // the frame it went, so the counter leapt whenever the stack it left changed - and a
+    // march leaving a stack opened a third of a hop away from it in one frame. Each
+    // marching unit now carries an opening weight that walks toward 1 (a stack behind)
+    // or 0 (none) by a fixed share a frame, so the counter slides. View state only.
+    static std::unordered_map<entity_id, float> s_glide_open;
+    {
+        std::unordered_map<entity_id, float> kept;
+        for (const unit_glide& g : state.unit_glides)
+            for (const entity_id uid : g.ids)
+                if (const auto it = s_glide_open.find(uid); it != s_glide_open.end())
+                    kept.emplace(uid, it->second);
+        s_glide_open.swap(kept); // a unit that stopped marching starts afresh next time
+    }
     if (draw_r >= 6.0f)
     {
         const float local_period = static_cast<float>(gw) * col_step;
@@ -6729,7 +6759,14 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             if (const auto st = tile_units.find(g.from); st != tile_units.end())
                 for (const unit_marker_summary& s : st->second)
                     if (s.owner == g.owner) stack_behind = true;
-            const float t = stack_behind ? 0.35f + 0.65f * g.t : g.t;
+            constexpr float k_open_step = 0.08f; // of the opening, per frame: ~12 frames
+            float open = 0.0f;
+            if (const auto it = s_glide_open.find(g.ids.front()); it != s_glide_open.end())
+                open = it->second;
+            open += std::clamp((stack_behind ? 1.0f : 0.0f) - open, -k_open_step, k_open_step);
+            for (const entity_id uid : g.ids)
+                s_glide_open[uid] = open;
+            const float t = g.t + 0.35f * (1.0f - g.t) * open;
             const ImVec2 a = hex_local_centre(ta->second.grid_x, ta->second.grid_y, hex_size);
             ImVec2       b = hex_local_centre(tb->second.grid_x, tb->second.grid_y, hex_size);
             // The hop across the seam goes the short way round the cylinder.
