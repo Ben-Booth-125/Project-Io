@@ -404,6 +404,9 @@ int main(int argc, char** argv)
             }
             // What a standing plant truly earned, beside what the door would quote.
             if (k == 4 || k == 20)
+            {
+                // The Method lever's question of the same plant: quote_site with it running.
+                site_quote_context acx = make_site_quote_context(w, seed_reg, &tick.report);
                 for (const entity_id nid : majors)
                 {
                     const auto nit = w.nations.find(nid);
@@ -421,11 +424,15 @@ int main(int argc, char** argv)
                         float run = 0.0f;
                         for (const building_report& br : tick.report.buildings)
                             if (br.building == a) { run = br.run; break; }
-                        std::printf("ACTUAL seed=%d nation=%llu q=%d name=%s idled=%d run=%.2f actual=%.2f quoted=%.2f\n",
+                        const site_quote lever = quote_site(w, seed_reg, acx, b->second.tile, b->second.type,
+                                                            b->second.target_resource, b->second.recipe, 1.0f, a, &b->second);
+                        std::printf("ACTUAL seed=%d nation=%llu q=%d name=%s idled=%d run=%.2f actual=%.2f quoted=%.2f lever=%.2f lstarved=%d\n",
                                     seed, static_cast<unsigned long long>(nid), k, rc->name.c_str(),
-                                    b->second.decommissioned ? 1 : 0, run, actual.net(), quoted.net());
+                                    b->second.decommissioned ? 1 : 0, run, actual.net(), quoted.net(),
+                                    lever.profit.net(), lever.starved ? 1 : 0);
                     }
                 }
+            }
 
             if (k == 4 || k == 8 || k == 20 || k == 40 || k == 80)
                 for (const entity_id nid : majors)
