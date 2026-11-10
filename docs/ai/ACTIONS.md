@@ -779,6 +779,7 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 **Valid when:**
 - The unit exists (rejected_invalid otherwise) and is the actor's own (rejected_not_owner otherwise).
 - A non-null `tile` lies in one of the actor's own fronts (rejected_invalid otherwise).
+- That front lies on the body the unit stands on: a land unit never marches between bodies (rejected_invalid otherwise; MILITARY.md § Space, 'A war spans every body').
 - The assignment changes something: not the same front again, not unassigning an unassigned unit (rejected_state otherwise).
 - No terrain precondition: a unit is assigned whatever the ground of the span. Its slots then skip ground its land class cannot enter (see the output; BL-1455, terrain class modifiers).
 
