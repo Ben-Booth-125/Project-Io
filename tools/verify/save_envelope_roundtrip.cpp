@@ -29,6 +29,11 @@
 //       exactly as they were (the atomicity `read_save_game` documents).
 //   S9  BL-1278: a v22 stream (v23 minus its tail targets) reads, targets 0.
 //   S10 BL-1278: an illegal nation-target pair is refused whole.
+//   S11 SAVE_BUILDING_REPORT (v27): the last economy report's read slice and the
+//       corp standings round-trip field-exact; the rebuilt indices equal live ones.
+//   S12 A v25 stream (no report tail) reads whole and opens with an empty report.
+//   S13 The v27 tail is untrusted: a hostile count, a bad enum byte, a non-finite
+//       float, a truncated tail are each refused, destination untouched.
 //
 // Kept outside src/ so the CMake game glob does not pull it into the build.
 
@@ -41,6 +46,8 @@
 #include <cstdio>
 #include <cstring>
 #include <filesystem>
+#include <iterator>
+#include <limits>
 #include <fstream>
 #include <string>
 #include <vector>
@@ -1021,7 +1028,7 @@ int main()
     // world a v75 snapshot, reads whole: the first 54 slots as written, airframes 0.
     // -----------------------------------------------------------------------
     {
-        static_assert(save_game_version == 25 && save_game_version_pre_airframes == 24,
+        static_assert(save_game_version_airframes == 25 && save_game_version_pre_airframes == 24,
                       "S9c pins v25 as airframes' envelope layout");
         world w = make_world();
         save_envelope env = make_envelope();
@@ -1062,6 +1069,341 @@ int main()
         be.speed = 77;
         check(!read_save_game(k_path, bw, be) && be.speed == 77,
               "S9c a 54-wide file stamped v25 is REFUSED, destination untouched");
+    }
+
+    // -----------------------------------------------------------------------
+    // S11 -- SAVE_BUILDING_REPORT (save_game_version 27): the last economy
+    // report's read slice and the corp standings round-trip FIELD-EXACT, and
+    // the indices the reader rebuilds equal the ones a live report holds.
+    // S12 -- a v25 stream (no tail) still reads whole and opens with an EMPTY
+    // report, as every load did before v27.
+    // -----------------------------------------------------------------------
+    static_assert(save_game_version == 27 && save_game_version_econ_report == 27
+                      && save_game_version_pre_econ_report == 25,
+                  "S11/S12 pin v27 as the last-report layout over a v25 prefix");
+    {
+        world w = make_world();
+        save_envelope env = make_envelope();
+        economy_report& r = env.last_econ_report;
+        // The fixture's ids run to 9000: a report row count is capped by the ids the
+        // world has issued (S13), so the hand-built world must have issued them.
+        w.set_next_entity_id(9000);
+        // Every field a distinct non-dyadic value, so a field read into its
+        // neighbour shows.
+        for (int k = 0; k < 3; ++k)
+        {
+            building_report b;
+            b.building = 7001 + k;
+            b.corp     = 61 + k;
+            b.body     = 3;
+            b.type     = k == 0 ? building_type::extraction_site : building_type::processing_facility;
+            b.target_resource = resource_type::copper_ore;
+            b.recipe   = static_cast<uint16_t>(11 + k);
+            b.active   = k != 1;
+            b.idle     = k == 1;
+            b.exhausted = k == 2;
+            b.output_quantity     = 3.3f + k;
+            b.effective_workforce = 0.7f + 0.1f * k;
+            b.has_limiting   = k == 2;
+            b.limiting_input = resource_type::coal;
+            b.run            = 0.45f + 0.1f * k;
+            for (std::size_t g = 0; g < resource_count; ++g)
+            {
+                b.wanted[g]     = 0.3f * static_cast<float>(g + 1) + 0.01f * k;
+                b.suppressed[g] = 0.7f * static_cast<float>(g + 2) - 0.03f * k;
+            }
+            r.buildings.push_back(b);
+        }
+        corp_budget cb;
+        cb.income = 101.1f; cb.expenditure = 22.3f; cb.maintenance = 3.7f; cb.wages = 9.9f;
+        cb.interest = 0.3f; cb.levies = 1.1f; cb.upkeep = 2.9f; cb.force_units = 5;
+        cb.force_unsupplied = 2; cb.subsidies = 4.1f; cb.taxes = 6.7f;
+        r.budgets[61] = cb;
+        cb.income = -7.7f;
+        r.budgets[62] = cb;
+        r.workforce_contention[{61, 3}] = 0.83f;
+        r.workforce_contention[{62, 3}] = 0.37f;
+        r.building_labour[7001] = 0.91f;
+        r.building_labour[7003] = 0.13f;
+        r.upkeep_unmet = {7002, 7003};
+        lp_tick& lp = r.logistic_points;
+        {
+            lp_nation_row n;
+            n.nation = 61; n.pool = 77.7f; n.supply_claim = 5.3f; n.supply_granted = 4.9f;
+            n.made = {1.1f, 2.2f, 3.3f}; n.sources = {4, 5, 6}; n.claim = {0.1f, 0.2f, 0.3f};
+            n.granted = {0.4f, 0.5f, 0.6f}; n.rule_set = true; n.left = {7.1f, 7.2f, 7.3f};
+            n.trade_drawn = 8.9f;
+            lp.nations.push_back(n);
+            lp_source_row s;
+            s.building = 7100; s.tile = 900; s.nation = 61; s.network = lp_network::sea;
+            s.made = 12.5f; s.connected = false;
+            lp.sources.push_back(s);
+            lp_building_row br;
+            br.building = 7001; br.owner = 61; br.nation = 61; br.cls = lp_class::champion;
+            br.need = 10.3f; br.coverage = 0.77f; br.granted = 7.1f; br.fraction = 0.69f;
+            lp.buildings.push_back(br);
+            br.building = 7003; br.cls = lp_class::other; br.fraction = 0.21f;
+            lp.buildings.push_back(br);
+            lp_supply_row su;
+            su.unit = 8001; su.nation = 61; su.tile = 901; su.need = 3.3f; su.cover = 0.6f;
+            su.granted = 1.9f; su.paid_tile = 902; su.draw_steps = 3; su.share_permille = 575;
+            su.recruits_delivered = 4;
+            lp.supplies.push_back(su);
+            lp.trade_anchors[40] = lp_trade_anchor{61, 0.55f};
+            lp.trade_anchors[41] = lp_trade_anchor{null_entity, 0.0f};
+            lp.resolved = true;
+        }
+        env.last_corp_standings.push_back(corp_standing{61, true, 2, 1234.5f, 0.375f, true});
+        env.last_corp_standings.push_back(corp_standing{62, false, 1, -55.25f, 0.125f, false});
+        // The live indices, as run_economy_step / resolve_logistic_points leave them.
+        rebuild_report_indices(r);
+
+        check(write_save_game(k_path, w, env), "S11 a v27 file with a last report was written");
+        world         lw;
+        save_envelope le;
+        const bool ok = read_save_game(k_path, lw, le);
+        check(ok, "S11 the v27 file reads back whole");
+        const economy_report& g = le.last_econ_report;
+
+        bool rows = ok && g.buildings.size() == r.buildings.size();
+        for (std::size_t k = 0; rows && k < r.buildings.size(); ++k)
+        {
+            const building_report& a = r.buildings[k];
+            const building_report& b = g.buildings[k];
+            rows = a.building == b.building && a.corp == b.corp && a.body == b.body
+                && a.type == b.type && a.target_resource == b.target_resource
+                && a.recipe == b.recipe && a.active == b.active && a.idle == b.idle
+                && a.exhausted == b.exhausted && a.output_quantity == b.output_quantity
+                && a.effective_workforce == b.effective_workforce
+                && a.has_limiting == b.has_limiting && a.limiting_input == b.limiting_input
+                && a.run == b.run && a.wanted == b.wanted && a.suppressed == b.suppressed;
+        }
+        check(rows, "S11 every building_report field round-trips, BL-1543 wanted/suppressed included");
+        check(ok && g.building_row == r.building_row && g.building_row.size() == 3
+                  && g.building_row.at(7002) == 1,
+              "S11 building_row is REBUILT on load and equals the live index");
+
+        bool budgets = ok && g.budgets.size() == r.budgets.size();
+        for (const auto& [id, a] : r.budgets)
+        {
+            const auto it = g.budgets.find(id);
+            budgets = budgets && it != g.budgets.end() && it->second.income == a.income
+                   && it->second.expenditure == a.expenditure
+                   && it->second.maintenance == a.maintenance && it->second.wages == a.wages
+                   && it->second.interest == a.interest && it->second.levies == a.levies
+                   && it->second.upkeep == a.upkeep && it->second.force_units == a.force_units
+                   && it->second.force_unsupplied == a.force_unsupplied
+                   && it->second.subsidies == a.subsidies && it->second.taxes == a.taxes;
+        }
+        check(budgets, "S11 budgets round-trip, all eleven fields per corp");
+        check(ok && g.workforce_contention == r.workforce_contention
+                  && g.building_labour == r.building_labour && g.upkeep_unmet == r.upkeep_unmet,
+              "S11 workforce_contention, building_labour and upkeep_unmet round-trip");
+
+        const lp_tick& gl = g.logistic_points;
+        bool lpok = ok && gl.nations.size() == 1 && gl.sources.size() == 1
+                 && gl.buildings.size() == 2 && gl.supplies.size() == 1 && gl.resolved;
+        if (lpok)
+        {
+            const lp_nation_row& a = lp.nations[0];
+            const lp_nation_row& b = gl.nations[0];
+            lpok = a.nation == b.nation && a.pool == b.pool && a.supply_claim == b.supply_claim
+                && a.supply_granted == b.supply_granted && a.made == b.made
+                && a.sources == b.sources && a.claim == b.claim && a.granted == b.granted
+                && a.rule_set == b.rule_set && a.left == b.left && a.trade_drawn == b.trade_drawn;
+            const lp_source_row& sa = lp.sources[0];
+            const lp_source_row& sb = gl.sources[0];
+            lpok = lpok && sa.building == sb.building && sa.tile == sb.tile
+                && sa.nation == sb.nation && sa.network == sb.network && sa.made == sb.made
+                && sa.connected == sb.connected;
+            for (std::size_t k = 0; k < 2; ++k)
+            {
+                const lp_building_row& ba = lp.buildings[k];
+                const lp_building_row& bb = gl.buildings[k];
+                lpok = lpok && ba.building == bb.building && ba.owner == bb.owner
+                    && ba.nation == bb.nation && ba.cls == bb.cls && ba.need == bb.need
+                    && ba.coverage == bb.coverage && ba.granted == bb.granted
+                    && ba.fraction == bb.fraction;
+            }
+            const lp_supply_row& ua = lp.supplies[0];
+            const lp_supply_row& ub = gl.supplies[0];
+            lpok = lpok && ua.unit == ub.unit && ua.nation == ub.nation && ua.tile == ub.tile
+                && ua.need == ub.need && ua.cover == ub.cover && ua.granted == ub.granted
+                && ua.paid_tile == ub.paid_tile && ua.draw_steps == ub.draw_steps
+                && ua.share_permille == ub.share_permille
+                && ua.recruits_delivered == ub.recruits_delivered;
+            lpok = lpok && gl.trade_anchors.size() == 2
+                && gl.trade_anchors.at(40).nation == 61 && gl.trade_anchors.at(40).cover == 0.55f
+                && gl.trade_anchors.at(41).nation == null_entity;
+        }
+        check(lpok, "S11 logistic_points rows (nations, sources, buildings, supplies, anchors) round-trip");
+        check(ok && gl.fraction == lp.fraction && gl.fraction.at(7003) == 0.21f
+                  && gl.supply_share == lp.supply_share && gl.supply_share.at(8001) == 575,
+              "S11 lp fraction and supply_share are REBUILT and equal the live lookups");
+
+        bool st = ok && le.last_corp_standings.size() == 2;
+        for (std::size_t k = 0; st && k < 2; ++k)
+        {
+            const corp_standing& a = env.last_corp_standings[k];
+            const corp_standing& b = le.last_corp_standings[k];
+            st = a.corp == b.corp && a.is_player == b.is_player
+              && a.reach_bodies == b.reach_bodies && a.capital_balance == b.capital_balance
+              && a.market_share == b.market_share && a.capital_disclosed == b.capital_disclosed;
+        }
+        check(st, "S11 the corp standings round-trip, order and every field");
+        check(ok && g.agency_events.empty() && g.wants.empty() && g.purchases.empty()
+                  && g.national_budget.transfers.empty() && g.research.empty(),
+              "S11 the members outside the read slice read back empty");
+        check(ok && le.planetary_pan_y == env.planetary_pan_y
+                  && le.params.major_target == env.params.major_target,
+              "S11 the fields before the tail are untouched by it");
+
+        // A byte-identical re-save: the write is a pure function of what it holds.
+        const std::string p2 = std::string(k_path) + ".2";
+        write_save_game(p2.c_str(), lw, le);
+        auto slurp = [](const std::string& p) {
+            std::ifstream f(p, std::ios::binary);
+            return std::string(std::istreambuf_iterator<char>(f), {});
+        };
+        check(ok && slurp(k_path) == slurp(p2), "S11 a loaded save re-saves byte-identical");
+        std::remove(p2.c_str());
+
+        // S12: the same envelope written at v25 has no tail and opens EMPTY.
+        check(write_save_game_at(k_path, w, env, save_game_version_pre_econ_report),
+              "S12 the verification writer wrote a v25 file");
+        world         vw;
+        save_envelope ve;
+        ve.last_econ_report.buildings.push_back(building_report{}); // must be replaced
+        ve.last_corp_standings.push_back(corp_standing{});
+        const bool vok = read_save_game(k_path, vw, ve);
+        check(vok, "S12 a v25 stream (no report tail) is ACCEPTED");
+        check(vok && ve.last_econ_report.buildings.empty() && ve.last_econ_report.budgets.empty()
+                  && ve.last_econ_report.building_row.empty()
+                  && ve.last_econ_report.logistic_points.buildings.empty()
+                  && !ve.last_econ_report.logistic_points.resolved
+                  && ve.last_corp_standings.empty(),
+              "S12 a v25 stream opens with an EMPTY report and no standings");
+        check(vok && ve.planetary_pan_y == env.planetary_pan_y
+                  && ve.params.major_target == env.params.major_target
+                  && same_market_history(ve.market_history, env.market_history),
+              "S12 the rest of a v25 envelope reads whole");
+        // v26 is BL-1527's layout on another branch, not one this build reads.
+        write_save_game(k_path, w, env);
+        {
+            std::fstream f(k_path, std::ios::binary | std::ios::in | std::ios::out);
+            f.seekp(4, std::ios::beg);
+            const uint32_t v26 = 26; // held by BL-1527's branch; not a layout this build reads
+            f.write(reinterpret_cast<const char*>(&v26), sizeof(v26));
+        }
+        save_envelope be;
+        be.speed = 55;
+        check(!read_save_game(k_path, vw, be) && be.speed == 55,
+              "S12 a stream stamped v26 (another branch's layout) is REFUSED, destination untouched");
+    }
+
+    // -----------------------------------------------------------------------
+    // S13 -- the v27 tail is an untrusted input (cold review of d4d7653b): a
+    // hostile count, an out-of-range enum byte, a non-finite float and a
+    // truncated tail are each REFUSED before anything is allocated or moved,
+    // and the destination world and envelope are left exactly as they were.
+    // The tail's offset is the size of the same envelope written at v25.
+    // -----------------------------------------------------------------------
+    {
+        auto file_size = [](const char* p) {
+            return static_cast<std::uint64_t>(std::filesystem::file_size(p));
+        };
+        auto poke = [](const char* p, std::uint64_t at, const void* bytes, std::size_t n) {
+            std::fstream f(p, std::ios::binary | std::ios::in | std::ios::out);
+            f.seekp(static_cast<std::streamoff>(at), std::ios::beg);
+            f.write(static_cast<const char*>(bytes), static_cast<std::streamsize>(n));
+        };
+        auto refused_untouched = [&](const char* what) {
+            world         lw = make_world();
+            seed_exchanges(lw, 3);
+            save_envelope le;
+            le.speed = 99;
+            le.last_corp_standings.push_back(corp_standing{4242, false, 0, 0.0f, 0.0f, false});
+            const bool ok = read_save_game(k_path, lw, le);
+            check(!ok && le.speed == 99 && le.last_corp_standings.size() == 1
+                      && le.last_corp_standings[0].corp == 4242 && lw.exchanges.size() == 3,
+                  what);
+        };
+
+        // (a)/(c): the S11-shaped report, one building row first in the tail.
+        world w = make_world();
+        w.set_next_entity_id(9000);
+        save_envelope env = make_envelope();
+        building_report b;
+        b.building = 7001;
+        b.type     = building_type::processing_facility;
+        env.last_econ_report.buildings.push_back(b);
+        write_save_game_at(k_path, w, env, save_game_version_pre_econ_report);
+        const std::uint64_t tail = file_size(k_path);
+        write_save_game(k_path, w, env);
+        const std::uint64_t full = file_size(k_path);
+        check(full > tail, "S13 anchor: the v27 file is longer than its v25 twin (the tail is there)");
+        {
+            world lw; save_envelope le;
+            check(read_save_game(k_path, lw, le) && le.last_econ_report.buildings.size() == 1,
+                  "S13 anchor: the unpoked file reads");
+        }
+
+        // (a) a count of 2^26 - 1 rows: ~32 GB if allocated. Refused, not thrown.
+        const uint32_t huge = (1u << 26) - 1u;
+        poke(k_path, tail, &huge, sizeof huge);
+        refused_untouched("S13a a 67M-row buildings count is REFUSED before allocating, destination untouched");
+        // ... and a count past the ids the world issued, though the bytes might hold it.
+        write_save_game(k_path, w, env);
+        const uint32_t over_ids = 9001u;
+        poke(k_path, tail, &over_ids, sizeof over_ids);
+        refused_untouched("S13a a row count past the world's issued ids is REFUSED, destination untouched");
+        // ... and one inside the id cap whose rows the bytes left cannot hold.
+        write_save_game(k_path, w, env);
+        const uint32_t over_bytes = 5000u; // 5000 x 473 bytes > the whole file
+        poke(k_path, tail, &over_bytes, sizeof over_bytes);
+        refused_untouched("S13a a row count the remaining bytes cannot hold is REFUSED, destination untouched");
+
+        // (b) building_type byte out of range: count(4) + three ids(12).
+        write_save_game(k_path, w, env);
+        const uint8_t bad_type = 200;
+        poke(k_path, tail + 4 + 12, &bad_type, 1);
+        refused_untouched("S13b an out-of-range building_type byte is REFUSED, destination untouched");
+
+        // (c) a truncated tail.
+        write_save_game(k_path, w, env);
+        std::filesystem::resize_file(k_path, full - 7);
+        refused_untouched("S13c a truncated tail is REFUSED, destination untouched");
+
+        // (b) lp_class out of range, and (d) a NaN, on a report holding ONE lp
+        // building row and nothing else: eight empty counts (buildings, budgets,
+        // contention, labour, unmet, lp nations, lp sources) then the lp
+        // buildings count, then the row's three ids, then its class byte.
+        save_envelope lpenv = make_envelope();
+        lp_building_row row;
+        row.building = 7001;
+        row.cls      = lp_class::other;
+        row.need     = 1.5f;
+        lpenv.last_econ_report.logistic_points.buildings.push_back(row);
+        write_save_game(k_path, w, lpenv);
+        {
+            world lw; save_envelope le;
+            check(read_save_game(k_path, lw, le)
+                      && le.last_econ_report.logistic_points.buildings.size() == 1
+                      && le.last_econ_report.logistic_points.buildings[0].need == 1.5f,
+                  "S13 anchor: the one-lp-row file reads");
+        }
+        const std::uint64_t cls_at = tail + 8 * 4 + 12;
+        const uint8_t bad_cls = 9;
+        poke(k_path, cls_at, &bad_cls, 1);
+        refused_untouched("S13b an out-of-range lp_class byte is REFUSED, destination untouched");
+        write_save_game(k_path, w, lpenv);
+        const float nan = std::numeric_limits<float>::quiet_NaN();
+        poke(k_path, cls_at + 1, &nan, sizeof nan); // the row's `need`
+        refused_untouched("S13d a NaN in the tail is REFUSED, destination untouched");
+        const float inf = std::numeric_limits<float>::infinity();
+        write_save_game(k_path, w, lpenv);
+        poke(k_path, cls_at + 1, &inf, sizeof inf);
+        refused_untouched("S13d an infinity in the tail is REFUSED, destination untouched");
     }
 
     // -----------------------------------------------------------------------

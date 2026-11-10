@@ -2112,7 +2112,7 @@ void app::step_economy()
                 .count() / 1000.0;
     t = lap_clock[k_campaign_settle_lap_count];
     // BL-262: this tick's standing profile for the Corporations panel; the
-    // report for the ledgers (transient runtime caches, not serialised).
+    // report for the ledgers (their read slice is saved: save_game.hpp part 5).
     m_last_econ_report    = std::move(tick.report);
     m_last_corp_standings = std::move(tick.standings);
     const auto& flows     = tick.flows;
@@ -2520,6 +2520,16 @@ bool app::save_game_to(const std::string& path)
     env.planetary_pan_x   = m_ui.planetary_pan_x;
     env.planetary_pan_y   = m_ui.planetary_pan_y;
 
+    // Part 5 (save_game_version 27): the report's read slice -- the writer takes
+    // only the fields save_game.hpp names, so the copy is of those alone.
+    env.last_econ_report.buildings            = m_last_econ_report.buildings;
+    env.last_econ_report.budgets              = m_last_econ_report.budgets;
+    env.last_econ_report.workforce_contention = m_last_econ_report.workforce_contention;
+    env.last_econ_report.building_labour      = m_last_econ_report.building_labour;
+    env.last_econ_report.upkeep_unmet         = m_last_econ_report.upkeep_unmet;
+    env.last_econ_report.logistic_points      = m_last_econ_report.logistic_points;
+    env.last_corp_standings                   = m_last_corp_standings;
+
     // Make the destination directory before writing. `write_save_game` opens an
     // ofstream, which does NOT create intervening directories, so a save aimed at
     // a path like "build_gen/verify/<name>.iosave" returned false for a reason
@@ -2631,11 +2641,13 @@ bool app::load_game_from(const std::string& path)
     m_ui.planetary_pan_x   = env.planetary_pan_x;
     m_ui.planetary_pan_y   = env.planetary_pan_y;
 
-    // App-side transients that describe the world just replaced. Left alone
-    // they would keep drawing the PREVIOUS campaign's numbers until the next
-    // econ tick overwrote them -- a stale panel is worse than an empty one.
-    m_last_econ_report = economy_report{};
-    m_last_corp_standings.clear();
+    // The last report and standings come from the SAVE (save_game_version 27):
+    // the profit figures, site finder and ledgers read on the first frame rather
+    // than after the first econ tick. A v25-or-older save carries none, and opens
+    // empty, as before -- never the PREVIOUS campaign's numbers (a stale panel is
+    // worse than an empty one). `building_row` was rebuilt by the reader.
+    m_last_econ_report    = std::move(env.last_econ_report);
+    m_last_corp_standings = std::move(env.last_corp_standings);
 
     // Selection state that indexes into the replaced world.
     m_ui.clear_battle_selection();

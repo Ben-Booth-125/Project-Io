@@ -1352,8 +1352,8 @@ private:
     void bench_report();
     recipe_registry m_registry;          ///< Recipes + economy constants, loaded from Lua at startup.
     works_registry  m_works;             ///< BL-321 Era -1 works table, loaded from scripts/works.lua at startup.
-    economy_report  m_last_econ_report;  ///< Most recent economy-step report; read by the ledgers.
-    std::vector<corp_standing> m_last_corp_standings; ///< Per-corp standing profile (BL-262 first slice), recomputed each econ tick from m_last_econ_report's cash flow; read by the Corporations panel. Transient runtime cache — NOT serialised, same as m_last_econ_report.
+    economy_report  m_last_econ_report;  ///< Most recent economy-step report; read by the ledgers. Its read slice is saved (save_game.hpp part 5).
+    std::vector<corp_standing> m_last_corp_standings; ///< Per-corp standing profile (BL-262 first slice), recomputed each econ tick from m_last_econ_report's cash flow; read by the Corporations panel. Saved in the envelope with m_last_econ_report's read slice (save_game.hpp part 5, v27).
     ui::chat_state  m_chat;              ///< Comms log state (BL-205): channels, messages, drafts.
     std::vector<persona::pack> m_persona_bench; ///< Seated mountain bench (BL-207 slice 1); empty if load_bench() failed.
     std::unordered_map<entity_id, int> m_counsel_channel; ///< corp -> its lazily-created Counsel chat_channel index.
