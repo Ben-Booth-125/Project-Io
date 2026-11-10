@@ -1269,6 +1269,27 @@
    "files": [
     "src/world/corp_ai.cpp"
    ]
+  },
+  {
+   "raised": "2026-11-10",
+   "status": "open",
+   "resolution": null,
+   "id": "NR-1207",
+   "title": "Space firsts: five calls taken, and the player cannot see a first yet",
+   "kind": "decision-taken",
+   "source": "BL-1606 lane report",
+   "what": "(1) Ties go to the lowest nation id; firsts are judged by the day. (2) A flat 400 RP per first (economy.research.space_first_grant_rp), not scaled with the research price. (3) The convoy first counts on delivery to another body's market, not dispatch. (4) Crew in orbit includes crew aboard a station core, so a station core launch can take both firsts. (5) One public history entry per first, tagged with the taker. The player's dispatch shows only war entries, so no surface shows a first yet. Calls 1 and 2 are written into ERAS.md § Firsts. Save v91.",
+   "why_it_matters": "The grant size sets how much racing to space pays.",
+   "options": [
+    "Accept all",
+    "Scale the grant with the research price",
+    "Count the convoy at dispatch"
+   ],
+   "recommendation": "Accept; tune the 400 in playtest.",
+   "files": [
+    "src/world/space_firsts.cpp",
+    "docs/economy/ERAS.md"
+   ]
   }
  ]
 }

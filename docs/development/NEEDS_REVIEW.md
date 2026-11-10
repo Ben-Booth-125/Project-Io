@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*69 entries — 66 open, 3 resolved.*
+*70 entries — 67 open, 3 resolved.*
 
 ---
 
@@ -851,6 +851,21 @@ corp_ai.cpp keeps the capital province's units at home, reading only the home ca
 > **Recommendation:** Grant it inside BL-1608; it is one line in the keep-home rule.
 
 *Files: `src/world/corp_ai.cpp`*
+
+### NR-1207 — Space firsts: five calls taken, and the player cannot see a first yet
+*decision taken on your behalf · raised 2026-11-10 · from BL-1606 lane report*
+
+(1) Ties go to the lowest nation id; firsts are judged by the day. (2) A flat 400 RP per first (economy.research.space_first_grant_rp), not scaled with the research price. (3) The convoy first counts on delivery to another body's market, not dispatch. (4) Crew in orbit includes crew aboard a station core, so a station core launch can take both firsts. (5) One public history entry per first, tagged with the taker. The player's dispatch shows only war entries, so no surface shows a first yet. Calls 1 and 2 are written into ERAS.md § Firsts. Save v91.
+
+**Why it matters.** The grant size sets how much racing to space pays.
+
+- Accept all
+- Scale the grant with the research price
+- Count the convoy at dispatch
+
+> **Recommendation:** Accept; tune the 400 in playtest.
+
+*Files: `src/world/space_firsts.cpp`, `docs/economy/ERAS.md`*
 
 ---
 
