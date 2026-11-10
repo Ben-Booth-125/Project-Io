@@ -718,6 +718,26 @@
     "src/world/stations.hpp",
     "scripts/economy.lua"
    ]
+  },
+  {
+   "raised": "2026-11-10",
+   "status": "open",
+   "resolution": null,
+   "id": "NR-1169",
+   "title": "Early Space branches open on a stand-in until quest deeds are read: Rocketry alone keys Interplanetary Convoys",
+   "kind": "decision-taken",
+   "source": "BL-1612 lane report",
+   "what": "Every Digitisation quest deed is declared unread, so no quest can be held and no Early Space branch could ever open. Stand-in (one place, branch_keyed_in): a branch is keyed if its quest is held, or if the quest's deed is unread and its major prerequisite is held. Consequence: any nation that meets the Era 2 gate already holds Rocketry, so Interplanetary Convoys (hulls, landers, tugs, drives) opens with the gate; In-Situ Propellant needs DG-PR-EN-C, Space Force needs Proven Readiness's major. One research pool and one queue: Digitisation entries are paid first. New dial space_gate_min_propellant = 1.0 (one launch's draw), since ERAS.md names a Lua threshold that did not exist.",
+   "why_it_matters": "It decides how soon far space opens after the first launch.",
+   "options": [
+    "Keep the stand-in until deeds are read",
+    "Read the space quest deeds now (first convoy to another body etc.)"
+   ],
+   "recommendation": "Keep; the firsts item (BL-1606, space firsts) reads the same deeds and can retire the stand-in.",
+   "files": [
+    "src/world/nation_tech.cpp",
+    "docs/economy/RESEARCH.md"
+   ]
   }
  ]
 }

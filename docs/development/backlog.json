@@ -2086,8 +2086,8 @@
    "design": "A verify script and a spectated run: do rivals reach the moons, close the propellant loop, found bases?"
   },
   {
-   "status": "designed",
-   "glyph": "○",
+   "status": "complete",
+   "glyph": "●",
    "sprint": 66,
    "version_goal": "v0.5.0",
    "written": "2026-11-10",
@@ -2110,6 +2110,33 @@
    ],
    "title": "A nation can research the next age's tree once it meets the Era 1 -> Era 2 gate",
    "design": "ERAS.md § Era 1 -> Era 2 gate, § Far-space technology. A nation's tech state holds one held set and one queue sized to the Digitisation tree; add per-tree state (held set + queue for the Early Space tree) with its save leg, a pure gate query (Rocketry held, a staffed home Launchpad, propellant on the home shelf), and branch availability keyed by the Digitisation quest that keys each branch. Quest deeds are all declared unread today, so a branch key also needs its quest's deed read (or a stand-in the gate opens). Done when a harness researches an Early Space node after the gate and is refused before it."
+  },
+  {
+   "status": "designed",
+   "glyph": "○",
+   "sprint": 66,
+   "version_goal": "v0.5.0",
+   "written": "2026-11-10",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Claude (lane G report, BL-1612)",
+   "requires": [
+    "BL-1612"
+   ],
+   "category": "Space",
+   "priority": "A",
+   "difficulty": 3,
+   "id": "BL-1613",
+   "short_name": "EARLY_SPACE_RESEARCH_SURFACES",
+   "authority_doc": "docs/economy/RESEARCH.md",
+   "files": [
+    "src/world/nation_tech.cpp",
+    "src/world/nation_ai.cpp",
+    "src/ui/tech_tree_panel.cpp",
+    "docs/ai/ACTIONS.json"
+   ],
+   "title": "The Early Space tree reachable by the player and the rivals: verb, panel, AI picker, modifiers read",
+   "design": "BL-1612 made the tree researchable in the model only. Owed: a queue verb for Early Space nodes with its ACTIONS.json entry; the tech tree panel shows the second tree once the gate is met; the rival research picker weighs Early Space nodes (its scorer is Digitisation-indexed today); nation_scalar folds Early Space modifier rows; remove/clear/unqueue and arrival projection cover the Early Space queue."
   }
  ]
 }
