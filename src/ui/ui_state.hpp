@@ -932,6 +932,13 @@ struct site_cell
     std::string best_place;         ///< That tile's place name, as the table's row names it.
     bool        best_near  = false;
     std::string refusal;            ///< Why no tile takes it (the commonest refusal); empty if some do.
+    /// THE CELL'S CONSTRUCT PRESS builds here (Ben, 2026-11-10): the listed tile with the
+    /// highest Net (whole credits; a priced site before an unpriced one), ties to the
+    /// highest Logistic Point cover, then the lowest tile id. null_entity with no site.
+    entity_id   build_tile  = null_entity;
+    bool        build_priced = false;
+    long        build_net    = 0;
+    float       build_cover  = 0.0f;
 };
 
 struct site_finder_state
@@ -990,6 +997,12 @@ struct site_finder_state
 
     /// Where the ledger's controls landed this frame (absent: x < 0).
     float         picker_x = -1.0f, picker_y = -1.0f;
+    /// The Site Finder TAB's press point in the construction ledger, as drawn this frame
+    /// (absent: x < 0), so a check opens the view through the real tab (Ben, 2026-11-09).
+    float         tab_x = -1.0f, tab_y = -1.0f;
+    /// The Net figures the canvas drew over map tiles this frame, their text only - no
+    /// position (Ben, 2026-11-09, the tenth verify grant).
+    std::vector<std::string> net_labels;
     /// The building grid's cells as drawn this frame, in drawn order: the glyph's
     /// half-extent, the name's widest wrapped line against its room, and where the
     /// cell's press is.
@@ -2083,7 +2096,7 @@ struct ui_state
         float         x = 0.0f, y = 0.0f;
         int           count = 1;
         bool          mine  = false;
-        ImVec2        box_min{}, box_max{}; ///< The count's rectangle; empty with no count drawn.
+        ImVec2        box_min{}, box_max{}; ///< The box holding glyph and count; empty with no count drawn.
     };
     std::vector<convoy_zone> convoy_zones;
     std::uint32_t hovered_convoy = 0; ///< The convoy the pointer's marker names; 0 none.

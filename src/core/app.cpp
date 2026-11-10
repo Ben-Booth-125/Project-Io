@@ -300,8 +300,12 @@ void app::apply_ui_draw_scale_to_frame()
     ImGuiIO& io = ImGui::GetIO();
     io.DisplaySize = {io.DisplaySize.x / m_ui_draw_scale, io.DisplaySize.y / m_ui_draw_scale};
     // The SDL backend queues the pointer in window pixels, and it has no scale to ask.
+    // Once each: an event the trickle queue carried over from last frame was scaled then
+    // (m_ui_scale_event_floor), and scaling it twice moved the pointer off the panel it
+    // was over, so the canvas took the panel's wheel.
     for (ImGuiInputEvent& e : ImGui::GetCurrentContext()->InputEventsQueue)
-        if (e.Type == ImGuiInputEventType_MousePos && e.MousePos.PosX > -FLT_MAX)
+        if (e.Type == ImGuiInputEventType_MousePos && e.MousePos.PosX > -FLT_MAX
+            && e.EventId >= m_ui_scale_event_floor)
         {
             e.MousePos.PosX /= m_ui_draw_scale;
             e.MousePos.PosY /= m_ui_draw_scale;
@@ -604,7 +608,10 @@ int app::run(autostart_mode autostart)
         // Continuous sim time for the intra-body vision beam (BL-152/154). The actual
         // vision refresh (update_body_vision) runs in render(), so both the live loop
         // and the --verify capture path (capture_frame -> render) get it.
-        m_ui.sim_now_days = now_days;
+        // The MOTION clock, not elapsed_days(): glides and convoy heads read a day's or a
+        // quarter's fraction against progress the day ticks advance, so the fraction must
+        // come from those ticks (sim_loop::motion_days; Ben, 2026-11-09, the jitter).
+        m_ui.sim_now_days = m_sim_loop.motion_days();
 
         // Resolve the economy on each econ-tick (quarter) boundary the clock crosses.
         const uint64_t econ = m_sim_loop.econ_tick();
@@ -2105,7 +2112,7 @@ void app::step_economy()
                 .count() / 1000.0;
     t = lap_clock[k_campaign_settle_lap_count];
     // BL-262: this tick's standing profile for the Corporations panel; the
-    // report for the ledgers (transient runtime caches, not serialised).
+    // report for the ledgers (their read slice is saved: save_game.hpp part 5).
     m_last_econ_report    = std::move(tick.report);
     m_last_corp_standings = std::move(tick.standings);
     const auto& flows     = tick.flows;
@@ -2513,6 +2520,16 @@ bool app::save_game_to(const std::string& path)
     env.planetary_pan_x   = m_ui.planetary_pan_x;
     env.planetary_pan_y   = m_ui.planetary_pan_y;
 
+    // Part 5 (save_game_version 27): the report's read slice -- the writer takes
+    // only the fields save_game.hpp names, so the copy is of those alone.
+    env.last_econ_report.buildings            = m_last_econ_report.buildings;
+    env.last_econ_report.budgets              = m_last_econ_report.budgets;
+    env.last_econ_report.workforce_contention = m_last_econ_report.workforce_contention;
+    env.last_econ_report.building_labour      = m_last_econ_report.building_labour;
+    env.last_econ_report.upkeep_unmet         = m_last_econ_report.upkeep_unmet;
+    env.last_econ_report.logistic_points      = m_last_econ_report.logistic_points;
+    env.last_corp_standings                   = m_last_corp_standings;
+
     // Make the destination directory before writing. `write_save_game` opens an
     // ofstream, which does NOT create intervening directories, so a save aimed at
     // a path like "build_gen/verify/<name>.iosave" returned false for a reason
@@ -2548,6 +2565,14 @@ bool app::load_game_from(const std::string& path)
         m_lua.load("scripts/world_gen.lua");
         m_worldgen_cfg.load_from_lua(m_lua);
     }
+    // THE RECIPE REGISTRY, the same way (2026-11-09 stall). Only a new game loaded it
+    // (start_new_game / load_economy), so a save opened from the main menu of a fresh
+    // process -- or by --load -- stepped on an EMPTY registry: every recipe lookup
+    // missed, every site completed at once on zero build days, and every nation's
+    // income fell to nothing within six quarters. Loaded BEFORE the read, which
+    // takes the registry's military walls (BL-1455).
+    if (m_registry.recipe_count() == 0)
+        load_recipe_registry();
     if (!read_save_game(path, w, env, &m_registry.military(), // BL-1455: legacy step-offs read the walls
                         &m_worldgen_cfg.kepler_base_price))
     {
@@ -2574,6 +2599,10 @@ bool app::load_game_from(const std::string& path)
     // `any` — had left in it, and a save could open on a roster its world did
     // not earn.
     m_registry.set_era(campaign_band_from_world(m_world)); // BL-1101: the one band body, on load as on a new game
+    // And the registry's presentation half, as load_economy runs it after its band:
+    // the reach mirror the placement surfaces filter on, the works table, the
+    // persona bench. A fresh-process load had none of them.
+    finish_economy_presentation();
 
     m_sim_loop.restore(env.sim_tick, env.day_tick, env.econ_tick, env.elapsed_days, env.speed);
     m_prev_speed     = (env.speed > 0) ? env.speed : 1;
@@ -2612,11 +2641,13 @@ bool app::load_game_from(const std::string& path)
     m_ui.planetary_pan_x   = env.planetary_pan_x;
     m_ui.planetary_pan_y   = env.planetary_pan_y;
 
-    // App-side transients that describe the world just replaced. Left alone
-    // they would keep drawing the PREVIOUS campaign's numbers until the next
-    // econ tick overwrote them -- a stale panel is worse than an empty one.
-    m_last_econ_report = economy_report{};
-    m_last_corp_standings.clear();
+    // The last report and standings come from the SAVE (save_game_version 27):
+    // the profit figures, site finder and ledgers read on the first frame rather
+    // than after the first econ tick. A v25-or-older save carries none, and opens
+    // empty, as before -- never the PREVIOUS campaign's numbers (a stale panel is
+    // worse than an empty one). `building_row` was rebuilt by the reader.
+    m_last_econ_report    = std::move(env.last_econ_report);
+    m_last_corp_standings = std::move(env.last_corp_standings);
 
     // Selection state that indexes into the replaced world.
     m_ui.clear_battle_selection();
@@ -2772,6 +2803,7 @@ void app::render()
     // last write wins). A no-op outside the verify harness — see app.hpp
     // § Synthetic pointer input.
     pump_injected_input();
+    m_ui_scale_event_floor = ImGui::GetCurrentContext()->InputEventsNextEventId; // scaled or UI px
     ImGui::NewFrame();
 
     // BL-1246: the ground pool's per-frame pump, on EVERY screen — the home

@@ -3084,8 +3084,17 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     std::unordered_set<entity_id> gliding;
     std::uint64_t glide_sig = 0; // order-independent: what the cached stacks exclude
     {
-        const float day_frac = static_cast<float>(
-            std::max(0.0, state.sim_now_days) - std::floor(std::max(0.0, state.sim_now_days)));
+        const double now_d    = std::max(0.0, state.sim_now_days);
+        const long long today = static_cast<long long>(std::floor(now_d));
+        const float day_frac  = static_cast<float>(now_d - std::floor(now_d));
+        // THE ORDER DAY (Ben, 2026-11-10: "assigning a unit to move to a tile jumps"). The
+        // day tick credits a whole day's walk however late in the day the order came, so
+        // a glide read at today's fraction opened partway along the hop the frame the
+        // order landed. The day an order lands, its glide maps the REST of the day onto
+        // the whole day's walk: it starts where the unit stands and reaches the tick's
+        // point as the tick lands. Keyed per unit, kept only while it marches.
+        static std::unordered_map<entity_id, std::pair<long long, float>> s_march_start;
+        std::unordered_map<entity_id, std::pair<long long, float>> march_start_now;
         std::vector<entity_id> marching;
         for (const auto& [uid, uc] : w.units)
             if (uc.count > 0 && uc.order.dest != null_entity)
@@ -3103,8 +3112,18 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 if (here == w.tiles.end() || here->second.body != state.active_body
                     || w.provinces.province_of(uc.position) == 0)
                     continue;
-                const float t = march_hop_fraction(w, reg, uc, day_frac);
-                if (t < 0.0f)
+                std::pair<long long, float> started{ today, day_frac };
+                if (const auto ms = s_march_start.find(uid); ms != s_march_start.end())
+                    started = ms->second;
+                march_start_now[uid] = started;
+                float eff = day_frac;
+                if (started.first == today)
+                    eff = started.second < 0.999f
+                        ? std::clamp((day_frac - started.second) / (1.0f - started.second), 0.0f, 1.0f)
+                        : 0.0f;
+                entity_id from = null_entity, to = null_entity;
+                float t = 0.0f;
+                if (!march_glide_point(w, reg, uc, eff, from, to, t))
                     continue;
                 const entity_id next = uc.order.path[uc.order.next_index];
                 gliding.insert(uid);
@@ -3113,7 +3132,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 constexpr float k_same_pace = 0.03f;
                 unit_glide* same = nullptr;
                 for (unit_glide& g : state.unit_glides)
-                    if (g.owner == uc.owner && g.from == uc.position && g.to == next
+                    if (g.owner == uc.owner && g.from == from && g.to == to
                         && std::fabs(g.t - t) <= k_same_pace)
                     { same = &g; break; }
                 if (same != nullptr)
@@ -3124,12 +3143,13 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 unit_glide g;
                 g.ids.push_back(uid);
                 g.owner = uc.owner;
-                g.from  = uc.position;
-                g.to    = next;
+                g.from  = from;
+                g.to    = to;
                 g.t     = t;
                 state.unit_glides.push_back(std::move(g));
             }
         }
+        s_march_start.swap(march_start_now);
     }
     static std::uint64_t s_glide_sig = 0;
 
@@ -5628,6 +5648,15 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         pm.mark(canvas_pass_meter::stat, dl);
     }
 
+    // Unit counters, standing and marching, are collected where they are resolved and
+    // drawn after the capital star, so the star sits UNDER them (Ben, 2026-11-09:
+    // "render the capital icon below units"). Their hit zones are pushed in place.
+    struct deferred_counter
+    {
+        ImVec2 pos; float r; ImU32 fill; int count; float hp, ready; bool bars, hovered;
+    };
+    std::vector<deferred_counter> unit_counters_drawn;
+
     // The two provinces the outline can light (BL-511): selected and hovered.
     const province* sel_prov = state.selected_province != 0
                              ? w.provinces.find(state.selected_province) : nullptr;
@@ -6291,8 +6320,8 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                             // hovered entity is then never a unit.
                             const bool hovered = state.overlay == overlay_mode::none
                                               && state.hovered_entity == grp.sample_unit;
-                            icons::unit_counter(dl, mpos, ur, fill, grp.count, hp, ready,
-                                                /*show_bars=*/grp.owner == player_owner, hovered);
+                            unit_counters_drawn.push_back({ mpos, ur, fill, grp.count, hp, ready,
+                                                            /*bars=*/grp.owner == player_owner, hovered });
 
                             // Hit zone (BL-031/BL-059/BL-575): the group's LOWEST-id
                             // unit is the click/hover target — same "lowest id wins"
@@ -6545,9 +6574,9 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     // head, gliding with the beam's clock. A press selects it; markers do not outrank a
     // lens, so under one it takes no press (BL-664). A rival's draws only on ground the
     // player's own vision lights (DISCOVERY.md), with the Resource lens's lifted fog not
-    // counting. Several on one tile draw as ONE marker with a count in a box beside it, the
-    // clutter guard: the press walks them, as the wing marker walks its wings. The marker
-    // and its box grow with the zoom (Ben, 2026-11-09). Off below the counters' zoom.
+    // counting. A marker is its glyph and count in one box, a lone convoy's reading 1 (Ben,
+    // 2026-11-10); several on one tile draw as ONE marker, the clutter guard: the press
+    // walks them, as the wing marker walks its wings. The marker and its box grow with the zoom (Ben, 2026-11-09). Off below the counters' zoom.
     state.convoy_zones.clear();
     if (draw_r >= 6.0f && !state.convoy_markers.empty())
     {
@@ -6576,6 +6605,55 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             }
             by_tile[ht].push_back({ &m, p });
         }
+        // THE MARKER NEVER JUMPS (Ben, 2026-11-09 and 2026-11-10: "the box tracks the
+        // furthest back convoy in that tile, so when a convoy merges or splits the box
+        // jumps"). A tile's one marker is drawn at its ANCHOR convoy: the selected one,
+        // else the convoy it anchored last frame while that one is still on the tile,
+        // else the player's own before a rival's, then the most advanced along its lane
+        // (lowest id on a tie). And every convoy
+        // carries a TRAIL: where it was drawn and where its lane put it last frame. A
+        // frame draws the anchor at its lane point plus what is left of last frame's
+        // offset from it, three quarters kept a frame - so a convoy moving on its lane
+        // has no offset and no lag, and a change of anchor, a merge or a split slides
+        // over a few frames instead of snapping. A convoy hidden in a shared marker is
+        // drawn AT the marker, so when it leaves it sets out from there. View state only.
+        struct convoy_trail { ImVec2 drawn{}, target{}; };
+        static std::unordered_map<std::uint32_t, convoy_trail> s_convoy_trail;
+        static entity_id s_convoy_trail_body = null_entity;
+        if (s_convoy_trail_body != state.active_body)
+        {
+            s_convoy_trail.clear();
+            s_convoy_trail_body = state.active_body;
+        }
+        std::unordered_map<std::uint32_t, convoy_trail> trail_now;
+        static std::unordered_map<entity_id, std::uint32_t> s_convoy_lead;
+        std::unordered_map<entity_id, std::uint32_t> convoy_lead_now;
+        constexpr float k_trail_keep = 0.75f;
+        const auto unwrap_near = [&](ImVec2 v, ImVec2 ref) {
+            while (v.x - ref.x > local_period * 0.5f) v.x -= local_period;
+            while (ref.x - v.x > local_period * 0.5f) v.x += local_period;
+            return v;
+        };
+        // The point along the lane, in ground space: between the two tiles whose clock
+        // brackets p.
+        const auto lane_point = [&](const head_mark& hm, ImVec2& out) -> bool {
+            const ui_state::convoy_marker& cm = *hm.m;
+            const std::size_t n = cm.path.size();
+            const std::size_t hi = std::min<std::size_t>(
+                static_cast<std::size_t>(std::lower_bound(cm.at.begin(), cm.at.end(), hm.p) - cm.at.begin()),
+                n - 1);
+            const std::size_t lo = hi > 0 ? hi - 1 : 0;
+            const auto ta = w.tiles.find(cm.path[lo]);
+            const auto tb = w.tiles.find(cm.path[hi]);
+            if (ta == w.tiles.end() || tb == w.tiles.end())
+                return false;
+            const float span = cm.at[hi] - cm.at[lo];
+            const float t = span > 0.0f ? std::clamp((hm.p - cm.at[lo]) / span, 0.0f, 1.0f) : 1.0f;
+            const ImVec2 a = hex_local_centre(ta->second.grid_x, ta->second.grid_y, hex_size);
+            const ImVec2 b = unwrap_near(hex_local_centre(tb->second.grid_x, tb->second.grid_y, hex_size), a);
+            out = { a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t };
+            return true;
+        };
         const float cr = std::max(6.0f, draw_r * 0.24f);
         // The count reads at the marker's scale, and never below legible.
         const float count_font = std::max(ImGui::GetFontSize() * 0.75f, cr * 1.1f);
@@ -6597,37 +6675,55 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 }
                 hovered = hovered || marks[i].m->id == state.hovered_convoy;
             }
+            if (!selected)
+            {
+                bool kept = false;
+                if (const auto pl = s_convoy_lead.find(tile); pl != s_convoy_lead.end())
+                    for (std::size_t i = 0; i < marks.size(); ++i)
+                        if (marks[i].m->id == pl->second)
+                        {
+                            lead = i;
+                            kept = true;
+                        }
+                // Else the player's own before a rival's, so a shared marker wears the
+                // player's colour, then the most advanced; marks are in ascending id, so
+                // a tie keeps the lowest.
+                if (!kept)
+                    for (std::size_t i = 1; i < marks.size(); ++i)
+                        if (marks[i].m->mine != marks[lead].m->mine ? marks[i].m->mine
+                                                                    : marks[i].p > marks[lead].p)
+                            lead = i;
+            }
+            convoy_lead_now[tile] = marks[lead].m->id;
             const ui_state::convoy_marker& m = *marks[lead].m;
-            // The point along the lane: between the two tiles whose clock brackets p.
-            const std::size_t n = m.path.size();
-            const float p = marks[lead].p;
-            const std::size_t hi = std::min<std::size_t>(
-                static_cast<std::size_t>(std::lower_bound(m.at.begin(), m.at.end(), p) - m.at.begin()),
-                n - 1);
-            const std::size_t lo = hi > 0 ? hi - 1 : 0;
-            const auto ta = w.tiles.find(m.path[lo]);
-            const auto tb = w.tiles.find(m.path[hi]);
-            if (ta == w.tiles.end() || tb == w.tiles.end())
+            ImVec2 target{};
+            if (!lane_point(marks[lead], target))
                 continue;
-            const float span = m.at[hi] - m.at[lo];
-            const float t = span > 0.0f ? std::clamp((p - m.at[lo]) / span, 0.0f, 1.0f) : 1.0f;
-            const ImVec2 a = hex_local_centre(ta->second.grid_x, ta->second.grid_y, hex_size);
-            ImVec2       b = hex_local_centre(tb->second.grid_x, tb->second.grid_y, hex_size);
-            if (b.x - a.x > local_period * 0.5f)       b.x -= local_period;
-            else if (a.x - b.x > local_period * 0.5f)  b.x += local_period;
-            const ImVec2 sc = to_screen({ a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t });
+            ImVec2 drawn = target;
+            if (const auto tr = s_convoy_trail.find(m.id); tr != s_convoy_trail.end())
+            {
+                const ImVec2 off{ (unwrap_near(tr->second.drawn, tr->second.target).x - tr->second.target.x) * k_trail_keep,
+                                  (tr->second.drawn.y - tr->second.target.y) * k_trail_keep };
+                if (off.x * off.x + off.y * off.y > 0.04f)
+                    drawn = { target.x + off.x, target.y + off.y };
+            }
+            for (const head_mark& hm : marks)
+            {
+                ImVec2 own = target;
+                if (hm.m != &m)
+                    (void)lane_point(hm, own);
+                trail_now[hm.m->id] = { drawn, own };
+            }
+            const ImVec2 sc = to_screen(drawn);
             if (sc.y < grid_area_origin.y - cr * 2.0f
                 || sc.y > grid_area_origin.y + grid_area_size.y + cr * 2.0f)
                 continue;
             const ImU32 col = corp_identity(m.owner);
             const ImU32 edge_col = selected ? palette::selection : hovered ? palette::hover : col;
+            // A lone convoy reads as a stack of one (Ben, 2026-11-10): the same box, a 1.
             char num[12] = "";
-            ImVec2 count_size{};
-            if (marks.size() > 1)
-            {
-                std::snprintf(num, sizeof num, "%d", static_cast<int>(marks.size()));
-                count_size = ImGui::GetFont()->CalcTextSizeA(count_font, FLT_MAX, 0.0f, num);
-            }
+            std::snprintf(num, sizeof num, "%d", static_cast<int>(marks.size()));
+            const ImVec2 count_size = ImGui::GetFont()->CalcTextSizeA(count_font, FLT_MAX, 0.0f, num);
             const int k_min = (period_px > 0.0f)
                 ? static_cast<int>(std::ceil((visible_left  - sc.x) / period_px)) : 0;
             const int k_max = (period_px > 0.0f)
@@ -6635,30 +6731,22 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             for (int k = k_min; k <= k_max; ++k)
             {
                 const ImVec2 mp{ sc.x + static_cast<float>(k) * period_px, sc.y };
-                dl->AddCircleFilled(mp, cr, IM_COL32(14, 18, 26, 215));
-                if (selected || hovered)
-                    dl->AddCircle(mp, cr + 1.0f, selected ? palette::selection : palette::hover, 0, 2.0f);
-                else
-                    dl->AddCircle(mp, cr, col, 0, 1.0f);
-                icons::convoy(dl, mp, cr * 0.72f, col);
                 ui_state::convoy_zone z;
-                if (marks.size() > 1)
-                {
-                    // The count in its own box, against the circle's right edge, so
-                    // it reads as part of the marker rather than floating behind it.
-                    const float pad_x = std::max(3.0f, count_font * 0.3f);
-                    const float pad_y = std::max(1.0f, count_font * 0.1f);
-                    const ImVec2 bmin{ mp.x + cr + 2.0f, mp.y - count_size.y * 0.5f - pad_y };
-                    const ImVec2 bmax{ bmin.x + count_size.x + pad_x * 2.0f,
-                                       mp.y + count_size.y * 0.5f + pad_y };
-                    dl->AddRectFilled(bmin, bmax, IM_COL32(14, 18, 26, 215), 2.0f);
-                    dl->AddRect(bmin, bmax, edge_col, 2.0f, 0, (selected || hovered) ? 2.0f : 1.0f);
-                    dl->AddText(ImGui::GetFont(), count_font,
-                                { bmin.x + pad_x, bmin.y + pad_y },
-                                IM_COL32(236, 240, 248, 255), num); // fit-exempt: the box is measured from this text
-                    z.box_min = bmin;
-                    z.box_max = bmax;
-                }
+                // One box holds the glyph and the count together (Ben, 2026-11-09), so
+                // the number reads as the marker's and the press answers on all of it.
+                const float pad_x = std::max(3.0f, count_font * 0.3f);
+                const float pad_y = std::max(1.0f, count_font * 0.1f);
+                const float half_h = std::max(cr + 1.0f, count_size.y * 0.5f + pad_y);
+                const ImVec2 bmin{ mp.x - cr - 2.0f, mp.y - half_h };
+                const ImVec2 bmax{ mp.x + cr + 2.0f + count_size.x + pad_x, mp.y + half_h };
+                dl->AddRectFilled(bmin, bmax, IM_COL32(14, 18, 26, 215), 3.0f);
+                dl->AddRect(bmin, bmax, edge_col, 3.0f, 0, (selected || hovered) ? 2.0f : 1.0f);
+                icons::convoy(dl, mp, cr * 0.72f, col);
+                dl->AddText(ImGui::GetFont(), count_font,
+                            { mp.x + cr + 2.0f, mp.y - count_size.y * 0.5f },
+                            IM_COL32(236, 240, 248, 255), num); // fit-exempt: the box is measured from this text
+                z.box_min = bmin;
+                z.box_max = bmax;
                 z.id     = next;
                 z.centre = mp;
                 z.radius = cr * 1.25f;
@@ -6669,6 +6757,8 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 state.convoy_zones.push_back(z);
             }
         }
+        s_convoy_lead.swap(convoy_lead_now);
+        s_convoy_trail.swap(trail_now);
     }
     {
         // Hover: the nearest marker under the pointer, with no lens (BL-664). One frame
@@ -6681,7 +6771,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             {
                 const float dx = mouse_g.x - z.centre.x, dy = mouse_g.y - z.centre.y;
                 const float d2 = dx * dx + dy * dy;
-                // The press answers on everything drawn: the circle, and the count's box.
+                // The press answers on everything drawn: the circle, or the box that holds both.
                 const bool on_box = z.box_max.x > z.box_min.x
                     && mouse_g.x >= z.box_min.x && mouse_g.x <= z.box_max.x
                     && mouse_g.y >= z.box_min.y && mouse_g.y <= z.box_max.y;
@@ -6699,6 +6789,34 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     // on the spot a standing counter holds. The hit zone follows the drawn point. A march
     // past the survey is not drawn. Where its own side still stands on the tile it left,
     // the counter opens a third of a hop ahead so the two never sit one on the other.
+    //
+    // THE OPENING EASES (Ben, 2026-11-09: "jitter ... when stacking / unstacking"). It
+    // was a step: a third of a hop added the frame a stack stood behind and taken away
+    // the frame it went, so the counter leapt whenever the stack it left changed - and a
+    // march leaving a stack opened a third of a hop away from it in one frame. Each
+    // marching unit now carries an opening weight that walks toward 1 (a stack behind)
+    // or 0 (none) by a fixed share a frame, so the counter slides. View state only.
+    static std::unordered_map<entity_id, float> s_glide_open;
+    // AND ITS TRAIL (Ben, 2026-11-10): where each marching unit was drawn and where its
+    // march put it last frame. A frame draws the march's point plus three quarters of
+    // last frame's offset from it, so a re-routed order or a corrected hop slides over a
+    // few frames, and a counter moving with its march carries no offset and no lag.
+    struct glide_trail { ImVec2 drawn{}, target{}; };
+    static std::unordered_map<entity_id, glide_trail> s_glide_trail;
+    {
+        std::unordered_map<entity_id, float> kept;
+        std::unordered_map<entity_id, glide_trail> kept_trail;
+        for (const unit_glide& g : state.unit_glides)
+            for (const entity_id uid : g.ids)
+            {
+                if (const auto it = s_glide_open.find(uid); it != s_glide_open.end())
+                    kept.emplace(uid, it->second);
+                if (const auto it = s_glide_trail.find(uid); it != s_glide_trail.end())
+                    kept_trail.emplace(uid, it->second);
+            }
+        s_glide_open.swap(kept); // a unit that stopped marching starts afresh next time
+        s_glide_trail.swap(kept_trail);
+    }
     if (draw_r >= 6.0f)
     {
         const float local_period = static_cast<float>(gw) * col_step;
@@ -6716,13 +6834,34 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             if (const auto st = tile_units.find(g.from); st != tile_units.end())
                 for (const unit_marker_summary& s : st->second)
                     if (s.owner == g.owner) stack_behind = true;
-            const float t = stack_behind ? 0.35f + 0.65f * g.t : g.t;
+            constexpr float k_open_step = 0.08f; // of the opening, per frame: ~12 frames
+            float open = 0.0f;
+            if (const auto it = s_glide_open.find(g.ids.front()); it != s_glide_open.end())
+                open = it->second;
+            open += std::clamp((stack_behind ? 1.0f : 0.0f) - open, -k_open_step, k_open_step);
+            for (const entity_id uid : g.ids)
+                s_glide_open[uid] = open;
+            const float t = g.t + 0.35f * (1.0f - g.t) * open;
             const ImVec2 a = hex_local_centre(ta->second.grid_x, ta->second.grid_y, hex_size);
             ImVec2       b = hex_local_centre(tb->second.grid_x, tb->second.grid_y, hex_size);
             // The hop across the seam goes the short way round the cylinder.
             if (b.x - a.x > local_period * 0.5f)       b.x -= local_period;
             else if (a.x - b.x > local_period * 0.5f)  b.x += local_period;
-            const ImVec2 sc = to_screen({ a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t });
+            const ImVec2 target{ a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t };
+            ImVec2 drawn = target;
+            if (const auto tr = s_glide_trail.find(g.ids.front()); tr != s_glide_trail.end())
+            {
+                ImVec2 pd = tr->second.drawn;
+                while (pd.x - tr->second.target.x > local_period * 0.5f) pd.x -= local_period;
+                while (tr->second.target.x - pd.x > local_period * 0.5f) pd.x += local_period;
+                const ImVec2 off{ (pd.x - tr->second.target.x) * 0.75f,
+                                  (pd.y - tr->second.target.y) * 0.75f };
+                if (off.x * off.x + off.y * off.y > 0.04f)
+                    drawn = { target.x + off.x, target.y + off.y };
+            }
+            for (const entity_id uid : g.ids)
+                s_glide_trail[uid] = { drawn, target };
+            const ImVec2 sc = to_screen(drawn);
             const float  uy = sc.y + draw_r * 0.50f;
             if (uy < grid_area_origin.y - ur * 2.0f
                 || uy > grid_area_origin.y + grid_area_size.y + ur * 2.0f)
@@ -6747,9 +6886,9 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             for (int k = k_min; k <= k_max; ++k)
             {
                 const ImVec2 mpos{ sc.x + static_cast<float>(k) * period_px, uy };
-                icons::unit_counter(dl, mpos, ur, corp_identity(g.owner),
-                                    static_cast<int>(g.ids.size()), hp, rd,
-                                    /*show_bars=*/g.owner == player_owner, hovered);
+                unit_counters_drawn.push_back({ mpos, ur, corp_identity(g.owner),
+                                                static_cast<int>(g.ids.size()), hp, rd,
+                                                /*bars=*/g.owner == player_owner, hovered });
                 marker_hit_zone hz;
                 hz.id     = g.ids.front();
                 hz.kind   = marker_hit_zone::kind::unit;
@@ -7340,6 +7479,10 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             }
         }
     }
+
+    // The unit counters, standing then marching, over the capital star.
+    for (const deferred_counter& uc : unit_counters_drawn)
+        icons::unit_counter(dl, uc.pos, uc.r, uc.fill, uc.count, uc.hp, uc.ready, uc.bars, uc.hovered);
 
     // Trade-flow lens (BL-1222; LENSES.md § Trade-flow lens). Reads only the
     // player's own dispatcher record (`w.player_trade_flow`, written by
@@ -8005,12 +8148,14 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     // THE RETURN OVER THE TILE (Ben, 2026-11-09): the table's own Net, in green, in the
     // chrome range so the camera's squash leaves the digits upright. Only where the figure
     // fits the hex: at a coarser rung the wash alone reads.
+    state.site_finder.net_labels.clear();
     for (const site_net_label& lab : site_net_labels)
     {
         const std::string txt = fmt::abbreviate(static_cast<double>(lab.net));
         const ImVec2 ts = ImGui::CalcTextSize(txt.c_str());
         if (ts.x + 4.0f > draw_r * 1.73f)
             continue;
+        state.site_finder.net_labels.push_back(txt); // the text as drawn, never where
         const float y = tilt_pivot + (lab.y - draw_r * 0.42f - tilt_pivot) * tilt_sy;
         const ImVec2 at{lab.x - ts.x * 0.5f, y - ts.y * 0.5f};
         dl->AddRectFilled({at.x - 2.0f, at.y}, {at.x + ts.x + 2.0f, at.y + ts.y}, IM_COL32(8, 14, 10, 170), 2.0f);

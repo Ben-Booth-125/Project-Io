@@ -60,6 +60,20 @@ void sim_loop::tick()
     }
 }
 
+double sim_loop::motion_days() const
+{
+    double part = 0.0;
+    if (m_speed > 0)
+    {
+        const double step_ms = (seconds_per_day_1x * 1000.0)
+                             / (sim_ticks_per_day * speed_multiplier(m_speed));
+        part = std::clamp(m_accum_ms / step_ms, 0.0, 1.0);
+    }
+    const double into_day = static_cast<double>(m_sim_tick % sim_ticks_per_day) + part;
+    return static_cast<double>(m_day_tick)
+         + std::min(into_day / static_cast<double>(sim_ticks_per_day), 1.0);
+}
+
 void sim_loop::advance_days(int days)
 {
     if (days <= 0)

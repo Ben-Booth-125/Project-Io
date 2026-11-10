@@ -259,9 +259,30 @@ capped at 1, read from the market's last clear. **Filled means received:** the h
 their bid off the market's shelf at the end of each clear, and the fill is what they took
 (`MARKETS.md` § The clearing tick, step 9). A shelf that stands full feeds them whether or not
 anything was listed that tick. Steel, ore, fuel and every other industrial want
-are out: they are industry's wants, and a city does not shrink because a mill is short. The grow
-threshold is unchanged at one half. A good the band does not make is never in the basket, because
+are out: they are industry's wants, and a city does not shrink because a mill is short. The
+basket splits in two for growth (Ben, 2026-11-10): the staples' fill is the floor, at one half,
+and the upper rungs' fill is the bonus (below). A good the band does not make is never in the basket, because
 the basket is era-masked as the bid is.
+
+**Growth is a rate, anchored on Earth's history (Ben, 2026-11-10).** A centre's heads grow by a
+natural increase each quarter, a quarter of an annual rate, with fractional heads carried so a
+small village still grows. The rate has two parts:
+
+- **A base that falls with development.** The base is 3.0 % a year for a nation with no qualified
+  workforce, falling in a straight line to 0.3 % for a fully qualified one (§ Qualification). This
+  is the demographic transition, read from a quantity the nation already carries: educated
+  nations have fewer children. The anchors are Earth's: about 2 % a year pooled in the 1960s,
+  under 1 % in the nations that industrialised first, near 3 % in the ones that had not.
+- **A bonus for consumer needs met.** The base is multiplied by one plus half the fill of the
+  centre's rungs above the staples (§ The stratum ladder): clean water, medical supplies,
+  consumer goods and the rungs above. A centre whose every upper rung is met grows half as fast
+  again; one whose upper rungs are bare grows at the base.
+
+The staples and habitability stay the floor. A centre grows only while its staples are at least
+half met and its habitability at least one half; below either, it declines at 1.6 % a year, the
+pace of the old step. Promotion, demotion, abandonment and razing read the headcount as before.
+The rate and both its parts are shown on the centre's card, so the player can see what is
+raising or lowering it. This rule is play's; the Era −1 history keeps its own growth.
 
 Decline is asymmetric by design: **passive failure only shrinks a centre — it never destroys
 one.** Outright destruction is a deliberate agent action (razing, in occupation), and it should

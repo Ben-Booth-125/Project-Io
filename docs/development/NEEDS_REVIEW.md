@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*33 entries — 30 open, 3 resolved.*
+*34 entries — 31 open, 3 resolved.*
 
 ---
 
@@ -342,6 +342,21 @@ Ben asked to design elimination of a landless nation. Taken: wars close as white
 > **Recommendation:** Keep the defaults.
 
 *Files: `docs/politics/NATIONS.md`, `docs/politics/RELATIONS.md`*
+
+### NR-1154 — Elimination as built: five calls, and rivals may now end the player
+*decision taken on your behalf · raised 2026-11-10 · from war lane building BL-1562 (war both hostile, elimination), commit 0eba4369*
+
+Taken while building: (1) elimination fires on no LAND province; coastal-water provinces pass to the conqueror with the cession; (2) every truce naming the ended nation is erased, including the one just written with the conqueror; (3) sentiment rows to and from it are deleted, generation grudge seeds kept as history; (4) its live capital is cleared, its generation capital kept as identity; (5) a debt written off sets the treasury to 0, which creates money outside the money books. Consequence of the legal verb under the existing AI grant: a rival imposing peace at 100 can now cede the last province and end any nation, the player included. Rival defenders push from the declaration rather than after answering.
+
+**Why it matters.** Call 5 breaks money conservation; the AI consequence means a campaign can be lost to a rival peace term.
+
+- Keep all as built
+- Debt passes to the conqueror (conserves money)
+- Rivals may not impose a last-province cession on the player
+
+> **Recommendation:** Keep 1-4. Ben to choose on 5 and on the rival ending the player.
+
+*Files: `src/world/war.cpp`, `docs/politics/NATIONS.md`*
 
 ---
 

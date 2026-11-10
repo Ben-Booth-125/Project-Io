@@ -568,6 +568,13 @@ private:
     /// SDL backend's NewFrame and ImGui's, before the harness's injected pointer, which
     /// is in UI pixels already.
     void apply_ui_draw_scale_to_frame();
+    /// The first input event id this frame's scale may touch (Ben, 2026-11-09: scrolling a
+    /// table sometimes zoomed the canvas). ImGui's trickle queue carries a pointer event that
+    /// follows a wheel event in the same frame over to the NEXT frame, still queued; scaled
+    /// again there, the pointer read at 0.875x of itself - off the panel, over the canvas -
+    /// and io.WantCaptureMouse went false for that wheel. Every event below this id has been
+    /// scaled already, or was injected in UI pixels.
+    unsigned int m_ui_scale_event_floor = 0;
     /// Draw ImGui's frame through the draw scale.
     void render_imgui_scaled();
     /// The constant the interactive path draws at.
@@ -1345,8 +1352,8 @@ private:
     void bench_report();
     recipe_registry m_registry;          ///< Recipes + economy constants, loaded from Lua at startup.
     works_registry  m_works;             ///< BL-321 Era -1 works table, loaded from scripts/works.lua at startup.
-    economy_report  m_last_econ_report;  ///< Most recent economy-step report; read by the ledgers.
-    std::vector<corp_standing> m_last_corp_standings; ///< Per-corp standing profile (BL-262 first slice), recomputed each econ tick from m_last_econ_report's cash flow; read by the Corporations panel. Transient runtime cache — NOT serialised, same as m_last_econ_report.
+    economy_report  m_last_econ_report;  ///< Most recent economy-step report; read by the ledgers. Its read slice is saved (save_game.hpp part 5).
+    std::vector<corp_standing> m_last_corp_standings; ///< Per-corp standing profile (BL-262 first slice), recomputed each econ tick from m_last_econ_report's cash flow; read by the Corporations panel. Saved in the envelope with m_last_econ_report's read slice (save_game.hpp part 5, v27).
     ui::chat_state  m_chat;              ///< Comms log state (BL-205): channels, messages, drafts.
     std::vector<persona::pack> m_persona_bench; ///< Seated mountain bench (BL-207 slice 1); empty if load_bench() failed.
     std::unordered_map<entity_id, int> m_counsel_channel; ///< corp -> its lazily-created Counsel chat_channel index.

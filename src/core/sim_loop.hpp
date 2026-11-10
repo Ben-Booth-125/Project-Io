@@ -88,6 +88,17 @@ public:
     /// motion, which wants finer resolution than the discrete day counter.
     double elapsed_days() const { return m_elapsed_days; }
 
+    /// THE MOTION CLOCK (Ben, 2026-11-09: "convoys and units moving on the map seem to
+    /// jitter"). The discrete day counter plus how far the sim has stepped into the
+    /// current day, with the accumulator's partial step for smoothness. Unlike
+    /// elapsed_days() it can never run ahead of or behind the day ticks the march and
+    /// the convoys advance on: the catch-up clamp (max_catchup_steps) drops steps on a
+    /// slow frame at speed while elapsed_days() keeps every millisecond, so the two
+    /// drifted apart and a glide read "progress + rate x the day's fraction" against
+    /// a fraction from the wrong clock - a step forward at each tick, a step back at
+    /// each wrap. Its fraction is 0 exactly on the frame a day tick lands.
+    double motion_days() const;
+
 private:
     void on_sim_step();
 
