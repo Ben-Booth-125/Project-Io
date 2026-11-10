@@ -24,7 +24,7 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 > **Generated file.** Produced by `node tools/session/render_actions.js`.
 > Edit the JSON, then re-run; hand edits here are overwritten.
 
-*240 entries — 65 gameplay · 41 canvas · 15 lens · 76 ledger · 43 chrome.*
+*242 entries — 67 gameplay · 41 canvas · 15 lens · 76 ledger · 43 chrome.*
 
 ---
 
@@ -1251,6 +1251,44 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 **Expected output.** applied: the satellite is in transit to the new node for the path's quarters; its old slot frees at once and the new one is held. Or queued outside coverage.
 
 **Reason to select.** Shift a satellite to a node where its role serves better, or out of a crowded orbit.
+
+### `gameplay.space_load_cargo` — No UI surface yet (the circumplanetary canvas's fleet controls are the UI lane's). In-process: src/world/space_convoy.hpp, the space-unit seam beside order_space_unit / refuel_space_unit. Not on apply_space_command or the --serve / MCP transport yet (a SPACE line beside COMMAND is owed).
+
+**Press.** In-process: load_space_cargo(world, space_unit_params, nation, unit, good, qty).
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `unit` | `entity_id (space unit)` | The nation's own Hauler or Lander. |
+| `good` | `resource index` | The good to lift; below resource_count (rejected_invalid otherwise). |
+| `qty` | `float` | Units to lift; finite and above zero (rejected_invalid otherwise). |
+
+**Valid when:**
+- The seam validates every field as the value that lands: the unit id must name a live space unit (rejected_unknown_unit) of the acting nation (rejected_not_owner); a refusal of any kind mutates nothing - no shelf, treasury, store, convoy or id allocator is touched.
+- The unit is a carrier (Hauler or Lander) with a cargo bay; any cargo already aboard is the same good, and what is aboard plus qty fits the bay (rejected_cargo). A trade's Hauler cannot be loaded by hand (rejected_cargo).
+- The unit is idle (rejected_busy) in a body's LOW ORBIT (rejected_wrong_node), and no armed unit of a nation at war with the owner stands at that node (rejected_hostile).
+- The nation holds a completed, staffed Launchpad on that body (rejected_no_pad); the pad tile's market shelf holds the goods and the lift's propellant - the body's climb Δv x launch_propellant_per_dv x qty - under the space ceiling (rejected_shelf_short / rejected_no_market), and the treasury pays both at the posted prices (rejected_insufficient_treasury).
+
+**Expected output.** ok: the goods and the lift's propellant leave the pad's shelf, the treasury pays their value, and the cargo is aboard (space_unit::cargo, its good on the unit's space_haul record, held). Loaded is heavier: the unit's Δv falls. Saved (world_save_version 85).
+
+**Reason to select.** Carry goods off a body by hand - to a moon market, or to stock a ship ahead of a move. A moon's lift costs a fraction of the home world's.
+
+### `gameplay.space_unload_cargo` — No UI surface yet (the circumplanetary canvas's fleet controls are the UI lane's). In-process: src/world/space_convoy.hpp, the space-unit seam beside order_space_unit / refuel_space_unit. Not on apply_space_command or the --serve / MCP transport yet (a SPACE line beside COMMAND is owed).
+
+**Press.** In-process: unload_space_cargo(world, space_unit_params, nation, unit).
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `unit` | `entity_id (space unit)` | The nation's own carrier with hand-loaded cargo aboard. |
+
+**Valid when:**
+- The seam validates every field as the value that lands: the unit id must name a live space unit (rejected_unknown_unit) of the acting nation (rejected_not_owner); a refusal of any kind mutates nothing - no shelf, treasury, store, convoy or id allocator is touched.
+- Hand-loaded cargo is aboard (rejected_cargo: nothing aboard, or a trade's cargo, which its Hauler unloads itself).
+- The unit is idle (rejected_busy) in a body's LOW ORBIT (rejected_wrong_node), and no armed unit of a nation at war with the owner stands at that node (rejected_hostile).
+- A completed, staffed Launchpad of ANY nation stands on the body below (rejected_no_pad); its tile's market shelf holds the descent's propellant - the body's climb Δv x launch_propellant_per_dv x the cargo - under the space ceiling (rejected_shelf_short / rejected_no_market), and the treasury pays it (rejected_insufficient_treasury).
+
+**Expected output.** ok: the descent's propellant leaves that shelf, the treasury pays it, the hold empties, and the whole cargo LANDS on that market as an arrived space convoy: the next credit_arrived_convoys lands it and the clear sells it for the owner, with any import duty, as any convoy's cargo.
+
+**Reason to select.** Sell carried goods into another body's market, or bring them home.
 
 ---
 

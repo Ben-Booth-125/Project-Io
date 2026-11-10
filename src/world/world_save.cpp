@@ -2365,6 +2365,26 @@ void write_world_snapshot_at(const world& w, std::ostream& out, uint32_t version
         }
     }
     // ===== END BL-1600 =====
+    // ===== BEGIN BL-1596 (v87): THE CARGO ABOARD, the last section =====
+    if (version >= k_world_save_version_space_convoys)
+    {
+        w_u32(out, static_cast<uint32_t>(w.space_hauls.size()));
+        for (const auto& [uid, h] : w.space_hauls) // ascending
+        {
+            w_id(out, uid);
+            w_id(out, h.owner);
+            w_enum(out, h.phase);
+            w_enum(out, h.cargo_res);
+            w_id(out, h.src_market);
+            w_u32(out, h.convoy);
+            w_id(out, h.dest_market);
+            w_id(out, h.target.body);
+            w_enum(out, h.target.kind);
+            w_id(out, h.home.body);
+            w_enum(out, h.home.kind);
+        }
+    }
+    // ===== END BL-1596 =====
 }
 
 void write_world_snapshot_pre_space_battles(const world& w, std::ostream& out)
@@ -2393,6 +2413,17 @@ std::size_t world_save_prospecting_section_bytes(const world& w)
     for (const auto& [key, k] : w.survey_knowledge)
         n += 16 + k.prospected.size();
     return n;
+}
+
+void write_world_snapshot_pre_space_convoys(const world& w, std::ostream& out)
+{
+    // VERIFICATION ONLY (BL-1596): the v86 stream shape - no space-convoy section.
+    write_world_snapshot_at(w, out, k_world_save_version_pre_space_convoys);
+}
+
+std::size_t world_save_space_convoy_section_bytes(const world& w)
+{
+    return 4 + 32 * w.space_hauls.size();
 }
 
 void write_world_snapshot_pre_space_units(const world& w, std::ostream& out)
@@ -2884,7 +2915,8 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
             && version != k_world_save_version_pre_space_nodes // BL-1581: v82, nodes derived, no orders
             && version != k_world_save_version_pre_space_units // BL-1594: v83, no space units
             && version != k_world_save_version_pre_space_battles // BL-1597: v84, no space battles
-            && version != k_world_save_version_pre_prospecting)) // BL-1600: v85, nothing mapped off-world
+            && version != k_world_save_version_pre_prospecting // BL-1600: v85, nothing mapped off-world
+            && version != k_world_save_version_pre_space_convoys)) // BL-1596: v86, nothing aboard
         return false; // mismatched version -- refuse rather than misread
 
     // BL-1422: a stream before the kit goods carries every per-resource array 49 wide;
@@ -5228,6 +5260,66 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
         }
     }
     // ===== END BL-1600 =====
+    // ===== BEGIN BL-1596 (v87): the cargo aboard. Untrusted, refused whole on any
+    // breach of world_save.hpp's v87 paragraph. A v86 (and older) stream ends before
+    // it: nothing aboard. =====
+    if (version >= k_world_save_version_space_convoys)
+    {
+        const auto node_ok = [&s](const orbital_node& n) {
+            const auto bit = s.bodies.find(n.body);
+            return bit != s.bodies.end() && bit->second.type != body_type::star
+                && static_cast<uint8_t>(n.kind) < static_cast<uint8_t>(orbital_node_kind_count);
+        };
+        uint32_t count = 0;
+        if (!r_u32(in, count) || count > s.space_units.size() || count > k_space_hauls_max)
+            return false;
+        entity_id prev = null_entity;
+        std::set<uint32_t> riding;
+        for (uint32_t k = 0; k < count; ++k)
+        {
+            entity_id  uid = null_entity;
+            space_haul h;
+            if (!r_id(in, uid) || uid == null_entity || (k > 0 && uid <= prev) || !r_id(in, h.owner)
+                || !r_enum(in, h.phase, space_haul_phase::returning) || !r_enum(in, h.cargo_res, max_resource)
+                || !r_id(in, h.src_market) || !r_u32(in, h.convoy) || !r_id(in, h.dest_market)
+                || !r_id(in, h.target.body) || !r_enum(in, h.target.kind, orbital_node_kind::l5)
+                || !r_id(in, h.home.body) || !r_enum(in, h.home.kind, orbital_node_kind::l5))
+                return false;
+            prev = uid;
+            const auto uit = s.space_units.find(uid);
+            if (uit == s.space_units.end() || uit->second.owner != h.owner || s.nations.count(h.owner) == 0
+                || (uit->second.hull != space_hull::hauler && uit->second.hull != space_hull::lander)
+                || s.markets.count(h.src_market) == 0 || !node_ok(h.target) || !node_ok(h.home))
+                return false;
+            const float cargo = uit->second.cargo;
+            if (h.phase == space_haul_phase::held)
+            {
+                if (!(cargo > 0.0f) || h.convoy != 0 || h.dest_market != null_entity)
+                    return false;
+            }
+            else
+            {
+                if (uit->second.hull != space_hull::hauler || s.markets.count(h.dest_market) == 0
+                    || h.home.kind != orbital_node_kind::low_orbit || h.target.kind != orbital_node_kind::low_orbit)
+                    return false;
+                if (h.phase == space_haul_phase::outbound)
+                {
+                    if (!(cargo > 0.0f) || h.convoy == 0 || !riding.insert(h.convoy).second)
+                        return false;
+                    const auto cit = std::find_if(s.convoys.begin(), s.convoys.end(),
+                                                  [&](const convoy_component& c) { return c.id == h.convoy; });
+                    if (cit == s.convoys.end() || cit->mode != convoy_mode::space || cit->arrived
+                        || cit->speed != 0.0f || cit->corp != h.owner || cit->cargo_resource != h.cargo_res
+                        || cit->cargo_qty != cargo || cit->dest_market != h.dest_market)
+                        return false;
+                }
+                else if (cargo != 0.0f || h.convoy != 0 || !(h.target == h.home))
+                    return false;
+            }
+            s.space_hauls.emplace_hint(s.space_hauls.end(), uid, h);
+        }
+    }
+    // ===== END BL-1596 =====
 
     // BL-1266 (v46): every manual trade names a live owner and two distinct
     // standing markets, and holds an id below the next one to be issued, all

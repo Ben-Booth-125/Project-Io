@@ -7,6 +7,7 @@
 #include "nation_tech.hpp"     // nation_scalar: logistics_cost (BL-1274)
 #include "orbital_system.hpp"
 #include "space_effects.hpp"    // BL-1586: the Navigation satellite's haul factor
+#include "space_convoy.hpp"     // BL-1596: inter-body trade ships as a Hauler
 #include "stance.hpp"
 #include "sentiment_emitters.hpp" // BL-1458: trade_conducted at landing
 
@@ -1190,6 +1191,31 @@ convoy_leg price_trade_leg(world& w, const recipe_registry& reg,
     // nation's state one; a nation holding no pad still keeps its trade on the body.
     if (!owner_has_launchpad_on(w, corp_id, src_body))
         return leg;
+    // BL-1596 (SPACE_FLEETS.md § Space convoys): A SPACE CONVOY IS A HAULER. A nation
+    // holding a live Hauler design ships its inter-body trade as one: a Hauler readied
+    // in the source's low orbit (an idle one refuelled over the pad, else one raised
+    // there, paying the climb), the cargo lifted at the source body's climb cost and
+    // set down at the destination's, flown hop by hop along the cheapest path. The
+    // cost is that physical space side per unit the Hauler can carry; the straight-
+    // line lane below stays the lane of a trader holding no Hauler design.
+    if (space_haul_eligible(w, corp_id, home))
+    {
+        if (!nation_mechanic(w, home, "space_dispatch"))
+            return leg;
+        const space_haul_quote q = quote_space_haul(w, reg.space_units(), home, src_market, dest_market_id);
+        if (!q.viable)
+            return leg;
+        const float send = std::min(qty, q.cap);
+        const float cost = q.cost_for(send) * (qty / send);
+        if (!std::isfinite(cost) || cost < 0.0f)
+            return leg;
+        leg.viable       = true;
+        leg.mode         = convoy_mode::space;
+        leg.hauler       = true;
+        leg.cost         = cost;
+        leg.travel_ticks = std::max(1, travel_ticks_for_days(q.days));
+        return leg;
+    }
     // BL-308 / BL-1265: the pad also has to be FUELLED. A launch burns
     // `launch_draw_per_convoy()`, which the trader BUYS off the source shelf;
     // without it on the shelf (under the ceiling) the lane is shut exactly as if
@@ -1247,6 +1273,77 @@ float market_lp_left(const lp_tick& lp, entity_id market_id)
     return lp_trade_left(lp, market_id);
 }
 
+namespace {
+
+/// BL-1596: a Hauler leg's shipment (SPACE_FLEETS.md § Space convoys; the steps of
+/// SUPPLY.md § A shipment, with the launch made physical). Re-quoted here, so a
+/// leg priced earlier this tick ships on today's shelves. All-or-nothing: false,
+/// nothing written, when the trip is not viable, the shelf leaves no cargo, or the
+/// trader cannot cover the space side now plus the cargo at the clear.
+bool commit_hauler_shipment(world& w, const recipe_registry& reg, economy_report& report,
+                            entity_id nation, entity_id src_market, entity_id dest_market_id,
+                            std::size_t ri, float qty, float* purse,
+                            float* out_sent, float* io_committed)
+{
+    const space_unit_params& p = reg.space_units();
+    const space_haul_quote q = quote_space_haul(w, p, nation, src_market, dest_market_id);
+    if (!q.viable)
+        return false;
+    market_component& src = w.markets.at(src_market);
+    const std::size_t pr = static_cast<std::size_t>(resource_type::propellant);
+    const entity_id pad_market = space_market_on_body(w, w.buildings.at(q.pad).tile, src.body);
+    // The space lot comes off the pad's shelf; where that is this shelf, the launch's
+    // goods come off first and the cargo has what is left.
+    float avail = std::max(0.0f, src.inventory[ri]);
+    if (pad_market == src_market)
+    {
+        avail -= q.fixed[ri];
+        if (ri == pr)
+            avail /= (1.0f + q.lift_per_unit);
+    }
+    const float send = std::min({qty, q.cap, avail});
+    if (!(send > 0.0f) || !std::isfinite(send))
+        return false;
+    const float purchase = send * posted_price(src, ri);
+    const float now      = q.fixed_credits + send * q.lift_per_unit * q.src_prop_price;
+    const float already  = (io_committed != nullptr) ? *io_committed : 0.0f;
+    if (!std::isfinite(purchase) || !std::isfinite(now) || !(*purse - already >= now + purchase))
+        return false;
+
+    float spent = 0.0f;
+    const entity_id unit = launch_space_haul(w, p, q, nation, ri, send, &spent);
+    if (unit == null_entity)
+        return false; // refused whole: nothing written
+
+    // The cargo: bought off the shelf as any trade's is, billed by the clear.
+    src.inventory[ri] = std::max(0.0f, src.inventory[ri] - send);
+    report.purchases[std::make_pair(nation, src_market)][ri] += send;
+    report.wants[std::make_pair(nation, src_market)][ri]     += send;
+
+    convoy_component c;
+    c.id             = w.allocate_convoy_id();
+    c.source_market  = src_market;
+    c.dest_market    = dest_market_id;
+    c.mode           = convoy_mode::space;
+    c.cargo_resource = static_cast<resource_type>(ri);
+    c.cargo_qty      = send;
+    c.progress       = 0.0f;
+    c.speed          = 0.0f; // it rides the Hauler: released arrived when the Hauler unloads
+    c.corp           = nation;
+    c.arrived        = false;
+    c.held           = false;
+    c.cost_paid      = spent;
+    w.convoys.push_back(c);
+    attach_space_haul(w, q, unit, nation, ri, send, c.id);
+    if (out_sent)
+        *out_sent = send;
+    if (io_committed)
+        *io_committed += purchase;
+    return true;
+}
+
+} // namespace
+
 bool commit_trade_shipment(world& w, const recipe_registry& reg, economy_report& report,
                            entity_id corp_id, entity_id src_market, entity_id dest_market_id,
                            std::size_t ri, float qty, const convoy_leg& leg,
@@ -1279,6 +1376,10 @@ bool commit_trade_shipment(world& w, const recipe_registry& reg, economy_report&
     // when the cargo IS that good the launch's draw is left behind.
     if (!shelf_admits(src, ri, res_mult, /*off_buys=*/true))
         return false;
+    // BL-1596: a Hauler leg buys its launch physically (space_convoy.hpp).
+    if (leg.mode == convoy_mode::space && leg.hauler)
+        return commit_hauler_shipment(w, reg, report, corp_id, src_market, dest_market_id, ri, qty, purse,
+                                      out_sent, io_committed);
     const auto& launch_draw = launch_draw_per_convoy();
     float on_shelf = std::max(0.0f, src.inventory[ri]);
     if (leg.mode == convoy_mode::space && launch_draw[ri] > 0.0f)

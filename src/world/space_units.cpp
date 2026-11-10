@@ -6,6 +6,7 @@
 #include "orbital_graph.hpp"
 #include "space_battle.hpp"  // BL-1597: an engaged unit's move is a withdrawal
 #include "space_assets.hpp"    // space_home_body_of, k_space_quarters_to_loss_ceiling
+#include "space_convoy.hpp"     // BL-1596: run_space_convoy_day, prune_space_hauls
 #include "space_tech_keys.hpp"
 #include "world.hpp"
 
@@ -775,6 +776,31 @@ std::vector<entity_id> space_armed_units_at(const world& w, entity_id nation, or
     return out;
 }
 
+bool space_quote_lot(const world& w, const space_unit_params& p, entity_id market,
+                     const std::array<float, resource_count>& lot, float* credits)
+{
+    const lot_quote q = quote_lot(w, p, market, lot);
+    if (credits != nullptr)
+        *credits = q.credits;
+    return q.shelf_ok;
+}
+
+void space_take_lot(world& w, entity_id nation, entity_id market,
+                    const std::array<float, resource_count>& lot, float credits)
+{
+    take_lot(w, nation, market, lot, credits);
+}
+
+entity_id space_market_on_body(const world& w, entity_id tile, entity_id body)
+{
+    return market_on_body(w, tile, body);
+}
+
+space_unit_result space_raise_ready(const world& w, entity_id nation, space_hull h)
+{
+    return raise_gate(w, nation, h);
+}
+
 float space_unit_firepower(const space_unit& u) { return evaluate_space_design(u.hull, u.design).firepower; }
 float space_unit_armour(const space_unit& u) { return evaluate_space_design(u.hull, u.design).armour; }
 float space_unit_max_hull_points(const space_unit& u) { return evaluate_space_design(u.hull, u.design).hull_points; }
@@ -816,6 +842,9 @@ void run_space_unit_day(world& w, const space_unit_params& p, const station_para
         u.hull_points = std::min(max_hp, u.hull_points + add);
         r.repaired += add;
     }
+    // BL-1596 (SPACE_FLEETS.md § Space convoys): the convoys fly on the same day, after
+    // the arrivals above; an empty store does nothing.
+    run_space_convoy_day(w, p, stp, &r.convoy);
     if (out != nullptr)
         *out = r;
 }
@@ -857,6 +886,9 @@ void run_space_unit_quarter(world& w, const space_unit_params& p, const station_
         }
         ++it;
     }
+
+    // BL-1596: a hauler lost above takes its cargo (and any trade riding it) with it.
+    prune_space_hauls(w);
 
     // 2. Depot stock: a station gone takes its stock with it.
     for (auto it = w.station_depot_stock.begin(); it != w.station_depot_stock.end();)
