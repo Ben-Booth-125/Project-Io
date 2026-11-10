@@ -824,6 +824,113 @@ logistics_path intra_body_path_avoiding(world& w, entity_id body, entity_id src_
     return res;
 }
 
+logistics_path intra_body_path_priced(world& w, entity_id body, entity_id src_tile,
+                                      entity_id dst_tile, const std::set<entity_id>& blocked,
+                                      const std::function<bool(const tile_component&)>* wall,
+                                      const hop_price_fn& price)
+{
+    logistics_path res;
+    const auto bit = w.bodies.find(body);
+    const auto sit = w.tiles.find(src_tile);
+    const auto dit = w.tiles.find(dst_tile);
+    if (bit == w.bodies.end() || sit == w.tiles.end() || dit == w.tiles.end()
+        || sit->second.body != body || dit->second.body != body || !price)
+        return res;
+    const int gw = bit->second.grid_width;
+    const int gh = bit->second.grid_height;
+    const std::vector<entity_id>& grid = body_tile_grid(w, body);
+    if (gw <= 0 || gh <= 0 || grid.empty())
+        return res;
+    if (src_tile == dst_tile)
+    {
+        res.reachable = true;
+        res.tiles     = { src_tile };
+        return res;
+    }
+
+    const int total = gw * gh;
+    std::vector<float> dist(static_cast<std::size_t>(total), 1e30f);
+    std::vector<int>   came_from(static_cast<std::size_t>(total), -1);
+    std::vector<char>  settled(static_cast<std::size_t>(total), 0);
+    const int src_idx = raster_idx(sit->second.grid_x, sit->second.grid_y, gw);
+    const int dst_idx = raster_idx(dit->second.grid_x, dit->second.grid_y, gw);
+    dist[static_cast<std::size_t>(src_idx)] = 0.0f;
+
+    // (cost, raster index): equal costs settle by the lower index, a fixed order.
+    using entry = std::pair<float, int>;
+    std::priority_queue<entry, std::vector<entry>, std::greater<entry>> pq;
+    pq.push({ 0.0f, src_idx });
+    while (!pq.empty())
+    {
+        const entry cur = pq.top();
+        pq.pop();
+        const int idx = cur.second;
+        if (settled[static_cast<std::size_t>(idx)])
+            continue;
+        settled[static_cast<std::size_t>(idx)] = 1;
+        if (idx == dst_idx)
+            break;
+        const entity_id cid = grid[static_cast<std::size_t>(idx)];
+        const auto cit = cid != null_entity ? w.tiles.find(cid) : w.tiles.end();
+        if (cit == w.tiles.end())
+            continue;
+        const int col = idx % gw, row = idx / gw;
+        for (int i = 0; i < 4; ++i)
+        {
+            const int nr = row + k_flood_off_dr[i];
+            if (nr < 0 || nr >= gh)
+                continue;
+            const int nc = ((col + k_flood_off_dc[i]) % gw + gw) % gw;
+            const int nidx = raster_idx(nc, nr, gw);
+            if (settled[static_cast<std::size_t>(nidx)])
+                continue;
+            const entity_id nid = grid[static_cast<std::size_t>(nidx)];
+            if (nid == null_entity)
+                continue;
+            const auto nit = w.tiles.find(nid);
+            if (nit == w.tiles.end())
+                continue;
+            if (nidx != dst_idx && blocked.count(nid) != 0)
+                continue; // another nation's stack: never walked through
+            if (wall != nullptr && (*wall)(nit->second))
+                continue; // ground the walker's class cannot enter
+            const float step = price(cid, cit->second, nid, nit->second);
+            if (!(step >= 0.0f))
+                continue;
+            const float nd = dist[static_cast<std::size_t>(idx)] + step;
+            if (nd < dist[static_cast<std::size_t>(nidx)])
+            {
+                dist[static_cast<std::size_t>(nidx)]      = nd;
+                came_from[static_cast<std::size_t>(nidx)] = idx;
+                pq.push({ nd, nidx });
+            }
+        }
+    }
+    if (!settled[static_cast<std::size_t>(dst_idx)] || dist[static_cast<std::size_t>(dst_idx)] >= 1e30f)
+        return res;
+
+    res.reachable = true;
+    res.cost      = dist[static_cast<std::size_t>(dst_idx)];
+    bool crossed_any = false;
+    std::vector<entity_id> seq; // dst -> src
+    for (int i = dst_idx; i != -1; i = came_from[static_cast<std::size_t>(i)])
+    {
+        const entity_id tid = grid[static_cast<std::size_t>(i)];
+        if (tid != null_entity)
+        {
+            seq.push_back(tid);
+            const auto tit = w.tiles.find(tid);
+            crossed_any = crossed_any || (tit != w.tiles.end() && is_water(tit->second.substrate));
+        }
+        if (i == src_idx) break;
+    }
+    res.crosses_ocean = crossed_any;
+    if (src_tile < dst_tile) // seq runs dst -> src; lo -> hi needs the flip
+        std::reverse(seq.begin(), seq.end());
+    res.tiles = std::move(seq);
+    return res;
+}
+
 // ---------------------------------------------------------------------------
 // BL-1186 (goods cross markets): a route's LEGS
 // ---------------------------------------------------------------------------

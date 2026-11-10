@@ -182,6 +182,22 @@ logistics_path intra_body_path_avoiding(world& w, entity_id body, entity_id src_
                                         entity_id dst_tile, const std::set<entity_id>& blocked,
                                         const std::function<bool(const tile_component&)>* wall = nullptr);
 
+/// One hop's price for `intra_body_path_priced`: travelling @p from -> @p to, adjacent.
+using hop_price_fn = std::function<float(entity_id from, const tile_component& from_tc,
+                                         entity_id to, const tile_component& to_tc)>;
+
+/// `intra_body_path_avoiding` with the hop priced by @p price rather than the network's
+/// edge (Ben, 2026-11-10: a march takes the route ITS OWN days make fastest - MILITARY.md
+/// § Terrain and the classes). The same 4-cardinal edges, the same @p blocked and @p wall
+/// rules (neither tested on @p src_tile; @p blocked never on @p dst_tile), searched FORWARD
+/// from @p src_tile and stopped once @p dst_tile settles, so @p price is asked in travel
+/// order. Uncached, by value, `tiles` in the canonical lo -> hi order. Deterministic: ties
+/// settle by raster index.
+logistics_path intra_body_path_priced(world& w, entity_id body, entity_id src_tile,
+                                      entity_id dst_tile, const std::set<entity_id>& blocked,
+                                      const std::function<bool(const tile_component&)>* wall,
+                                      const hop_price_fn& price);
+
 /// Every cell of @p body whose travel cost TO @p anchor_tile is at most
 /// @p max_cost, as (raster index, cost) pairs in settle order (cost
 /// ascending). The same directed edge weights `intra_body_path`'s flood

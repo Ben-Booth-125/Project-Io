@@ -925,6 +925,12 @@ float march_days_per_tile(const military_capability_params& mil, uint16_t type);
 /// drawn cannot drift from what the march banks. Pure read.
 float march_hop_cost(const world& w, const recipe_registry& reg, const unit_component& u,
                      const tile_component& to, entity_id to_id, const tile_component& from);
+/// The same price from the military parameters, for a unit of roster row @p type owned by
+/// @p owner stepping @p from_id -> @p to_id. The march's ROUTE is solved with it (Ben,
+/// 2026-11-10), so the path a march takes is the one its own days make fastest.
+float march_hop_cost(const world& w, const military_capability_params& mil, uint16_t type,
+                     entity_id owner, entity_id from_id, const tile_component& from,
+                     entity_id to_id, const tile_component& to);
 
 /// How far along its next hop @p u's march stands, in [0, 1]: the bank, plus @p day_fraction
 /// of today's movement, over the hop's price (MILITARY.md § Land — on the canvas: drawn at

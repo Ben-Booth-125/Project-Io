@@ -4738,13 +4738,20 @@ void charge_supply_draws(world& w, const recipe_registry& reg, const lp_tick& lp
 float march_hop_cost(const world& w, const recipe_registry& reg, const unit_component& u,
                      const tile_component& to, entity_id to_id, const tile_component& from)
 {
-    const int march_side = road_side_between(w, u.position, to_id);
+    return march_hop_cost(w, reg.military(), u.type, u.owner, u.position, from, to_id, to);
+}
+
+float march_hop_cost(const world& w, const military_capability_params& mil, uint16_t type,
+                     entity_id owner, entity_id from_id, const tile_component& from,
+                     entity_id to_id, const tile_component& to)
+{
+    const int march_side = road_side_between(w, from_id, to_id);
     float step_cost = edge_traversal_cost(from, to, march_side);
     // BL-1455 (MILITARY.md § Terrain and the classes): the class's MOVE row on the
     // destination tile multiplies the hop's days - a dismount folded in as foot
     // infantry's days over the class's own. Exactly 1.0 on ground no row names.
     {
-        const float move = terrain_class_effects_for_type(reg.military(), u.type, to).move;
+        const float move = terrain_class_effects_for_type(mil, type, to).move;
         if (move != 1.0f)
             step_cost *= move;
     }
@@ -4754,7 +4761,7 @@ float march_hop_cost(const world& w, const recipe_registry& reg, const unit_comp
     // no superiority is flown anywhere.
     if (!w.air_superiority.empty())
     {
-        const int slow = air_march_cost_permille(w, reg, u.owner, to_id);
+        const int slow = air_march_cost_permille(w, mil, owner, to_id);
         if (slow != 1000)
             step_cost *= static_cast<float>(slow) / 1000.0f;
     }
@@ -4935,7 +4942,7 @@ unit_march_tick run_unit_march(world& w, const recipe_registry& reg, int day_tic
                     break;
                 }
                 const std::vector<entity_id> rp =
-                    march_path(w, cur_it->second.body, u.position, u.order.dest, {}, &wall);
+                    march_path(w, cur_it->second.body, u.position, u.order.dest, {}, &wall, &mil, &u);
                 ++out.recomputed;
                 if (rp.size() < 2)
                 {
@@ -4974,7 +4981,7 @@ unit_march_tick run_unit_march(world& w, const recipe_registry& reg, int day_tic
                 ++out.blocked;
                 const std::vector<entity_id> rp =
                     march_path(w, cur_it->second.body, u.position, u.order.dest, blocked_for(u.owner),
-                               &wall);
+                               &wall, &mil, &u);
                 if (rp.size() < 2 || foreign_holder(rp[1], u.owner, false) != null_entity)
                 {
                     u.order = movement_order{};

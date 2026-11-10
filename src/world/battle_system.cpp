@@ -3,6 +3,7 @@
 
 #include "air_combat.hpp" // air_land_recon_milli: the air's recon over a battle (BL-1453)
 #include "carried_supplies.hpp" // BL-1452: the round's supply term and the recovery step
+#include "economy_system.hpp" // march_hop_cost: the march route is priced by the march (Ben, 2026-11-10)
 #include "fronts.hpp" // BL-1502: occupy_on_entry, reanchor_fronts (the advance occupies)
 #include "logistics.hpp" // road_edge_neighbour: the retreat step (BL-1421)
 #include "placement_rules.hpp"
@@ -653,7 +654,9 @@ terrain_class_effect unit_terrain_effects(const world& w, const military_capabil
 
 std::vector<entity_id> march_path(world& w, entity_id body, entity_id from, entity_id dest,
                                   const std::set<entity_id>& blocked,
-                                  const std::function<bool(const tile_component&)>* wall)
+                                  const std::function<bool(const tile_component&)>* wall,
+                                  const military_capability_params* mil,
+                                  const unit_component* walker)
 {
     std::vector<entity_id> path;
     // BL-1455: a destination the class cannot enter is no destination at all.
@@ -666,6 +669,24 @@ std::vector<entity_id> march_path(world& w, entity_id body, entity_id from, enti
     };
     if (walls && dest != from && walled(dest))
         return path;
+    if (mil != nullptr && walker != nullptr)
+    {
+        const uint16_t type = walker->type;
+        const entity_id owner = walker->owner;
+        const hop_price_fn price = [&w, mil, type, owner](entity_id a, const tile_component& at,
+                                                         entity_id b, const tile_component& bt) {
+            return march_hop_cost(w, *mil, type, owner, a, at, b, bt);
+        };
+        const logistics_path p = intra_body_path_priced(w, body, from, dest, blocked,
+                                                        walls ? wall : nullptr, price);
+        if (p.reachable && !p.tiles.empty())
+        {
+            path = p.tiles;
+            if (path.front() != from)
+                std::reverse(path.begin(), path.end());
+        }
+        return path;
+    }
     {
         const logistics_path& p = intra_body_path(w, body, from, dest);
         if (p.reachable && !p.tiles.empty())

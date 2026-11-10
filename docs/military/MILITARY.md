@@ -831,8 +831,11 @@ march or a front's order routes around it, an order with no legal route is refus
 (§ Fronts) a slot the class cannot enter gives way to the nearest span tile it can, ties to the
 lower index; a unit with no such slot holds where it stands. A push skips a target the class
 cannot enter or reach for the next in the push's order. "A road on it"
-is any road edge on the tile. The move rows price a hop's days but do not steer the route: the
-path is the shared terrain-weighted one, solved around the walls. A pre-modern row, which declares
+is any road edge on the tile. **The march's own days steer its route (Ben, 2026-11-10)**: the
+path is solved, around the walls and the other nations' stacks, over the hop a march pays - the
+network's terrain-and-road price times the class's move row on the tile entered and the air
+superiority slow - so a unit is never sent the long way down a road through ground its class
+crosses slowly. A convoy's route stays the network's own. A pre-modern row, which declares
 no land class, reads none of these rows.
 
 ---

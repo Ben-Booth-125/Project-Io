@@ -403,9 +403,18 @@ int withdraw_units(world& w, const std::vector<entity_id>& units, const std::vec
 /// per-tile wall (`class_wall`): the path never enters a tile it answers true for,
 /// save @p from - a unit may leave a wall it stands on - and a walled @p dest is
 /// unreachable (an empty path).
+///
+/// THE MARCH'S OWN DAYS STEER IT (Ben, 2026-11-10). With @p mil and @p walker given, the
+/// route is solved by `intra_body_path_priced` over `march_hop_cost` for the walker's class
+/// and owner - the network's hop times the class's MOVE row and the air slow - so the path
+/// is the one the march itself crosses fastest. The network's route prices a hop as a
+/// convoy pays it, and sent marches along roads through ground their class crosses slowly
+/// (seed 46: 41 of 49 off-road moves took a slower route, up to 8.4 days).
 std::vector<entity_id> march_path(world& w, entity_id body, entity_id from, entity_id dest,
                                   const std::set<entity_id>& blocked,
-                                  const std::function<bool(const tile_component&)>* wall = nullptr);
+                                  const std::function<bool(const tile_component&)>* wall = nullptr,
+                                  const military_capability_params* mil = nullptr,
+                                  const unit_component* walker = nullptr);
 
 /// THE PER-CLASS WALL (BL-1455; MILITARY.md § Terrain and the classes): true for a
 /// tile a unit of roster row @p type cannot ENTER - a matching row blocks it unless

@@ -382,13 +382,19 @@ int air_share_permille(const world& w, uint32_t province, entity_id nation)
 int air_march_cost_permille(const world& w, const recipe_registry& reg, entity_id mover,
                             entity_id tile)
 {
+    return air_march_cost_permille(w, reg.military(), mover, tile);
+}
+
+int air_march_cost_permille(const world& w, const military_capability_params& mil, entity_id mover,
+                            entity_id tile)
+{
     if (w.air_superiority.empty())
         return 1000;
     const uint32_t p = w.provinces.province_of(tile);
     if (p == 0)
         return 1000;
     const int share = air_share_permille(w, p, mover);
-    return 1000 + reg.military().air.march_slow_permille * (1000 - share) / 1000;
+    return 1000 + mil.air.march_slow_permille * (1000 - share) / 1000;
 }
 
 int air_defence_kit_bonus_permille(const unit_design& kit)

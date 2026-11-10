@@ -170,6 +170,10 @@ int air_share_permille(const world& w, uint32_t province, entity_id nation);
 /// 1000 + march_slow_permille as its share over the tile's province falls.
 int air_march_cost_permille(const world& w, const recipe_registry& reg, entity_id mover,
                             entity_id tile);
+/// The same read from the military parameters alone (the march's route search holds no
+/// registry).
+int air_march_cost_permille(const world& w, const military_capability_params& mil, entity_id mover,
+                            entity_id tile);
 
 // ---- The passes -----------------------------------------------------------------
 

@@ -936,7 +936,7 @@ corp_command_result march_check(world& w, entity_id actor, entity_id unit, entit
         march_wall(uit->second.type, cwall);
     const std::vector<entity_id> path =
         march_path(w, sit->second.body, uit->second.position, tile, foreign,
-                   wall ? &wall : nullptr);
+                   wall ? &wall : nullptr, mil, &uit->second);
     if (path.size() < 2)
     {
         // The second search names the reason, and runs only where class walls exist:
