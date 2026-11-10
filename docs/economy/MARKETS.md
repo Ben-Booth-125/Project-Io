@@ -980,6 +980,14 @@ target = base_price × √(demand / supply)     — damped elasticity
 price  = prior + 0.5 × (target − prior)       — EMA smoothing
 ```
 
+**The target reads one tick; the EMA is the price's only memory (BL-1618, price falls as supply
+vanishes).** `supply` and `demand` are this tick's figures, never a running average. So a market
+fed in lumps saws: every empty tick pulls the price halfway to the ceiling, and one landing pulls it
+halfway back toward `base × √(demand / supply)`. One landing of 4.25 against a demand of 7.47 aims
+at about 1.3× base, and takes a price at the ceiling to under 6× in a single tick. A price read at
+one tick after a landing can therefore sit lower than it stood before supply thinned, though the
+mean supply fell. Compare prices over a window, or at ticks with no landing, not at single ticks.
+
 **The shelf is supply (Ben, 2026-10-03):** `supply` is this tick's listings plus the shelf's share
 of the stock standing on the market's shelf (`inventory`) — at most k ticks of demand, k set by
 measurement (below). A market fed only by deliveries is not a market with
