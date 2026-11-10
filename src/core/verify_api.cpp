@@ -5480,6 +5480,19 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         out["ties_covered"]     = sf.ties_covered;
         out["picker_x"]     = sf.picker_x;
         out["picker_y"]     = sf.picker_y;
+        // The tenth grant (Ben, 2026-11-09): the Site Finder tab's press point, and the
+        // COUNT and TEXT of the Net labels the canvas drew over tiles - never a position.
+        out["tab_x"]        = sf.tab_x;
+        out["tab_y"]        = sf.tab_y;
+        out["tab_ok"]       = sf.tab_x >= 0.0f;
+        {
+            sol::table nl = st.create_table();
+            int nn = 0;
+            for (const std::string& t : sf.net_labels)
+                nl[++nn] = t;
+            out["net_labels"]   = nl;
+            out["n_net_labels"] = nn;
+        }
         {
             sol::table pr = st.create_table();
             int pn = 0;

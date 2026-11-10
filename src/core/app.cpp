@@ -300,8 +300,12 @@ void app::apply_ui_draw_scale_to_frame()
     ImGuiIO& io = ImGui::GetIO();
     io.DisplaySize = {io.DisplaySize.x / m_ui_draw_scale, io.DisplaySize.y / m_ui_draw_scale};
     // The SDL backend queues the pointer in window pixels, and it has no scale to ask.
+    // Once each: an event the trickle queue carried over from last frame was scaled then
+    // (m_ui_scale_event_floor), and scaling it twice moved the pointer off the panel it
+    // was over, so the canvas took the panel's wheel.
     for (ImGuiInputEvent& e : ImGui::GetCurrentContext()->InputEventsQueue)
-        if (e.Type == ImGuiInputEventType_MousePos && e.MousePos.PosX > -FLT_MAX)
+        if (e.Type == ImGuiInputEventType_MousePos && e.MousePos.PosX > -FLT_MAX
+            && e.EventId >= m_ui_scale_event_floor)
         {
             e.MousePos.PosX /= m_ui_draw_scale;
             e.MousePos.PosY /= m_ui_draw_scale;
@@ -604,7 +608,10 @@ int app::run(autostart_mode autostart)
         // Continuous sim time for the intra-body vision beam (BL-152/154). The actual
         // vision refresh (update_body_vision) runs in render(), so both the live loop
         // and the --verify capture path (capture_frame -> render) get it.
-        m_ui.sim_now_days = now_days;
+        // The MOTION clock, not elapsed_days(): glides and convoy heads read a day's or a
+        // quarter's fraction against progress the day ticks advance, so the fraction must
+        // come from those ticks (sim_loop::motion_days; Ben, 2026-11-09, the jitter).
+        m_ui.sim_now_days = m_sim_loop.motion_days();
 
         // Resolve the economy on each econ-tick (quarter) boundary the clock crosses.
         const uint64_t econ = m_sim_loop.econ_tick();
@@ -2784,6 +2791,7 @@ void app::render()
     // last write wins). A no-op outside the verify harness — see app.hpp
     // § Synthetic pointer input.
     pump_injected_input();
+    m_ui_scale_event_floor = ImGui::GetCurrentContext()->InputEventsNextEventId; // scaled or UI px
     ImGui::NewFrame();
 
     // BL-1246: the ground pool's per-frame pump, on EVERY screen — the home
