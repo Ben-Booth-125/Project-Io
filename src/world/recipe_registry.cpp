@@ -315,6 +315,26 @@ void recipe_registry::load_from_lua(lua_state& lua)
             throw std::runtime_error("recipe_registry: economy.population_growth.demand_basket is retired "
                                      "(BL-1163) - the growth basket is economy.population_demand's");
         gp.growth_met_threshold = growth->get_or("growth_met_threshold", gp.growth_met_threshold);
+        gp.base_rate_raw        = growth->get_or("base_rate_raw", gp.base_rate_raw);
+        gp.base_rate_qualified  = growth->get_or("base_rate_qualified", gp.base_rate_qualified);
+        gp.consumer_bonus       = growth->get_or("consumer_bonus", gp.consumer_bonus);
+        gp.decline_rate         = growth->get_or("decline_rate", gp.decline_rate);
+        // POPULATION_GROWTH_RATE: refused, never clamped (the authored-rate rule).
+        // An annual rate is a share of heads in [0, 0.25]: above a quarter a
+        // year no human population has sustained, and the dial is a typo.
+        const auto in_range = [](float v, float lo, float hi) {
+            return std::isfinite(v) && v >= lo && v <= hi;
+        };
+        if (!in_range(gp.growth_met_threshold, 0.0f, 1.0f))
+            throw std::runtime_error("recipe_registry: economy.population_growth.growth_met_threshold "
+                                     "must be finite and in [0, 1]");
+        if (!in_range(gp.base_rate_raw, 0.0f, 0.25f) || !in_range(gp.base_rate_qualified, 0.0f, 0.25f)
+            || !in_range(gp.decline_rate, 0.0f, 0.25f))
+            throw std::runtime_error("recipe_registry: economy.population_growth base_rate_raw, "
+                                     "base_rate_qualified and decline_rate must be finite and in [0, 0.25]");
+        if (!in_range(gp.consumer_bonus, 0.0f, 4.0f))
+            throw std::runtime_error("recipe_registry: economy.population_growth.consumer_bonus "
+                                     "must be finite and in [0, 4]");
         m_growth = gp;
     }
 

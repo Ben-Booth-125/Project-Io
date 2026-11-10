@@ -2541,6 +2541,9 @@ struct province_pop_row
     int         population   = 0;     ///< Absolute headcount in thousands.
     float       habitability = 0.0f;
     bool        here         = false; ///< Stands on the SELECTED tile.
+    bool        razed        = false;
+    /// POPULATION_GROWTH_RATE: the reading the growth pass applies (read_centre_growth).
+    centre_growth_reading growth;
 };
 
 struct province_pop_table
@@ -2557,7 +2560,8 @@ struct province_pop_table
 /// per-tile headcount to show and a per-tile section would have to invent one.
 /// The centre that stands on the selected tile — if one does — is flagged, so the
 /// list reads as "this ground, in its neighbourhood" rather than as a bare roster.
-province_pop_table province_population(const world& w, entity_id tile_id)
+province_pop_table province_population(const world& w, const recipe_registry& reg,
+                                       const economy_report& report, entity_id tile_id)
 {
     province_pop_table t;
     const uint32_t  pid = w.provinces.province_of(tile_id);
@@ -2582,6 +2586,11 @@ province_pop_table province_population(const world& w, entity_id tile_id)
         r.population   = pc.population;
         r.habitability = pc.habitability;
         r.here         = (tit->second == tile_id);
+        r.razed        = pc.razed;
+        // The pass's own gatherer (read_centre_growth): the last report's body
+        // habitability, or, before any report exists, the figure the next pass
+        // will compute -- never a stand-in 1.0.
+        r.growth       = read_centre_growth(w, reg, cid, &report);
         t.total       += pc.population;
         t.rows.push_back(r);
     }
@@ -3782,6 +3791,31 @@ void draw_population_tooltip(const province_pop_table& pt)
         ImGui::TextDisabled("%s \xc2\xb7 %d k \xc2\xb7 hab %.2f",
                             population_scale_name(r.scale), r.population,
                             static_cast<double>(r.habitability));
+        // POPULATION_GROWTH_RATE (POPULATION.md § Growth, decline and razing): the
+        // annual rate the growth pass applies, and what makes it.
+        const centre_growth_reading& g = r.growth;
+        ImGui::TextUnformatted("   ");
+        ImGui::SameLine();
+        if (r.razed)
+            ImGui::TextDisabled("razed: re-settles while staples and habitability hold");
+        else if (!g.recorded)
+            ImGui::TextDisabled("growth: no market reading yet");
+        else if (g.grows())
+            ImGui::TextDisabled("grows %+.1f%%/yr = base %.1f%% (qualification %.0f%%) + consumer %.1f%% (upper rungs %.0f%% met)",
+                                100.0 * g.annual_rate, 100.0 * g.base_rate,
+                                100.0 * g.qualification, 100.0 * g.bonus_rate,
+                                100.0 * g.upper_fill);
+        else
+            ImGui::TextColored(ImVec4(0.90f, 0.55f, 0.35f, 1.0f),
+                               "declines %.1f%%/yr: %s", 100.0 * g.annual_rate,
+                               !g.staples_ok
+                                   ? (g.hab_ok ? "staples under half met" : "staples under half met, habitability under 0.5")
+                                   : "habitability under 0.5");
+        if (!r.razed && g.recorded && !g.staples_ok)
+        {
+            ImGui::SameLine();
+            ImGui::TextDisabled("(staples %.0f%%)", 100.0 * g.staples_fill);
+        }
     }
     ImGui::EndTooltip();
 }
@@ -3791,7 +3825,8 @@ void draw_population_tooltip(const province_pop_table& pt)
 // the resource table taking the rest of the height and scrolling INSIDE itself.
 // The card's own window never scrolls (NoScrollbar | NoScrollWithMouse), and its
 // scroll range is published so a check can hold it to zero.
-void draw_province_card(const world& w, ui_state& ui, entity_id tile_id, float card_w, float total_h)
+void draw_province_card(const world& w, const recipe_registry& reg, const economy_report& report,
+                        ui_state& ui, entity_id tile_id, float card_w, float total_h)
 {
     const ImGuiStyle& style = ImGui::GetStyle();
     ImGui::BeginChild("##province_card", {card_w, total_h}, true,
@@ -3821,7 +3856,7 @@ void draw_province_card(const world& w, ui_state& ui, entity_id tile_id, float c
     }
 
     // ── The header row: title | capacity bar | population ──
-    const province_pop_table pt = province_population(w, tile_id);
+    const province_pop_table pt = province_population(w, reg, report, tile_id);
     ui.tile_card.population = pt.total;
     char pop[32];
     std::snprintf(pop, sizeof pop, "%d k", pt.total);
@@ -4123,7 +4158,7 @@ void draw_tile_selection(world& w, const recipe_registry& reg, const economy_rep
     if (water)
         draw_water_facts_column(w, tile_id, tile, prov_w, total_h);
     else
-        draw_province_card(w, ui, tile_id, prov_w, total_h);
+        draw_province_card(w, reg, report, ui, tile_id, prov_w, total_h);
     ImGui::SameLine();
 
     // ── 3. Tile: its buildings, or one of them expanded ──

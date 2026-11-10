@@ -2137,8 +2137,25 @@ void write_world_snapshot_at(const world& w, std::ostream& out, uint32_t version
         }
     }
 
-    // world_save_version 81 (BL-1562): THE ENDED NATIONS, the last section. Every
-    // ended nation, ascending id.
+    // world_save_version 82 (POPULATION_GROWTH_RATE): THE GROWTH CARRY. Each centre's
+    // fractional thousand heads, only where non-zero.
+    if (version >= k_world_save_version_growth_carry)
+    {
+        std::vector<entity_id> cids;
+        for (const auto& [cid, pc] : w.population_centres)
+            if (pc.growth_carry != 0.0f)
+                cids.push_back(cid);
+        std::sort(cids.begin(), cids.end());
+        w_u32(out, static_cast<uint32_t>(cids.size()));
+        for (const entity_id cid : cids)
+        {
+            w_id(out, cid);
+            w_f32(out, w.population_centres.at(cid).growth_carry);
+        }
+    }
+
+    // world_save_version 83 (BL-1562): THE ENDED NATIONS, the last section, after the
+    // v82 carry. Every ended nation, ascending id.
     if (version >= k_world_save_version_ended)
     {
         std::vector<entity_id> ids;
@@ -2152,9 +2169,24 @@ void write_world_snapshot_at(const world& w, std::ostream& out, uint32_t version
     }
 }
 
+void write_world_snapshot_pre_growth_carry(const world& w, std::ostream& out)
+{
+    // VERIFICATION ONLY (POPULATION_GROWTH_RATE): the v80 stream shape - no carry section.
+    write_world_snapshot_at(w, out, k_world_save_version_pre_growth_carry);
+}
+
+std::size_t world_save_growth_carry_section_bytes(const world& w)
+{
+    std::size_t n = 0;
+    for (const auto& [cid, pc] : w.population_centres)
+        if (pc.growth_carry != 0.0f)
+            ++n;
+    return 4 + 8 * n;
+}
+
 void write_world_snapshot_pre_ended(const world& w, std::ostream& out)
 {
-    // VERIFICATION ONLY (BL-1562): the v80 stream shape - no ended-nations section.
+    // VERIFICATION ONLY (BL-1562): the v82 stream shape - no ended-nations section.
     write_world_snapshot_at(w, out, k_world_save_version_pre_ended);
 }
 
@@ -2573,7 +2605,8 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
             && version != k_world_save_version_pre_occupation // BL-1502: v77, nothing occupied
             && version != k_world_save_version_pre_defend     // BL-1504: v78, no defend orders
             && version != k_world_save_version_pre_research_books // BL-1539: v79, nothing booked
-            && version != k_world_save_version_pre_ended))        // BL-1562: v80, no nation ended
+            && version != k_world_save_version_pre_growth_carry // v80: every growth carry 0
+            && version != k_world_save_version_pre_ended))      // BL-1562: v82, no nation ended
         return false; // mismatched version -- refuse rather than misread
 
     // BL-1422: a stream before the kit goods carries every per-resource array 49 wide;
@@ -4361,15 +4394,41 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
         rescale_site_days_to_research_books(s);
     }
 
-    // v81 (BL-1562): the ended nations. Untrusted: each names a nation of the stream,
+    // v82 (POPULATION_GROWTH_RATE): the growth carry. Untrusted: rows strictly
+    // ascending, each a centre of the stream, the carry finite and in (0, 1).
+    // Refused whole otherwise. A v80 (and older) stream ends before it: every
+    // carry 0, which is what a centre that never grew at a rate holds.
+    if (version >= k_world_save_version_growth_carry)
+    {
+        uint32_t count = 0;
+        if (!r_u32(in, count) || count > s.population_centres.size())
+            return false;
+        entity_id prev = null_entity;
+        for (uint32_t k = 0; k < count; ++k)
+        {
+            entity_id cid = null_entity;
+            float carry = 0.0f;
+            if (!r_id(in, cid) || cid == null_entity || (k > 0 && cid <= prev) || !r_f32(in, carry))
+                return false;
+            prev = cid;
+            if (!std::isfinite(carry) || !(carry > 0.0f) || !(carry < 1.0f))
+                return false;
+            const auto cit = s.population_centres.find(cid);
+            if (cit == s.population_centres.end())
+                return false;
+            cit->second.growth_carry = carry;
+        }
+    }
+
+    // v83 (BL-1562), after the v82 carry: the ended nations. Untrusted: each names a nation of the stream,
     // strictly ascending, never null, that owns no tile, fields no unit and is party to
     // no open war - what elimination leaves - and (fix round, cold review) that keeps
     // nothing else elimination clears: no hostility, friendship, friendship-offer,
     // embargo or peace-offer row and no sentiment row naming it; no law it enacted, no
     // trade, convoy, wing, muster or front order of its own; no building or space asset;
     // no positive treasury; no live capital. Refused whole otherwise (the scratch world
-    // is dropped, so nothing lands). A v80 (and older) stream ends before it: no nation
-    // has ended.
+    // is dropped, so nothing lands). A v82 (or v80, and older) stream ends before it: no
+    // nation has ended.
     if (version >= k_world_save_version_ended)
     {
         uint32_t count = 0;

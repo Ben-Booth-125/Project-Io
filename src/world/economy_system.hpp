@@ -1228,3 +1228,54 @@ inline bool dial_idled(const building_component& b)
         && (b.type == building_type::extraction_site
             || b.type == building_type::processing_facility);
 }
+
+/// POPULATION_GROWTH_RATE (Ben, 2026-11-10; POPULATION.md § Growth, decline and
+/// razing, "Growth is a rate, anchored on Earth's history"). One centre's growth
+/// reading: the two floors, the two parts of the rate and the signed annual
+/// rate the growth pass applies a quarter of. The growth pass and the centre's
+/// card read the SAME function, so what the card shows is what the pass does.
+struct centre_growth_reading
+{
+    bool  recorded      = true;  ///< false: the market has not cleared since it was made; the pass carries the streak.
+    bool  staples_ok    = true;  ///< staples fill >= the floor (growth_met_threshold).
+    bool  hab_ok        = true;  ///< body habitability >= 0.5.
+    float staples_fill  = 1.0f;
+    float upper_fill    = 0.0f;
+    float habitability  = 1.0f;
+    float qualification = 0.0f;  ///< the owning nation's; 0 for a stateless centre.
+    float base_rate     = 0.0f;  ///< annual, from qualification.
+    float bonus_rate    = 0.0f;  ///< annual, base x consumer_bonus x upper fill.
+    float annual_rate   = 0.0f;  ///< signed: base + bonus when both floors hold, -decline_rate otherwise.
+    bool  grows() const { return staples_ok && hab_ok; }
+};
+
+/// One market's household fill split for growth (`population_basket_fill`,
+/// market_clearing.hpp, documents each field).
+struct population_fill
+{
+    float staples  = 1.0f;
+    float upper    = 0.0f;
+    bool  recorded = true;
+};
+
+/// The pure rule over its inputs (no world read).
+centre_growth_reading centre_growth_from(float staples_fill, float upper_fill, bool recorded,
+                                         float habitability, float qualification,
+                                         const growth_params& gp);
+
+/// The body habitability the growth pass gates a centre on: @p report's
+/// `body_habitability` for @p body when it holds one, otherwise the same
+/// figure computed the same way (the scale-weighted mean over the body's
+/// non-razed centres, ascending id, 1.0 for a body with none) — so a card
+/// read before any report exists shows what the next pass will use.
+float growth_body_habitability(const world& w, const economy_report* report, entity_id body);
+
+/// THE one input gatherer for centre @p cid, read by the growth pass and the
+/// centre's card alike: its catchment market's household fill
+/// (`population_basket_fill`), its owning nation's qualification, and its
+/// body's habitability (`growth_body_habitability`). A centre whose body has no
+/// market reads its staples met and no bonus. @p fill_memo (optional) caches
+/// each market's fill for a caller reading many centres in one pass.
+centre_growth_reading read_centre_growth(const world& w, const recipe_registry& reg, entity_id cid,
+                                         const economy_report* report,
+                                         std::map<entity_id, population_fill>* fill_memo = nullptr);

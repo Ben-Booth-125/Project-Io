@@ -565,6 +565,27 @@ uint64_t world::state_hash(int tick) const
         }
     }
 
+    // POPULATION_GROWTH_RATE (Ben, 2026-11-10): each population centre's growth carry,
+    // folded only where non-zero (sorted walk), so a world that never grew at a rate
+    // hashes as it did.
+    {
+        std::vector<entity_id> carried;
+        for (const auto& [cid, pc] : population_centres)
+            if (pc.growth_carry != 0.0f)
+                carried.push_back(cid);
+        if (!carried.empty())
+        {
+            std::sort(carried.begin(), carried.end());
+            fnv1a_u32(h, 0x47525443u); // "GRTC"
+            fnv1a_u32(h, static_cast<uint32_t>(carried.size()));
+            for (const entity_id cid : carried)
+            {
+                fnv1a_u32(h, cid);
+                fnv1a_f32(h, population_centres.at(cid).growth_carry);
+            }
+        }
+    }
+
     // Ben, 2026-11-02 (ports make sea recruits): each nation's sea pool, folded only
     // where non-zero (sorted walk), so a world without one hashes as it did.
     {

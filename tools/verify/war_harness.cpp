@@ -177,14 +177,14 @@ corp_command war_cmd(corp_verb v, entity_id actor, entity_id other, std::vector<
 }
 
 /// The bytes of every section the writer appends AFTER the v75 peace refusals (v77
-/// provenance, v78 occupation, v79 defend orders, v80 research books, v81 ended
-/// nations). The offset rows below count back from the stream's end and must step over
+/// provenance, v78 occupation, v79 defend orders, v80 research books, v82 growth
+/// carry, v83 ended nations). The offset rows below count back from the stream's end and must step over
 /// these; they had gone stale as each section landed (BL-1562 brought them current).
 std::size_t tail_after_refusals(const world& w)
 {
     return world_save_contributors_section_bytes(w) + world_save_occupation_section_bytes(w)
          + world_save_defend_section_bytes(w) + world_save_research_books_section_bytes(w)
-         + world_save_ended_section_bytes(w);
+         + world_save_growth_carry_section_bytes(w) + world_save_ended_section_bytes(w);
 }
 
 /// BL-1562: whether @p nation may order a PUSH on its front toward @p neighbour through
@@ -519,12 +519,12 @@ int main()
         check(from_bytes(b67, old) && old.wars.empty() && old.truces.empty() && old.peace_offers.empty()
                   && old.war_history.empty() && old.province_cessions.empty()
                   && b67.size() == b.size() - world_save_war_section_bytes(w)
-                                              - world_save_embargo_section_bytes(w) - world_save_gen_capital_section_bytes(w) - world_save_recruits_section_bytes(w) - world_save_sea_recruits_section_bytes(w) - world_save_refusals_section_bytes(w) /* BL-1480 (v75) */ - tail_after_refusals(w) /* v77..v81 */ // BL-1418 (v70)
+                                              - world_save_embargo_section_bytes(w) - world_save_gen_capital_section_bytes(w) - world_save_recruits_section_bytes(w) - world_save_sea_recruits_section_bytes(w) - world_save_refusals_section_bytes(w) /* BL-1480 (v75) */ - tail_after_refusals(w) /* v77..v83 */ // BL-1418 (v70)
                                               - world_save_kit_goods_bytes(w), // BL-1422: arrays 49 wide before v74
               "R4l a v68 stream (today's less the war and embargo sections) loads with no wars");
         // Untrusted: an answered byte of 2 is refused whole.
         std::string bad = b;
-        const std::size_t war0 = b.size() - world_save_embargo_section_bytes(w) - world_save_gen_capital_section_bytes(w) - world_save_recruits_section_bytes(w) - world_save_sea_recruits_section_bytes(w) - world_save_refusals_section_bytes(w) /* BL-1480 (v75) */ - tail_after_refusals(w) /* v77..v81 */ // BL-1418 (v70), last
+        const std::size_t war0 = b.size() - world_save_embargo_section_bytes(w) - world_save_gen_capital_section_bytes(w) - world_save_recruits_section_bytes(w) - world_save_sea_recruits_section_bytes(w) - world_save_refusals_section_bytes(w) /* BL-1480 (v75) */ - tail_after_refusals(w) /* v77..v83 */ // BL-1418 (v70), last
                                - world_save_war_section_bytes(w) + 4; // past the war count
         bad[war0 + 8] = 2;
         world untouched;
@@ -1164,7 +1164,7 @@ int main()
             check(read_world_snapshot(old, in) && !old.nations.at(f.B).ended
                       && to_bytes(w).size() == v80.size() + world_save_ended_section_bytes(w)
                       && cleared.state_hash(0) == old.state_hash(0),
-                  "E12 a v80 stream (before the flag) loads with every nation not ended, and is the v81 stream less the section");
+                  "E12 a v82 stream (before the flag) loads with every nation not ended, and is the v83 stream less the section");
         }
         {
             world bad = w;
@@ -1366,7 +1366,7 @@ int main()
         std::string bad2 = b2;
         // The offer sits after the war count + one war record + the truce table.
         const war_record& wr = w.wars.begin()->second;
-        const std::size_t off = b2.size() - world_save_embargo_section_bytes(w) - world_save_gen_capital_section_bytes(w) - world_save_recruits_section_bytes(w) - world_save_sea_recruits_section_bytes(w) - world_save_refusals_section_bytes(w) /* BL-1480 (v75) */ - tail_after_refusals(w) /* v77..v81 */ - world_save_war_section_bytes(w) + 4
+        const std::size_t off = b2.size() - world_save_embargo_section_bytes(w) - world_save_gen_capital_section_bytes(w) - world_save_recruits_section_bytes(w) - world_save_sea_recruits_section_bytes(w) - world_save_refusals_section_bytes(w) /* BL-1480 (v75) */ - tail_after_refusals(w) /* v77..v83 */ - world_save_war_section_bytes(w) + 4
                               + (4 + 4 + 1 + 4 + 4 + 8 + 8 + 4 + 4 + 4 + 4 + 4 + 4 * wr.declarer_goals.size() + 4 + 4 * wr.defender_goals.size())
                               + 4 + 12 * w.truces.size() + 4 + 4 + 4 + 4 + 4; // to the kind byte
         bad2[off] = 7;

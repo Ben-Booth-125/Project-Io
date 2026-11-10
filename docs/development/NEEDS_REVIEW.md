@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*34 entries — 31 open, 3 resolved.*
+*35 entries — 32 open, 3 resolved.*
 
 ---
 
@@ -357,6 +357,22 @@ Taken while building: (1) elimination fires on no LAND province; coastal-water p
 > **Recommendation:** Keep 1-4. Ben to choose on 5 and on the rival ending the player.
 
 *Files: `src/world/war.cpp`, `docs/politics/NATIONS.md`*
+
+### NR-1155 — Population growth as built: 1.18%/yr pooled, and centres demote on their first bad quarter
+*question · raised 2026-11-10 · from population lane building POPULATION_GROWTH_RATE (growth as a rate), commit 317c6bfe*
+
+16 seeds, 40 quarters: pooled growth -0.22 -> 1.18%/yr (target about 2%); a third of centre-ticks still fail a floor and shed 1.6%/yr. Seeds 92/17/27/13 grow 2.0-2.3%; seed 64 is flat. Handoff shape: centre heads +3.5%; villages 245 -> 305, towns 274 -> 249, cities 248 -> 212. Cause of the shift: generation seeds every centre at exactly its rung headcount, and the first failing quarter now sheds 0.4% and demotes at once (the old step waited 10 quarters). No nation reaches qualification 0.8 on any library seed.
+
+**Why it matters.** The opening map loses a seventh of its cities to a rounding edge, and growth runs below the anchor.
+
+- Add a demotion margin (demote below e.g. 90% of the rung)
+- Seed centres above their rung at generation
+- Calibrate growth: staples floor, decline rate or staple supply
+- Accept as built
+
+> **Recommendation:** A demotion margin first, then re-measure growth before touching the dials.
+
+*Files: `src/world/economy_system.cpp`, `src/world/population_generation.cpp`, `docs/economy/POPULATION.md`*
 
 ---
 

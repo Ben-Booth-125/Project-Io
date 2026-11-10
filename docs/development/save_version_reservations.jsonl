@@ -53,3 +53,6 @@
 {"version":25,"kind":"envelope","owner":"BL-1436 kit in the age tree (the market history 55 series wide; v24 reads 54 wide, v23/v22 49)","ts":"2026-11-03T18:00:00.000Z","branch":"worktree-agent-a0503edf72390d684"}
 {"version":77,"kind":"world","owner":"BL-1470 sentiment contributors (per-row largest-contributor ledger and the grudge seed records; a trailing section after v76; a v76 stream reads with none)","ts":"2026-11-04T08:33:06.670Z","branch":"worktree-agent-a12ea7057053dc41a"}
 {"version":27,"kind":"envelope","owner":"SAVE_BUILDING_REPORT (the last economy report at the envelope tail; v25 reads with an empty report; v26 held by BL-1527 ship kit)","ts":"2026-11-09T12:00:00.000Z","branch":"worktree-agent-ae0c427c7a3c15e95"}
+{"version":81,"kind":"world","owner":"BL-1527 ship kit (on claude/naval-warfare-system-b0d978; recorded on main so no lane re-takes it)","ts":"2026-11-06T08:29:16.947Z","branch":"claude/naval-warfare-system-b0d978"}
+{"version":82,"kind":"world","owner":"POPULATION_GROWTH_RATE growth carry (trailing section after BL-1539 v80; v81 not on this line)","ts":"2026-11-10T01:30:00.000Z","branch":"worktree-agent-adf26f83a755734b4"}
+{"version":83,"kind":"world","owner":"BL-1562 war both hostile, elimination (ended-nations section after the v82 carry section)","ts":"2026-11-10T03:10:00.000Z","branch":"worktree-agent-a0170c6e269581170"}

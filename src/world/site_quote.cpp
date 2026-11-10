@@ -68,6 +68,27 @@ bool own_bid_admitted(const recipe_registry& reg, const market_component& m, std
            <= band.reservation_mult * m.base_price[r];
 }
 
+/// The SUPPLY half of "obtainable is local evidence" (construction.md § What the quote
+/// asks, Ben 2026-11-09): the spare supply in reach (`reachable_supply`, the asker's own
+/// output and draw taken out) counts only what is LEFT OVER after the plant's own
+/// market's demand for the good, because the plant draws from its own shelf and spare
+/// that local buyers already take never reaches that shelf. A pooled good (power) is
+/// priced and drawn across a grid, not one shelf, so it keeps the reach reading.
+/// Writes the cheapest landed unit when there is spare to land.
+bool supply_left_over_locally(world& w, const recipe_registry& reg, site_quote_context& cx,
+                              const market_component& m, entity_id mid, std::size_t r, float want,
+                              entity_id self, float* out_landed)
+{
+    if (!(want > 0.0f))
+        return true;
+    const reachable_spare s = reachable_supply(w, reg, cx.reach, mid, r, self);
+    if (out_landed) *out_landed = s.landed;
+    if (!(s.landed >= 0.0f))
+        return false;
+    const float local_demand = grid_good_crosses_markets(r) ? 0.0f : std::max(0.0f, m.demand[r]);
+    return s.spare - local_demand >= want * reg.t_idle();
+}
+
 /// The market as it would read without the plant @p self's last quarter: exactly what
 /// its report row says it listed and filed, by the recipe THE ROW ran, since a Switch
 /// writes the building at once and the market still holds the old recipe's trade. Its
@@ -151,6 +172,10 @@ site_quote quote_site(world& w, const recipe_registry& reg, site_quote_context& 
         // 7 of those ran. The scorer's stricter test for a new plant, spare supply alone,
         // called 131 idle and 95 ran, because a plant bids goods away from other buyers.
         // That test decides whether a rival builds; this one says what a plant would do.
+        // Obtainable is LOCAL evidence (Ben, 2026-11-09): the plant's own shelf holds the
+        // good, or reach spare is left over after its own market's demand. Same census,
+        // 16 library seeds, 734 processors: called idle 88 -> 116 (46 -> 56 ran), called
+        // running but never ran 53 -> 35; consumer goods right about paying 35 -> 44 of 55.
         std::array<float, resource_count> cost{};
         for (std::size_t r = 0; r < resource_count; ++r)
         {
@@ -159,10 +184,12 @@ site_quote quote_site(world& w, const recipe_registry& reg, site_quote_context& 
                 continue;
             const float want = rc->inputs[r] * batches;
             float landed = -1.0f;
-            bool have = input_supply_covers(w, reg, cx.reach, mid, r, want, self, &landed) && landed >= 0.0f;
+            bool have = supply_left_over_locally(w, reg, cx, m, mid, r, want, self, &landed);
             if (!have)
             {
-                const input_access access = input_obtainable(w, reg, cx.reach, mid, nullptr, r, want, self);
+                // The shelf: the stock clause alone, so reach cannot stand in for it.
+                const input_access access = input_obtainable(w, reg, cx.reach, mid, nullptr, r, want, self,
+                                                             /*allow_supply=*/false);
                 have   = access.obtainable;
                 landed = access.unit_cost;
             }

@@ -691,6 +691,132 @@ static void test_unrecorded_bid_carries_streak()
 }
 
 // ---------------------------------------------------------------------------
+// POPULATION_GROWTH_RATE review fixes (POPULATION.md § Growth, decline and
+// razing, "Growth is a rate"). One market, one centre, the bid recorded by hand.
+//   G1: a centre drained to 0 heads (recruiting, recruits.cpp take_heads) with
+//       its staples met takes no rate step: it stays at 0, it does not get a
+//       head back from nothing on every tick.
+//   G2: a carry just under 1 whose step rounds to 1.0f in the narrowing is a
+//       whole head: population +1, carry 0 (not the head silently dropped).
+//   G3: upper goods bid and filled with NO staple priced: staples read 0, the
+//       staples floor fails, and the centre declines rather than grows.
+// ---------------------------------------------------------------------------
+static void test_growth_rate_review_fixes()
+{
+    std::printf("--- POPULATION_GROWTH_RATE review fixes: empty centres, the carry edge, no staples ---\n");
+
+    const std::size_t food  = ri(resource_type::agricultural_produce);
+    const std::size_t cloth = ri(resource_type::cloth);
+    struct fixture
+    {
+        world w;
+        entity_id mkt = null_entity, pop = null_entity;
+        recipe_registry reg;
+    };
+    // `staple_priced` false: food is in the basket but the market prices none.
+    auto make = [&](int population, float carry, bool staple_priced, const growth_params& gp) {
+        auto f = std::make_unique<fixture>();
+        world& w = f->w;
+        const entity_id body = w.create_entity();
+        {
+            body_component bc{};
+            bc.name        = "Rate";
+            bc.grid_width  = 4;
+            bc.grid_height = 4;
+            w.bodies[body] = bc;
+        }
+        const entity_id tile = w.create_entity();
+        {
+            tile_component tc{};
+            tc.body = body;
+            w.tiles[tile] = tc;
+        }
+        f->mkt = w.create_entity();
+        {
+            market_component mc{};
+            mc.body        = body;
+            mc.centre_tile = tile;
+            if (staple_priced)
+            {
+                mc.base_price[food]     = 1.0f;
+                mc.household_bid[food]  = 10.0f;
+                mc.household_fill[food] = 10.0f; // staples fully met
+            }
+            mc.base_price[cloth]     = 1.0f;
+            mc.household_bid[cloth]  = 10.0f;
+            mc.household_fill[cloth] = 10.0f;    // upper rung fully met
+            w.markets[f->mkt] = mc;
+        }
+        f->pop = w.create_entity();
+        {
+            population_centre_component pcc{};
+            pcc.scale        = 1;
+            pcc.population   = population;
+            pcc.habitability = 0.9f;
+            pcc.growth_carry = carry;
+            w.population_centres[f->pop]     = pcc;
+            w.population_centre_tile[f->pop] = tile;
+        }
+        population_demand_params pd;
+        pd.demand_basket[food] = 1.0f; // the shared tranche: the staple
+        era_basket upper;
+        upper.demand_basket[cloth] = 1.0f; // a band row: an upper rung
+        pd.baskets.push_back(upper);
+        f->reg.set_population_demand(pd);
+        f->reg.set_growth(gp);
+        return f;
+    };
+
+    // G1 — drained to zero.
+    {
+        auto f = make(0, 0.0f, true, growth_params{});
+        for (int t = 0; t < 5; ++t)
+            run_economy_step(f->w, f->reg);
+        const population_centre_component& pcc = f->w.population_centres.at(f->pop);
+        std::printf("  G1 a 0-head centre, staples met, after 5 steps: population %d carry %.4f\n",
+                    pcc.population, static_cast<double>(pcc.growth_carry));
+        check(pcc.population == 0 && pcc.growth_carry == 0.0f,
+              "G1 a centre at 0 heads takes no rate step (no head from nothing)",
+              static_cast<float>(pcc.population), 0.0f);
+    }
+
+    // G2 — the carry edge. A rate of 2e-7 a year on one thousand heads adds
+    // 5e-8 a quarter; on a carry of nextafter(1, 0) = 0.99999994 the sum is
+    // 0.99999999, past the midpoint 0.99999997, so it narrows to 1.0f.
+    {
+        growth_params gp;
+        gp.base_rate_raw       = 2.0e-7f;
+        gp.base_rate_qualified = 2.0e-7f;
+        gp.consumer_bonus      = 0.0f;
+        const float edge = std::nextafter(1.0f, 0.0f);
+        auto f = make(1, edge, true, gp);
+        run_economy_step(f->w, f->reg);
+        const population_centre_component& pcc = f->w.population_centres.at(f->pop);
+        std::printf("  G2 carry %.8f + 5e-8: population 1 -> %d carry %.8f\n",
+                    static_cast<double>(edge), pcc.population, static_cast<double>(pcc.growth_carry));
+        check(pcc.population == 2 && pcc.growth_carry == 0.0f,
+              "G2 a carry that rounds to 1.0f is a whole head: population +1, carry 0",
+              static_cast<float>(pcc.population), 2.0f);
+    }
+
+    // G3 — upper goods and no staple.
+    {
+        auto f = make(1000, 0.0f, false, growth_params{});
+        const population_fill fill = population_basket_fill(f->w, f->reg, f->mkt);
+        const centre_growth_reading g = read_centre_growth(f->w, f->reg, f->pop, nullptr);
+        run_economy_step(f->w, f->reg);
+        const population_centre_component& pcc = f->w.population_centres.at(f->pop);
+        std::printf("  G3 cloth met, no staple priced: staples %.2f upper %.2f staples_ok %d rate %+.4f; 1000 -> %d\n",
+                    static_cast<double>(fill.staples), static_cast<double>(fill.upper), g.staples_ok ? 1 : 0,
+                    static_cast<double>(g.annual_rate), pcc.population);
+        check(fill.recorded && fill.staples == 0.0f && fill.upper == 1.0f && !g.staples_ok && g.annual_rate < 0.0f,
+              "G3 upper goods bid with no staple: staples read 0 and the staples floor fails");
+        check(pcc.population < 1000 && pcc.growth_accumulator < 0,
+              "G3 ... and the centre declines rather than grows", static_cast<float>(pcc.population), 999.0f);
+    }
+}
+
+// ---------------------------------------------------------------------------
 // BL-1196 (households consume): MULTI-TICK. The households a market serves draw
 // their bid off its shelf at the end of every clear, and the next tick's growth
 // gate reads what they received (household_fill / household_bid). A one-tick
@@ -1067,6 +1193,7 @@ int main()
     test_population_growth();
     test_multi_market_growth_aggregate();
     test_unrecorded_bid_carries_streak();
+    test_growth_rate_review_fixes();
     test_household_draw_multi_tick();
     test_background_draw_after_processors();
     test_background_draw_real_clear();

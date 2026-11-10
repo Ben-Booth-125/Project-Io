@@ -6,12 +6,14 @@
 // ticks, and every --every ticks print, per settled body, the inputs the growth
 // pass (economy_system.cpp, BL-048B/BL-078/BL-616) gates a centre on:
 //
-//   conditions_met = body habitability >= 0.5  AND  met_ratio >= threshold
+//   conditions_met = body habitability >= 0.5  AND  staples fill >= threshold
 //
-// where met_ratio is, since BL-1163, PER CENTRE: the household met ratio at
-// the centre's own market (population_met_ratio — the share of the population
-// channel's bid the LAST clear filled, over the household basket it bids,
-// exactly what the next tick's growth pass reads). Alongside: centres, heads
+// where, since POPULATION_GROWTH_RATE (Ben, 2026-11-10), the fill is split:
+// the STAPLES share at the centre's own market (population_basket_fill — the
+// share of the shared-tranche bid the LAST clear filled) is the floor, and the
+// upper rungs' share raises the rate. Each centre is read through
+// read_centre_growth / centre_growth_from, the pass's own gatherer and rule, so
+// this prints exactly what the next tick's growth pass reads. Alongside: centres, heads
 // (k), centres on a negative streak, the distribution of per-centre met ratios
 // (min / p25 / median / max, and how many sit below the threshold), and each
 // household good's body-summed supply/demand, and (BL-1196) the households'
@@ -83,7 +85,7 @@ void sample(const world& w, const recipe_registry& reg, int tick, const economy_
             sh[r] += mc.inventory[r]; hb[r] += mc.household_bid[r]; hf[r] += mc.household_fill[r];
         }
     }
-    struct acc { int n = 0, pop = 0, neg = 0, v = 0, below = 0; float hs = 0, hw = 0; std::vector<float> met; std::map<entity_id, int> mkts; };
+    struct acc { int n = 0, pop = 0, neg = 0, v = 0, below = 0, failing = 0; float hs = 0, hw = 0, upper = 0, rate = 0; std::vector<float> met; std::map<entity_id, int> mkts; };
     std::map<entity_id, acc> by_body;
     std::vector<entity_id> cids;
     for (const auto& kv : w.population_centres) cids.push_back(kv.first);
@@ -102,10 +104,16 @@ void sample(const world& w, const recipe_registry& reg, int tick, const economy_
         if (pc.scale == 1) ++a.v;
         const float ws = static_cast<float>(std::max(1, pc.scale));
         a.hs += pc.habitability * ws; a.hw += ws;
+        // POPULATION_GROWTH_RATE review fix: read what the growth pass reads —
+        // the staples / upper split (population_basket_fill) through the rule
+        // itself (centre_growth_from), by way of the pass's own gatherer.
         const entity_id mid = market_for_tile(w, ti->second);
-        const float m = (mid != null_entity) ? population_met_ratio(w, reg, mid) : 1.0f;
-        a.met.push_back(m);
-        if (m < thr) ++a.below;
+        const centre_growth_reading g = read_centre_growth(w, reg, c, rep);
+        a.met.push_back(g.staples_fill);
+        if (!g.staples_ok) ++a.below;
+        if (!g.grows()) ++a.failing;
+        a.upper += g.upper_fill;
+        a.rate  += g.annual_rate;
         ++a.mkts[mid];
     }
     for (auto& [body, a] : by_body)
@@ -128,10 +136,11 @@ void sample(const world& w, const recipe_registry& reg, int tick, const economy_
                           resource_names::name_of(static_cast<resource_type>(r)).c_str(), s, d, hf, hb, sh);
             goods += buf;
         }
-        std::printf("  t%4d body %llu | centres %4d villages %4d heads %7dk declining %4d | hab %.3f | met min %.2f p25 %.2f med %.2f max %.2f, %d centres below %.2f over %zu markets |%s\n",
+        std::printf("  t%4d body %llu | centres %4d villages %4d heads %7dk declining %4d | hab %.3f | staples min %.2f p25 %.2f med %.2f max %.2f, %d centres below %.2f, %d below a floor; upper mean %.2f, rate mean %+.2f%%/yr over %zu markets |%s\n",
                     tick, static_cast<unsigned long long>(body), a.n, a.v, a.pop, a.neg,
                     a.hw > 0 ? a.hs / a.hw : 1.0f, q(0.0f), q(0.25f), q(0.5f), a.met.empty() ? 1.0f : a.met.back(),
-                    a.below, thr, a.mkts.size(), goods.c_str());
+                    a.below, thr, a.failing, a.n ? a.upper / a.n : 0.0f, a.n ? 100.0f * a.rate / a.n : 0.0f,
+                    a.mkts.size(), goods.c_str());
     }
     std::fflush(stdout);
 }
