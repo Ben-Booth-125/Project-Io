@@ -32,7 +32,7 @@
     "src/world/components.hpp"
    ],
    "title": "Missiles as munitions, interceptor defence, tactical nuclear use, and military satellites",
-   "design": "MILITARY.md § Missiles and § Space. Missiles are goods fired by launchers and consumed; interceptors thin short-range attacks; tactical nuclear use permitted with a severe Alarm cost, strategic never fired. Recon satellites lift fog (SPACE_ASSETS, BL-1329 satellites and rovers). The nuclear cost reading depends on Ben's call on the era catastrophe (2026-10-26)."
+   "design": "MILITARY.md § Missiles and § Space. Missiles are goods fired by launchers and consumed; interceptors thin short-range attacks; tactical nuclear use permitted with a severe Alarm cost, strategic never fired. Recon satellites lift fog (SPACE_ASSETS, BL-1329 satellites and rovers). The nuclear cost reading depends on Ben's call on the era catastrophe (2026-10-26). Scoped (Ben, 2026-11-10): missiles and launchers, interceptor defence and tactical nuclear are in v0.3.0; recon satellites are out (no space asset exists since BL-1329 (satellites and rovers) was cancelled). Rival use is granted (AI_OPPONENT.md § 11, Rival nations fire missiles)."
   },
   {
    "status": "proposed",
