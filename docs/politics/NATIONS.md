@@ -150,7 +150,8 @@ of that peace, after the ground has moved:
   and friendship offers drop. No truce is written: there is nobody left to declare.
 - **Its relations clear.** Hostility, friendship, embargo and tariff rows to and from it are
   removed, and nobody's sentiment toward it is read again.
-- **Its force ends.** Its units disband where they stand, and its convoys and trades are cancelled.
+- **Its force ends.** Its units and its ships disband where they stand (a ship with everyone
+  aboard), and its convoys and trades are cancelled.
   A land unit of a nation at peace with the conqueror, left on the ground the conqueror just
   gained, withdraws as at any peace.
 - **Its treasury passes to the conqueror.** A positive balance goes to the nation that took its

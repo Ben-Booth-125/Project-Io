@@ -4946,8 +4946,17 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
             for (const auto& [aid, a] : s.space_assets)
                 if (a.owner == nid)
                     return false;
+            // The naval merge: no ship, sighting or ship design of its own (the naval
+            // sections precede this one in a v88 stream).
+            for (const auto& [sid, sh] : s.ships)
+                if (sh.owner == nid)
+                    return false;
+            for (const auto& seen : s.sea_sightings)
+                if (seen.first == nid)
+                    return false;
             const nation_component& enc = nit->second;
-            if (!enc.state_assets.empty() || enc.treasury > 0.0f || enc.capital_tile != null_entity)
+            if (!enc.state_assets.empty() || enc.treasury > 0.0f || enc.capital_tile != null_entity
+                || !enc.ship_design_kit.empty())
                 return false;
             nit->second.ended = true;
         }

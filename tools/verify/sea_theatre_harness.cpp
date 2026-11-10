@@ -31,6 +31,7 @@
 #include "world/unit_designs.hpp"
 #include "world/unit_roster.hpp"
 #include "world/world.hpp"
+#include "world/war.hpp"
 #include "world/world_save.hpp"
 
 #include <algorithm>
@@ -815,6 +816,37 @@ int main()
         check(b.w.state_hash(1) == h0, "R4c no ship hashes as before");
         add_ship(b, b.a, b.a_port, DES, 8, 3);
         check(b.w.state_hash(1) != h0, "R4d a ship reaches the digest");
+    }
+
+    // -----------------------------------------------------------------------
+    std::printf("\nR4e - an ended nation's fleet ends with it (the naval merge)\n");
+    {
+        fixture f;
+        build(f);
+        const entity_id mine = add_ship(f, f.a, f.a_port, DES, 8, 3);
+        const entity_id theirs = add_ship(f, f.b, f.b_port, DES, 9, 3);
+        f.w.sea_sightings.insert({f.a, theirs});
+        f.w.sea_sightings.insert({f.b, mine});
+        f.w.nations.at(f.a).ship_design_kit = {ship_kit_item_by_id("des.hull.quiet")};
+        // The fixture writes tile_to_nation alone; a generated world keeps each nation's
+        // tile list beside it, and elimination cedes from that list.
+        for (const entity_id t : f.grid)
+            if (const auto o = f.w.tile_to_nation.find(t); o != f.w.tile_to_nation.end())
+                f.w.nations.at(o->second).tiles.push_back(t);
+        eliminate_nation(f.w, sentiment_params{}, f.a, f.b, {});
+        check(f.w.nations.at(f.a).ended && f.w.ships.count(mine) == 0 && f.w.ships.count(theirs) == 1,
+              "R4e elimination sinks the ended nation's ships and no one else's");
+        check(f.w.sea_sightings.empty() && f.w.nations.at(f.a).ship_design_kit.empty(),
+              "R4f its sightings, the sightings of its ships and its ship designs clear");
+        world back;
+        check(from_bytes(to_bytes(f.w), back) && back.nations.at(f.a).ended && back.ships.size() == 1,
+              "R4g the world it leaves saves and loads (the ended-nations reader accepts it)");
+        world stale = f.w;
+        stale.ships.emplace(mine, f.w.ships.at(theirs));
+        stale.ships.at(mine).owner = f.a;
+        world sink;
+        check(!from_bytes(to_bytes(stale), sink) && sink.ships.empty(),
+              "R4h an ended nation still owning a ship is REFUSED, destination untouched");
     }
 
     // -----------------------------------------------------------------------
