@@ -1470,6 +1470,7 @@ void draw_assign_front_popup(const world& w, ui_state& ui, const char* popup_id,
         return;
     entity_id nation = null_entity;
     entity_id shared = null_entity; // the front every unit is on, if they agree
+    entity_id body   = null_entity; // BL-1633: the body the lead unit stands on
     bool      agree  = true;
     for (std::size_t i = 0; i < units.size(); ++i)
     {
@@ -1480,6 +1481,8 @@ void draw_assign_front_popup(const world& w, ui_state& ui, const char* popup_id,
         {
             nation = it->second.owner;
             shared = it->second.front;
+            if (const auto pt = w.tiles.find(it->second.position); pt != w.tiles.end())
+                body = pt->second.body;
         }
         else if (it->second.front != shared)
             agree = false;
@@ -1495,11 +1498,22 @@ void draw_assign_front_popup(const world& w, ui_state& ui, const char* popup_id,
                        units.size() > 1 ? "Assign %d units to front" : "Assign to front",
                        static_cast<int>(units.size()));
     ImGui::Separator();
+    // BL-1633 (MILITARY.md § Space): a land unit fights on the body it stands on and
+    // an assignment to a front on another body is refused, so only the fronts on the
+    // units' own body are offered. A group shares one tile: its lead's body is all of
+    // theirs.
     const std::vector<front_view>& fronts = fronts_of(w, nation);
-    if (fronts.empty())
-        ImGui::TextDisabled("This nation has no fronts.");
+    int offered = 0;
+    for (const front_view& fv : fronts)
+        if (fv.body == body)
+            ++offered;
+    if (offered == 0)
+        ImGui::TextDisabled("%s", fronts.empty() ? "This nation has no fronts."
+                                                 : "This nation has no fronts on this body.");
     for (const front_view& fv : fronts)
     {
+        if (fv.body != body)
+            continue;
         const bool on = agree && shared == fv.f.key;
         ImGui::PushID(static_cast<int>(fv.f.key));
         ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(

@@ -647,7 +647,9 @@ rule keeps the rest, so the nation is still reached a little inside each side.
    seat.
 
 **Assign to front** is on the unit card (the action grid's sixth cell) and on the header of a
-group of the player's own units. It opens a menu of the units' own nation's fronts, each named by
+group of the player's own units. It opens a menu of the units' own nation's fronts **on the body
+the units stand on** — a land unit fights on its own body, and an assignment to a front on another
+is refused (`../military/MILITARY.md` § Space) — each named by
 neighbour and span — *Varneth — 14 tiles*, with *(north)*/*(south)*, *(west)*/*(east)* or
 *(n of m)* where one neighbour has more than one — plus **Unassign**. The front every unit is
 already on is checked, and picking it again unassigns (the toggle rule). A pick sends one
