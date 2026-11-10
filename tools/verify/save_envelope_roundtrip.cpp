@@ -32,6 +32,8 @@
 //   S11 SAVE_BUILDING_REPORT (v27): the last economy report's read slice and the
 //       corp standings round-trip field-exact; the rebuilt indices equal live ones.
 //   S12 A v25 stream (no report tail) reads whole and opens with an empty report.
+//   S13 The v27 tail is untrusted: a hostile count, a bad enum byte, a non-finite
+//       float, a truncated tail are each refused, destination untouched.
 //
 // Kept outside src/ so the CMake game glob does not pull it into the build.
 
@@ -45,6 +47,7 @@
 #include <cstring>
 #include <filesystem>
 #include <iterator>
+#include <limits>
 #include <fstream>
 #include <string>
 #include <vector>
@@ -1082,6 +1085,9 @@ int main()
         world w = make_world();
         save_envelope env = make_envelope();
         economy_report& r = env.last_econ_report;
+        // The fixture's ids run to 9000: a report row count is capped by the ids the
+        // world has issued (S13), so the hand-built world must have issued them.
+        w.set_next_entity_id(9000);
         // Every field a distinct non-dyadic value, so a field read into its
         // neighbour shows.
         for (int k = 0; k < 3; ++k)
@@ -1293,6 +1299,111 @@ int main()
         be.speed = 55;
         check(!read_save_game(k_path, vw, be) && be.speed == 55,
               "S12 a stream stamped v26 (another branch's layout) is REFUSED, destination untouched");
+    }
+
+    // -----------------------------------------------------------------------
+    // S13 -- the v27 tail is an untrusted input (cold review of d4d7653b): a
+    // hostile count, an out-of-range enum byte, a non-finite float and a
+    // truncated tail are each REFUSED before anything is allocated or moved,
+    // and the destination world and envelope are left exactly as they were.
+    // The tail's offset is the size of the same envelope written at v25.
+    // -----------------------------------------------------------------------
+    {
+        auto file_size = [](const char* p) {
+            return static_cast<std::uint64_t>(std::filesystem::file_size(p));
+        };
+        auto poke = [](const char* p, std::uint64_t at, const void* bytes, std::size_t n) {
+            std::fstream f(p, std::ios::binary | std::ios::in | std::ios::out);
+            f.seekp(static_cast<std::streamoff>(at), std::ios::beg);
+            f.write(static_cast<const char*>(bytes), static_cast<std::streamsize>(n));
+        };
+        auto refused_untouched = [&](const char* what) {
+            world         lw = make_world();
+            seed_exchanges(lw, 3);
+            save_envelope le;
+            le.speed = 99;
+            le.last_corp_standings.push_back(corp_standing{4242, false, 0, 0.0f, 0.0f, false});
+            const bool ok = read_save_game(k_path, lw, le);
+            check(!ok && le.speed == 99 && le.last_corp_standings.size() == 1
+                      && le.last_corp_standings[0].corp == 4242 && lw.exchanges.size() == 3,
+                  what);
+        };
+
+        // (a)/(c): the S11-shaped report, one building row first in the tail.
+        world w = make_world();
+        w.set_next_entity_id(9000);
+        save_envelope env = make_envelope();
+        building_report b;
+        b.building = 7001;
+        b.type     = building_type::processing_facility;
+        env.last_econ_report.buildings.push_back(b);
+        write_save_game_at(k_path, w, env, save_game_version_pre_econ_report);
+        const std::uint64_t tail = file_size(k_path);
+        write_save_game(k_path, w, env);
+        const std::uint64_t full = file_size(k_path);
+        check(full > tail, "S13 anchor: the v27 file is longer than its v25 twin (the tail is there)");
+        {
+            world lw; save_envelope le;
+            check(read_save_game(k_path, lw, le) && le.last_econ_report.buildings.size() == 1,
+                  "S13 anchor: the unpoked file reads");
+        }
+
+        // (a) a count of 2^26 - 1 rows: ~32 GB if allocated. Refused, not thrown.
+        const uint32_t huge = (1u << 26) - 1u;
+        poke(k_path, tail, &huge, sizeof huge);
+        refused_untouched("S13a a 67M-row buildings count is REFUSED before allocating, destination untouched");
+        // ... and a count past the ids the world issued, though the bytes might hold it.
+        write_save_game(k_path, w, env);
+        const uint32_t over_ids = 9001u;
+        poke(k_path, tail, &over_ids, sizeof over_ids);
+        refused_untouched("S13a a row count past the world's issued ids is REFUSED, destination untouched");
+        // ... and one inside the id cap whose rows the bytes left cannot hold.
+        write_save_game(k_path, w, env);
+        const uint32_t over_bytes = 5000u; // 5000 x 473 bytes > the whole file
+        poke(k_path, tail, &over_bytes, sizeof over_bytes);
+        refused_untouched("S13a a row count the remaining bytes cannot hold is REFUSED, destination untouched");
+
+        // (b) building_type byte out of range: count(4) + three ids(12).
+        write_save_game(k_path, w, env);
+        const uint8_t bad_type = 200;
+        poke(k_path, tail + 4 + 12, &bad_type, 1);
+        refused_untouched("S13b an out-of-range building_type byte is REFUSED, destination untouched");
+
+        // (c) a truncated tail.
+        write_save_game(k_path, w, env);
+        std::filesystem::resize_file(k_path, full - 7);
+        refused_untouched("S13c a truncated tail is REFUSED, destination untouched");
+
+        // (b) lp_class out of range, and (d) a NaN, on a report holding ONE lp
+        // building row and nothing else: eight empty counts (buildings, budgets,
+        // contention, labour, unmet, lp nations, lp sources) then the lp
+        // buildings count, then the row's three ids, then its class byte.
+        save_envelope lpenv = make_envelope();
+        lp_building_row row;
+        row.building = 7001;
+        row.cls      = lp_class::other;
+        row.need     = 1.5f;
+        lpenv.last_econ_report.logistic_points.buildings.push_back(row);
+        write_save_game(k_path, w, lpenv);
+        {
+            world lw; save_envelope le;
+            check(read_save_game(k_path, lw, le)
+                      && le.last_econ_report.logistic_points.buildings.size() == 1
+                      && le.last_econ_report.logistic_points.buildings[0].need == 1.5f,
+                  "S13 anchor: the one-lp-row file reads");
+        }
+        const std::uint64_t cls_at = tail + 8 * 4 + 12;
+        const uint8_t bad_cls = 9;
+        poke(k_path, cls_at, &bad_cls, 1);
+        refused_untouched("S13b an out-of-range lp_class byte is REFUSED, destination untouched");
+        write_save_game(k_path, w, lpenv);
+        const float nan = std::numeric_limits<float>::quiet_NaN();
+        poke(k_path, cls_at + 1, &nan, sizeof nan); // the row's `need`
+        refused_untouched("S13d a NaN in the tail is REFUSED, destination untouched");
+        const float inf = std::numeric_limits<float>::infinity();
+        write_save_game(k_path, w, lpenv);
+        poke(k_path, cls_at + 1, &inf, sizeof inf);
+        refused_untouched("S13d an infinity in the tail is REFUSED, destination untouched");
     }
 
     // -----------------------------------------------------------------------

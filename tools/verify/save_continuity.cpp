@@ -28,13 +28,9 @@
 //       a loaded world; if A diverges from both, the cause is outside the
 //       report (a load-order effect in the world snapshot) and is reported.
 //
-//   build: a live-Lua harness that ALSO compiles src/core/save_game.cpp, and so
-//          needs imgui's headers (no imgui code is linked). Neither shipped
-//          builder does that today: build_lua_harness.sh's command with
-//          src/core/save_game.cpp added to the source set and
-//          /I _deps_cache/imgui_src on the include line builds it (and
-//          save_envelope_roundtrip) - measured 2026-11-10. A committed builder
-//          for the pair is owed.
+//   build: bash tools/verify/build_env_harness.sh save_continuity
+//          (a live-Lua harness that also compiles src/core/save_game.cpp, so it
+//          needs imgui's headers; build_harness.js routes it there).
 //   run:   build_gen/verify/save_continuity.exe [seed=7] [N=4] [M=8]   (repo root)
 // ---------------------------------------------------------------------------
 

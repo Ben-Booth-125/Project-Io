@@ -7,6 +7,7 @@
 #include "world/world_save.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <array>
 #include <fstream>
 #include <utility>
@@ -878,6 +879,68 @@ bool r_rank_snapshot(std::istream& i, std::unordered_map<entity_id, int>& snap)
 // every enum byte is range-checked on the way back, the same rule as above.
 
 constexpr auto max_building_type = static_cast<building_type>(building_type_count - 1);
+
+// HOSTILE-INPUT GUARDS for this tail (cold review of d4d7653b). The shared r_vec
+// trusts any count up to bio::max_count (2^26) and resizes before reading, so a
+// crafted v27 count could ask for ~32 GB and throw bad_alloc out of the load
+// instead of refusing it. Every vector here is read through r_vec_capped, which
+// refuses a count whose MINIMUM on-disk size exceeds the bytes left in the
+// stream (or a caller cap) BEFORE allocating. Floats must be finite. A breach is
+// a refused load; the reader fills a scratch envelope, so nothing is mutated.
+
+/// Bytes left in @p i from the current position; 0 if the stream cannot seek.
+std::uint64_t bytes_remaining(std::istream& i)
+{
+    const auto here = i.tellg();
+    if (here < 0)
+        return 0;
+    i.seekg(0, std::ios::end);
+    const auto end = i.tellg();
+    i.seekg(here);
+    return (end < here || !i) ? 0 : static_cast<std::uint64_t>(end - here);
+}
+
+bool r_f32f(std::istream& i, float& v)
+{
+    return r_f32(i, v) && std::isfinite(v);
+}
+
+template <std::size_t N>
+bool r_f32f_array(std::istream& i, std::array<float, N>& a)
+{
+    if (!r_f32_array(i, a))
+        return false;
+    for (const float v : a)
+        if (!std::isfinite(v))
+            return false;
+    return true;
+}
+
+/// r_vec with the count checked against what the stream can still hold: each
+/// element is at least @p min_bytes on disk, and at most @p cap of them.
+template <class T, class F>
+bool r_vec_capped(std::istream& i, std::vector<T>& v, F read_one, std::uint64_t min_bytes,
+                  std::uint64_t cap = bio::max_count)
+{
+    uint32_t n = 0;
+    if (!r_count(i, n) || n > cap || static_cast<std::uint64_t>(n) * min_bytes > bytes_remaining(i))
+        return false;
+    v.clear();
+    v.resize(n);
+    for (uint32_t k = 0; k < n; ++k)
+        if (!read_one(i, v[k]))
+            return false;
+    return true;
+}
+
+// Minimum on-disk record sizes (bytes), from the writers below.
+constexpr std::uint64_t k_min_building_report = 3 * 4 + 2 + 2 + 3 + 2 * 4 + 1 + 1 + 4 + 2 * 4 * resource_count;
+constexpr std::uint64_t k_min_lp_nation_row   = 4 + 3 * 4 + 5 * 4 * lp_network_count + 1 + 4;
+constexpr std::uint64_t k_min_lp_source_row   = 3 * 4 + 1 + 4 + 1;
+constexpr std::uint64_t k_min_lp_building_row = 3 * 4 + 1 + 4 * 4;
+constexpr std::uint64_t k_min_lp_supply_row   = 3 * 4 + 3 * 4 + 4 + 3 * 4;
+constexpr std::uint64_t k_min_corp_standing   = 4 + 1 + 4 + 4 + 4 + 1;
+constexpr std::uint64_t k_min_id              = 4;
 constexpr auto max_lp_class      = static_cast<lp_class>(lp_class_count - 1);
 constexpr auto max_lp_network    = static_cast<lp_network>(lp_network_count - 1);
 
@@ -922,10 +985,10 @@ bool r_building_report(std::istream& i, building_report& b)
     return r_id(i, b.building) && r_id(i, b.corp) && r_id(i, b.body)
         && r_enum(i, b.type, max_building_type) && r_enum(i, b.target_resource, max_resource)
         && r_u16(i, b.recipe) && r_bool(i, b.active) && r_bool(i, b.idle)
-        && r_bool(i, b.exhausted) && r_f32(i, b.output_quantity)
-        && r_f32(i, b.effective_workforce) && r_bool(i, b.has_limiting)
-        && r_enum(i, b.limiting_input, max_resource) && r_f32(i, b.run)
-        && r_f32_array(i, b.wanted) && r_f32_array(i, b.suppressed);
+        && r_bool(i, b.exhausted) && r_f32f(i, b.output_quantity)
+        && r_f32f(i, b.effective_workforce) && r_bool(i, b.has_limiting)
+        && r_enum(i, b.limiting_input, max_resource) && r_f32f(i, b.run)
+        && r_f32f_array(i, b.wanted) && r_f32f_array(i, b.suppressed);
 }
 
 void w_corp_budget(std::ostream& o, const corp_budget& b)
@@ -945,10 +1008,10 @@ void w_corp_budget(std::ostream& o, const corp_budget& b)
 
 bool r_corp_budget(std::istream& i, corp_budget& b)
 {
-    return r_f32(i, b.income) && r_f32(i, b.expenditure) && r_f32(i, b.maintenance)
-        && r_f32(i, b.wages) && r_f32(i, b.interest) && r_f32(i, b.levies)
-        && r_f32(i, b.upkeep) && r_int(i, b.force_units) && r_int(i, b.force_unsupplied)
-        && r_f32(i, b.subsidies) && r_f32(i, b.taxes);
+    return r_f32f(i, b.income) && r_f32f(i, b.expenditure) && r_f32f(i, b.maintenance)
+        && r_f32f(i, b.wages) && r_f32f(i, b.interest) && r_f32f(i, b.levies)
+        && r_f32f(i, b.upkeep) && r_int(i, b.force_units) && r_int(i, b.force_unsupplied)
+        && r_f32f(i, b.subsidies) && r_f32f(i, b.taxes);
 }
 
 void w_id_pair(std::ostream& o, const std::pair<entity_id, entity_id>& k)
@@ -963,7 +1026,7 @@ bool r_id_pair(std::istream& i, std::pair<entity_id, entity_id>& k)
 }
 
 void w_f32v(std::ostream& o, const float& v) { w_f32(o, v); }
-bool r_f32v(std::istream& i, float& v) { return r_f32(i, v); }
+bool r_f32v(std::istream& i, float& v) { return r_f32f(i, v); }
 void w_idv(std::ostream& o, const entity_id& v) { w_id(o, v); }
 bool r_idv(std::istream& i, entity_id& v) { return r_id(i, v); }
 
@@ -984,10 +1047,10 @@ void w_lp_nation_row(std::ostream& o, const lp_nation_row& r)
 
 bool r_lp_nation_row(std::istream& i, lp_nation_row& r)
 {
-    return r_id(i, r.nation) && r_f32(i, r.pool) && r_f32(i, r.supply_claim)
-        && r_f32(i, r.supply_granted) && r_f32_array(i, r.made) && r_int_array(i, r.sources)
-        && r_f32_array(i, r.claim) && r_f32_array(i, r.granted) && r_bool(i, r.rule_set)
-        && r_f32_array(i, r.left) && r_f32(i, r.trade_drawn);
+    return r_id(i, r.nation) && r_f32f(i, r.pool) && r_f32f(i, r.supply_claim)
+        && r_f32f(i, r.supply_granted) && r_f32f_array(i, r.made) && r_int_array(i, r.sources)
+        && r_f32f_array(i, r.claim) && r_f32f_array(i, r.granted) && r_bool(i, r.rule_set)
+        && r_f32f_array(i, r.left) && r_f32f(i, r.trade_drawn);
 }
 
 void w_lp_source_row(std::ostream& o, const lp_source_row& r)
@@ -1003,7 +1066,7 @@ void w_lp_source_row(std::ostream& o, const lp_source_row& r)
 bool r_lp_source_row(std::istream& i, lp_source_row& r)
 {
     return r_id(i, r.building) && r_id(i, r.tile) && r_id(i, r.nation)
-        && r_enum(i, r.network, max_lp_network) && r_f32(i, r.made) && r_bool(i, r.connected);
+        && r_enum(i, r.network, max_lp_network) && r_f32f(i, r.made) && r_bool(i, r.connected);
 }
 
 void w_lp_building_row(std::ostream& o, const lp_building_row& r)
@@ -1021,8 +1084,8 @@ void w_lp_building_row(std::ostream& o, const lp_building_row& r)
 bool r_lp_building_row(std::istream& i, lp_building_row& r)
 {
     return r_id(i, r.building) && r_id(i, r.owner) && r_id(i, r.nation)
-        && r_enum(i, r.cls, max_lp_class) && r_f32(i, r.need) && r_f32(i, r.coverage)
-        && r_f32(i, r.granted) && r_f32(i, r.fraction);
+        && r_enum(i, r.cls, max_lp_class) && r_f32f(i, r.need) && r_f32f(i, r.coverage)
+        && r_f32f(i, r.granted) && r_f32f(i, r.fraction);
 }
 
 void w_lp_supply_row(std::ostream& o, const lp_supply_row& r)
@@ -1041,8 +1104,8 @@ void w_lp_supply_row(std::ostream& o, const lp_supply_row& r)
 
 bool r_lp_supply_row(std::istream& i, lp_supply_row& r)
 {
-    return r_id(i, r.unit) && r_id(i, r.nation) && r_id(i, r.tile) && r_f32(i, r.need)
-        && r_f32(i, r.cover) && r_f32(i, r.granted) && r_id(i, r.paid_tile)
+    return r_id(i, r.unit) && r_id(i, r.nation) && r_id(i, r.tile) && r_f32f(i, r.need)
+        && r_f32f(i, r.cover) && r_f32f(i, r.granted) && r_id(i, r.paid_tile)
         && r_int(i, r.draw_steps) && r_int(i, r.share_permille)
         && r_int(i, r.recruits_delivered);
 }
@@ -1055,7 +1118,7 @@ void w_lp_anchor(std::ostream& o, const lp_trade_anchor& a)
 
 bool r_lp_anchor(std::istream& i, lp_trade_anchor& a)
 {
-    return r_id(i, a.nation) && r_f32(i, a.cover);
+    return r_id(i, a.nation) && r_f32f(i, a.cover);
 }
 
 void w_lp_tick(std::ostream& o, const lp_tick& t)
@@ -1071,8 +1134,10 @@ void w_lp_tick(std::ostream& o, const lp_tick& t)
 
 bool r_lp_tick(std::istream& i, lp_tick& t)
 {
-    return r_vec(i, t.nations, r_lp_nation_row) && r_vec(i, t.sources, r_lp_source_row)
-        && r_vec(i, t.buildings, r_lp_building_row) && r_vec(i, t.supplies, r_lp_supply_row)
+    return r_vec_capped(i, t.nations, r_lp_nation_row, k_min_lp_nation_row)
+        && r_vec_capped(i, t.sources, r_lp_source_row, k_min_lp_source_row)
+        && r_vec_capped(i, t.buildings, r_lp_building_row, k_min_lp_building_row)
+        && r_vec_capped(i, t.supplies, r_lp_supply_row, k_min_lp_supply_row)
         && r_map(i, t.trade_anchors, r_idv, r_lp_anchor) && r_bool(i, t.resolved);
 }
 
@@ -1089,7 +1154,7 @@ void w_corp_standing(std::ostream& o, const corp_standing& s)
 bool r_corp_standing(std::istream& i, corp_standing& s)
 {
     return r_id(i, s.corp) && r_bool(i, s.is_player) && r_int(i, s.reach_bodies)
-        && r_f32(i, s.capital_balance) && r_f32(i, s.market_share)
+        && r_f32f(i, s.capital_balance) && r_f32f(i, s.market_share)
         && r_bool(i, s.capital_disclosed);
 }
 
@@ -1105,15 +1170,22 @@ void w_last_report(std::ostream& o, const save_envelope& e)
     w_vec(o, e.last_corp_standings, w_corp_standing);
 }
 
-bool r_last_report(std::istream& i, save_envelope& e)
+/// @p entity_cap: the loaded world's `next_entity_id()`. Every report row is a
+/// distinct building id the world issued, so a row count past it is corrupt. Not
+/// the world's CURRENT building count: the insolvency wind-up runs last in the
+/// tick and can erase buildings the production pass already reported.
+bool r_last_report(std::istream& i, save_envelope& e, std::uint64_t entity_cap)
 {
     economy_report& r = e.last_econ_report;
     std::vector<entity_id> unmet;
-    if (!(r_vec(i, r.buildings, r_building_report) && r_map(i, r.budgets, r_idv, r_corp_budget)
+    if (!(r_vec_capped(i, r.buildings, r_building_report, k_min_building_report, entity_cap)
+          && r_map(i, r.budgets, r_idv, r_corp_budget)
           && r_map(i, r.workforce_contention, r_id_pair, r_f32v)
-          && r_map(i, r.building_labour, r_idv, r_f32v) && r_ids(i, unmet)
+          && r_map(i, r.building_labour, r_idv, r_f32v)
+          && r_vec_capped(i, unmet, r_idv, k_min_id, entity_cap)
           && r_lp_tick(i, r.logistic_points)
-          && r_vec(i, e.last_corp_standings, r_corp_standing)))
+          && r_vec_capped(i, e.last_corp_standings, r_corp_standing, k_min_corp_standing,
+                          entity_cap)))
         return false;
     r.upkeep_unmet = std::set<entity_id>(unmet.begin(), unmet.end());
     rebuild_report_indices(r);
@@ -1187,7 +1259,8 @@ void w_envelope(std::ostream& o, const save_envelope& e, uint32_t version = save
 /// Every envelope field a v22 stream carries, in order (defined below).
 bool r_envelope_v22(std::istream& i, save_envelope& e);
 
-bool r_envelope(std::istream& i, save_envelope& e, uint32_t version)
+bool r_envelope(std::istream& i, save_envelope& e, uint32_t version,
+                std::uint64_t entity_cap = bio::max_count)
 {
     // BL-1422: an envelope before v24 carries EVERY resource_count-wide array - each
     // body's planetology endowment (read twice a body) and the market history's series -
@@ -1211,7 +1284,7 @@ bool r_envelope(std::istream& i, save_envelope& e, uint32_t version)
     // and opens with an empty report, as every load did before v27.
     if (version < save_game_version_econ_report)
         return true;
-    return r_last_report(i, e);
+    return r_last_report(i, e, entity_cap);
 }
 
 bool r_envelope_v22(std::istream& i, save_envelope& e)
@@ -1326,7 +1399,7 @@ bool read_save_game(const std::string& path, world& w, save_envelope& env,
 
     if (!read_world_snapshot(scratch_world, in, mil, base_price))
         return false;
-    if (!r_envelope(in, scratch_env, version))
+    if (!r_envelope(in, scratch_env, version, scratch_world.next_entity_id()))
         return false;
 
     w   = std::move(scratch_world);
