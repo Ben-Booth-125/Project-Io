@@ -272,5 +272,53 @@
    "you can walk your own"
   ],
   "owner": "sprint 63 (war rulings of 2026-11-09)"
+ },
+ {
+  "ruling": "A declaration of war writes both hostility rows (Ben, 2026-11-09)",
+  "doc": "docs/politics/RELATIONS.md",
+  "anchor": "war.{0,6} writes both rows",
+  "stale": [],
+  "owner": "BL-1562 (war both hostile, elimination)"
+ },
+ {
+  "ruling": "A last province may be ceded and the nation ends (Ben, 2026-11-09)",
+  "doc": "docs/politics/NATIONS.md",
+  "anchor": "Elimination — a nation with no ground ends",
+  "stale": [
+   "last province cannot be ceded"
+  ],
+  "owner": "BL-1562 (war both hostile, elimination)"
+ },
+ {
+  "ruling": "Obtainable is local evidence: the shelf, or reach supply left after local demand (Ben, 2026-11-09)",
+  "doc": "docs/ui/ledgers/construction.md",
+  "anchor": "Obtainable is local evidence",
+  "stale": [],
+  "owner": "BL-1542 (consumer quote mystery)"
+ },
+ {
+  "ruling": "Population grows at an Earth-anchored rate with a consumer bonus (Ben, 2026-11-10)",
+  "doc": "docs/economy/POPULATION.md",
+  "anchor": "Growth is a rate, anchored on Earth",
+  "stale": [],
+  "owner": "BL-1567 (population growth rate)"
+ },
+ {
+  "ruling": "A march route is priced by the march's own hop (Ben, 2026-11-10)",
+  "doc": "docs/military/MILITARY.md",
+  "anchor": "own days steer its route",
+  "stale": [
+   "but do not steer the route"
+  ],
+  "owner": "march route fix (Ben, 2026-11-10)"
+ },
+ {
+  "ruling": "A march steps across all six sides of its hex (Ben, 2026-11-10)",
+  "doc": "docs/military/MILITARY.md",
+  "anchor": "A march steps across all six sides of its hex",
+  "stale": [
+   "the four a march crosses"
+  ],
+  "owner": "six-sided marches (Ben, 2026-11-10)"
  }
 ]

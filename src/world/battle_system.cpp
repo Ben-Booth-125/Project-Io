@@ -277,7 +277,7 @@ int retreat_side(world& w, std::vector<entity_id>& units, entity_id owner, uint3
 }
 
 /// The six hex neighbours of @p tile, ascending and unique — "adjacent" for the
-/// join rule. All six sides, not the four a march crosses: a stack beside the
+/// join rule. All six sides, the same six a march crosses: a stack beside the
 /// tile is beside it whichever way the grid runs.
 std::vector<entity_id> hex_neighbours(const world& w, entity_id tile)
 {

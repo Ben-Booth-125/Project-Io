@@ -10,6 +10,28 @@ sessions can be scoped and paced with less waste.
 
 ---
 
+## 2026-11-10 — Sprint 63 closed: the opening, war's end, a save that keeps its economy
+
+**Runtime:** a long session across two days, Delivery Full in worktree lanes with cold reviews; Ben live-checking.
+
+**What was built.** Four lanes merged after cold review:
+- **UI round 2:** the convoy box anchors steadily, and a lone convoy reads 1. A march order glides, and the Site Finder cell gains Construct at its best site.
+- **Consumer quote (BL-1542):** inputs count only on local evidence.
+- **Population (BL-1567):** growth is an Earth-anchored rate with a consumer bonus. Fractional heads carry, at world save v82.
+- **War (BL-1562):** a declaration makes both sides hostile, and a last province ends the nation (world save v83).
+
+Then, on Ben's live checks:
+- **Motion:** markers chase their point at a capped pace, which made it smooth.
+- **Marches:** routes are priced by the march's own hop cost (`march_detour_probe`: 10 of 69 slower routes to 0). Marches step all six hex sides (76 of 97 to 0).
+
+The naval branch merged onto main at world save v88 and envelope v29. The ship-elimination gap was fixed in the merge.
+
+**Measured.** Pooled population growth went from -0.22 to 1.18%/yr over ten years on 16 seeds. On consumer goods, the quote was right about paying on 44 of 55 plants, up from 35.
+
+**Left open.** The re-bless: every handoff digest moves. Calls in NR-1154, NR-1155, NR-1193 and NR-1194. Carried: BL-1490 (province resource clip), BL-1495 (UI scale down), BL-1537 (lighter tileset), BL-1561 (tech pacing). Nothing pushed; no version cut.
+
+---
+
 ## 2026-11-08 — BL-1532 (opening fleets): a major opens with the fleet of its kit
 
 **Runtime:** one session, Delivery Full on the naval worktree, across a crash.
