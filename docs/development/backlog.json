@@ -1858,8 +1858,8 @@
    "design": "NATIONS.md § Off-world bases. Found on a mapped tile with colonists and a base kit; partition the body on first landing; life-support goods off the local market."
   },
   {
-   "status": "designed",
-   "glyph": "○",
+   "status": "complete",
+   "glyph": "●",
    "sprint": 66,
    "version_goal": "v0.5.0",
    "written": "2026-11-10",
@@ -2237,6 +2237,74 @@
    ],
    "title": "The MCP server range-checks research orders against 160 nodes; the Digitisation tree has 194",
    "design": "tools/mcp/server.js holds RESEARCH_NODE_COUNT = 160. Read the count from the generated tree data (or the store) instead of a literal, so valid orders 160..193 are not refused before the wire."
+  },
+  {
+   "status": "designed",
+   "glyph": "○",
+   "version_goal": "v0.5.0",
+   "written": "2026-11-10",
+   "parked": false,
+   "blocked_on": null,
+   "requires": [],
+   "sprint": 66,
+   "author": "Claude (BL-1602 lane report)",
+   "category": "Verification",
+   "priority": "B",
+   "difficulty": 2,
+   "id": "BL-1632",
+   "short_name": "STALE_TAIL_HARNESSES",
+   "authority_doc": "docs/development/DEVELOPMENT_PRACTICES.md",
+   "files": [
+    "tools/verify/war_harness.cpp",
+    "tools/verify/cession_harness.cpp",
+    "tools/verify/embargo_harness.cpp"
+   ],
+   "title": "Twelve save harnesses measure from the stream end but stop summing sections at v75-v79",
+   "design": "war_harness (R4l, RF1, RF3, RF4 fail), cession, embargo, railway, recruits, refit_units, road_edges, tax_discontent, tile_contact, carried_supplies, lp_pool and quarterly_return subtract tail sections only up to about v75 (refusals); every later section (contributors v77 onward, through the space sections to v90) is missing. Better than adding terms again: one helper world_save_tail_bytes_after(version, w) in world_save.cpp that sums every section after a version, so the next bump updates one place."
+  },
+  {
+   "status": "designed",
+   "glyph": "○",
+   "version_goal": "v0.5.0",
+   "written": "2026-11-10",
+   "parked": false,
+   "blocked_on": null,
+   "requires": [],
+   "sprint": 66,
+   "author": "Claude (BL-1602 lane report)",
+   "category": "UI",
+   "priority": "C",
+   "difficulty": 1,
+   "id": "BL-1633",
+   "short_name": "FRONT_MENU_BY_BODY",
+   "authority_doc": "docs/military/MILITARY.md",
+   "files": [
+    "src/ui/selection_panel.cpp"
+   ],
+   "title": "The unit card's Assign to front menu lists only fronts on the unit's body",
+   "design": "Assigning a unit to a front on another body is refused (MILITARY.md § Space). The menu still lists every front of the nation; filter it by the unit's body."
+  },
+  {
+   "status": "designed",
+   "glyph": "○",
+   "version_goal": "v0.5.0",
+   "written": "2026-11-10",
+   "parked": false,
+   "blocked_on": null,
+   "requires": [],
+   "sprint": 66,
+   "author": "Claude (BL-1602 lane report)",
+   "category": "Military",
+   "priority": "B",
+   "difficulty": 2,
+   "id": "BL-1634",
+   "short_name": "GARRISON_CHASE_LOOP",
+   "authority_doc": "docs/military/MILITARY.md",
+   "files": [
+    "src/world/fronts.cpp"
+   ],
+   "title": "A garrison defending its province can chase a pushing stack forever without a battle",
+   "design": "Seen on any body: the lower-id attacker steps first each day, the push prefers empty tiles, and the defender walks onto the tile the attacker just left, so they never meet. war_bodies_harness clears the defend order before its battle to avoid it. Diagnose the step order and fix so a defender closing on a pusher meets it."
   }
  ]
 }

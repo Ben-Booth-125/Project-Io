@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*68 entries — 65 open, 3 resolved.*
+*69 entries — 66 open, 3 resolved.*
 
 ---
 
@@ -837,6 +837,20 @@ Briefed to make auto trade size off the silenced want, the lane found that alrea
 > **Recommendation:** Keep until NR-1203 is ruled.
 
 *Files: `src/world/trade.cpp`*
+
+### NR-1206 — Rival units at a moon base are not kept home: a scorer change, raised
+*question · raised 2026-11-10 · from BL-1602 lane report*
+
+corp_ai.cpp keeps the capital province's units at home, reading only the home capital. A rival's units at an off-world base would be sent to fronts. Treating a base province as a home to keep is a scorer change to land behaviour. The 2026-11-10 grant names space verbs; it is silent on land units at a base. Also taken by the lane: a cross-body front assignment is refused; the fallback war goal prefers the defender's base on that body; a ceded capital stays on its own body while land remains there (MILITARY.md § Space).
+
+**Why it matters.** A rival base would be stripped of its garrison.
+
+- Grant it: a base province is a home the scorer keeps
+- Leave it for BL-1608 (rival far-space AI) to cover
+
+> **Recommendation:** Grant it inside BL-1608; it is one line in the keep-home rule.
+
+*Files: `src/world/corp_ai.cpp`*
 
 ---
 
