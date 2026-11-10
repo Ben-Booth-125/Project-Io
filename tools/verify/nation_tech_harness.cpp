@@ -1416,8 +1416,17 @@ void rows_t2(const recipe_registry& reg)
                         && recipe_unlocked(f.w, reg, f.corp2, reg.recipe_id(name));
         bool all_types = true;
         for (std::uint8_t ty = 0; ty < building_type_count; ++ty)
+        {
+            // BL-1582: the Astronaut Training Centre is gated by a MECHANIC key
+            // (SPACE_ASSETS.md § Astronauts), not a structure unlock; checked below.
+            if (static_cast<building_type>(ty) == building_type::astronaut_training_centre)
+                continue;
             all_types = all_types && structure_unlocked(f.w, f.corp2, static_cast<building_type>(ty));
-        check(open && all_types, "T2l no node names propellant or a structure: propellant and every building type open to every nation");
+        }
+        check(open && all_types, "T2l no node names propellant or a structure: propellant and every other building type open to every nation");
+        check(structure_unlocked(f.w, f.corp2, building_type::astronaut_training_centre)
+                  == nation_has_mechanic(f.w, owner_home_nation(f.w, f.corp2), space_keys::astronaut_training),
+              "T2l2 the Astronaut Training Centre opens exactly with its mechanic key");
     }
 
     // (e2) Wind Power (Ben, 2026-11-05): the one recipe a node opens. Closed to both
