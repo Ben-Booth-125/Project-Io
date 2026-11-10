@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*49 entries — 46 open, 3 resolved.*
+*54 entries — 51 open, 3 resolved.*
 
 ---
 
@@ -567,6 +567,78 @@ At 1280x720 the bottom band (~280 px) covers the moon outer orbit, so its L5 dia
 > **Recommendation:** Lift the rung centre; a clamped L-point lies about where it is.
 
 *Files: `src/ui/circum_nodes.cpp`, `src/ui/circum_assets.cpp`, `docs/ui/CIRCUMPLANETARY.md`*
+
+### NR-1176 — Spectator finding: rivals reach Rocketry (first 1976, 14 of 41 by 2000) but launch nothing, because no Launchpad ever exists
+*decision taken on your behalf · raised 2026-11-10 · from BL-1589 lane report (seed 0 spectate to 2000)*
+
+Rocketry holders: 2 in 1977, 3 in 1978, 7 in 1988, 14 by 1994. Launches 0, space spend 0: every holder is blocked no_launchpad. Nothing builds a Launchpad (not generation, not the nation build scorer), and placement_rules.cpp allows ONE Launchpad per body world-wide, so on a shared home world only one nation could ever launch. SPACE_ASSETS.md says a staffed Launchpad on the nation home body, i.e. one per nation. Training centres are never built either, so every astronaut pool is 0. Treasuries: richest about 35.6k in 1975, about 108k-123k by 2000; a comms satellite quotes about 23.5k, a core about 60k. DECISION TAKEN: the doc wins, the cap becomes one Launchpad per nation per body; rivals build a Launchpad and an Astronaut Training Centre through the build scorer on their own ground. I read this as inside the 2026-10-23 build grant (what to build, own ground) and the 2026-11-10 space grant (which names astronaut training), not a new widening; filed as BL-1615 (rival space groundwork).
+
+**Why it matters.** This is the first hurdle Ben asked about: without it no rival goes to space at all.
+
+- Accept: per-nation pads, rivals build pads and centres
+- Generation opens a pad for each major instead
+- Keep one pad per body and make it a contested asset
+
+> **Recommendation:** Accept; it matches the doc and the existing grants.
+
+*Files: `src/world/placement_rules.cpp`, `src/world/nation_ai.cpp`, `docs/economy/SPACE_ASSETS.md`, `docs/ai/AI_OPPONENT.md`*
+
+### NR-1177 — Rival space scorer dials: research relief 0.25 for near-space keys, half-treasury reserve, a fixed 14-module target
+*decision taken on your behalf · raised 2026-11-10 · from BL-1589 lane report*
+
+The research picker weighed only Rocketry among mechanic keys; every other near-space key now earns research_space_key_relief 0.25 (half of research_unlock_relief) x the space emphasis. That moves rival research picks after the handover in every campaign, so post-handover campaign digests are expected to move (not measured, nothing re-blessed). Reserve: one action spends at most half the treasury and keeps 8 quarters of space upkeep. A comms satellite first, then a core at the cheapest free home node, then modules toward a fixed order (power, research, habitation, life support, power, research, observatory, comms relay, power, habitation, life support, research, fuel depot, cargo hold). Home body only; no upgrades, retasks or crewed missions. Never the player nation, even under spectate.
+
+**Why it matters.** These set how fast and how far rivals climb.
+
+- Accept as first cut
+- Tune after the groundwork rerun
+
+> **Recommendation:** Accept; re-read after BL-1615 (rival space groundwork) lets them launch.
+
+*Files: `src/world/nation_ai.cpp`*
+
+### NR-1178 — Space battle dials and stand-ins: pooled armour can stall a battle, double-count across two battles at one node
+*decision taken on your behalf · raised 2026-11-10 · from BL-1597 lane report*
+
+Defence module firepower 12, armour 6, hull points 40, mass 6; core mass 20; 16 closed reports kept. Armour is spent once per target per day, so a side whose whole fire is at or below the front target armour lands nothing and the battle can stall with no forced end. Defence damage lives in the battle record (no repair rule). One battle per (node, nation pair): a nation hostile to two others at one node fires its whole firepower into both. Crew loss may be counted in both the battle and the station step reports. Withdrawn fleets can meet again where they withdraw to.
+
+**Why it matters.** A stalled battle never ends; the double-count favours a side fighting two enemies.
+
+- Accept and add a stall rule later
+- Add a daily minimum damage now
+- Split a nation fire across its battles
+
+> **Recommendation:** Add a stall rule (a battle with no damage for N days ends as a standoff) with BL-1598 (debris).
+
+*Files: `src/world/space_battle.cpp`, `docs/military/SPACE_FLEETS.md`*
+
+### NR-1179 — Mapping then prospecting: the old probe and the two-step model overlap; deposits still show on mapped ground
+*question · raised 2026-11-10 · from BL-1600 lane report*
+
+Other bodies do have tile grids (Cinder 180x84, Selene 90x42, asteroids 30x14), and survey regions are the existing 8-tile partition. Knowledge is now per (nation, body); the home world counts as surveyed for all. A dispatched probe still reveals tiles and deposits the old way, and a body being mapped from orbit refuses a probe. The Planetary canvas gates deposits on survey_tile_visible only, so mapped ground still shows deposits before prospecting (UI work, noted on BL-1610 (base and prospect UI)). corp_ai reads the player mirror body.survey for fog. Novel: per-nation geographic fog state. Dials: satellite 4 regions/quarter, Observatory 2, prospect 1/quarter; region 0 stands in for the landing site; prospecting needs no comms coverage.
+
+**Why it matters.** Two routes to the same knowledge confuse the player; the AI reads the player view.
+
+- Retire the probe in favour of mapping then prospecting
+- Keep the probe as a second, cheaper route
+
+> **Recommendation:** Retire the probe; one route reads cleaner.
+
+*Files: `src/world/survey_system.cpp`, `docs/ui/DISCOVERY.md`*
+
+### NR-1180 — Space convoys: the straight-line lane kept for nations with no Hauler design; a chemical Hauler cannot round-trip home to moon
+*decision taken on your behalf · raised 2026-11-10 · from BL-1596 lane report*
+
+A nation with a live Hauler design ships inter-body trades as Haulers; one without still uses the old straight-line space lane (kept so worlds without designs do not move; the backlog says Haulers replace it). Unescorted Haulers meeting an armed hostile are lost with cargo; escorted ones wait (battles now exist, so the wait should become a battle). Unloading uses the lowest-id staffed pad of ANY nation on the body. The cargo cap reserves fuel for the empty trip home, with no refuelling counted, so the default chemical Hauler cannot round-trip home-moon; interplanetary Hauler trade is effectively closed until refuelling at the destination is counted. Each hop takes at least a day. Novel: the first cross-store save check (each outbound haul matches its live convoy).
+
+**Why it matters.** As built, Hauler trade rarely pays and the old lane still carries most space trade.
+
+- Count destination refuelling in the cap
+- Retire the old lane now
+
+> **Recommendation:** Count destination refuelling where the owner has a pad there; retire the old lane once rivals hold Hauler designs (BL-1608 (rival far-space AI)).
+
+*Files: `src/world/space_convoy.cpp`, `src/world/supply_system.cpp`, `docs/military/SPACE_FLEETS.md`*
 
 ---
 

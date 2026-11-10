@@ -1552,8 +1552,8 @@
    "design": "Every near-space verb (launch to node, fit, remove, refit, apply template, upgrade, retask) as a legal command, validated as an untrusted input where the seam takes wire input, with an ACTIONS.json entry each."
   },
   {
-   "status": "designed",
-   "glyph": "○",
+   "status": "complete",
+   "glyph": "●",
    "sprint": 65,
    "version_goal": "v0.4.0",
    "written": "2026-11-10",
@@ -1724,8 +1724,8 @@
    "design": "SPACE_FLEETS.md § Thrust, § Where a space unit is. A move the budget cannot pay is refused; cargo adds mass; refuel at a Dock with a Fuel depot or in low orbit over an owned Launchpad; a Dock berths two. Done when a harness flies a laden hauler short of where an empty one reaches."
   },
   {
-   "status": "designed",
-   "glyph": "○",
+   "status": "complete",
+   "glyph": "●",
    "sprint": 66,
    "version_goal": "v0.5.0",
    "written": "2026-11-10",
@@ -1746,8 +1746,8 @@
    "design": "SPACE_FLEETS.md § Space convoys, § Raising and launching. Replaces the straight-line space leg in SUPPLY with a Hauler on the cheapest path; a moon launch costs a fraction of the home world's; a hostile armed fleet on the path stops it. Gives the station Market and Cargo hold their link (SPACE_ASSETS.md § Open). Measure haulage before and after (memory: goldens cannot see trade)."
   },
   {
-   "status": "designed",
-   "glyph": "○",
+   "status": "complete",
+   "glyph": "●",
    "sprint": 66,
    "version_goal": "v0.5.0",
    "written": "2026-11-10",
@@ -1810,11 +1810,11 @@
    "authority_doc": "docs/military/SPACE_FLEETS.md",
    "files": [],
    "title": "Blockade of a body's orbit, bombardment, the orbital defence battery",
-   "design": "SPACE_FLEETS.md § Blockade, § Bombardment and fire at orbit. Bombardment raises Alarm as a missile strike does."
+   "design": "SPACE_FLEETS.md § Blockade, § Bombardment and fire at orbit. Bombardment raises Alarm as a missile strike does. Also (BL-1596 lane): an escorted Hauler meeting armed hostiles waits; with battles built, the meeting should open a battle instead."
   },
   {
-   "status": "designed",
-   "glyph": "○",
+   "status": "complete",
+   "glyph": "●",
    "sprint": 66,
    "version_goal": "v0.5.0",
    "written": "2026-11-10",
@@ -2059,7 +2059,7 @@
    "authority_doc": "docs/politics/NATIONS.md",
    "files": [],
    "title": "Founding a base and watching prospecting",
-   "design": "A found-base flow from a landed Lander; prospecting progress and the two-step region mask on the Planetary canvas. Needs a live click."
+   "design": "A found-base flow from a landed Lander; prospecting progress and the two-step region mask on the Planetary canvas. Needs a live click. Also (BL-1600 lane): the Planetary canvas shows deposits on mapped ground; hide them until prospected, reading survey_tile_prospected for the player nation."
   },
   {
    "status": "designed",
@@ -2163,6 +2163,32 @@
    ],
    "title": "A moving space asset carries its origin node and departure tick, and the canvas draws its transit segment",
    "design": "An in-transit satellite or station records only its destination and arrival tick, so the canvas draws it dimmed at the destination. Add origin node and departure tick (a save section), then draw the dashed segment and the share of the way travelled. Space units (space_units.hpp) already carry node and dest; reuse that shape."
+  },
+  {
+   "status": "designed",
+   "glyph": "○",
+   "sprint": 65,
+   "version_goal": "v0.4.0",
+   "written": "2026-11-10",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Claude (spectator finding, BL-1589)",
+   "requires": [
+    "BL-1589"
+   ],
+   "category": "Space",
+   "priority": "A",
+   "difficulty": 3,
+   "id": "BL-1615",
+   "short_name": "RIVAL_SPACE_GROUNDWORK",
+   "authority_doc": "docs/economy/SPACE_ASSETS.md",
+   "files": [
+    "src/world/placement_rules.cpp",
+    "src/world/nation_ai.cpp",
+    "src/main.cpp"
+   ],
+   "title": "Rivals can launch: one Launchpad per nation per body, and rivals build a Launchpad and a Training Centre",
+   "design": "SPACE_ASSETS.md § Launching: a launch needs a staffed Launchpad on the nation home body. placement_rules allows one Launchpad per body world-wide; make it one per nation per body. The nation build scorer (2026-10-23 grant, own ground only) builds a Launchpad once the nation holds Rocketry and can afford it, and an Astronaut Training Centre once it holds the training key; never for the player. Done when a spectated run shows rivals launching (the spectate census reports launches)."
   }
  ]
 }
