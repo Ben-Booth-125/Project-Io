@@ -1266,6 +1266,35 @@ void write_world_snapshot_pre_transit_origin(const world& w, std::ostream& out);
 /// asset with a recorded origin. The LAST section of a v90 stream.
 std::size_t world_save_transit_origin_section_bytes(const world& w);
 
+/// BL-1632: the byte lengths of the v57..v66 trailing sections `w` writes, each
+/// mirroring its writer block field for field - the construction days (v57), the unit
+/// combat state (v58), the muster queue (v59), the obsolete-row flips (v60), the refits
+/// (v61), the fronts (v62), the attacking stacks (v63), the designs (v64), the air (v65,
+/// pruned exactly as written) and the carried supplies (v66). VERIFICATION ONLY.
+std::size_t world_save_days_section_bytes(const world& w);
+std::size_t world_save_combat_section_bytes(const world& w);
+std::size_t world_save_muster_section_bytes(const world& w);
+std::size_t world_save_obsolete_section_bytes(const world& w);
+std::size_t world_save_refit_section_bytes(const world& w);
+std::size_t world_save_fronts_section_bytes(const world& w);
+std::size_t world_save_stacks_section_bytes(const world& w);
+std::size_t world_save_designs_section_bytes(const world& w);
+std::size_t world_save_air_section_bytes(const world& w);
+std::size_t world_save_supplies_section_bytes(const world& w);
+
+/// BL-1632 (stale tail harnesses): the total bytes of every section today's writer
+/// (`write_world_snapshot`) appends AFTER the section introduced at @p version, in
+/// writer order - so the section introduced at version v starts at
+/// `stream.size() - world_save_tail_bytes_after(v - 1, w)`. Summed from the per-section
+/// `world_save_*_section_bytes` functions (never measured off a written stream, so a
+/// harness comparing an older writer's stream against it is not tautological). Covers
+/// every trailing section from the v52 tax rows to the newest (v92 transit origins); a
+/// version that introduced no trailing section (v53, v54, v74, v76) adds nothing.
+/// @p version must be at least 51 (`k_world_save_version_pre_tax`); a new trailing
+/// section must be added to its table, or every tail-addressing harness drifts again.
+/// VERIFICATION ONLY.
+std::size_t world_save_tail_bytes_after(int version, const world& w);
+
 /// BL-1422, widened by BL-1436: the bytes ALL SIX kit goods' extra elements add to
 /// every per-resource array of the stream `w` writes - the widening from 49 to today's
 /// width: (the v74 stream less the v73 stream, the five goods) plus

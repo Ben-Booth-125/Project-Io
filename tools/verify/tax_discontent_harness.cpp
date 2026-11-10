@@ -540,14 +540,10 @@ void t6_save(const app_start_world& out)
     // BL-1407 (v56): the tax section carries the nation rows only (its
     // corporation half is gone, so the helper's pre-v56 count of 4 is not
     // written), and the v55 majors and v56 nation-books sections follow it.
-    // v57 (Ben, 2026-10-24): the CONSTRUCTION-DAYS section follows the books and
-    // ends the stream — its size is the current stream less the pre-days one.
-    std::size_t days_tail = 0;
-    {
-        std::ostringstream o(std::ios::binary);
-        write_world_snapshot_pre_days(c, o);
-        days_tail = b52.size() - o.str().size();
-    }
+    // v57 (Ben, 2026-10-24) on: the CONSTRUCTION-DAYS section and every later one follow
+    // the books. BL-1632: measured section by section — the current stream less the
+    // pre-days one also counted the wider resource arrays (v74, v76) and v68's Alarm rows.
+    const std::size_t days_tail = world_save_tail_bytes_after(k_world_save_version_pre_days, c);
     const std::size_t tail56   = tail - 4;
     const std::size_t books    = world_save_books_section_bytes(c);
     const std::size_t net_tail = world_save_major_section_bytes(c) + books + days_tail;

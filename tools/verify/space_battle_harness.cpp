@@ -584,7 +584,7 @@ int main()
         std::ostringstream o84(std::ios::binary);
         write_world_snapshot_pre_space_battles(f.w, o84);
         const std::size_t sec = world_save_space_battle_section_bytes(f.w);
-        check(o84.str().size() + sec + world_save_prospecting_section_bytes(f.w) + (world_save_space_convoy_section_bytes(f.w) + (world_save_debris_section_bytes(f.w) + (world_save_space_bombard_section_bytes(f.w) + (world_save_offworld_base_section_bytes(f.w) + (world_save_space_firsts_section_bytes(f.w) + world_save_transit_origin_section_bytes(f.w)))))) == mid_bytes.size() && sec == 8 + 80 + 9 + 8,
+        check(o84.str().size() + sec + world_save_tail_bytes_after(k_world_save_version_space_battles, f.w) /* BL-1632 */ == mid_bytes.size() && sec == 8 + 80 + 9 + 8,
               "S10b", fmt("the section is %zu bytes (8 + 80 + 9 + 8); v84 prefix %zu + %zu == %zu", sec,
                           o84.str().size(), sec, mid_bytes.size()));
         // Both fight the next day identically.
@@ -613,7 +613,10 @@ int main()
         const std::string& b = mid_bytes;
         // `saved` has fought one more day since mid_bytes; the section's shape is
         // the one S10b measured: 8 + 80 + 9 + 8.
-        const std::size_t s0 = b.size() - (8 + 80 + 9 + 8) - 4 - 4 - 12 - 4 - 8 - 4 - 4; // (BL-1606: then the v91 firsts section, empty: 4; BL-1614: the v92 transit section, empty: 4) the v86 survey and v87 convoy sections follow, both empty here (4 bytes each), then the v88 debris section (BL-1598), empty: 12 bytes, the v89 bombard section (BL-1599), empty: 4, and the v90 base section (BL-1601), empty: 8
+        world as_saved; // BL-1632: the world `b` reads as, to measure what follows the section
+        (void)from_bytes(b, as_saved);
+        const std::size_t s0 = b.size() - (8 + 80 + 9 + 8)
+                             - world_save_tail_bytes_after(k_world_save_version_space_battles, as_saved); // v86 survey and every later section follow
         const std::size_t b0 = s0 + 8;
         const auto refused = [&](std::string bad) {
             world t;

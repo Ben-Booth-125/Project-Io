@@ -18,6 +18,7 @@
 
 #include <sstream>
 #include <algorithm>
+#include <cassert> // BL-1632: world_save_tail_bytes_after's version floor
 #include <cmath> // std::isfinite -- the sentiment record's own rejection (BL-546)
 #include <istream>
 #include <limits>
@@ -2979,6 +2980,184 @@ std::size_t world_save_tax_section_bytes(const world& w)
     n += 4; // BL-1407: the corporation half, an empty count (pre-v56 layout)
     return n;
 }
+
+// ===== BEGIN BL-1632 (stale tail harnesses): the v57..v66 sizes and the whole tail =====
+// Each mirrors its block in `write_world_snapshot_at` field for field. VERIFICATION ONLY.
+
+std::size_t world_save_days_section_bytes(const world& w)
+{
+    std::size_t n = 4 + 4; // the quarter-day cursor, the count
+    for (const auto& [bid, b] : w.buildings)
+        if (building_has_construction_days(b))
+            n += 4 + 7 * 4 + 4; // id, seven i32 day fields, the f32 credit
+    return n;
+}
+
+std::size_t world_save_combat_section_bytes(const world& w)
+{
+    return 4 + 16 * w.units.size(); // id, establishment, readiness, morale
+}
+
+std::size_t world_save_muster_section_bytes(const world& w)
+{
+    // next id, count; per order id, base, owner, u16 type, days total, days remaining
+    return 4 + 4 + (4 + 4 + 4 + 2 + 4 + 4) * w.musters.size();
+}
+
+std::size_t world_save_obsolete_section_bytes(const world& w)
+{
+    std::size_t n = 4;
+    for (const auto& [nid, nc] : w.nations)
+        if (!nc.roster_obsolete_flips.empty())
+            n += 4 + 4 + 2 * nc.roster_obsolete_flips.size();
+    return n;
+}
+
+std::size_t world_save_refit_section_bytes(const world& w)
+{
+    std::size_t n = 4;
+    for (const auto& [uid, u] : w.units)
+        if (unit_refitting(u))
+            n += 4 + 2 + 4; // id, u16 target row, days left
+    return n;
+}
+
+std::size_t world_save_fronts_section_bytes(const world& w)
+{
+    std::size_t n = 4;
+    for (const auto& [uid, u] : w.units)
+        if (u.front != null_entity)
+            n += 4 + 4;
+    return n + 4 + (4 + 4 + 1) * w.front_orders.size();
+}
+
+std::size_t world_save_stacks_section_bytes(const world& w)
+{
+    std::size_t n = 4;
+    for (const active_battle& b : w.battles)
+        n += 4 + 4 * b.attacking_units.size();
+    return n;
+}
+
+std::size_t world_save_designs_section_bytes(const world& w)
+{
+    std::size_t n = 4;
+    for (const auto& [nid, nc] : w.nations)
+        if (!nc.unit_design_kit.empty())
+            n += 4 + 4 + 2 * nc.unit_design_kit.size();
+    n += 4;
+    for (const auto& [uid, u] : w.units)
+        if (!u.kit.is_base() || !u.refit_kit.is_base())
+            n += 4 + u.kit.fit.size() + u.refit_kit.fit.size();
+    n += 4;
+    for (const muster_order& m : w.musters)
+        if (!m.kit.is_base())
+            n += 4 + m.kit.fit.size();
+    return n;
+}
+
+std::size_t world_save_air_section_bytes(const world& w)
+{
+    std::size_t n = 4;
+    for (const auto& [wid, wg] : w.wings)
+        if (w.nations.count(wg.owner) != 0 && w.buildings.count(wg.airbase) != 0)
+            n += 4 + 4 + 4 + 2 + 4 + 4 + 4 + 4 + wg.kit.fit.size() + 1 + 4 + 4 * wg.provinces.size();
+    n += 4;
+    for (const auto& [key, v] : w.air_superiority)
+        if (v > 0 && w.nations.count(key.second) != 0)
+            n += 12;
+    n += 4;
+    for (const auto& [viewer, unit] : w.air_revealed)
+        if (w.nations.count(viewer) != 0 && w.units.count(unit) != 0)
+            n += 8;
+    n += 4;
+    for (const auto& [uid, bank] : w.air_hit_bank)
+        if (w.units.count(uid) != 0)
+            n += 12;
+    n += 4;
+    for (const auto& [nid, nc] : w.nations)
+        if (!nc.air_design_kit.empty())
+            n += 4 + 4 + 2 * nc.air_design_kit.size();
+    n += 4;
+    for (const auto& [bid, bc] : w.buildings)
+        if (bc.condition_permille != 1000)
+            n += 8;
+    return n;
+}
+
+std::size_t world_save_supplies_section_bytes(const world& w)
+{
+    std::size_t n = 4;
+    for (const auto& [uid, u] : w.units)
+        if (!unit_supplies_full(u))
+            n += 4 + 8 * 4; // id, food, ammo, equipment, carry, three remainders, share
+    return n;
+}
+
+namespace
+{
+// Today's stream writes only the tax section's NATION rows; its corporation half (the
+// helper's trailing 4) is pre-v56.
+std::size_t tax_rows_today(const world& w) { return world_save_tax_section_bytes(w) - 4; }
+} // namespace
+
+std::size_t world_save_tail_bytes_after(int version, const world& w)
+{
+    // Every trailing section today's writer appends, IN WRITER ORDER, keyed by the version
+    // that introduced it. v53 (road edges, inside the tile record), v54 (the corporations'
+    // exact nets, written at v54..v55 only), v74 and v76 (wider resource arrays) add no
+    // trailing section to today's stream.
+    using bytes_fn = std::size_t (*)(const world&);
+    struct tail_section { uint32_t version; bytes_fn bytes; };
+    static const tail_section k_tail[] = {
+        { k_world_save_version_pre_tax + 1,          tax_rows_today },                              // v52
+        { k_world_save_version_pre_books,            world_save_major_section_bytes },              // v55
+        { k_world_save_version_pre_days,             world_save_books_section_bytes },              // v56
+        { k_world_save_version_pre_combat,           world_save_days_section_bytes },               // v57
+        { k_world_save_version_pre_muster,           world_save_combat_section_bytes },             // v58
+        { k_world_save_version_pre_obsolete,         world_save_muster_section_bytes },             // v59
+        { k_world_save_version_pre_refit,            world_save_obsolete_section_bytes },           // v60
+        { k_world_save_version_pre_fronts,           world_save_refit_section_bytes },              // v61
+        { k_world_save_version_pre_tile,             world_save_fronts_section_bytes },             // v62
+        { k_world_save_version_pre_designs,          world_save_stacks_section_bytes },             // v63
+        { k_world_save_version_pre_air,              world_save_designs_section_bytes },            // v64
+        { k_world_save_version_pre_air + 1,          world_save_air_section_bytes },                // v65
+        { k_world_save_version_pre_supplies + 1,     world_save_supplies_section_bytes },           // v66
+        { k_world_save_version_battle_carry,         world_save_battle_carry_section_bytes },       // v67
+        { k_world_save_version_alarm,                world_save_alarm_section_bytes },              // v68
+        { k_world_save_version_war,                  world_save_war_section_bytes },                // v69
+        { k_world_save_version_embargo,              world_save_embargo_section_bytes },            // v70
+        { k_world_save_version_gen_capital,          world_save_gen_capital_section_bytes },        // v71
+        { k_world_save_version_recruits,             world_save_recruits_section_bytes },           // v72
+        { k_world_save_version_sea_recruits,         world_save_sea_recruits_section_bytes },       // v73
+        { k_world_save_version_refusals,             world_save_refusals_section_bytes },           // v75
+        { k_world_save_version_contributors,         world_save_contributors_section_bytes },       // v77
+        { k_world_save_version_occupation,           world_save_occupation_section_bytes },         // v78
+        { k_world_save_version_defend,               world_save_defend_section_bytes },             // v79
+        { k_world_save_version_research_books,       world_save_research_books_section_bytes },     // v80
+        { k_world_save_version_stations,             world_save_station_section_bytes },            // v81
+        { k_world_save_version_early_space,          world_save_early_space_section_bytes },        // v82
+        { k_world_save_version_space_nodes,          world_save_space_node_section_bytes },         // v83
+        { k_world_save_version_space_units,          world_save_space_unit_section_bytes },         // v84
+        { k_world_save_version_space_battles,        world_save_space_battle_section_bytes },       // v85
+        { k_world_save_version_prospecting,          world_save_prospecting_section_bytes },        // v86
+        { k_world_save_version_space_convoys,        world_save_space_convoy_section_bytes },       // v87
+        { k_world_save_version_debris,               world_save_debris_section_bytes },             // v88
+        { k_world_save_version_space_bombard,        world_save_space_bombard_section_bytes },      // v89
+        { k_world_save_version_offworld_bases,       world_save_offworld_base_section_bytes },      // v90
+        { k_world_save_version_space_firsts,         world_save_space_firsts_section_bytes },       // v91
+        { k_world_save_version_transit_origin,       world_save_transit_origin_section_bytes },     // v92
+    };
+    static_assert(k_world_save_version_transit_origin == world_save_version,
+                  "BL-1632: a new trailing section joins world_save_tail_bytes_after's table");
+    assert(version >= static_cast<int>(k_world_save_version_pre_tax)); // older tails are not today's
+    std::size_t n = 0;
+    for (const tail_section& s : k_tail)
+        if (static_cast<int>(s.version) > version)
+            n += s.bytes(w);
+    return n;
+}
+// ===== END BL-1632 =====
 
 void write_world_snapshot(const world& w, std::ostream& out)
 {
