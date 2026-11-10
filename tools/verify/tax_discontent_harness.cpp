@@ -512,28 +512,84 @@ void t6_save(const app_start_world& out)
     // with the cursor at 0 and each site's days derived from its ticks
     // (`sync_construction_days`), every other day field at its default.
     base.construction_quarter_day = 0;
+    // BL-1635: a building's whole v51 state is its base record (w_building), so the
+    // default world's building is a DEFAULT building carrying that record - not the live
+    // one with each later field zeroed by hand, which missed v64's condition and rots
+    // with every field added after it. Its days then derive from its ticks.
     for (auto& [bid, b] : base.buildings)
     {
         (void)bid;
-        b.days_remaining = 0; b.build_rate_permille = 0; b.build_paid_days = 0;
-        b.build_day_milli = 0; b.completion_day = 0; b.output_share_permille = 1000;
-        b.build_arrears_milli = 0; b.build_credit_paid = 0.0f;
+        building_component d{};
+        d.tile = b.tile; d.type = b.type; d.workforce_assigned = b.workforce_assigned;
+        d.target_resource = b.target_resource; d.recipe = b.recipe;
+        d.workforce_target = b.workforce_target; d.workforce_auto = b.workforce_auto;
+        d.decommissioned = b.decommissioned; d.active_recipe_index = b.active_recipe_index;
+        d.ticks_remaining = b.ticks_remaining; d.construction_progress = b.construction_progress;
+        d.loss_streak = b.loss_streak; d.ai_cooldown = b.ai_cooldown; d.wage_bid = b.wage_bid;
+        d.supply_factor_permille = b.supply_factor_permille;
+        d.recipe_switch_cooldown = b.recipe_switch_cooldown; d.construction_paid = b.construction_paid;
+        b = d;
         if (b.ticks_remaining > 0)
+        {
             sync_construction_days(b);
+            // ...and a pre-v80 stream's sites move to the x2/3 build days (BL-1499; the
+            // reader's `rescale_site_days_to_research_books`): nearest day, floored at one,
+            // the quarters they span.
+            const int q = k_construction_quarter_days;
+            b.days_remaining  = std::max(1, static_cast<int>(std::lround(b.days_remaining * 2.0 / 3.0)));
+            b.ticks_remaining = (b.days_remaining + q - 1) / q;
+        }
+    }
+    // ...and the v74/v76 WIDER RESOURCE ARRAYS (the kit goods, then airframes): a v51
+    // stream carries every per-resource array at its own width, the goods past it reading
+    // 0. A market is the one saved record whose live tail is not already 0.
+    {
+        const std::size_t W = world_stream_resource_width(k_world_save_version_pre_tax);
+        for (auto& [mid, m] : base.markets)
+        {
+            (void)mid;
+            for (std::size_t r = W; r < resource_count; ++r)
+            {
+                m.supply[r] = 0.0f; m.demand[r] = 0.0f; m.price[r] = 0.0f; m.base_price[r] = 0.0f;
+                m.inventory[r] = 0.0f; m.household_bid[r] = 0.0f; m.household_fill[r] = 0.0f;
+                m.household_weight[r] = 0.0f; m.hauler_want[r] = 0.0f; m.unposted_bid[r] = 0.0f;
+                m.unposted_bid_tick[r] = 0; m.background_fill[r] = 0.0f;
+            }
+        }
     }
     // ...and the v62 FRONTS (BL-1427): a pre-fronts stream reads with no unit
     // assigned and every front holding; a stepped world's rivals have assigned some.
     // A unit a front marched may have lost supply and so morale, and the v58 combat
     // state is not in a v51 stream either: it reads with full readiness and morale.
+    // BL-1635: as the buildings above - a unit's v51 state is its base record (w_unit),
+    // so every later field (v60 refits, v66 stocks, v67 carries, v79 defence posts, as
+    // well as these fronts and combat state) reads at its default.
     for (auto& [uid, u] : base.units)
     {
         (void)uid;
-        u.front = null_entity;
-        u.establishment = 0; u.readiness_permille = 1000; u.morale_permille = 1000;
+        unit_component d{};
+        d.position = u.position; d.owner = u.owner; d.count = u.count; d.type = u.type;
+        d.order.dest = u.order.dest; d.order.path = u.order.path;
+        d.order.next_index = u.order.next_index; d.order.progress = u.order.progress;
+        d.supply_factor_permille = u.supply_factor_permille; d.muster_base = u.muster_base;
+        u = d;
     }
     base.front_orders.clear();
+    // ...and the v72/v73 RECRUITS (Ben, 2026-10-31 / 2026-11-02): a pre-recruits stream
+    // reads every nation's land, air and sea pools empty and no centre's heads taken; a
+    // stepped world's bases have filled them (BL-1635: the zeroing this row missed).
+    for (auto& [nid, nc] : base.nations)
+    {
+        (void)nid;
+        nc.land_recruits = 0; nc.air_recruits = 0; nc.sea_recruits = 0;
+    }
+    for (auto& [cid, pc] : base.population_centres)
+    {
+        (void)cid;
+        pc.recruit_heads_taken = 0;
+    }
     check(ok51 && r51.state_hash(0) == base.state_hash(0), "T6",
-          "...and hashes as the default world less the v56 books, the majors, the v57 day state and the v62 fronts (the fold is sparse)");
+          "...and hashes as the default world less the v56 books, the majors, the v57 day state, the v62 fronts, the v72 recruits, the v74 arrays and the v80 days (the fold is sparse)");
 
     // Bad values refuse whole and leave the target untouched. The FIRST row of
     // the section is ids.front(): id (4) then tier (1) then discontent (4).

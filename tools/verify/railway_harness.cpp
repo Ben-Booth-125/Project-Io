@@ -581,7 +581,9 @@ void run_seed(lua_state& lua, std::uint32_t seed, bool mechanics)
             // BL-1309: "anyone may build" a station, so a corporation's book is a
             // legal door now; off the line the build door still refuses it.
             rows.push_back({P_(fmt("verb=0 tile=%u type=11", city)), "rejected_placement", "a station naming no nation, on a city touching no track"});
-            rows.push_back({P_(fmt("verb=0 tile=%u type=12 nation=%u", city, pn)), "rejected_invalid", "a building type past the roster"});
+            // One past the roster, read off the enum's tail (a literal 12 became the airbase).
+            rows.push_back({P_(fmt("verb=0 tile=%u type=%u nation=%u", city, static_cast<unsigned>(building_type_count), pn)),
+                            "rejected_invalid", "a building type past the roster"});
         }
         rows.push_back({P_(fmt("verb=%u tile=0 nation=%u", LT, pn)), "rejected_invalid", "track on no tile"});
         rows.push_back({P_(fmt("verb=%u tile=1 nation=%u", static_cast<unsigned>(corp_verb_count), pn)), "rejected_invalid", "a verb past the dictionary"});
@@ -807,12 +809,25 @@ void run_seed(lua_state& lua, std::uint32_t seed, bool mechanics)
                 bool avoids = true;
                 for (const entity_id t : live.tiles)
                     if (const auto rt = c.rail_track.find(t); rt != c.rail_track.end() && rt->second == nat) avoids = false;
-                std::unordered_map<entity_id, corp_cash_flow> flows;
-                std::map<std::pair<entity_id, entity_id>, float> contention;
+                // "Pays nothing" FOR ITS TRACK. BL-1482 (Ben, 2026-11-05: a brief negative
+                // treasury is accepted): at an empty treasury the buildings that pay for
+                // themselves keep running, so the close is no longer 0 and cannot stand
+                // for the track. The twin is the same world with the nation's track
+                // lifted after the gate ran: an idle track is billed nothing iff the
+                // two close on the same treasury.
+                world twin = c;
+                for (auto it = twin.rail_track.begin(); it != twin.rail_track.end();)
+                    it = it->second == nat ? twin.rail_track.erase(it) : std::next(it);
+                std::unordered_map<entity_id, corp_cash_flow> flows, twin_flows;
+                std::map<std::pair<entity_id, entity_id>, float> contention, twin_contention;
                 apply_budget(c, reg, flows, contention);
-                check(idle && avoids && phys.reachable && c.nations.at(nat).treasury == 0.0f, "R7/D",
-                      fmt("a nation (%u) with nothing to pay its track upkeep: its track idles (no rail route over it, tile %u), and pays nothing",
-                          static_cast<unsigned>(nat), static_cast<unsigned>(via)));
+                apply_budget(twin, reg, twin_flows, twin_contention);
+                const float close = c.nations.at(nat).treasury, close_no_track = twin.nations.at(nat).treasury;
+                check(idle && avoids && phys.reachable && close == close_no_track, "R7/D",
+                      fmt("a nation (%u) with nothing to pay its track upkeep: its track idles (no rail route over it, tile %u), "
+                          "and pays nothing for it (closes on %.4f, as with no track: %.4f)",
+                          static_cast<unsigned>(nat), static_cast<unsigned>(via),
+                          static_cast<double>(close), static_cast<double>(close_no_track)));
                 c.nations.at(nat).treasury = 1.0e6f;
                 plan_state_funding(c, reg);
                 check(c.rail_idle.count(nat) == 0 && rail_leg_path(c, c.home_body, sa, sb).reachable, "R7/D",
@@ -902,7 +917,20 @@ void run_seed(lua_state& lua, std::uint32_t seed, bool mechanics)
         tail += world_save_tax_section_bytes(c);
         tail += world_save_net_section_bytes(c); // BL-1337 (v54): the exact nets
         tail += world_save_major_section_bytes(c); // BL-1404 (v55): the majors, last
-        std::string v48 = b55.substr(0, b55.size() - tail);
+        // BL-1635: the v48 stream is sliced off the PRE-EDGE stream, not b55. Since v53
+        // (BL-1340) the tile record is road edges, so a v55 body relabelled 48 carries a
+        // tile record the v48 reader does not read. The verification-only pre-edge writer
+        // writes at v52 (the old tile record) and ends after the v52 tax section, so its
+        // tail is this section, the share rules, the v51 space assets and the taxes - no
+        // v54 net or v55 majors (lp_pool_harness L7 and save_roundtrip P20b do the same).
+        std::string b52;
+        {
+            std::ostringstream o52(std::ios::binary);
+            write_world_snapshot_pre_road_edges(c, o52);
+            b52 = o52.str();
+        }
+        const std::size_t tail52 = tail - world_save_net_section_bytes(c) - world_save_major_section_bytes(c);
+        std::string v48 = b52.substr(0, b52.size() - tail52);
         const uint32_t ver = k_world_save_version_pre_rail;
         std::memcpy(&v48[4], &ver, sizeof ver);
         world old;
