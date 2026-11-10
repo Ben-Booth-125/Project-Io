@@ -5150,6 +5150,7 @@ void run_space_day(world& w, const recipe_registry& reg)
     run_space_battle_day(w, reg.space_units(), reg.stations(), reg.space_battles(), &bd);
     run_space_strike_day(w, reg.space_battles()); // BL-1599: standing bombard orders and battery fire
     run_space_debris_day(w, reg.space_debris(), ud, bd);
+    run_space_firsts(w, reg.research()); // BL-1606 (ERAS.md § Firsts): the day's deeds, read last
 }
 } // namespace
 

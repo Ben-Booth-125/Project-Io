@@ -265,6 +265,9 @@ void run_nation_step(world& w, const recipe_registry& reg, economy_report& repor
         bp.reservation_mult = reg.price_band().reservation_mult;
         run_offworld_base_quarter(w, bp);
     }
+    // ---- 7g. Space firsts (BL-1606, ERAS.md § Firsts) — after every space step, so
+    // a satellite arriving this quarter is read the quarter it arrives.
+    run_space_firsts(w, reg.research());
 
     // ---- 8. The tax tier (BL-1335) — LAST, so the scorer reads this quarter's
     // whole budget (rationed lines, the research line) and the Discontent the

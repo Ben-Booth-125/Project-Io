@@ -1525,6 +1525,8 @@ void recipe_registry::load_from_lua(lua_state& lua)
         read_checked(t, "rp_per_economy_unit",         rp.rp_per_economy_unit,         0.0, k_dial_max, ctx);
         // BL-1612: the gate into space's propellant threshold (ERAS.md condition 3).
         read_checked(t, "space_gate_min_propellant",   rp.space_gate_min_propellant,   0.0, k_dial_max, ctx);
+        // BL-1606: the space firsts' one-time research grant (ERAS.md § Firsts).
+        read_checked(t, "space_first_grant_rp",        rp.space_first_grant_rp,        0.0, k_dial_max, ctx);
 
         m_research = rp;
     }

@@ -2454,6 +2454,18 @@ void write_world_snapshot_at(const world& w, std::ostream& out, uint32_t version
             }
     }
     // ===== END BL-1601 =====
+    // ===== BEGIN BL-1606 (v91): THE SPACE FIRSTS TAKEN, the last section =====
+    if (version >= k_world_save_version_space_firsts)
+    {
+        w_u32(out, static_cast<uint32_t>(w.space_firsts.size()));
+        for (const auto& [k, f] : w.space_firsts) // ascending kind
+        {
+            w_u8(out, k);
+            w_id(out, f.nation);
+            w_i32(out, f.day_tick);
+        }
+    }
+    // ===== END BL-1606 =====
 }
 
 void write_world_snapshot_pre_space_battles(const world& w, std::ostream& out)
@@ -2526,6 +2538,17 @@ void write_world_snapshot_pre_offworld_bases(const world& w, std::ostream& out)
 {
     // VERIFICATION ONLY (BL-1601): the v89 stream shape - no off-world base section.
     write_world_snapshot_at(w, out, k_world_save_version_pre_offworld_bases);
+}
+
+void write_world_snapshot_pre_space_firsts(const world& w, std::ostream& out)
+{
+    // VERIFICATION ONLY (BL-1606): the v90 stream shape - no space-firsts section.
+    write_world_snapshot_at(w, out, k_world_save_version_pre_space_firsts);
+}
+
+std::size_t world_save_space_firsts_section_bytes(const world& w)
+{
+    return 4 + 9 * w.space_firsts.size();
 }
 
 std::size_t world_save_offworld_base_section_bytes(const world& w)
@@ -3029,7 +3052,8 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
             && version != k_world_save_version_pre_space_convoys // BL-1596: v86, nothing aboard
             && version != k_world_save_version_pre_debris // BL-1598: v87, no debris, wear or quiet days
             && version != k_world_save_version_pre_space_bombard // BL-1599: v88, no bombard orders
-            && version != k_world_save_version_pre_offworld_bases)) // BL-1601: v89, no base, nobody aboard
+            && version != k_world_save_version_pre_offworld_bases // BL-1601: v89, no base, nobody aboard
+            && version != k_world_save_version_pre_space_firsts)) // BL-1606: v90, no first taken
         return false; // mismatched version -- refuse rather than misread
 
     // BL-1422: a stream before the kit goods carries every per-resource array 49 wide;
@@ -5562,6 +5586,28 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
         }
     }
     // ===== END BL-1601 =====
+    // ===== BEGIN BL-1606 (v91): the space firsts taken. Untrusted, refused whole on
+    // any breach of world_save.hpp's v91 paragraph. A v90 (and older) stream ends
+    // before it: no first taken. =====
+    if (version >= k_world_save_version_space_firsts)
+    {
+        uint32_t count = 0;
+        if (!r_u32(in, count) || count > space_first_kind_count)
+            return false;
+        int prev = -1;
+        for (uint32_t k = 0; k < count; ++k)
+        {
+            uint8_t            kind = 0;
+            space_first_record f;
+            if (!r_u8(in, kind) || kind >= space_first_kind_count || static_cast<int>(kind) <= prev
+                || !r_id(in, f.nation) || f.nation == null_entity || s.nations.count(f.nation) == 0
+                || !r_i32(in, f.day_tick) || f.day_tick < 0)
+                return false;
+            prev = kind;
+            s.space_firsts.emplace_hint(s.space_firsts.end(), kind, f);
+        }
+    }
+    // ===== END BL-1606 =====
 
     // BL-1266 (v46): every manual trade names a live owner and two distinct
     // standing markets, and holds an id below the next one to be issued, all

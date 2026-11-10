@@ -650,7 +650,7 @@ int main()
         std::ostringstream o87(std::ios::binary);
         write_world_snapshot_pre_debris(f.w, o87);
         const std::size_t sec = world_save_debris_section_bytes(f.w);
-        check(o87.str().size() + sec + (world_save_space_bombard_section_bytes(f.w) + world_save_offworld_base_section_bytes(f.w)) == bytes.size() && sec == 12 + 2 * 9 + 8 + 8, "D9b",
+        check(o87.str().size() + sec + (world_save_space_bombard_section_bytes(f.w) + (world_save_offworld_base_section_bytes(f.w) + world_save_space_firsts_section_bytes(f.w))) == bytes.size() && sec == 12 + 2 * 9 + 8 + 8, "D9b",
               fmt("the section is %zu bytes (12 + 18 + 8 + 8); v87 prefix %zu + %zu == %zu", sec, o87.str().size(),
                   sec, bytes.size()));
         // The v87 prefix of the same world reads with the debris dropped.
@@ -685,7 +685,7 @@ int main()
     std::printf("--- D10 tampered ---\n");
     {
         const std::string& b = bytes;
-        const std::size_t s0 = b.size() - (12 + 2 * 9 + 8 + 8) - 4 - 8; // the v89 bombard (BL-1599) and v90 base (BL-1601) sections follow, empty: 4 + 8 bytes
+        const std::size_t s0 = b.size() - (12 + 2 * 9 + 8 + 8) - 4 - 8 - 4; // the v89 bombard (BL-1599), v90 base (BL-1601) and v91 firsts (BL-1606) sections follow, empty: 4 + 8 + 4 bytes
         const std::size_t lv0 = s0 + 4;           // first level: body, kind, f32
         const std::size_t lv1 = lv0 + 9;
         const std::size_t w0  = lv1 + 9 + 4;      // first wear: id, f32

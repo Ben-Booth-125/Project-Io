@@ -298,6 +298,24 @@ base, the first space convoy between two bodies. The first nation to meet each e
 research grant and a history-log entry every nation reads; a first is never taken twice. Firsts are
 the space race's successes made visible (§ The point of an Era: *"we want to encourage successes"*).
 
+How each deed reads (`src/world/space_firsts.hpp`), checked at the end of every space day and after
+the quarter's space steps:
+
+| First | The deed in state |
+|---|---|
+| Satellite in orbit | A satellite in place (active or decaying), not in transit. |
+| Crew in orbit | A crewed asset in place at an orbital node, or a space unit with crew aboard at an orbital node, not in transit. |
+| Station core | A station core in place. |
+| Crew on a moon | A crewed mission in place on a moon's surface, or a space unit with crew aboard landed there. |
+| Off-world base | A base whose tile the nation holds. |
+| Space convoy | A Hauler that has delivered a trade's cargo to a market on another body. |
+
+**Ties go to the lowest nation id.** Two nations meeting one first on the same day share no
+grant; the first in the nation store's id order takes it. A day is the grain the deeds are read at,
+so "first" means first by day. **The grant is a flat research-point sum** paid into the nation's
+research pool, the same for every first and every year of the age (`economy.research.space_first_grant_rp`).
+The log entry is one public history-log entry tagged with the nation that took the first.
+
 ### Far-space technology (Ben, 2026-11-10)
 
 **Far space is researched in the next age's tree** (`tech/EARLY_SPACE_TREE.md`; `RESEARCH.md` § Quests key the next age): its

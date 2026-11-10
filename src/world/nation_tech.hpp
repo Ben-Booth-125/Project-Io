@@ -118,6 +118,12 @@ struct research_params
     /// No such value existed before this dial; 1.0 is one launch's draw
     /// (`launch_draw_per_convoy`, supply_system.cpp), the least a launch buys.
     float space_gate_min_propellant = 1.0f;
+
+    /// BL-1606 (ERAS.md § Firsts): the one-time research grant, in RP, the first
+    /// nation to do each space deed earns (space_firsts.hpp). ERAS.md fixes no
+    /// size; 400 RP is two cost units at the age's opening price, a bit over three
+    /// quarters of the base accrual (economy.research.space_first_grant_rp).
+    float space_first_grant_rp = 400.0f;
 };
 
 /// The price index (ppm: 1'000'000 = the age's opening price) after
