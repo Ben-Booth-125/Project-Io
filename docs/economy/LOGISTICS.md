@@ -232,7 +232,9 @@ neighbour, and the two agreeing is an invariant, asserted rather than assumed.
 
 **Only a side a walk can cross may carry a road.** The cost walks are 4-cardinal, so of a tile's six
 sides exactly four are reachable, and which four depends on the row's parity — an even row reaches
-E, NE, W, SE; an odd row reaches E, NW, W, SW. A road laid on one of the other two could be bought,
+E, NE, W, SE; an odd row reaches E, NW, W, SW. (A unit's march is the one walk that steps all six
+sides — Ben, 2026-11-10, MILITARY.md § Terrain and the classes — and it reads no road on the other
+two, since none can lie there.) A road laid on one of the other two could be bought,
 counted, billed and still be crossed by nothing and drawn by nothing, which is not a road but a
 receipt. **So laying one is refused**, and nothing that picks a side for the player or for
 generation may offer one. The six-side field is kept because it is the river pass's geometry and the

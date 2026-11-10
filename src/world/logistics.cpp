@@ -875,12 +875,17 @@ logistics_path intra_body_path_priced(world& w, entity_id body, entity_id src_ti
         if (cit == w.tiles.end())
             continue;
         const int col = idx % gw, row = idx / gw;
-        for (int i = 0; i < 4; ++i)
+        // Every hex side (Ben, 2026-11-10): the offsets that name a side for this row's
+        // parity - six of the eight around it - in a fixed order.
+        for (int k = 0; k < 9; ++k)
         {
-            const int nr = row + k_flood_off_dr[i];
+            const int dc = k % 3 - 1, dr = k / 3 - 1;
+            if ((dc == 0 && dr == 0) || hex_side_for_offset(dc, dr, (row & 1) != 0) < 0)
+                continue;
+            const int nr = row + dr;
             if (nr < 0 || nr >= gh)
                 continue;
-            const int nc = ((col + k_flood_off_dc[i]) % gw + gw) % gw;
+            const int nc = ((col + dc) % gw + gw) % gw;
             const int nidx = raster_idx(nc, nr, gw);
             if (settled[static_cast<std::size_t>(nidx)])
                 continue;

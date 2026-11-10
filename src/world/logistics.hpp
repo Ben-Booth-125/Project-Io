@@ -188,7 +188,8 @@ using hop_price_fn = std::function<float(entity_id from, const tile_component& f
 
 /// `intra_body_path_avoiding` with the hop priced by @p price rather than the network's
 /// edge (Ben, 2026-11-10: a march takes the route ITS OWN days make fastest - MILITARY.md
-/// § Terrain and the classes). The same 4-cardinal edges, the same @p blocked and @p wall
+/// § Terrain and the classes). ALL SIX hex sides (Ben, 2026-11-10: a march steps across any
+/// side of its hex; the network's walks keep their four), the same @p blocked and @p wall
 /// rules (neither tested on @p src_tile; @p blocked never on @p dst_tile), searched FORWARD
 /// from @p src_tile and stopped once @p dst_tile settles, so @p price is asked in travel
 /// order. Uncached, by value, `tiles` in the canonical lo -> hi order. Deterministic: ties

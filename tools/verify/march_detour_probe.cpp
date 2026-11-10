@@ -151,7 +151,7 @@ int main(int argc, char** argv)
                 for (int dx = -1; dx <= 1; ++dx)
                 {
                     if (dx == 0 && dy == 0) continue;
-                    if (!hex6 && dx != 0 && dy != 0) continue; // the route's own 4 offsets
+                    if (!hex6 && dx != 0 && dy != 0) continue; // the network's 4 offsets
                     const int x = ((t.grid_x + dx) % gw + gw) % gw;
                     const auto it = at.find({ t.body, x, t.grid_y + dy });
                     if (it != at.end() && road_side_between(w, cur, it->second) >= 0)

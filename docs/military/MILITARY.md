@@ -835,7 +835,9 @@ is any road edge on the tile. **The march's own days steer its route (Ben, 2026-
 path is solved, around the walls and the other nations' stacks, over the hop a march pays - the
 network's terrain-and-road price times the class's move row on the tile entered and the air
 superiority slow - so a unit is never sent the long way down a road through ground its class
-crosses slowly. A convoy's route stays the network's own. A pre-modern row, which declares
+crosses slowly. **A march steps across all six sides of its hex (Ben, 2026-11-10)**, so a unit
+heading on a diagonal goes straight rather than zigzagging over the network's four. A road still
+helps only on the sides it can lie on. A convoy's route stays the network's own. A pre-modern row, which declares
 no land class, reads none of these rows.
 
 ---
