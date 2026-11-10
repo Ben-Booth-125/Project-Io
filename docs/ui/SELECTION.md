@@ -235,6 +235,12 @@ a tile keep the shared header (§ Layout & chrome).
    no **Manage Buildings** button: the building grid *is* the tile's buildings. **While a
    building is expanded, the grid retargets to that building's actions** (§ The building
    element's layout).
+   **Every cell carries a hover tooltip, enabled or not** (Ben, 2026-11-09): an enabled one
+   says what it does; a disabled one says why it is disabled. A disabled **Construct** names
+   the placement rules' own refusal (`placement_reason_text`) — the tile's shared gate where
+   one refused (not your nation's ground, a site already under way, no road reaches it, the
+   province full, out of logistics reach), since that bars every type at once; else the
+   first type's refusal. The same holds on the building and unit grids.
 
 **What retired, and why** (Ben, 2026-10-13):
 
@@ -566,10 +572,19 @@ selection holds. What the player may see of another nation's convoy follows the 
 (`DISCOVERY.md`).
 
 **The marker's scale and count (Ben, 2026-11-09).** A convoy marker is a zoomed size: it grows with
-the map, at a quarter of the hex radius, with a floor so it stays legible zoomed out. Where several
-convoys share a tile the count sits **in a rectangle beside the circle**, sized from its own number
-and scaling with the marker, rather than floating behind it. The press answers on the whole of what
-is drawn, circle and rectangle alike.
+the map, at a quarter of the hex radius, with a floor so it stays legible zoomed out. **One
+rectangle holds the convoy glyph and the count of convoys on the tile** (Ben, 2026-11-09: *"make
+them larger so they cover the convoy icon as well"*), a lone convoy's reading **1** (Ben,
+2026-11-10: *"render lone convoys the same as stacks"*), sized from the glyph and its own number
+and scaling with the marker. The press answers on the whole rectangle.
+
+**The marker never jumps (Ben, 2026-11-10: *"the box tracks the furthest back convoy in that tile,
+so when a convoy merges or splits the box jumps"*).** A shared marker is drawn at one ANCHOR
+convoy: the selected one; else the one it was drawn at while that one stays on the tile; else the
+player's own before a rival's, so a shared marker wears the player's colour; then the most advanced
+along its lane, the lowest id on a tie. When the anchor changes, or a convoy joins
+or leaves, the marker slides to its new point over a few frames rather than snapping, and a
+convoy leaving a shared marker sets out from where the marker was drawn.
 
 ### The front element
 

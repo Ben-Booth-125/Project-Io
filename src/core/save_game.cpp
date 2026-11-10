@@ -7,6 +7,7 @@
 #include "world/world_save.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <array>
 #include <fstream>
 #include <utility>
@@ -872,6 +873,326 @@ bool r_rank_snapshot(std::istream& i, std::unordered_map<entity_id, int>& snap)
 }
 
 // ---------------------------------------------------------------------------
+// The last economy report (part 5; save_game_version 27)
+// ---------------------------------------------------------------------------
+// Only the read slice save_game.hpp names. Every float is written as it stands;
+// every enum byte is range-checked on the way back, the same rule as above.
+
+constexpr auto max_building_type = static_cast<building_type>(building_type_count - 1);
+
+// HOSTILE-INPUT GUARDS for this tail (cold review of d4d7653b). The shared r_vec
+// trusts any count up to bio::max_count (2^26) and resizes before reading, so a
+// crafted v27 count could ask for ~32 GB and throw bad_alloc out of the load
+// instead of refusing it. Every vector here is read through r_vec_capped, which
+// refuses a count whose MINIMUM on-disk size exceeds the bytes left in the
+// stream (or a caller cap) BEFORE allocating. Floats must be finite. A breach is
+// a refused load; the reader fills a scratch envelope, so nothing is mutated.
+
+/// Bytes left in @p i from the current position; 0 if the stream cannot seek.
+std::uint64_t bytes_remaining(std::istream& i)
+{
+    const auto here = i.tellg();
+    if (here < 0)
+        return 0;
+    i.seekg(0, std::ios::end);
+    const auto end = i.tellg();
+    i.seekg(here);
+    return (end < here || !i) ? 0 : static_cast<std::uint64_t>(end - here);
+}
+
+bool r_f32f(std::istream& i, float& v)
+{
+    return r_f32(i, v) && std::isfinite(v);
+}
+
+template <std::size_t N>
+bool r_f32f_array(std::istream& i, std::array<float, N>& a)
+{
+    if (!r_f32_array(i, a))
+        return false;
+    for (const float v : a)
+        if (!std::isfinite(v))
+            return false;
+    return true;
+}
+
+/// r_vec with the count checked against what the stream can still hold: each
+/// element is at least @p min_bytes on disk, and at most @p cap of them.
+template <class T, class F>
+bool r_vec_capped(std::istream& i, std::vector<T>& v, F read_one, std::uint64_t min_bytes,
+                  std::uint64_t cap = bio::max_count)
+{
+    uint32_t n = 0;
+    if (!r_count(i, n) || n > cap || static_cast<std::uint64_t>(n) * min_bytes > bytes_remaining(i))
+        return false;
+    v.clear();
+    v.resize(n);
+    for (uint32_t k = 0; k < n; ++k)
+        if (!read_one(i, v[k]))
+            return false;
+    return true;
+}
+
+// Minimum on-disk record sizes (bytes), from the writers below.
+constexpr std::uint64_t k_min_building_report = 3 * 4 + 2 + 2 + 3 + 2 * 4 + 1 + 1 + 4 + 2 * 4 * resource_count;
+constexpr std::uint64_t k_min_lp_nation_row   = 4 + 3 * 4 + 5 * 4 * lp_network_count + 1 + 4;
+constexpr std::uint64_t k_min_lp_source_row   = 3 * 4 + 1 + 4 + 1;
+constexpr std::uint64_t k_min_lp_building_row = 3 * 4 + 1 + 4 * 4;
+constexpr std::uint64_t k_min_lp_supply_row   = 3 * 4 + 3 * 4 + 4 + 3 * 4;
+constexpr std::uint64_t k_min_corp_standing   = 4 + 1 + 4 + 4 + 4 + 1;
+constexpr std::uint64_t k_min_id              = 4;
+constexpr auto max_lp_class      = static_cast<lp_class>(lp_class_count - 1);
+constexpr auto max_lp_network    = static_cast<lp_network>(lp_network_count - 1);
+
+template <std::size_t N>
+void w_int_array(std::ostream& o, const std::array<int, N>& a)
+{
+    for (const int v : a)
+        w_int(o, v);
+}
+
+template <std::size_t N>
+bool r_int_array(std::istream& i, std::array<int, N>& a)
+{
+    for (int& v : a)
+        if (!r_int(i, v))
+            return false;
+    return true;
+}
+
+void w_building_report(std::ostream& o, const building_report& b)
+{
+    w_id(o, b.building);
+    w_id(o, b.corp);
+    w_id(o, b.body);
+    w_enum(o, b.type);
+    w_enum(o, b.target_resource);
+    w_u16(o, b.recipe);
+    w_bool(o, b.active);
+    w_bool(o, b.idle);
+    w_bool(o, b.exhausted);
+    w_f32(o, b.output_quantity);
+    w_f32(o, b.effective_workforce);
+    w_bool(o, b.has_limiting);
+    w_enum(o, b.limiting_input);
+    w_f32(o, b.run);
+    w_f32_array(o, b.wanted);     // BL-1543: quote_site nets the running plant's row
+    w_f32_array(o, b.suppressed);
+}
+
+bool r_building_report(std::istream& i, building_report& b)
+{
+    return r_id(i, b.building) && r_id(i, b.corp) && r_id(i, b.body)
+        && r_enum(i, b.type, max_building_type) && r_enum(i, b.target_resource, max_resource)
+        && r_u16(i, b.recipe) && r_bool(i, b.active) && r_bool(i, b.idle)
+        && r_bool(i, b.exhausted) && r_f32f(i, b.output_quantity)
+        && r_f32f(i, b.effective_workforce) && r_bool(i, b.has_limiting)
+        && r_enum(i, b.limiting_input, max_resource) && r_f32f(i, b.run)
+        && r_f32f_array(i, b.wanted) && r_f32f_array(i, b.suppressed);
+}
+
+void w_corp_budget(std::ostream& o, const corp_budget& b)
+{
+    w_f32(o, b.income);
+    w_f32(o, b.expenditure);
+    w_f32(o, b.maintenance);
+    w_f32(o, b.wages);
+    w_f32(o, b.interest);
+    w_f32(o, b.levies);
+    w_f32(o, b.upkeep);
+    w_int(o, b.force_units);
+    w_int(o, b.force_unsupplied);
+    w_f32(o, b.subsidies);
+    w_f32(o, b.taxes);
+}
+
+bool r_corp_budget(std::istream& i, corp_budget& b)
+{
+    return r_f32f(i, b.income) && r_f32f(i, b.expenditure) && r_f32f(i, b.maintenance)
+        && r_f32f(i, b.wages) && r_f32f(i, b.interest) && r_f32f(i, b.levies)
+        && r_f32f(i, b.upkeep) && r_int(i, b.force_units) && r_int(i, b.force_unsupplied)
+        && r_f32f(i, b.subsidies) && r_f32f(i, b.taxes);
+}
+
+void w_id_pair(std::ostream& o, const std::pair<entity_id, entity_id>& k)
+{
+    w_id(o, k.first);
+    w_id(o, k.second);
+}
+
+bool r_id_pair(std::istream& i, std::pair<entity_id, entity_id>& k)
+{
+    return r_id(i, k.first) && r_id(i, k.second);
+}
+
+void w_f32v(std::ostream& o, const float& v) { w_f32(o, v); }
+bool r_f32v(std::istream& i, float& v) { return r_f32f(i, v); }
+void w_idv(std::ostream& o, const entity_id& v) { w_id(o, v); }
+bool r_idv(std::istream& i, entity_id& v) { return r_id(i, v); }
+
+void w_lp_nation_row(std::ostream& o, const lp_nation_row& r)
+{
+    w_id(o, r.nation);
+    w_f32(o, r.pool);
+    w_f32(o, r.supply_claim);
+    w_f32(o, r.supply_granted);
+    w_f32_array(o, r.made);
+    w_int_array(o, r.sources);
+    w_f32_array(o, r.claim);
+    w_f32_array(o, r.granted);
+    w_bool(o, r.rule_set);
+    w_f32_array(o, r.left);
+    w_f32(o, r.trade_drawn);
+}
+
+bool r_lp_nation_row(std::istream& i, lp_nation_row& r)
+{
+    return r_id(i, r.nation) && r_f32f(i, r.pool) && r_f32f(i, r.supply_claim)
+        && r_f32f(i, r.supply_granted) && r_f32f_array(i, r.made) && r_int_array(i, r.sources)
+        && r_f32f_array(i, r.claim) && r_f32f_array(i, r.granted) && r_bool(i, r.rule_set)
+        && r_f32f_array(i, r.left) && r_f32f(i, r.trade_drawn);
+}
+
+void w_lp_source_row(std::ostream& o, const lp_source_row& r)
+{
+    w_id(o, r.building);
+    w_id(o, r.tile);
+    w_id(o, r.nation);
+    w_enum(o, r.network);
+    w_f32(o, r.made);
+    w_bool(o, r.connected);
+}
+
+bool r_lp_source_row(std::istream& i, lp_source_row& r)
+{
+    return r_id(i, r.building) && r_id(i, r.tile) && r_id(i, r.nation)
+        && r_enum(i, r.network, max_lp_network) && r_f32f(i, r.made) && r_bool(i, r.connected);
+}
+
+void w_lp_building_row(std::ostream& o, const lp_building_row& r)
+{
+    w_id(o, r.building);
+    w_id(o, r.owner);
+    w_id(o, r.nation);
+    w_enum(o, r.cls);
+    w_f32(o, r.need);
+    w_f32(o, r.coverage);
+    w_f32(o, r.granted);
+    w_f32(o, r.fraction);
+}
+
+bool r_lp_building_row(std::istream& i, lp_building_row& r)
+{
+    return r_id(i, r.building) && r_id(i, r.owner) && r_id(i, r.nation)
+        && r_enum(i, r.cls, max_lp_class) && r_f32f(i, r.need) && r_f32f(i, r.coverage)
+        && r_f32f(i, r.granted) && r_f32f(i, r.fraction);
+}
+
+void w_lp_supply_row(std::ostream& o, const lp_supply_row& r)
+{
+    w_id(o, r.unit);
+    w_id(o, r.nation);
+    w_id(o, r.tile);
+    w_f32(o, r.need);
+    w_f32(o, r.cover);
+    w_f32(o, r.granted);
+    w_id(o, r.paid_tile);
+    w_int(o, r.draw_steps);
+    w_int(o, r.share_permille);
+    w_int(o, r.recruits_delivered);
+}
+
+bool r_lp_supply_row(std::istream& i, lp_supply_row& r)
+{
+    return r_id(i, r.unit) && r_id(i, r.nation) && r_id(i, r.tile) && r_f32f(i, r.need)
+        && r_f32f(i, r.cover) && r_f32f(i, r.granted) && r_id(i, r.paid_tile)
+        && r_int(i, r.draw_steps) && r_int(i, r.share_permille)
+        && r_int(i, r.recruits_delivered);
+}
+
+void w_lp_anchor(std::ostream& o, const lp_trade_anchor& a)
+{
+    w_id(o, a.nation);
+    w_f32(o, a.cover);
+}
+
+bool r_lp_anchor(std::istream& i, lp_trade_anchor& a)
+{
+    return r_id(i, a.nation) && r_f32f(i, a.cover);
+}
+
+void w_lp_tick(std::ostream& o, const lp_tick& t)
+{
+    w_vec(o, t.nations, w_lp_nation_row);
+    w_vec(o, t.sources, w_lp_source_row);
+    w_vec(o, t.buildings, w_lp_building_row);
+    w_vec(o, t.supplies, w_lp_supply_row);
+    w_map(o, t.trade_anchors, w_idv, w_lp_anchor);
+    w_bool(o, t.resolved);
+    // `fraction` and `supply_share` are indices over the rows: rebuilt on read.
+}
+
+bool r_lp_tick(std::istream& i, lp_tick& t)
+{
+    return r_vec_capped(i, t.nations, r_lp_nation_row, k_min_lp_nation_row)
+        && r_vec_capped(i, t.sources, r_lp_source_row, k_min_lp_source_row)
+        && r_vec_capped(i, t.buildings, r_lp_building_row, k_min_lp_building_row)
+        && r_vec_capped(i, t.supplies, r_lp_supply_row, k_min_lp_supply_row)
+        && r_map(i, t.trade_anchors, r_idv, r_lp_anchor) && r_bool(i, t.resolved);
+}
+
+void w_corp_standing(std::ostream& o, const corp_standing& s)
+{
+    w_id(o, s.corp);
+    w_bool(o, s.is_player);
+    w_int(o, s.reach_bodies);
+    w_f32(o, s.capital_balance);
+    w_f32(o, s.market_share);
+    w_bool(o, s.capital_disclosed);
+}
+
+bool r_corp_standing(std::istream& i, corp_standing& s)
+{
+    return r_id(i, s.corp) && r_bool(i, s.is_player) && r_int(i, s.reach_bodies)
+        && r_f32f(i, s.capital_balance) && r_f32f(i, s.market_share)
+        && r_bool(i, s.capital_disclosed);
+}
+
+void w_last_report(std::ostream& o, const save_envelope& e)
+{
+    const economy_report& r = e.last_econ_report;
+    w_vec(o, r.buildings, w_building_report);
+    w_map(o, r.budgets, w_idv, w_corp_budget);
+    w_map(o, r.workforce_contention, w_id_pair, w_f32v);
+    w_map(o, r.building_labour, w_idv, w_f32v);
+    w_ids(o, std::vector<entity_id>(r.upkeep_unmet.begin(), r.upkeep_unmet.end())); // sorted
+    w_lp_tick(o, r.logistic_points);
+    w_vec(o, e.last_corp_standings, w_corp_standing);
+}
+
+/// @p entity_cap: the loaded world's `next_entity_id()`. Every report row is a
+/// distinct building id the world issued, so a row count past it is corrupt. Not
+/// the world's CURRENT building count: the insolvency wind-up runs last in the
+/// tick and can erase buildings the production pass already reported.
+bool r_last_report(std::istream& i, save_envelope& e, std::uint64_t entity_cap)
+{
+    economy_report& r = e.last_econ_report;
+    std::vector<entity_id> unmet;
+    if (!(r_vec_capped(i, r.buildings, r_building_report, k_min_building_report, entity_cap)
+          && r_map(i, r.budgets, r_idv, r_corp_budget)
+          && r_map(i, r.workforce_contention, r_id_pair, r_f32v)
+          && r_map(i, r.building_labour, r_idv, r_f32v)
+          && r_vec_capped(i, unmet, r_idv, k_min_id, entity_cap)
+          && r_lp_tick(i, r.logistic_points)
+          && r_vec_capped(i, e.last_corp_standings, r_corp_standing, k_min_corp_standing,
+                          entity_cap)))
+        return false;
+    r.upkeep_unmet = std::set<entity_id>(unmet.begin(), unmet.end());
+    rebuild_report_indices(r);
+    return true;
+}
+
+// ---------------------------------------------------------------------------
 // The envelope
 // ---------------------------------------------------------------------------
 
@@ -929,12 +1250,17 @@ void w_envelope(std::ostream& o, const save_envelope& e, uint32_t version = save
         w_int(o, e.params.nation_total_target);
         w_int(o, e.params.major_target);
     }
+    // save_game_version 27 (SAVE_BUILDING_REPORT): the last report, after the
+    // targets, so v25 is a strict prefix. Keep r_envelope in step.
+    if (version >= save_game_version_econ_report)
+        w_last_report(o, e);
 }
 
 /// Every envelope field a v22 stream carries, in order (defined below).
 bool r_envelope_v22(std::istream& i, save_envelope& e);
 
-bool r_envelope(std::istream& i, save_envelope& e, uint32_t version)
+bool r_envelope(std::istream& i, save_envelope& e, uint32_t version,
+                std::uint64_t entity_cap = bio::max_count)
 {
     // BL-1422: an envelope before v24 carries EVERY resource_count-wide array - each
     // body's planetology endowment (read twice a body) and the market history's series -
@@ -951,8 +1277,14 @@ bool r_envelope(std::istream& i, save_envelope& e, uint32_t version)
     }
     // save_game_version 23 (BL-1278) -- keep w_envelope in step. An illegal
     // pair is corrupt, refused whole rather than clamped.
-    return r_int(i, e.params.nation_total_target) && r_int(i, e.params.major_target)
-        && nation_targets_valid(e.params);
+    if (!(r_int(i, e.params.nation_total_target) && r_int(i, e.params.major_target)
+          && nation_targets_valid(e.params)))
+        return false;
+    // save_game_version 27 -- keep w_envelope in step. An older stream ends here
+    // and opens with an empty report, as every load did before v27.
+    if (version < save_game_version_econ_report)
+        return true;
+    return r_last_report(i, e, entity_cap);
 }
 
 bool r_envelope_v22(std::istream& i, save_envelope& e)
@@ -974,6 +1306,23 @@ bool r_envelope_v22(std::istream& i, save_envelope& e)
 } // namespace
 
 // ---------------------------------------------------------------------------
+
+void rebuild_report_indices(economy_report& r)
+{
+    // As run_economy_step fills it (economy_system.cpp, BL-360).
+    r.building_row.clear();
+    r.building_row.reserve(r.buildings.size());
+    for (std::size_t k = 0; k < r.buildings.size(); ++k)
+        r.building_row.emplace(r.buildings[k].building, k);
+    // As resolve_logistic_points fills them (logistic_points.cpp).
+    lp_tick& t = r.logistic_points;
+    t.fraction.clear();
+    for (const lp_building_row& row : t.buildings)
+        t.fraction[row.building] = row.fraction;
+    t.supply_share.clear();
+    for (const lp_supply_row& sr : t.supplies)
+        t.supply_share[sr.unit] = sr.share_permille;
+}
 
 bool write_save_game(const std::string& path, const world& w, const save_envelope& env)
 {
@@ -1001,7 +1350,8 @@ bool write_save_game_at(const std::string& path, const world& w, const save_enve
     // the matching shape - for v23/v22, a v73 world snapshot (every per-resource array 49
     // wide) and an envelope whose endowments and market history are 49 wide (and, for
     // v22, no nation targets). The game writes only `write_save_game`.
-    if (version != save_game_version && version != save_game_version_pre_airframes
+    if (version != save_game_version && version != save_game_version_pre_econ_report
+        && version != save_game_version_pre_airframes
         && version != save_game_version_pre_kit_goods
         && version != save_game_version_prefix_compatible)
         return false;
@@ -1035,10 +1385,11 @@ bool read_save_game(const std::string& path, world& w, save_envelope& env,
 
     uint32_t version = 0;
     if (!r_u32(in, version)
-        || (version != save_game_version && version != save_game_version_pre_airframes
+        || (version != save_game_version && version != save_game_version_pre_econ_report
+            && version != save_game_version_pre_airframes
             && version != save_game_version_pre_kit_goods
             && version != save_game_version_prefix_compatible))
-        return false; // LAYOUT 25: v24 reads 54 wide (BL-1436); v23 and v22 49 wide (BL-1422)
+        return false; // LAYOUT 27: v25 has no report tail; v24 reads 54 wide (BL-1436); v23 and v22 49 wide (BL-1422)
 
     // Both halves build into scratch. `read_world_snapshot` already guarantees
     // this for the world; doing the same for the envelope is what lets a caller
@@ -1048,7 +1399,7 @@ bool read_save_game(const std::string& path, world& w, save_envelope& env,
 
     if (!read_world_snapshot(scratch_world, in, mil, base_price))
         return false;
-    if (!r_envelope(in, scratch_env, version))
+    if (!r_envelope(in, scratch_env, version, scratch_world.next_entity_id()))
         return false;
 
     w   = std::move(scratch_world);

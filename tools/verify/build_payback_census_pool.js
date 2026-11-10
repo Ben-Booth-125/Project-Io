@@ -75,8 +75,11 @@ if (laps.length) {
 if (actual.length) {
   const by = new Map();
   for (const a of actual) { const k = a.q + ' ' + a.name; if (!by.has(k)) by.set(k, []); by.get(k).push(a); }
-  console.log('\nq recipe | plants | idled | run | earned net/q | old quote');
-  for (const [k, v] of [...by.entries()].sort()) console.log(`${k.padEnd(36)} ${String(v.length).padStart(4)} ${String(v.filter(x => x.idled).length).padStart(4)} ${med(v.map(x => x.run)).toFixed(2).padStart(6)} ${f1(med(v.map(x => x.actual))).padStart(9)} ${f1(med(v.map(x => x.quoted))).padStart(9)}`);
+  console.log('\nq recipe | plants | idled | run | never ran | earned net/q | old quote | lever quote | lever starved (of them ran)');
+  for (const [k, v] of [...by.entries()].sort()) {
+    const ls = v.filter(x => x.lstarved);
+    console.log(`${k.padEnd(36)} ${String(v.length).padStart(4)} ${String(v.filter(x => x.idled).length).padStart(4)} ${med(v.map(x => x.run)).toFixed(2).padStart(6)} ${String(v.filter(x => !(x.run > 0)).length).padStart(4)} ${f1(med(v.map(x => x.actual))).padStart(9)} ${f1(med(v.map(x => x.quoted))).padStart(9)} ${f1(med(v.map(x => x.lever))).padStart(9)} ${String(ls.length).padStart(4)} (${ls.filter(x => x.run > 0).length})`);
+  }
 }
 
 // The new quote's spread: does the site matter for a processor now?
@@ -93,6 +96,10 @@ if (holdout.length) {
   const sign = (f) => holdout.filter((x) => (f(x) > 0) === (x.earned > 0)).length / holdout.length;
   console.log(`\nHOLDOUT ${holdout.length} buildings. median |quote - earned|: old ${f1(abs((x) => x.old))}  new ${f1(abs((x) => x.new))}`);
   console.log(`  right about whether it pays: old ${f0(100 * sign((x) => x.old))}%  new ${f0(100 * sign((x) => x.new))}%`);
+  // Processors only: an extraction row's run is not reported, so it never "ran".
+  const proc = holdout.filter((x) => x.kind === 1);
+  const idle = proc.filter((x) => x.starved);
+  console.log(`  processors ${proc.length}: called idle by the new quote ${idle.length}, of which ran ${idle.filter((x) => x.run > 0).length}; called running ${proc.length - idle.length}, of which never ran ${proc.filter((x) => !x.starved && !(x.run > 0)).length}`);
   const by = new Map();
   for (const h of holdout) { if (!by.has(h.name)) by.set(h.name, []); by.get(h.name).push(h); }
   console.log('name | n | run | earned | old quote | new quote | share | starved');

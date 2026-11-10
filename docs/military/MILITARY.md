@@ -468,6 +468,17 @@ the land class the unit fights as (`../ui/ICONS.md` § Entity markers).
 centre, at the pace the march is actually banking, and its press follows what is drawn. This is
 presentation: the march still resolves tile by tile.
 
+**Its drawn point never jumps (Ben, 2026-11-09: "jitter ... when stacking / unstacking").** The
+day's fraction a glide adds is read off the same day ticks the march banks on, never a separate
+wall clock, so the counter does not step forward at a tick and back at the day's wrap. Where its
+own side still stands on the tile it left, the counter opens ahead of that stack; the opening
+eases in and out over a few frames as the stack behind appears or empties, rather than stepping.
+A unit fast enough to cross several tiles in a day is drawn walking each of them, along its
+path, at each hop's own price (Ben, 2026-11-10). On the day an order lands, the glide spreads the
+day's whole walk over what is left of that day, so the counter sets out from where it stands
+rather than opening partway along its hop. Any other correction (a re-routed order, a hop priced
+anew) slides over a few frames. Convoy markers obey the same rule (`../ui/SELECTION.md` § The convoy element).
+
 ### Fortifications
 
 A **bunker** is a building. Units on its tile gain defence, and the tile's defenders gain hardness

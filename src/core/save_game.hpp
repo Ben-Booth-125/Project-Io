@@ -3,7 +3,9 @@
 #include "core/save_names.hpp"
 #include "ui/plot_history.hpp"
 #include "ui/ui_state.hpp"
+#include "world/economy_system.hpp"   // economy_report (part 5)
 #include "world/hard_coded_world.hpp" // world_params, generation_report
+#include "world/standing.hpp"         // corp_standing (part 5)
 #include "world/world.hpp"
 
 #include <cstdint>
@@ -40,10 +42,30 @@ struct military_capability_params; // world/recipe_registry.hpp (BL-1455)
 //      lens with no plates -- precisely the surfaces a design pass wants to
 //      capture, which is what motivated this item.
 //   4. The app-owned per-tick HISTORIES and a narrow `ui_state` slice.
+//   5. THE LAST ECONOMY REPORT'S READ SLICE and the corp standings (Ben,
+//      2026-11-09: "Everything recalculates after the first tick. It would be
+//      good to load building profit info into the save"; save_game_version 27).
+//      Before it a load opened with every building profit figure, the site
+//      finder, the Selection element's profit bar and the ledgers empty until
+//      the first econ tick. Saved: the fields a surface reads between a load
+//      and that tick -- `buildings` (every `building_report` field, the BL-1543
+//      wanted/suppressed arrays included), `budgets`, `workforce_contention`,
+//      `building_labour`, `upkeep_unmet` and `logistic_points` (its rows and
+//      trade anchors; `fraction` and `supply_share` are rebuilt from the rows)
+//      -- and `m_last_corp_standings` whole. `building_row` is REBUILT on load
+//      from `buildings`, never stored: an index is derived data.
+//      NO WORLD LOGIC reads it across a tick: `run_settle_tick` builds its own
+//      report, so the save carries it for the surfaces, and the world snapshot
+//      stays the sim's whole state. Everything else on `economy_report` is a
+//      within-tick register (wants, purchases, processor/hauler wants, shelf
+//      rations, claims, the national budget pass, the scorers' traces) or an
+//      event log already voiced when its tick ran (agency events, battle
+//      dispatches, earmarks, firm exits, research, taxes, space and network
+//      purchases, recruitment/refit/air tallies): no surface reads one between
+//      a load and the next tick, so each opens empty, as before.
 //
 // WHAT IS DELIBERATELY LEFT OUT, and why each is not an oversight:
-//   - `m_last_econ_report` / `m_last_corp_standings` -- recomputed on the next
-//      econ tick, and already documented on `app` as transient runtime caches.
+//   - The rest of `m_last_econ_report` -- see part 5 for which and why.
 //   - The BL-198 resource-deposit series, whose own comment in app.hpp says
 //     "app-owned, capped, UNSERIALISED... survives the session only". Honouring
 //     that beats quietly overturning it in a different item.
@@ -346,7 +368,21 @@ inline constexpr uint32_t save_game_magic =
 /// so every resource_count-wide envelope array is one element longer. v24 stays readable
 /// with every such array read 54 wide (`k_resource_count_pre_airframes`), airframes empty;
 /// v23 and v22 still 49 wide.
-inline constexpr uint32_t save_game_version = 25; // BL-1436: the market history 55 series wide
+/// LAYOUT 27 (SAVE_BUILDING_REPORT, Ben 2026-11-09) = LAYOUT 25 PLUS ONE RECORD AT THE
+/// ENVELOPE'S TAIL, after the nation targets. 27 and not 26 because an unmerged branch
+/// (claude/naval-warfare-system-b0d978, BL-1527 ship kit) already carries a v26 layout
+/// of its own (the v6 note above: two layouts never share a number); whoever merges
+/// second stacks the two. The tail: the last economy report's read slice and
+/// the corp standings (part 5 above), written by `w_last_report` / read by
+/// `r_last_report`. At the tail so v25 is a strict prefix: a v25 (or older accepted)
+/// stream ends before it and opens with an empty report, exactly as every load did
+/// before v27. The rebuilt indices (`building_row`, `logistic_points.fraction` and
+/// `.supply_share`) are never on disk.
+inline constexpr uint32_t save_game_version = 27; // SAVE_BUILDING_REPORT: the last report at the tail
+/// The first layout carrying the last economy report (part 5).
+inline constexpr uint32_t save_game_version_econ_report = 27;
+/// v25: the v27 layout without the last-report tail.
+inline constexpr uint32_t save_game_version_pre_econ_report = 25;
 /// BL-1436: the first layout whose market history is 55 series wide.
 inline constexpr uint32_t save_game_version_airframes = 25;
 /// BL-1436: v24, the v25 layout with the market history 54 series wide.
@@ -409,7 +445,23 @@ struct save_envelope
     float solar_zoom      = 1.0f, solar_pan_x = 0.0f, solar_pan_y = 0.0f;
     float circum_zoom     = 1.0f, circum_pan_x = 0.0f, circum_pan_y = 0.0f;
     float planetary_zoom  = 4.0f / 3.0f, planetary_pan_x = 0.0f, planetary_pan_y = 0.0f;
+
+    // --- the last economy report (part 5; save_game_version 27) ------------
+    /// The read slice of `app::m_last_econ_report`: `buildings`, `budgets`,
+    /// `workforce_contention`, `building_labour`, `upkeep_unmet`,
+    /// `logistic_points`. Every other member is written by nobody and reads back
+    /// empty; `building_row` and the lp lookups are rebuilt by the reader. Empty on
+    /// a v25-or-older stream.
+    economy_report             last_econ_report;
+    /// `app::m_last_corp_standings`, whole. Empty on a v25-or-older stream.
+    std::vector<corp_standing> last_corp_standings;
 };
+
+/// Rebuild the derived indices of a report whose rows were restored from a save:
+/// `building_row` from `buildings`, and `logistic_points.fraction` / `.supply_share`
+/// from the lp rows -- the same maps run_economy_step and resolve_logistic_points
+/// fill. Exposed so a harness can prove a rebuilt index equals a live one.
+void rebuild_report_indices(economy_report& r);
 
 /// Write @p w and @p env to @p path as a complete save game.
 ///
@@ -426,7 +478,8 @@ bool write_save_game(const std::string& path, const world& w, const save_envelop
 /// (`save_game_version_pre_kit_goods` or `save_game_version_prefix_compatible`): the
 /// world as a v73 snapshot and every resource_count-wide envelope array 49 wide, so the
 /// narrowed reader has a genuine producer. BL-1436: `save_game_version_pre_airframes`
-/// writes a v75 world and 54-wide arrays. False for any other version.
+/// writes a v75 world and 54-wide arrays. `save_game_version_pre_econ_report` (v25)
+/// writes today's world and arrays with no last-report tail. False for any other version.
 bool write_save_game_at(const std::string& path, const world& w, const save_envelope& env,
                         uint32_t version);
 

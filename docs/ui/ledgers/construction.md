@@ -83,6 +83,20 @@ wraps inside its cell, and the cell is as tall as the tallest name needs), the *
 table's gates and `quote_for_tile` at each tile's own Logistic Point cover, so a cell's count is its
 table's row count and its figure is that table's top Net.
 
+**The lower line is halved, and its right half builds (Ben, 2026-11-10: *"truncate the lower
+portions (credits and site number) to half the width, add Cr prefix to the credits, and use the
+other half for a construct button. This will automatically pick the most profitable (or highest
+spare logistic points on ties), and start construction there."*).** The left half carries the best
+Net as **"Cr <figure>"** and the site count; the right half is a **Construct** press. It builds the
+cell's building at its **best site**: the listed tile with the highest Net in whole credits (a priced
+site before an unpriced one), ties to the highest Logistic Point cover, then the lowest tile id - one
+answer, whatever the order the tiles were priced in. It goes through the map press's own path (the
+pending construction `construct_nation` runs, with its own treasury test), so it can never build
+where the map press would not. Under the province scope it builds inside that province. It is
+disabled while the cell is still being priced, and where no listed tile takes it; its hover then says
+why (the treasury, or the commonest refusal), and when live names the tile it will build on. It is a
+door, not a toggle: nothing about it stays lit.
+
 **A building that makes nothing to sell has no figure.** Infrastructure and military types, whose
 quote would be upkeep alone, show the count and no Net: a fake loss reads worse than no figure.
 

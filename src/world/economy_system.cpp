@@ -4786,6 +4786,49 @@ float march_hop_fraction(const world& w, const recipe_registry& reg, const unit_
     return std::clamp((u.order.progress + rate * day_fraction) / cost, 0.0f, 1.0f);
 }
 
+bool march_glide_point(const world& w, const recipe_registry& reg, const unit_component& u,
+                       float day_fraction, entity_id& from, entity_id& to, float& t)
+{
+    if (u.order.dest == null_entity || u.order.next_index >= u.order.path.size())
+        return false;
+    const float rate = march_rate_per_day(reg.military(), u.type);
+    if (rate <= 0.0f)
+        return false;
+    unit_component probe = u; // the hop price reads the unit's position: walk a copy
+    float budget = u.order.progress + rate * std::clamp(day_fraction, 0.0f, 1.0f);
+    entity_id walked_from = null_entity, walked_to = null_entity; // the last hop walked whole
+    for (std::size_t i = u.order.next_index; i < u.order.path.size(); ++i)
+    {
+        const entity_id next_id = u.order.path[i];
+        const auto cur = w.tiles.find(probe.position);
+        const auto nxt = w.tiles.find(next_id);
+        if (cur == w.tiles.end() || nxt == w.tiles.end() || nxt->second.body != cur->second.body)
+        {
+            if (walked_to == null_entity)
+                return false;
+            from = walked_from; // drawn at the end of the last hop it could walk
+            to   = walked_to;
+            t    = 1.0f;
+            return true;
+        }
+        const float cost = march_hop_cost(w, reg, probe, nxt->second, next_id, cur->second);
+        const bool last = i + 1 >= u.order.path.size();
+        if (!last && (cost <= 0.0f || budget + 1e-6f >= cost))
+        {
+            budget -= std::max(cost, 0.0f);
+            walked_from    = probe.position;
+            walked_to      = next_id;
+            probe.position = next_id;
+            continue;
+        }
+        from = probe.position;
+        to   = next_id;
+        t    = cost > 0.0f ? std::clamp(budget / cost, 0.0f, 1.0f) : 0.0f;
+        return true;
+    }
+    return false;
+}
+
 unit_march_tick run_unit_march(world& w, const recipe_registry& reg, int day_tick)
 {
     unit_march_tick out;
