@@ -3654,6 +3654,46 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         }
         return out;
     });
+    // BL-1603 (LAYOUT.md § Pinned items): the pinned panel and the pin toggle as drawn
+    // last frame - each card's kind (front or pin), what it names (a body for a front
+    // pin, the enemy nation beside it) and its centre; the toggle's centre and state;
+    // and the canvas framing a double-click moves (rung, active body, planetary pan,
+    // and whether a centre-on-tile is queued). Everything on screen; no tile position.
+    v.set_function("pinned_panel", [this](sol::this_state ts) {
+        sol::state_view lua(ts);
+        sol::table out = lua.create_table();
+        const auto& d = m_ui.pinned.drawn;
+        out["panel"] = d.panel;
+        out["x"] = d.x; out["y"] = d.y; out["w"] = d.w; out["h"] = d.h;
+        out["pins"] = static_cast<int>(m_ui.pinned.pins.size());
+        int fronts = 0;
+        sol::table cards = lua.create_table();
+        int i = 0;
+        for (const auto& c : d.cards)
+        {
+            sol::table row = lua.create_table();
+            row["front"] = c.front;
+            row["id"]    = static_cast<double>(c.id);
+            row["enemy"] = static_cast<double>(c.enemy);
+            row["x"] = c.x; row["y"] = c.y; row["w"] = c.w; row["h"] = c.h;
+            cards[++i] = row;
+            fronts += c.front ? 1 : 0;
+        }
+        out["cards"]  = cards;
+        out["fronts"] = fronts;
+        out["toggle_x"]  = d.toggle_x;
+        out["toggle_y"]  = d.toggle_y;
+        out["toggle_on"] = d.toggle_on;
+        out["toggle_subject"] = static_cast<double>(d.toggle_subject);
+        out["level"]       = static_cast<int>(m_ui.primary_level);
+        out["active_body"] = static_cast<double>(m_ui.active_body);
+        out["pan_x"]       = m_ui.planetary_pan_x;
+        out["pan_y"]       = m_ui.planetary_pan_y;
+        out["center_pending"] = m_ui.planetary_center_pending;
+        out["selected"]    = static_cast<double>(m_ui.selected_entity);
+        out["front_selected"] = m_ui.has_front_selection();
+        return out;
+    });
     // BL-1515: which ledger stands open, so a check can read where a click-through led.
     v.set_function("open_ledgers", [this](sol::this_state ts) {
         sol::state_view lua(ts);

@@ -1324,6 +1324,20 @@
     "src/ui/circumplanetary_canvas.cpp"
    ],
    "status": "drafted"
+  },
+  "pinned_items": {
+   "surface": "Pinned items: the right chrome column's residual middle, between the time panel and the minimap; front pins on top, then the player's own pins as watch cards; the pin toggle at the Selection band's top-right corner",
+   "answers": "What am I keeping an eye on while I work elsewhere, and where are my wars being fought?",
+   "because": "LAYOUT.md reserved the slot (BL-216) and nothing drew in it. A watch card keeps a chosen entity's stat block in view without holding the Selection band, so the band stays free for the thing in hand; acting on a pin is one click away (select), going to it one double-click. Front pins (Ben, 2026-11-10) earn the top of the list because a war spans every body: without them a front on another body is found only by going there. They are placed and removed by the war, never by the player.",
+   "backlog_item": "BL-1603 (pinned panel, front pins)",
+   "files": [
+    "src/ui/pinned_panel.cpp",
+    "src/ui/pinned_panel.hpp",
+    "src/ui/ui_state.hpp",
+    "src/core/app.cpp",
+    "src/core/save_game.cpp"
+   ],
+   "status": "drafted"
   }
  }
 }

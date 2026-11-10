@@ -24,7 +24,7 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 > **Generated file.** Produced by `node tools/session/render_actions.js`.
 > Edit the JSON, then re-run; hand edits here are overwritten.
 
-*226 entries — 54 gameplay · 40 canvas · 15 lens · 76 ledger · 41 chrome.*
+*228 entries — 54 gameplay · 40 canvas · 15 lens · 76 ledger · 43 chrome.*
 
 ---
 
@@ -2938,6 +2938,28 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 **Expected output.** Dismiss removes that notice. Answer opens the Diplomacy ledger's answer flow (ledger.diplomacy_answer) on that war; Open Wars opens the Wars tab; both also remove the notice. The notice leaves by itself if the war ends. It issues no command, and neither pauses nor changes the simulation.
 
 **Reason to select.** To learn that a war has begun where the eye already is, and step straight to answering it.
+
+### `chrome.pin_toggle` — The pin toggle: a small pushpin square at the Selection band's top-right corner, over the band's header row, shown whenever the band shows an entity - a body, tile, building, market, unit, nation or air wing (docs/ui/LAYOUT.md § Pinned items).
+
+**Press.** Press the pin toggle. It is a toggle: pressing it while the subject is pinned unpins it.
+
+**Valid when:**
+- App is in game and the Selection band shows an entity (not the resting state, and not a province, front, battle, deposit, plate or convoy).
+
+**Expected output.** Pins the band's entity to the pinned-items panel (the right chrome column between the time panel and the minimap), at the end of the list, as a watch card: kind glyph, kind, and the shared entity_summary stat block. Pressed again, removes it. The toggle reads gold while its subject is pinned. Pins travel in the save; a pin whose entity is gone drops off. Issues no command and changes nothing in the simulation.
+
+**Reason to select.** To keep an entity's figures in view while working elsewhere, without holding the Selection band on it.
+
+### `chrome.pin_press` — A card in the pinned-items panel, the right chrome column between the time panel and the minimap: front pins first (one per body where a war the player's nation is party to has a front, placed by the war), then the player's own pins in pin order (docs/ui/LAYOUT.md § Pinned items).
+
+**Press.** Single-click a card to select; double-click it to navigate.
+
+**Valid when:**
+- App is in game and the panel shows at least one card: the player has pinned something, or the player's nation is at war with a nation that holds provinces on a body where it holds provinces too.
+
+**Expected output.** A player pin: single-click selects its entity (the Selection band shows it); double-click also frames the canvas on it (focus_on_entity; a tile or a nation's capital tile on the Planetary view, centred). A front pin: single-click selects the player's land front toward that enemy on that body (the front card), or the enemy nation where no land front exists; double-click also takes the canvas to that body's Planetary view centred on the front (else a contested province, else the enemy's province nearest the player's ground). The front pin's card shows the body, the enemy, provinces each side holds, provinces occupied either way, and the war score from the player's side. Issues no command.
+
+**Reason to select.** To return to a watched entity, or to reach a front of a war on any body, in one double-click.
 
 ### `chrome.f10_options` — Keyboard; opens the centred Options window
 

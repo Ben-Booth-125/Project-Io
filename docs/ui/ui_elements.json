@@ -2204,6 +2204,41 @@
    "checks": [
     "war_notice"
    ]
+  },
+  {
+   "id": "UI-143",
+   "name": "Pinned items panel",
+   "kind": "panel",
+   "parent": null,
+   "source": [
+    "docs/ui/LAYOUT.md § Pinned items — right column, middle",
+    "docs/military/MILITARY.md § Space",
+    "src/ui/pinned_panel.hpp",
+    "src/ui/pinned_panel.cpp",
+    "src/ui/shell_metrics.hpp"
+   ],
+   "summary": "The watch list in the right chrome column's residual middle, between the time panel and the minimap: front pins (one per body where a war of the player's has a front, placed by the war) above the player's own pins, each a watch card - kind glyph, kind and the shared entity_summary stat block. Single-click selects, double-click navigates.",
+   "interesting_question": "The panel shares its residual with the count-driven lens keys, which grow upward from the minimap into the same space - which yields when both want it?",
+   "resolution": "The lens key keeps its place: the key is bottom-anchored on the minimap so its toggle never moves (shell_metrics.hpp lens_chrome_rect), and the pinned panel stops one margin above whatever rect the key opened that frame (lens_chrome_this_frame), drawing nothing if the key took the whole residual.",
+   "checks": [
+    "pinned_panel"
+   ]
+  },
+  {
+   "id": "UI-144",
+   "name": "Pin toggle",
+   "kind": "control",
+   "parent": "UI-043",
+   "source": [
+    "docs/ui/LAYOUT.md § Pinned items — right column, middle",
+    "src/ui/pinned_panel.cpp"
+   ],
+   "summary": "A pushpin square at the Selection band's top-right corner, over the header row: pins the entity the band shows to the pinned-items panel, and unpins it when pressed again. Gold while its subject is pinned.",
+   "interesting_question": "Most band layouts own their own header (tile, building, unit, wing), so there is no single header row to put the toggle in - how does one toggle sit on all of them?",
+   "resolution": "It is its own small window at the band's top-right corner, drawn after the band (app.cpp, draw_pin_toggle), so it sits over whichever layout drew; it shows only when the band shows an entity (pin_subject), never on the resting state or a non-entity selection.",
+   "checks": [
+    "pinned_panel"
+   ]
   }
  ]
 }

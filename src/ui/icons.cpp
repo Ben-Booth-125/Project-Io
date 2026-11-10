@@ -2172,6 +2172,25 @@ void capital(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
     dl->AddPolyline(ring, 10, outline, ImDrawFlags_Closed, std::max(1.0f, r * 0.12f));
 }
 
+void pin(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
+{
+    // A pushpin leaning right: the head up and to the right, the needle's point down
+    // and to the left. The head is a filled circle; a short collar bar sits under it,
+    // square to the needle; the needle is one stroke from the collar to the point.
+    const ImVec2 dir   = { -0.7071f, 0.7071f };                  // head -> point
+    const ImVec2 perp  = { 0.7071f, 0.7071f };                   // square to the needle
+    const ImVec2 head  = { centre.x + r * 0.32f, centre.y - r * 0.32f };
+    const float  hr    = r * 0.42f;
+    const ImVec2 neck  = { head.x + dir.x * hr * 1.35f, head.y + dir.y * hr * 1.35f };
+    const ImVec2 point = { centre.x - r * 0.95f, centre.y + r * 0.95f };
+    const float  w     = std::max(1.0f, r * 0.14f);
+    dl->AddLine(neck, point, colour, w);
+    dl->AddLine({ neck.x - perp.x * hr * 0.9f, neck.y - perp.y * hr * 0.9f },
+                { neck.x + perp.x * hr * 0.9f, neck.y + perp.y * hr * 0.9f }, colour,
+                std::max(1.0f, r * 0.2f));
+    dl->AddCircleFilled(head, hr, colour, 16);
+}
+
 void corp_emblem(ImDrawList* dl, ImVec2 centre, float r, int shape, ImU32 fill)
 {
     // Simple, legible geometric primitives so the emblem reads at portrait size on

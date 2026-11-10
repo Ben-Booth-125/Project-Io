@@ -463,6 +463,7 @@ save_envelope make_envelope()
     e.active_body       = 17;
     e.selected_entity   = 23;
     e.selected_province = 91;
+    e.pins              = { 23, 17, 5 }; // BL-1603: pin order is the list's order, not ascending
 
     // Nine distinct non-dyadic-ish floats: a reader that swapped pan_x and pan_y,
     // or read a zoom into a pan, cannot pass.
@@ -826,6 +827,7 @@ int main()
                   && le.selected_entity == env.selected_entity
                   && le.selected_province == env.selected_province,
               "S5 the ui_state slice's rung, lens and selection survive");
+        check(le.pins == env.pins, "S5 the player's pins survive, in pin order (v28, BL-1603)");
         check(le.solar_zoom == env.solar_zoom && le.solar_pan_x == env.solar_pan_x
                   && le.solar_pan_y == env.solar_pan_y && le.circum_zoom == env.circum_zoom
                   && le.circum_pan_x == env.circum_pan_x && le.circum_pan_y == env.circum_pan_y
@@ -1078,7 +1080,7 @@ int main()
     // S12 -- a v25 stream (no tail) still reads whole and opens with an EMPTY
     // report, as every load did before v27.
     // -----------------------------------------------------------------------
-    static_assert(save_game_version == 27 && save_game_version_econ_report == 27
+    static_assert(save_game_version_pre_pins == 27 && save_game_version_econ_report == 27
                       && save_game_version_pre_econ_report == 25,
                   "S11/S12 pin v27 as the last-report layout over a v25 prefix");
     {
@@ -1287,6 +1289,21 @@ int main()
                   && ve.params.major_target == env.params.major_target
                   && same_market_history(ve.market_history, env.market_history),
               "S12 the rest of a v25 envelope reads whole");
+        // S14 (BL-1603, save_game_version 28): the same envelope written at v27 has no
+        // pins tail; it is ACCEPTED and opens with no pins and the report whole.
+        static_assert(save_game_version == 28 && save_game_version_pins == 28,
+                      "S14 pins v28 as the pins layout over a v27 prefix");
+        check(write_save_game_at(k_path, w, env, save_game_version_pre_pins),
+              "S14 the verification writer wrote a v27 file");
+        {
+            world         pw;
+            save_envelope pe;
+            pe.pins = { 99 }; // must be replaced
+            const bool pok = read_save_game(k_path, pw, pe);
+            check(pok && pe.pins.empty(), "S14 a v27 stream (no pins tail) is ACCEPTED and opens with no pins");
+            check(pok && pe.last_econ_report.buildings.size() == env.last_econ_report.buildings.size(),
+                  "S14 a v27 stream's report tail reads whole");
+        }
         // v26 is BL-1527's layout on another branch, not one this build reads.
         write_save_game(k_path, w, env);
         {

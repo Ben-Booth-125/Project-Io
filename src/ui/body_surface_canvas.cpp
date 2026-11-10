@@ -622,6 +622,7 @@ ui::shell_rect open_lens_chrome(ImDrawList* dl, const ui_state& state, float wan
 {
     const ui::shell_rect r =
         ui::lens_chrome_rect(ImGui::GetIO().DisplaySize, state.time_panel_h, want_h);
+    ui::note_lens_chrome(r); // BL-1603: the pinned panel stops above it
     const ImVec2 p0 = { r.x, r.y };
     const ImVec2 p1 = { r.x + r.w, r.y + r.h };
     // OPAQUE. The region is chrome sitting on the minimap's edge, not an overlay on

@@ -9,7 +9,7 @@ space**, with the backlog item that demanded it. The pair is required. Enforceme
 authorship, not machinery — there is deliberately no audit check against this file
 (BL-260, Ben 2026-08-01: *"the docs are the audit"*).
 
-**81 surfaces** — 4 settled, 77 awaiting Ben's wording.
+**82 surfaces** — 4 settled, 78 awaiting Ben's wording.
 
 ---
 
@@ -337,6 +337,14 @@ THE SEAM'S ANSWER IS SHOWN, because set_trade validates what the form cannot (bo
 **Because:** Every ledger and panel needs exactly one discoverable door, and the rail is where that door is. A surface with no slot is drawn every frame and reachable by nobody; a slot with no surface teaches a system the game does not have. That is why the inert Acquisitions slot left the rail rather than standing blank once its ledger retired (Ben, 2026-10-24: "we can retire rail slot 5, and move everything up"): twelve slots, every later one moved up one.
 
 *Demanded by BL-022, BL-027, BL-028 · `src/ui/nav_pane.cpp` · id `nav_pane`*
+
+### Pinned items: the right chrome column's residual middle, between the time panel and the minimap; front pins on top, then the player's own pins as watch cards; the pin toggle at the Selection band's top-right corner
+
+**Answers:** What am I keeping an eye on while I work elsewhere, and where are my wars being fought?
+
+**Because:** LAYOUT.md reserved the slot (BL-216) and nothing drew in it. A watch card keeps a chosen entity's stat block in view without holding the Selection band, so the band stays free for the thing in hand; acting on a pin is one click away (select), going to it one double-click. Front pins (Ben, 2026-11-10) earn the top of the list because a war spans every body: without them a front on another body is found only by going there. They are placed and removed by the war, never by the player.
+
+*Demanded by BL-1603 (pinned panel, front pins) · `src/ui/pinned_panel.cpp`, `src/ui/pinned_panel.hpp`, `src/ui/ui_state.hpp`, `src/core/app.cpp`, `src/core/save_game.cpp` · id `pinned_items`*
 
 ### Placement lens (Planetary canvas, while the Site Finder view's site finder has a building chosen) - a mode of the build flow, not an overlay_mode
 

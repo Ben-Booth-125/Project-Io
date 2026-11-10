@@ -2,6 +2,7 @@
 
 #include "canvas_scale.hpp"
 #include "circum_nodes.hpp"
+#include "pinned_panel.hpp"   // is_pinned: a pinned body keeps the pinned ring
 #include "highlight.hpp"
 #include "nav_pane.hpp"
 #include "presentation.hpp"
@@ -268,9 +269,9 @@ void draw_circumplanetary_canvas(const world& w, ui_state& state, ImVec2 origin,
 
         dl->AddCircleFilled(pos, radius, style.colour);
 
-        // Shared selection / hover / pinned ring (pinning not yet wired).
+        // Shared selection / hover / pinned ring (pinned: the watch list, BL-1603).
         draw_body_highlight(dl, pos, radius,
-            resolve_highlight(id == state.selected_entity, this_hovered, /*pinned=*/false));
+            resolve_highlight(id == state.selected_entity, this_hovered, is_pinned(state, id)));
     }
 
     // Diamonds and slot pips: over the rings and bodies, under the labels.
