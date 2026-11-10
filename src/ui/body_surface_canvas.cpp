@@ -6577,6 +6577,29 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     // counting. A marker is its glyph and count in one box, a lone convoy's reading 1 (Ben,
     // 2026-11-10); several on one tile draw as ONE marker, the clutter guard: the press
     // walks them, as the wing marker walks its wings. The marker and its box grow with the zoom (Ben, 2026-11-09). Off below the counters' zoom.
+    // THE DRAWN POINT CHASES ITS TARGET AT A CAPPED PACE (Ben, 2026-11-10, second live
+    // check: "units and convoys still jump when they move"). Keeping a share of last
+    // frame's OFFSET smoothed only a change of anchor; a jump in a mover's own point -
+    // a tick that lands it somewhere the glide did not predict, a new leg, the order
+    // day's stretch ending, several sim steps in one frame at speed - had no offset to
+    // keep, so it drew as a jump. Now the drawn point steps toward the target by at most
+    // twice the target's own step this frame, and never less than a twelfth of a hex,
+    // so a mover in steady motion tracks its point exactly and a jump of any cause
+    // slides over a few frames. A gap of more than four hexes snaps (a re-route or a
+    // seam the chase should not crawl across). @p prev_drawn / @p prev_target are last
+    // frame's, already unwrapped near @p target. View state only.
+    const auto chase_point = [&](ImVec2 prev_drawn, ImVec2 prev_target, ImVec2 target) -> ImVec2 {
+        const float gx = target.x - prev_drawn.x, gy = target.y - prev_drawn.y;
+        const float gap = std::sqrt(gx * gx + gy * gy);
+        if (gap < 0.2f || gap > hex_size * 4.0f * 1.7320508f)
+            return target;
+        const float sx = target.x - prev_target.x, sy = target.y - prev_target.y;
+        const float step = std::sqrt(sx * sx + sy * sy);
+        const float cap = std::max(2.0f * step, hex_size * 1.7320508f / 12.0f);
+        if (gap <= cap)
+            return target;
+        return { prev_drawn.x + gx * (cap / gap), prev_drawn.y + gy * (cap / gap) };
+    };
     state.convoy_zones.clear();
     if (draw_r >= 6.0f && !state.convoy_markers.empty())
     {
@@ -6612,10 +6635,10 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         // else the player's own before a rival's, then the most advanced along its lane
         // (lowest id on a tie). And every convoy
         // carries a TRAIL: where it was drawn and where its lane put it last frame. A
-        // frame draws the anchor at its lane point plus what is left of last frame's
-        // offset from it, three quarters kept a frame - so a convoy moving on its lane
-        // has no offset and no lag, and a change of anchor, a merge or a split slides
-        // over a few frames instead of snapping. A convoy hidden in a shared marker is
+        // frame draws the anchor by chase_point from where it was drawn toward its lane
+        // point - so a convoy moving on its lane tracks it with no lag, and a change of
+        // anchor, a merge, a split or a jump in the lane point slides over a few frames
+        // instead of snapping. A convoy hidden in a shared marker is
         // drawn AT the marker, so when it leaves it sets out from there. View state only.
         struct convoy_trail { ImVec2 drawn{}, target{}; };
         static std::unordered_map<std::uint32_t, convoy_trail> s_convoy_trail;
@@ -6628,7 +6651,6 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         std::unordered_map<std::uint32_t, convoy_trail> trail_now;
         static std::unordered_map<entity_id, std::uint32_t> s_convoy_lead;
         std::unordered_map<entity_id, std::uint32_t> convoy_lead_now;
-        constexpr float k_trail_keep = 0.75f;
         const auto unwrap_near = [&](ImVec2 v, ImVec2 ref) {
             while (v.x - ref.x > local_period * 0.5f) v.x -= local_period;
             while (ref.x - v.x > local_period * 0.5f) v.x += local_period;
@@ -6701,12 +6723,8 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 continue;
             ImVec2 drawn = target;
             if (const auto tr = s_convoy_trail.find(m.id); tr != s_convoy_trail.end())
-            {
-                const ImVec2 off{ (unwrap_near(tr->second.drawn, tr->second.target).x - tr->second.target.x) * k_trail_keep,
-                                  (tr->second.drawn.y - tr->second.target.y) * k_trail_keep };
-                if (off.x * off.x + off.y * off.y > 0.04f)
-                    drawn = { target.x + off.x, target.y + off.y };
-            }
+                drawn = chase_point(unwrap_near(tr->second.drawn, target),
+                                    unwrap_near(tr->second.target, target), target);
             for (const head_mark& hm : marks)
             {
                 ImVec2 own = target;
@@ -6798,9 +6816,9 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     // or 0 (none) by a fixed share a frame, so the counter slides. View state only.
     static std::unordered_map<entity_id, float> s_glide_open;
     // AND ITS TRAIL (Ben, 2026-11-10): where each marching unit was drawn and where its
-    // march put it last frame. A frame draws the march's point plus three quarters of
-    // last frame's offset from it, so a re-routed order or a corrected hop slides over a
-    // few frames, and a counter moving with its march carries no offset and no lag.
+    // march put it last frame. A frame draws by chase_point toward the march's point, so
+    // a re-routed order, a corrected hop or a day tick the glide did not predict slides
+    // over a few frames, and a counter moving with its march tracks it with no lag.
     struct glide_trail { ImVec2 drawn{}, target{}; };
     static std::unordered_map<entity_id, glide_trail> s_glide_trail;
     {
@@ -6851,13 +6869,12 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             ImVec2 drawn = target;
             if (const auto tr = s_glide_trail.find(g.ids.front()); tr != s_glide_trail.end())
             {
-                ImVec2 pd = tr->second.drawn;
-                while (pd.x - tr->second.target.x > local_period * 0.5f) pd.x -= local_period;
-                while (tr->second.target.x - pd.x > local_period * 0.5f) pd.x += local_period;
-                const ImVec2 off{ (pd.x - tr->second.target.x) * 0.75f,
-                                  (pd.y - tr->second.target.y) * 0.75f };
-                if (off.x * off.x + off.y * off.y > 0.04f)
-                    drawn = { target.x + off.x, target.y + off.y };
+                const auto near_target = [&](ImVec2 v) {
+                    while (v.x - target.x > local_period * 0.5f) v.x -= local_period;
+                    while (target.x - v.x > local_period * 0.5f) v.x += local_period;
+                    return v;
+                };
+                drawn = chase_point(near_target(tr->second.drawn), near_target(tr->second.target), target);
             }
             for (const entity_id uid : g.ids)
                 s_glide_trail[uid] = { drawn, target };
