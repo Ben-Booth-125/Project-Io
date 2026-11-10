@@ -150,6 +150,24 @@
     "BL-1614 (SPACE_TRANSIT_SEGMENT)"
    ],
    "notes": []
+  },
+  {
+   "id": 67,
+   "theme": "Launch fix and space calls",
+   "state": "open",
+   "status_line": "open: boost (BL-1637), generated body mass (BL-1638), probe retirement (BL-1639) in lanes; B measured for NR-1203",
+   "opened_date": "2026-11-10",
+   "closed_date": null,
+   "author": "Claude (Ben's form, 2026-11-10)",
+   "goal": "Rivals launch: launch goods reach a pad by trade and are drawn over time as boost, with no pooling of markets. Then the far-space spectate (BL-1611) and the re-pin.",
+   "planned": [
+    "BL-1637 (LAUNCH_BOOST)",
+    "BL-1638 (GENERATED_BODY_MASS)",
+    "BL-1639 (RETIRE_SURVEY_PROBE)",
+    "BL-1630 (LAUNCH_GOODS_SUPPLY)",
+    "BL-1611 (FAR_SPACE_SPECTATOR_CHECK)"
+   ],
+   "notes": []
   }
  ],
  "next_up": "SPRINT 61 CLOSED 2026-11-05 (no version cut). v0.3.0 needs the naval system and a playtest with a few wars. BL-1470 (sentiment contributors) passed its live click 2026-11-05; BL-1490 (province resource clip) waits on BL-1495 (UI scale down); BL-1494 (new-library tick-50 stall) leads the economy work. SPRINT 63 (UI, QOL and the opening) OPEN 2026-11-05: Ben's playtest list is filed; the payback census has read: research is the missing money and the door quotes mirages on scarce goods.",

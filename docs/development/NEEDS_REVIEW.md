@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*77 entries — 74 open, 3 resolved.*
+*77 entries — 33 open, 44 resolved.*
 
 ---
 
@@ -343,48 +343,6 @@ Ben asked to design elimination of a landless nation. Taken: wars close as white
 
 *Files: `docs/politics/NATIONS.md`, `docs/politics/RELATIONS.md`*
 
-### NR-1160 — Near-space design filled in on your behalf: slot counts, signal delay of one quarter, data home only through coverage
-*decision taken on your behalf · raised 2026-11-10 · from space-mechanics session (worktree claude/space-mechanics-design), writing your form answers into SPACE_ASSETS.md*
-
-Your answers set the shape; I chose the rest. Nodes: surface, low, high per body, plus L1/L2/L4/L5 per pair (L3 left out). Slots: low 8 + 4 per Earth mass, high 4 (planet) or 2, L4/L5 3, L1/L2 2; first come, first held. Launch buys spacecraft_components + propellant off the home shelf. An order outside comms coverage waits one quarter; research, observation and survey data are earned only in coverage. An edge module (Dock, Shipyard) enclosed by a grid upgrade goes idle until refitted. Upgrades: 5x3 -> 7x5 -> 9x7. Budgets stop the newest module first. Solar power falls with the square of orbital radius.
-
-**Why it matters.** These are the numbers and rules a first playtest of v0.4.0 will feel.
-
-- Keep them
-- Name the ones to change
-
-> **Recommendation:** Keep them until the spectator run and your playtest say otherwise.
-
-*Files: `docs/economy/SPACE_ASSETS.md`*
-
-### NR-1161 — Far-space design written whole on your behalf (SPACE_FLEETS.md and six sibling sections)
-*decision taken on your behalf · raised 2026-11-10 · from space-mechanics session, designing v0.5.0 so its lanes can run while you are away*
-
-New doc docs/military/SPACE_FLEETS.md: five hull classes (Hauler, Lander, Tug, Frigate, Cruiser; Cruiser only from a Shipyard); a dv budget that refuses an unaffordable move, cargo adding mass; refuel at a Dock+Fuel depot or over an owned Launchpad; a Dock berths two; space convoys are Haulers on the cheapest path, interdicted by hostile armed fleets on it; daily deterministic battles at a node; blockade = hostile armed fleet in low orbit with none of the holder's; bombardment from low orbit and an orbital defence battery. Also: debris as wear and cascade (SPACE_ASSETS), mapping-then-prospecting (DISCOVERY), bases as capitals that partition a body into provinces on first landing (NATIONS), war across every body (MILITARY), war-placed front pins (LAYOUT), seeded solar storms (EVENTS), firsts with a research grant, the propellant loop and the next age's tree (ERAS).
-
-**Why it matters.** It is a large design taken without a form. Each piece is in its owning doc, so a change is an edit there.
-
-- Keep and build as written
-- Pause v0.5.0 lanes for a design form when you are back
-
-> **Recommendation:** Keep and build; your v0.6.0 playtest is the place to reshape it.
-
-*Files: `docs/military/SPACE_FLEETS.md`, `docs/economy/SPACE_ASSETS.md`, `docs/ui/DISCOVERY.md`, `docs/politics/NATIONS.md`, `docs/military/MILITARY.md`, `docs/ui/LAYOUT.md`, `docs/EVENTS.md`, `docs/economy/ERAS.md`*
-
-### NR-1162 — Space work is on its own branch, ids from BL-1580 and sprints 65 and 66
-*observation · raised 2026-11-10 · from space-mechanics session*
-
-All space work lands on branch claude/space-mechanics-design (worktree .claude/worktrees/space-mechanics-design), cut from local main and merged with main as it moves. It is not merged into main: main's checkout is shared, and other sessions commit there. Backlog ids start at BL-1580 (a gap above BL-1567) and NR ids at NR-1160, so a parallel session minting on main does not collide; sprints are numbered 65 (near space) and 66 (far space).
-
-**Why it matters.** Merging the branch into main, and whether 65/66 clash with a sprint another session opened, are yours to decide.
-
-- Merge into main when you are back
-- Keep it on the branch until v0.6.0
-
-> **Recommendation:** Merge at each version cut, after your look.
-
-*Files: `docs/development/sprints.json`, `docs/development/backlog.json`*
-
 ### NR-1163 — v0.3.0 (military) is not cut and the naval branch is unmerged, while v0.5.0 builds space war
 *question · raised 2026-11-10 · from space-mechanics session, standing rule on milestone order*
 
@@ -399,405 +357,10 @@ ROADMAP says the numbers are naming order, not build order, and you asked for v0
 
 *Files: `docs/military/SPACE_FLEETS.md`*
 
-### NR-1164 — Generated bodies other than the homeworld carry mass 1.0, so a moon's climb is cheap only because it has no air
-*question · raised 2026-11-10 · from BL-1580 (orbital graph) lane report, confirmed by its harness WARN line on seed 20260911*
-
-hard_coded_world.cpp sets mass_earths only on the homeworld; planetology's per-body masses are not copied onto body_component. On the generated world the moon climbs 8.0 dv against home's 12.16 (atmosphere does all the work), an asteroid climbs 8.0, and low-orbit slots read 12 for both instead of 8. Copying the masses fixes it but moves body_km_per_tile (logistics.cpp) and so very likely the digests.
-
-**Why it matters.** Your item 7 wants smaller bodies cheaper to launch from; today the gap is half what it should be, and the asteroid is as heavy as the moon.
-
-- Copy planetology masses in generation and re-bless the digests
-- Keep body_km_per_tile on the old value and give the graph its own mass read
-- Leave it until v0.6.0
-
-> **Recommendation:** Copy the masses and re-bless at the v0.4.0 cut; you said continuity between releases is not a constraint.
-
-*Files: `src/world/hard_coded_world.cpp`, `src/world/orbital_graph.cpp`, `src/world/logistics.cpp`*
-
-### NR-1165 — Which Digitisation node unlocks each near-space thing, and the Early Space tree's first cut
-*decision taken on your behalf · raised 2026-11-10 · from BL-1592 + BL-1607 lane report*
-
-Every near-space unlock rides an existing Digitisation node as an added mechanic effect (no node added): e.g. Comms role on Communication Satellites, Navigation on Satellite Navigation, Observation on Thermal Imaging, Survey on Seismic Survey, astronaut training on Mass Higher Education, Dock on Gantry Cranes, Power on Photolithography, 7x5 grid on Numerical Control; the station core sits on Rocketry so a nation can found a station as soon as it can launch. The Early Space tree's first cut is three trees of one branch each (In-Situ Propellant, Interplanetary Convoys, Space Force; 54 nodes), keyed by the Digitisation quests named in keys_next_branch; the other six named branches are reserved. Kit item keys (two drives, two tanks, two armaments, two armours, a debris arm) were invented; quest deeds, advantage figures and Era 3 branch names are placeholders.
-
-**Why it matters.** Where an unlock sits sets how soon a nation reaches each module, which is the opening of the space race.
-
-- Keep
-- Move named unlocks
-
-> **Recommendation:** Keep until the spectator run shows how soon rivals reach each module.
-
-*Files: `docs/economy/tech/DIGITISATION_TREE.md`, `docs/economy/tech/EARLY_SPACE_TREE.md`, `src/world/space_tech_keys.hpp`*
-
-### NR-1166 — Novel work: per-tree research state so a nation can research the next age's tree
-*novel-work · raised 2026-11-10 · from BL-1607 lane report*
-
-The research queue has one held set and one queue, both sized to the Digitisation tree, and no Era 1 -> Era 2 gate query exists. Filed as BL-1612 (early space researchable): per-tree state with a save leg, the gate query, and branch keys by quest. All Digitisation quest deeds are declared unread, so no branch can be keyed today; the item reads them or lets the gate stand in.
-
-**Why it matters.** It grows the research system from one age to two, which no doc had designed in code terms.
-
-- Build it as filed
-- Collapse far-space unlocks onto the Digitisation tree instead
-
-> **Recommendation:** Build it as filed; it is the shape RESEARCH.md already describes.
-
-*Files: `docs/economy/RESEARCH.md`, `src/world/nation_tech.cpp`*
-
-### NR-1167 — Re-pin the player_seed_sweep digests at the v0.4.0 cut (the save format moved them, the world did not)
-*question · raised 2026-11-10 · from BL-1583 lane report: save v80 -> v81*
-
-Adding the station section bumped world_save_version 80 -> 81, and player_seed_sweep --digest-check fails seeds 46 and 31 on D_land, D_settle and D_seat (D_search unmoved). rebless_shape_probe on both trees: every ROW and MIX line identical, so the world is unchanged; only the stream moved, as with earlier version bumps. More space save legs land in sprint 65 (slots, roles, pending orders, per-tree research), each moving the stream again.
-
-**Why it matters.** A failing digest gate hides any real world movement that lands beside it.
-
-- Re-pin once at the v0.4.0 cut, with a shape probe either side
-- Re-pin after each save leg
-
-> **Recommendation:** Once at the v0.4.0 cut; I will run the shape probe and leave the re-pin for your go.
-
-*Files: `tools/verify/player_seed_sweep.cpp`*
-
-### NR-1168 — Station model calls: core costs, module numbers, which module stops, removal keeps crew
-*decision taken on your behalf · raised 2026-11-10 · from BL-1583 + BL-1585 lane report*
-
-Core launch 50,000 cr, upkeep 2,500; core gives power 4, crew room 2, life support 2, needs 1 crew. Module draw/crew: Research 3/1, Defence 2/1, Power 0/0 (+6), Dock 1/1, Habitation 1/0 (+4 room), Life support 2/0 (+4), Fuel depot 1/0, Shipyard 4/2, Factory 4/2, Observatory 2/1, Relay 1/0, Cargo 0/0, Market 1/1. On a shortfall the newest module drawing on the SHORT budget stops (a Power module is passed over in a crew shortfall). An upgrade grows the grid when ordered, its truss launched after. Removing an arrived module moves its crew onto the core; a lost core loses the whole station and its crew. Training: 2 astronauts per centre per quarter, pool cap 20 per running centre; the Astronaut Training Centre costs 300 cr, 240 days, 35 steel.
-
-**Why it matters.** These set how fast a station grows and what a shortfall feels like.
-
-- Keep
-- Name the numbers to change
-
-> **Recommendation:** Keep until the spectator run.
-
-*Files: `src/world/stations.hpp`, `scripts/economy.lua`*
-
-### NR-1169 — Early Space branches open on a stand-in until quest deeds are read: Rocketry alone keys Interplanetary Convoys
-*decision taken on your behalf · raised 2026-11-10 · from BL-1612 lane report*
-
-Every Digitisation quest deed is declared unread, so no quest can be held and no Early Space branch could ever open. Stand-in (one place, branch_keyed_in): a branch is keyed if its quest is held, or if the quest's deed is unread and its major prerequisite is held. Consequence: any nation that meets the Era 2 gate already holds Rocketry, so Interplanetary Convoys (hulls, landers, tugs, drives) opens with the gate; In-Situ Propellant needs DG-PR-EN-C, Space Force needs Proven Readiness's major. One research pool and one queue: Digitisation entries are paid first. New dial space_gate_min_propellant = 1.0 (one launch's draw), since ERAS.md names a Lua threshold that did not exist.
-
-**Why it matters.** It decides how soon far space opens after the first launch.
-
-- Keep the stand-in until deeds are read
-- Read the space quest deeds now (first convoy to another body etc.)
-
-> **Recommendation:** Keep; the firsts item (BL-1606, space firsts) reads the same deeds and can retire the stand-in.
-
-*Files: `src/world/nation_tech.cpp`, `docs/economy/RESEARCH.md`*
-
-### NR-1170 — A new near-space command seam (space_command.*) beside the nation command path
-*novel-work · raised 2026-11-10 · from BL-1588 lane report*
-
-Space verbs (launch, move, fit, retire, set role and so on; 11 gameplay.space_* entries in ACTIONS.json) go through a new space_command seam. It holds a pending-order queue for signal delay: an order outside comms coverage waits one quarter, then applies or is dropped if it is no longer legal. The seam validates as an untrusted boundary, but no --serve/MCP transport carries it yet.
-
-**Why it matters.** It is a second command path; the AI and the wire must both use it.
-
-- Keep it separate (space orders carry delay; ground orders do not)
-- Fold it into the nation command path later
-
-> **Recommendation:** Keep; file the --serve/MCP transport as v0.5.0 work.
-
-*Files: `src/world/space_command.hpp`, `docs/ai/ACTIONS.json`*
-
-### NR-1171 — Launch cost formula and slot use: base + 250 per dv + goods value; slots only for satellites and cores
-*decision taken on your behalf · raised 2026-11-10 · from BL-1581/BL-1582 lane report*
-
-Launch cost = base + 250 credits per unit of delta-v climbed + the market value of the goods bought off the home shelf. Only satellites and station cores take an orbital slot. A station core may launch to any orbital node, including L-points. Launch and move debits are paid but are not yet booked as a line in the nation return.
-
-**Why it matters.** It sets how expensive space is, and the return under-reports the spend.
-
-- Keep these numbers for v0.4.0 and tune after the spectator run
-- Book the debits as a return line now
-
-> **Recommendation:** Keep the numbers; book the return line with the Space ledger item, BL-1591 (space ledger and designer).
-
-*Files: `src/world/space_command.cpp`, `docs/economy/SPACE_ASSETS.md`*
-
-### NR-1172 — Station and satellite effect dials and stand-ins taken by the effects lane
-*decision taken on your behalf · raised 2026-11-10 · from BL-1584/BL-1586 lane report*
-
-Life support keeps no memory: a station either buys its rations this quarter or starves. Electronics stands in as the factory module's output good. An Observation satellite lifts only the vision fog, not the activity fog. Survey satellites start the mapping, at a stand-in rate until prospecting lands (v0.5.0). Dials: navigation factor 0.9, research module 50 RP a quarter; the rest are in space_effects.hpp.
-
-**Why it matters.** These are first numbers; the spectator run will show whether they matter.
-
-- Accept as first cut
-- Revisit any dial
-
-> **Recommendation:** Accept; revisit after the spectator observation.
-
-*Files: `src/world/space_effects.cpp`, `docs/economy/SPACE_ASSETS.md`*
-
-### NR-1173 — Space units: an authored hull and item stat table, the rocket equation, and a depot that buys propellant on its own
-*novel-work · raised 2026-11-10 · from BL-1594/BL-1595 lane report*
-
-Delta-v is the rocket equation over propellant aboard (never a stored delta-v). Five hulls (Hauler 10 mass/20 hp, Lander 8/15, Tug 8/20, Frigate 14/40, Cruiser 40/120 and yard-only) and eleven items (chemical drive ve 10, nuclear thermal ve 20, tanks 20/45, kinetic and missile armament, Whipple and composite armour, cargo and passenger bays, capture arm) are a new numeric table no doc owns. A working Fuel depot fills itself each quarter off the owner home shelf (200 a depot). Raising draws goods market-direct and credits no seller. Docking is own-nation only. Dials: launch_propellant_per_dv 0.1, repair 1/day, quarters_to_loss 4, berths_per_dock 2. Space-unit verbs, UI and cargo loading are owed (BL-1596 onward).
-
-**Why it matters.** The table sets how far and how cheaply fleets move; the depot is a new automatic buyer.
-
-- Accept the table as a first cut and tune at the v0.6.0 playtest
-- Move the table into SPACE_FLEETS.md as authority now
-
-> **Recommendation:** Accept; the numbers live on recipe_registry::space_units() and can move to Lua later.
-
-*Files: `src/world/space_units.cpp`, `docs/military/SPACE_FLEETS.md`*
-
-### NR-1174 — Pinned panel: pins travel in the UI save (save_game v28); the lens key and the panel share the column
-*decision taken on your behalf · raised 2026-11-10 · from BL-1603 lane report*
-
-Player pins are saved in the ui_state slice (save_game_version 28; v27 opens with no pins). Front pins are derived each frame and never saved: one per (war, body) where both sides hold land. The panel stops one margin above a grown lens key (a new shell_metrics hand-off). The pin toggle sits left of the band header go-to button, or ends the tile heading row. New verify read verify.pinned_panel() reports only what the panel draws; it reads no tile data, so no grant was taken. Fronts off the home body wait on BL-1602 (interplanetary war).
-
-**Why it matters.** A save-format change and a chrome hand-off grew past a UI-only brief; a live click is still owed.
-
-- Accept
-- Keep pins out of the save
-
-> **Recommendation:** Accept.
-
-*Files: `src/ui/pinned_panel.cpp`, `src/core/save_game.cpp`, `docs/ui/LAYOUT.md`*
-
-### NR-1175 — Circumplanetary assets: L5 clamped above the band, first-cut mark sizes, a new space_asset selection kind
-*decision taken on your behalf · raised 2026-11-10 · from BL-1590 lane report*
-
-At 1280x720 the bottom band (~280 px) covers the moon outer orbit, so its L5 diamond is clamped above the band and floats off its orbit when zoomed. The alternative is to lift the rung centre so the whole system clears the band. Satellite plate radius 5.5 px; station 8.5 px plus 2 per grid ring; the player dark magenta reads dim on the satellite plate. A new selection_kind::space_asset (a station selects by its core) and its band card were added; SELECTION.md carries the row. New verify calls near_space_fixture (staging) and circum_assets report only what the canvas draws and touch no tile data, so no grant was taken. The transit segment needs an origin node and departure tick on a moving asset (a save change): filed as work.
-
-**Why it matters.** A visual call, and whether verify staging calls need a dated grant when they carry no tile data.
-
-- Keep the clamp
-- Lift the rung centre above the band
-
-> **Recommendation:** Lift the rung centre; a clamped L-point lies about where it is.
-
-*Files: `src/ui/circum_nodes.cpp`, `src/ui/circum_assets.cpp`, `docs/ui/CIRCUMPLANETARY.md`*
-
-### NR-1176 — Spectator finding: rivals reach Rocketry (first 1976, 14 of 41 by 2000) but launch nothing, because no Launchpad ever exists
-*decision taken on your behalf · raised 2026-11-10 · from BL-1589 lane report (seed 0 spectate to 2000)*
-
-Rocketry holders: 2 in 1977, 3 in 1978, 7 in 1988, 14 by 1994. Launches 0, space spend 0: every holder is blocked no_launchpad. Nothing builds a Launchpad (not generation, not the nation build scorer), and placement_rules.cpp allows ONE Launchpad per body world-wide, so on a shared home world only one nation could ever launch. SPACE_ASSETS.md says a staffed Launchpad on the nation home body, i.e. one per nation. Training centres are never built either, so every astronaut pool is 0. Treasuries: richest about 35.6k in 1975, about 108k-123k by 2000; a comms satellite quotes about 23.5k, a core about 60k. DECISION TAKEN: the doc wins, the cap becomes one Launchpad per nation per body; rivals build a Launchpad and an Astronaut Training Centre through the build scorer on their own ground. I read this as inside the 2026-10-23 build grant (what to build, own ground) and the 2026-11-10 space grant (which names astronaut training), not a new widening; filed as BL-1615 (rival space groundwork).
-
-**Why it matters.** This is the first hurdle Ben asked about: without it no rival goes to space at all.
-
-- Accept: per-nation pads, rivals build pads and centres
-- Generation opens a pad for each major instead
-- Keep one pad per body and make it a contested asset
-
-> **Recommendation:** Accept; it matches the doc and the existing grants.
-
-*Files: `src/world/placement_rules.cpp`, `src/world/nation_ai.cpp`, `docs/economy/SPACE_ASSETS.md`, `docs/ai/AI_OPPONENT.md`*
-
-### NR-1177 — Rival space scorer dials: research relief 0.25 for near-space keys, half-treasury reserve, a fixed 14-module target
-*decision taken on your behalf · raised 2026-11-10 · from BL-1589 lane report*
-
-The research picker weighed only Rocketry among mechanic keys; every other near-space key now earns research_space_key_relief 0.25 (half of research_unlock_relief) x the space emphasis. That moves rival research picks after the handover in every campaign, so post-handover campaign digests are expected to move (not measured, nothing re-blessed). Reserve: one action spends at most half the treasury and keeps 8 quarters of space upkeep. A comms satellite first, then a core at the cheapest free home node, then modules toward a fixed order (power, research, habitation, life support, power, research, observatory, comms relay, power, habitation, life support, research, fuel depot, cargo hold). Home body only; no upgrades, retasks or crewed missions. Never the player nation, even under spectate.
-
-**Why it matters.** These set how fast and how far rivals climb.
-
-- Accept as first cut
-- Tune after the groundwork rerun
-
-> **Recommendation:** Accept; re-read after BL-1615 (rival space groundwork) lets them launch.
-
-*Files: `src/world/nation_ai.cpp`*
-
-### NR-1178 — Space battle dials and stand-ins: pooled armour can stall a battle, double-count across two battles at one node
-*decision taken on your behalf · raised 2026-11-10 · from BL-1597 lane report*
-
-Defence module firepower 12, armour 6, hull points 40, mass 6; core mass 20; 16 closed reports kept. Armour is spent once per target per day, so a side whose whole fire is at or below the front target armour lands nothing and the battle can stall with no forced end. Defence damage lives in the battle record (no repair rule). One battle per (node, nation pair): a nation hostile to two others at one node fires its whole firepower into both. Crew loss may be counted in both the battle and the station step reports. Withdrawn fleets can meet again where they withdraw to.
-
-**Why it matters.** A stalled battle never ends; the double-count favours a side fighting two enemies.
-
-- Accept and add a stall rule later
-- Add a daily minimum damage now
-- Split a nation fire across its battles
-
-> **Recommendation:** Add a stall rule (a battle with no damage for N days ends as a standoff) with BL-1598 (debris).
-
-*Files: `src/world/space_battle.cpp`, `docs/military/SPACE_FLEETS.md`*
-
-### NR-1179 — Mapping then prospecting: the old probe and the two-step model overlap; deposits still show on mapped ground
-*question · raised 2026-11-10 · from BL-1600 lane report*
-
-Other bodies do have tile grids (Cinder 180x84, Selene 90x42, asteroids 30x14), and survey regions are the existing 8-tile partition. Knowledge is now per (nation, body); the home world counts as surveyed for all. A dispatched probe still reveals tiles and deposits the old way, and a body being mapped from orbit refuses a probe. The Planetary canvas gates deposits on survey_tile_visible only, so mapped ground still shows deposits before prospecting (UI work, noted on BL-1610 (base and prospect UI)). corp_ai reads the player mirror body.survey for fog. Novel: per-nation geographic fog state. Dials: satellite 4 regions/quarter, Observatory 2, prospect 1/quarter; region 0 stands in for the landing site; prospecting needs no comms coverage.
-
-**Why it matters.** Two routes to the same knowledge confuse the player; the AI reads the player view.
-
-- Retire the probe in favour of mapping then prospecting
-- Keep the probe as a second, cheaper route
-
-> **Recommendation:** Retire the probe; one route reads cleaner.
-
-*Files: `src/world/survey_system.cpp`, `docs/ui/DISCOVERY.md`*
-
-### NR-1180 — Space convoys: the straight-line lane kept for nations with no Hauler design; a chemical Hauler cannot round-trip home to moon
-*decision taken on your behalf · raised 2026-11-10 · from BL-1596 lane report*
-
-A nation with a live Hauler design ships inter-body trades as Haulers; one without still uses the old straight-line space lane (kept so worlds without designs do not move; the backlog says Haulers replace it). Unescorted Haulers meeting an armed hostile are lost with cargo; escorted ones wait (battles now exist, so the wait should become a battle). Unloading uses the lowest-id staffed pad of ANY nation on the body. The cargo cap reserves fuel for the empty trip home, with no refuelling counted, so the default chemical Hauler cannot round-trip home-moon; interplanetary Hauler trade is effectively closed until refuelling at the destination is counted. Each hop takes at least a day. Novel: the first cross-store save check (each outbound haul matches its live convoy).
-
-**Why it matters.** As built, Hauler trade rarely pays and the old lane still carries most space trade.
-
-- Count destination refuelling in the cap
-- Retire the old lane now
-
-> **Recommendation:** Count destination refuelling where the owner has a pad there; retire the old lane once rivals hold Hauler designs (BL-1608 (rival far-space AI)).
-
-*Files: `src/world/space_convoy.cpp`, `src/world/supply_system.cpp`, `docs/military/SPACE_FLEETS.md`*
-
-### NR-1181 — Solar storms are the first campaign event built ahead of the event system: hard-coded, derived from the seed, purely negative
-*novel-work · raised 2026-11-10 · from BL-1605 lane report*
-
-A storm is a pure function of the world seed and econ tick: one seeded draw per 12-quarter solar cycle (750 in 1000 carry a storm), so about three a decade and nothing saved. Every L-point and every asteroid orbit is exposed; planet and moon orbits are sheltered (binary; the doc names no strength or shielding). A struck satellite is dark for every role read; a struck station stops all modules for the quarter; nothing is worn or lost; astronauts untouched. A working Observatory warns its owner a quarter ahead; only the player row posts, on the Field channel. It is C++, not a Lua event on condition_set / modifier_set, because the general event system (BL-548) is not built; EVENTS.md says no event may be purely negative, and this one is. The canvas does not yet mark a dark satellite or stormed station.
-
-**Why it matters.** It sets a precedent for events built before the event system.
-
-- Accept as a hard-coded stand-in, migrate when the event system lands
-- Give storms an upside now (e.g. research from an observed storm)
-
-> **Recommendation:** Accept; add the upside and the canvas marker with BL-1609 (fleet UI).
-
-*Files: `src/world/solar_storm.hpp`, `docs/EVENTS.md`*
-
-### NR-1182 — Space ledger: rail slot 9 renumbers History and the developer tail; a verify fixture writes the player tech, buildings and treasury
-*decision taken on your behalf · raised 2026-11-10 · from BL-1591 lane report*
-
-Space sits at rail slot 9 after Diplomacy, under MENU.md rule that curated systems go above the developer tail; History and the tail move down and the rail has 13 slots (nav_rail_fit passes at 1280x720 and 1920x1080). verify.space_ledger_fixture() stages the player nation with every Digitisation node, a staffed pad and training centre, 40 astronauts and 5M credits; it reveals no tile data. Gaps against ledgers/space.md: applying a template does not quote its total first; satellite Move has no control; the Assets list does not show per-module rows. A live click in the built app is still owed (the scripted run passes 39 checks).
-
-**Why it matters.** Rail order is a layout call; verify staging calls are listed by date in the standing rules.
-
-- Accept slot 9 and the fixture
-- Move Space elsewhere on the rail
-
-> **Recommendation:** Accept; record the staging fixtures (this and near_space_fixture) as a dated verify grant if you want them listed.
-
-*Files: `src/ui/space_ledger.cpp`, `src/ui/nav_pane.cpp`, `docs/ui/MENU.md`, `src/core/verify_api.cpp`*
-
-### NR-1183 — Debris and the battle stall: a standoff after 10 quiet days, settled in SPACE_FLEETS.md by the lane
-*novel-work · raised 2026-11-10 · from BL-1598 lane report*
-
-Debris per node grows from every orbital loss (battle, upkeep, wear), wears assets (0.004 a quarter per unit of debris) and damages units daily (0.002 hp per debris), decays by drag in low orbit only (0.08 a quarter), and an idle Tug with a capture arm clears 6 a quarter at its node (no new verb: moving the Tug there is the order). The cascade is emergent (wear reaches 1, the wreck raises the level), with no separate threshold. The battle stall answers NR-1178: a battle with no damage landed for stall_days = 10 ends as a standoff, and that pair does not re-engage at the node until one side could land fire. No doc owned the stall, so the lane wrote it into SPACE_FLEETS.md § Battles as settled design. No UI reads debris yet.
-
-**Why it matters.** A rule written into an authority doc without a ruling.
-
-- Confirm the stall rule
-- Change the window or the re-engage condition
-
-> **Recommendation:** Confirm.
-
-*Files: `src/world/debris.cpp`, `src/world/space_battle.cpp`, `docs/military/SPACE_FLEETS.md`, `docs/economy/SPACE_ASSETS.md`*
-
-### NR-1195 — Blockade and bombardment built with four calls taken on your behalf
-*decision taken on your behalf · raised 2026-11-10 · from BL-1599 lane report*
-
-(1) A bombardment strike charges the existing force_used Alarm path; there is no separate missile Alarm code. (2) The orbital defence battery is a new building type, number 15, opened by its own Early Space node; it fires at hostile units in its body's low orbit. (3) Strikes spend no munitions; the cost is the unit's upkeep and its exposure to the battery. (4) A unit the battery kills does not raise debris, unlike a battle loss. Save v89 carries the standing bombard orders; blockade is derived and adds no bytes.
-
-**Why it matters.** Calls (1), (3) and (4) shape how costly orbital war is.
-
-- Accept all four
-- Give strikes a munitions cost
-- Feed battery kills into debris
-
-> **Recommendation:** Accept for v0.5.0; feeding battery kills into debris is a one-line follow-up if wanted.
-
-*Files: `src/world/space_bombard.cpp`, `docs/military/SPACE_FLEETS.md`*
-
-### NR-1196 — Rivals cannot bombard or blockade yet: no AI uses the new verbs
-*novel-work · raised 2026-11-10 · from BL-1599 lane report*
-
-The bombard order and the battery are player-and-script only. Rival use belongs to BL-1608 (rival far-space AI), which is open; the 2026-11-10 grant covers it.
-
-**Why it matters.** The spectator check will show rivals never striking until BL-1608 lands.
-
-- Leave it to BL-1608 (rival far-space AI)
-
-> **Recommendation:** Leave it to BL-1608.
-
-*Files: `src/world/corp_ai.cpp`*
-
-### NR-1197 — Grant reading: rivals building their own Launchpad and Training Centre
-*decision taken on your behalf · raised 2026-11-10 · from BL-1615 lane report*
-
-The lane read the 2026-11-10 space grant (which names astronaut training) together with the 2026-10-23 own-economy build grant as covering a rival building its own pad and centre, on its own ground, through the build verb, paid only with twice the capex uncommitted. Never for the player nation. Pads are placed nearest the capital.
-
-**Why it matters.** A grant read as covering a new subject is the pattern AI_OPPONENT.md § 11 asks to be raised.
-
-- Confirm the reading
-- Write it into § 11 as its own dated line
-
-> **Recommendation:** Confirm, and add one line to § 11 so the reading is on record.
-
-*Files: `src/world/corp_ai.cpp`, `docs/ai/AI_OPPONENT.md`*
-
-### NR-1198 — Branch ids collide with main: BL-1580..1618 and NR-1181..1183, save v83..v88
-*question · raised 2026-11-10 · from main session, merge prep*
-
-This branch minted BL-1580..1615 and NR-1181..1183; main now holds BL ids up to 1618 and NR-1181..1194 (the naval merge), plus world save v83 (BL-1562) and v88 (naval) and envelope v29. New ids on this branch start at BL-1630 and NR-1195. Merging the branch into main needs a renumber pass of ids and save versions.
-
-**Why it matters.** The merge is yours (NR-1162); this is its cost.
-
-- Renumber this branch at the merge
-- Renumber main's side
-
-> **Recommendation:** Renumber this branch at the merge; its versions stack on top of main's.
-
-*Files: `docs/development/backlog.json`, `src/world/world_save.hpp`*
-
-### NR-1199 — Grant reading: the rival research picker also picks Early Space nodes
-*decision taken on your behalf · raised 2026-11-10 · from BL-1613 lane report*
-
-The research grant covers one frontier node at a time over the nation's own tree. Once a rival meets the gate into space, the picker also scores Early Space nodes it can queue alone (quests excluded), by the same rule; a tie keeps the Digitisation node. The lane read the second tree as the same verb on the same queue.
-
-**Why it matters.** A second tree may be a new subject under AI_OPPONENT.md § 11.
-
-- Confirm: same verb, same queue
-- Treat it as a new grant and write it into § 11
-
-> **Recommendation:** Confirm, with one dated line in § 11.
-
-*Files: `src/world/nation_ai.cpp`, `docs/ai/AI_OPPONENT.md`*
-
-### NR-1200 — Research age tabs: re-clicking the active tab closes the panel
-*decision taken on your behalf · raised 2026-11-10 · from BL-1613 lane report*
-
-The research canvas has Digitisation and Early Space tabs. Per the toggle rule, re-clicking the active tab closes the research panel. If the tabs count as a cross-cutting selector (exempt), that press should do nothing instead. The Early Space tree draws as three branch columns, not a ring (the lane's layout call).
-
-**Why it matters.** A small UX call, and a layout you have not seen.
-
-- Keep: toggle closes
-- Exempt the tabs
-
-> **Recommendation:** Keep; it matches every other sub-view tab.
-
-*Files: `src/ui/tech_tree_panel.cpp`*
-
-### NR-1201 — Off-world bases: colonists, the base kit and life support are stand-ins no doc defined
-*novel-work · raised 2026-11-10 · from BL-1601 lane report*
-
-Colonists are counted in thousands, one Lander passenger berth per thousand; a base needs 2. The base kit is 20 machinery carried as cargo on a landed Lander. Life support is 1 water and 1 food ration per thousand per quarter, scaled by the habitability the tile lacks (oxygen folded into water). An unfed quarter costs max(1, ceil(25%)) of the people; the base is razed at 0. Colonists come from the most populous home centre that keeps at least a thousand. All are dials in offworld_base_params. Founding lays one Track to a dry neighbour so the base can build at all. Save v90.
-
-**Why it matters.** These numbers set how hard a base is to keep alive.
-
-- Accept as first cut
-- Retune any of them
-
-> **Recommendation:** Accept for v0.5.0; tune in the v0.6.0 playtest.
-
-*Files: `src/world/offworld_base.cpp`, `docs/politics/NATIONS.md`*
-
-### NR-1202 — A fed base reads its province at habitability 1 (the building ceiling, labour and the hub source)
-*decision taken on your behalf · raised 2026-11-10 · from BL-1601 lane report*
-
-Five home-body assumptions were widened to a base: labour and workforce read the base habitability (1 when fed); the logistics chain anchor and the capital free source fall back to the base capital on that body; and measure_province_sustain, which capped an airless province at one building, reads a fed base province at habitability 1. The last is a design reading, not a bug fix.
-
-**Why it matters.** It decides how much a base can grow.
-
-- Accept: a fed base is habitable ground
-- Keep the airless cap and let bases stay small
-
-> **Recommendation:** Accept.
-
-*Files: `src/world/province.cpp`, `src/world/economy_system.cpp`, `src/world/logistic_points.cpp`*
-
 ### NR-1203 — Launch goods sit on the wrong shelves: their trade routes rank too low to move (measured)
 *question · raised 2026-11-10 · from BL-1630 lane report*
 
-With a staffed pad bidding for its launch lot, plants appear (seed 0: 5 components, 10 propellant by 2000), but the goods pile on different markets of the one body: 2015, 47582 holds 1,468 components and 21 propellant; 47599 and 47665 hold 1,542 and 788 propellant. 0 launches through 2015. MEASURED (experiment lane, seed 0): the ceiling does silence some wants, but auto trade already sizes to them (BL-1547, dispatch_absorbable), and every route exists overland. What blocks is RANKING: auto trade ranks by margin per trade point, and launch goods move few units per point (components 0.13, propellant 0.6), so their routes rank #68-#141 of ~250 at the source and the points run out first (272 "no points left" against 3 sends in the sample). Logistic Points by value also bite: a component draws 77.9 LP, a propellant unit 16.1. EXPERIMENT (branch worktree-agent-a9f2b8a287ef3a8e6, 8aa5f49b, NOT merged): routes into a market with a silenced want rank first. Result: first rival launch 1992, 3 by 2005, 4 by 2015 (vs none). Cost: pads completed by 2000 fall 7 to 4; treasuries 2015 947k to 629k; market_viability quick G1 at tick 50 86.0 PASS to 80.8 FAIL (target 84). It moves every good from ~1970. OPTION D MEASURED (branch worktree-agent-a83d4ca4b411f9d7d, bbcb17b5, NOT merged; switch launch_draws_body_wide, off byte-identical): a good the home shelf cannot cover may come whole off another market on the home body where the nation owns ground, ascending market id, at that market's price, no haul charge. Seed 0 to 2010: first rival launch 1993; 4 launches by 2000 (Teishe: a comms satellite, then a station core; Thuamuas and Tososhei: comms satellites); none added 2000-2010; 7 of 11 padded nations still refused at the shelf, cause unprobed. Pads unchanged (7 by 2000, 11 by 2010). Treasury sum 2000: -87k. market_viability quick: identical (it ends ~1972, before Rocketry, so it cannot see D). RULING (Ben, 2026-11-10): D is rejected; no global pools for goods (written into SPACE_ASSETS.md). Measure B next. Ben also raised a fourth shape: a Launchpad produces boost, a good on its market, so the economic draw happens over time; a launch consumes boost by the distance in space.
+With a staffed pad bidding for its launch lot, plants appear (seed 0: 5 components, 10 propellant by 2000), but the goods pile on different markets of the one body: 2015, 47582 holds 1,468 components and 21 propellant; 47599 and 47665 hold 1,542 and 788 propellant. 0 launches through 2015. MEASURED (experiment lane, seed 0): the ceiling does silence some wants, but auto trade already sizes to them (BL-1547, dispatch_absorbable), and every route exists overland. What blocks is RANKING: auto trade ranks by margin per trade point, and launch goods move few units per point (components 0.13, propellant 0.6), so their routes rank #68-#141 of ~250 at the source and the points run out first (272 "no points left" against 3 sends in the sample). Logistic Points by value also bite: a component draws 77.9 LP, a propellant unit 16.1. EXPERIMENT (branch worktree-agent-a9f2b8a287ef3a8e6, 8aa5f49b, NOT merged): routes into a market with a silenced want rank first. Result: first rival launch 1992, 3 by 2005, 4 by 2015 (vs none). Cost: pads completed by 2000 fall 7 to 4; treasuries 2015 947k to 629k; market_viability quick G1 at tick 50 86.0 PASS to 80.8 FAIL (target 84). It moves every good from ~1970. OPTION D MEASURED (branch worktree-agent-a83d4ca4b411f9d7d, bbcb17b5, NOT merged; switch launch_draws_body_wide, off byte-identical): a good the home shelf cannot cover may come whole off another market on the home body where the nation owns ground, ascending market id, at that market's price, no haul charge. Seed 0 to 2010: first rival launch 1993; 4 launches by 2000 (Teishe: a comms satellite, then a station core; Thuamuas and Tososhei: comms satellites); none added 2000-2010; 7 of 11 padded nations still refused at the shelf, cause unprobed. Pads unchanged (7 by 2000, 11 by 2010). Treasury sum 2000: -87k. market_viability quick: identical (it ends ~1972, before Rocketry, so it cannot see D). RULING (Ben, 2026-11-10): D is rejected; no global pools for goods (written into SPACE_ASSETS.md). Measure B next. Ben also raised a fourth shape: a Launchpad produces boost, a good on its market, so the economic draw happens over time; a launch consumes boost by the distance in space. FORM (Ben, 2026-11-10): build boost now alongside the B measurement: a pad burns propellant and components into boost, which stays on the pad's market (SPACE_ASSETS.md § Boost). Work: BL-1637 (launch boost).
 
 **Why it matters.** The wall between rivals and space is a trade-ranking rule. The one lever tried works for space and hurts the wider economy.
 
@@ -810,24 +373,10 @@ With a staffed pad bidding for its launch lot, plants appear (seed 0: 5 componen
 
 *Files: `src/world/trade.cpp`, `docs/economy/TRADE.md`, `docs/economy/SPACE_ASSETS.md`*
 
-### NR-1204 — The BL-644 space-programme lumps are retired by data (authored at zero)
-*decision taken on your behalf · raised 2026-11-10 · from BL-1630 lane report*
-
-The lumps bought a whole launch lot off any shelf and consumed it with nothing launched; seed 0 1983-2000 bought 80 lumps and starved every launch. The real launch now buys the goods, so components_lump and propellant_lump are 0 in economy.lua and NATIONS.md says so. A staffed pad instead posts a standing bid (standing_lots = 1) on its home market, including the player's pad: a demand on the market, nothing bought or built for you. The state hash moves after 1980; no digest re-pinned.
-
-**Why it matters.** Post-1960 pins will move at the next re-bless.
-
-- Accept
-- Limit the standing bid to rivals
-
-> **Recommendation:** Accept.
-
-*Files: `scripts/economy.lua`, `src/world/economy_system.cpp`, `docs/politics/NATIONS.md`*
-
 ### NR-1205 — Experiment lane went past its brief: changed route ranking, not sizing
 *novel-work · raised 2026-11-10 · from NR-1203 experiment lane*
 
-Briefed to make auto trade size off the silenced want, the lane found that already built (BL-1547) and instead ranked silenced-want routes first, behind a tunable. It is on its own branch, unmerged.
+Briefed to make auto trade size off the silenced want, the lane found that already built (BL-1547) and instead ranked silenced-want routes first, behind a tunable. It is on its own branch, unmerged. Ben, 2026-11-10: delete the D branch; keep A until B reads.
 
 **Why it matters.** Recorded so the branch is not mistaken for a delivery.
 
@@ -837,133 +386,6 @@ Briefed to make auto trade size off the silenced want, the lane found that alrea
 > **Recommendation:** Keep until NR-1203 is ruled.
 
 *Files: `src/world/trade.cpp`*
-
-### NR-1206 — Rival units at a moon base are not kept home: a scorer change, raised
-*question · raised 2026-11-10 · from BL-1602 lane report*
-
-corp_ai.cpp keeps the capital province's units at home, reading only the home capital. A rival's units at an off-world base would be sent to fronts. Treating a base province as a home to keep is a scorer change to land behaviour. The 2026-11-10 grant names space verbs; it is silent on land units at a base. Also taken by the lane: a cross-body front assignment is refused; the fallback war goal prefers the defender's base on that body; a ceded capital stays on its own body while land remains there (MILITARY.md § Space).
-
-**Why it matters.** A rival base would be stripped of its garrison.
-
-- Grant it: a base province is a home the scorer keeps
-- Leave it for BL-1608 (rival far-space AI) to cover
-
-> **Recommendation:** Grant it inside BL-1608; it is one line in the keep-home rule.
-
-*Files: `src/world/corp_ai.cpp`*
-
-### NR-1207 — Space firsts: five calls taken, and the player cannot see a first yet
-*decision taken on your behalf · raised 2026-11-10 · from BL-1606 lane report*
-
-(1) Ties go to the lowest nation id; firsts are judged by the day. (2) A flat 400 RP per first (economy.research.space_first_grant_rp), not scaled with the research price. (3) The convoy first counts on delivery to another body's market, not dispatch. (4) Crew in orbit includes crew aboard a station core, so a station core launch can take both firsts. (5) One public history entry per first, tagged with the taker. The player's dispatch shows only war entries, so no surface shows a first yet. Calls 1 and 2 are written into ERAS.md § Firsts. Save v91.
-
-**Why it matters.** The grant size sets how much racing to space pays.
-
-- Accept all
-- Scale the grant with the research price
-- Count the convoy at dispatch
-
-> **Recommendation:** Accept; tune the 400 in playtest.
-
-*Files: `src/world/space_firsts.cpp`, `docs/economy/ERAS.md`*
-
-### NR-1208 — Fleet UI: nine calls taken, and seven new verify reads to grant
-*decision taken on your behalf · raised 2026-11-10 · from BL-1609 / BL-1614 lane report*
-
-Calls: (1) unit orders are not signal-delayed; (2) orders sit on the Selection card, not a right-click; (3) bombard targets whole provinces, listed where a building can be struck; (4) one fleet mark per (node, owner), a press selects the lowest-id lead, "Whole fleet" moves them all; (5) an asset's transit share is quarters gone plus day/90, a unit's from path days; (6) the card has two columns, destinations cheapest first; (7) the space designer expands rows in place; Recruit has no Space tab; (8) theatre_tabs became a template for four Design tabs; (9) a digest from a world with assets in transit may move (the origin is hashed). The space_command seam gained eight unit verbs (13-20) from a UI item. New verify reads, each reporting what the screen draws (screen positions included): verify.circum_transits, circum_fleets, solar_fleets, circum_fleet_hovered, circum_debris, fleet_card, space_designs; STAGING verify.space_fleet_fixture writes a Frigate design, four units and debris 25 (returns counts and the player id); circum_assets rows gain a storm flag. A solar storm cannot be staged (derived from the seed), so no capture shows the storm mark.
-
-**Why it matters.** The verify reads touch the no-tile-data rule (io-standing-rules § Determinism & data model); each needs your grant like the ten before it.
-
-- Grant the reads as an eleventh scoped exception
-- Narrow them
-
-> **Recommendation:** Grant: they report only what the canvas draws.
-
-*Files: `src/core/verify_api.cpp`, `src/world/space_command.hpp`, `.claude/rules/io-standing-rules.md`*
-
-### NR-1209 — Rival far-space AI: five calls taken; rivals design but raise nothing (the NR-1203 wall)
-*decision taken on your behalf · raised 2026-11-10 · from BL-1608 lane report*
-
-One far-space verb per rival per quarter, first wanted and legal of: design (best researched item per slot, redesign when a better one is researched), war (bombard from low orbit, move the fleet whole only when every unit there is armed, raise Frigates up to 2 per hostile, max 6), base (embark, load kit, move, found on the most-deposit prospected tile; max 1 base). Calls: (1) a base trip a full Lander cannot make with the 20-unit kit is refused (14.6 dv loaded vs 21.7 empty), so a heavy moon never gets a base; (2) once a rival holds a Hauler design the existing trade code ships its inter-body trade by Hauler, which moves the world from ~2020 (BL-1596's design); (3) Tugs and Cruisers get designs but are never raised; no shipyard or docking used; (4) the pick pays at the fair-price ceiling; (5) the pick's priority order is written only in nation_ai.hpp, not AI_OPPONENT.md. NR-1206 keep-home is wired behind far_space_keep_base_home = 0 (OFF). Spectate seed 0 to 2030: 9 designs held by three rivals by 2030, no unit raised (Teishe at war meets shelf_short for its Frigate), 1 launch all game.
-
-**Why it matters.** The far-space AI exists and is correct in harness, but the world never lets it act: everything waits on NR-1203.
-
-- Accept the calls
-- Write the priority order into AI_OPPONENT.md
-
-> **Recommendation:** Accept; rule NR-1203 first, then re-spectate (BL-1611).
-
-*Files: `src/world/nation_ai.cpp`, `src/world/corp_ai.cpp`, `docs/ai/AI_OPPONENT.md`*
-
-### NR-1210 — Propellant loop: the Electrolysis Plant keeps refined fuel as an input, against "water and power"
-*decision taken on your behalf · raised 2026-11-10 · from BL-1604 lane report*
-
-No new building types: the Ice Extractor is the extraction site on an ice deposit, the Electrolysis Plant the existing propellant_electrolysis route (water x3 + refined fuel x1). ERAS.md's ruling says water and power; the lane kept the recipe and wrote that the fuel half is shipped in or made locally. Also: the Ice Extractor key applies only off the builder's home body; the electrolysis key is read on the tile owner (so the propellant chain stays open to every nation at home); a Fuel depot over a base fills from the base shelf, else home; neither fill path checks blockade.
-
-**Why it matters.** With refined fuel as an input a base still depends on home for half its propellant.
-
-- Keep refined fuel (a base must import)
-- Make it water and power only (a base is self-sufficient)
-
-> **Recommendation:** Keep: it gives Haulers a reason to run; rule otherwise if bases should close the loop alone.
-
-*Files: `scripts/recipes.lua`, `docs/economy/ERAS.md`*
-
-### NR-1211 — Base and prospect UI: five calls taken, and four new verify reads to grant
-*decision taken on your behalf · raised 2026-11-10 · from BL-1610 / BL-1633 lane report*
-
-Calls: (1) the player picks the base site from a list, one row per province with mapped unclaimed land, at its most habitable tile, because a Lander lands at a surface node and no tile is behind it; (2) ground a dispatched probe is scanning keeps showing its deposits, and a fully surveyed body shows everything (DISCOVERY.md leaves a probed body to its probe); (3) the unprospected wash is 30% slate (palette::unprospected), subtle over grey regolith; (4) two deposit reads were left raw: the construction-suitability wash and the extraction candidates on the tile card, which could show bands on an unprospected base province; (5) Embark defaults to every free berth. BL-1633: Assign to front lists only fronts on the units' own body. New verify reads: verify.base_card() (the base orders as drawn, including each site row's label, grid col/row, chosen and prospected flags), verify.prospect_mask() (washed tile count, lens key goods, the title's mapped/prospected/total counts); STAGING verify.base_prospect_fixture() (grants the base_founding key, maps a moon, lands two player Landers with colonists and kit, idles an empty Lander in home low orbit; returns the moon name and three unit ids) and verify.stage_prospect(n) (prospects up to n regions by the real rule; returns the count); fleet_card().presses gains embark/confirm_embark/found_base/confirm_found.
-
-**Why it matters.** The reads touch the no-tile-data rule; base_card returns site tile positions the card already prints. Call (4) is a small leak of deposit information on unprospected ground.
-
-- Grant the reads; fix call (4) as a follow-up
-- Narrow base_card to labels only
-
-> **Recommendation:** Grant, since they report what the card draws; route the two raw reads through prospect_view.hpp.
-
-*Files: `src/core/verify_api.cpp`, `src/ui/prospect_view.hpp`, `.claude/rules/io-standing-rules.md`*
-
-### NR-1212 — Novelty: a base-site picker list, and a shared prospect-visibility test
-*novel-work · raised 2026-11-10 · from BL-1610 lane report*
-
-The design note expected a Lander "landed on a mapped tile"; a Lander lands at a surface node, so the lane built a site list the note did not anticipate. src/ui/prospect_view.hpp is a new shared piece every deposit-drawing surface now asks. Scope stayed small.
-
-**Why it matters.** Novelty should be chosen, not accreted (standing rules).
-
-- Accept the list as the base-site idiom
-- Replace it with a press on the Planetary canvas
-
-> **Recommendation:** Accept for v0.5.0; revisit in the v0.6.0 polish pass if it reads poorly in play.
-
-*Files: `src/ui/circum_units.cpp`, `docs/ui/SELECTION.md`*
-
-### NR-1213 — Garrison chase fix moves the campaign march; two harness re-aims taken
-*decision taken on your behalf · raised 2026-11-10 · from BL-1634 / BL-1632 lane reports*
-
-BL-1634 (garrison chase loop): units on a defend order now step last in the daily march, and re-aim at where the day's steps left the hostile stacks (economy_system.cpp run_unit_march; MILITARY.md § Defend province). Chosen over a swap/cross rule because the chase never swaps or crosses tiles. Side effect: a stack entering a province draws its defenders the same day, not the next. Any world where a defender steps beside other units moves, so play-path digests and sweeps may move; none of the harnesses run pins one. BL-1632 (stale tail harnesses): one helper, world_save_tail_bytes_after, replaces the hand sums; a static_assert breaks the build when the save version passes 92 until the new section joins its table. Calls: war_harness RF1 asserted ver == 76 and now asserts ver == world_save_version (as R4j and R9b do); tile_contact T13e and quarterly_return R5 passed only by corrupting the wrong section and are re-aimed at the bytes they name.
-
-**Why it matters.** The march change is a world-mover folded into the pending digest re-pin (NR-1167).
-
-- Accept the step rule
-- Prefer a same-tile meeting rule instead
-
-> **Recommendation:** Accept: one sentence, deterministic, reuses the existing targeting.
-
-*Files: `src/world/economy_system.cpp`, `docs/military/MILITARY.md`, `src/world/world_save.cpp`*
-
-### NR-1214 — Research pacing has drifted out of its pin (first research comes sooner and less evenly): re-pin, or treat it as a fold defect
-*question · raised 2026-11-10 · from BL-1635 lane report*
-
-nation_tech_harness R0h pins median quarters-to-first-research in [16,24]; R0i pins p10 >= 8. Pooled over the 16 library seeds: 10-15 db77bdde 20/11; 10-23 17/9; 10-24 17/7 (R0i first fails, the nations-own-everything wave); 10-25 15/5 (R0h first fails); 11-01 19/6; 11-03 15/5; HEAD 15/6. The largest single step on a two-seed probe (46/28) is f1d05dfc BL-1402 (fold to ground): 15/15 to 12/12, then small drops at the road-join, site-days and port-links commits. The seed re-curation is not the cause. Not re-pinned. Also from the same lane: well_gate shields its fixture from the rival dial with ai_cooldown = 8 (seating the player conflicts with the harness's seat move); railway R7/D now compares against a twin world with the track erased, since a nation may briefly run a negative treasury (BL-1482).
-
-**Why it matters.** Research is reached faster and more unevenly than the pacing band intends; either the band or the fold is wrong.
-
-- Re-pin the band to the post-fold reading (median 15, p10 6)
-- Treat it as a fold defect and file the work
-
-> **Recommendation:** Your call: the drift is the cost of nations owning their ground, and it is not obviously wrong.
-
-*Files: `tools/verify/nation_tech_harness.cpp`, `src/world/state_industry.cpp`*
 
 ---
 
@@ -998,4 +420,664 @@ docs/economy/RESEARCH.md gains a sentence for a major that needs one node of eac
 **Why it matters.** A grammar exception is how a tree loses its grammar.
 
 > **RESOLVED.** Ben, 2026-11-09: keep the new shape (one node of each arm).
+
+### NR-1160 — Near-space design filled in on your behalf: slot counts, signal delay of one quarter, data home only through coverage
+*decision taken on your behalf · raised 2026-11-10 · from space-mechanics session (worktree claude/space-mechanics-design), writing your form answers into SPACE_ASSETS.md*
+
+Your answers set the shape; I chose the rest. Nodes: surface, low, high per body, plus L1/L2/L4/L5 per pair (L3 left out). Slots: low 8 + 4 per Earth mass, high 4 (planet) or 2, L4/L5 3, L1/L2 2; first come, first held. Launch buys spacecraft_components + propellant off the home shelf. An order outside comms coverage waits one quarter; research, observation and survey data are earned only in coverage. An edge module (Dock, Shipyard) enclosed by a grid upgrade goes idle until refitted. Upgrades: 5x3 -> 7x5 -> 9x7. Budgets stop the newest module first. Solar power falls with the square of orbital radius.
+
+**Why it matters.** These are the numbers and rules a first playtest of v0.4.0 will feel.
+
+- Keep them
+- Name the ones to change
+
+> **Recommendation:** Keep them until the spectator run and your playtest say otherwise.
+
+> **RESOLVED.** Ben, 2026-11-10: accepted with every call taken on your behalf in this stretch ("accept all, tune in playtest").
+
+*Files: `docs/economy/SPACE_ASSETS.md`*
+
+### NR-1161 — Far-space design written whole on your behalf (SPACE_FLEETS.md and six sibling sections)
+*decision taken on your behalf · raised 2026-11-10 · from space-mechanics session, designing v0.5.0 so its lanes can run while you are away*
+
+New doc docs/military/SPACE_FLEETS.md: five hull classes (Hauler, Lander, Tug, Frigate, Cruiser; Cruiser only from a Shipyard); a dv budget that refuses an unaffordable move, cargo adding mass; refuel at a Dock+Fuel depot or over an owned Launchpad; a Dock berths two; space convoys are Haulers on the cheapest path, interdicted by hostile armed fleets on it; daily deterministic battles at a node; blockade = hostile armed fleet in low orbit with none of the holder's; bombardment from low orbit and an orbital defence battery. Also: debris as wear and cascade (SPACE_ASSETS), mapping-then-prospecting (DISCOVERY), bases as capitals that partition a body into provinces on first landing (NATIONS), war across every body (MILITARY), war-placed front pins (LAYOUT), seeded solar storms (EVENTS), firsts with a research grant, the propellant loop and the next age's tree (ERAS).
+
+**Why it matters.** It is a large design taken without a form. Each piece is in its owning doc, so a change is an edit there.
+
+- Keep and build as written
+- Pause v0.5.0 lanes for a design form when you are back
+
+> **Recommendation:** Keep and build; your v0.6.0 playtest is the place to reshape it.
+
+> **RESOLVED.** Ben, 2026-11-10: accepted with every call taken on your behalf in this stretch ("accept all, tune in playtest").
+
+*Files: `docs/military/SPACE_FLEETS.md`, `docs/economy/SPACE_ASSETS.md`, `docs/ui/DISCOVERY.md`, `docs/politics/NATIONS.md`, `docs/military/MILITARY.md`, `docs/ui/LAYOUT.md`, `docs/EVENTS.md`, `docs/economy/ERAS.md`*
+
+### NR-1162 — Space work is on its own branch, ids from BL-1580 and sprints 65 and 66
+*observation · raised 2026-11-10 · from space-mechanics session*
+
+All space work lands on branch claude/space-mechanics-design (worktree .claude/worktrees/space-mechanics-design), cut from local main and merged with main as it moves. It is not merged into main: main's checkout is shared, and other sessions commit there. Backlog ids start at BL-1580 (a gap above BL-1567) and NR ids at NR-1160, so a parallel session minting on main does not collide; sprints are numbered 65 (near space) and 66 (far space).
+
+**Why it matters.** Merging the branch into main, and whether 65/66 clash with a sprint another session opened, are yours to decide.
+
+- Merge into main when you are back
+- Keep it on the branch until v0.6.0
+
+> **Recommendation:** Merge at each version cut, after your look.
+
+> **RESOLVED.** Ben, 2026-11-10: accepted with every call taken on your behalf in this stretch ("accept all, tune in playtest").
+
+*Files: `docs/development/sprints.json`, `docs/development/backlog.json`*
+
+### NR-1164 — Generated bodies other than the homeworld carry mass 1.0, so a moon's climb is cheap only because it has no air
+*question · raised 2026-11-10 · from BL-1580 (orbital graph) lane report, confirmed by its harness WARN line on seed 20260911*
+
+hard_coded_world.cpp sets mass_earths only on the homeworld; planetology's per-body masses are not copied onto body_component. On the generated world the moon climbs 8.0 dv against home's 12.16 (atmosphere does all the work), an asteroid climbs 8.0, and low-orbit slots read 12 for both instead of 8. Copying the masses fixes it but moves body_km_per_tile (logistics.cpp) and so very likely the digests.
+
+**Why it matters.** Your item 7 wants smaller bodies cheaper to launch from; today the gap is half what it should be, and the asteroid is as heavy as the moon.
+
+- Copy planetology masses in generation and re-bless the digests
+- Keep body_km_per_tile on the old value and give the graph its own mass read
+- Leave it until v0.6.0
+
+> **Recommendation:** Copy the masses and re-bless at the v0.4.0 cut; you said continuity between releases is not a constraint.
+
+> **RESOLVED.** Ben, 2026-11-10: generate each body's size and density, and derive its mass (PLANETOLOGY.md § The prototype body set); the orbital graph reads it. Work: BL-1638 (generated body mass).
+
+*Files: `src/world/hard_coded_world.cpp`, `src/world/orbital_graph.cpp`, `src/world/logistics.cpp`*
+
+### NR-1165 — Which Digitisation node unlocks each near-space thing, and the Early Space tree's first cut
+*decision taken on your behalf · raised 2026-11-10 · from BL-1592 + BL-1607 lane report*
+
+Every near-space unlock rides an existing Digitisation node as an added mechanic effect (no node added): e.g. Comms role on Communication Satellites, Navigation on Satellite Navigation, Observation on Thermal Imaging, Survey on Seismic Survey, astronaut training on Mass Higher Education, Dock on Gantry Cranes, Power on Photolithography, 7x5 grid on Numerical Control; the station core sits on Rocketry so a nation can found a station as soon as it can launch. The Early Space tree's first cut is three trees of one branch each (In-Situ Propellant, Interplanetary Convoys, Space Force; 54 nodes), keyed by the Digitisation quests named in keys_next_branch; the other six named branches are reserved. Kit item keys (two drives, two tanks, two armaments, two armours, a debris arm) were invented; quest deeds, advantage figures and Era 3 branch names are placeholders.
+
+**Why it matters.** Where an unlock sits sets how soon a nation reaches each module, which is the opening of the space race.
+
+- Keep
+- Move named unlocks
+
+> **Recommendation:** Keep until the spectator run shows how soon rivals reach each module.
+
+> **RESOLVED.** Ben, 2026-11-10: accepted with every call taken on your behalf in this stretch ("accept all, tune in playtest").
+
+*Files: `docs/economy/tech/DIGITISATION_TREE.md`, `docs/economy/tech/EARLY_SPACE_TREE.md`, `src/world/space_tech_keys.hpp`*
+
+### NR-1166 — Novel work: per-tree research state so a nation can research the next age's tree
+*novel-work · raised 2026-11-10 · from BL-1607 lane report*
+
+The research queue has one held set and one queue, both sized to the Digitisation tree, and no Era 1 -> Era 2 gate query exists. Filed as BL-1612 (early space researchable): per-tree state with a save leg, the gate query, and branch keys by quest. All Digitisation quest deeds are declared unread, so no branch can be keyed today; the item reads them or lets the gate stand in.
+
+**Why it matters.** It grows the research system from one age to two, which no doc had designed in code terms.
+
+- Build it as filed
+- Collapse far-space unlocks onto the Digitisation tree instead
+
+> **Recommendation:** Build it as filed; it is the shape RESEARCH.md already describes.
+
+> **RESOLVED.** Ben, 2026-11-10: accepted with every call taken on your behalf in this stretch ("accept all, tune in playtest").
+
+*Files: `docs/economy/RESEARCH.md`, `src/world/nation_tech.cpp`*
+
+### NR-1167 — Re-pin the player_seed_sweep digests at the v0.4.0 cut (the save format moved them, the world did not)
+*question · raised 2026-11-10 · from BL-1583 lane report: save v80 -> v81*
+
+Adding the station section bumped world_save_version 80 -> 81, and player_seed_sweep --digest-check fails seeds 46 and 31 on D_land, D_settle and D_seat (D_search unmoved). rebless_shape_probe on both trees: every ROW and MIX line identical, so the world is unchanged; only the stream moved, as with earlier version bumps. More space save legs land in sprint 65 (slots, roles, pending orders, per-tree research), each moving the stream again.
+
+**Why it matters.** A failing digest gate hides any real world movement that lands beside it.
+
+- Re-pin once at the v0.4.0 cut, with a shape probe either side
+- Re-pin after each save leg
+
+> **Recommendation:** Once at the v0.4.0 cut; I will run the shape probe and leave the re-pin for your go.
+
+> **RESOLVED.** Ben, 2026-11-10: re-pin once, after the launch fix lands.
+
+*Files: `tools/verify/player_seed_sweep.cpp`*
+
+### NR-1168 — Station model calls: core costs, module numbers, which module stops, removal keeps crew
+*decision taken on your behalf · raised 2026-11-10 · from BL-1583 + BL-1585 lane report*
+
+Core launch 50,000 cr, upkeep 2,500; core gives power 4, crew room 2, life support 2, needs 1 crew. Module draw/crew: Research 3/1, Defence 2/1, Power 0/0 (+6), Dock 1/1, Habitation 1/0 (+4 room), Life support 2/0 (+4), Fuel depot 1/0, Shipyard 4/2, Factory 4/2, Observatory 2/1, Relay 1/0, Cargo 0/0, Market 1/1. On a shortfall the newest module drawing on the SHORT budget stops (a Power module is passed over in a crew shortfall). An upgrade grows the grid when ordered, its truss launched after. Removing an arrived module moves its crew onto the core; a lost core loses the whole station and its crew. Training: 2 astronauts per centre per quarter, pool cap 20 per running centre; the Astronaut Training Centre costs 300 cr, 240 days, 35 steel.
+
+**Why it matters.** These set how fast a station grows and what a shortfall feels like.
+
+- Keep
+- Name the numbers to change
+
+> **Recommendation:** Keep until the spectator run.
+
+> **RESOLVED.** Ben, 2026-11-10: accepted with every call taken on your behalf in this stretch ("accept all, tune in playtest").
+
+*Files: `src/world/stations.hpp`, `scripts/economy.lua`*
+
+### NR-1169 — Early Space branches open on a stand-in until quest deeds are read: Rocketry alone keys Interplanetary Convoys
+*decision taken on your behalf · raised 2026-11-10 · from BL-1612 lane report*
+
+Every Digitisation quest deed is declared unread, so no quest can be held and no Early Space branch could ever open. Stand-in (one place, branch_keyed_in): a branch is keyed if its quest is held, or if the quest's deed is unread and its major prerequisite is held. Consequence: any nation that meets the Era 2 gate already holds Rocketry, so Interplanetary Convoys (hulls, landers, tugs, drives) opens with the gate; In-Situ Propellant needs DG-PR-EN-C, Space Force needs Proven Readiness's major. One research pool and one queue: Digitisation entries are paid first. New dial space_gate_min_propellant = 1.0 (one launch's draw), since ERAS.md names a Lua threshold that did not exist.
+
+**Why it matters.** It decides how soon far space opens after the first launch.
+
+- Keep the stand-in until deeds are read
+- Read the space quest deeds now (first convoy to another body etc.)
+
+> **Recommendation:** Keep; the firsts item (BL-1606, space firsts) reads the same deeds and can retire the stand-in.
+
+> **RESOLVED.** Ben, 2026-11-10: accepted with every call taken on your behalf in this stretch ("accept all, tune in playtest").
+
+*Files: `src/world/nation_tech.cpp`, `docs/economy/RESEARCH.md`*
+
+### NR-1170 — A new near-space command seam (space_command.*) beside the nation command path
+*novel-work · raised 2026-11-10 · from BL-1588 lane report*
+
+Space verbs (launch, move, fit, retire, set role and so on; 11 gameplay.space_* entries in ACTIONS.json) go through a new space_command seam. It holds a pending-order queue for signal delay: an order outside comms coverage waits one quarter, then applies or is dropped if it is no longer legal. The seam validates as an untrusted boundary, but no --serve/MCP transport carries it yet.
+
+**Why it matters.** It is a second command path; the AI and the wire must both use it.
+
+- Keep it separate (space orders carry delay; ground orders do not)
+- Fold it into the nation command path later
+
+> **Recommendation:** Keep; file the --serve/MCP transport as v0.5.0 work.
+
+> **RESOLVED.** Ben, 2026-11-10: accepted with every call taken on your behalf in this stretch ("accept all, tune in playtest").
+
+*Files: `src/world/space_command.hpp`, `docs/ai/ACTIONS.json`*
+
+### NR-1171 — Launch cost formula and slot use: base + 250 per dv + goods value; slots only for satellites and cores
+*decision taken on your behalf · raised 2026-11-10 · from BL-1581/BL-1582 lane report*
+
+Launch cost = base + 250 credits per unit of delta-v climbed + the market value of the goods bought off the home shelf. Only satellites and station cores take an orbital slot. A station core may launch to any orbital node, including L-points. Launch and move debits are paid but are not yet booked as a line in the nation return.
+
+**Why it matters.** It sets how expensive space is, and the return under-reports the spend.
+
+- Keep these numbers for v0.4.0 and tune after the spectator run
+- Book the debits as a return line now
+
+> **Recommendation:** Keep the numbers; book the return line with the Space ledger item, BL-1591 (space ledger and designer).
+
+> **RESOLVED.** Ben, 2026-11-10: accepted with every call taken on your behalf in this stretch ("accept all, tune in playtest").
+
+*Files: `src/world/space_command.cpp`, `docs/economy/SPACE_ASSETS.md`*
+
+### NR-1172 — Station and satellite effect dials and stand-ins taken by the effects lane
+*decision taken on your behalf · raised 2026-11-10 · from BL-1584/BL-1586 lane report*
+
+Life support keeps no memory: a station either buys its rations this quarter or starves. Electronics stands in as the factory module's output good. An Observation satellite lifts only the vision fog, not the activity fog. Survey satellites start the mapping, at a stand-in rate until prospecting lands (v0.5.0). Dials: navigation factor 0.9, research module 50 RP a quarter; the rest are in space_effects.hpp.
+
+**Why it matters.** These are first numbers; the spectator run will show whether they matter.
+
+- Accept as first cut
+- Revisit any dial
+
+> **Recommendation:** Accept; revisit after the spectator observation.
+
+> **RESOLVED.** Ben, 2026-11-10: accepted with every call taken on your behalf in this stretch ("accept all, tune in playtest").
+
+*Files: `src/world/space_effects.cpp`, `docs/economy/SPACE_ASSETS.md`*
+
+### NR-1173 — Space units: an authored hull and item stat table, the rocket equation, and a depot that buys propellant on its own
+*novel-work · raised 2026-11-10 · from BL-1594/BL-1595 lane report*
+
+Delta-v is the rocket equation over propellant aboard (never a stored delta-v). Five hulls (Hauler 10 mass/20 hp, Lander 8/15, Tug 8/20, Frigate 14/40, Cruiser 40/120 and yard-only) and eleven items (chemical drive ve 10, nuclear thermal ve 20, tanks 20/45, kinetic and missile armament, Whipple and composite armour, cargo and passenger bays, capture arm) are a new numeric table no doc owns. A working Fuel depot fills itself each quarter off the owner home shelf (200 a depot). Raising draws goods market-direct and credits no seller. Docking is own-nation only. Dials: launch_propellant_per_dv 0.1, repair 1/day, quarters_to_loss 4, berths_per_dock 2. Space-unit verbs, UI and cargo loading are owed (BL-1596 onward).
+
+**Why it matters.** The table sets how far and how cheaply fleets move; the depot is a new automatic buyer.
+
+- Accept the table as a first cut and tune at the v0.6.0 playtest
+- Move the table into SPACE_FLEETS.md as authority now
+
+> **Recommendation:** Accept; the numbers live on recipe_registry::space_units() and can move to Lua later.
+
+> **RESOLVED.** Ben, 2026-11-10: accepted with every call taken on your behalf in this stretch ("accept all, tune in playtest").
+
+*Files: `src/world/space_units.cpp`, `docs/military/SPACE_FLEETS.md`*
+
+### NR-1174 — Pinned panel: pins travel in the UI save (save_game v28); the lens key and the panel share the column
+*decision taken on your behalf · raised 2026-11-10 · from BL-1603 lane report*
+
+Player pins are saved in the ui_state slice (save_game_version 28; v27 opens with no pins). Front pins are derived each frame and never saved: one per (war, body) where both sides hold land. The panel stops one margin above a grown lens key (a new shell_metrics hand-off). The pin toggle sits left of the band header go-to button, or ends the tile heading row. New verify read verify.pinned_panel() reports only what the panel draws; it reads no tile data, so no grant was taken. Fronts off the home body wait on BL-1602 (interplanetary war).
+
+**Why it matters.** A save-format change and a chrome hand-off grew past a UI-only brief; a live click is still owed.
+
+- Accept
+- Keep pins out of the save
+
+> **Recommendation:** Accept.
+
+> **RESOLVED.** Ben, 2026-11-10: accepted with every call taken on your behalf in this stretch ("accept all, tune in playtest").
+
+*Files: `src/ui/pinned_panel.cpp`, `src/core/save_game.cpp`, `docs/ui/LAYOUT.md`*
+
+### NR-1175 — Circumplanetary assets: L5 clamped above the band, first-cut mark sizes, a new space_asset selection kind
+*decision taken on your behalf · raised 2026-11-10 · from BL-1590 lane report*
+
+At 1280x720 the bottom band (~280 px) covers the moon outer orbit, so its L5 diamond is clamped above the band and floats off its orbit when zoomed. The alternative is to lift the rung centre so the whole system clears the band. Satellite plate radius 5.5 px; station 8.5 px plus 2 per grid ring; the player dark magenta reads dim on the satellite plate. A new selection_kind::space_asset (a station selects by its core) and its band card were added; SELECTION.md carries the row. New verify calls near_space_fixture (staging) and circum_assets report only what the canvas draws and touch no tile data, so no grant was taken. The transit segment needs an origin node and departure tick on a moving asset (a save change): filed as work.
+
+**Why it matters.** A visual call, and whether verify staging calls need a dated grant when they carry no tile data.
+
+- Keep the clamp
+- Lift the rung centre above the band
+
+> **Recommendation:** Lift the rung centre; a clamped L-point lies about where it is.
+
+> **RESOLVED.** Ben, 2026-11-10: accepted with every call taken on your behalf in this stretch ("accept all, tune in playtest").
+
+*Files: `src/ui/circum_nodes.cpp`, `src/ui/circum_assets.cpp`, `docs/ui/CIRCUMPLANETARY.md`*
+
+### NR-1176 — Spectator finding: rivals reach Rocketry (first 1976, 14 of 41 by 2000) but launch nothing, because no Launchpad ever exists
+*decision taken on your behalf · raised 2026-11-10 · from BL-1589 lane report (seed 0 spectate to 2000)*
+
+Rocketry holders: 2 in 1977, 3 in 1978, 7 in 1988, 14 by 1994. Launches 0, space spend 0: every holder is blocked no_launchpad. Nothing builds a Launchpad (not generation, not the nation build scorer), and placement_rules.cpp allows ONE Launchpad per body world-wide, so on a shared home world only one nation could ever launch. SPACE_ASSETS.md says a staffed Launchpad on the nation home body, i.e. one per nation. Training centres are never built either, so every astronaut pool is 0. Treasuries: richest about 35.6k in 1975, about 108k-123k by 2000; a comms satellite quotes about 23.5k, a core about 60k. DECISION TAKEN: the doc wins, the cap becomes one Launchpad per nation per body; rivals build a Launchpad and an Astronaut Training Centre through the build scorer on their own ground. I read this as inside the 2026-10-23 build grant (what to build, own ground) and the 2026-11-10 space grant (which names astronaut training), not a new widening; filed as BL-1615 (rival space groundwork).
+
+**Why it matters.** This is the first hurdle Ben asked about: without it no rival goes to space at all.
+
+- Accept: per-nation pads, rivals build pads and centres
+- Generation opens a pad for each major instead
+- Keep one pad per body and make it a contested asset
+
+> **Recommendation:** Accept; it matches the doc and the existing grants.
+
+> **RESOLVED.** Ben, 2026-11-10: accepted with every call taken on your behalf in this stretch ("accept all, tune in playtest").
+
+*Files: `src/world/placement_rules.cpp`, `src/world/nation_ai.cpp`, `docs/economy/SPACE_ASSETS.md`, `docs/ai/AI_OPPONENT.md`*
+
+### NR-1177 — Rival space scorer dials: research relief 0.25 for near-space keys, half-treasury reserve, a fixed 14-module target
+*decision taken on your behalf · raised 2026-11-10 · from BL-1589 lane report*
+
+The research picker weighed only Rocketry among mechanic keys; every other near-space key now earns research_space_key_relief 0.25 (half of research_unlock_relief) x the space emphasis. That moves rival research picks after the handover in every campaign, so post-handover campaign digests are expected to move (not measured, nothing re-blessed). Reserve: one action spends at most half the treasury and keeps 8 quarters of space upkeep. A comms satellite first, then a core at the cheapest free home node, then modules toward a fixed order (power, research, habitation, life support, power, research, observatory, comms relay, power, habitation, life support, research, fuel depot, cargo hold). Home body only; no upgrades, retasks or crewed missions. Never the player nation, even under spectate.
+
+**Why it matters.** These set how fast and how far rivals climb.
+
+- Accept as first cut
+- Tune after the groundwork rerun
+
+> **Recommendation:** Accept; re-read after BL-1615 (rival space groundwork) lets them launch.
+
+> **RESOLVED.** Ben, 2026-11-10: accepted with every call taken on your behalf in this stretch ("accept all, tune in playtest").
+
+*Files: `src/world/nation_ai.cpp`*
+
+### NR-1178 — Space battle dials and stand-ins: pooled armour can stall a battle, double-count across two battles at one node
+*decision taken on your behalf · raised 2026-11-10 · from BL-1597 lane report*
+
+Defence module firepower 12, armour 6, hull points 40, mass 6; core mass 20; 16 closed reports kept. Armour is spent once per target per day, so a side whose whole fire is at or below the front target armour lands nothing and the battle can stall with no forced end. Defence damage lives in the battle record (no repair rule). One battle per (node, nation pair): a nation hostile to two others at one node fires its whole firepower into both. Crew loss may be counted in both the battle and the station step reports. Withdrawn fleets can meet again where they withdraw to.
+
+**Why it matters.** A stalled battle never ends; the double-count favours a side fighting two enemies.
+
+- Accept and add a stall rule later
+- Add a daily minimum damage now
+- Split a nation fire across its battles
+
+> **Recommendation:** Add a stall rule (a battle with no damage for N days ends as a standoff) with BL-1598 (debris).
+
+> **RESOLVED.** Ben, 2026-11-10: accepted with every call taken on your behalf in this stretch ("accept all, tune in playtest").
+
+*Files: `src/world/space_battle.cpp`, `docs/military/SPACE_FLEETS.md`*
+
+### NR-1179 — Mapping then prospecting: the old probe and the two-step model overlap; deposits still show on mapped ground
+*question · raised 2026-11-10 · from BL-1600 lane report*
+
+Other bodies do have tile grids (Cinder 180x84, Selene 90x42, asteroids 30x14), and survey regions are the existing 8-tile partition. Knowledge is now per (nation, body); the home world counts as surveyed for all. A dispatched probe still reveals tiles and deposits the old way, and a body being mapped from orbit refuses a probe. The Planetary canvas gates deposits on survey_tile_visible only, so mapped ground still shows deposits before prospecting (UI work, noted on BL-1610 (base and prospect UI)). corp_ai reads the player mirror body.survey for fog. Novel: per-nation geographic fog state. Dials: satellite 4 regions/quarter, Observatory 2, prospect 1/quarter; region 0 stands in for the landing site; prospecting needs no comms coverage.
+
+**Why it matters.** Two routes to the same knowledge confuse the player; the AI reads the player view.
+
+- Retire the probe in favour of mapping then prospecting
+- Keep the probe as a second, cheaper route
+
+> **Recommendation:** Retire the probe; one route reads cleaner.
+
+> **RESOLVED.** Ben, 2026-11-10: retire the probe; mapping then prospecting is the one route. Work: BL-1639 (retire the survey probe).
+
+*Files: `src/world/survey_system.cpp`, `docs/ui/DISCOVERY.md`*
+
+### NR-1180 — Space convoys: the straight-line lane kept for nations with no Hauler design; a chemical Hauler cannot round-trip home to moon
+*decision taken on your behalf · raised 2026-11-10 · from BL-1596 lane report*
+
+A nation with a live Hauler design ships inter-body trades as Haulers; one without still uses the old straight-line space lane (kept so worlds without designs do not move; the backlog says Haulers replace it). Unescorted Haulers meeting an armed hostile are lost with cargo; escorted ones wait (battles now exist, so the wait should become a battle). Unloading uses the lowest-id staffed pad of ANY nation on the body. The cargo cap reserves fuel for the empty trip home, with no refuelling counted, so the default chemical Hauler cannot round-trip home-moon; interplanetary Hauler trade is effectively closed until refuelling at the destination is counted. Each hop takes at least a day. Novel: the first cross-store save check (each outbound haul matches its live convoy).
+
+**Why it matters.** As built, Hauler trade rarely pays and the old lane still carries most space trade.
+
+- Count destination refuelling in the cap
+- Retire the old lane now
+
+> **Recommendation:** Count destination refuelling where the owner has a pad there; retire the old lane once rivals hold Hauler designs (BL-1608 (rival far-space AI)).
+
+> **RESOLVED.** Ben, 2026-11-10: accepted with every call taken on your behalf in this stretch ("accept all, tune in playtest").
+
+*Files: `src/world/space_convoy.cpp`, `src/world/supply_system.cpp`, `docs/military/SPACE_FLEETS.md`*
+
+### NR-1181 — Solar storms are the first campaign event built ahead of the event system: hard-coded, derived from the seed, purely negative
+*novel-work · raised 2026-11-10 · from BL-1605 lane report*
+
+A storm is a pure function of the world seed and econ tick: one seeded draw per 12-quarter solar cycle (750 in 1000 carry a storm), so about three a decade and nothing saved. Every L-point and every asteroid orbit is exposed; planet and moon orbits are sheltered (binary; the doc names no strength or shielding). A struck satellite is dark for every role read; a struck station stops all modules for the quarter; nothing is worn or lost; astronauts untouched. A working Observatory warns its owner a quarter ahead; only the player row posts, on the Field channel. It is C++, not a Lua event on condition_set / modifier_set, because the general event system (BL-548) is not built; EVENTS.md says no event may be purely negative, and this one is. The canvas does not yet mark a dark satellite or stormed station.
+
+**Why it matters.** It sets a precedent for events built before the event system.
+
+- Accept as a hard-coded stand-in, migrate when the event system lands
+- Give storms an upside now (e.g. research from an observed storm)
+
+> **Recommendation:** Accept; add the upside and the canvas marker with BL-1609 (fleet UI).
+
+> **RESOLVED.** Ben, 2026-11-10: accepted with every call taken on your behalf in this stretch ("accept all, tune in playtest").
+
+*Files: `src/world/solar_storm.hpp`, `docs/EVENTS.md`*
+
+### NR-1182 — Space ledger: rail slot 9 renumbers History and the developer tail; a verify fixture writes the player tech, buildings and treasury
+*decision taken on your behalf · raised 2026-11-10 · from BL-1591 lane report*
+
+Space sits at rail slot 9 after Diplomacy, under MENU.md rule that curated systems go above the developer tail; History and the tail move down and the rail has 13 slots (nav_rail_fit passes at 1280x720 and 1920x1080). verify.space_ledger_fixture() stages the player nation with every Digitisation node, a staffed pad and training centre, 40 astronauts and 5M credits; it reveals no tile data. Gaps against ledgers/space.md: applying a template does not quote its total first; satellite Move has no control; the Assets list does not show per-module rows. A live click in the built app is still owed (the scripted run passes 39 checks).
+
+**Why it matters.** Rail order is a layout call; verify staging calls are listed by date in the standing rules.
+
+- Accept slot 9 and the fixture
+- Move Space elsewhere on the rail
+
+> **Recommendation:** Accept; record the staging fixtures (this and near_space_fixture) as a dated verify grant if you want them listed.
+
+> **RESOLVED.** Ben, 2026-11-10: accepted with every call taken on your behalf in this stretch ("accept all, tune in playtest").
+
+*Files: `src/ui/space_ledger.cpp`, `src/ui/nav_pane.cpp`, `docs/ui/MENU.md`, `src/core/verify_api.cpp`*
+
+### NR-1183 — Debris and the battle stall: a standoff after 10 quiet days, settled in SPACE_FLEETS.md by the lane
+*novel-work · raised 2026-11-10 · from BL-1598 lane report*
+
+Debris per node grows from every orbital loss (battle, upkeep, wear), wears assets (0.004 a quarter per unit of debris) and damages units daily (0.002 hp per debris), decays by drag in low orbit only (0.08 a quarter), and an idle Tug with a capture arm clears 6 a quarter at its node (no new verb: moving the Tug there is the order). The cascade is emergent (wear reaches 1, the wreck raises the level), with no separate threshold. The battle stall answers NR-1178: a battle with no damage landed for stall_days = 10 ends as a standoff, and that pair does not re-engage at the node until one side could land fire. No doc owned the stall, so the lane wrote it into SPACE_FLEETS.md § Battles as settled design. No UI reads debris yet.
+
+**Why it matters.** A rule written into an authority doc without a ruling.
+
+- Confirm the stall rule
+- Change the window or the re-engage condition
+
+> **Recommendation:** Confirm.
+
+> **RESOLVED.** Ben, 2026-11-10: accepted with every call taken on your behalf in this stretch ("accept all, tune in playtest").
+
+*Files: `src/world/debris.cpp`, `src/world/space_battle.cpp`, `docs/military/SPACE_FLEETS.md`, `docs/economy/SPACE_ASSETS.md`*
+
+### NR-1195 — Blockade and bombardment built with four calls taken on your behalf
+*decision taken on your behalf · raised 2026-11-10 · from BL-1599 lane report*
+
+(1) A bombardment strike charges the existing force_used Alarm path; there is no separate missile Alarm code. (2) The orbital defence battery is a new building type, number 15, opened by its own Early Space node; it fires at hostile units in its body's low orbit. (3) Strikes spend no munitions; the cost is the unit's upkeep and its exposure to the battery. (4) A unit the battery kills does not raise debris, unlike a battle loss. Save v89 carries the standing bombard orders; blockade is derived and adds no bytes.
+
+**Why it matters.** Calls (1), (3) and (4) shape how costly orbital war is.
+
+- Accept all four
+- Give strikes a munitions cost
+- Feed battery kills into debris
+
+> **Recommendation:** Accept for v0.5.0; feeding battery kills into debris is a one-line follow-up if wanted.
+
+> **RESOLVED.** Ben, 2026-11-10: accepted with every call taken on your behalf in this stretch ("accept all, tune in playtest").
+
+*Files: `src/world/space_bombard.cpp`, `docs/military/SPACE_FLEETS.md`*
+
+### NR-1196 — Rivals cannot bombard or blockade yet: no AI uses the new verbs
+*novel-work · raised 2026-11-10 · from BL-1599 lane report*
+
+The bombard order and the battery are player-and-script only. Rival use belongs to BL-1608 (rival far-space AI), which is open; the 2026-11-10 grant covers it.
+
+**Why it matters.** The spectator check will show rivals never striking until BL-1608 lands.
+
+- Leave it to BL-1608 (rival far-space AI)
+
+> **Recommendation:** Leave it to BL-1608.
+
+> **RESOLVED.** Resolved by BL-1608 (rival far-space AI), whose war pick bombards from low orbit. Ben, 2026-11-10: accepted.
+
+*Files: `src/world/corp_ai.cpp`*
+
+### NR-1197 — Grant reading: rivals building their own Launchpad and Training Centre
+*decision taken on your behalf · raised 2026-11-10 · from BL-1615 lane report*
+
+The lane read the 2026-11-10 space grant (which names astronaut training) together with the 2026-10-23 own-economy build grant as covering a rival building its own pad and centre, on its own ground, through the build verb, paid only with twice the capex uncommitted. Never for the player nation. Pads are placed nearest the capital.
+
+**Why it matters.** A grant read as covering a new subject is the pattern AI_OPPONENT.md § 11 asks to be raised.
+
+- Confirm the reading
+- Write it into § 11 as its own dated line
+
+> **Recommendation:** Confirm, and add one line to § 11 so the reading is on record.
+
+> **RESOLVED.** Ben, 2026-11-10: accepted with every call taken on your behalf in this stretch ("accept all, tune in playtest").
+
+*Files: `src/world/corp_ai.cpp`, `docs/ai/AI_OPPONENT.md`*
+
+### NR-1198 — Branch ids collide with main: BL-1580..1618 and NR-1181..1183, save v83..v88
+*question · raised 2026-11-10 · from main session, merge prep*
+
+This branch minted BL-1580..1615 and NR-1181..1183; main now holds BL ids up to 1618 and NR-1181..1194 (the naval merge), plus world save v83 (BL-1562) and v88 (naval) and envelope v29. New ids on this branch start at BL-1630 and NR-1195. Merging the branch into main needs a renumber pass of ids and save versions.
+
+**Why it matters.** The merge is yours (NR-1162); this is its cost.
+
+- Renumber this branch at the merge
+- Renumber main's side
+
+> **Recommendation:** Renumber this branch at the merge; its versions stack on top of main's.
+
+> **RESOLVED.** Ben, 2026-11-10: merge after the launch fix; renumber this branch onto main's ids and save versions then.
+
+*Files: `docs/development/backlog.json`, `src/world/world_save.hpp`*
+
+### NR-1199 — Grant reading: the rival research picker also picks Early Space nodes
+*decision taken on your behalf · raised 2026-11-10 · from BL-1613 lane report*
+
+The research grant covers one frontier node at a time over the nation's own tree. Once a rival meets the gate into space, the picker also scores Early Space nodes it can queue alone (quests excluded), by the same rule; a tie keeps the Digitisation node. The lane read the second tree as the same verb on the same queue.
+
+**Why it matters.** A second tree may be a new subject under AI_OPPONENT.md § 11.
+
+- Confirm: same verb, same queue
+- Treat it as a new grant and write it into § 11
+
+> **Recommendation:** Confirm, with one dated line in § 11.
+
+> **RESOLVED.** Ben, 2026-11-10: accepted with every call taken on your behalf in this stretch ("accept all, tune in playtest").
+
+*Files: `src/world/nation_ai.cpp`, `docs/ai/AI_OPPONENT.md`*
+
+### NR-1200 — Research age tabs: re-clicking the active tab closes the panel
+*decision taken on your behalf · raised 2026-11-10 · from BL-1613 lane report*
+
+The research canvas has Digitisation and Early Space tabs. Per the toggle rule, re-clicking the active tab closes the research panel. If the tabs count as a cross-cutting selector (exempt), that press should do nothing instead. The Early Space tree draws as three branch columns, not a ring (the lane's layout call).
+
+**Why it matters.** A small UX call, and a layout you have not seen.
+
+- Keep: toggle closes
+- Exempt the tabs
+
+> **Recommendation:** Keep; it matches every other sub-view tab.
+
+> **RESOLVED.** Ben, 2026-11-10: accepted with every call taken on your behalf in this stretch ("accept all, tune in playtest").
+
+*Files: `src/ui/tech_tree_panel.cpp`*
+
+### NR-1201 — Off-world bases: colonists, the base kit and life support are stand-ins no doc defined
+*novel-work · raised 2026-11-10 · from BL-1601 lane report*
+
+Colonists are counted in thousands, one Lander passenger berth per thousand; a base needs 2. The base kit is 20 machinery carried as cargo on a landed Lander. Life support is 1 water and 1 food ration per thousand per quarter, scaled by the habitability the tile lacks (oxygen folded into water). An unfed quarter costs max(1, ceil(25%)) of the people; the base is razed at 0. Colonists come from the most populous home centre that keeps at least a thousand. All are dials in offworld_base_params. Founding lays one Track to a dry neighbour so the base can build at all. Save v90.
+
+**Why it matters.** These numbers set how hard a base is to keep alive.
+
+- Accept as first cut
+- Retune any of them
+
+> **Recommendation:** Accept for v0.5.0; tune in the v0.6.0 playtest.
+
+> **RESOLVED.** Ben, 2026-11-10: accepted with every call taken on your behalf in this stretch ("accept all, tune in playtest").
+
+*Files: `src/world/offworld_base.cpp`, `docs/politics/NATIONS.md`*
+
+### NR-1202 — A fed base reads its province at habitability 1 (the building ceiling, labour and the hub source)
+*decision taken on your behalf · raised 2026-11-10 · from BL-1601 lane report*
+
+Five home-body assumptions were widened to a base: labour and workforce read the base habitability (1 when fed); the logistics chain anchor and the capital free source fall back to the base capital on that body; and measure_province_sustain, which capped an airless province at one building, reads a fed base province at habitability 1. The last is a design reading, not a bug fix.
+
+**Why it matters.** It decides how much a base can grow.
+
+- Accept: a fed base is habitable ground
+- Keep the airless cap and let bases stay small
+
+> **Recommendation:** Accept.
+
+> **RESOLVED.** Ben, 2026-11-10: accepted with every call taken on your behalf in this stretch ("accept all, tune in playtest").
+
+*Files: `src/world/province.cpp`, `src/world/economy_system.cpp`, `src/world/logistic_points.cpp`*
+
+### NR-1204 — The BL-644 space-programme lumps are retired by data (authored at zero)
+*decision taken on your behalf · raised 2026-11-10 · from BL-1630 lane report*
+
+The lumps bought a whole launch lot off any shelf and consumed it with nothing launched; seed 0 1983-2000 bought 80 lumps and starved every launch. The real launch now buys the goods, so components_lump and propellant_lump are 0 in economy.lua and NATIONS.md says so. A staffed pad instead posts a standing bid (standing_lots = 1) on its home market, including the player's pad: a demand on the market, nothing bought or built for you. The state hash moves after 1980; no digest re-pinned.
+
+**Why it matters.** Post-1960 pins will move at the next re-bless.
+
+- Accept
+- Limit the standing bid to rivals
+
+> **Recommendation:** Accept.
+
+> **RESOLVED.** Ben, 2026-11-10: accepted with every call taken on your behalf in this stretch ("accept all, tune in playtest").
+
+*Files: `scripts/economy.lua`, `src/world/economy_system.cpp`, `docs/politics/NATIONS.md`*
+
+### NR-1206 — Rival units at a moon base are not kept home: a scorer change, raised
+*question · raised 2026-11-10 · from BL-1602 lane report*
+
+corp_ai.cpp keeps the capital province's units at home, reading only the home capital. A rival's units at an off-world base would be sent to fronts. Treating a base province as a home to keep is a scorer change to land behaviour. The 2026-11-10 grant names space verbs; it is silent on land units at a base. Also taken by the lane: a cross-body front assignment is refused; the fallback war goal prefers the defender's base on that body; a ceded capital stays on its own body while land remains there (MILITARY.md § Space).
+
+**Why it matters.** A rival base would be stripped of its garrison.
+
+- Grant it: a base province is a home the scorer keeps
+- Leave it for BL-1608 (rival far-space AI) to cover
+
+> **Recommendation:** Grant it inside BL-1608; it is one line in the keep-home rule.
+
+> **RESOLVED.** Ben, 2026-11-10: granted; a base province is a home the scorer keeps (the dial is switched on).
+
+*Files: `src/world/corp_ai.cpp`*
+
+### NR-1207 — Space firsts: five calls taken, and the player cannot see a first yet
+*decision taken on your behalf · raised 2026-11-10 · from BL-1606 lane report*
+
+(1) Ties go to the lowest nation id; firsts are judged by the day. (2) A flat 400 RP per first (economy.research.space_first_grant_rp), not scaled with the research price. (3) The convoy first counts on delivery to another body's market, not dispatch. (4) Crew in orbit includes crew aboard a station core, so a station core launch can take both firsts. (5) One public history entry per first, tagged with the taker. The player's dispatch shows only war entries, so no surface shows a first yet. Calls 1 and 2 are written into ERAS.md § Firsts. Save v91.
+
+**Why it matters.** The grant size sets how much racing to space pays.
+
+- Accept all
+- Scale the grant with the research price
+- Count the convoy at dispatch
+
+> **Recommendation:** Accept; tune the 400 in playtest.
+
+> **RESOLVED.** Ben, 2026-11-10: accepted with every call taken on your behalf in this stretch ("accept all, tune in playtest").
+
+*Files: `src/world/space_firsts.cpp`, `docs/economy/ERAS.md`*
+
+### NR-1208 — Fleet UI: nine calls taken, and seven new verify reads to grant
+*decision taken on your behalf · raised 2026-11-10 · from BL-1609 / BL-1614 lane report*
+
+Calls: (1) unit orders are not signal-delayed; (2) orders sit on the Selection card, not a right-click; (3) bombard targets whole provinces, listed where a building can be struck; (4) one fleet mark per (node, owner), a press selects the lowest-id lead, "Whole fleet" moves them all; (5) an asset's transit share is quarters gone plus day/90, a unit's from path days; (6) the card has two columns, destinations cheapest first; (7) the space designer expands rows in place; Recruit has no Space tab; (8) theatre_tabs became a template for four Design tabs; (9) a digest from a world with assets in transit may move (the origin is hashed). The space_command seam gained eight unit verbs (13-20) from a UI item. New verify reads, each reporting what the screen draws (screen positions included): verify.circum_transits, circum_fleets, solar_fleets, circum_fleet_hovered, circum_debris, fleet_card, space_designs; STAGING verify.space_fleet_fixture writes a Frigate design, four units and debris 25 (returns counts and the player id); circum_assets rows gain a storm flag. A solar storm cannot be staged (derived from the seed), so no capture shows the storm mark.
+
+**Why it matters.** The verify reads touch the no-tile-data rule (io-standing-rules § Determinism & data model); each needs your grant like the ten before it.
+
+- Grant the reads as an eleventh scoped exception
+- Narrow them
+
+> **Recommendation:** Grant: they report only what the canvas draws.
+
+> **RESOLVED.** Ben, 2026-11-10: granted as a scoped exception (io-standing-rules.md, eleventh).
+
+*Files: `src/core/verify_api.cpp`, `src/world/space_command.hpp`, `.claude/rules/io-standing-rules.md`*
+
+### NR-1209 — Rival far-space AI: five calls taken; rivals design but raise nothing (the NR-1203 wall)
+*decision taken on your behalf · raised 2026-11-10 · from BL-1608 lane report*
+
+One far-space verb per rival per quarter, first wanted and legal of: design (best researched item per slot, redesign when a better one is researched), war (bombard from low orbit, move the fleet whole only when every unit there is armed, raise Frigates up to 2 per hostile, max 6), base (embark, load kit, move, found on the most-deposit prospected tile; max 1 base). Calls: (1) a base trip a full Lander cannot make with the 20-unit kit is refused (14.6 dv loaded vs 21.7 empty), so a heavy moon never gets a base; (2) once a rival holds a Hauler design the existing trade code ships its inter-body trade by Hauler, which moves the world from ~2020 (BL-1596's design); (3) Tugs and Cruisers get designs but are never raised; no shipyard or docking used; (4) the pick pays at the fair-price ceiling; (5) the pick's priority order is written only in nation_ai.hpp, not AI_OPPONENT.md. NR-1206 keep-home is wired behind far_space_keep_base_home = 0 (OFF). Spectate seed 0 to 2030: 9 designs held by three rivals by 2030, no unit raised (Teishe at war meets shelf_short for its Frigate), 1 launch all game.
+
+**Why it matters.** The far-space AI exists and is correct in harness, but the world never lets it act: everything waits on NR-1203.
+
+- Accept the calls
+- Write the priority order into AI_OPPONENT.md
+
+> **Recommendation:** Accept; rule NR-1203 first, then re-spectate (BL-1611).
+
+> **RESOLVED.** Ben, 2026-11-10: accepted with every call taken on your behalf in this stretch ("accept all, tune in playtest").
+
+*Files: `src/world/nation_ai.cpp`, `src/world/corp_ai.cpp`, `docs/ai/AI_OPPONENT.md`*
+
+### NR-1210 — Propellant loop: the Electrolysis Plant keeps refined fuel as an input, against "water and power"
+*decision taken on your behalf · raised 2026-11-10 · from BL-1604 lane report*
+
+No new building types: the Ice Extractor is the extraction site on an ice deposit, the Electrolysis Plant the existing propellant_electrolysis route (water x3 + refined fuel x1). ERAS.md's ruling says water and power; the lane kept the recipe and wrote that the fuel half is shipped in or made locally. Also: the Ice Extractor key applies only off the builder's home body; the electrolysis key is read on the tile owner (so the propellant chain stays open to every nation at home); a Fuel depot over a base fills from the base shelf, else home; neither fill path checks blockade.
+
+**Why it matters.** With refined fuel as an input a base still depends on home for half its propellant.
+
+- Keep refined fuel (a base must import)
+- Make it water and power only (a base is self-sufficient)
+
+> **Recommendation:** Keep: it gives Haulers a reason to run; rule otherwise if bases should close the loop alone.
+
+> **RESOLVED.** Ben, 2026-11-10: keep refined fuel as an input; a base imports half its propellant.
+
+*Files: `scripts/recipes.lua`, `docs/economy/ERAS.md`*
+
+### NR-1211 — Base and prospect UI: five calls taken, and four new verify reads to grant
+*decision taken on your behalf · raised 2026-11-10 · from BL-1610 / BL-1633 lane report*
+
+Calls: (1) the player picks the base site from a list, one row per province with mapped unclaimed land, at its most habitable tile, because a Lander lands at a surface node and no tile is behind it; (2) ground a dispatched probe is scanning keeps showing its deposits, and a fully surveyed body shows everything (DISCOVERY.md leaves a probed body to its probe); (3) the unprospected wash is 30% slate (palette::unprospected), subtle over grey regolith; (4) two deposit reads were left raw: the construction-suitability wash and the extraction candidates on the tile card, which could show bands on an unprospected base province; (5) Embark defaults to every free berth. BL-1633: Assign to front lists only fronts on the units' own body. New verify reads: verify.base_card() (the base orders as drawn, including each site row's label, grid col/row, chosen and prospected flags), verify.prospect_mask() (washed tile count, lens key goods, the title's mapped/prospected/total counts); STAGING verify.base_prospect_fixture() (grants the base_founding key, maps a moon, lands two player Landers with colonists and kit, idles an empty Lander in home low orbit; returns the moon name and three unit ids) and verify.stage_prospect(n) (prospects up to n regions by the real rule; returns the count); fleet_card().presses gains embark/confirm_embark/found_base/confirm_found.
+
+**Why it matters.** The reads touch the no-tile-data rule; base_card returns site tile positions the card already prints. Call (4) is a small leak of deposit information on unprospected ground.
+
+- Grant the reads; fix call (4) as a follow-up
+- Narrow base_card to labels only
+
+> **Recommendation:** Grant, since they report what the card draws; route the two raw reads through prospect_view.hpp.
+
+> **RESOLVED.** Ben, 2026-11-10: granted as a scoped exception (io-standing-rules.md, eleventh).
+
+*Files: `src/core/verify_api.cpp`, `src/ui/prospect_view.hpp`, `.claude/rules/io-standing-rules.md`*
+
+### NR-1212 — Novelty: a base-site picker list, and a shared prospect-visibility test
+*novel-work · raised 2026-11-10 · from BL-1610 lane report*
+
+The design note expected a Lander "landed on a mapped tile"; a Lander lands at a surface node, so the lane built a site list the note did not anticipate. src/ui/prospect_view.hpp is a new shared piece every deposit-drawing surface now asks. Scope stayed small.
+
+**Why it matters.** Novelty should be chosen, not accreted (standing rules).
+
+- Accept the list as the base-site idiom
+- Replace it with a press on the Planetary canvas
+
+> **Recommendation:** Accept for v0.5.0; revisit in the v0.6.0 polish pass if it reads poorly in play.
+
+> **RESOLVED.** Ben, 2026-11-10: accepted with every call taken on your behalf in this stretch ("accept all, tune in playtest").
+
+*Files: `src/ui/circum_units.cpp`, `docs/ui/SELECTION.md`*
+
+### NR-1213 — Garrison chase fix moves the campaign march; two harness re-aims taken
+*decision taken on your behalf · raised 2026-11-10 · from BL-1634 / BL-1632 lane reports*
+
+BL-1634 (garrison chase loop): units on a defend order now step last in the daily march, and re-aim at where the day's steps left the hostile stacks (economy_system.cpp run_unit_march; MILITARY.md § Defend province). Chosen over a swap/cross rule because the chase never swaps or crosses tiles. Side effect: a stack entering a province draws its defenders the same day, not the next. Any world where a defender steps beside other units moves, so play-path digests and sweeps may move; none of the harnesses run pins one. BL-1632 (stale tail harnesses): one helper, world_save_tail_bytes_after, replaces the hand sums; a static_assert breaks the build when the save version passes 92 until the new section joins its table. Calls: war_harness RF1 asserted ver == 76 and now asserts ver == world_save_version (as R4j and R9b do); tile_contact T13e and quarterly_return R5 passed only by corrupting the wrong section and are re-aimed at the bytes they name.
+
+**Why it matters.** The march change is a world-mover folded into the pending digest re-pin (NR-1167).
+
+- Accept the step rule
+- Prefer a same-tile meeting rule instead
+
+> **Recommendation:** Accept: one sentence, deterministic, reuses the existing targeting.
+
+> **RESOLVED.** Ben, 2026-11-10: accepted with every call taken on your behalf in this stretch ("accept all, tune in playtest").
+
+*Files: `src/world/economy_system.cpp`, `docs/military/MILITARY.md`, `src/world/world_save.cpp`*
+
+### NR-1214 — Research pacing has drifted out of its pin (first research comes sooner and less evenly): re-pin, or treat it as a fold defect
+*question · raised 2026-11-10 · from BL-1635 lane report*
+
+nation_tech_harness R0h pins median quarters-to-first-research in [16,24]; R0i pins p10 >= 8. Pooled over the 16 library seeds: 10-15 db77bdde 20/11; 10-23 17/9; 10-24 17/7 (R0i first fails, the nations-own-everything wave); 10-25 15/5 (R0h first fails); 11-01 19/6; 11-03 15/5; HEAD 15/6. The largest single step on a two-seed probe (46/28) is f1d05dfc BL-1402 (fold to ground): 15/15 to 12/12, then small drops at the road-join, site-days and port-links commits. The seed re-curation is not the cause. Not re-pinned. Also from the same lane: well_gate shields its fixture from the rival dial with ai_cooldown = 8 (seating the player conflicts with the harness's seat move); railway R7/D now compares against a twin world with the track erased, since a nation may briefly run a negative treasury (BL-1482).
+
+**Why it matters.** Research is reached faster and more unevenly than the pacing band intends; either the band or the fold is wrong.
+
+- Re-pin the band to the post-fold reading (median 15, p10 6)
+- Treat it as a fold defect and file the work
+
+> **Recommendation:** Your call: the drift is the cost of nations owning their ground, and it is not obviously wrong.
+
+> **RESOLVED.** Ben, 2026-11-10: re-pin the pacing band to the post-fold reading.
+
+*Files: `tools/verify/nation_tech_harness.cpp`, `src/world/state_industry.cpp`*
 

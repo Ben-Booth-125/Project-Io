@@ -767,8 +767,8 @@ void rows_far_space(const recipe_registry& reg)
     }
 
     // ---- F8 the keep-home dial -----------------------------------------------------------
-    check(nation_ai_params{}.far_space_keep_base_home == 0, "F8",
-          "NR-1206 is raised, not granted: the keep-base-home dial defaults OFF");
+    check(nation_ai_params{}.far_space_keep_base_home == 1, "F8",
+          "NR-1206 is granted (Ben, 2026-11-10): the keep-base-home dial defaults ON");
 
     // ---- F9 determinism ------------------------------------------------------------------
     {

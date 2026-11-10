@@ -2362,6 +2362,11 @@ boilerplate: pure, seeded, deterministic, replayable, legal verbs only, never a 
   next one (a template is a target the scorer fills one launch at a time, not a plan it commits
   to). Pure, seeded, deterministic, replayable, legal verbs only, never a planner.
 
+  **A rival keeps its off-world base garrisoned — granted (Ben, 2026-11-10, NR-1206).** The land
+  scorer's keep-home rule, which holds a capital province's units at home, also holds the units in a
+  rival's off-world base province. A scorer change to land behaviour, admitted for the base province
+  only; nothing else about where a rival's land units go is widened.
+
   **Every AI nation builds its own economy — granted (Ben, 2026-10-23; `../politics/NATIONS.md`
   § What a nation owns).** A new actor grain, and the largest widening in this register: the
   corporations and companies are retired, and **every non-player nation, major and minor alike**,

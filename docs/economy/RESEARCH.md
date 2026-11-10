@@ -143,7 +143,8 @@ whose branch carries a placeholder needs only the branch's real rim major until 
 
 **An age lasts about eighty years (Ben, 2026-10-10)**, and the tree is priced to it: the richest
 nation, researching without pause, completes the whole tree inside the age, and the median nation
-reaches its first ring-2 major in about five years.
+reaches its first ring-2 major in about four years, its fastest tenth in no less than about a year
+and a quarter (Ben, 2026-11-10: re-pinned from five years once nations owned their ground).
 
 **A node costs its tier's base × its ring × the RP unit.** The unit is a dial, set so that a nation
 spending a typical research share reaches a power surge — a major — at steady intervals through the

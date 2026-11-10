@@ -2387,6 +2387,10 @@ void rows_r0(const std::vector<std::uint32_t>& seeds, int quarters, bool twice, 
     constexpr double k_min_reach = 0.90;
     // The targets scale with the RP unit: set at 100 RP a unit (16 quarters, median 8-12, p10 >= 4),
     // and Ben's 200 (an age is ~80 years) doubles them. --quarters should be 16 x the scale.
+    // RE-PINNED (Ben, 2026-11-10, NR-1214): median 6-10 and p10 >= 2.5 x scale. Cause: nations
+    // owning their ground (the 2026-10-24 wave, chiefly the fold, f1d05dfc) brought the first major
+    // forward; pooled over the 16 library seeds the median read 15-19 and p10 5-7 at scale 2 from
+    // 2026-10-25 on, against the old 16-24 and 8.
     const double sc = used.rp_per_cost_unit / 100.0;
     double tree_units = 0.0;
     for (int n = 0; n < io::dg::node_count; ++n) tree_units += io::dg::nodes[static_cast<std::size_t>(n)].cost_units;
@@ -2395,11 +2399,11 @@ void rows_r0(const std::vector<std::uint32_t>& seeds, int quarters, bool twice, 
                 "  the whole tree (%.0f units, %.0f RP at the opening price; R4 runs the rising one) in %.0f quarters (%.1f years).\n",
                 best_full, tree_units, tree_units * used.rp_per_cost_unit, tree_q, tree_q / 4.0);
     std::printf("  thresholds: >= %.0f%% reach it in %d; median in [%.0f, %.0f]; p10 >= %.0f\n",
-                100.0 * k_min_reach, static_cast<int>(16 * sc), 8 * sc, 12 * sc, 4 * sc);
+                100.0 * k_min_reach, static_cast<int>(16 * sc), 6 * sc, 10 * sc, 2.5 * sc);
     check(quarters >= static_cast<int>(16 * sc) && frac >= k_min_reach,
           "R0g PACING: >= 90% of nations with a source reach their first ring-2 major in 16 x scale quarters");
-    check(med_q >= 8.0 * sc && med_q <= 12.0 * sc, "R0h PACING: the median nation reaches it in 8-12 x scale quarters");
-    check(fast_q >= 4.0 * sc, "R0i PACING: the fastest decile takes no fewer than ~4 x scale quarters");
+    check(med_q >= 6.0 * sc && med_q <= 10.0 * sc, "R0h PACING: the median nation reaches it in 6-10 x scale quarters");
+    check(fast_q >= 2.5 * sc, "R0i PACING: the fastest decile takes no fewer than ~2.5 x scale quarters");
 }
 
 // ---------------------------------------------------------------------------

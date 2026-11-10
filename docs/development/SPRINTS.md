@@ -124,6 +124,18 @@ Build under test: build_rel at 8af285f7. A UI item needs a live click before it 
 - BL-1613 (EARLY_SPACE_RESEARCH_SURFACES)
 - BL-1614 (SPACE_TRANSIT_SEGMENT)
 
+### Sprint 67 — Launch fix and space calls
+*Open · opened 2026-11-10 · Claude (Ben's form, 2026-11-10)*
+
+**Goal.** Rivals launch: launch goods reach a pad by trade and are drawn over time as boost, with no pooling of markets. Then the far-space spectate (BL-1611) and the re-pin.
+
+**Planned.**
+- BL-1637 (LAUNCH_BOOST)
+- BL-1638 (GENERATED_BODY_MASS)
+- BL-1639 (RETIRE_SURVEY_PROBE)
+- BL-1630 (LAUNCH_GOODS_SUPPLY)
+- BL-1611 (FAR_SPACE_SPECTATOR_CHECK)
+
 ## Where things stand
 
 | Sprint | Theme | State |
@@ -212,9 +224,10 @@ Build under test: build_rel at 8af285f7. A UI item needs a live click before it 
 | 63 | UI, QOL and the opening | OPEN 2026-11-05. Ben's playtest list: 29 items in three waves. The opening balance leads: a mine costs six months of net, easing over 10-20 years, and every major starts play on the same credits. |
 | 65 | Near space (v0.4.0) | gated on NR-1203 (trade wall): every item built except BL-1630 (launch goods supply); spectate shows 0 rival launches (BL-1593, NEXT_SESSION.md) |
 | 66 | Far space (v0.5.0) | open: every item built except BL-1611 (far-space spectator check), gated on NR-1203; four live clicks owed (NEXT_SESSION.md) |
+| 67 | Launch fix and space calls | open: boost (BL-1637), generated body mass (BL-1638), probe retirement (BL-1639) in lanes; B measured for NR-1203 |
 
 **Next up.** SPRINT 61 CLOSED 2026-11-05 (no version cut). v0.3.0 needs the naval system and a playtest with a few wars. BL-1470 (sentiment contributors) passed its live click 2026-11-05; BL-1490 (province resource clip) waits on BL-1495 (UI scale down); BL-1494 (new-library tick-50 stall) leads the economy work. SPRINT 63 (UI, QOL and the opening) OPEN 2026-11-05: Ben's playtest list is filed; the payback census has read: research is the missing money and the door quotes mirages on scarce goods.
 
 **The standing debt out of P1**, worth repeating here because it spans four items: nothing built in that sprint was ever *rendered*. The session ran in a container that cannot build the GUI, so every UI half is compile-clean and arithmetically checked and visually unseen, and no golden was blessed. For a sprint whose own method note is *build it, look at it, then rule*, that is the thing to fix first.
 
-*81 sprints archived cold; 3 open/gated in the hot store.*
+*81 sprints archived cold; 4 open/gated in the hot store.*

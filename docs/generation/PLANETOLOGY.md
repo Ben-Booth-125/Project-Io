@@ -787,8 +787,14 @@ is both truer and a second free axis.
 wizard's live `preview_system()` walk that same list with the same seeds, so **the charts a player
 decides against cannot drift from the world actually built.**
 
-The **physical facts** in that list are authored (mass and orbit are what a prototype body set
-*is*). The **names are not** — see § Body naming below. The literals still sitting in the
+The **orbits** in that list are authored (orbit is what a prototype body set *is*). **A body's
+size and density are generated, and its mass follows from them** (Ben, 2026-11-10): every body
+other than the homeworld rolls a radius and a bulk density from its own seed, inside its kind's band
+(planet, moon, asteroid, core fragment), and its mass is density × volume. The homeworld keeps its
+own corridor (`home_mass`, § The homeworld rule). Below ~0.05 M⊕ the density comes from the core mass
+fraction, per the implementation trap in S1. Every reader of a body's mass, the orbital graph's
+climb included, reads this one generated mass. The **names are not** authored either — see
+§ Body naming below. The literals still sitting in the
 `prototype_entry` table are placeholders that never reach the world; `make_hard_coded_world`
 overwrites `body_inputs::name` with the coined name before the chain runs.
 

@@ -1351,10 +1351,10 @@ economy = {
         -- ceiling in all: a war is the reason to raise one. [0, 1024]
         far_space_warships_per_hostile = 2,
         far_space_warships_max         = 6,
-        -- NR-1206, RAISED NOT GRANTED: 1 keeps a rival's off-world base
+        -- NR-1206, GRANTED (Ben, 2026-11-10): 1 keeps a rival's off-world base
         -- province garrisoned as its capital's is (corp_ai.cpp, the fronts'
-        -- keep-home rule). OFF until Ben rules. [0, 1]
-        far_space_keep_base_home       = 0,
+        -- keep-home rule). [0, 1]
+        far_space_keep_base_home       = 1,
     },
 
     -- BL-643: network upkeep — the logistics_maintenance budget line's

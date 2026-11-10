@@ -292,8 +292,8 @@ struct nation_ai_params
     int far_space_warships_max         = 6;
     /// NR-1206 (RAISED, NOT GRANTED): when 1, the land-front scorer keeps a
     /// rival's off-world base province garrisoned as it keeps its capital's.
-    /// Defaults OFF until Ben rules.
-    int far_space_keep_base_home = 0;
+    /// Granted (Ben, 2026-11-10, NR-1206): on by default.
+    int far_space_keep_base_home = 1;
 };
 
 /// The three terms, per nation, exactly as they were computed. Reported, never

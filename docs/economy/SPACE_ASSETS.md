@@ -121,28 +121,41 @@ technology and that pad is complete, it builds one Astronaut Training Centre the
 build at a time, paid from the treasury, and only while the uncommitted treasury holds twice the
 build's cost. Never for the player's nation.
 
-**A launch buys its goods off the home market's shelf** — `spacecraft_components` and
-`propellant`, at the market's price, debited from the treasury. A shelf that cannot fill the whole
-lot refuses the launch whole; nothing is half-bought. The lot scales with the payload's class and
-the path's thrust cost: a further node burns more propellant. **No launch draws from a pool of
-markets** (Ben, 2026-11-10): goods reach the home shelf by trade, or the launch waits. A good held
-on another market of the same body is that market's, not the launch's.
+### Boost (Ben, 2026-11-10)
 
-**A staffed pad bids for its launch (BL-1630, launch goods supply).** Every nation that holds
-Rocketry and has a staffed pad on its home body bids each quarter for one launch lot on its home
-market: one satellite's components and the propellant to its home low orbit. The bid is **posted
-demand**, so the market prices it and the goods find makers (`MARKETS.md` § Demand channels,
-property 3). A buyer the market cannot see calls forth no plant. Over the fair-price ceiling a good
-does not bid, as every draw obeys. This is the pad's want on the market, not a decision: nothing is
-bought, built or launched by it, so it stands for the player's nation as for any other. The lot
-count a quarter is data (`economy.space_programme.standing_lots`).
+**A staffed Launchpad makes boost.** Boost is the launch capacity a pad has banked: the goods of a
+launch, already bought and readied. The pad is a processor (PRODUCTION): each day it buys
+`spacecraft_components` and `propellant` off **its own market's shelf**, at the market's price,
+paid from its nation's treasury, and turns them into boost. The recipe holds the two goods in the
+ratio a launch burns them, so a launch costs the same goods it always did; what changes is *when*
+they are bought: a little every day, not a whole lot at once.
 
-**The launch is the space programme's goods buyer.** No lump of space goods is bought and consumed
-besides it: a lump consumed with nothing launched would empty the shelf the launch is waiting on.
+**The draw is steady and visible.** The pad's intake is a daily input like any processor's, so
+its market sees a standing want and prices it (`MARKETS.md` § Demand channels), and plants are
+called forth to meet it. A shelf that holds less than a day's intake is drawn as far as it goes;
+nothing waits for a whole lot to stockpile. Over the fair-price ceiling a good is not drawn, as
+every draw obeys. The intake rate is data.
+
+**Boost stays where it is made.** It is held on the pad's market, by the pad's nation, and is never
+traded, hauled or sold. It is not a pool: a pad's boost serves launches from that pad only. **No
+launch draws from a pool of markets** (Ben, 2026-11-10): goods reach the pad's shelf by trade, or
+the boost waits. A good held on another market of the same body is that market's, not the pad's.
+
+**A pad banks up to a cap**, enough for its largest launch (data). A full pad stops drawing, so a
+pad that is not launching does not drain its market.
+
+**A launch spends boost by distance.** The boost a launch needs scales with the payload's class
+and the path's thrust cost to its node: a further node spends more. A space unit raised at a pad is
+a launch and spends boost the same way. Once a unit is in space it burns the propellant aboard it
+(`../military/SPACE_FLEETS.md`), not boost.
+
+**Boost is the space programme's goods buyer.** No lump of space goods is bought and consumed
+besides the pad's intake. The pad draws for every nation alike, the player's included: it is a
+building's input, not a decision.
 
 **A launch is refused whole** — the world is not touched — when the nation has no staffed pad, lacks
-the technology, cannot pay, the shelf cannot fill the lot, the class may not go to that node, or
-the node has no free slot.
+the technology, cannot pay its launch cost, the pad holds too little boost for the path, the class
+may not go to that node, or the node has no free slot.
 
 ## Satellites (Ben, 2026-11-10)
 
