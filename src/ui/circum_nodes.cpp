@@ -18,13 +18,14 @@ constexpr ImU32 k_ring_low    = IM_COL32( 56,  64,  82, 255);
 constexpr ImU32 k_ring_high   = IM_COL32( 50,  57,  74, 255);
 constexpr ImU32 k_diamond     = IM_COL32(150, 162, 188, 255);
 constexpr ImU32 k_diamond_rim = IM_COL32( 20,  22,  32, 255);
-constexpr ImU32 k_pip_free    = IM_COL32(128, 138, 160, 255);
-constexpr ImU32 k_pip_held    = IM_COL32(200, 205, 215, 255);
+constexpr ImU32 k_pip_free    = IM_COL32(165, 175, 200, 255);
+constexpr ImU32 k_pip_held    = IM_COL32(200, 205, 215, 255); ///< A holder with no nation colour.
+constexpr ImU32 k_pip_rim     = IM_COL32( 14,  16,  24, 255); ///< Dark rim under every pip.
 
 // Constant pixel sizes — none of these scale with zoom.
 constexpr float k_diamond_r   = 4.0f;  ///< Centre to tip.
-constexpr float k_pip_r       = 1.8f;
-constexpr float k_pip_step    = 5.0f;  ///< Centre-to-centre along a row.
+constexpr float k_pip_r       = 2.4f;
+constexpr float k_pip_step    = 6.5f;  ///< Centre-to-centre along a row.
 constexpr float k_pip_gap     = 4.0f;  ///< From the node to the first pip's edge.
 constexpr float k_ring_hit    = 3.0f;  ///< Either side of a ring's line.
 constexpr float k_diamond_hit = 6.0f;
@@ -48,6 +49,18 @@ float pip_row_end(const circum_node_mark& m)
 {
     const float n = static_cast<float>(std::max(0, m.capacity - 1));
     return m.pip_start.x + m.pip_dir * n * k_pip_step;
+}
+
+/// The owners of the assets holding @p n's slots — the world's
+/// `orbital_slots_held` rule (a satellite or station core, not lost), walked
+/// in ascending asset id.
+std::vector<entity_id> slot_holders(const world& w, orbital_node n)
+{
+    std::vector<entity_id> out;
+    for (const auto& [id, a] : w.space_assets)
+        if (space_class_holds_slot(a.cls) && a.state != space_asset_state::lost && a.node == n)
+            out.push_back(a.owner);
+    return out;
 }
 
 } // namespace
@@ -97,6 +110,7 @@ std::vector<circum_node_mark> layout_circum_nodes(const world& w, entity_id anch
             m.ring_r   = radii[i];
             m.capacity = orbital_slot_capacity(w, m.node);
             m.held     = std::min(m.capacity, orbital_slots_held(w, m.node));
+            m.holders  = slot_holders(w, m.node);
             // Pips ride the ring's top: the low orbit's row runs right, the high
             // orbit's left, so the two rows never share a run of the canvas.
             m.pip_dir   = i == 0 ? 1.0f : -1.0f;
@@ -141,8 +155,14 @@ std::vector<circum_node_mark> layout_circum_nodes(const world& w, entity_id anch
             circum_node_mark m;
             m.node      = { moon, k };
             m.pos       = to_screen_au(orbital_node_position(w, m.node));
+            if (m.pos.y > f.safe_bottom)
+            {
+                m.pos.y   = f.safe_bottom;
+                m.clamped = true;
+            }
             m.capacity  = orbital_slot_capacity(w, m.node);
             m.held      = std::min(m.capacity, orbital_slots_held(w, m.node));
+            m.holders   = slot_holders(w, m.node);
             m.pip_dir   = 1.0f;
             m.pip_start = { m.pos.x + k_diamond_r + k_pip_gap + k_pip_r, m.pos.y };
             out.push_back(m);
@@ -177,10 +197,16 @@ void draw_circum_node_marks(ImDrawList* dl, const std::vector<circum_node_mark>&
         {
             const ImVec2 p = { m.pip_start.x + m.pip_dir * static_cast<float>(s) * k_pip_step,
                                m.pip_start.y };
+            dl->AddCircleFilled(p, k_pip_r + 1.0f, k_pip_rim, 10);
             if (s < m.held)
-                dl->AddCircleFilled(p, k_pip_r, k_pip_held, 8);
+            {
+                const ImU32 c = static_cast<std::size_t>(s) < m.holders.size()
+                                    ? palette::nation_colour(m.holders[static_cast<std::size_t>(s)])
+                                    : k_pip_held;
+                dl->AddCircleFilled(p, k_pip_r, c, 10);
+            }
             else
-                dl->AddCircle(p, k_pip_r, k_pip_free, 8, 1.0f);
+                dl->AddCircle(p, k_pip_r - 0.4f, k_pip_free, 10, 1.3f);
         }
     }
 }

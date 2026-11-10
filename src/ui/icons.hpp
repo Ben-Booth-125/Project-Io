@@ -1,6 +1,7 @@
 #pragma once
 
 #include "world/components.hpp"
+#include "world/space_assets.hpp" // space_satellite_role (the satellite glyph)
 
 #include <imgui.h>
 
@@ -738,5 +739,26 @@ enum class stat_glyph : uint8_t
 /// @param which  The stat to depict.
 /// @param colour Stroke colour.
 void stat(ImDrawList* dl, ImVec2 centre, float r, stat_glyph which, ImU32 colour);
+
+/// BL-1590 (CIRCUMPLANETARY.md § Orbital nodes and what sits at them): a satellite
+/// ROLE's mark in @p colour inside a 2r box — comms: a feed dot under two signal
+/// arcs; navigation: a four-point compass star; observation: an eye (a lens of two
+/// arcs round a filled pupil); survey: a lens with a handle. `none` draws a dot.
+/// Built to hold at r = 4 px.
+void satellite_role(ImDrawList* dl, ImVec2 centre, float r, space_satellite_role role, ImU32 colour);
+
+/// BL-1590: a SATELLITE marker — a round dark plate of radius @p r ringed in the
+/// owner's colour (@p fill), a short solar wing out of each side, and the role's
+/// mark on the plate in that colour. @p in_transit draws it at half strength: on
+/// its way to the node, holding its slot, not yet in place.
+void satellite_marker(ImDrawList* dl, ImVec2 centre, float r, space_satellite_role role,
+                      ImU32 fill, bool in_transit = false);
+
+/// BL-1590: a STATION marker — a filled square core in the owner's colour
+/// (@p fill) on a truss that runs out to a solar panel at each side, all outlined
+/// dark. Larger than the satellite's plate and square-cored where it is round, so
+/// the two never read alike; the caller sizes @p r by the station's grid.
+/// @p in_transit draws it at half strength, as the satellite does.
+void station_marker(ImDrawList* dl, ImVec2 centre, float r, ImU32 fill, bool in_transit = false);
 
 } // namespace ui::icons

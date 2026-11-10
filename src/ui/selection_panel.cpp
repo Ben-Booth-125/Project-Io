@@ -7,6 +7,7 @@
 
 #include "building_state.hpp" // BL-1239: the one running-state classification (hover card, Production, Status)
 #include "charts.hpp"
+#include "circum_assets.hpp"   // BL-1590: the satellite/station card
 #include "construction_panel.hpp" // building_group_name - the aim of the open-in-ledger button
 #include "diplomacy_ledger.hpp"   // open_declaration - the front card's Answer door
 #include "world/war.hpp"          // war_between - the front card's unanswered war
@@ -4686,6 +4687,9 @@ void draw_selection_content(world& w, const recipe_registry& reg,
     // canvas already shows the name (Ben, 2026-10-13). Every other kind keeps it.
     // BL-1450: an air WING owns its whole card (wing_card.hpp), header included.
     if (kind == selection_kind::wing && draw_wing_selection(w, reg, ui))
+        return;
+    // BL-1590: a satellite or station draws the shared space-asset summary.
+    if (kind == selection_kind::space_asset && draw_space_asset_selection(w, ui))
         return;
 
     if (kind == selection_kind::tile)

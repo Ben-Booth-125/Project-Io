@@ -1871,9 +1871,24 @@ struct ui_state
         float       ring_r = 0.0f;      ///< 0 for a diamond.
         int         capacity = 0;
         int         free     = 0;
+        bool        clamped  = false;   ///< A diamond held above the bottom strip.
     };
     std::vector<circum_node_drawn> circum_nodes_drawn;
     std::string                    circum_node_hovered; ///< Empty when none.
+
+    /// BL-1590 part 2: each satellite and station as the rung drew it this frame
+    /// (primary view only) — what the screen shows, for `verify.circum_assets()`.
+    struct circum_asset_drawn
+    {
+        entity_id   id      = null_entity; ///< A station's is its core's.
+        entity_id   owner   = null_entity;
+        bool        station = false;
+        bool        in_transit = false;
+        float       x = 0.0f, y = 0.0f, r = 0.0f;
+        std::string node;                  ///< The node it is drawn at.
+    };
+    std::vector<circum_asset_drawn> circum_assets_drawn;
+    entity_id                       circum_asset_hovered = null_entity;
 
     /// Research-queue presses from the panel (queue a node, remove the last,
     /// clear), applied by `app::render` through `apply_corp_command` — the

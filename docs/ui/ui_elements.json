@@ -275,6 +275,27 @@
    ]
   },
   {
+   "id": "UI-143",
+   "name": "Satellites and stations (Circumplanetary)",
+   "kind": "sub-element",
+   "parent": "UI-009",
+   "source": [
+    "docs/ui/CIRCUMPLANETARY.md § Orbital nodes and what sits at them",
+    "docs/economy/SPACE_ASSETS.md § Satellites",
+    "docs/economy/SPACE_ASSETS.md § Space stations",
+    "src/ui/circum_assets.hpp",
+    "src/ui/circum_assets.cpp",
+    "src/ui/circumplanetary_canvas.cpp",
+    "src/ui/icons.cpp"
+   ],
+   "summary": "Every nation's satellites and stations at the node they occupy: a satellite as a round plate in its owner's colour with solar wings and its role's mark, a station as a larger square core on a truss between two panels, sized by its grid; one in transit draws at its destination at half strength. Held slot pips fill in the holder's colour. Hovering a mark opens the shared hover card (owner, role or modules and crew, node, state); a press selects it and the Selection band shows the same summary.",
+   "interesting_question": "The world records an asset's destination and arrival tick but not where a move set out from or when, so the in-transit segment along the link cannot be placed; is the ghost at the destination enough?",
+   "resolution": "Open.",
+   "checks": [
+    "near_space_assets"
+   ]
+  },
+  {
    "id": "UI-013",
    "name": "Planetary Canvas",
    "kind": "canvas",

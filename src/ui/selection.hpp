@@ -37,6 +37,11 @@ enum class selection_kind
     /// `create_entity`, so it travels in `selected_entity` and `selection_kind_of`
     /// resolves it; its card is its own element (wing_card.hpp).
     wing,
+    /// BL-1590: a SATELLITE or a STATION (`world::space_assets`, `world::stations`),
+    /// pressed on the Circumplanetary rung. A station is selected by its id, which is
+    /// its core asset's; a station's modules are not selectable on their own. Its
+    /// card is the shared space-asset summary (circum_assets.hpp).
+    space_asset,
     // Future kinds (logistics vessel, …) slot in here once their component
     // stores exist; see SELECTION.md (§ Polymorphism).
 };

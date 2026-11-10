@@ -23,7 +23,7 @@ for _, n in ipairs(nodes) do
 end
 verify.expect(#nodes >= 2, "the anchor's low and high orbit are drawn")
 
--- Every node shows every slot free until occupancy lands (BL-1581).
+-- Nothing is launched at the start: every node shows every slot free.
 for _, n in ipairs(nodes) do
     verify.expect(n.free == n.capacity, n.name .. " shows every slot free")
 end

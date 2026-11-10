@@ -62,6 +62,7 @@
 #include "world/logistic_points.hpp"  // lp_sea_walk: the chain fixture's far port
 #include "world/state_industry.hpp" // BL-1255: state_uncommitted_treasury (rail_state)
 #include "ui/rail_tool.hpp"          // BL-1255: rail_player_nation
+#include "world/orbital_graph.hpp"   // BL-1590: orbital_slot_capacity - the near-space fixture
 #include "world/market_clearing.hpp" // BL-1241: stage_one mirrors place_building's market emergence
 #include "world/trade.hpp"           // BL-1516: market_trade_points, corp_trade_markets - the gate check
 #include "world/placement_rules.hpp"
@@ -1763,6 +1764,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             case ui::selection_kind::nation:      k = "nation";      break;
             case ui::selection_kind::corporation: k = "corporation"; break;
             case ui::selection_kind::wing:        k = "wing";        break; // BL-1450
+            case ui::selection_kind::space_asset: k = "space_asset"; break; // BL-1590
             default:                              k = "none";        break;
             }
             // BL-1427: a front is a fourth non-entity channel; the band draws it
@@ -3798,12 +3800,118 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             row["ring_r"]   = n.ring_r;
             row["capacity"] = n.capacity;
             row["free"]     = n.free;
+            row["clamped"]  = n.clamped;
             out[i++] = row;
         }
         return out;
     });
     v.set_function("circum_node_hovered", [this]() -> std::string {
         return m_ui.circum_node_hovered;
+    });
+    // BL-1590 part 2: each satellite and station as the rung LAST DREW it - its
+    // id, owner, kind ("satellite" / "station"), whether it is in transit, its
+    // screen centre and drawn radius, and the node it is drawn at. Only what
+    // the screen draws. `circum_asset_hovered()` is the hovered one's id, or 0.
+    v.set_function("circum_assets", [this](sol::this_state ts) -> sol::table {
+        sol::state_view lua(ts);
+        sol::table out = lua.create_table();
+        int i = 1;
+        for (const auto& a : m_ui.circum_assets_drawn)
+        {
+            sol::table row = lua.create_table();
+            row["id"]         = static_cast<unsigned>(a.id);
+            row["owner"]      = static_cast<unsigned>(a.owner);
+            row["kind"]       = std::string(a.station ? "station" : "satellite");
+            row["in_transit"] = a.in_transit;
+            row["x"]          = a.x;
+            row["y"]          = a.y;
+            row["r"]          = a.r;
+            row["node"]       = a.node;
+            out[i++] = row;
+        }
+        return out;
+    });
+    v.set_function("circum_asset_hovered", [this]() -> unsigned {
+        return static_cast<unsigned>(m_ui.circum_asset_hovered);
+    });
+    // BL-1590 part 2: a verify-only STAGING fixture for the near-space draw. It
+    // writes straight into the stores (no launch verb: the gate, the shelf and
+    // the treasury are not what the canvas check is about) and puts, at the home
+    // body's nodes where a slot is free: two player satellites in low orbit
+    // (observation, comms), a player station core in high orbit with one
+    // research module, a rival nation's navigation satellite in high orbit, and
+    // a player survey satellite in transit to the first moon's L4 (two quarters
+    // out). Returns the counts it staged and nothing else.
+    v.set_function("near_space_fixture", [this](sol::this_state ts) -> sol::table {
+        sol::state_view lua(ts);
+        sol::table out = lua.create_table();
+        out["satellites"] = 0;
+        out["stations"]   = 0;
+        const entity_id pn   = player_nation(m_world);
+        const entity_id home = m_world.home_body;
+        if (pn == null_entity || !m_world.bodies.count(home))
+            return out;
+        entity_id rival = null_entity;
+        for (const auto& [nid, n] : m_world.nations)
+            if (nid != pn) { rival = nid; break; }
+        entity_id moon = null_entity;
+        for (const auto& [bid, b] : m_world.bodies)
+            if (b.parent == home) { moon = bid; break; }
+
+        int sats = 0, stations = 0;
+        auto stage = [&](entity_id owner, space_asset_class cls, orbital_node node,
+                         space_satellite_role role, bool transit) -> entity_id {
+            if (owner == null_entity || !m_world.bodies.count(node.body))
+                return null_entity;
+            if (orbital_slots_held(m_world, node) >= orbital_slot_capacity(m_world, node))
+                return null_entity;
+            space_asset a;
+            a.id    = m_world.create_entity();
+            a.owner = owner;
+            a.cls   = cls;
+            a.node  = node;
+            a.dest  = {node.body, space_slot_of(node.kind)};
+            a.role  = role;
+            a.state = transit ? space_asset_state::in_transit : space_asset_state::active;
+            a.launch_tick  = m_world.current_econ_tick;
+            a.arrival_tick = m_world.current_econ_tick + (transit ? 2 : 0);
+            const entity_id id = a.id;
+            m_world.space_assets.emplace(id, a);
+            return id;
+        };
+        const orbital_node low  {home, orbital_node_kind::low_orbit};
+        const orbital_node high {home, orbital_node_kind::high_orbit};
+        if (stage(pn, space_asset_class::satellite, low, space_satellite_role::observation, false)) ++sats;
+        if (stage(pn, space_asset_class::satellite, low, space_satellite_role::comms, false)) ++sats;
+        if (const entity_id core = stage(pn, space_asset_class::station_core, high,
+                                         space_satellite_role::none, false))
+        {
+            space_station st;
+            st.id = core; st.owner = pn; st.core = core; st.node = high; st.level = 0;
+            st.slots.assign(static_cast<std::size_t>(st.width() * st.height()), null_entity);
+            st.slots[static_cast<std::size_t>(st.centre())] = core;
+            space_asset& c = m_world.space_assets.at(core);
+            c.station = core; c.station_slot = static_cast<int16_t>(st.centre()); c.crew = 2;
+            space_asset mod;
+            mod.id = m_world.create_entity(); mod.owner = pn;
+            mod.cls = space_asset_class::station_module; mod.node = high;
+            mod.dest = {home, space_slot::orbit}; mod.state = space_asset_state::active;
+            mod.launch_tick = mod.arrival_tick = m_world.current_econ_tick;
+            mod.station = core; mod.station_slot = 0;
+            mod.module = static_cast<uint8_t>(station_module_kind::research); mod.crew = 1;
+            st.slots[0] = mod.id;
+            m_world.space_assets.emplace(mod.id, mod);
+            m_world.stations.emplace(core, std::move(st));
+            ++stations;
+        }
+        if (stage(rival, space_asset_class::satellite, high, space_satellite_role::navigation, false)) ++sats;
+        if (moon != null_entity
+            && stage(pn, space_asset_class::satellite, {moon, orbital_node_kind::l4},
+                     space_satellite_role::survey, true))
+            ++sats;
+        out["satellites"] = sats;
+        out["stations"]   = stations;
+        return out;
     });
     // The selected entity's id (0 = none), so a check can prove a press on a
     // node leaves the selection as it was.
