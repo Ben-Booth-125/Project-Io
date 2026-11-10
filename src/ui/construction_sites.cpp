@@ -619,9 +619,13 @@ void step_site_grid(world& w, const recipe_registry& reg, ui_state& ui, const st
                 const float cover = site_lp_cover(w, tid);
                 if (!(cover > 0.0f))
                     ++cell.no_lp;
+                bool priced = false;
+                long net    = 0;
                 if (earns)
                 {
                     const site_quote sq = quote_for_tile(w, reg, tid, o.type, o.target, o.recipe, cover);
+                    priced = sq.profit.has_data;
+                    net    = priced ? std::lround(sq.profit.net()) : 0;
                     if (sq.profit.has_data && (!cell.has_figure || sq.profit.net() > cell.best_net))
                     {
                         const tile_component& tc = w.tiles.at(tid);
@@ -631,6 +635,20 @@ void step_site_grid(world& w, const recipe_registry& reg, ui_state& ui, const st
                         cell.best_starved = sq.starved;
                         cell.best_place   = p.places->name(tid, tc.grid_x, tc.grid_y, cell.best_near);
                     }
+                }
+                // The Construct press's site: highest Net, then cover, then lowest id.
+                const bool better =
+                    cell.build_tile == null_entity
+                    || (priced != cell.build_priced ? priced
+                        : net != cell.build_net     ? net > cell.build_net
+                        : cover != cell.build_cover ? cover > cell.build_cover
+                                                    : tid < cell.build_tile);
+                if (better)
+                {
+                    cell.build_tile   = tid;
+                    cell.build_priced = priced;
+                    cell.build_net    = net;
+                    cell.build_cover  = cover;
                 }
             }
             if (!to_completion && ++since_clock >= k_grid_clock_every)
@@ -779,7 +797,8 @@ void draw_site_grid(const world& w, const recipe_registry& reg, ui_state& ui)
 
         ImGui::SetCursorScreenPos(mn);
         ImGui::PushID(idx);
-        const bool pressed = ImGui::InvisibleButton("##cell", {cell_w, cell_h});
+        ImGui::SetNextItemAllowOverlap(); // the Construct press sits over the cell's
+        bool pressed = ImGui::InvisibleButton("##cell", {cell_w, cell_h});
         const bool hovered = ImGui::IsItemHovered();
         ImGui::PopID();
 
@@ -797,19 +816,85 @@ void draw_site_grid(const world& w, const recipe_registry& reg, ui_state& ui)
         dl->AddText(ImGui::GetFont(), ImGui::GetFontSize(), name_at, dim ? dim_ink : text_ink, o.name.c_str(),
                     nullptr, name_room); // fit-exempt: the column count is chosen so it wraps whole
 
-        const float   fig_y = mn.y + cell_h - pad - lh;
-        const ImVec2  net_at{mn.x + pad, fig_y};
-        if (c.pending)
-            dl->AddText(net_at, dim_ink, "...");
-        else if (c.has_figure)
-            dl->AddText(net_at, value_colour(static_cast<double>(c.best_net)),
-                        fmt::abbreviate(static_cast<double>(c.best_net)).c_str());
-
+        // THE LOWER LINE, HALVED (Ben, 2026-11-10): the credits and the site count on the
+        // left half, a Construct press on the right that builds at the cell's best site.
+        // The line reads a step smaller than the name so the pair fits its half; the
+        // count stands at the half's right edge and the credits are clipped short of it,
+        // never run into it (the "truncate" of the ruling).
+        const float   fig_y  = mn.y + cell_h - pad - lh;
+        const float   half_x = mn.x + cell_w * 0.5f;
+        const float   small  = ImGui::GetFontSize() * 0.85f;
+        const float   small_dy = (lh - small) * 0.5f;
+        ImFont* const font   = ImGui::GetFont();
         char count_text[32] = "";
+        float count_x = half_x - st.ItemInnerSpacing.x;
         if (!c.pending)
         {
-            std::snprintf(count_text, sizeof count_text, "%d %s", c.sites, c.sites == 1 ? "site" : "sites");
-            dl->AddText({mx.x - pad - ImGui::CalcTextSize(count_text).x, fig_y}, dim_ink, count_text);
+            std::snprintf(count_text, sizeof count_text, "%d", c.sites);
+            count_x -= font->CalcTextSizeA(small, FLT_MAX, 0.0f, count_text).x;
+            dl->AddText(font, small, {count_x, fig_y + small_dy}, dim_ink, count_text); // fit-exempt: measured above
+        }
+        const ImVec4 net_clip{mn.x + pad, fig_y - 2.0f, count_x - 3.0f, mx.y};
+        const ImVec2 net_at{mn.x + pad, fig_y + small_dy};
+        std::string net_text;
+        if (c.pending)
+            dl->AddText(font, small, net_at, dim_ink, "...");
+        else if (c.has_figure)
+        {
+            net_text = "Cr " + fmt::abbreviate(static_cast<double>(c.best_net));
+            dl->AddText(font, small, net_at, value_colour(static_cast<double>(c.best_net)), net_text.c_str(),
+                        nullptr, 0.0f, &net_clip); // fit-exempt: clipped short of the count
+        }
+
+        // The press: a real button over the cell's right half, so it takes the press
+        // and the hover before the cell under it.
+        const bool can_build = !c.pending && c.sites > 0 && c.build_tile != null_entity;
+        const ImVec2 b_mn{half_x + st.ItemInnerSpacing.x * 0.5f, fig_y - 2.0f};
+        const ImVec2 b_mx{mx.x - pad, mx.y - 2.0f};
+        ImGui::SetCursorScreenPos(b_mn);
+        ImGui::PushID(idx);
+        ImGui::BeginDisabled(!can_build);
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, {1.0f, 0.0f});
+        ImGui::SetWindowFontScale(0.85f); // the label reads at the line's size
+        const bool build_pressed = ImGui::Button("Construct##cell_build", {b_mx.x - b_mn.x, b_mx.y - b_mn.y});
+        ImGui::SetWindowFontScale(1.0f);
+        ImGui::PopStyleVar();
+        ImGui::EndDisabled();
+        const bool build_hovered = ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled);
+        ImGui::PopID();
+        if (build_hovered)
+            pressed = false; // the press was the button's
+        if (build_hovered)
+        {
+            std::string why;
+            if (c.pending)
+                why = "Still being priced.";
+            else if (can_build)
+            {
+                const tile_component& bt = w.tiles.at(c.build_tile);
+                char buf[200];
+                std::snprintf(buf, sizeof buf,
+                              "Construct %s at its best site, tile [%d, %d]: the highest Net, then the most "
+                              "Logistic Point cover%s.",
+                              o.name.c_str(), bt.grid_x, bt.grid_y,
+                              sf.scope_province != 0 ? ", in this province" : "");
+                why = buf;
+            }
+            else if (c.unaffordable > 0)
+                why = "Can't afford it: every site costs more than the treasury holds.";
+            else
+                why = c.refusal.empty() ? std::string("No tile of your ground takes it.") : c.refusal;
+            ImGui::SetTooltip("%s", why.c_str());
+        }
+        if (build_pressed && can_build)
+        {
+            // The map press's path: app::render runs the same construct_nation the Build
+            // door does, with its own treasury test.
+            ui.construction.pending_tile   = c.build_tile;
+            ui.construction.pending_type   = o.type;
+            ui.construction.pending_target = o.target;
+            ui.construction.pending_recipe = o.recipe;
+            ui.construction.last_message.clear();
         }
 
         // EACH ELEMENT EXPLAINS ITSELF (construction.md): the figure, the count and the
@@ -827,7 +912,7 @@ void draw_site_grid(const world& w, const recipe_registry& reg, ui_state& ui)
                                                         : " Press to see it on the map anyway."));
         else
         {
-            const float mid = mx.x - pad - std::max(ImGui::CalcTextSize(count_text).x, 40.0f);
+            const float mid = half_x - st.ItemInnerSpacing.x - std::max(ImGui::CalcTextSize(count_text).x, 16.0f);
             char count_card[220];
             int  n = std::snprintf(count_card, sizeof count_card, "%d %s of your ground %s take it.", c.sites,
                                    c.sites == 1 ? "tile" : "tiles",
@@ -838,7 +923,7 @@ void draw_site_grid(const world& w, const recipe_registry& reg, ui_state& ui)
             if (c.unaffordable > 0)
                 std::snprintf(count_card + n, sizeof count_card - n,
                               " %d more cost more than the treasury.", c.unaffordable);
-            card("count", {mid, fig_y - 1.0f}, mx, count_card);
+            card("count", {mid, fig_y - 1.0f}, {half_x, mx.y}, count_card);
             if (c.has_figure)
             {
                 char buf[240];
@@ -864,7 +949,8 @@ void draw_site_grid(const world& w, const recipe_registry& reg, ui_state& ui)
                                            : "Press to list its sites and mark them on the map, then press a "
                                              "marked tile to build there.");
         }
-        construction_column_card(o.name.c_str(), cards);
+        if (!build_hovered) // the Construct press carries its own card
+            construction_column_card(o.name.c_str(), cards);
 
         sf.picker_rows.push_back({o.name, o.category, gr,
                                   ImGui::CalcTextSize(o.name.c_str(), nullptr, false, name_room).x, name_room,

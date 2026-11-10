@@ -288,6 +288,79 @@ verify.expect(not esc.armed, "G9: Esc disarms the chosen building")
 verify.expect(esc.picker_x >= 0, "G9: Esc leaves the ledger open")
 verify.site_clear()
 
+-- G11: a cell's own Construct press builds at its best site (Ben, 2026-11-10): the highest
+-- Net in whole credits (priced before unpriced), ties to the most Logistic Point cover, then
+-- the lowest tile id. The press is aimed from the cells' own published centres: the right half
+-- of the lower line, the column and row pitch measured off neighbouring cells.
+do
+  verify.clear_selection()
+  verify.frames(3)
+  -- Arm the top cell and clear it: a pick frames its cell, so the grid scrolls home and the
+  -- cells' published centres are on screen.
+  local top = verify.site_finder().picker_rows[1].name
+  verify.site_pick(top)
+  verify.frames(3)
+  verify.site_clear()
+  verify.frames(3)
+  local s = verify.site_finder()
+  local cells = s.picker_rows
+  local c1 = cells[1]
+  local pitch_x, pitch_y = nil, nil
+  for i = 2, #cells do
+    if pitch_x == nil and math.abs(cells[i].y - c1.y) < 0.5 then pitch_x = cells[i].x - c1.x end
+    if pitch_y == nil and cells[i].y > c1.y + 0.5 then pitch_y = cells[i].y - c1.y end
+  end
+  local cell_w = pitch_x and (pitch_x - 3.0) or (c1.have + 8.0 + 2.0 * c1.glyph_r + 4.0)
+  local cell_h = pitch_y and (pitch_y - 3.0) or nil
+  verify.expect(cell_h ~= nil, "G11: the grid has a second row to measure its pitch from")
+  if cell_h then
+    -- The expected site, from the table the cell's figure is: arm, read, clear.
+    verify.expect(verify.site_pick(c1.name), "G11: the top cell can be armed to read its table")
+    verify.frames(3)
+    local rows = verify.site_finder().rows
+    local best = nil
+    local function key_better(r, b)
+      local rp, bp = r.priced and 1 or 0, b.priced and 1 or 0
+      if rp ~= bp then return rp > bp end
+      local rn, bn = math.floor(r.profit + 0.5), math.floor(b.profit + 0.5)
+      if rn ~= bn then return rn > bn end
+      if r.cover ~= b.cover then return r.cover > b.cover end
+      return r.tile < b.tile
+    end
+    for _, r in ipairs(rows) do
+      if best == nil or key_better(r, best) then best = r end
+    end
+    verify.site_clear()
+    verify.frames(3)
+    c1 = verify.site_finder().picker_rows[1] -- re-read: the pick framed it
+    verify.expect(best ~= nil, "G11: the top cell lists a site")
+    if best then
+      local lh = c1.glyph_r * 2.0 / 1.5
+      local bx = c1.x + cell_w * 0.25
+      local by = c1.y + cell_h * 0.5 - 4.0 - lh * 0.5
+      local function count_at(x, y)
+        local n = 0
+        for _, b in ipairs(verify.buildings()) do
+          if b.player and b.x == x and b.y == y then n = n + 1 end
+        end
+        return n
+      end
+      local before_n, before_here = #verify.buildings(), count_at(best.x, best.y)
+      verify.hover(bx, by, 2)
+      shot("site_grid_cell_construct_hover")
+      verify.click(bx, by)
+      verify.frames(4)
+      print(string.format("[site_grid] G11: '%s' Construct at (%.0f, %.0f); best site %d,%d (net %.0f, cover %.2f)",
+            c1.name, bx, by, best.x, best.y, best.profit, best.cover))
+      verify.expect(#verify.buildings() == before_n + 1, string.format(
+        "G11: the cell's Construct builds one (%d buildings, was %d)", #verify.buildings(), before_n))
+      verify.expect(count_at(best.x, best.y) == before_here + 1,
+        "G11: it builds on the best site: highest Net, then cover, then lowest tile id")
+      verify.expect(not verify.site_finder().armed, "G11: the Construct press does not choose the cell")
+    end
+  end
+end
+
 -- The narrow end: every cell still legible at 1280.
 verify.window(1280, 720)
 verify.frames(3)
