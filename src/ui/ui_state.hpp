@@ -484,6 +484,8 @@ struct pinned_items_state
     /// element sets it to its tile column's heading (selection_panel.cpp); the toggle
     /// reads and clears it. -1 = the default, the header row's end.
     float header_anchor_x = -1.0f, header_anchor_y = -1.0f;
+};
+
 /// The Space ledger's view state (rail slot 9; docs/ui/ledgers/space.md), plus
 /// where its controls landed this frame so a verify script presses the REAL
 /// control. VIEW state, not serialised. Every press queues a `space_command` on
