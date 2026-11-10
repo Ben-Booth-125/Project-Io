@@ -216,7 +216,7 @@ yields less further out.
 | **Dock** | Lets space units dock, refuel and unload (`../military/SPACE_FLEETS.md`). Edge only. |
 | **Habitation** | Adds crew room. |
 | **Life support** | Adds life support; buys food rations off the home shelf each quarter. |
-| **Fuel depot** | Holds propellant, for refuelling docked space units. |
+| **Fuel depot** | Holds propellant, for refuelling docked space units. Stocked off the market of its owner's base on the body below, else off the home shelf (`ERAS.md` § The propellant loop). |
 | **Shipyard** | Builds space units too large to launch from a surface. Edge only. |
 | **Microgravity factory** | Turns goods bought off the home shelf into goods only orbit can make, sold onto the home market. |
 | **Observatory** | **Maps** every body in its owner's comms coverage that its owner has not mapped whole: two regions a quarter on each (`../ui/DISCOVERY.md` § Mapping, then prospecting). |

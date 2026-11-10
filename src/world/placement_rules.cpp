@@ -4,6 +4,8 @@
 #include "world/logistics.hpp"
 #include "world/province.hpp"  // BL-513: the province building ceiling
 #include "world/nation_tech.hpp" // structure_unlocked (BL-1273; BL-344 before it)
+#include "world/space_assets.hpp"    // space_home_body_of (BL-1604: the Ice Extractor gate)
+#include "world/space_tech_keys.hpp" // space_keys::ice_extractor
 #include "world/world.hpp"
 
 #include <algorithm>
@@ -518,6 +520,21 @@ placement_result can_place_in_world(const world& w, entity_id tile_id,
     // entirely when the caller named no corp (see the header).
     if (!structure_unlocked(w, corp, type))
         return placement_reason::tech_locked;
+
+    // BL-1604 (ERAS.md § The propellant loop; PRODUCTION.md § Extraction buildings):
+    // the ICE EXTRACTOR - an extraction site drawing water off an ice deposit - is far
+    // space's to open OFF THE BUILDER'S HOME BODY: there it needs the Early Space
+    // tree's Ice Extraction (`ice_extractor`). On the home body the deposit route stays
+    // open as it always was. A Well (no deposit) is not an Ice Extractor.
+    if (corp != null_entity && type == building_type::extraction_site && target == resource_type::water
+        && tc_it->second.resource_deposit[static_cast<std::size_t>(resource_type::water)] > 0.0f)
+    {
+        const entity_id nation = owner_home_nation(w, corp);
+        const entity_id home   = space_home_body_of(w, nation); // null: no home to be off
+        if (home != null_entity && tc_it->second.body != home
+            && !nation_has_mechanic(w, nation, space_keys::ice_extractor))
+            return placement_reason::tech_locked;
+    }
 
     // BL-1399 OWN GROUND (Ben, 2026-10-23; NATIONS.md § Own ground): a nation builds
     // only on its own tiles - never another nation's, never ground no nation owns. Asked

@@ -138,6 +138,10 @@ recipes = {
         inputs  = { water = 3.0, refined_fuel = 1.0 },
         outputs = { propellant = 1.0 },
         air     = "airless",    -- runs only on an airless body (Ben, 2026-10-09)
+        -- BL-1604 (ERAS.md § The propellant loop): this route IS the Electrolysis
+        -- Plant, and runs only on the ground of a nation holding the Early Space
+        -- tree's Electrolysis Plants (its `electrolysis_plant` mechanic key).
+        mechanic = "electrolysis_plant",
     },
 
     -- BL-340 (2026-08-11) — the processing-chain roster. Every value here

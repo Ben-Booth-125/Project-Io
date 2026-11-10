@@ -261,6 +261,9 @@ void recipe_registry::load_from_lua(lua_state& lua)
                                          + air + "' (any | atmosphere | airless)");
         }
 
+        // BL-1604: the mechanic key the recipe's ground must hold (absent = none).
+        r.mechanic = entry->get_or<std::string>("mechanic", "");
+
         // A retired slot (Ben, 2026-10-27, BL-1438): kept so stored recipe ids
         // never shift; it must name no inputs and no outputs — a retired row
         // that still trades is authored nonsense, refused rather than ignored.
