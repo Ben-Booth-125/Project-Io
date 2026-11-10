@@ -289,6 +289,19 @@ A space unit refuels off the shelf of the body it orbits, and a station's Fuel d
 the market of its node's body (`../military/SPACE_FLEETS.md` § Thrust — the Δv budget). A nation that makes
 propellant at a moon stops paying the home world's climb for every tank it burns.
 
+**The two buildings are researched, and only off the home world.** The Ice Extractor is the
+extraction site that draws water off an ice deposit (`PRODUCTION.md` § Extraction buildings): on a
+nation's home body it stands open as it always has, and on any other body it needs the Early Space
+tree's Ice Extraction (`tech/EARLY_SPACE_TREE.md`). The Electrolysis Plant is the Chemical Plant's
+airless route, `propellant_electrolysis` — water, with refined fuel shipped in or made locally, into
+propellant (`PRODUCTION.md` § Chemical Plant). It runs only on the ground of a nation holding
+Electrolysis Plants, and only on an airless body, so it is never a home-world building.
+
+**The local shelf is the base's.** A unit in a body's low orbit refuels off the market its owner's
+Launchpad there routes to, home world or base alike. A station's Fuel depot is stocked off the market
+its owner's off-world base on the station's body routes to; with no base of its owner below, it is
+stocked off the home shelf.
+
 ### Firsts (Ben, 2026-11-10)
 
 **The first nation to do a thing in space is told so, and so is everyone else.** Each **first** is a

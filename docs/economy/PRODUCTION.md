@@ -230,6 +230,9 @@ where people settled. So water is cheap where the river runs, and a river city h
 dry one must buy. The Ice Extractor stays the route on icy ground and off-world; a tile can satisfy
 either rule, both, or neither. Where it satisfies both, the deposit wins: a tile carrying any ice
 deposit takes the Ice Extractor route — even once that deposit is spent — and never offers a Well.
+**Off the builder's home body the Ice Extractor is far space's (ERAS.md § The propellant loop):** there
+it needs the Early Space tree's Ice Extraction, and the build door refuses it as locked technology
+without. On the home body it needs no key.
 
 **The deposit-agnostic yield (BL-1198, BL-1199).** A Well and a Fishing Wharf have no deposit, so
 neither has a richness to set its rate nor a reserve to draw. Each runs at the rate a **typical**
@@ -305,6 +308,12 @@ air allows, never a cheaper choice beside the other. "Airless" is planetology's 
 atmosphere class of `none` or `thin` (a trace atmosphere at zero surface pressure), the same
 bodies planetology routes to the airless tables (`atmosphere_class`, `src/world/components.hpp`;
 Ben's ruling 2026-10-09 applied with the existing definition). Closing the in-situ propellant loop there (water → liquid oxygen, refined fuel shipped or synthesised) is the defining Era 2 logistical problem.
+
+**The airless route is the Electrolysis Plant (ERAS.md § The propellant loop).** A Chemical Plant on
+`propellant_electrolysis` is what the Early Space tree calls the Electrolysis Plant, and it runs only on
+the ground of a nation holding Electrolysis Plants. A recipe names that key as data (`mechanic` in
+`scripts/recipes.lua`), and every door that asks whether a recipe may run at a tile asks it with the
+body's air: the build door and the retool door refuse it as locked technology without.
 
 #### Electronics Lab
 

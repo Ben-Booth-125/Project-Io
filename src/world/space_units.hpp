@@ -64,7 +64,10 @@ struct world;
 // that body, buying a full top-up off that body's shelf (refused whole when the
 // shelf or treasury is short). The depot stock is filled each QUARTER
 // (`run_space_unit_quarter`) up to `depot_stock_per_depot` x working depots, bought
-// off the owner's home shelf as far as the shelf and treasury allow.
+// off the market of the station's node's body where its owner holds an off-world
+// base there (BL-1604; ERAS.md § The propellant loop), else off the owner's home
+// shelf, as far as the shelf and treasury allow. A low-orbit refuel already buys off
+// the body below: the pad's market on that body, home or base alike.
 //
 // UPKEEP AND DECAY — THE SPACE-ASSET RULE SHAPE. Each unit pays its hull's upkeep
 // whole each quarter from its owner's treasury, or pays nothing and counts an

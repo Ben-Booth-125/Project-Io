@@ -115,6 +115,16 @@ struct recipe
     /// recipes.lua; absent means `any`. Read through `recipe_runs_on_body`, the
     /// one predicate every door asks.
     recipe_air air = recipe_air::any;
+    /// BL-1604 (propellant loop; ERAS.md § The propellant loop): the MECHANIC key a
+    /// nation must hold for this recipe to run on its ground, authored as
+    /// `mechanic = "<key>"` in recipes.lua (a space_tech_keys.hpp key); absent =
+    /// empty = no key. `propellant_electrolysis` is the Electrolysis Plant and names
+    /// `electrolysis_plant` (the Early Space tree's Electrolysis Plants). Asked of the
+    /// TILE'S OWNER through `recipe_runs_at_tile`, so every door that asks a recipe's
+    /// air asks its key too. Not a research unlock (`recipe_unlocked` stays the
+    /// research-opened list): a recipe that names a key stays offered to every nation
+    /// and runs only on the ground of one that holds it.
+    std::string mechanic;
     /// BL-613 (qualification fraction; docs/economy/POPULATION.md
     /// § Qualification): the fraction of this recipe's labour that must be
     /// QUALIFIED, in [0, 1]. 0 (the default, and the value for every
@@ -163,11 +173,16 @@ inline bool recipe_runs_on_body(const recipe& rc, const body_component& b)
     return true;
 }
 
-/// The predicate at a tile: the tile's body's air. True for an unknown tile or
-/// body (no air to read, nothing to refuse on — the callers' own existence
-/// checks refuse those).
+/// The predicate at a tile: the tile's body's air, and (BL-1604) the recipe's
+/// mechanic key held by the tile's owner — a recipe naming a key runs on no
+/// unowned ground. True for an unknown tile or body (no air to read, nothing to
+/// refuse on — the callers' own existence checks refuse those).
 struct world;
 bool recipe_runs_at_tile(const world& w, const recipe& rc, entity_id tile); // defined in construction.cpp (a Lua-free TU)
+/// The key half alone: does the owner of @p tile hold @p rc's mechanic key (true
+/// for a recipe naming none)? The build and retool doors ask it first so the
+/// refusal reads `tech_locked`, not `wrong_air`.
+bool recipe_mechanic_held_at_tile(const world& w, const recipe& rc, entity_id tile); // construction.cpp
 
 /// The primary output resource of a recipe — the argmax of its outputs. Used
 /// to key a processing method's resource pip (construction_panel.cpp) and,

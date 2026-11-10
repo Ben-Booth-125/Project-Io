@@ -3,6 +3,7 @@
 #include "components.hpp"
 #include "market_clearing.hpp" // market_for_tile
 #include "nation_tech.hpp"     // nation_has_mechanic
+#include "offworld_base.hpp"   // BL-1604: offworld_base_capital (the depot's local shelf)
 #include "orbital_graph.hpp"
 #include "space_battle.hpp"  // BL-1597: an engaged unit's move is a withdrawal
 #include "space_assets.hpp"    // space_home_body_of, k_space_quarters_to_loss_ceiling
@@ -117,6 +118,26 @@ entity_id home_market_of(const world& w, entity_id nation)
         if (m.body == body && body != null_entity)
             return mid;
     return null_entity;
+}
+
+/// BL-1604 (ERAS.md § The propellant loop): the shelf a station's Fuel depot is
+/// stocked from - the market of its node's body when that body is not its owner's
+/// home and the owner holds a base there (the market the base's tile routes to);
+/// else the owner's home shelf. No base, the home shelf: unchanged.
+entity_id depot_market_of(const world& w, const space_station& st)
+{
+    const entity_id body = st.node.body;
+    if (!w.offworld_bases.empty() && body != space_home_body_of(w, st.owner))
+    {
+        const entity_id base_tile = offworld_base_capital(w, st.owner, body);
+        if (base_tile != null_entity)
+        {
+            const entity_id m = market_for_tile(w, base_tile);
+            if (m != null_entity)
+                return m;
+        }
+    }
+    return home_market_of(w, st.owner);
 }
 
 /// The market a building's tile clears against, else the lowest-id market on @p body.
@@ -909,8 +930,9 @@ void run_space_unit_quarter(world& w, const space_unit_params& p, const station_
     for (auto it = w.station_depot_stock.begin(); it != w.station_depot_stock.end();)
         it = (w.stations.count(it->first) == 0) ? w.station_depot_stock.erase(it) : std::next(it);
 
-    // 3. The fill, ascending station id: up to the cap, off the owner's home shelf,
-    // as far as the shelf (under the ceiling) and the treasury allow.
+    // 3. The fill, ascending station id: up to the cap, off the depot's shelf (the
+    // owner's home shelf, or its base's below - BL-1604, `depot_market_of`), as far
+    // as the shelf (under the ceiling) and the treasury allow.
     const std::size_t pr = static_cast<std::size_t>(rt::propellant);
     for (const auto& [sid, st] : w.stations)
     {
@@ -924,7 +946,7 @@ void run_space_unit_quarter(world& w, const space_unit_params& p, const station_
         float want = cap - have;
         if (!(want > 0.0f))
             continue;
-        const entity_id market = home_market_of(w, st.owner);
+        const entity_id market = depot_market_of(w, st);
         const auto mit = w.markets.find(market);
         const auto nit = w.nations.find(st.owner);
         if (mit == w.markets.end() || nit == w.nations.end())

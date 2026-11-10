@@ -1970,7 +1970,10 @@ recipe_switch_result try_switch_recipe(world& w, const recipe_registry& reg,
         return recipe_switch_result::tech_locked;
 
     // Propellant routes follow the body's air (Ben, 2026-10-09; PRODUCTION.md
-    // § Chemical Plant): the build door's gate, mirrored at the retool door.
+    // § Chemical Plant): the build door's gate, mirrored at the retool door - its
+    // key half first (BL-1604), as the build door asks it.
+    if (!recipe_mechanic_held_at_tile(w, *new_r, b.tile))
+        return recipe_switch_result::tech_locked;
     if (!recipe_runs_at_tile(w, *new_r, b.tile))
         return recipe_switch_result::wrong_air;
 
