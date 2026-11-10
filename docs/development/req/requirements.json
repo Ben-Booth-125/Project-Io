@@ -8363,6 +8363,68 @@
      "evidence": "2026-11-09 rival_fleet_census seeds 0,13,17,29, tick 40, against the 2026-11-08 A/B: broke at tick 40 55 to 23 of 129; earning 104 of 129. Gate 2026-11-09: only the known reds; nation_tech_harness timed out with no FAIL."
     }
    ]
+  },
+  {
+   "brief": "sea-trade-reading",
+   "title": "BL-1526 - What crosses the water (MILITARY.md § Sea)",
+   "difficulty": 2,
+   "importance": "A",
+   "evaluated_difficulty": 2,
+   "status": "complete",
+   "requirements": [
+    {
+     "id": "R1",
+     "text": "Per library seed and per major: the sea share of landed cargo value, imports and exports, and the ports carrying it.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "2026-11-10 naval_reading, sixteen library seeds, 40 ticks, after the re-bless (f48be3f6): Sea legs carry 58.7% of landed cargo value pooled (17.5% seed 22 to 96.3% seed 7); per major, median 82% of imports and 82% of exports by value go by sea (n=54 / 45; 3 and 2 majors under 10%); 7 to 31 ports carry it a seed."
+    }
+   ]
+  },
+  {
+   "brief": "naval-war-reading",
+   "title": "BL-1535 - The naval war on the library (MILITARY.md § Sea)",
+   "difficulty": 3,
+   "importance": "A",
+   "evaluated_difficulty": 3,
+   "status": "open",
+   "requirements": [
+    {
+     "id": "R1",
+     "text": "Sweep the library: fleets raised, raids landed, ports closed, landings made, fleet upkeep.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "2026-11-10 naval_reading, sixteen library seeds, 40 ticks, after the re-bless (f48be3f6): Raids material on two seeds only (seed 54 4.1% of sea value, seed 0 2.0%); a blockade ran on seeds 0, 31, 60, one port closed each; 5 units landed (seeds 31, 60), all at full LP share, so food held at 1000; 7 rival ship hires on 4 seeds; crew wages 42 to 210 a tick against fleet treasuries 21k to 286k."
+    },
+    {
+     "id": "R2",
+     "text": "A clearing price moves at a blockaded market on a real seed.",
+     "kind": "headless",
+     "status": "failed",
+     "evidence": "Blockaded price against its own price the tick before closing, netted of the other markets' move over the same span: seed 0 0.998 vs 1.040, seed 31 1.038 vs 1.038, seed 60 1.055 vs 1.026 (110, 864, 880 readings). The blockaded markets read 14-24% below other markets, but they were cheap before closing. Raised as NR-1156."
+    },
+    {
+     "id": "R3",
+     "text": "The sprint re-bless, described by the shape probe.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "f48be3f6: 64 digests moved, 16/16 confirmed by --digest-check; shape probe on seeds 46, 28, 11, 31, 40, 12, 37 against bc7ac30f."
+    },
+    {
+     "id": "R4",
+     "text": "A landed army on a real seed runs its stocks down with no port, and holds once it takes one.",
+     "kind": "headless",
+     "status": "pending",
+     "evidence": "No landing arose uncovered on the library: all 5 landed units stood at LP share 1000. Needs a staged landing."
+    },
+    {
+     "id": "R5",
+     "text": "A live war played to a landing.",
+     "kind": "visual",
+     "status": "pending",
+     "evidence": ""
+    }
+   ]
   }
  ]
 }

@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*37 entries — 33 open, 4 resolved.*
+*38 entries — 34 open, 4 resolved.*
 
 ---
 
@@ -340,6 +340,11 @@ Two calls. Income is the mean of the last four returns of income plus taxes less
 *decision taken on your behalf · raised 2026-11-09 · from MINOR_PLANT_FLOOR (BL-1554), GARRISON_INCOME (BL-1555)*
 
 Three calls. The plant floor visits every nation, because majors are not known until after the walk; the kit then replaces a major's floor firm. Garrisons are paid at the 0.50 force ceiling, not the threat-scaled share, so a minor is not stripped by its first reading. The opening chest cut now reserves only the 20-man token's pay. Measured on four seeds: 22 of 112 minors still open plantless, and 15 of the 23 broke rivals at tick 40 are among those. World digests moved and wait on the re-bless.
+
+### NR-1156 — A blockade does not move the blockaded market's price
+*question · raised 2026-11-10 · from NAVAL_WAR_READING (BL-1535)*
+
+MILITARY.md § Blockade says the cost of a closed port lands on the blockaded market's prices. On the three library seeds where a blockade closed a port, it did not. Blockaded price against its own price the tick before closing, netted of the other markets' move over the same span: seed 0 0.998 vs 1.040, seed 31 1.038 vs 1.038, seed 60 1.055 vs 1.026 (110, 864, 880 readings). The blockaded markets read 14-24% below other markets, but they were cheap before closing. Likely cause, unconfirmed: each market has other ports or land routes, so one closed port reroutes trade without shortage.
 
 ---
 
