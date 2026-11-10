@@ -92,8 +92,8 @@
   {
    "id": 65,
    "theme": "Near space (v0.4.0)",
-   "state": "open",
-   "status_line": "open",
+   "state": "gated",
+   "status_line": "gated on NR-1203 (trade wall): every item built except BL-1630 (launch goods supply); spectate shows 0 rival launches (BL-1593, NEXT_SESSION.md)",
    "opened_date": "2026-11-10",
    "closed_date": null,
    "author": "Claude (Ben, 2026-11-10: deliver v0.4.0 and v0.5.0 in lanes)",
@@ -120,9 +120,9 @@
   {
    "id": 66,
    "theme": "Far space (v0.5.0)",
-   "state": "planned",
-   "status_line": "planned; opens when sprint 65 closes",
-   "opened_date": null,
+   "state": "open",
+   "status_line": "open: every item built except BL-1611 (far-space spectator check), gated on NR-1203, and BL-1635 (ownerless harness failures); four live clicks owed (NEXT_SESSION.md)",
+   "opened_date": "2026-11-10",
    "closed_date": null,
    "author": "Claude (Ben, 2026-11-10: deliver v0.4.0 and v0.5.0 in lanes)",
    "goal": "The whole solar system with the next age's technology: designed space units and fleets, convoys as Haulers, battles, debris, bases that run like the home world, prospecting, and wars across every body. Cuts v0.5.0.",

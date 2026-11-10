@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*73 entries — 70 open, 3 resolved.*
+*76 entries — 73 open, 3 resolved.*
 
 ---
 
@@ -908,6 +908,48 @@ No new building types: the Ice Extractor is the extraction site on an ice deposi
 > **Recommendation:** Keep: it gives Haulers a reason to run; rule otherwise if bases should close the loop alone.
 
 *Files: `scripts/recipes.lua`, `docs/economy/ERAS.md`*
+
+### NR-1211 — Base and prospect UI: five calls taken, and four new verify reads to grant
+*decision taken on your behalf · raised 2026-11-10 · from BL-1610 / BL-1633 lane report*
+
+Calls: (1) the player picks the base site from a list, one row per province with mapped unclaimed land, at its most habitable tile, because a Lander lands at a surface node and no tile is behind it; (2) ground a dispatched probe is scanning keeps showing its deposits, and a fully surveyed body shows everything (DISCOVERY.md leaves a probed body to its probe); (3) the unprospected wash is 30% slate (palette::unprospected), subtle over grey regolith; (4) two deposit reads were left raw: the construction-suitability wash and the extraction candidates on the tile card, which could show bands on an unprospected base province; (5) Embark defaults to every free berth. BL-1633: Assign to front lists only fronts on the units' own body. New verify reads: verify.base_card() (the base orders as drawn, including each site row's label, grid col/row, chosen and prospected flags), verify.prospect_mask() (washed tile count, lens key goods, the title's mapped/prospected/total counts); STAGING verify.base_prospect_fixture() (grants the base_founding key, maps a moon, lands two player Landers with colonists and kit, idles an empty Lander in home low orbit; returns the moon name and three unit ids) and verify.stage_prospect(n) (prospects up to n regions by the real rule; returns the count); fleet_card().presses gains embark/confirm_embark/found_base/confirm_found.
+
+**Why it matters.** The reads touch the no-tile-data rule; base_card returns site tile positions the card already prints. Call (4) is a small leak of deposit information on unprospected ground.
+
+- Grant the reads; fix call (4) as a follow-up
+- Narrow base_card to labels only
+
+> **Recommendation:** Grant, since they report what the card draws; route the two raw reads through prospect_view.hpp.
+
+*Files: `src/core/verify_api.cpp`, `src/ui/prospect_view.hpp`, `.claude/rules/io-standing-rules.md`*
+
+### NR-1212 — Novelty: a base-site picker list, and a shared prospect-visibility test
+*novel-work · raised 2026-11-10 · from BL-1610 lane report*
+
+The design note expected a Lander "landed on a mapped tile"; a Lander lands at a surface node, so the lane built a site list the note did not anticipate. src/ui/prospect_view.hpp is a new shared piece every deposit-drawing surface now asks. Scope stayed small.
+
+**Why it matters.** Novelty should be chosen, not accreted (standing rules).
+
+- Accept the list as the base-site idiom
+- Replace it with a press on the Planetary canvas
+
+> **Recommendation:** Accept for v0.5.0; revisit in the v0.6.0 polish pass if it reads poorly in play.
+
+*Files: `src/ui/circum_units.cpp`, `docs/ui/SELECTION.md`*
+
+### NR-1213 — Garrison chase fix moves the campaign march; two harness re-aims taken
+*decision taken on your behalf · raised 2026-11-10 · from BL-1634 / BL-1632 lane reports*
+
+BL-1634 (garrison chase loop): units on a defend order now step last in the daily march, and re-aim at where the day's steps left the hostile stacks (economy_system.cpp run_unit_march; MILITARY.md § Defend province). Chosen over a swap/cross rule because the chase never swaps or crosses tiles. Side effect: a stack entering a province draws its defenders the same day, not the next. Any world where a defender steps beside other units moves, so play-path digests and sweeps may move; none of the harnesses run pins one. BL-1632 (stale tail harnesses): one helper, world_save_tail_bytes_after, replaces the hand sums; a static_assert breaks the build when the save version passes 92 until the new section joins its table. Calls: war_harness RF1 asserted ver == 76 and now asserts ver == world_save_version (as R4j and R9b do); tile_contact T13e and quarterly_return R5 passed only by corrupting the wrong section and are re-aimed at the bytes they name.
+
+**Why it matters.** The march change is a world-mover folded into the pending digest re-pin (NR-1167).
+
+- Accept the step rule
+- Prefer a same-tile meeting rule instead
+
+> **Recommendation:** Accept: one sentence, deterministic, reuses the existing targeting.
+
+*Files: `src/world/economy_system.cpp`, `docs/military/MILITARY.md`, `src/world/world_save.cpp`*
 
 ---
 

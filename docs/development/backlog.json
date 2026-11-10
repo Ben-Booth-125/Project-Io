@@ -1652,8 +1652,8 @@
    "design": "Keyed to existing Digitisation nodes where one fits (Rocketry, Communication Satellites, Satellite Navigation, Guidance Systems); the rest are named in RESEARCH and the tree. In-band mapping, logged."
   },
   {
-   "status": "designed",
-   "glyph": "○",
+   "status": "complete",
+   "glyph": "●",
    "sprint": 65,
    "version_goal": "v0.4.0",
    "written": "2026-11-10",
@@ -1675,7 +1675,7 @@
     "scripts/verify/near_space.lua"
    ],
    "title": "Spectate rivals going to space, and a visual check of the near-space surfaces",
-   "design": "A verify script captures the Circumplanetary canvas and the Space ledger; a spectated run is watched for how rivals approach space. The finding is Ben's first hurdle before playtesting."
+   "design": "A verify script captures the Circumplanetary canvas and the Space ledger; a spectated run is watched for how rivals approach space. The finding is Ben's first hurdle before playtesting. Finding (2026-11-10, seed 0 Release spectate to 2015): rivals research Rocketry 1976, lay pads 1977, staff 4 pads by 1995, launch 0 times; the trade wall (NR-1203) stops the launch goods. Captures: near_space_assets.lua, space_ledger.lua. Write-up in NEXT_SESSION.md section 2."
   },
   {
    "status": "complete",
@@ -2039,8 +2039,8 @@
    "design": "Circumplanetary and Solar draw fleets at nodes and in transit; select a fleet and order a move (showing the Δv cost against the budget), dock, refuel, bombard; the Military designer gains space hulls. Needs a live click. Also (BL-1605 lane): mark a satellite dark and a station stormed on the circumplanetary canvas during a solar storm. Also (BL-1598 lane): no surface reads debris yet; draw it per node. Also (BL-1606 lane): show a space first in the player's dispatch (history_topic::space_first; the dispatch filters only war entries). Live click owed: seven presses (fleet mark, Move with preview and confirm, re-press disarms, Dock/Undock, Refuel, Bombard and lift, Military Design Space save, Solar fleet press)."
   },
   {
-   "status": "designed",
-   "glyph": "○",
+   "status": "complete",
+   "glyph": "●",
    "sprint": 66,
    "version_goal": "v0.5.0",
    "written": "2026-11-10",
@@ -2059,7 +2059,7 @@
    "authority_doc": "docs/politics/NATIONS.md",
    "files": [],
    "title": "Founding a base and watching prospecting",
-   "design": "A found-base flow from a landed Lander; prospecting progress and the two-step region mask on the Planetary canvas. Needs a live click. Also (BL-1600 lane): the Planetary canvas shows deposits on mapped ground; hide them until prospected, reading survey_tile_prospected for the player nation."
+   "design": "A found-base flow from a landed Lander; prospecting progress and the two-step region mask on the Planetary canvas. Needs a live click. Also (BL-1600 lane): the Planetary canvas shows deposits on mapped ground; hide them until prospected, reading survey_tile_prospected for the player nation. Live click owed: found a base from a landed Lander (toggle, pick, un-pick, confirm); embark on a seed with a staffed Launchpad; the slate wash, title counts and \"Not yet prospected\" hover on a part-prospected moon."
   },
   {
    "status": "designed",
@@ -2239,8 +2239,8 @@
    "design": "tools/mcp/server.js holds RESEARCH_NODE_COUNT = 160. Read the count from the generated tree data (or the store) instead of a literal, so valid orders 160..193 are not refused before the wire."
   },
   {
-   "status": "designed",
-   "glyph": "○",
+   "status": "complete",
+   "glyph": "●",
    "version_goal": "v0.5.0",
    "written": "2026-11-10",
    "parked": false,
@@ -2263,8 +2263,8 @@
    "design": "war_harness (R4l, RF1, RF3, RF4 fail), cession, embargo, railway, recruits, refit_units, road_edges, tax_discontent, tile_contact, carried_supplies, lp_pool and quarterly_return subtract tail sections only up to about v75 (refusals); every later section (contributors v77 onward, through the space sections to v90) is missing. Better than adding terms again: one helper world_save_tail_bytes_after(version, w) in world_save.cpp that sums every section after a version, so the next bump updates one place."
   },
   {
-   "status": "designed",
-   "glyph": "○",
+   "status": "complete",
+   "glyph": "●",
    "version_goal": "v0.5.0",
    "written": "2026-11-10",
    "parked": false,
@@ -2282,11 +2282,11 @@
     "src/ui/selection_panel.cpp"
    ],
    "title": "The unit card's Assign to front menu lists only fronts on the unit's body",
-   "design": "Assigning a unit to a front on another body is refused (MILITARY.md § Space). The menu still lists every front of the nation; filter it by the unit's body."
+   "design": "Assigning a unit to a front on another body is refused (MILITARY.md § Space). The menu still lists every front of the nation; filter it by the unit's body. Live click owed: Assign to front on a unit whose nation has fronts on another body lists only same-body fronts."
   },
   {
-   "status": "designed",
-   "glyph": "○",
+   "status": "complete",
+   "glyph": "●",
    "version_goal": "v0.5.0",
    "written": "2026-11-10",
    "parked": false,
@@ -2325,10 +2325,13 @@
    "files": [
     "tools/verify/construction_harness.cpp",
     "tools/verify/well_gate.cpp",
-    "tools/verify/nation_tech_harness.cpp"
+    "tools/verify/nation_tech_harness.cpp",
+    "tools/verify/railway_harness.cpp",
+    "tools/verify/lp_pool_harness.cpp",
+    "tools/verify/tax_discontent_harness.cpp"
    ],
    "title": "Three harnesses fail with or without the space work: construction (8), well_gate (5), nation_tech pacing R0h/R0i",
-   "design": "Confirmed by rebuilding with the lane's files reverted: construction_harness C.R2/R3/R4/R8 (8 rows), well_gate E1/W5/W7 (5 rows), nation_tech_harness R0h/R0i (research pacing, median 14, p10 6). Find which commit broke each; fix or re-pin with a cause comment (pacing re-pins are Ben's)."
+   "design": "Confirmed by rebuilding with the lane's files reverted: construction_harness C.R2/R3/R4/R8 (8 rows), well_gate E1/W5/W7 (5 rows), nation_tech_harness R0h/R0i (research pacing, median 14, p10 6). Find which commit broke each; fix or re-pin with a cause comment (pacing re-pins are Ben's). Also left by BL-1632 (not tail-offset problems): railway_harness R6 relabels a v55 body as v48 although the tile record changed at v53 (use the pre-edge writer lp_pool uses), R4 and R7/D (rail logic); lp_pool \"M seed 0: every consumer reached after seeding\" (logistics reach); tax_discontent T6 (the v51 hash compares with a hand-zeroed world that misses later state)."
   }
  ]
 }
