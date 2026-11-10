@@ -153,28 +153,6 @@
    "title": "Tech pacing below its band",
    "design": "Measured 2026-11-09, 16 seeds, 577 nations: majors' completed nodes median 15, p10 6, against targets 16-24 and at least 8. The before-sprint tree read 15 and 5, so this is not a sprint 63 regression. A calibration for a later sprint, after Ben's opening playtest. Carried at the sprint 63 close (2026-11-10): a later calibration, after the opening playtest.",
    "author": "main session (Ben, 2026-11-09)"
-  },
-  {
-   "status": "proposed",
-   "glyph": "○",
-   "sprint": null,
-   "version_goal": "v0.3.0",
-   "written": "2026-11-10",
-   "parked": false,
-   "blocked_on": null,
-   "author": "main session (naval_reading, 2026-11-10)",
-   "category": "Economy",
-   "authority_doc": "docs/economy/MARKETS.md",
-   "id": "BL-1618",
-   "short_name": "PRICE_FALLS_AS_SUPPLY_VANISHES",
-   "requires": [],
-   "priority": "B",
-   "difficulty": 2,
-   "files": [
-    "src/world/market_clearing.cpp"
-   ],
-   "title": "A price falls as its supply vanishes, with demand flat",
-   "design": "MARKETS.md § Price resolution: target = base x sqrt(demand / supply), and base x ceil_mult with no supply, so a price should climb as supply falls toward zero. Read on seed 31 at the blockaded market 47921 (naval_reading, 40 ticks, 2026-11-10): machinery supply 1.7 -> 0.1 a tick, demand 7.5 flat (all background), yet the price fell 473.43 -> 370.00 while other markets moved x0.969. A price of 473 standing above what looks like the band ceiling (370) means a price is written outside resolve_price, or the ceiling moved. Find which, and whether it is a defect or a rule the doc does not state. Read before changing anything. Carried at the sprint 64 close (2026-11-10): an investigation, not started; read before changing anything."
   }
  ]
 }

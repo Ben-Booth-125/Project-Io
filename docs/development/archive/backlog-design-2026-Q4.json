@@ -18004,6 +18004,50 @@
         "design",
         "resolved"
       ]
+    },
+    "BL-1618": {
+      "status": "complete",
+      "glyph": "●",
+      "sprint": null,
+      "version_goal": "v0.3.0",
+      "written": "2026-11-10",
+      "parked": false,
+      "blocked_on": null,
+      "author": "main session (naval_reading, 2026-11-10)",
+      "category": "Economy",
+      "authority_doc": "docs/economy/MARKETS.md",
+      "id": "BL-1618",
+      "short_name": "PRICE_FALLS_AS_SUPPLY_VANISHES",
+      "requires": [],
+      "priority": "B",
+      "difficulty": 2,
+      "files": [
+        "src/world/market_clearing.cpp"
+      ],
+      "title": "A price falls as its supply vanishes, with demand flat",
+      "design": "MARKETS.md § Price resolution: target = base x sqrt(demand / supply), and base x ceil_mult with no supply, so a price should climb as supply falls toward zero. Read on seed 31 at the blockaded market 47921 (naval_reading, 40 ticks, 2026-11-10): machinery supply 1.7 -> 0.1 a tick, demand 7.5 flat (all background), yet the price fell 473.43 -> 370.00 while other markets moved x0.969. A price of 473 standing above what looks like the band ceiling (370) means a price is written outside resolve_price, or the ceiling moved. Find which, and whether it is a defect or a rule the doc does not state. Read before changing anything. Carried at the sprint 64 close (2026-11-10): an investigation, not started; read before changing anything. Resolved 2026-11-10: not a defect. The base was 61, not 37, so 473 and 370 sit inside the 15.25-610 band; the target reads one tick, so a lump-fed market saws. Written into MARKETS.md § Price resolution; tools/verify/price_vanish_probe.cpp reads it per tick.",
+      "resolved": "2026-11-10",
+      "_row_keys": [
+        "status",
+        "glyph",
+        "sprint",
+        "version_goal",
+        "written",
+        "parked",
+        "blocked_on",
+        "author",
+        "category",
+        "authority_doc",
+        "id",
+        "short_name",
+        "requires",
+        "priority",
+        "difficulty",
+        "files",
+        "title",
+        "design",
+        "resolved"
+      ]
     }
   }
 }
