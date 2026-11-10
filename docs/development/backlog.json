@@ -1576,8 +1576,8 @@
    "design": "AI_OPPONENT.md § 11, the 2026-11-10 grant. One space action per quarter at most, scored: a comms satellite first, then a station core at a free node, then modules toward its template, astronaut training when crew is short. Never for the player. Done when a spectated run shows rivals launching in a seeded, replayable order."
   },
   {
-   "status": "in_progress",
-   "glyph": "◐",
+   "status": "complete",
+   "glyph": "●",
    "sprint": 65,
    "version_goal": "v0.4.0",
    "written": "2026-11-10",
@@ -1678,8 +1678,8 @@
    "design": "A verify script captures the Circumplanetary canvas and the Space ledger; a spectated run is watched for how rivals approach space. The finding is Ben's first hurdle before playtesting."
   },
   {
-   "status": "designed",
-   "glyph": "○",
+   "status": "complete",
+   "glyph": "●",
    "sprint": 66,
    "version_goal": "v0.5.0",
    "written": "2026-11-10",
@@ -1701,8 +1701,8 @@
    "design": "SPACE_FLEETS.md § A space unit is raised to a design, § Raising and launching. Hauler, Lander, Tug, Frigate, Cruiser (Shipyard only). One live design per class; kit bought off the shelf; crew drawn from astronauts. Saved."
   },
   {
-   "status": "designed",
-   "glyph": "○",
+   "status": "complete",
+   "glyph": "●",
    "sprint": 66,
    "version_goal": "v0.5.0",
    "written": "2026-11-10",
@@ -1881,8 +1881,8 @@
    "design": "MILITARY.md § Space, \"A war spans every body\". Fronts and garrisons work on any body a nation holds."
   },
   {
-   "status": "designed",
-   "glyph": "○",
+   "status": "complete",
+   "glyph": "●",
    "sprint": 66,
    "version_goal": "v0.5.0",
    "written": "2026-11-10",
@@ -2137,6 +2137,32 @@
    ],
    "title": "The Early Space tree reachable by the player and the rivals: verb, panel, AI picker, modifiers read",
    "design": "BL-1612 made the tree researchable in the model only. Owed: a queue verb for Early Space nodes with its ACTIONS.json entry; the tech tree panel shows the second tree once the gate is met; the rival research picker weighs Early Space nodes (its scorer is Digitisation-indexed today); nation_scalar folds Early Space modifier rows; remove/clear/unqueue and arrival projection cover the Early Space queue."
+  },
+  {
+   "status": "designed",
+   "glyph": "○",
+   "sprint": 66,
+   "version_goal": "v0.5.0",
+   "written": "2026-11-10",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Claude (lane K report, BL-1590)",
+   "requires": [
+    "BL-1590"
+   ],
+   "category": "Space",
+   "priority": "B",
+   "difficulty": 2,
+   "id": "BL-1614",
+   "short_name": "SPACE_TRANSIT_SEGMENT",
+   "authority_doc": "docs/ui/CIRCUMPLANETARY.md",
+   "files": [
+    "src/world/space_assets.hpp",
+    "src/world/world_save.cpp",
+    "src/ui/circum_assets.cpp"
+   ],
+   "title": "A moving space asset carries its origin node and departure tick, and the canvas draws its transit segment",
+   "design": "An in-transit satellite or station records only its destination and arrival tick, so the canvas draws it dimmed at the destination. Add origin node and departure tick (a save section), then draw the dashed segment and the share of the way travelled. Space units (space_units.hpp) already carry node and dest; reuse that shape."
   }
  ]
 }

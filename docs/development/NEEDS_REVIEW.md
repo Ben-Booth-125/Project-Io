@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*46 entries — 43 open, 3 resolved.*
+*49 entries — 46 open, 3 resolved.*
 
 ---
 
@@ -525,6 +525,48 @@ Life support keeps no memory: a station either buys its rations this quarter or 
 > **Recommendation:** Accept; revisit after the spectator observation.
 
 *Files: `src/world/space_effects.cpp`, `docs/economy/SPACE_ASSETS.md`*
+
+### NR-1173 — Space units: an authored hull and item stat table, the rocket equation, and a depot that buys propellant on its own
+*novel-work · raised 2026-11-10 · from BL-1594/BL-1595 lane report*
+
+Delta-v is the rocket equation over propellant aboard (never a stored delta-v). Five hulls (Hauler 10 mass/20 hp, Lander 8/15, Tug 8/20, Frigate 14/40, Cruiser 40/120 and yard-only) and eleven items (chemical drive ve 10, nuclear thermal ve 20, tanks 20/45, kinetic and missile armament, Whipple and composite armour, cargo and passenger bays, capture arm) are a new numeric table no doc owns. A working Fuel depot fills itself each quarter off the owner home shelf (200 a depot). Raising draws goods market-direct and credits no seller. Docking is own-nation only. Dials: launch_propellant_per_dv 0.1, repair 1/day, quarters_to_loss 4, berths_per_dock 2. Space-unit verbs, UI and cargo loading are owed (BL-1596 onward).
+
+**Why it matters.** The table sets how far and how cheaply fleets move; the depot is a new automatic buyer.
+
+- Accept the table as a first cut and tune at the v0.6.0 playtest
+- Move the table into SPACE_FLEETS.md as authority now
+
+> **Recommendation:** Accept; the numbers live on recipe_registry::space_units() and can move to Lua later.
+
+*Files: `src/world/space_units.cpp`, `docs/military/SPACE_FLEETS.md`*
+
+### NR-1174 — Pinned panel: pins travel in the UI save (save_game v28); the lens key and the panel share the column
+*decision taken on your behalf · raised 2026-11-10 · from BL-1603 lane report*
+
+Player pins are saved in the ui_state slice (save_game_version 28; v27 opens with no pins). Front pins are derived each frame and never saved: one per (war, body) where both sides hold land. The panel stops one margin above a grown lens key (a new shell_metrics hand-off). The pin toggle sits left of the band header go-to button, or ends the tile heading row. New verify read verify.pinned_panel() reports only what the panel draws; it reads no tile data, so no grant was taken. Fronts off the home body wait on BL-1602 (interplanetary war).
+
+**Why it matters.** A save-format change and a chrome hand-off grew past a UI-only brief; a live click is still owed.
+
+- Accept
+- Keep pins out of the save
+
+> **Recommendation:** Accept.
+
+*Files: `src/ui/pinned_panel.cpp`, `src/core/save_game.cpp`, `docs/ui/LAYOUT.md`*
+
+### NR-1175 — Circumplanetary assets: L5 clamped above the band, first-cut mark sizes, a new space_asset selection kind
+*decision taken on your behalf · raised 2026-11-10 · from BL-1590 lane report*
+
+At 1280x720 the bottom band (~280 px) covers the moon outer orbit, so its L5 diamond is clamped above the band and floats off its orbit when zoomed. The alternative is to lift the rung centre so the whole system clears the band. Satellite plate radius 5.5 px; station 8.5 px plus 2 per grid ring; the player dark magenta reads dim on the satellite plate. A new selection_kind::space_asset (a station selects by its core) and its band card were added; SELECTION.md carries the row. New verify calls near_space_fixture (staging) and circum_assets report only what the canvas draws and touch no tile data, so no grant was taken. The transit segment needs an origin node and departure tick on a moving asset (a save change): filed as work.
+
+**Why it matters.** A visual call, and whether verify staging calls need a dated grant when they carry no tile data.
+
+- Keep the clamp
+- Lift the rung centre above the band
+
+> **Recommendation:** Lift the rung centre; a clamped L-point lies about where it is.
+
+*Files: `src/ui/circum_nodes.cpp`, `src/ui/circum_assets.cpp`, `docs/ui/CIRCUMPLANETARY.md`*
 
 ---
 
