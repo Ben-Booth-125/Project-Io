@@ -183,6 +183,10 @@ a tile keep the shared header (§ Layout & chrome).
      Hovering it lists each population centre by name with its scale word (Outpost /
      Settlement / Town / City / Metropolis, POPULATION.md § Scale bonus model), headcount and
      habitability, largest first; a centre standing on the *selected tile itself* is marked.
+     Under each centre a line gives its **growth**: the annual rate and its two parts, the
+     base from its nation's qualification and the consumer bonus from its upper rungs' fill
+     — or, below a floor, the decline and which floor failed (staples under half met,
+     habitability under one half), as POPULATION.md § Growth, decline and razing rules it.
      The list moved into the hover so the table can have the card's height. Province grain
      because the data model is.
 

@@ -720,7 +720,21 @@ inline constexpr uint32_t k_world_save_version_pre_recruits = 71;
 /// PREFIX of v80 and is read too (`k_world_save_version_pre_research_books`), as a world
 /// whose returns booked none. Below v80 a building site's `days_remaining` is on the old
 /// build days, so the reader rescales it (`rescale_site_days_to_research_books`).
-inline constexpr uint32_t world_save_version = 80;
+///
+/// **82 (POPULATION_GROWTH_RATE, POPULATION.md § Growth, decline and razing) — THE GROWTH
+/// CARRY.** Appended last: after a u32 count, every population centre with a non-zero
+/// `growth_carry`, ascending id, as (id, f32 carry). Each names a centre of the stream; the
+/// carry finite and in (0, 1). Refused whole otherwise. v81 is reserved by the naval branch
+/// (BL-1527, ship kit) and is not on this line: v80 is the STRICT PREFIX read here
+/// (`k_world_save_version_pre_growth_carry`), as a world whose every carry is 0. Whoever
+/// stacks the two adds v81 to the accepted set beside it.
+inline constexpr uint32_t world_save_version = 82;
+
+/// POPULATION_GROWTH_RATE: the first version carrying the growth-carry section.
+inline constexpr uint32_t k_world_save_version_growth_carry = 82;
+
+/// POPULATION_GROWTH_RATE: the version before it on this line, a strict prefix of it.
+inline constexpr uint32_t k_world_save_version_pre_growth_carry = 80;
 
 /// BL-1539: the first version carrying the research-books section (see above).
 inline constexpr uint32_t k_world_save_version_research_books = 80;
@@ -947,6 +961,10 @@ std::size_t world_save_defend_section_bytes(const world& w);
 /// 4 per return for each nation it lists. The LAST section of a v80 stream.
 std::size_t world_save_research_books_section_bytes(const world& w);
 
+/// POPULATION_GROWTH_RATE: the byte length of the v82 growth-carry section `w` writes -
+/// 4, plus 8 for each centre with a non-zero carry. The LAST section of a v82 stream.
+std::size_t world_save_growth_carry_section_bytes(const world& w);
+
 /// BL-1422, widened by BL-1436: the bytes ALL SIX kit goods' extra elements add to
 /// every per-resource array of the stream `w` writes - the widening from 49 to today's
 /// width: (the v74 stream less the v73 stream, the five goods) plus
@@ -1075,6 +1093,9 @@ void write_world_snapshot_pre_defend(const world& w, std::ostream& out);
 
 /// VERIFICATION ONLY (BL-1539): the v79 stream shape - no research-books section.
 void write_world_snapshot_pre_research_books(const world& w, std::ostream& out);
+
+/// VERIFICATION ONLY (POPULATION_GROWTH_RATE): the v80 stream shape - no growth-carry section.
+void write_world_snapshot_pre_growth_carry(const world& w, std::ostream& out);
 
 /// BL-1453: the recon stock a battle loaded from a pre-v67 stream is given — enough to
 /// see every defending unit in full (twice the stealthiest defender's kit stealth, in

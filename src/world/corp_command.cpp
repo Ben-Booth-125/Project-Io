@@ -1696,6 +1696,7 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
             cit->second.population         = 0;
             cit->second.scale              = 1;
             cit->second.growth_accumulator = 0;
+            cit->second.growth_carry       = 0.0f; // POPULATION_GROWTH_RATE: no heads, no fraction
             return corp_command_result::applied;
         }
 

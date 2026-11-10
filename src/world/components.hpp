@@ -1850,6 +1850,14 @@ struct population_centre_component
     /// heads a centre can still give are `population x 1000 - this` (0 once razed). Saved
     /// (world_save_version 68, only where non-zero) and hashed only where non-zero.
     int32_t recruit_heads_taken = 0;
+
+    /// POPULATION_GROWTH_RATE (Ben, 2026-11-10; POPULATION.md § Growth, decline and
+    /// razing): the fraction of a thousand heads the growth rate has accrued and not
+    /// yet added to (or shed from) `population`, always in [0, 1). Carried so a small
+    /// village still grows at a rate rather than rounding to nothing. Saved
+    /// (world_save_version 82, a trailing section, only where non-zero); an older
+    /// stream loads every carry at 0.
+    float growth_carry = 0.0f;
 };
 
 /// Deployable unit stub. Faction AI and transport are deferred; the combat
