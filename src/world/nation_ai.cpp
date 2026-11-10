@@ -13,6 +13,12 @@
 #include "space_tech_keys.hpp" // BL-1589: the near-space keys
 #include "stance.hpp"
 #include "stations.hpp"        // BL-1589: the station quote and budget
+#include "offworld_base.hpp"   // BL-1608: the base's colonists, kit and capital
+#include "space_battle.hpp"    // BL-1608: space_hostile
+#include "space_bombard.hpp"   // BL-1608: blockade, the bombard verb and pick
+#include "space_convoy.hpp"    // BL-1608: load_space_cargo (the base kit)
+#include "space_units.hpp"     // BL-1608: designs, raises, moves, refuel
+#include "survey_system.hpp"   // BL-1608: what a nation has mapped and prospected
 #include "world.hpp"
 
 #include <algorithm>
@@ -22,6 +28,7 @@
 #include <cstdint>
 #include <string_view>
 #include <map>
+#include <set>
 #include <utility>
 #include <unordered_map>
 #include <vector>
@@ -1742,6 +1749,748 @@ int run_nation_space_ai(world& w, const recipe_registry& reg, std::vector<space_
             out->push_back(pick);
     }
     return issued;
+}
+
+// ---------------------------------------------------------------------------
+// BL-1608 — the far-space pick. Contract in nation_ai.hpp.
+// ---------------------------------------------------------------------------
+
+namespace {
+
+constexpr std::size_t k_far_prop = static_cast<std::size_t>(resource_type::propellant);
+
+/// The fair-price ceiling every far-space draw obeys: the registry's, as the
+/// launch seam copies it into its own params (space_command.cpp).
+space_unit_params far_space_params(const recipe_registry& reg)
+{
+    space_unit_params sup = reg.space_units();
+    sup.reservation_mult  = reg.price_band().reservation_mult;
+    return sup;
+}
+
+/// The best item the nation holds the key for in slot @p s of hull @p h: the
+/// slot's own figure (drive: exhaust; tanks: capacity; armament: firepower;
+/// armour: armour), ties to the lowest catalogue id. `k_no_space_item` if none.
+uint8_t best_space_item(const world& w, entity_id nation, space_hull h, space_unit_slot s)
+{
+    const std::vector<space_item>& cat = space_item_catalogue();
+    uint8_t best   = k_no_space_item;
+    float   best_v = -1.0f;
+    for (std::size_t i = 0; i < cat.size() && i < k_no_space_item; ++i)
+    {
+        const space_item& it = cat[i];
+        if (it.slot != s || (it.hull_mask & (1u << static_cast<unsigned>(h))) == 0)
+            continue;
+        if (!it.key.empty() && !nation_has_mechanic(w, nation, it.key))
+            continue;
+        float v = 0.0f;
+        switch (s)
+        {
+            case space_unit_slot::drive:    v = it.exhaust; break;
+            case space_unit_slot::tanks:    v = it.tank; break;
+            case space_unit_slot::armament: v = it.firepower; break;
+            case space_unit_slot::armour:   v = it.armour; break;
+            default:                        v = 0.0f; break;
+        }
+        if (v > best_v)
+        {
+            best   = static_cast<uint8_t>(i);
+            best_v = v;
+        }
+    }
+    return best;
+}
+
+/// The catalogue index of item @p id, or `k_no_space_item`.
+uint8_t space_item_index(std::string_view id)
+{
+    const std::vector<space_item>& cat = space_item_catalogue();
+    for (std::size_t i = 0; i < cat.size() && i < k_no_space_item; ++i)
+        if (id == cat[i].id)
+            return static_cast<uint8_t>(i);
+    return k_no_space_item;
+}
+
+/// The best design the nation can hold for @p h (bay @p bay for a carrier).
+/// False when the hull's key, or any slot's item, is not held.
+bool best_space_design(const world& w, entity_id nation, space_hull h, uint8_t bay, space_design& out)
+{
+    if (!nation_has_mechanic(w, nation, space_hull_table()[static_cast<std::size_t>(h)].key))
+        return false;
+    out.fill(k_no_space_item);
+    for (std::size_t s = 0; s < space_unit_slot_count; ++s)
+    {
+        const space_unit_slot slot = static_cast<space_unit_slot>(s);
+        if (!space_hull_has_slot(h, slot))
+            continue;
+        const uint8_t it = slot == space_unit_slot::bay ? bay : best_space_item(w, nation, h, slot);
+        if (it == k_no_space_item)
+            return false;
+        out[s] = it;
+    }
+    return evaluate_space_design(h, out).valid;
+}
+
+/// The nation's off-world bases: centres whose tile it holds.
+int own_base_count(const world& w, entity_id nation)
+{
+    int n = 0;
+    for (const auto& [cid, b] : w.offworld_bases)
+    {
+        (void)b;
+        const entity_id t = offworld_base_tile(w, cid);
+        const auto it = w.tile_to_nation.find(t);
+        if (t != null_entity && it != w.tile_to_nation.end() && it->second == nation)
+            ++n;
+    }
+    return n;
+}
+
+/// The bodies @p nation holds a base on, ascending.
+std::vector<entity_id> own_base_bodies(const world& w, entity_id nation)
+{
+    std::vector<entity_id> out;
+    for (const auto& [cid, b] : w.offworld_bases)
+    {
+        (void)b;
+        const entity_id t = offworld_base_tile(w, cid);
+        const auto nt = w.tile_to_nation.find(t);
+        const auto tt = w.tiles.find(t);
+        if (t != null_entity && nt != w.tile_to_nation.end() && nt->second == nation && tt != w.tiles.end())
+            out.push_back(tt->second.body);
+    }
+    std::sort(out.begin(), out.end());
+    out.erase(std::unique(out.begin(), out.end()), out.end());
+    return out;
+}
+
+float unit_kit_aboard(const world& w, const offworld_base_params& bp, entity_id unit)
+{
+    const auto hit = w.space_hauls.find(unit);
+    if (hit == w.space_hauls.end() || hit->second.phase != space_haul_phase::held || hit->second.cargo_res != bp.kit_res)
+        return 0.0f;
+    return std::max(0.0f, w.space_units.at(unit).cargo);
+}
+
+/// The raise of @p h at @p nation's staffed pad on @p body, priced as the verb
+/// prices it (space_units.cpp raise_at). `ok` with @p cost, or the wall.
+far_space_block quote_far_raise(const world& w, const space_unit_params& sup, entity_id nation, space_hull h,
+                                entity_id body, float& cost, float& upkeep)
+{
+    const space_design* d = space_unit_design_of(w, nation, h);
+    if (d == nullptr)
+        return far_space_block::refused;
+    const space_design_stats st = evaluate_space_design(h, *d);
+    const entity_id pad = space_staffed_pad_on(w, nation, body);
+    if (pad == null_entity)
+        return far_space_block::no_pad;
+    if (space_blockaded(w, nation, body))
+        return far_space_block::blockaded;
+    const entity_id market = space_market_on_body(w, w.buildings.at(pad).tile, body);
+    const double climb = orbital_climb_dv(w, orbital_graph_params{}, body);
+    const float  rate  = std::isfinite(sup.launch_propellant_per_dv) ? std::max(0.0f, sup.launch_propellant_per_dv) : 0.0f;
+    std::array<float, resource_count> lot = st.goods;
+    lot[k_far_prop] += st.tank + static_cast<float>(climb * rate * (st.dry_mass + st.tank));
+    if (market == null_entity || !space_quote_lot(w, sup, market, lot, &cost))
+        return far_space_block::shelf_short;
+    if (w.nations.at(nation).astronauts < st.crew)
+        return far_space_block::crew_short;
+    upkeep = st.upkeep;
+    return far_space_block::none;
+}
+
+/// A top-up of @p u over its owner's pad in that body's low orbit, priced.
+far_space_block quote_far_refuel(const world& w, const space_unit_params& sup, entity_id nation, const space_unit& u,
+                                 float& cost)
+{
+    if (u.state != space_unit_state::idle || u.node.kind != orbital_node_kind::low_orbit)
+        return far_space_block::no_dv;
+    const entity_id pad = space_staffed_pad_on(w, nation, u.node.body);
+    if (pad == null_entity)
+        return far_space_block::no_dv;
+    if (space_blockaded(w, nation, u.node.body))
+        return far_space_block::blockaded;
+    const float need = evaluate_space_design(u.hull, u.design).tank - u.propellant;
+    if (!(need > 0.0f))
+        return far_space_block::no_dv;
+    std::array<float, resource_count> lot{};
+    lot[k_far_prop] = need;
+    const entity_id market = space_market_on_body(w, w.buildings.at(pad).tile, u.node.body);
+    if (market == null_entity || !space_quote_lot(w, sup, market, lot, &cost))
+        return far_space_block::shelf_short;
+    return far_space_block::none;
+}
+
+/// Can @p u pay the move to @p to from where it stands?
+bool far_move_paid(const world& w, const space_unit& u, orbital_node to)
+{
+    const orbital_path_result path = orbital_path(w, orbital_graph_params{}, u.node, to);
+    if (!path.ok || !std::isfinite(path.dv))
+        return false;
+    const float burn = space_unit_burn_for(u, static_cast<float>(path.dv));
+    return std::isfinite(burn) && burn <= u.propellant;
+}
+
+} // namespace
+
+far_space_pick choose_far_space_action(const world& w, const recipe_registry& reg, entity_id nation,
+                                       const nation_ai_params& p)
+{
+    far_space_pick pick;
+    pick.nation = nation;
+    const auto nit = w.nations.find(nation);
+    if (nit == w.nations.end())
+        return pick;
+    if (!nation_has_mechanic(w, nation, space_keys::dispatch))
+    {
+        pick.block = far_space_block::no_rocketry;
+        return pick;
+    }
+    const entity_id home = space_home_body_of(w, nation);
+    if (home == null_entity)
+    {
+        pick.block = far_space_block::nothing_wanted;
+        return pick;
+    }
+    const space_unit_params sup = far_space_params(reg);
+    const offworld_base_params bp; // the seam's own (space_command.cpp found_base)
+    const orbital_node home_low{home, orbital_node_kind::low_orbit};
+
+    far_space_block wall = far_space_block::nothing_wanted;
+    const auto note = [&](far_space_block b) {
+        if (wall == far_space_block::nothing_wanted)
+            wall = b;
+    };
+    const auto take = [&](far_space_action a) {
+        pick.action = a;
+        pick.block  = far_space_block::none;
+        return pick;
+    };
+
+    // What it holds in space, ascending unit id.
+    bool has_pass = false, has_cargo = false, any_lander = false;
+    int  armed = 0;
+    for (const auto& [id, u] : w.space_units)
+    {
+        if (u.owner != nation)
+            continue;
+        const space_design_stats st = evaluate_space_design(u.hull, u.design);
+        if (u.hull == space_hull::lander)
+        {
+            any_lander = true;
+            has_pass   = has_pass || st.passengers > 0;
+            has_cargo  = has_cargo || st.cargo > 0.0f;
+        }
+        if (space_unit_firepower(u) > 0.0f)
+            ++armed;
+    }
+    const bool programme = nation_has_mechanic(w, nation, space_keys::base_founding)
+                        && own_base_count(w, nation) < std::max(0, p.far_space_bases_max);
+
+    // ---- 1. DESIGN --------------------------------------------------------
+    const uint8_t bay_cargo = space_item_index("bay.cargo");
+    const uint8_t bay_pass  = space_item_index("bay.passenger");
+    const space_design* live_lander = space_unit_design_of(w, nation, space_hull::lander);
+    uint8_t lander_bay = bay_cargo;
+    if (programme && !has_pass)
+        lander_bay = bay_pass;
+    else if (has_cargo && live_lander != nullptr)
+        lander_bay = (*live_lander)[static_cast<std::size_t>(space_unit_slot::bay)];
+    bool any_hull = false;
+    for (std::size_t hi = 0; hi < space_hull_count; ++hi)
+    {
+        const space_hull h = static_cast<space_hull>(hi);
+        if (!nation_has_mechanic(w, nation, space_hull_table()[hi].key))
+            continue;
+        any_hull = true;
+        space_design best{};
+        const uint8_t bay = h == space_hull::lander ? lander_bay : bay_cargo;
+        if (!best_space_design(w, nation, h, bay, best))
+            continue;
+        const space_design* live = space_unit_design_of(w, nation, h);
+        if (live == nullptr || *live != best)
+        {
+            pick.hull   = static_cast<uint8_t>(h);
+            pick.design = best;
+            return take(far_space_action::design);
+        }
+    }
+    if (!any_hull)
+    {
+        pick.block = far_space_block::no_hull;
+        return pick;
+    }
+
+    // ---- 2. WAR -------------------------------------------------------------
+    std::vector<entity_id> hostiles;
+    for (const entity_id o : sorted_nation_ids(w))
+        if (o != nation && space_hostile(w, nation, o))
+            hostiles.push_back(o);
+    if (!hostiles.empty())
+    {
+        // a. BOMBARD: an idle missile-armed unit in a low orbit, no standing order.
+        if (nation_has_mechanic(w, nation, space_keys::orbital_bombardment))
+            for (const auto& [id, u] : w.space_units)
+            {
+                if (u.owner != nation || u.state != space_unit_state::idle
+                    || u.node.kind != orbital_node_kind::low_orbit || !space_unit_can_bombard(u)
+                    || w.space_bombard_orders.count(id) != 0)
+                    continue;
+                entity_id best = null_entity;
+                int       best_c = -1;
+                for (const auto& [bid, b] : w.buildings) // order-free: max condition, ties lowest id
+                {
+                    const auto tit = w.tiles.find(b.tile);
+                    if (tit == w.tiles.end() || tit->second.body != u.node.body)
+                        continue;
+                    space_bombard_order o;
+                    o.kind   = space_bombard_target::building;
+                    o.target = static_cast<uint32_t>(bid);
+                    if (space_bombard_pick(w, nation, o) != bid)
+                        continue;
+                    const int c = b.condition_permille;
+                    if (c > best_c || (c == best_c && bid < best))
+                    {
+                        best   = bid;
+                        best_c = c;
+                    }
+                }
+                if (best != null_entity)
+                {
+                    pick.unit   = id;
+                    pick.target = best;
+                    pick.from   = u.node;
+                    return take(far_space_action::bombard);
+                }
+            }
+
+        // b. FLEET: the war's node — own ground blockaded, a hostile's base body,
+        // a hostile's home body — the first with no armed unit of its own there.
+        std::vector<orbital_node> targets;
+        {
+            std::vector<entity_id> own_bodies = own_base_bodies(w, nation);
+            own_bodies.insert(own_bodies.begin(), home);
+            for (const entity_id b : own_bodies)
+                if (space_blockaded(w, nation, b))
+                    targets.push_back({b, orbital_node_kind::low_orbit});
+            for (const entity_id h : hostiles)
+                for (const entity_id b : own_base_bodies(w, h))
+                    targets.push_back({b, orbital_node_kind::low_orbit});
+            for (const entity_id h : hostiles)
+            {
+                const entity_id hb = space_home_body_of(w, h);
+                if (hb != null_entity)
+                    targets.push_back({hb, orbital_node_kind::low_orbit});
+            }
+        }
+        const auto is_target = [&](orbital_node n) {
+            return std::find(targets.begin(), targets.end(), n) != targets.end();
+        };
+        orbital_node goal{};
+        bool have_goal = false;
+        for (const orbital_node n : targets)
+            if (space_armed_units_at(w, nation, n).empty())
+            {
+                goal      = n;
+                have_goal = true;
+                break;
+            }
+        if (have_goal)
+            for (const auto& [id, u] : w.space_units)
+            {
+                if (u.owner != nation || u.state == space_unit_state::in_transit || u.state == space_unit_state::landed
+                    || space_unit_firepower(u) <= 0.0f || is_target(u.node))
+                    continue;
+                if (!far_move_paid(w, u, goal))
+                {
+                    float c = 0.0f;
+                    const far_space_block r = quote_far_refuel(w, sup, nation, u, c);
+                    if (r == far_space_block::none && space_reserve_admits(w, nation, p, c, 0.0f))
+                    {
+                        pick.unit = id;
+                        pick.from = u.node;
+                        pick.cost = c;
+                        return take(far_space_action::refuel);
+                    }
+                    note(r == far_space_block::none ? far_space_block::reserve : far_space_block::no_dv);
+                    continue;
+                }
+                // The whole fleet only when every unit standing there is armed: a
+                // fleet order moves every unit at the node, Landers included.
+                bool all_armed = true;
+                int  n_here    = 0;
+                for (const auto& [oid, o] : w.space_units)
+                    if (o.owner == nation && o.node == u.node && o.state != space_unit_state::in_transit)
+                    {
+                        ++n_here;
+                        all_armed = all_armed && space_unit_firepower(o) > 0.0f && far_move_paid(w, o, goal);
+                    }
+                pick.unit  = id;
+                pick.from  = u.node;
+                pick.to    = goal;
+                pick.fleet = all_armed && n_here > 1;
+                pick.count = pick.fleet ? n_here : 1;
+                return take(far_space_action::fleet_move);
+            }
+
+        // c. RAISE a warship while short of the war's count.
+        const int want = std::min(std::max(0, p.far_space_warships_max),
+                                  std::max(0, p.far_space_warships_per_hostile) * static_cast<int>(hostiles.size()));
+        if (armed < want && space_unit_design_of(w, nation, space_hull::frigate) != nullptr)
+        {
+            float c = 0.0f, up = 0.0f;
+            const far_space_block r = quote_far_raise(w, sup, nation, space_hull::frigate, home, c, up);
+            if (r != far_space_block::none)
+                note(r);
+            else if (!space_reserve_admits(w, nation, p, c, up))
+                note(far_space_block::reserve);
+            else
+            {
+                pick.hull = static_cast<uint8_t>(space_hull::frigate);
+                pick.cost = c;
+                pick.to   = home_low;
+                return take(far_space_action::raise_warship);
+            }
+        }
+    }
+
+    // ---- 3. BASE AND PROSPECT ----------------------------------------------
+    if (live_lander == nullptr)
+    {
+        pick.block = wall;
+        return pick;
+    }
+    const space_design_stats lst = evaluate_space_design(space_hull::lander, *live_lander);
+    // TARGET: the body it has mapped most of, reachable on a full tank, no base of its own there.
+    entity_id target = null_entity;
+    int       target_mapped = 0;
+    for (const auto& [bid, b] : w.bodies) // order-free: max mapped, ties lowest id
+    {
+        (void)b;
+        if (bid == home || !survey_knowledge_applies(w, bid) || offworld_base_capital(w, nation, bid) != null_entity)
+            continue;
+        const body_survey_knowledge* k = survey_knowledge_of(w, nation, bid);
+        if (k == nullptr || k->regions_mapped <= 0)
+            continue;
+        const orbital_path_result path =
+            orbital_path(w, orbital_graph_params{}, home_low, orbital_node{bid, orbital_node_kind::surface});
+        if (!path.ok || !std::isfinite(path.dv) || static_cast<float>(path.dv) > lst.dv_capacity)
+            continue;
+        if (k->regions_mapped > target_mapped || (k->regions_mapped == target_mapped && bid < target))
+        {
+            target        = bid;
+            target_mapped = k->regions_mapped;
+        }
+    }
+    const orbital_node target_surface{target, orbital_node_kind::surface};
+
+    // a. FOUND: its landed Landers there carry the colonists and the kit.
+    if (programme && target != null_entity)
+    {
+        int64_t colonists = 0;
+        float   kit = 0.0f;
+        for (const auto& [id, u] : w.space_units)
+            if (u.owner == nation && u.hull == space_hull::lander && u.state == space_unit_state::landed
+                && u.node == target_surface)
+            {
+                colonists += space_unit_colonists(w, id);
+                kit += unit_kit_aboard(w, bp, id);
+            }
+        if (colonists >= std::max<int32_t>(1, bp.min_colonists) && kit >= bp.kit_qty)
+        {
+            std::set<entity_id> occupied;
+            for (const auto& [cid, t] : w.population_centre_tile)
+                occupied.insert(t);
+            for (const auto& [bid, b] : w.buildings)
+                occupied.insert(b.tile);
+            entity_id best = null_entity;
+            float     best_d = -1.0f;
+            for (const auto& [tid, tc] : w.tiles) // order-free: max deposit, ties lowest id
+            {
+                if (tc.body != target || is_water(tc.substrate)
+                    || !survey_tile_prospected(w, nation, target, tc.grid_x, tc.grid_y)
+                    || w.tile_to_nation.count(tid) != 0 || occupied.count(tid) != 0)
+                    continue;
+                const uint32_t pid = w.provinces.province_of(tid);
+                if (pid != 0 && province_holder_for(w, pid) != null_entity)
+                    continue;
+                float d = 0.0f;
+                for (const float v : tc.resource_deposit)
+                    d += std::max(0.0f, v);
+                if (d > best_d || (d == best_d && tid < best))
+                {
+                    best   = tid;
+                    best_d = d;
+                }
+            }
+            if (best != null_entity)
+            {
+                pick.tile = best;
+                pick.to   = target_surface;
+                return take(far_space_action::found_base);
+            }
+            note(far_space_block::no_target); // nothing prospected yet: the Landers prospect on
+        }
+    }
+
+    // b..d. The Landers at home low orbit (embark also from the home surface).
+    const bool home_pad = space_staffed_pad_on(w, nation, home) != null_entity;
+    for (const auto& [id, u] : w.space_units)
+    {
+        if (u.owner != nation || u.hull != space_hull::lander)
+            continue;
+        const space_design_stats st = evaluate_space_design(u.hull, u.design);
+        const bool at_home_low = u.state == space_unit_state::idle && u.node == home_low;
+        const bool at_home = at_home_low
+            || (u.state == space_unit_state::landed && u.node == orbital_node{home, orbital_node_kind::surface});
+        if (!at_home)
+            continue;
+        const int32_t aboard = space_unit_colonists(w, id);
+        const float   kit    = unit_kit_aboard(w, bp, id);
+        // b. EMBARK
+        if (programme && st.passengers > aboard)
+        {
+            const int32_t goal  = std::max(std::max<int32_t>(1, bp.min_colonists), p.far_space_colonists);
+            const int32_t count = std::min(st.passengers - aboard, goal - aboard);
+            if (count > 0)
+            {
+                if (!home_pad)
+                {
+                    note(far_space_block::no_pad);
+                    continue;
+                }
+                pick.unit  = id;
+                pick.count = count;
+                pick.from  = u.node;
+                return take(far_space_action::embark);
+            }
+        }
+        // c. LOAD the kit
+        if (programme && at_home_low && st.cargo > 0.0f && kit < bp.kit_qty)
+        {
+            const float qty = bp.kit_qty - kit;
+            const auto hit = w.space_hauls.find(id);
+            const bool other = hit != w.space_hauls.end() && hit->second.cargo_res != bp.kit_res;
+            // The kit is bought only for a trip a full tank can fly laden.
+            space_unit laden = u;
+            laden.cargo += qty;
+            laden.propellant = st.tank;
+            if (!other && u.cargo + qty <= st.cargo && target != null_entity && !far_move_paid(w, laden, target_surface))
+            {
+                note(far_space_block::no_dv);
+                continue;
+            }
+            if (!other && u.cargo + qty <= st.cargo)
+            {
+                const entity_id pad = space_staffed_pad_on(w, nation, home);
+                if (pad == null_entity)
+                {
+                    note(far_space_block::no_pad);
+                    continue;
+                }
+                const entity_id market = space_market_on_body(w, w.buildings.at(pad).tile, home);
+                const double climb = orbital_climb_dv(w, orbital_graph_params{}, home);
+                std::array<float, resource_count> lot{};
+                lot[static_cast<std::size_t>(bp.kit_res)] += qty;
+                lot[k_far_prop] += static_cast<float>(climb * std::max(0.0f, sup.launch_propellant_per_dv) * qty);
+                float c = 0.0f;
+                if (market == null_entity || !space_quote_lot(w, sup, market, lot, &c))
+                    note(far_space_block::shelf_short);
+                else if (!space_reserve_admits(w, nation, p, c, 0.0f))
+                    note(far_space_block::reserve);
+                else
+                {
+                    pick.unit  = id;
+                    pick.count = static_cast<int32_t>(std::ceil(qty));
+                    pick.cost  = c;
+                    pick.from  = u.node;
+                    return take(far_space_action::load_kit);
+                }
+                continue;
+            }
+        }
+        // d. MOVE to the target's surface: carrying what a base needs, or to prospect.
+        const bool carrying = aboard > 0 || kit >= bp.kit_qty;
+        if (at_home_low && (programme ? carrying : true))
+        {
+            if (target == null_entity)
+            {
+                note(far_space_block::no_target);
+                continue;
+            }
+            if (far_move_paid(w, u, target_surface))
+            {
+                pick.unit = id;
+                pick.from = u.node;
+                pick.to   = target_surface;
+                return take(far_space_action::lander_move);
+            }
+            float c = 0.0f;
+            const far_space_block r = quote_far_refuel(w, sup, nation, u, c);
+            if (r == far_space_block::none && space_reserve_admits(w, nation, p, c, 0.0f))
+            {
+                pick.unit = id;
+                pick.from = u.node;
+                pick.cost = c;
+                return take(far_space_action::refuel);
+            }
+            note(r == far_space_block::none ? far_space_block::reserve : far_space_block::no_dv);
+        }
+    }
+
+    // e. RAISE a Lander: none at all, or (programme) none of the live design's bay.
+    {
+        const bool live_pass = lst.passengers > 0;
+        const bool wanted = !any_lander || (programme && (live_pass ? !has_pass : !has_cargo));
+        if (wanted)
+        {
+            // A cargo Lander for the kit is raised only when, laden on a full tank, it
+            // could fly the kit to the target's surface.
+            space_unit probe;
+            probe.hull       = space_hull::lander;
+            probe.design     = *live_lander;
+            probe.state      = space_unit_state::idle;
+            probe.node       = probe.dest = home_low;
+            probe.propellant = lst.tank;
+            probe.cargo      = (programme && !live_pass) ? std::min(lst.cargo, bp.kit_qty) : 0.0f;
+            if (target == null_entity)
+                note(far_space_block::no_target);
+            else if (!far_move_paid(w, probe, target_surface))
+                note(far_space_block::no_dv);
+            else
+            {
+                float c = 0.0f, up = 0.0f;
+                const far_space_block r = quote_far_raise(w, sup, nation, space_hull::lander, home, c, up);
+                if (r != far_space_block::none)
+                    note(r);
+                else if (!space_reserve_admits(w, nation, p, c, up))
+                    note(far_space_block::reserve);
+                else
+                {
+                    pick.hull = static_cast<uint8_t>(space_hull::lander);
+                    pick.cost = c;
+                    pick.to   = home_low;
+                    return take(far_space_action::raise_lander);
+                }
+            }
+        }
+    }
+
+    pick.block = wall;
+    return pick;
+}
+
+int run_nation_far_space_ai(world& w, const recipe_registry& reg, std::vector<far_space_pick>* out)
+{
+    if (w.nations.empty() || !research_age_open(w))
+        return 0;
+    const nation_ai_params& p = reg.nation_ai();
+    const space_unit_params sup = far_space_params(reg);
+    // The player's nation is never acted on, spectated or not (the grant's "Not
+    // admitted"). Ascending id.
+    const entity_id seat = player_nation(w);
+    int applied = 0;
+    for (const entity_id n : sorted_nation_ids(w))
+    {
+        if (n == seat)
+            continue;
+        far_space_pick pick = choose_far_space_action(w, reg, n, p);
+        bool ok = false;
+        switch (pick.action)
+        {
+            case far_space_action::none:
+                break;
+            case far_space_action::design:
+            {
+                const space_unit_result r = set_space_unit_design(w, n, static_cast<space_hull>(pick.hull), pick.design);
+                pick.result = static_cast<uint8_t>(r);
+                ok = r == space_unit_result::ok;
+                break;
+            }
+            case far_space_action::bombard:
+            {
+                const space_unit_result r = order_space_bombard(w, n, pick.unit, space_bombard_target::building,
+                                                                static_cast<uint32_t>(pick.target));
+                pick.result = static_cast<uint8_t>(r);
+                ok = r == space_unit_result::ok;
+                break;
+            }
+            case far_space_action::fleet_move:
+            case far_space_action::lander_move:
+            {
+                const space_unit_op op = pick.fleet ? order_space_fleet(w, sup, n, pick.from, pick.to)
+                                                    : order_space_unit(w, sup, n, pick.unit, pick.to);
+                pick.result = static_cast<uint8_t>(op.result);
+                ok = op.result == space_unit_result::ok;
+                break;
+            }
+            case far_space_action::raise_warship:
+            case far_space_action::raise_lander:
+            {
+                const space_unit_op op = raise_space_unit_at_pad(w, sup, n, static_cast<space_hull>(pick.hull),
+                                                                 pick.to.body);
+                pick.result = static_cast<uint8_t>(op.result);
+                ok = op.result == space_unit_result::ok;
+                if (ok)
+                {
+                    pick.unit = op.unit;
+                    pick.cost = op.credits;
+                }
+                break;
+            }
+            case far_space_action::refuel:
+            {
+                const space_unit_op op = refuel_space_unit(w, sup, reg.stations(), n, pick.unit);
+                pick.result = static_cast<uint8_t>(op.result);
+                ok = op.result == space_unit_result::ok;
+                if (ok)
+                    pick.cost = op.credits;
+                break;
+            }
+            case far_space_action::load_kit:
+            {
+                const offworld_base_params bp;
+                const space_unit_op op = load_space_cargo(w, sup, n, pick.unit, static_cast<std::size_t>(bp.kit_res),
+                                                          bp.kit_qty - unit_kit_aboard(w, bp, pick.unit));
+                pick.result = static_cast<uint8_t>(op.result);
+                ok = op.result == space_unit_result::ok;
+                if (ok)
+                    pick.cost = op.credits;
+                break;
+            }
+            case far_space_action::embark:
+            case far_space_action::found_base:
+            {
+                space_command c;
+                c.nation = n;
+                if (pick.action == far_space_action::embark)
+                {
+                    c.verb    = static_cast<uint8_t>(space_verb::embark_colonists);
+                    c.subject = pick.unit;
+                    c.slot    = pick.count;
+                }
+                else
+                {
+                    c.verb    = static_cast<uint8_t>(space_verb::found_base);
+                    c.subject = pick.tile;
+                }
+                const space_command_outcome o = apply_space_command(w, reg, c);
+                pick.result = static_cast<uint8_t>(o.base);
+                ok = o.result == space_command_result::applied;
+                break;
+            }
+        }
+        if (pick.action != far_space_action::none)
+        {
+            if (ok)
+                ++applied;
+            else
+                pick.block = far_space_block::refused;
+        }
+        if (out)
+            out->push_back(pick);
+    }
+    return applied;
 }
 
 // ---------------------------------------------------------------------------

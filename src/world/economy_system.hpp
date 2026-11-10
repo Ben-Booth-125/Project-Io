@@ -564,6 +564,8 @@ struct economy_report
     std::vector<research_ai_pick> research_picks;
     /// BL-1589: the quarter's space picks, one per non-player nation, ascending id.
     std::vector<space_ai_pick> space_picks;
+    /// BL-1608: the quarter's far-space picks, one per non-player nation, ascending id.
+    std::vector<far_space_pick> far_space_picks;
 
     /// What the space-asset step did this quarter (BL-1327; space_assets.hpp):
     /// launches and their cost (the launch debit), arrivals, and the upkeep

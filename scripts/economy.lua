@@ -1335,6 +1335,28 @@ economy = {
         ai_headroom    = 0.0625,
     },
 
+    -- BL-1608 (rival far-space AI; AI_OPPONENT.md § 11, "Rival nations go to
+    -- space as the player does", Ben 2026-11-10): the far-space pick's dials,
+    -- read over the C++ defaults in nation_ai_params (nation_ai.hpp), so an
+    -- absent key keeps them. Every other economy.nation_ai key stays at its
+    -- struct default. Loader bounds: integers, rejected by name when outside.
+    nation_ai = {
+        -- Off-world bases a rival founds toward; at the count it stops raising
+        -- Landers for a base (prospecting and its bases go on). [0, 1024]
+        far_space_bases_max            = 1,
+        -- Colonists (thousands) one embark boards: at least the founding
+        -- minimum, at most the Lander's free berths. [1, 65536]
+        far_space_colonists            = 4,
+        -- Armed hulls a rival keeps per nation it is hostile to, and its
+        -- ceiling in all: a war is the reason to raise one. [0, 1024]
+        far_space_warships_per_hostile = 2,
+        far_space_warships_max         = 6,
+        -- NR-1206, RAISED NOT GRANTED: 1 keeps a rival's off-world base
+        -- province garrisoned as its capital's is (corp_ai.cpp, the fronts'
+        -- keep-home rule). OFF until Ben rules. [0, 1]
+        far_space_keep_base_home       = 0,
+    },
+
     -- BL-643: network upkeep — the logistics_maintenance budget line's
     -- consumer and the Infrastructure demand channel (MARKETS.md). Each tick a
     -- nation's road/hub network bills stone and timber at these rates

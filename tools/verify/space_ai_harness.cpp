@@ -51,6 +51,21 @@
 //       to report.hauler_wants.
 //   B5  WALLS: no Rocketry, an unstaffed pad, the settle, standing_lots 0 - no bid.
 //
+// BL-1608 (rival far-space AI), on a third fixture: a gridded home planet and an
+// airless moon, three nations holding every near and far key (choose_far_space_action):
+//   F1  DESIGN: the pick is pure; one live design per researched class, every slot
+//       the best item researched.
+//   F2  LANDERS: raise, embark, load the kit, move - each chosen when it scores.
+//   F3  BASE: a base founded on a prospected moon tile from two Landers; none raised
+//       past far_space_bases_max.
+//   F4  NEVER THE PLAYER, one verb a nation a quarter; a Hauler design makes the
+//       rival's inter-body trade a Hauler convoy (the trade seam's).
+//   F5  WALLS: no far key, no Rocketry, the reserve, no mapped body, the settle.
+//   F6  WAR: Frigates raised to the war's count, a bombard order on the hostile's
+//       building, a fleet away from the war's node ordered to it whole.
+//   F7  BATTERY: a hostile Frigate in home orbit: one orbital defence battery built.
+//   F8  NR-1206's dial defaults OFF.  F9  two runs byte-identical.
+//
 // Build: node tools/verify/build_harness.js space_ai_harness --run
 // ---------------------------------------------------------------------------
 
@@ -67,12 +82,24 @@
 #include "world/stations.hpp"
 #include "world/world.hpp"
 #include "world/world_save.hpp"
+#include "world/early_space_tree_data.hpp" // BL-1608: the far-space keys
+#include "world/nation_tech.hpp"
+#include "world/offworld_base.hpp"
+#include "world/province.hpp"
+#include "world/space_battle.hpp"
+#include "world/space_bombard.hpp"
+#include "world/space_convoy.hpp"
+#include "world/space_effects.hpp"
+#include "world/space_units.hpp"
+#include "world/stance.hpp"
+#include "world/survey_system.hpp"
 #include "space_fixture.hpp"
 
 #include <cmath>
 #include <cstdarg>
 #include <cstdint>
 #include <cstdio>
+#include <cstring>
 #include <map>
 #include <sstream>
 #include <string>
@@ -274,6 +301,492 @@ void programme(fixture& f, const recipe_registry& reg)
 {
     for (int q = 0; q < 20; ++q)
         quarter(f.w, reg, k_campaign_settle_ticks + q);
+}
+
+// ---- BL-1608 the far-space fixture --------------------------------------------------
+// A star, a gridded home planet (6x2: two tiles each for Alpha, Beta and the Seat, the
+// player's nation), and an airless moon (16x8 regolith, one iron deposit at (5, 3)).
+// Every nation holds every Digitisation and Early Space key, a staffed pad on its own
+// capital tile, a centre of 50 thousand there and two million credits; one home shelf
+// holds every good. The moon is unpartitioned, as base_harness stages it.
+constexpr int FW = 16, FH = 8;
+
+struct far_fixture
+{
+    world     w;
+    entity_id star = null_entity, home = null_entity, moon = null_entity;
+    entity_id a = null_entity, b = null_entity, player = null_entity;
+    entity_id market = null_entity;
+    entity_id cap[3] = {};
+    entity_id moon_tile[FW * FH] = {};
+};
+
+entity_id far_body(world& w, const char* name, body_type t, entity_id parent, float au, int gw, int gh)
+{
+    const entity_id id = add_body(w, name, t, parent, au);
+    w.bodies.at(id).grid_width  = gw;
+    w.bodies.at(id).grid_height = gh;
+    w.bodies.at(id).atmosphere  = t == body_type::moon ? atmosphere_class::none : atmosphere_class::moderate;
+    return id;
+}
+
+entity_id far_tile(world& w, entity_id body, int x, int y, terrain_substrate sub, float hab)
+{
+    const entity_id id = w.create_entity();
+    tile_component tc{};
+    tc.body = body;
+    tc.grid_x = x;
+    tc.grid_y = y;
+    tc.substrate = sub;
+    tc.landform = terrain_landform::plains;
+    tc.habitability = hab;
+    w.tiles.emplace(id, tc);
+    return id;
+}
+
+void grant_far_space(world& w, entity_id nation)
+{
+    nation_tech_state& st = w.nation_tech[nation];
+    for (const io::es::effect& e : io::es::effects)
+        if (e.kind == io::es::effect_kind::mechanic && e.node >= 0 && e.node < io::es::node_count)
+            st.es_held.set(static_cast<std::size_t>(e.node));
+}
+
+uint8_t item(const char* id)
+{
+    const auto& cat = space_item_catalogue();
+    for (std::size_t i = 0; i < cat.size(); ++i)
+        if (std::strcmp(cat[i].id, id) == 0)
+            return static_cast<uint8_t>(i);
+    return k_no_space_item;
+}
+
+void build_far(far_fixture& f, float moon_mass = 0.0123f)
+{
+    world& w = f.w;
+    f.star = add_body(w, "Star", body_type::star, null_entity, 0.0f);
+    f.home = far_body(w, "Home", body_type::planet, null_entity, 1.0f, 6, 2);
+    f.moon = far_body(w, "Moon", body_type::moon, f.home, 0.0026f, FW, FH);
+    w.bodies.at(f.moon).mass_earths = moon_mass;
+    w.star_body = f.star;
+    w.home_body = f.home;
+    w.bodies.at(f.home).survey.phase = survey_phase::surveyed;
+    const char* names[3] = {"Alpha", "Beta", "Seat"};
+    entity_id* ids[3] = {&f.a, &f.b, &f.player};
+    for (int i = 0; i < 3; ++i)
+    {
+        *ids[i] = w.create_entity();
+        nation_component nc;
+        nc.name = names[i];
+        nc.treasury = 2000000.0f;
+        nc.astronauts = 40;
+        w.nations.emplace(*ids[i], nc);
+    }
+    for (int y = 0; y < 2; ++y)
+        for (int x = 0; x < 6; ++x)
+        {
+            const entity_id t = far_tile(w, f.home, x, y, terrain_substrate::sedimentary, 1.0f);
+            const int i = x / 2;
+            w.set_tile_nation(t, *ids[i]);
+            w.nations.at(*ids[i]).tiles.push_back(t);
+            if (y == 0 && x % 2 == 0)
+                f.cap[i] = t;
+        }
+    for (int i = 0; i < 3; ++i)
+    {
+        w.nations.at(*ids[i]).capital_tile = f.cap[i];
+        const entity_id c = w.create_entity();
+        population_centre_component pc;
+        pc.scale = 3;
+        pc.population = 50;
+        w.population_centres[c] = pc;
+        w.population_centre_tile[c] = f.cap[i];
+        space_fixture::hold_every_node(w, *ids[i]);
+        grant_far_space(w, *ids[i]);
+        space_fixture::add_pad(w, *ids[i], f.cap[i], 10.0f);
+    }
+    w.player_entity = f.player;
+    f.market = space_fixture::add_shelf(w, f.home);
+    {
+        market_component& m = w.markets.at(f.market);
+        for (std::size_t r = 0; r < resource_count; ++r)
+            if (m.base_price[r] <= 0.0f)
+            {
+                m.base_price[r] = m.price[r] = 10.0f;
+                m.inventory[r] = space_fixture::k_shelf_stock;
+            }
+    }
+    build_province_partition(w, 0x1608u);
+    seed_province_holders(w);
+    for (int y = 0; y < FH; ++y)
+        for (int x = 0; x < FW; ++x)
+            f.moon_tile[y * FW + x] = far_tile(w, f.moon, x, y, terrain_substrate::regolith, 0.0f);
+    {
+        tile_component& tc = w.tiles.at(f.moon_tile[3 * FW + 5]);
+        tc.resource_deposit[static_cast<std::size_t>(resource_type::iron_ore)] = 2.0f;
+        tc.resource_remaining[static_cast<std::size_t>(resource_type::iron_ore)] = 1.0e6f;
+    }
+    w.body_tile_index.clear();
+    w.current_econ_tick = k_campaign_settle_ticks;
+}
+
+/// One quarter as the step runs it for space units: the far pick, the days (moves
+/// land), the effects (a landed Lander prospects), the unit quarter (upkeep).
+std::vector<far_space_pick> far_quarter(world& w, const recipe_registry& reg, int tick)
+{
+    w.current_econ_tick = tick;
+    std::vector<far_space_pick> picks;
+    run_nation_far_space_ai(w, reg, &picks);
+    for (int d = 0; d < 90; ++d)
+    {
+        run_space_unit_day(w, reg.space_units(), reg.stations());
+        run_space_battle_day(w, reg.space_units(), reg.stations(), reg.space_battles());
+        run_space_strike_day(w, reg.space_battles());
+    }
+    run_space_effects(w, space_effects_params{}, reg.stations(), 0.0f, tick);
+    run_space_unit_quarter(w, reg.space_units(), reg.stations(), tick);
+    return picks;
+}
+
+const far_space_pick* far_for(const std::vector<far_space_pick>& v, entity_id n)
+{
+    for (const far_space_pick& p : v)
+        if (p.nation == n)
+            return &p;
+    return nullptr;
+}
+
+int units_of(const world& w, entity_id n, space_hull h)
+{
+    int c = 0;
+    for (const auto& [id, u] : w.space_units)
+        if (u.owner == n && u.hull == h)
+            ++c;
+    return c;
+}
+
+bool base_of(const world& w, entity_id n, entity_id body)
+{
+    return offworld_base_capital(w, n, body) != null_entity;
+}
+
+void rows_far_space(const recipe_registry& reg)
+{
+    std::printf("\n-- BL-1608 the far-space pick --\n");
+    const nation_ai_params& p = reg.nation_ai();
+    std::printf("dials: bases %d, colonists %d, warships %d per hostile (max %d), keep base home %d\n",
+                p.far_space_bases_max, p.far_space_colonists, p.far_space_warships_per_hostile,
+                p.far_space_warships_max, p.far_space_keep_base_home);
+
+    // ---- F1..F4 the base programme, end to end ------------------------------------------
+    {
+        far_fixture f;
+        build_far(f);
+        world& w = f.w;
+        survey_map_regions(w, f.a, f.moon, 99); // Alpha's Survey satellite mapped the moon
+        const orbital_path_result path = orbital_path(w, orbital_graph_params{},
+                                                      orbital_node{f.home, orbital_node_kind::low_orbit},
+                                                      orbital_node{f.moon, orbital_node_kind::surface});
+        std::printf("    home low orbit -> moon surface: dv %.2f, %.1f days\n", path.dv, path.days);
+
+        const unsigned long long h0 = w.state_hash(0);
+        const far_space_pick pre = choose_far_space_action(w, reg, f.a, p);
+        check(pre.action == far_space_action::design && pre.hull == static_cast<uint8_t>(space_hull::hauler)
+                  && w.state_hash(0) == h0,
+              "F1", "the pick is pure, and a keyed rival's first far-space pick designs its first hull (Hauler)");
+
+        std::map<int, int> seen; // action -> first quarter
+        std::vector<int> actions_a;
+        bool player_row = false, one_verb = true, player_untouched = true;
+        int founded_q = -1;
+        for (int q = 0; q < 16 && founded_q < 0; ++q)
+        {
+            const std::size_t units0 = w.space_units.size();
+            const std::vector<far_space_pick> picks = far_quarter(w, reg, k_campaign_settle_ticks + q);
+            player_row |= far_for(picks, f.player) != nullptr;
+            const far_space_pick* k = far_for(picks, f.a);
+            if (k != nullptr)
+            {
+                actions_a.push_back(static_cast<int>(k->action));
+                if (k->action != far_space_action::none && k->block != far_space_block::none)
+                    std::printf("    q%d Alpha action %d refused (result %d)\n", q, static_cast<int>(k->action),
+                                static_cast<int>(k->result));
+                if (k->action != far_space_action::none && seen.count(static_cast<int>(k->action)) == 0)
+                    seen[static_cast<int>(k->action)] = q;
+            }
+            int raised = 0;
+            for (const far_space_pick& fp : picks)
+                if ((fp.action == far_space_action::raise_lander || fp.action == far_space_action::raise_warship)
+                    && fp.block == far_space_block::none)
+                    ++raised;
+            one_verb = one_verb && w.space_units.size() <= units0 + static_cast<std::size_t>(raised)
+                    && picks.size() == 2;
+            if (base_of(w, f.a, f.moon))
+                founded_q = q;
+        }
+        std::string trail;
+        for (const int a : actions_a)
+            trail += std::to_string(a) + " ";
+        std::printf("    Alpha's actions by quarter: %s\n", trail.c_str());
+
+        int designs = 0;
+        bool designs_valid = true;
+        if (const auto it = w.space_unit_designs.find(f.a); it != w.space_unit_designs.end())
+            for (const auto& [h, d] : it->second)
+            {
+                ++designs;
+                designs_valid = designs_valid && evaluate_space_design(static_cast<space_hull>(h), d).valid;
+            }
+        check(designs == static_cast<int>(space_hull_count) && designs_valid, "F1",
+              fmt("one live design per researched class, each valid: %d designs", designs));
+        const space_design* hauler = space_unit_design_of(w, f.a, space_hull::hauler);
+        check(hauler != nullptr && (*hauler)[0] == item("drive.nuclear_thermal") && (*hauler)[1] == item("tanks.extended"),
+              "F1", "each slot takes the best researched item: nuclear-thermal drive, extended tanks");
+        check(seen.count(static_cast<int>(far_space_action::raise_lander)) && seen.count(static_cast<int>(far_space_action::embark))
+                  && seen.count(static_cast<int>(far_space_action::load_kit))
+                  && seen.count(static_cast<int>(far_space_action::lander_move)),
+              "F2", "the Lander steps each chosen when they score: raise, embark, load the kit, move");
+        const bool order_ok = seen.count(static_cast<int>(far_space_action::raise_lander))
+            && seen.count(static_cast<int>(far_space_action::embark))
+            && seen[static_cast<int>(far_space_action::raise_lander)] < seen[static_cast<int>(far_space_action::embark)];
+        check(order_ok, "F2", "a Lander is raised before colonists board it");
+        check(founded_q >= 0 && base_of(w, f.a, f.moon) && units_of(w, f.a, space_hull::lander) == 2, "F3",
+              fmt("Alpha founds a base on the moon (quarter %d), from two Landers: colonists and kit", founded_q));
+        bool prospected_site = false;
+        if (const entity_id t = offworld_base_capital(w, f.a, f.moon); t != null_entity)
+        {
+            const tile_component& tc = w.tiles.at(t);
+            prospected_site = survey_tile_prospected(w, f.a, f.moon, tc.grid_x, tc.grid_y);
+            std::printf("    base tile (%d, %d), iron %.1f\n", tc.grid_x, tc.grid_y,
+                        tc.resource_deposit[static_cast<std::size_t>(resource_type::iron_ore)]);
+        }
+        check(prospected_site, "F3", "the base stands on a tile Alpha has prospected");
+        player_untouched = units_of(w, f.player, space_hull::lander) == 0 && units_of(w, f.player, space_hull::hauler) == 0
+                        && w.space_unit_designs.count(f.player) == 0
+                        && std::fabs(w.nations.at(f.player).treasury - 2000000.0f) < 1.0f;
+        check(!player_row && player_untouched && one_verb, "F4",
+              "the player's nation, keyed, padded and funded, has no row, no design, no unit; one verb a nation a quarter");
+        check(space_haul_eligible(w, f.a, f.a), "F4b",
+              "convoys: with its Hauler design live, Alpha's inter-body trade ships by Hauler (the trade seam's)");
+
+        // After the base: the programme is closed (bases_max 1) - no more Landers raised.
+        const int landers = units_of(w, f.a, space_hull::lander);
+        for (int q = 0; q < 4; ++q)
+            (void)far_quarter(w, reg, k_campaign_settle_ticks + 40 + q);
+        check(units_of(w, f.a, space_hull::lander) == landers, "F3b",
+              "at far_space_bases_max the rival raises no further Lander");
+    }
+
+    // ---- F3a the laden Lander: a moon a laden Lander cannot reach ----------------------
+    {
+        far_fixture f;
+        build_far(f, /*moon_mass=*/1.0f); // an Earth-mass moon: the kit cuts the reach short
+        world& w = f.w;
+        survey_map_regions(w, f.a, f.moon, 99);
+        std::vector<int> trail;
+        far_space_block last = far_space_block::none;
+        for (int q = 0; q < 16; ++q)
+        {
+            const std::vector<far_space_pick> picks = far_quarter(w, reg, k_campaign_settle_ticks + q);
+            if (const far_space_pick* k = far_for(picks, f.a))
+            {
+                trail.push_back(static_cast<int>(k->action));
+                last = k->block;
+            }
+        }
+        std::string t;
+        for (const int x : trail)
+            t += std::to_string(x) + " ";
+        int cargo_landers = 0;
+        for (const auto& [uid, u] : w.space_units)
+            if (u.owner == f.a && u.hull == space_hull::lander && evaluate_space_design(u.hull, u.design).cargo > 0.0f)
+                ++cargo_landers;
+        std::printf("    heavy moon: Alpha's actions %s; last block %d\n", t.c_str(), static_cast<int>(last));
+        check(cargo_landers == 0 && w.space_hauls.empty() && last == far_space_block::no_dv && !base_of(w, f.a, f.moon),
+              "F3a", "a kit no Lander could fly there laden is never bought, nor a cargo Lander raised: no_dv");
+    }
+
+    // ---- F5 walls ------------------------------------------------------------------------
+    {
+        far_fixture nk;
+        build_far(nk);
+        nk.w.nation_tech[nk.a].es_held.reset();
+        const far_space_pick k0 = choose_far_space_action(nk.w, reg, nk.a, p);
+        far_fixture nr;
+        build_far(nr);
+        space_fixture::drop_key(nr.w, nr.a, space_keys::dispatch);
+        const far_space_pick k1 = choose_far_space_action(nr.w, reg, nr.a, p);
+        check(k0.block == far_space_block::no_hull && k1.block == far_space_block::no_rocketry, "F5",
+              fmt("no far key: no_hull (%d); no Rocketry: no_rocketry (%d)", static_cast<int>(k0.block),
+                  static_cast<int>(k1.block)));
+
+        far_fixture rs;
+        build_far(rs);
+        survey_map_regions(rs.w, rs.a, rs.moon, 99);
+        for (int q = 0; q < 5; ++q) // the five designs: free
+            (void)far_quarter(rs.w, reg, k_campaign_settle_ticks + q);
+        rs.w.nations.at(rs.a).treasury = 100.0f;
+        const std::string before = to_bytes(rs.w);
+        std::vector<far_space_pick> picks;
+        rs.w.current_econ_tick = k_campaign_settle_ticks + 5;
+        run_nation_far_space_ai(rs.w, reg, &picks);
+        const far_space_pick* k = far_for(picks, rs.a);
+        check(k != nullptr && k->action == far_space_action::none && k->block == far_space_block::reserve
+                  && units_of(rs.w, rs.a, space_hull::lander) == 0,
+              "F5", fmt("a raise the reserve forbids is refused cleanly (block %d), no Lander",
+                        k ? static_cast<int>(k->block) : -1));
+
+        far_fixture nt;
+        build_far(nt); // nothing mapped: no target
+        for (int q = 0; q < 5; ++q)
+            (void)far_quarter(nt.w, reg, k_campaign_settle_ticks + q);
+        const unsigned long long h = nt.w.state_hash(0);
+        std::vector<far_space_pick> picks2;
+        run_nation_far_space_ai(nt.w, reg, &picks2);
+        const far_space_pick* k2 = far_for(picks2, nt.a);
+        check(k2 != nullptr && k2->block == far_space_block::no_target && nt.w.state_hash(0) == h, "F5",
+              "with no mapped body a Lander has no target: no_target, and the world hashes as before");
+
+        far_fixture st;
+        build_far(st);
+        st.w.current_econ_tick = k_campaign_settle_ticks - 1;
+        std::vector<far_space_pick> picks3;
+        check(run_nation_far_space_ai(st.w, reg, &picks3) == 0 && picks3.empty(), "F5",
+              "in the settle the pass does nothing");
+    }
+
+    // ---- F6 war: raise, bombard, fleet ---------------------------------------------------
+    {
+        far_fixture f;
+        build_far(f);
+        world& w = f.w;
+        // Beta's extraction site on its own capital tile: a building a strike wears.
+        const entity_id site = w.create_entity();
+        {
+            building_component b{};
+            b.tile = f.cap[1];
+            b.type = building_type::extraction_site;
+            b.ticks_remaining = 0;
+            b.condition_permille = 1000;
+            w.buildings.emplace(site, b);
+            w.nations.at(f.b).state_assets.push_back(site);
+        }
+        w.nation_tech[f.b].es_held.reset(); // Beta fields nothing: the subject is Alpha's war, not a battle
+        for (int q = 0; q < 5; ++q)
+            (void)far_quarter(w, reg, k_campaign_settle_ticks + q);
+        const far_space_pick calm = choose_far_space_action(w, reg, f.a, p);
+        check(calm.action != far_space_action::raise_warship && units_of(w, f.a, space_hull::frigate) == 0, "F6",
+              "at peace no warship is raised");
+        declare_hostile(w, f.b, f.a);
+        std::map<int, int> seen;
+        for (int q = 5; q < 9; ++q)
+        {
+            const std::vector<far_space_pick> picks = far_quarter(w, reg, k_campaign_settle_ticks + q);
+            if (const far_space_pick* k = far_for(picks, f.a); k && k->block == far_space_block::none)
+                seen.emplace(static_cast<int>(k->action), q);
+        }
+        const int frigates = units_of(w, f.a, space_hull::frigate);
+        bool order_on_site = false;
+        for (const auto& [uid, o] : w.space_bombard_orders)
+            if (w.space_units.at(uid).owner == f.a && o.kind == space_bombard_target::building && o.target == site)
+                order_on_site = true;
+        check(seen.count(static_cast<int>(far_space_action::raise_warship)) && frigates == p.far_space_warships_per_hostile,
+              "F6", fmt("at war Alpha raises Frigates to its count: %d", frigates));
+        // The order drops itself once the building is worn past striking (space_bombard.hpp).
+        check((order_on_site || seen.count(static_cast<int>(far_space_action::bombard)) != 0)
+                  && w.buildings.at(site).condition_permille < 1000, "F6",
+              fmt("a missile Frigate in the hostile's low orbit bombards its building (condition %d)",
+                  w.buildings.at(site).condition_permille));
+        check(units_of(w, f.player, space_hull::frigate) == 0, "F6", "the player's nation raises nothing");
+
+        // FLEET: stage Alpha's frigates at the moon's low orbit; the war's node is home low orbit.
+        for (auto& [uid, u] : w.space_units)
+            if (u.owner == f.a && u.hull == space_hull::frigate)
+            {
+                u.state = space_unit_state::idle;
+                u.node = u.dest = {f.moon, orbital_node_kind::low_orbit};
+                u.propellant = evaluate_space_design(u.hull, u.design).tank;
+            }
+        for (auto it = w.space_bombard_orders.begin(); it != w.space_bombard_orders.end();)
+            it = w.space_units.at(it->first).owner == f.a ? w.space_bombard_orders.erase(it) : std::next(it);
+        const far_space_pick fm = choose_far_space_action(w, reg, f.a, p);
+        check(fm.action == far_space_action::fleet_move && fm.fleet && fm.count == frigates
+                  && fm.to == orbital_node{f.home, orbital_node_kind::low_orbit},
+              "F6", fmt("the fleet away from the war's node is ordered to it whole (%d units)", fm.count));
+        std::vector<far_space_pick> picks;
+        w.current_econ_tick = k_campaign_settle_ticks + 9;
+        run_nation_far_space_ai(w, reg, &picks);
+        int going = 0;
+        for (const auto& [uid, u] : w.space_units)
+            if (u.owner == f.a && u.hull == space_hull::frigate && u.state == space_unit_state::in_transit
+                && u.dest == orbital_node{f.home, orbital_node_kind::low_orbit})
+                ++going;
+        check(going == frigates, "F6", fmt("applied: %d Frigates in transit home", going));
+    }
+
+    // ---- F7 the battery ------------------------------------------------------------------
+    {
+        recipe_registry greg;
+        ground g;
+        build_ground(g);
+        world& w = g.w;
+        space_fixture::hold_every_node(w, g.a);
+        grant_far_space(w, g.a);
+        // Alpha's pad, built: the battery is the call, not the pad.
+        const entity_id pad = space_fixture::add_pad(w, g.a, g.tiles_a[1], 10.0f);
+        (void)pad;
+        const space_ground_pick calm = score_nation_space_ground(w, greg, g.a, k_campaign_settle_ticks, false);
+        declare_hostile(w, g.b, g.a);
+        const space_ground_pick no_ship = score_nation_space_ground(w, greg, g.a, k_campaign_settle_ticks, false);
+        // A Beta Frigate in the home low orbit.
+        const entity_id fid = w.create_entity();
+        {
+            space_unit u;
+            u.id = fid;
+            u.owner = g.b;
+            u.hull = space_hull::frigate;
+            u.design.fill(k_no_space_item);
+            u.design[0] = item("drive.chemical");
+            u.design[1] = item("tanks.standard");
+            u.design[2] = item("armament.missile");
+            u.design[3] = item("armour.whipple");
+            u.state = space_unit_state::idle;
+            u.node = u.dest = {g.home, orbital_node_kind::low_orbit};
+            u.hull_points = evaluate_space_design(u.hull, u.design).hull_points;
+            w.space_units.emplace(fid, u);
+        }
+        const space_ground_pick held = score_nation_space_ground(w, greg, g.a, k_campaign_settle_ticks);
+        check(calm.type != building_type::orbital_defence_battery && no_ship.type != building_type::orbital_defence_battery
+                  && held.type == building_type::orbital_defence_battery && held.block == space_ground_block::none
+                  && count_of_type(w, g.a, building_type::orbital_defence_battery) == 1,
+              "F7", fmt("a hostile Frigate holding home orbit: Alpha builds an orbital defence battery (block %d)",
+                        static_cast<int>(held.block)));
+        const space_ground_pick again = score_nation_space_ground(w, greg, g.a, k_campaign_settle_ticks + 1, false);
+        check(again.type != building_type::orbital_defence_battery && count_of_type(w, g.player, building_type::orbital_defence_battery) == 0,
+              "F7", "one battery on the body is enough; the player's nation is never built for");
+    }
+
+    // ---- F8 the keep-home dial -----------------------------------------------------------
+    check(nation_ai_params{}.far_space_keep_base_home == 0, "F8",
+          "NR-1206 is raised, not granted: the keep-base-home dial defaults OFF");
+
+    // ---- F9 determinism ------------------------------------------------------------------
+    {
+        far_fixture f1, f2;
+        build_far(f1);
+        build_far(f2);
+        for (far_fixture* f : {&f1, &f2})
+        {
+            survey_map_regions(f->w, f->a, f->moon, 99);
+            survey_map_regions(f->w, f->b, f->moon, 99);
+            declare_hostile(f->w, f->b, f->a);
+            for (int q = 0; q < 24; ++q)
+                (void)far_quarter(f->w, reg, k_campaign_settle_ticks + q);
+        }
+        check(f1.w.state_hash(0) == f2.w.state_hash(0) && to_bytes(f1.w) == to_bytes(f2.w) && !f1.w.space_units.empty(),
+              "F9", fmt("two far-space runs end byte-identical (%zu units, %zu bases)", f1.w.space_units.size(),
+                        f1.w.offworld_bases.size()));
+    }
 }
 
 } // namespace
@@ -722,6 +1235,8 @@ int main()
                   && r_off.hauler_wants.empty() && reg.space_programme().standing_lots == 0.0f,
               "B5", "no Rocketry, an unstaffed pad, the settle, standing_lots 0 (the C++ default): no bid");
     }
+
+    rows_far_space(reg); // BL-1608
 
     std::printf("\nspace_ai_harness: %d passed, %d failed\n", g_pass, g_fail);
     return g_fail == 0 ? 0 : 1;

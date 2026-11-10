@@ -208,6 +208,11 @@ void run_nation_step(world& w, const recipe_registry& reg, economy_report& repor
     // and before the order queue and the asset step (so a launch is this
     // quarter's). Never the player's nation; nothing in the settle.
     run_nation_space_ai(w, reg, &report.space_picks);
+    // ---- 6a'. The far-space pick (BL-1608, the same grant) — the sibling faculty:
+    // at most one far-space verb per non-player nation (designs, raises, moves,
+    // the base programme, bombard), after the near pick so a station core
+    // launched this quarter is already the world it reads. Never the player's.
+    run_nation_far_space_ai(w, reg, &report.far_space_picks);
 
     // ---- 6b. Pending near-space orders (BL-1587, SPACE_ASSETS.md § Signal delay) —
     // an order issued outside comms coverage last quarter reaches its station or
