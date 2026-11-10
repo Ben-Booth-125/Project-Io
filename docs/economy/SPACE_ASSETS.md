@@ -124,7 +124,9 @@ build's cost. Never for the player's nation.
 **A launch buys its goods off the home market's shelf** — `spacecraft_components` and
 `propellant`, at the market's price, debited from the treasury. A shelf that cannot fill the whole
 lot refuses the launch whole; nothing is half-bought. The lot scales with the payload's class and
-the path's thrust cost: a further node burns more propellant.
+the path's thrust cost: a further node burns more propellant. **No launch draws from a pool of
+markets** (Ben, 2026-11-10): goods reach the home shelf by trade, or the launch waits. A good held
+on another market of the same body is that market's, not the launch's.
 
 **A staffed pad bids for its launch (BL-1630, launch goods supply).** Every nation that holds
 Rocketry and has a staffed pad on its home body bids each quarter for one launch lot on its home
