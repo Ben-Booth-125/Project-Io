@@ -24,7 +24,7 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 > **Generated file.** Produced by `node tools/session/render_actions.js`.
 > Edit the JSON, then re-run; hand edits here are overwritten.
 
-*225 entries — 54 gameplay · 39 canvas · 15 lens · 76 ledger · 41 chrome.*
+*226 entries — 54 gameplay · 39 canvas · 15 lens · 77 ledger · 41 chrome.*
 
 ---
 
@@ -1930,6 +1930,22 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 **Expected output.** Arms the site finder on that building. The site ledger beneath lists every tile of the player's own ground on the active body, or in the selected tile's province, that the Build door would accept it on (placement rules with the player's actor, the recipe's air, and the treasury against the capex), sorted by estimated net per quarter descending, ties by tile id; lines above the table count the ones with no Logistic Points operating and the ones that would fit but cost more than the treasury. On the Planetary rung the placement lens marks the same tiles on the map: green for a site, amber with a struck-truck flag where no Logistic Point source reaches it, everything else dimmed. Each site also carries its estimated Net per quarter over the tile, in green with its sign, where the figure fits the hex (Ben, 2026-11-09). Pure view state - nothing is built or charged. The choice clears when the ledger closes, on a second press of the chosen cell, or on Esc while it owns the map press; switching to another view leaves the map plain while it lasts. A row whose recipe input has under 4 quarters left on its market's shelf (shelf over this plant's use plus the shelf's net fall) carries an amber mark beside its Net figure, and that column's hover opens by naming the good and the quarters; a row that would likely stand idle carries no second warning.
 
 **Reason to select.** Answers 'what would earn most on my ground, and where?' without choosing a building first or sweeping the map tile by tile; selecting a tile narrows the same question to its province. The estimate is today's prices with each tile's Logistic Point cover applied - one input among several, not the move.
+
+### `ledger.construction_site_construct` — Construction ledger, Site Finder view, the 'Find a site' building grid: the Construct press on the right half of each cell's lower line (the left half carries 'Cr <best Net>' and the site count)
+
+**Press.** Press 'Construct' on a cell of the 'Find a site' grid. No cell need be chosen first, and the press does not choose or clear one.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `building` | `enum` | The cell's building, in the Build door's vocabulary - an extraction good, a processing recipe, or an infrastructure / military type |
+
+**Valid when:**
+- The Construction ledger is open on its Site Finder view
+- The cell has finished pricing and lists at least one site: some tile of the player's own ground (in the selected tile's province, where one is selected) passes the Build door's gates and the treasury covers its capex. Otherwise the press is disabled and its hover says why - still being priced, the treasury short of every site, or the commonest refusal
+
+**Expected output.** Queues the building at the cell's best site (Ben, 2026-11-10): the listed tile with the highest estimated Net per quarter in whole credits (a priced site before an unpriced one), ties to the highest Logistic Point cover, then the lowest tile id. It runs the map press's own path - the pending construction app::render executes through construct_nation, with that path's own treasury test - so a refused build changes nothing and names the reason in the ledger. The live press's hover names the tile it will build on. Nothing stays lit: a door, not a toggle.
+
+**Reason to select.** One press from 'what would earn most on my ground' to building it, at the single best site, without choosing the building and then a tile on the map.
 
 ### `ledger.construction_site_sort` — Construction ledger, Site Finder view, the site ledger's column headers (Place, Net, Cost, Market, LP, Yield)
 

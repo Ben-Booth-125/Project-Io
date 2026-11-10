@@ -926,6 +926,13 @@ struct site_cell
     std::string best_place;         ///< That tile's place name, as the table's row names it.
     bool        best_near  = false;
     std::string refusal;            ///< Why no tile takes it (the commonest refusal); empty if some do.
+    /// THE CELL'S CONSTRUCT PRESS builds here (Ben, 2026-11-10): the listed tile with the
+    /// highest Net (whole credits; a priced site before an unpriced one), ties to the
+    /// highest Logistic Point cover, then the lowest tile id. null_entity with no site.
+    entity_id   build_tile  = null_entity;
+    bool        build_priced = false;
+    long        build_net    = 0;
+    float       build_cover  = 0.0f;
 };
 
 struct site_finder_state

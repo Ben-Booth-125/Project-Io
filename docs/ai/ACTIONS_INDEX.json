@@ -286,6 +286,10 @@
    "Construction ledger, Site Finder view, the 'Find a site' building grid"
   ],
   [
+   "ledger.construction_site_construct",
+   "Construction ledger, Site Finder view, the 'Find a site' building grid: the Construct press on the right half of each cell's lower line (the left half carries 'Cr <best Net>' and the site count)"
+  ],
+  [
    "ledger.construction_site_sort",
    "Construction ledger, Site Finder view, the site ledger's column headers (Place, Net, Cost, Market, LP, Yield)"
   ],
