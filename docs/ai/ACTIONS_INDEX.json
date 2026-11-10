@@ -130,6 +130,10 @@
    "The Circumplanetary canvas (primary view only): the low and high orbit rings around the anchor and each moon, the L1/L2/L4/L5 diamonds of every anchor-moon pair, and the slot-pip row beside each node (CIRCUMPLANETARY.md § Orbital nodes and what sits at them)."
   ],
   [
+   "canvas.space_asset_select",
+   "The Circumplanetary canvas (primary view only): a satellite mark (a small round plate in its owner nation's colour, a solar wing out of each side, its role's mark on the plate) or a station mark (a larger square core on a truss between two solar panels, in its owner's colour, larger for a larger grid), drawn at the orbital node it occupies - down the side of a ring, or in a row under a diamond. One in transit draws at its destination at half strength (CIRCUMPLANETARY.md § Orbital nodes and what sits at them)."
+  ],
+  [
    "canvas.construction_site_card",
    "Planetary canvas: the build-progress circle drawn over each of the player's sites under construction."
   ],

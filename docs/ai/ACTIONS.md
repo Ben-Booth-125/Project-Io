@@ -24,7 +24,7 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 > **Generated file.** Produced by `node tools/session/render_actions.js`.
 > Edit the JSON, then re-run; hand edits here are overwritten.
 
-*239 entries — 65 gameplay · 40 canvas · 15 lens · 76 ledger · 43 chrome.*
+*240 entries — 65 gameplay · 41 canvas · 15 lens · 76 ledger · 43 chrome.*
 
 ---
 
@@ -1347,7 +1347,7 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 
 ### `canvas.hover_orbital_node` — The Circumplanetary canvas (primary view only): the low and high orbit rings around the anchor and each moon, the L1/L2/L4/L5 diamonds of every anchor-moon pair, and the slot-pip row beside each node (CIRCUMPLANETARY.md § Orbital nodes and what sits at them).
 
-**Press.** Hold the pointer over a node: on a diamond, on a ring's line, or on a node's row of slot pips. A body under the pointer wins: over a planet or moon disc the body's own tooltip shows instead.
+**Press.** Hold the pointer over a node: on a diamond, on a ring's line, or on a node's row of slot pips. A satellite or station mark under the pointer wins, then a body: over either, its own card shows instead.
 
 | Arg | Type | Meaning |
 |---|---|---|
@@ -1355,11 +1355,27 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 
 **Valid when:**
 - The app is in-game with the Circumplanetary rung primary.
-- No body disc is under the pointer.
+- No satellite, station or body disc is under the pointer.
 
-**Expected output.** The shared hover card appears at once, beside the cursor: the node's name, its free slots out of its capacity, and the thrust cost (∆v) and travel days from the player's home surface along the cheapest route. A press on a node changes nothing: a node is not a selectable entity, so the selection is kept rather than cleared. Pips are hollow for a free slot and filled for a held one.
+**Expected output.** The shared hover card appears at once, beside the cursor: the node's name, its free slots out of its capacity, and the thrust cost (∆v) and travel days from the player's home surface along the cheapest route. A press on a node changes nothing: a node is not a selectable entity, so the selection is kept rather than cleared. Pips are hollow for a free slot and filled for a held one, in the identity colour of the nation whose satellite or station holds it. An L-point whose place falls under the bottom strip is held just above it.
 
 **Reason to select.** Compare where around a planet there is room to place an orbital asset, and what reaching each place costs from home, before committing to one.
+
+### `canvas.space_asset_select` — The Circumplanetary canvas (primary view only): a satellite mark (a small round plate in its owner nation's colour, a solar wing out of each side, its role's mark on the plate) or a station mark (a larger square core on a truss between two solar panels, in its owner's colour, larger for a larger grid), drawn at the orbital node it occupies - down the side of a ring, or in a row under a diamond. One in transit draws at its destination at half strength (CIRCUMPLANETARY.md § Orbital nodes and what sits at them).
+
+**Press.** Hover a mark for its card; left-click it to select it.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `asset` | `entity_id` | The satellite, or the station (whose id is its core's), under the pointer. A station's modules are not selectable on their own. |
+
+**Valid when:**
+- The app is in-game with the Circumplanetary rung primary.
+- Every nation's satellites and stations at the rung's nodes draw, the player's and rivals' alike.
+
+**Expected output.** Hover: the shared hover card - the title ("Observation satellite", "Station"), the owner nation in its colour, the role (a satellite) or modules of the grid's slots and crew (a station), the node, and the state (in place; decaying with the unpaid quarters; in transit with the quarters to arrival). Press: the asset becomes the selection, its mark is ringed, and the Selection band shows the same summary. No world change.
+
+**Reason to select.** See who holds which place around a planet and what each satellite there does, before choosing where to launch or move your own.
 
 ### `canvas.construction_site_card` — Planetary canvas: the build-progress circle drawn over each of the player's sites under construction.
 

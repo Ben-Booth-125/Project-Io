@@ -38,6 +38,10 @@ struct circum_frame
     ImVec2 view_origin {0.0f, 0.0f}; ///< Screen position of the anchor.
     float  zoom  = 1.0f;             ///< The rung's live zoom.
     float  scale = 1.0f;             ///< Pixels per AU before zoom (the visible-offset scale).
+    /// The lowest screen y a diamond may sit at: the top of the bottom strip,
+    /// less a margin. A diamond whose place falls below it is held at it (and
+    /// marked `clamped`), so an L-point never hides under the Selection band.
+    float  safe_bottom = 1.0e9f;
 };
 
 /// One orbital node as laid out this frame.
@@ -50,6 +54,10 @@ struct circum_node_mark
     float        pip_dir = 1.0f;   ///< +1 the row runs right, −1 left.
     int          capacity = 0;     ///< orbital_slot_capacity.
     int          held     = 0;     ///< orbital_slots_held.
+    /// The owner nation of each held slot's holder, ascending asset id — the
+    /// colour of each filled pip (CIRCUMPLANETARY.md § Slot occupancy).
+    std::vector<entity_id> holders;
+    bool         clamped  = false; ///< A diamond held up at `circum_frame::safe_bottom`.
 };
 
 // Slots of a node held by an asset: the world's `orbital_slots_held`

@@ -2472,4 +2472,123 @@ void stat(ImDrawList* dl, ImVec2 c, float r, stat_glyph which, ImU32 col)
     }
 }
 
+// ---------------------------------------------------------------------------
+// BL-1590: near-space markers (CIRCUMPLANETARY.md § Orbital nodes and what sits
+// at them). Constant pixel size at any zoom; the caller passes r.
+// ---------------------------------------------------------------------------
+
+namespace {
+
+ImU32 half_alpha(ImU32 c)
+{
+    const ImU32 a = (c >> IM_COL32_A_SHIFT) & 0xFFu;
+    return (c & ~IM_COL32_A_MASK) | ((a / 2u) << IM_COL32_A_SHIFT);
+}
+
+} // namespace
+
+void satellite_role(ImDrawList* dl, ImVec2 c, float r, space_satellite_role role, ImU32 colour)
+{
+    const float th = std::max(1.0f, r * 0.22f);
+    switch (role)
+    {
+        case space_satellite_role::comms:
+        {
+            // A feed dot low-left, two signal arcs opening up-right from it.
+            const ImVec2 o{ c.x - r * 0.55f, c.y + r * 0.55f };
+            dl->AddCircleFilled(o, std::max(1.0f, r * 0.25f), colour, 8);
+            constexpr float a0 = -1.5707963f, a1 = 0.0f; // up, round to the right
+            dl->PathArcTo(o, r * 0.75f, a0, a1, 8);
+            dl->PathStroke(colour, ImDrawFlags_None, th);
+            dl->PathArcTo(o, r * 1.30f, a0, a1, 10);
+            dl->PathStroke(colour, ImDrawFlags_None, th);
+            break;
+        }
+        case space_satellite_role::navigation:
+        {
+            // A four-point compass star, filled as four convex kites.
+            const float in = r * 0.28f;
+            const ImVec2 pts[8] = {
+                { c.x, c.y - r }, { c.x + in, c.y - in }, { c.x + r, c.y }, { c.x + in, c.y + in },
+                { c.x, c.y + r }, { c.x - in, c.y + in }, { c.x - r, c.y }, { c.x - in, c.y - in },
+            };
+            for (int i = 0; i < 4; ++i)
+                dl->AddQuadFilled(c, pts[(2 * i + 7) % 8], pts[2 * i], pts[2 * i + 1], colour);
+            break;
+        }
+        case space_satellite_role::observation:
+        {
+            // An eye: a lens of two arcs round a filled pupil.
+            const float rr   = r * 1.25f;
+            const float dy   = std::sqrt(std::max(0.0f, rr * rr - r * r));
+            const float half = std::atan2(r, dy);
+            dl->PathArcTo({ c.x, c.y + dy }, rr, -1.5707963f - half, -1.5707963f + half, 10);
+            dl->PathStroke(colour, ImDrawFlags_None, th);
+            dl->PathArcTo({ c.x, c.y - dy }, rr, 1.5707963f - half, 1.5707963f + half, 10);
+            dl->PathStroke(colour, ImDrawFlags_None, th);
+            dl->AddCircleFilled(c, std::max(1.0f, r * 0.34f), colour, 10);
+            break;
+        }
+        case space_satellite_role::survey:
+        {
+            // A lens up-left with a handle to the lower right.
+            const ImVec2 lc{ c.x - r * 0.25f, c.y - r * 0.25f };
+            const float  lr = r * 0.55f;
+            dl->AddCircle(lc, lr, colour, 12, th);
+            dl->AddLine({ lc.x + lr * 0.72f, lc.y + lr * 0.72f }, { c.x + r * 0.85f, c.y + r * 0.85f },
+                        colour, th * 1.3f);
+            break;
+        }
+        case space_satellite_role::none:
+        default:
+            dl->AddCircleFilled(c, std::max(1.0f, r * 0.3f), colour, 8);
+            break;
+    }
+}
+
+void satellite_marker(ImDrawList* dl, ImVec2 c, float r, space_satellite_role role, ImU32 fill,
+                      bool in_transit)
+{
+    const ImU32 col = in_transit ? half_alpha(fill) : fill;
+    // Solar wings first, so the plate's ring sits over their roots.
+    const float wl = r * 0.55f, wh = std::max(1.5f, r * 0.30f);
+    for (const float s : { -1.0f, 1.0f })
+    {
+        const float x0 = c.x + s * (r - 1.0f);
+        const float x1 = c.x + s * (r + wl);
+        dl->AddRectFilled({ std::min(x0, x1) - 1.0f, c.y - wh - 1.0f },
+                          { std::max(x0, x1) + 1.0f, c.y + wh + 1.0f }, outline);
+        dl->AddRectFilled({ std::min(x0, x1), c.y - wh }, { std::max(x0, x1), c.y + wh }, col);
+    }
+    dl->AddCircleFilled(c, r + 1.0f, outline, 16);
+    dl->AddCircleFilled(c, r, IM_COL32(18, 20, 26, 235), 16);
+    dl->AddCircle(c, r, col, 16, std::max(1.0f, r * 0.16f));
+    satellite_role(dl, c, r * 0.58f, role, col);
+}
+
+void station_marker(ImDrawList* dl, ImVec2 c, float r, ImU32 fill, bool in_transit)
+{
+    const ImU32 col   = in_transit ? half_alpha(fill) : fill;
+    const float core  = r * 0.42f;
+    const float truss = std::max(1.0f, r * 0.12f);
+    const float pw = r * 0.26f, ph = r * 0.62f; // a panel's half-width and half-height
+    // The truss, outlined.
+    dl->AddRectFilled({ c.x - r + pw, c.y - truss - 1.0f }, { c.x + r - pw, c.y + truss + 1.0f }, outline);
+    dl->AddRectFilled({ c.x - r + pw, c.y - truss }, { c.x + r - pw, c.y + truss }, col);
+    // A solar panel at each end.
+    for (const float s : { -1.0f, 1.0f })
+    {
+        const float  xa = c.x + s * r, xb = c.x + s * (r - 2.0f * pw);
+        const ImVec2 tl{ std::min(xa, xb), c.y - ph }, br{ std::max(xa, xb), c.y + ph };
+        dl->AddRectFilled({ tl.x - 1.0f, tl.y - 1.0f }, { br.x + 1.0f, br.y + 1.0f }, outline);
+        dl->AddRectFilled(tl, br, col);
+        dl->AddLine({ tl.x, c.y }, { br.x, c.y }, outline, 1.0f); // the panel's cell line
+    }
+    // The core, over the truss, with a dark hatch so it reads as a hull.
+    dl->AddRectFilled({ c.x - core - 1.0f, c.y - core - 1.0f }, { c.x + core + 1.0f, c.y + core + 1.0f }, outline);
+    dl->AddRectFilled({ c.x - core, c.y - core }, { c.x + core, c.y + core }, col);
+    dl->AddRectFilled({ c.x - core * 0.35f, c.y - core * 0.35f }, { c.x + core * 0.35f, c.y + core * 0.35f },
+                      outline);
+}
+
 } // namespace ui::icons

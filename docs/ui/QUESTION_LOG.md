@@ -9,7 +9,7 @@ space**, with the backlog item that demanded it. The pair is required. Enforceme
 authorship, not machinery — there is deliberately no audit check against this file
 (BL-260, Ben 2026-08-01: *"the docs are the audit"*).
 
-**82 surfaces** — 4 settled, 78 awaiting Ben's wording.
+**83 surfaces** — 4 settled, 79 awaiting Ben's wording.
 
 ---
 
@@ -91,6 +91,14 @@ alphabetical order.
 **Because:** Near space is a graph of named nodes (SPACE_ASSETS.md § The orbital graph), and every space decision the player makes - where a satellite sits, where a station goes, whether a slot is still free - is a choice between those nodes. Without them on the rung the graph is invisible and its costs are a number the player can only meet after committing. The rings and diamonds say which places exist; the pips say how full each is at a glance, so the scarce L-points read as scarce; the hover card carries the cost and days, because those are the figures a choice between two nodes turns on, and a press does nothing because a node is a place, not a thing to select.
 
 *Demanded by BL-1590 · `src/ui/circum_nodes.hpp`, `src/ui/circum_nodes.cpp`, `src/ui/circumplanetary_canvas.cpp` · id `circumplanetary_orbital_nodes`*
+
+### Circumplanetary space assets: every nation's satellites (owner colour, role mark) and stations (a larger square-cored mark sized by its grid) drawn at the node they occupy, one in transit at half strength at its destination; slot pips filled in the holder's colour; a hover card and a Selection band card sharing one summary - owner, role or modules and crew, node, state
+
+**Answers:** Who holds the places around this planet, what is each satellite there doing, and is my station there in working order?
+
+**Because:** Slots are scarce (SPACE_ASSETS.md § Orbital slots), so the question the node pips raise - how full is it - is followed at once by whose it is. A satellite's role decides what its owner gains on that body (comms coverage, cheaper logistics, lifted fog, a survey), so a rival's observation satellite over the home planet is a fact the player acts on; the role mark carries that at a glance and the card carries the rest. A station is the largest near-space investment and is told apart from a satellite by size and silhouette. The ghost at the destination shows a slot already spoken for by something not yet in place.
+
+*Demanded by BL-1590 · `src/ui/circum_assets.hpp`, `src/ui/circum_assets.cpp`, `src/ui/circum_nodes.cpp`, `src/ui/circumplanetary_canvas.cpp`, `src/ui/icons.cpp`, `src/ui/selection_panel.cpp` · id `circumplanetary_space_assets`*
 
 ### Construction ledger - Buildings view (the estate by type)
 

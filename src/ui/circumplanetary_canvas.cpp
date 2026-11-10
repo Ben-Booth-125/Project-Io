@@ -1,8 +1,10 @@
 #include "circumplanetary_canvas.hpp"
 
 #include "canvas_scale.hpp"
+#include "circum_assets.hpp"
 #include "circum_nodes.hpp"
 #include "pinned_panel.hpp"   // is_pinned: a pinned body keeps the pinned ring
+#include "foldout_column.hpp" // selection_band_height: the bottom strip a diamond keeps clear of
 #include "highlight.hpp"
 #include "nav_pane.hpp"
 #include "presentation.hpp"
@@ -201,7 +203,8 @@ void draw_circumplanetary_canvas(const world& w, ui_state& state, ImVec2 origin,
     // Orbital nodes (CIRCUMPLANETARY.md § Orbital nodes and what sits at them):
     // laid out from the live angles, on the moons' own visible-offset frame.
     // Primary view only — the minimap is too small for a legible pip row.
-    std::vector<circum_node_mark> node_marks;
+    std::vector<circum_node_mark>  node_marks;
+    std::vector<circum_asset_mark> asset_marks;
     if (apply_view)
     {
         std::vector<float> radii;
@@ -209,14 +212,34 @@ void draw_circumplanetary_canvas(const world& w, ui_state& state, ImVec2 origin,
         radii.push_back(body_radius(anchor, true));
         for (entity_id id : moons)
             radii.push_back(body_radius(id, false));
-        node_marks = layout_circum_nodes(w, anchor, moons, radii, {view_origin, zoom, scale});
+        // Diamonds keep above the bottom strip (the Selection band) with room
+        // for a row of assets under them.
+        circum_frame f{view_origin, zoom, scale};
+        f.safe_bottom = origin.y + size.y - selection_band_height(size.x, size.y) - 28.0f;
+        node_marks  = layout_circum_nodes(w, anchor, moons, radii, f);
+        asset_marks = layout_circum_assets(w, node_marks);
         state.circum_nodes_drawn.clear();
         for (const circum_node_mark& m : node_marks)
             state.circum_nodes_drawn.push_back({ orbital_node_display_name(w, m.node), m.pos.x,
                                                  m.pos.y, m.ring_r, m.capacity,
-                                                 m.capacity - m.held });
+                                                 m.capacity - m.held, m.clamped });
+        state.circum_assets_drawn.clear();
+        for (const circum_asset_mark& m : asset_marks)
+            state.circum_assets_drawn.push_back({ m.id, m.owner, m.station, m.in_transit,
+                                                  m.pos.x, m.pos.y, m.r,
+                                                  orbital_node_display_name(
+                                                      w, node_marks[static_cast<std::size_t>(m.node_index)].node) });
         state.circum_node_hovered.clear();
+        state.circum_asset_hovered = null_entity;
     }
+
+    // A satellite or station under the pointer wins over a body and a node: it
+    // draws on top of both.
+    int hovered_asset = -1;
+    if (input_enabled && !asset_marks.empty())
+        hovered_asset = hit_circum_asset(asset_marks, mouse);
+    const entity_id hovered_asset_id =
+        hovered_asset >= 0 ? asset_marks[static_cast<std::size_t>(hovered_asset)].id : null_entity;
 
     // Moon orbital rings, centred on the anchor.
     for (entity_id id : moons)
@@ -239,7 +262,7 @@ void draw_circumplanetary_canvas(const world& w, ui_state& state, ImVec2 origin,
     // highlight tie convention in highlight.hpp). Nearest centre to the cursor
     // wins; the strict `<` keeps an exact tie on the first entry (the anchor).
     entity_id hovered_body = null_entity;
-    if (input_enabled)
+    if (input_enabled && hovered_asset < 0)
     {
         float best_d2 = std::numeric_limits<float>::max();
         for (const auto& [id, is_anchor] : draw_list)
@@ -276,6 +299,8 @@ void draw_circumplanetary_canvas(const world& w, ui_state& state, ImVec2 origin,
 
     // Diamonds and slot pips: over the rings and bodies, under the labels.
     draw_circum_node_marks(dl, node_marks);
+    // Satellites and stations at their nodes: over the node marks.
+    draw_circum_assets(dl, asset_marks, hovered_asset_id, state.selected_entity);
 
     if (draw_labels)
     {
@@ -352,8 +377,14 @@ void draw_circumplanetary_canvas(const world& w, ui_state& state, ImVec2 origin,
     }
 
     // A node answers hover only where no body does: body hover and selection win.
+    if (hovered_asset_id != null_entity)
+    {
+        state.circum_asset_hovered = hovered_asset_id;
+        draw_circum_asset_card(w, hovered_asset_id, mouse);
+    }
+
     int hovered_node = -1;
-    if (hovered_body == null_entity && !node_marks.empty())
+    if (hovered_body == null_entity && hovered_asset < 0 && !node_marks.empty())
         hovered_node = hit_circum_node(node_marks, mouse);
     if (hovered_node >= 0)
     {
@@ -374,7 +405,12 @@ void draw_circumplanetary_canvas(const world& w, ui_state& state, ImVec2 origin,
     else
     {
         // A node is not a selectable entity: a press on one changes nothing.
-        if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) && hovered_node < 0)
+        // A satellite or station is: a press selects it (SELECTION.md).
+        if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) && hovered_asset_id != null_entity)
+        {
+            state.selected_entity = hovered_asset_id;
+        }
+        else if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) && hovered_node < 0)
         {
             state.selected_entity = hovered_body;
         }

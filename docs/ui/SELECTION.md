@@ -129,6 +129,7 @@ Each kind routes its 'go to' to the right place:
 | **Front** (non-entity) | Its own card — § The front element. | | None: a front is selected from its line on the canvas. |
 | **Market** | **Go to** — locate on the canvas. | (none) | Canvas: `focus_on_surface`. |
 | **Nation** | None — **"Open its ledger via [>]."** | (none) | A ledger (no canvas of its own). |
+| **Space asset** (a satellite or a station) | None. | The shared space-asset summary, the same the hover card draws: owner, role (a satellite) or modules and crew (a station), node, state. | None: it is pressed on the Circumplanetary rung it is drawn on. A station is selected by its core's id; its modules are not selectable on their own. |
 
 So 'go to' is itself polymorphic: spatial entities navigate a canvas;
 non-spatial entities (a nation) open the relevant ledger.
