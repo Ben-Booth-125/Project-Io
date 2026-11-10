@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*54 entries — 51 open, 3 resolved.*
+*56 entries — 53 open, 3 resolved.*
 
 ---
 
@@ -639,6 +639,34 @@ A nation with a live Hauler design ships inter-body trades as Haulers; one witho
 > **Recommendation:** Count destination refuelling where the owner has a pad there; retire the old lane once rivals hold Hauler designs (BL-1608 (rival far-space AI)).
 
 *Files: `src/world/space_convoy.cpp`, `src/world/supply_system.cpp`, `docs/military/SPACE_FLEETS.md`*
+
+### NR-1181 — Solar storms are the first campaign event built ahead of the event system: hard-coded, derived from the seed, purely negative
+*novel-work · raised 2026-11-10 · from BL-1605 lane report*
+
+A storm is a pure function of the world seed and econ tick: one seeded draw per 12-quarter solar cycle (750 in 1000 carry a storm), so about three a decade and nothing saved. Every L-point and every asteroid orbit is exposed; planet and moon orbits are sheltered (binary; the doc names no strength or shielding). A struck satellite is dark for every role read; a struck station stops all modules for the quarter; nothing is worn or lost; astronauts untouched. A working Observatory warns its owner a quarter ahead; only the player row posts, on the Field channel. It is C++, not a Lua event on condition_set / modifier_set, because the general event system (BL-548) is not built; EVENTS.md says no event may be purely negative, and this one is. The canvas does not yet mark a dark satellite or stormed station.
+
+**Why it matters.** It sets a precedent for events built before the event system.
+
+- Accept as a hard-coded stand-in, migrate when the event system lands
+- Give storms an upside now (e.g. research from an observed storm)
+
+> **Recommendation:** Accept; add the upside and the canvas marker with BL-1609 (fleet UI).
+
+*Files: `src/world/solar_storm.hpp`, `docs/EVENTS.md`*
+
+### NR-1182 — Space ledger: rail slot 9 renumbers History and the developer tail; a verify fixture writes the player tech, buildings and treasury
+*decision taken on your behalf · raised 2026-11-10 · from BL-1591 lane report*
+
+Space sits at rail slot 9 after Diplomacy, under MENU.md rule that curated systems go above the developer tail; History and the tail move down and the rail has 13 slots (nav_rail_fit passes at 1280x720 and 1920x1080). verify.space_ledger_fixture() stages the player nation with every Digitisation node, a staffed pad and training centre, 40 astronauts and 5M credits; it reveals no tile data. Gaps against ledgers/space.md: applying a template does not quote its total first; satellite Move has no control; the Assets list does not show per-module rows. A live click in the built app is still owed (the scripted run passes 39 checks).
+
+**Why it matters.** Rail order is a layout call; verify staging calls are listed by date in the standing rules.
+
+- Accept slot 9 and the fixture
+- Move Space elsewhere on the rail
+
+> **Recommendation:** Accept; record the staging fixtures (this and near_space_fixture) as a dated verify grant if you want them listed.
+
+*Files: `src/ui/space_ledger.cpp`, `src/ui/nav_pane.cpp`, `docs/ui/MENU.md`, `src/core/verify_api.cpp`*
 
 ---
 

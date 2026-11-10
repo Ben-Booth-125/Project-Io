@@ -1602,8 +1602,8 @@
    "design": "CIRCUMPLANETARY.md. Low and high orbit rings, L-point markers moving with the pair, slot occupancy, owner-coloured satellites and stations, hover and select. Needs a live click. PART 1 LANDED: rings, L-point diamonds, hollow slot pips, node hover card (near_space_nodes.lua). Owed: occupancy, satellites, stations, transit. Polish: pips faint; L5 can sit under the bottom band at 1280x720."
   },
   {
-   "status": "designed",
-   "glyph": "○",
+   "status": "complete",
+   "glyph": "●",
    "sprint": 65,
    "version_goal": "v0.4.0",
    "written": "2026-11-10",
@@ -1925,8 +1925,8 @@
    "design": "ERAS.md § The propellant loop. Authored buildings and recipes; refuelling and Fuel depots read the local shelf."
   },
   {
-   "status": "designed",
-   "glyph": "○",
+   "status": "complete",
+   "glyph": "●",
    "sprint": 66,
    "version_goal": "v0.5.0",
    "written": "2026-11-10",
@@ -2036,7 +2036,7 @@
    "authority_doc": "docs/military/SPACE_FLEETS.md",
    "files": [],
    "title": "Fleets on the canvases, fleet orders, the space hull designer, debris drawn",
-   "design": "Circumplanetary and Solar draw fleets at nodes and in transit; select a fleet and order a move (showing the Δv cost against the budget), dock, refuel, bombard; the Military designer gains space hulls. Needs a live click."
+   "design": "Circumplanetary and Solar draw fleets at nodes and in transit; select a fleet and order a move (showing the Δv cost against the budget), dock, refuel, bombard; the Military designer gains space hulls. Needs a live click. Also (BL-1605 lane): mark a satellite dark and a station stormed on the circumplanetary canvas during a solar storm."
   },
   {
    "status": "designed",

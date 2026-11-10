@@ -964,6 +964,48 @@
     "src/world/supply_system.cpp",
     "docs/military/SPACE_FLEETS.md"
    ]
+  },
+  {
+   "raised": "2026-11-10",
+   "status": "open",
+   "resolution": null,
+   "id": "NR-1181",
+   "title": "Solar storms are the first campaign event built ahead of the event system: hard-coded, derived from the seed, purely negative",
+   "kind": "novel-work",
+   "source": "BL-1605 lane report",
+   "what": "A storm is a pure function of the world seed and econ tick: one seeded draw per 12-quarter solar cycle (750 in 1000 carry a storm), so about three a decade and nothing saved. Every L-point and every asteroid orbit is exposed; planet and moon orbits are sheltered (binary; the doc names no strength or shielding). A struck satellite is dark for every role read; a struck station stops all modules for the quarter; nothing is worn or lost; astronauts untouched. A working Observatory warns its owner a quarter ahead; only the player row posts, on the Field channel. It is C++, not a Lua event on condition_set / modifier_set, because the general event system (BL-548) is not built; EVENTS.md says no event may be purely negative, and this one is. The canvas does not yet mark a dark satellite or stormed station.",
+   "why_it_matters": "It sets a precedent for events built before the event system.",
+   "options": [
+    "Accept as a hard-coded stand-in, migrate when the event system lands",
+    "Give storms an upside now (e.g. research from an observed storm)"
+   ],
+   "recommendation": "Accept; add the upside and the canvas marker with BL-1609 (fleet UI).",
+   "files": [
+    "src/world/solar_storm.hpp",
+    "docs/EVENTS.md"
+   ]
+  },
+  {
+   "raised": "2026-11-10",
+   "status": "open",
+   "resolution": null,
+   "id": "NR-1182",
+   "title": "Space ledger: rail slot 9 renumbers History and the developer tail; a verify fixture writes the player tech, buildings and treasury",
+   "kind": "decision-taken",
+   "source": "BL-1591 lane report",
+   "what": "Space sits at rail slot 9 after Diplomacy, under MENU.md rule that curated systems go above the developer tail; History and the tail move down and the rail has 13 slots (nav_rail_fit passes at 1280x720 and 1920x1080). verify.space_ledger_fixture() stages the player nation with every Digitisation node, a staffed pad and training centre, 40 astronauts and 5M credits; it reveals no tile data. Gaps against ledgers/space.md: applying a template does not quote its total first; satellite Move has no control; the Assets list does not show per-module rows. A live click in the built app is still owed (the scripted run passes 39 checks).",
+   "why_it_matters": "Rail order is a layout call; verify staging calls are listed by date in the standing rules.",
+   "options": [
+    "Accept slot 9 and the fixture",
+    "Move Space elsewhere on the rail"
+   ],
+   "recommendation": "Accept; record the staging fixtures (this and near_space_fixture) as a dated verify grant if you want them listed.",
+   "files": [
+    "src/ui/space_ledger.cpp",
+    "src/ui/nav_pane.cpp",
+    "docs/ui/MENU.md",
+    "src/core/verify_api.cpp"
+   ]
   }
  ]
 }
