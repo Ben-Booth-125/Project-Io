@@ -3,6 +3,11 @@
 #include "entity.hpp"
 #include "nation_budget.hpp"
 #include "nation_tax.hpp" // BL-1335: tax_params, tax_ai_pick (header-only)
+#include "orbital_node.hpp"  // BL-1589: the space pick's node
+#include "space_assets.hpp"  // BL-1589: station_module_kind, k_no_station_module
+#include "space_command.hpp" // BL-1589: space_command_result
+
+#include <array>
 
 #include <cstddef>
 #include <cstdint>
@@ -228,6 +233,47 @@ struct nation_ai_params
     /// pass (Ben, 2026-10-15: re-pick within the quarter while the pool covers
     /// the next node; a bounded loop, one node queued at a time).
     int research_repicks_per_quarter = 8;
+    /// BL-1589 (rival space AI): relief units per near-space MECHANIC key a node
+    /// carries (`space_tech_keys.hpp`'s `near_space`, Rocketry's `space_dispatch`
+    /// excepted — it already scores as the space gate, `research_unlock_relief`),
+    /// before the space_programme line's emphasis. Half an unlock: a key is a
+    /// promise of a verb, not a building. Without it a node whose only effect is
+    /// a key (Communication Satellites, every module key) weighs nothing and the
+    /// picker reaches it only on the way to something else.
+    float research_space_key_relief = 0.25f;
+
+    // --- The space pick (BL-1589; AI_OPPONENT.md § 11, Ben 2026-11-10) ------
+    /// The treasury a nation keeps after any space action: the action is taken
+    /// only when `treasury - cost >= space_reserve_share x treasury +
+    /// space_reserve_upkeep_quarters x (its space upkeep a quarter, the new
+    /// asset's included)` — one launch spends at most (1 - share) of what the
+    /// treasury holds, and leaves the upkeep of what it then owns for that many
+    /// quarters. A share, not a credit floor, because treasuries differ by orders
+    /// of magnitude between worlds and nations. A reserve rule, not a forecast.
+    float space_reserve_share           = 0.5f;
+    int   space_reserve_upkeep_quarters = 8;
+    /// The station the scorer fills, one launch at a time, in this order: the
+    /// next entry whose kind the station holds fewer of than the list has up to
+    /// that entry, whose key is held, whose crew the pool covers and which the
+    /// station's power, crew room and life support (every fitted part counted,
+    /// in transit or in place) would still cover. Fourteen entries: a 5x3 grid
+    /// less its core. `k_no_station_module` ends the list early.
+    std::array<uint8_t, 14> space_station_target{{
+        static_cast<uint8_t>(station_module_kind::power),
+        static_cast<uint8_t>(station_module_kind::research),
+        static_cast<uint8_t>(station_module_kind::habitation),
+        static_cast<uint8_t>(station_module_kind::life_support),
+        static_cast<uint8_t>(station_module_kind::power),
+        static_cast<uint8_t>(station_module_kind::research),
+        static_cast<uint8_t>(station_module_kind::observatory),
+        static_cast<uint8_t>(station_module_kind::comms_relay),
+        static_cast<uint8_t>(station_module_kind::power),
+        static_cast<uint8_t>(station_module_kind::habitation),
+        static_cast<uint8_t>(station_module_kind::life_support),
+        static_cast<uint8_t>(station_module_kind::research),
+        static_cast<uint8_t>(station_module_kind::fuel_depot),
+        static_cast<uint8_t>(station_module_kind::cargo_hold),
+    }};
 };
 
 /// The three terms, per nation, exactly as they were computed. Reported, never
@@ -390,6 +436,79 @@ int run_nation_research_ai(world& w, const recipe_registry& reg, bool spectating
 /// only what the queue owed. Returns how many nodes it queued.
 int run_nation_research_repick(world& w, const recipe_registry& reg, bool spectating,
                                std::vector<research_ai_pick>* out = nullptr);
+
+// ---------------------------------------------------------------------------
+// BL-1589 — THE SPACE PICK (AI_OPPONENT.md § 11, "Rival nations go to space as
+// the player does", Ben 2026-11-10; SPACE_ASSETS.md § Launching, § Satellites,
+// § Space stations). At most ONE near-space action per nation per quarter,
+// issued through the near-space command seam (`apply_space_command`) and
+// nothing else. In order, the first that is wanted, keyed and affordable:
+//
+//   1. comms_satellite  no comms satellite of its own (not lost) and it holds
+//                       `space_role_comms`: one to its home body's LOW orbit.
+//   2. station_core     no station of its own and it holds `space_station_core`:
+//                       a core at the cheapest free orbital node of its home
+//                       body (quote order low, high, L1, L2, L4, L5; ties to the
+//                       earlier), crewed from the pool.
+//   3. station_module   its lowest-id station is short of `space_station_target`:
+//                       the next entry (see the dial) into the lowest empty slot.
+//
+// AFFORDABLE is the launch quote's own answer (pad, shelf, slot, treasury) and
+// the reserve rule (`space_reserve_*`). CREW is the pool: a crewed launch the
+// pool cannot cover is not issued; the scorer issues no training (an Astronaut
+// Training Centre is a building, not a near-space verb) and reports `crew_short`.
+// A nation with a pending near-space order (signal delay) waits for it.
+//
+// NEVER the player's nation — not under spectate either (the grant: "Not
+// admitted: any space verb for the player's nation"). Not in the settle
+// (`research_age_open`). Pure choice, ascending nation id, no memory, no plan:
+// the target layout is filled one launch at a time.
+// ---------------------------------------------------------------------------
+
+enum class space_ai_action : uint8_t
+{
+    none = 0,
+    comms_satellite,
+    station_core,
+    station_module,
+};
+
+/// Why a nation took no space action this quarter (the first wall it met).
+enum class space_ai_block : uint8_t
+{
+    none = 0,         ///< It acted.
+    no_rocketry,      ///< `space_dispatch` not held.
+    no_launchpad,     ///< No staffed Launchpad on its home body.
+    pending_order,    ///< A near-space order of its own is still in the queue.
+    crew_short,       ///< The only wanted launch needs crew the pool lacks.
+    reserve,          ///< The wanted launch would breach the treasury reserve.
+    refused,          ///< The wanted launch's quote refused it (shelf, slot, treasury...).
+    nothing_wanted,   ///< Nothing keyed is wanted (or the station is full).
+};
+
+/// What the space pick did for one nation. Reported, never stored.
+struct space_ai_pick
+{
+    entity_id            nation  = null_entity;
+    space_ai_action      action  = space_ai_action::none;
+    space_ai_block       block   = space_ai_block::nothing_wanted;
+    orbital_node         node{};
+    entity_id            station = null_entity;
+    int                  slot    = -1;
+    uint8_t              module  = k_no_station_module;
+    float                cost    = 0.0f;   ///< The quote's whole cost (credits).
+    space_command_result result  = space_command_result::rejected_invalid; ///< When issued.
+};
+
+/// The pick @p nation would make now — PURE (reads @p w, writes nothing).
+space_ai_pick choose_space_action(const world& w, const recipe_registry& reg, entity_id nation,
+                                  const nation_ai_params& p);
+
+/// The quarterly pass, inside the nation step after research and before the
+/// pending-order queue: every non-player nation, ascending id, issues its pick
+/// through `apply_space_command`. Returns how many commands applied or queued.
+int run_nation_space_ai(world& w, const recipe_registry& reg,
+                        std::vector<space_ai_pick>* out = nullptr);
 
 // ---------------------------------------------------------------------------
 // BL-1335 — THE NATION'S TAX TIER (NATIONS.md § Taxes and Discontent; the

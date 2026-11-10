@@ -561,6 +561,8 @@ struct economy_report
     /// BL-1275: what the nation research AI weighed this tick — one row per
     /// nation whose queue was idle and that it may act for, ascending.
     std::vector<research_ai_pick> research_picks;
+    /// BL-1589: the quarter's space picks, one per non-player nation, ascending id.
+    std::vector<space_ai_pick> space_picks;
 
     /// What the space-asset step did this quarter (BL-1327; space_assets.hpp):
     /// launches and their cost (the launch debit), arrivals, and the upkeep
