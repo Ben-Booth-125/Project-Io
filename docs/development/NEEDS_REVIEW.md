@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*40 entries — 37 open, 3 resolved.*
+*42 entries — 39 open, 3 resolved.*
 
 ---
 
@@ -441,6 +441,34 @@ The research queue has one held set and one queue, both sized to the Digitisatio
 > **Recommendation:** Build it as filed; it is the shape RESEARCH.md already describes.
 
 *Files: `docs/economy/RESEARCH.md`, `src/world/nation_tech.cpp`*
+
+### NR-1167 — Re-pin the player_seed_sweep digests at the v0.4.0 cut (the save format moved them, the world did not)
+*question · raised 2026-11-10 · from BL-1583 lane report: save v80 -> v81*
+
+Adding the station section bumped world_save_version 80 -> 81, and player_seed_sweep --digest-check fails seeds 46 and 31 on D_land, D_settle and D_seat (D_search unmoved). rebless_shape_probe on both trees: every ROW and MIX line identical, so the world is unchanged; only the stream moved, as with earlier version bumps. More space save legs land in sprint 65 (slots, roles, pending orders, per-tree research), each moving the stream again.
+
+**Why it matters.** A failing digest gate hides any real world movement that lands beside it.
+
+- Re-pin once at the v0.4.0 cut, with a shape probe either side
+- Re-pin after each save leg
+
+> **Recommendation:** Once at the v0.4.0 cut; I will run the shape probe and leave the re-pin for your go.
+
+*Files: `tools/verify/player_seed_sweep.cpp`*
+
+### NR-1168 — Station model calls: core costs, module numbers, which module stops, removal keeps crew
+*decision taken on your behalf · raised 2026-11-10 · from BL-1583 + BL-1585 lane report*
+
+Core launch 50,000 cr, upkeep 2,500; core gives power 4, crew room 2, life support 2, needs 1 crew. Module draw/crew: Research 3/1, Defence 2/1, Power 0/0 (+6), Dock 1/1, Habitation 1/0 (+4 room), Life support 2/0 (+4), Fuel depot 1/0, Shipyard 4/2, Factory 4/2, Observatory 2/1, Relay 1/0, Cargo 0/0, Market 1/1. On a shortfall the newest module drawing on the SHORT budget stops (a Power module is passed over in a crew shortfall). An upgrade grows the grid when ordered, its truss launched after. Removing an arrived module moves its crew onto the core; a lost core loses the whole station and its crew. Training: 2 astronauts per centre per quarter, pool cap 20 per running centre; the Astronaut Training Centre costs 300 cr, 240 days, 35 steel.
+
+**Why it matters.** These set how fast a station grows and what a shortfall feels like.
+
+- Keep
+- Name the numbers to change
+
+> **Recommendation:** Keep until the spectator run.
+
+*Files: `src/world/stations.hpp`, `scripts/economy.lua`*
 
 ---
 

@@ -1393,8 +1393,8 @@
    "design": "SPACE_ASSETS.md § Launching. Replaces the credits-only launch cost: spacecraft_components and propellant bought from the home market at its price, lot scaled by class and path thrust cost. Refused whole on any shortfall. Done when a harness shows the shelf drawn down and the treasury debited by the same priced lot."
   },
   {
-   "status": "designed",
-   "glyph": "○",
+   "status": "complete",
+   "glyph": "●",
    "sprint": 65,
    "version_goal": "v0.4.0",
    "written": "2026-11-10",
@@ -1447,8 +1447,8 @@
    "design": "SPACE_ASSETS.md § Space stations, the module roster. Research points to the owner, rations bought off the home shelf, the microgravity factory turning shelf goods into an orbit-only good, the observatory shortening surveys in coverage. Defence, Dock, Fuel depot, Shipyard, Cargo hold and Market wait on v0.5.0 space units and say so on their card. Done when a harness reads each working effect over several quarters."
   },
   {
-   "status": "designed",
-   "glyph": "○",
+   "status": "complete",
+   "glyph": "●",
    "sprint": 65,
    "version_goal": "v0.4.0",
    "written": "2026-11-10",
@@ -1576,8 +1576,8 @@
    "design": "AI_OPPONENT.md § 11, the 2026-11-10 grant. One space action per quarter at most, scored: a comms satellite first, then a station core at a free node, then modules toward its template, astronaut training when crew is short. Never for the player. Done when a spectated run shows rivals launching in a seeded, replayable order."
   },
   {
-   "status": "designed",
-   "glyph": "○",
+   "status": "in_progress",
+   "glyph": "◐",
    "sprint": 65,
    "version_goal": "v0.4.0",
    "written": "2026-11-10",
@@ -1599,7 +1599,7 @@
     "docs/ui/CIRCUMPLANETARY.md"
    ],
    "title": "The Circumplanetary canvas draws nodes, Lagrange points, slots, satellites and stations",
-   "design": "CIRCUMPLANETARY.md. Low and high orbit rings, L-point markers moving with the pair, slot occupancy, owner-coloured satellites and stations, hover and select. Needs a live click."
+   "design": "CIRCUMPLANETARY.md. Low and high orbit rings, L-point markers moving with the pair, slot occupancy, owner-coloured satellites and stations, hover and select. Needs a live click. PART 1 LANDED: rings, L-point diamonds, hollow slot pips, node hover card (near_space_nodes.lua). Owed: occupancy, satellites, stations, transit. Polish: pips faint; L5 can sit under the bottom band at 1280x720."
   },
   {
    "status": "designed",

@@ -679,6 +679,45 @@
     "docs/economy/RESEARCH.md",
     "src/world/nation_tech.cpp"
    ]
+  },
+  {
+   "raised": "2026-11-10",
+   "status": "open",
+   "resolution": null,
+   "id": "NR-1167",
+   "title": "Re-pin the player_seed_sweep digests at the v0.4.0 cut (the save format moved them, the world did not)",
+   "kind": "question",
+   "source": "BL-1583 lane report: save v80 -> v81",
+   "what": "Adding the station section bumped world_save_version 80 -> 81, and player_seed_sweep --digest-check fails seeds 46 and 31 on D_land, D_settle and D_seat (D_search unmoved). rebless_shape_probe on both trees: every ROW and MIX line identical, so the world is unchanged; only the stream moved, as with earlier version bumps. More space save legs land in sprint 65 (slots, roles, pending orders, per-tree research), each moving the stream again.",
+   "why_it_matters": "A failing digest gate hides any real world movement that lands beside it.",
+   "options": [
+    "Re-pin once at the v0.4.0 cut, with a shape probe either side",
+    "Re-pin after each save leg"
+   ],
+   "recommendation": "Once at the v0.4.0 cut; I will run the shape probe and leave the re-pin for your go.",
+   "files": [
+    "tools/verify/player_seed_sweep.cpp"
+   ]
+  },
+  {
+   "raised": "2026-11-10",
+   "status": "open",
+   "resolution": null,
+   "id": "NR-1168",
+   "title": "Station model calls: core costs, module numbers, which module stops, removal keeps crew",
+   "kind": "decision-taken",
+   "source": "BL-1583 + BL-1585 lane report",
+   "what": "Core launch 50,000 cr, upkeep 2,500; core gives power 4, crew room 2, life support 2, needs 1 crew. Module draw/crew: Research 3/1, Defence 2/1, Power 0/0 (+6), Dock 1/1, Habitation 1/0 (+4 room), Life support 2/0 (+4), Fuel depot 1/0, Shipyard 4/2, Factory 4/2, Observatory 2/1, Relay 1/0, Cargo 0/0, Market 1/1. On a shortfall the newest module drawing on the SHORT budget stops (a Power module is passed over in a crew shortfall). An upgrade grows the grid when ordered, its truss launched after. Removing an arrived module moves its crew onto the core; a lost core loses the whole station and its crew. Training: 2 astronauts per centre per quarter, pool cap 20 per running centre; the Astronaut Training Centre costs 300 cr, 240 days, 35 steel.",
+   "why_it_matters": "These set how fast a station grows and what a shortfall feels like.",
+   "options": [
+    "Keep",
+    "Name the numbers to change"
+   ],
+   "recommendation": "Keep until the spectator run.",
+   "files": [
+    "src/world/stations.hpp",
+    "scripts/economy.lua"
+   ]
   }
  ]
 }

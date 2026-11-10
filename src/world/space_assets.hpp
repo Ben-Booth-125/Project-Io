@@ -1,6 +1,7 @@
 #pragma once
 
 #include "entity.hpp"
+#include "orbital_node.hpp"
 
 #include <array>
 #include <cstddef>
@@ -123,6 +124,17 @@ enum class space_asset_state : uint8_t
 };
 
 /// One space asset. SERIALISED (world_save.cpp, the v51 trailing section).
+/// A satellite's role (SPACE_ASSETS.md § Satellites). Append-only (saved).
+enum class space_satellite_role : uint8_t
+{
+    none        = 0, ///< Not a satellite.
+    comms       = 1,
+    navigation  = 2,
+    observation = 3,
+    survey      = 4,
+};
+inline constexpr std::size_t space_satellite_role_count = 5;
+
 struct space_asset
 {
     entity_id         id    = null_entity; ///< From the world's entity allocator.
@@ -144,6 +156,11 @@ struct space_asset
     uint8_t   module       = k_no_station_module; ///< A station_module's `station_module_kind`.
     int32_t   crew         = 0;           ///< Astronauts aboard, drawn from the pool at launch (BL-1585).
     int32_t   refit_done_tick = -1;       ///< A refit's first working econ tick; -1 when not refitting.
+
+    // ---- BL-1581 / BL-1586: where it sits on the orbital graph, and a
+    // satellite's role. SAVE LEG OWED to BL-1581's lane (it bumps the version).
+    orbital_node node{};                          ///< The orbital node it occupies (or travels to).
+    space_satellite_role role = space_satellite_role::none; ///< Satellites only; none otherwise.
 };
 
 /// The hard ceiling on `space_asset_params::quarters_to_loss`. The step clamps
