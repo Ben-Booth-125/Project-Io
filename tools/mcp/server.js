@@ -110,12 +110,20 @@ const VERBS = [
   'queue_space_research', 'unqueue_space_research',    // BL-1613 -- the seat's nation's Early Space tail; order = Early Space node index
 ];
 
-// io::dg::node_count (src/world/digitisation_tree_data.hpp, generated from
-// docs/economy/tech/digitisation_tree.json): the research verbs' `order` range.
-const RESEARCH_NODE_COUNT = 160;
-// io::es::node_count (src/world/early_space_tree_data.hpp, generated from
-// docs/economy/tech/early_space_tree.json): the Early Space verbs' `order` range.
-const EARLY_SPACE_NODE_COUNT = 54;
+// BL-1631: each tree's `node_count`, read from its generated header at start-up so the
+// range can never drift from the store again (a literal 160 refused valid orders
+// 160..193 once the Digitisation tree grew). The header is generated from
+// docs/economy/tech/<tree>.json; an unreadable header is a start-up error, not a guess.
+function tree_node_count(header) {
+  const p = require('path').join(__dirname, '..', '..', 'src', 'world', header);
+  const m = require('fs').readFileSync(p, 'utf8').match(/inline constexpr int node_count\s*=\s*(\d+);/);
+  if (!m) throw new Error(`${header}: no node_count`);
+  return Number(m[1]);
+}
+// io::dg::node_count: the research verbs' `order` range.
+const RESEARCH_NODE_COUNT = tree_node_count('digitisation_tree_data.hpp');
+// io::es::node_count: the Early Space verbs' `order` range.
+const EARLY_SPACE_NODE_COUNT = tree_node_count('early_space_tree_data.hpp');
 
 // ---------------------------------------------------------------------------
 // The ProjectIo --serve child process

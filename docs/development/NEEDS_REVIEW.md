@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*72 entries — 69 open, 3 resolved.*
+*73 entries — 70 open, 3 resolved.*
 
 ---
 
@@ -894,6 +894,20 @@ One far-space verb per rival per quarter, first wanted and legal of: design (bes
 > **Recommendation:** Accept; rule NR-1203 first, then re-spectate (BL-1611).
 
 *Files: `src/world/nation_ai.cpp`, `src/world/corp_ai.cpp`, `docs/ai/AI_OPPONENT.md`*
+
+### NR-1210 — Propellant loop: the Electrolysis Plant keeps refined fuel as an input, against "water and power"
+*decision taken on your behalf · raised 2026-11-10 · from BL-1604 lane report*
+
+No new building types: the Ice Extractor is the extraction site on an ice deposit, the Electrolysis Plant the existing propellant_electrolysis route (water x3 + refined fuel x1). ERAS.md's ruling says water and power; the lane kept the recipe and wrote that the fuel half is shipped in or made locally. Also: the Ice Extractor key applies only off the builder's home body; the electrolysis key is read on the tile owner (so the propellant chain stays open to every nation at home); a Fuel depot over a base fills from the base shelf, else home; neither fill path checks blockade.
+
+**Why it matters.** With refined fuel as an input a base still depends on home for half its propellant.
+
+- Keep refined fuel (a base must import)
+- Make it water and power only (a base is self-sufficient)
+
+> **Recommendation:** Keep: it gives Haulers a reason to run; rule otherwise if bases should close the loop alone.
+
+*Files: `scripts/recipes.lua`, `docs/economy/ERAS.md`*
 
 ---
 

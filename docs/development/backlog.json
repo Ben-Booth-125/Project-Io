@@ -1903,8 +1903,8 @@
    "design": "LAYOUT.md § Pinned items. The panel rect is reserved but nothing draws in it: draw the panel and its pins, then the war-placed front pins with double-click navigation. Needs a live click."
   },
   {
-   "status": "designed",
-   "glyph": "○",
+   "status": "complete",
+   "glyph": "●",
    "sprint": 66,
    "version_goal": "v0.5.0",
    "written": "2026-11-10",
@@ -2217,8 +2217,8 @@
    "design": "The BL-1615 spectate (seed 0 to 1995) ends with 4 staffed rival pads and 0 launches. Three padded nations are refused rejected_shelf: their home market holds no spacecraft_components or propellant lot (components_lump 25, propellant_lump 50), though treasuries are 50 to 88k. The plants exist (recipes spacecraft_components, spacecraft_components_heavy, propellant_atmospheric) but nothing builds them: no demand shows before a launch. Second gap: pads take 5 to 9 years, some sites at rate 0 for want of materials. Fix as an in-world force, not a term in the agent: the space programme demand must be visible to the nation build scorer (2026-10-23 grant, own ground only) so it builds the plants, or the launch buy must post a standing order the market and builders can see. Done when a spectated run shows rival launches before 2000."
   },
   {
-   "status": "designed",
-   "glyph": "○",
+   "status": "complete",
+   "glyph": "●",
    "sprint": 66,
    "version_goal": "v0.5.0",
    "written": "2026-11-10",
@@ -2305,6 +2305,30 @@
    ],
    "title": "A garrison defending its province can chase a pushing stack forever without a battle",
    "design": "Seen on any body: the lower-id attacker steps first each day, the push prefers empty tiles, and the defender walks onto the tile the attacker just left, so they never meet. war_bodies_harness clears the defend order before its battle to avoid it. Diagnose the step order and fix so a defender closing on a pusher meets it."
+  },
+  {
+   "status": "designed",
+   "glyph": "○",
+   "version_goal": "v0.5.0",
+   "written": "2026-11-10",
+   "parked": false,
+   "blocked_on": null,
+   "requires": [],
+   "sprint": 66,
+   "author": "Claude (BL-1604 lane report)",
+   "category": "Verification",
+   "priority": "B",
+   "difficulty": 2,
+   "id": "BL-1635",
+   "short_name": "OWNERLESS_HARNESS_FAILURES",
+   "authority_doc": "docs/development/DEVELOPMENT_PRACTICES.md",
+   "files": [
+    "tools/verify/construction_harness.cpp",
+    "tools/verify/well_gate.cpp",
+    "tools/verify/nation_tech_harness.cpp"
+   ],
+   "title": "Three harnesses fail with or without the space work: construction (8), well_gate (5), nation_tech pacing R0h/R0i",
+   "design": "Confirmed by rebuilding with the lane's files reverted: construction_harness C.R2/R3/R4/R8 (8 rows), well_gate E1/W5/W7 (5 rows), nation_tech_harness R0h/R0i (research pacing, median 14, p10 6). Find which commit broke each; fix or re-pin with a cause comment (pacing re-pins are Ben's)."
   }
  ]
 }
