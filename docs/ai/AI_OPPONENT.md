@@ -2437,6 +2437,16 @@ boilerplate: pure, seeded, deterministic, replayable, legal verbs only, never a 
   borders it or is hostile to it), through fog, with no position, type or count. **Not admitted:** any
   other read of another nation's force; disbanding to meet the target; sizing the player's nation;
   a plan beyond the next hire. Pure, seeded, deterministic, replayable, legal verbs only, never a planner.
+  **Rival nations fire missiles — granted (Ben, 2026-11-10; `../military/MILITARY.md` § Missiles).**
+  A new subject: a rival nation's scorer may buy missiles and interceptors onto its OWN shelves, fire
+  a missile from one of its OWN launchers at a province or building of a nation it is already hostile
+  to, and stock interceptors at its OWN air defence, by scored utility over the same legal verbs the
+  player presses. A tactical nuclear warhead is a munition like any other, and the scorer weighs its
+  Alarm cost (`../politics/RELATIONS.md` § 6) as the player meets it. **Not admitted:** a strategic
+  nuclear launch, which no verb fires; any launcher or stock of another nation, the player's included;
+  declaring the hostility a strike needs; aiming at a target the nation has not sighted; a strike
+  planned beyond the next verb. Pure, seeded, deterministic, replayable, legal verbs only, never a
+  planner.
   **Rival nations wage war whole — granted (Ben, 2026-10-30, resolving NR-1100;
   `../politics/RELATIONS.md` § 7).** The stance grant (BL-450) already covers a rival declaring
   war, and Ben confirmed it does, goals included. The rest of a war is a new subject — territory,
