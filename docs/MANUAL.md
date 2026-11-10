@@ -18,9 +18,9 @@ game is, how to start, and every control. If you are **building** it, section 4 
 the document that owns it, so you can find the authority rather than guessing from the code.
 
 The project is solo-developed in C++ with Lua scripting. It began as a near-future space game; that
-arc is a separate product arc, on the `era/space` branch and tag `space-arc-parked`, intended to
-return as downloadable content (Ben, 2026-08-12, NR-177; `docs/development/ROADMAP.md` § The two
-arcs).
+arc was parked on the `era/space` branch and tag `space-arc-parked` (Ben, 2026-08-12, NR-177), and
+returns into the product as its next milestones (Ben, 2026-11-10; `docs/development/ROADMAP.md`
+§ The industrial arc's milestones).
 
 ---
 

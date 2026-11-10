@@ -1,7 +1,8 @@
 # Project Io — Space Assets
 
 > **Settles:** what makes an asset a space asset rather than a building · the Era 1 near-space
-> classes · who launches them · how they are built, launched, placed and kept.
+> classes · who launches them · how they are built, launched, placed and kept · what a station
+> is, and how its modules are fitted.
 > **Not here:** fixed surface installations and their recipes (PRODUCTION) · when each class
 > unlocks (RESEARCH, the Digitisation tree) · which resources space makes reachable (RESOURCES) ·
 > how a nation chooses to launch (`../ai/AI_OPPONENT.md` § 11).
@@ -38,7 +39,42 @@ asset after a travel time. Orbits and bodies carry a cost to reach; the further 
 **Upkeep** is paid each quarter; an asset unpaid decays and is lost. It counts inside the nation's net
 (`FINANCE.md` § The quarterly return; Ben, 2026-11-07).
 
+## Space stations (Ben, 2026-11-10)
+
+**A station is not a body.** It has no tile grid, terrain or population centre, and nothing
+generates on it. It is fitted the way a unit is designed (`../military/MILITARY.md` § Land — the classes;
+`../ui/ledgers/military.md` § The designer): the player picks which module goes in which slot.
+
+**The core comes first.** Launching a **station core** places it in orbit and opens a grid of
+**5 × 3 slots**. The core takes the centre slot, leaving 14 empty for modules.
+
+**Templates and upgrades.** Stations come in **templates**, and **upgrades** add slots to the grid.
+Placement is still the player's choice inside whatever grid the station has.
+
+**Modules need astronauts to run.** A module with no crew does not work.
+
+**The module roster.** Unlocked by research:
+
+| Module | What it is for |
+|---|---|
+| Research | Earns research points in orbit. |
+| Defence | Protects the station and its orbit. |
+| Power | Supplies the other modules. |
+| Dock | Lets space units dock, refuel and unload. |
+| Habitation | Houses astronauts; sets the crew a station can hold. |
+| Life support | Keeps the crew alive. |
+| Fuel depot | Holds propellant for refuelling. |
+| Shipyard | Builds hulls too large to launch from a surface. |
+| Microgravity factory | Runs recipes that only work in orbit. |
+| Observatory | Surveys and prospects bodies from orbit. |
+| Comms relay | Carries command and information across space. |
+| Cargo hold | A stockpile in orbit. |
+| Market | An orbital market centre. |
+
 ## Open
+
+**Stations.** What a template is: a core type, or a saved layout. How an upgrade grows the grid.
+Whether a module's position matters (adjacency), or only which modules are fitted.
 
 The orbital model's grain, per-class costs and payloads, and what each class yields (survey data,
 research points, prestige, deeds for quests) are set at the sprint 55 cut.
