@@ -300,8 +300,12 @@ void app::apply_ui_draw_scale_to_frame()
     ImGuiIO& io = ImGui::GetIO();
     io.DisplaySize = {io.DisplaySize.x / m_ui_draw_scale, io.DisplaySize.y / m_ui_draw_scale};
     // The SDL backend queues the pointer in window pixels, and it has no scale to ask.
+    // Once each: an event the trickle queue carried over from last frame was scaled then
+    // (m_ui_scale_event_floor), and scaling it twice moved the pointer off the panel it
+    // was over, so the canvas took the panel's wheel.
     for (ImGuiInputEvent& e : ImGui::GetCurrentContext()->InputEventsQueue)
-        if (e.Type == ImGuiInputEventType_MousePos && e.MousePos.PosX > -FLT_MAX)
+        if (e.Type == ImGuiInputEventType_MousePos && e.MousePos.PosX > -FLT_MAX
+            && e.EventId >= m_ui_scale_event_floor)
         {
             e.MousePos.PosX /= m_ui_draw_scale;
             e.MousePos.PosY /= m_ui_draw_scale;
@@ -2772,6 +2776,7 @@ void app::render()
     // last write wins). A no-op outside the verify harness — see app.hpp
     // § Synthetic pointer input.
     pump_injected_input();
+    m_ui_scale_event_floor = ImGui::GetCurrentContext()->InputEventsNextEventId; // scaled or UI px
     ImGui::NewFrame();
 
     // BL-1246: the ground pool's per-frame pump, on EVERY screen — the home

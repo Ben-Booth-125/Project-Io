@@ -568,6 +568,13 @@ private:
     /// SDL backend's NewFrame and ImGui's, before the harness's injected pointer, which
     /// is in UI pixels already.
     void apply_ui_draw_scale_to_frame();
+    /// The first input event id this frame's scale may touch (Ben, 2026-11-09: scrolling a
+    /// table sometimes zoomed the canvas). ImGui's trickle queue carries a pointer event that
+    /// follows a wheel event in the same frame over to the NEXT frame, still queued; scaled
+    /// again there, the pointer read at 0.875x of itself - off the panel, over the canvas -
+    /// and io.WantCaptureMouse went false for that wheel. Every event below this id has been
+    /// scaled already, or was injected in UI pixels.
+    unsigned int m_ui_scale_event_floor = 0;
     /// Draw ImGui's frame through the draw scale.
     void render_imgui_scaled();
     /// The constant the interactive path draws at.
