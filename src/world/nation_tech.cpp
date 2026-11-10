@@ -5,6 +5,7 @@
 #include "nation_budget.hpp"
 #include "recipe_registry.hpp"
 #include "resource_names.hpp"
+#include "space_assets.hpp"    // BL-1612: space_home_body_of (the gate's home body)
 #include "space_tech_keys.hpp"
 #include "world.hpp"
 
@@ -203,13 +204,29 @@ std::int64_t compound_one(std::int64_t idx, std::int64_t rate_ppm)
          + ((idx % k_price_unit_ppm) * rate_ppm + k_price_unit_ppm / 2) / k_price_unit_ppm;
     return std::min(idx, k_price_cap_ppm);
 }
+std::int64_t priced_cost_milli(int cost_units, const research_params& p, std::int64_t price_ppm);
 } // namespace
 
 std::int64_t node_cost_milli(int node, const research_params& p, std::int64_t price_ppm)
 {
     if (!valid_node(node))
         return 0;
-    const std::int64_t unpriced = to_milli(static_cast<double>(node_at(node).cost_units)
+    return priced_cost_milli(node_at(node).cost_units, p, price_ppm);
+}
+
+std::int64_t early_space_node_cost_milli(int es_node, const research_params& p, std::int64_t price_ppm)
+{
+    if (es_node < 0 || es_node >= io::es::node_count)
+        return 0;
+    return priced_cost_milli(io::es::nodes[static_cast<std::size_t>(es_node)].cost_units, p, price_ppm);
+}
+
+namespace {
+// The one cost law both trees are priced by (BL-1612 split it out of
+// node_cost_milli, bit for bit): cost units x the RP unit x the price index.
+std::int64_t priced_cost_milli(int cost_units, const research_params& p, std::int64_t price_ppm)
+{
+    const std::int64_t unpriced = to_milli(static_cast<double>(cost_units)
                                            * static_cast<double>(p.rp_per_cost_unit));
     // BL-1324: the price index, in integer arithmetic. At the opening price
     // (1'000'000 ppm) this is the unpriced cost exactly, so a flat-price world
@@ -231,6 +248,7 @@ std::int64_t node_cost_milli(int node, const research_params& p, std::int64_t pr
     const std::int64_t frac_part = hi * frac + (lo * frac + k_price_unit_ppm / 2) / k_price_unit_ppm;
     return sat_add(whole_part, frac_part);
 }
+} // namespace
 
 std::int64_t research_price_ppm_at(int age_quarter, const research_params& p)
 {
@@ -770,11 +788,18 @@ bool nation_mechanic(const world& w, entity_id nation, std::string_view key)
 
 bool nation_has_mechanic(const world& w, entity_id nation, std::string_view key)
 {
-    // Only a HELD node opens a key: unlike nation_mechanic, a key no Digitisation
-    // node carries is closed (a far-space key is the Early Space tree's, which no
-    // nation holds any of: nation_tech_state carries one tree; see the header).
+    // Only a HELD node opens a key: unlike nation_mechanic, a key no node carries
+    // is closed. A near-space key is the Digitisation tree's; a far-space key the
+    // Early Space tree's, answered from its own held set (BL-1612).
     for (const resolved_mechanic& m : tables().mechanics)
         if (m.key == key && nation_holds(w, nation, static_cast<int>(m.node)))
+            return true;
+    const nation_tech_state* st = state_of(w, nation);
+    if (st == nullptr || st->es_held.none())
+        return false;
+    for (const io::es::effect& e : io::es::effects)
+        if (e.kind == io::es::effect_kind::mechanic && key == e.target && e.node >= 0
+            && e.node < io::es::node_count && st->es_held.test(static_cast<std::size_t>(e.node)))
             return true;
     return false;
 }
@@ -791,10 +816,231 @@ int early_space_branch_key_node(int es_branch)
     return -1;
 }
 
-bool early_space_branch_keyed(const world& w, entity_id nation, int es_branch)
+namespace {
+
+const io::es::node& es_node_at(int n)
+{
+    return io::es::nodes[static_cast<std::size_t>(n)];
+}
+
+bool es_valid(int n)
+{
+    return n >= 0 && n < io::es::node_count;
+}
+
+/// The branch index (`io::es::branches`) Early Space node @p n sits on, or -1.
+int es_branch_of(int n)
+{
+    if (!es_valid(n))
+        return -1;
+    const std::string_view key = es_node_at(n).branch;
+    for (int b = 0; b < io::es::branch_count; ++b)
+        if (key == io::es::branches[static_cast<std::size_t>(b)].key)
+            return b;
+    return -1;
+}
+
+bool es_groups_met(const std::bitset<io::es::node_count>& held, int n)
+{
+    const io::es::node& nd = es_node_at(n);
+    for (int g = 0; g < nd.group_count; ++g)
+    {
+        bool any = false;
+        for (const std::int16_t m : nd.groups[static_cast<std::size_t>(g)])
+            if (m >= 0 && m < io::es::node_count && held.test(static_cast<std::size_t>(m)))
+            {
+                any = true;
+                break;
+            }
+        if (!any)
+            return false;
+    }
+    return true;
+}
+
+/// Whether an Early Space quest's deed is met. Every Early Space deed is declared
+/// unread (`deed_waits_on`), so an Early Space quest waits in the queue, exactly as
+/// a Digitisation quest does (`deed_met`).
+bool es_deed_met(int n)
+{
+    return es_valid(n) && !es_node_at(n).is_quest;
+}
+
+/// Whether Early Space branch @p es_branch is keyed, read off a Digitisation held set.
+///
+/// THE STAND-IN (BL-1612). RESEARCH.md § Quests key the next age: a branch is
+/// keyed by HOLDING the Digitisation quest that names it, and a quest completes
+/// only when its deed is met. Every Digitisation deed is declared unread today
+/// (`deed_met` reads false for each), so no quest can be held in play and no branch
+/// could ever be keyed. Until a quest's deed is read, holding the quest's own
+/// requirement - its cluster's major - stands in for holding the quest (the gate
+/// half, `nation_meets_space_gate`, is required beside it by every caller that
+/// opens a node). Remove this clause, quest by quest, as each deed gains a machine
+/// form: a quest with a read deed keys its branch only by being held.
+bool branch_keyed_in(const std::bitset<io::dg::node_count>& held, int es_branch)
 {
     const int quest = early_space_branch_key_node(es_branch);
-    return quest >= 0 && nation_holds(w, nation, quest);
+    if (quest < 0)
+        return false;
+    if (held.test(static_cast<std::size_t>(quest)))
+        return true;
+    const io::dg::node& q = node_at(quest);
+    return q.deed_waits_on[0] != '\0' && groups_met(held, quest); // the stand-in
+}
+
+/// The gate's research half: a held Digitisation node carries `space_dispatch`.
+bool holds_rocketry(const std::bitset<io::dg::node_count>& held)
+{
+    for (const resolved_mechanic& m : tables().mechanics)
+        if (m.key == space_keys::dispatch && held.test(m.node))
+            return true;
+    return false;
+}
+
+/// The gate's ground half (ERAS.md conditions 2 and 3): a staffed Launchpad of the
+/// nation's on its home body, and propellant on a home-body market's shelf.
+bool space_gate_ground_met(const world& w, entity_id nation, const research_params& p)
+{
+    const entity_id body = space_home_body_of(w, nation);
+    if (body == null_entity)
+        return false;
+
+    bool pad = false;
+    if (const std::vector<entity_id>* assets = assets_of(w, nation))
+        for (const entity_id bid : *assets)
+        {
+            const auto bit = w.buildings.find(bid);
+            if (bit == w.buildings.end())
+                continue;
+            const building_component& b = bit->second;
+            if (b.type != building_type::launchpad || b.ticks_remaining > 0 || b.decommissioned
+                || !(b.workforce_assigned > 0.0f))
+                continue;
+            const auto tit = w.tiles.find(b.tile);
+            if (tit != w.tiles.end() && tit->second.body == body)
+            {
+                pad = true;
+                break;
+            }
+        }
+    if (!pad)
+        return false;
+
+    // Any market on the body: an any-of, so the walk order cannot move the answer.
+    const float need = std::isfinite(p.space_gate_min_propellant)
+                           ? std::max(0.0f, p.space_gate_min_propellant) : 0.0f;
+    const std::size_t pr = static_cast<std::size_t>(resource_type::propellant);
+    for (const auto& [mid, m] : w.markets)
+        if (m.body == body && std::isfinite(m.inventory[pr]) && m.inventory[pr] >= need)
+            return true;
+    return false;
+}
+
+/// Whether Early Space node @p n is available against state @p st with the gate
+/// already resolved (@p gate): not held, branch keyed, requirements held.
+bool es_available_in(const nation_tech_state& st, bool gate, int n)
+{
+    if (!gate || !es_valid(n) || st.es_held.test(static_cast<std::size_t>(n)))
+        return false;
+    return branch_keyed_in(st.held, es_branch_of(n)) && es_groups_met(st.es_held, n);
+}
+
+bool gate_for(const world& w, entity_id nation, const nation_tech_state& st, const research_params& p)
+{
+    return holds_rocketry(st.held) && space_gate_ground_met(w, nation, p);
+}
+
+} // namespace
+
+bool early_space_branch_keyed(const world& w, entity_id nation, int es_branch)
+{
+    const nation_tech_state* st = state_of(w, nation);
+    if (st == nullptr)
+        return false;
+    return branch_keyed_in(st->held, es_branch);
+}
+
+bool nation_meets_space_gate(const world& w, entity_id nation, const research_params& p)
+{
+    if (w.nations.find(nation) == w.nations.end())
+        return false;
+    const nation_tech_state* st = state_of(w, nation);
+    return st != nullptr && gate_for(w, nation, *st, p);
+}
+
+bool nation_holds_early_space(const world& w, entity_id nation, int es_node)
+{
+    if (!es_valid(es_node))
+        return false;
+    const nation_tech_state* st = state_of(w, nation);
+    return st != nullptr && st->es_held.test(static_cast<std::size_t>(es_node));
+}
+
+bool early_space_node_available(const world& w, entity_id nation, int es_node, const research_params& p)
+{
+    if (!es_valid(es_node) || w.nations.find(nation) == w.nations.end())
+        return false;
+    const nation_tech_state* st = state_of(w, nation);
+    return st != nullptr && es_available_in(*st, gate_for(w, nation, *st, p), es_node);
+}
+
+enqueue_result enqueue_early_space_node(world& w, entity_id nation, int es_node, const research_params& p)
+{
+    if (!es_valid(es_node) || w.nations.find(nation) == w.nations.end())
+        return enqueue_result::invalid;
+    const nation_tech_state* existing = state_of(w, nation);
+    static const nation_tech_state empty{};
+    const nation_tech_state& st = existing != nullptr ? *existing : empty;
+
+    if (st.es_held.test(static_cast<std::size_t>(es_node)))
+        return enqueue_result::already_held;
+    if (std::find(st.es_queue.begin(), st.es_queue.end(), static_cast<std::uint16_t>(es_node))
+        != st.es_queue.end())
+        return enqueue_result::already_queued;
+    if (!gate_for(w, nation, st, p) || !branch_keyed_in(st.held, es_branch_of(es_node)))
+        return enqueue_result::refused_locked;
+
+    // Unheld requirements ahead, depth first in group order. The tree has one
+    // member per group and no pick-one pair (EARLY_SPACE_TREE.md; the generator's
+    // max_group_members is 1), so there is no choice to plan. Every requirement
+    // sits on the node's own branch, so the key checked above covers them all.
+    std::vector<std::uint16_t> plan;
+    const auto present = [&](int n) {
+        return st.es_held.test(static_cast<std::size_t>(n))
+            || std::find(st.es_queue.begin(), st.es_queue.end(), static_cast<std::uint16_t>(n)) != st.es_queue.end()
+            || std::find(plan.begin(), plan.end(), static_cast<std::uint16_t>(n)) != plan.end();
+    };
+    bool ok = true;
+    const auto expand = [&](auto&& self, int n, int depth) -> void {
+        if (!ok || present(n))
+            return;
+        if (depth > io::es::node_count || !es_valid(n))
+        {
+            ok = false; // a corrupt (cyclic) store; the generated one is a DAG
+            return;
+        }
+        const io::es::node& nd = es_node_at(n);
+        for (int g = 0; g < nd.group_count && ok; ++g)
+        {
+            bool met = false;
+            for (const std::int16_t m : nd.groups[static_cast<std::size_t>(g)])
+                if (m >= 0 && present(m)) { met = true; break; }
+            if (met)
+                continue;
+            for (const std::int16_t m : nd.groups[static_cast<std::size_t>(g)])
+                if (m >= 0) { self(self, m, depth + 1); break; } // the first member (the only one)
+        }
+        if (ok && !present(n))
+            plan.push_back(static_cast<std::uint16_t>(n));
+    };
+    expand(expand, es_node, 0);
+    if (!ok || plan.empty())
+        return enqueue_result::invalid;
+
+    nation_tech_state& dst = w.nation_tech[nation];
+    for (const std::uint16_t n : plan)
+        dst.es_queue.push_back(n);
+    return enqueue_result::queued;
 }
 
 bool structure_unlocked(const world& w, entity_id corp, building_type type)
@@ -895,6 +1141,42 @@ int flow_state(const world& w, entity_id nation, nation_tech_state& st, const re
             st.queue.erase(st.queue.begin() + static_cast<std::ptrdiff_t>(i));
             ++completed;
             moved = true; // the remainder flows on; rescan (a completion can open a passed entry)
+            break;
+        }
+    }
+
+    // BL-1612: the Early Space tail, behind every Digitisation entry (one logical
+    // queue; nation_tech.hpp). Reached only when no Digitisation entry waits on
+    // funding (that case returned above). The same rules: an entry not available
+    // (the gate unmet, its branch unkeyed, a requirement unheld) or a quest whose
+    // deed is unmet is passed over and stays queued. Nothing here runs for an empty
+    // tail, so a world with no Early Space queue flows exactly as before.
+    if (st.es_queue.empty())
+        return completed;
+    const bool gate = gate_for(w, nation, st, p);
+    moved = true;
+    while (moved)
+    {
+        moved = false;
+        for (std::size_t i = 0; i < st.es_queue.size(); ++i)
+        {
+            const int n = st.es_queue[i];
+            if (st.es_held.test(static_cast<std::size_t>(n)))
+            {
+                st.es_queue.erase(st.es_queue.begin() + static_cast<std::ptrdiff_t>(i));
+                moved = true;
+                break;
+            }
+            if (!es_available_in(st, gate, n) || !es_deed_met(n))
+                continue;
+            const std::int64_t cost = early_space_node_cost_milli(n, p, price_ppm);
+            if (st.pool_milli < cost)
+                return completed;
+            st.pool_milli -= cost;
+            st.es_held.set(static_cast<std::size_t>(n));
+            st.es_queue.erase(st.es_queue.begin() + static_cast<std::ptrdiff_t>(i));
+            ++completed;
+            moved = true;
             break;
         }
     }
@@ -1031,6 +1313,8 @@ research_accrual compute_accrual(const world& w, entity_id nid, const research_b
     {
         for (const std::uint16_t n : st->queue)
             owed = sat_add(owed, node_cost_milli(n, p, price_ppm));
+        for (const std::uint16_t n : st->es_queue) // BL-1612: the Early Space tail owes too
+            owed = sat_add(owed, early_space_node_cost_milli(n, p, price_ppm));
         // Both sides sit inside +-k_milli_cap (the panel's estimate passes a
         // pool of -1e18), so the difference cannot overflow.
         owed -= std::clamp<std::int64_t>(st->pool_milli, -k_milli_cap, k_milli_cap);

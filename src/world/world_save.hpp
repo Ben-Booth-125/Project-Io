@@ -735,7 +735,27 @@ inline constexpr uint32_t k_world_save_version_pre_recruits = 71;
 /// at that index; a live module or truss names a live station; refused whole otherwise.
 /// v80 is a STRICT PREFIX of v81 and is read too (`k_world_save_version_pre_stations`),
 /// as a world with no station, no template and empty pools.
-inline constexpr uint32_t world_save_version = 81;
+///
+/// **82 (BL-1612, RESEARCH.md / ERAS.md § Far-space technology) — THE EARLY SPACE
+/// TREE.** Appended last, after a u32 count: every nation whose tech state holds an
+/// Early Space node or queues one, ascending id, as (id, u32 node count, ceil(count /
+/// 32) x u32 held words, u32 n, n x u16 queued node). Each names a nation with a
+/// nation_tech entry; count <= this build's `io::es::node_count`, no bit past it,
+/// every queued node in the tree, queued once and not held, the record not empty.
+/// Refused whole otherwise. v81 is a STRICT PREFIX of v82 and is read too
+/// (`k_world_save_version_pre_early_space`), as a world with no Early Space progress.
+///
+/// MERGE NOTE (BL-1612): this lane's bump is the ONE block here - the doc paragraph
+/// above, `world_save_version`, the two `k_world_save_version_*early_space` constants
+/// below, the one accepted-version line in `read_world_snapshot`, and the one section
+/// at the end of the writer and of the reader. A parallel bump renumbers these only.
+inline constexpr uint32_t world_save_version = 82;
+
+/// BL-1612: the first version carrying the Early Space tree section (see above).
+inline constexpr uint32_t k_world_save_version_early_space = 82;
+
+/// BL-1612: v81, a strict prefix of v82.
+inline constexpr uint32_t k_world_save_version_pre_early_space = k_world_save_version_early_space - 1;
 
 /// BL-1583: the first version carrying the station section (see above).
 inline constexpr uint32_t k_world_save_version_stations = 81;
@@ -972,6 +992,11 @@ std::size_t world_save_research_books_section_bytes(const world& w);
 /// of a v81 stream.
 std::size_t world_save_station_section_bytes(const world& w);
 
+/// BL-1612: the byte length of the v82 Early Space section `w` writes - 4, plus, per
+/// nation with progress, 4 + 4 + 4 x ceil(node_count / 32) + 4 + 2 per queued node.
+/// The LAST section of a v82 stream.
+std::size_t world_save_early_space_section_bytes(const world& w);
+
 /// BL-1422, widened by BL-1436: the bytes ALL SIX kit goods' extra elements add to
 /// every per-resource array of the stream `w` writes - the widening from 49 to today's
 /// width: (the v74 stream less the v73 stream, the five goods) plus
@@ -1103,6 +1128,9 @@ void write_world_snapshot_pre_research_books(const world& w, std::ostream& out);
 
 /// VERIFICATION ONLY (BL-1583): the v80 stream shape - no station section.
 void write_world_snapshot_pre_stations(const world& w, std::ostream& out);
+
+/// VERIFICATION ONLY (BL-1612): the v81 stream shape - no Early Space section.
+void write_world_snapshot_pre_early_space(const world& w, std::ostream& out);
 
 /// BL-1453: the recon stock a battle loaded from a pre-v67 stream is given — enough to
 /// see every defending unit in full (twice the stealthiest defender's kit stealth, in

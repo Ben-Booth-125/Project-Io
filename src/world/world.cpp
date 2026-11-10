@@ -812,6 +812,27 @@ uint64_t world::state_hash(int tick) const
                 for (const uint16_t n : st.queue)
                     fnv1a_u32(h, n);
             }
+            // BL-1612: the Early Space held sets and queues, folded only for a
+            // nation that has any, behind their own tag - so a world with no
+            // Early Space progress hashes exactly as before the tree opened.
+            for (const auto& [nid, st] : nation_tech)
+            {
+                if (st.es_empty())
+                    continue;
+                fnv1a_u32(h, 0xE5A7u);
+                fnv1a_u32(h, nid);
+                for (int i = 0; i < io::es::node_count; i += 32)
+                {
+                    uint32_t word = 0;
+                    for (int b = 0; b < 32 && i + b < io::es::node_count; ++b)
+                        if (st.es_held.test(static_cast<std::size_t>(i + b)))
+                            word |= (1u << b);
+                    fnv1a_u32(h, word);
+                }
+                fnv1a_u32(h, static_cast<uint32_t>(st.es_queue.size()));
+                for (const uint16_t n : st.es_queue)
+                    fnv1a_u32(h, n);
+            }
         }
         // BL-1327: the space assets, on the nation_tech precedent — folded only
         // when the store is non-empty, so a world that never launched hashes as

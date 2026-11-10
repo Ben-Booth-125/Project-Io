@@ -1520,6 +1520,8 @@ void recipe_registry::load_from_lua(lua_state& lua)
         // arithmetic; bounded here so a typo cannot run it away) and the economy term.
         read_checked(t, "price_growth_per_year",       rp.price_growth_per_year,       0.0,   1.0, ctx);
         read_checked(t, "rp_per_economy_unit",         rp.rp_per_economy_unit,         0.0, k_dial_max, ctx);
+        // BL-1612: the gate into space's propellant threshold (ERAS.md condition 3).
+        read_checked(t, "space_gate_min_propellant",   rp.space_gate_min_propellant,   0.0, k_dial_max, ctx);
 
         m_research = rp;
     }

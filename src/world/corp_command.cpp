@@ -1760,7 +1760,8 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
                     case enqueue_result::queued:         return corp_command_result::applied;
                     case enqueue_result::already_held:
                     case enqueue_result::already_queued:
-                    case enqueue_result::refused_pair:   return corp_command_result::rejected_state;
+                    case enqueue_result::refused_pair:
+                    case enqueue_result::refused_locked: return corp_command_result::rejected_state;
                     case enqueue_result::invalid:        return corp_command_result::rejected_invalid;
                 }
                 return corp_command_result::rejected_invalid;

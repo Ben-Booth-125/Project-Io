@@ -1360,6 +1360,10 @@ economy = {
         -- through the research line, ~0.5% a year from 1970. Faster prices slow it.
         price_growth_per_year       = 0.005, -- nominal, compounded quarterly: 1.49 by 2040
         rp_per_economy_unit         = 0.03,  -- RP a quarter per credit of home firms' previous quarter's filed income
+        -- BL-1612 (ERAS.md § Era 1 -> Era 2 gate, condition 3): the propellant a
+        -- market on the home body must hold on its shelf before the Early Space
+        -- tree opens to a nation. 1.0 = one launch's draw (launch_draw_per_convoy).
+        space_gate_min_propellant   = 1.0,
     },
 
     -- BL-545/BL-546: the relational substrate's DECAY (sentiment.hpp). Each

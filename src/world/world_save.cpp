@@ -2197,6 +2197,49 @@ void write_world_snapshot_at(const world& w, std::ostream& out, uint32_t version
                 w_i32(out, nc.astronauts);
             }
     }
+
+    // world_save_version 82 (BL-1612): THE EARLY SPACE TREE, the last section - every
+    // nation with Early Space progress, ascending (nation_tech is a std::map).
+    if (version >= k_world_save_version_early_space)
+    {
+        uint32_t n = 0;
+        for (const auto& [nid, st] : w.nation_tech)
+            n += st.es_empty() ? 0u : 1u;
+        w_u32(out, n);
+        for (const auto& [nid, st] : w.nation_tech)
+        {
+            if (st.es_empty())
+                continue;
+            w_id(out, nid);
+            const uint32_t count = static_cast<uint32_t>(io::es::node_count);
+            w_u32(out, count);
+            for (uint32_t i = 0; i < count; i += 32)
+            {
+                uint32_t word = 0;
+                for (uint32_t b = 0; b < 32 && i + b < count; ++b)
+                    if (st.es_held.test(i + b))
+                        word |= (1u << b);
+                w_u32(out, word);
+            }
+            w_vec(out, st.es_queue, [](std::ostream& s, const uint16_t& q) { w_u16(s, q); });
+        }
+    }
+}
+
+void write_world_snapshot_pre_early_space(const world& w, std::ostream& out)
+{
+    // VERIFICATION ONLY (BL-1612): the v81 stream shape - no Early Space section.
+    write_world_snapshot_at(w, out, k_world_save_version_pre_early_space);
+}
+
+std::size_t world_save_early_space_section_bytes(const world& w)
+{
+    const std::size_t words = (static_cast<std::size_t>(io::es::node_count) + 31) / 32;
+    std::size_t n = 4;
+    for (const auto& [nid, st] : w.nation_tech)
+        if (!st.es_empty())
+            n += 4 + 4 + 4 * words + 4 + 2 * st.es_queue.size();
+    return n;
 }
 
 void write_world_snapshot_pre_stations(const world& w, std::ostream& out)
@@ -2634,7 +2677,8 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
             && version != k_world_save_version_pre_occupation // BL-1502: v77, nothing occupied
             && version != k_world_save_version_pre_defend     // BL-1504: v78, no defend orders
             && version != k_world_save_version_pre_research_books // BL-1539: v79, nothing booked
-            && version != k_world_save_version_pre_stations)) // BL-1583: v80, no stations
+            && version != k_world_save_version_pre_stations   // BL-1583: v80, no stations
+            && version != k_world_save_version_pre_early_space)) // BL-1612: v81, no Early Space progress
         return false; // mismatched version -- refuse rather than misread
 
     // BL-1422: a stream before the kit goods carries every per-resource array 49 wide;
@@ -4598,6 +4642,58 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
                 return false;
             if (lost && slotted.count(aid) != 0)
                 return false;
+        }
+    }
+
+    // v82 (BL-1612): the Early Space tree. Untrusted: ids ascending, each a nation
+    // with a nation_tech entry (the v47 map above); the held set no wider than this
+    // build's tree and no bit past its written count; every queued node in the tree,
+    // queued once and not already held; never an empty record (the writer skips
+    // those). Refused whole otherwise. A v81 (and older) stream ends before it.
+    if (version >= k_world_save_version_early_space)
+    {
+        uint32_t count = 0;
+        if (!r_u32(in, count) || count > s.nation_tech.size())
+            return false;
+        entity_id prev = null_entity;
+        for (uint32_t k = 0; k < count; ++k)
+        {
+            entity_id nid = null_entity;
+            uint32_t  nodes = 0;
+            if (!r_id(in, nid) || nid == null_entity || (k > 0 && nid <= prev) || !r_u32(in, nodes)
+                || nodes > static_cast<uint32_t>(io::es::node_count))
+                return false;
+            prev = nid;
+            const auto tit = s.nation_tech.find(nid);
+            if (tit == s.nation_tech.end())
+                return false;
+            nation_tech_state& st = tit->second;
+            st.es_held.reset();
+            for (uint32_t base = 0; base < nodes; base += 32)
+            {
+                uint32_t word = 0;
+                if (!r_u32(in, word))
+                    return false;
+                for (uint32_t b = 0; b < 32; ++b)
+                {
+                    if ((word & (1u << b)) == 0)
+                        continue;
+                    if (base + b >= nodes)
+                        return false; // a bit past the written count
+                    st.es_held.set(base + b);
+                }
+            }
+            if (!r_vec(in, st.es_queue, [](std::istream& is, uint16_t& q) { return r_u16(is, q); }))
+                return false;
+            std::bitset<io::es::node_count> queued;
+            for (const uint16_t q : st.es_queue)
+            {
+                if (q >= static_cast<uint16_t>(io::es::node_count) || queued.test(q) || st.es_held.test(q))
+                    return false; // outside the tree, queued twice, or queued while held
+                queued.set(q);
+            }
+            if (st.es_empty())
+                return false; // the writer never writes an empty record
         }
     }
 

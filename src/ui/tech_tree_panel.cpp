@@ -455,6 +455,7 @@ std::string refusal_reason(const world& w, entity_id nation, int node,
         case enqueue_result::already_held:   return std::string(n.name) + " is already held.";
         case enqueue_result::already_queued: return std::string(n.name) + " is already queued.";
         case enqueue_result::invalid:        return "That node is not on this age's tree.";
+        case enqueue_result::refused_locked: return std::string(n.name) + " is locked."; // BL-1612: Early Space only
         case enqueue_result::refused_pair:
         {
             if (n.excludes >= 0)
