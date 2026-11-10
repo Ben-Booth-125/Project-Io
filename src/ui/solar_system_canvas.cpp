@@ -1,6 +1,7 @@
 #include "solar_system_canvas.hpp"
 
 #include "canvas_scale.hpp"
+#include "circum_units.hpp" // BL-1609: the fleet marks
 #include "highlight.hpp"
 #include "icons.hpp"
 #include "presentation.hpp"
@@ -9,6 +10,7 @@
 #include <cmath>
 #include <cstdio>
 #include <limits>
+#include <map>
 #include <random>
 #include <vector>
 
@@ -171,8 +173,37 @@ void draw_solar_system_canvas(const world& w, ui_state& state, ImVec2 origin, Im
     // tie convention in highlight.hpp). The body whose centre is nearest the
     // cursor wins; the strict `<` over id-sorted bodies keeps an exact-distance
     // tie on the lowest id, which is arbitrary but stable frame-to-frame.
+    // BL-1609 (SOLAR.md § Space fleets): fleets per nation per body, and moves
+    // between bodies on their segments. Primary view only. A fleet wins the
+    // pointer over a body.
+    std::vector<circum_fleet_mark> fleet_marks;
+    if (apply_view)
+    {
+        std::map<entity_id, std::pair<ImVec2, float>> placed;
+        for (entity_id id : body_ids)
+        {
+            const body_component& body = w.bodies.at(id);
+            if (body.type == body_type::star)
+                continue;
+            placed[id] = { to_screen(body_world(id, body_world)),
+                           std::max(2.0f, style_for(body.type).base_radius * element_scale) };
+        }
+        fleet_marks = layout_solar_fleets(w, placed);
+        state.solar_fleets_drawn.clear();
+        for (const circum_fleet_mark& f : fleet_marks)
+            state.solar_fleets_drawn.push_back({ f.lead, f.owner, f.hull, f.count, f.in_transit,
+                                                 f.pos.x, f.pos.y, f.r, f.node, f.share });
+    }
+    int hovered_fleet = -1;
+    if (input_enabled && !fleet_marks.empty())
+        hovered_fleet = hit_circum_fleet(fleet_marks, mouse);
+    const entity_id hovered_fleet_id =
+        hovered_fleet >= 0 ? fleet_marks[static_cast<std::size_t>(hovered_fleet)].lead : null_entity;
+    if (apply_view)
+        state.circum_fleet_hovered = hovered_fleet_id;
+
     entity_id hovered_body = null_entity;
-    if (input_enabled)
+    if (input_enabled && hovered_fleet < 0)
     {
         float best_d2 = std::numeric_limits<float>::max();
         for (entity_id id : body_ids)
@@ -354,6 +385,9 @@ void draw_solar_system_canvas(const world& w, ui_state& state, ImVec2 origin, Im
         }
     }
 
+    // BL-1609: the fleets, over the bodies and lanes.
+    draw_circum_fleets(dl, fleet_marks, hovered_fleet_id, state.selected_entity);
+
     // Scale bar + zoom slider — primary view only, pinned to the bottom centre.
     // Shared with the Circumplanetary canvas via draw_scale_zoom_overlay. Drawn
     // before the input_enabled early-out so it stays put while an ImGui panel
@@ -366,6 +400,9 @@ void draw_solar_system_canvas(const world& w, ui_state& state, ImVec2 origin, Im
 
     if (!input_enabled)
         return;
+
+    if (hovered_fleet_id != null_entity)
+        draw_circum_fleet_card(w, hovered_fleet_id, mouse); // BL-1609
 
     // Hover tooltip for the resolved body.
     if (hovered_body != null_entity)
@@ -410,7 +447,8 @@ void draw_solar_system_canvas(const world& w, ui_state& state, ImVec2 origin, Im
         // selection on empty space) without moving the view.
         if (ImGui::IsMouseClicked(ImGuiMouseButton_Left))
         {
-            state.selected_entity = hovered_body;
+            // BL-1609: a fleet mark selects its lead unit.
+            state.selected_entity = hovered_fleet_id != null_entity ? hovered_fleet_id : hovered_body;
         }
 
         // A double-click on a body navigates: descend into its circumplanetary

@@ -21,6 +21,7 @@ selection_kind selection_kind_of(const world& w, entity_id e)
     if (const auto ait = w.space_assets.find(e);
         ait != w.space_assets.end() && ait->second.cls == space_asset_class::satellite)
         return selection_kind::space_asset;
+    if (w.space_units.count(e))  return selection_kind::space_unit; // BL-1609
     // BL-1407: no corporation exists to select (`selection_kind::corporation`
     // stays in the enum, never returned).
 
@@ -43,6 +44,7 @@ const char* selection_kind_name(selection_kind k)
         case selection_kind::contract:    return "Contract";
         case selection_kind::wing:        return "Wing";
         case selection_kind::space_asset: return "Space asset";
+        case selection_kind::space_unit:  return "Space unit";
     }
     return "?";
 }

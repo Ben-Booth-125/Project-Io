@@ -44,6 +44,7 @@ struct circum_asset_mark
     bool      station = false;
     space_satellite_role role = space_satellite_role::none; ///< Satellites only.
     bool      in_transit = false;
+    bool      storm      = false;     ///< BL-1609: a dark satellite / a stormed station (the bolt draws).
     int       node_index = -1;        ///< Into the node marks it was laid against.
     ImVec2    pos {0.0f, 0.0f};
     float     r = 0.0f;               ///< Drawn half-extent, px.

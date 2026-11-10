@@ -130,6 +130,7 @@ Each kind routes its 'go to' to the right place:
 | **Market** | **Go to** — locate on the canvas. | (none) | Canvas: `focus_on_surface`. |
 | **Nation** | None — **"Open its ledger via [>]."** | (none) | A ledger (no canvas of its own). |
 | **Space asset** (a satellite or a station) | None. | The shared space-asset summary, the same the hover card draws: owner, role (a satellite) or modules and crew (a station), node, state. | None: it is pressed on the Circumplanetary rung it is drawn on. A station is selected by its core's id; its modules are not selectable on their own. |
+| **Space unit** (a ship; its fleet) | The player's own: **Move**, **Dock** / **Undock**, **Refuel**, **Bombard** — § The space-unit element. A rival's: none. | The shared space-unit summary, the same the hover card draws: hull, owner, node or transit, Δv budget, propellant, hull points, cargo, firepower. | None: it is pressed on the Circumplanetary or Solar rung it is drawn on. |
 
 So 'go to' is itself polymorphic: spatial entities navigate a canvas;
 non-spatial entities (a nation) open the relevant ledger.
@@ -574,6 +575,29 @@ convoys share a tile **one rectangle holds the convoy glyph and the count togeth
 2026-11-09: *"make them larger so they cover the convoy icon as well"*), sized from the glyph and
 its own number and scaling with the marker, so the number reads as the marker's. The press answers
 on the whole of what is drawn: the circle alone, or the rectangle.
+
+### The space-unit element
+
+A press on a fleet mark (`../military/SPACE_FLEETS.md`: one nation's units at one node) selects its
+**lead unit**, the lowest id. The card is the shared space-unit summary, then — for a fleet of more
+than one — a row per unit, a press on which selects that unit instead.
+
+For the player's own unit, not in transit, the card carries its **orders**, the way a land unit's
+right-click carries its march: a ship is ordered from where it is drawn, and the Space ledger is the
+inventory, not the helm. The orders stand in a column beside the summary, so an armed list takes
+the band's height rather than what the summary leaves below it.
+
+- **Move** is a toggle. Lit, it lists every node the unit can be sent to with the path's Δv and
+  days, cheapest burn first, greyed where the budget cannot pay. Picking a row (a toggle again) shows **"Move costs Δv
+  x of y"** against the budget before **Confirm move** sends it. **Whole fleet** sends every unit of
+  the fleet, held to the weakest budget.
+- **Dock** berths it at the player's station at its node; **Undock** releases it.
+- **Refuel** fills the tanks where SPACE_FLEETS.md § Thrust allows.
+- **Bombard** is a toggle, open only to a unit with an orbital-missile armament in a low orbit. Lit,
+  it lists the hostile ground below; a row sets the standing order. While an order stands the
+  button stays lit, and pressing it lifts the order.
+
+A refused order answers on the card's message line with the seam's reason.
 
 ### The front element
 

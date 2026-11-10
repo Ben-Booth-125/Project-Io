@@ -782,4 +782,20 @@ void satellite_marker(ImDrawList* dl, ImVec2 centre, float r, space_satellite_ro
 /// @p in_transit draws it at half strength, as the satellite does.
 void station_marker(ImDrawList* dl, ImVec2 centre, float r, ImU32 fill, bool in_transit = false);
 
+/// BL-1609: a SPACE FLEET marker — a pointed hull (a kite, nose up) in the owner's
+/// colour (@p fill), outlined dark, carrying its lead hull's mark (@p hull, a
+/// space_hull value: hauler a hold box, lander two legs, tug a claw, frigate one
+/// stripe, cruiser two). @p count > 1 prints as a badge at its lower right.
+/// @p in_transit draws it at half strength.
+void space_fleet_marker(ImDrawList* dl, ImVec2 centre, float r, int hull, ImU32 fill, int count,
+                        bool in_transit = false);
+
+/// BL-1609: DEBRIS at an orbital node — three small angular shards around the
+/// centre, filled in @p colour and outlined dark. Holds at r = 4 px.
+void debris(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
+
+/// BL-1609: STRUCK BY A SOLAR STORM — a lightning bolt, filled in @p colour and
+/// outlined dark. Drawn at a dark satellite's or a stormed station's upper right.
+void storm_bolt(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
+
 } // namespace ui::icons

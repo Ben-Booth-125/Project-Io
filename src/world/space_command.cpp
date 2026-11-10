@@ -1,7 +1,9 @@
 #include "space_command.hpp"
 
 #include "recipe_registry.hpp"
+#include "space_bombard.hpp" // BL-1609: order_space_bombard
 #include "space_coverage.hpp"
+#include "space_units.hpp"   // BL-1609: the space-unit verbs
 #include "world.hpp"
 
 #include <algorithm>
@@ -71,6 +73,34 @@ space_command_outcome from_satellite(const satellite_order& r, entity_id asset)
     o.asset     = asset;
     o.result    = r.result == satellite_order_result::ok ? space_command_result::applied
                                                          : space_command_result::rejected_refused;
+    return o;
+}
+
+/// BL-1609: the unit params a command acts with: the registry's, with the world's
+/// fair-price ceiling copied in (as `launch_params`).
+space_unit_params unit_params(const recipe_registry& reg)
+{
+    space_unit_params up = reg.space_units();
+    up.reservation_mult = reg.price_band().reservation_mult;
+    return up;
+}
+
+space_command_outcome from_unit(space_unit_result r, entity_id unit)
+{
+    space_command_outcome o;
+    o.unit    = static_cast<uint8_t>(r);
+    o.unit_id = unit;
+    o.result  = r == space_unit_result::ok ? space_command_result::applied
+                                           : space_command_result::rejected_refused;
+    return o;
+}
+
+space_command_outcome from_unit_op(const space_unit_op& op, entity_id unit)
+{
+    space_command_outcome o = from_unit(op.result, op.unit != null_entity ? op.unit : unit);
+    o.unit_dv     = op.dv;
+    o.unit_days   = op.days;
+    o.withdrawing = op.withdrawing;
     return o;
 }
 
@@ -147,6 +177,42 @@ space_command_outcome execute(world& w, const recipe_registry& reg, const space_
                                   c.subject);
         case space_verb::move_satellite:
             return from_satellite(move_satellite(w, sp, c.nation, c.subject, node_of(c)), c.subject);
+        // ---- BL-1609: the space-unit verbs, each the existing verb, refused whole there.
+        case space_verb::set_unit_design:
+        {
+            space_design d{};
+            for (std::size_t i = 0; i < d.size(); ++i)
+                d[i] = c.design[i];
+            return from_unit(set_space_unit_design(w, c.nation, static_cast<space_hull>(c.cls), d), null_entity);
+        }
+        case space_verb::raise_unit:
+        {
+            const space_unit_params up = unit_params(reg);
+            const space_hull h = static_cast<space_hull>(c.cls);
+            return from_unit_op(c.subject != null_entity
+                                    ? raise_space_unit_at_shipyard(w, up, stp, c.nation, h, c.subject)
+                                    : raise_space_unit_at_pad(w, up, c.nation, h, c.node_body),
+                                null_entity);
+        }
+        case space_verb::move_unit:
+            return from_unit_op(order_space_unit(w, unit_params(reg), c.nation, c.subject, node_of(c)), c.subject);
+        case space_verb::move_fleet:
+            return from_unit_op(order_space_fleet(w, unit_params(reg), c.nation, w.space_units.at(c.subject).node,
+                                                  node_of(c)),
+                                c.subject);
+        case space_verb::dock_unit:
+            return from_unit(dock_space_unit(w, unit_params(reg), stp, c.nation, c.subject,
+                                             static_cast<entity_id>(c.target)),
+                             c.subject);
+        case space_verb::undock_unit:
+            return from_unit(undock_space_unit(w, c.nation, c.subject), c.subject);
+        case space_verb::refuel_unit:
+            return from_unit_op(refuel_space_unit(w, unit_params(reg), stp, c.nation, c.subject), c.subject);
+        case space_verb::bombard:
+            return from_unit(order_space_bombard(w, c.nation, c.subject,
+                                                 static_cast<space_bombard_target>(c.target_kind), c.target,
+                                                 c.clear),
+                             c.subject);
     }
     return {}; // unreachable: validated
 }
@@ -244,6 +310,51 @@ space_command_result validate_space_command(const world& w, const space_command&
             if (r != space_command_result::applied)
                 return r;
             return node_ok(w, c) ? space_command_result::applied : space_command_result::rejected_invalid;
+        }
+        // ---- BL-1609: the space-unit verbs. Ranges as the value that lands, then the
+        // unit's (or station's) existence and ownership; the verb checks the rest.
+        case space_verb::set_unit_design:
+        {
+            if (c.cls >= space_hull_count)
+                return space_command_result::rejected_invalid;
+            const std::size_t items = space_item_catalogue().size();
+            for (const uint8_t id : c.design)
+                if (id != k_no_space_item && id >= items)
+                    return space_command_result::rejected_invalid;
+            return space_command_result::applied;
+        }
+        case space_verb::raise_unit:
+        {
+            if (c.cls >= space_hull_count)
+                return space_command_result::rejected_invalid;
+            if (c.subject != null_entity)
+                return station_check();
+            const auto bit = w.bodies.find(c.node_body);
+            return bit != w.bodies.end() && bit->second.type != body_type::star
+                       ? space_command_result::applied : space_command_result::rejected_invalid;
+        }
+        case space_verb::move_unit:
+        case space_verb::move_fleet:
+        case space_verb::dock_unit:
+        case space_verb::undock_unit:
+        case space_verb::refuel_unit:
+        case space_verb::bombard:
+        {
+            const auto uit = w.space_units.find(c.subject);
+            if (c.subject == null_entity || uit == w.space_units.end())
+                return space_command_result::rejected_invalid;
+            if (uit->second.owner != c.nation)
+                return space_command_result::rejected_not_owner;
+            const space_verb v = static_cast<space_verb>(c.verb);
+            if (v == space_verb::move_unit || v == space_verb::move_fleet)
+                return node_ok(w, c) ? space_command_result::applied : space_command_result::rejected_invalid;
+            if (v == space_verb::dock_unit)
+                return c.target != 0 && w.stations.count(static_cast<entity_id>(c.target))
+                           ? space_command_result::applied : space_command_result::rejected_invalid;
+            if (v == space_verb::bombard)
+                return c.target_kind <= static_cast<uint8_t>(space_bombard_target::province) && (c.clear || c.target != 0)
+                           ? space_command_result::applied : space_command_result::rejected_invalid;
+            return space_command_result::applied;
         }
     }
     return space_command_result::rejected_invalid;

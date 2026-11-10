@@ -8,6 +8,7 @@
 #include "building_state.hpp" // BL-1239: the one running-state classification (hover card, Production, Status)
 #include "charts.hpp"
 #include "circum_assets.hpp"   // BL-1590: the satellite/station card
+#include "circum_units.hpp"    // BL-1609: the space-unit card
 #include "construction_panel.hpp" // building_group_name - the aim of the open-in-ledger button
 #include "diplomacy_ledger.hpp"   // open_declaration - the front card's Answer door
 #include "world/war.hpp"          // war_between - the front card's unanswered war
@@ -4696,6 +4697,9 @@ void draw_selection_content(world& w, const recipe_registry& reg,
         return;
     // BL-1590: a satellite or station draws the shared space-asset summary.
     if (kind == selection_kind::space_asset && draw_space_asset_selection(w, ui))
+        return;
+    // BL-1609: a space unit draws the shared space-unit summary and its orders.
+    if (kind == selection_kind::space_unit && draw_space_unit_selection(w, ui))
         return;
 
     if (kind == selection_kind::tile)

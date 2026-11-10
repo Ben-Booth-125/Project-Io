@@ -1,5 +1,7 @@
 #include "circum_assets.hpp"
 
+#include "circum_units.hpp" // space_asset_storm_struck (BL-1609)
+
 #include "highlight.hpp"
 #include "hover_card.hpp"
 #include "icons.hpp"
@@ -77,6 +79,7 @@ std::vector<circum_asset_mark> layout_circum_assets(const world& w,
             m.owner      = st.owner;
             m.station    = true;
             m.in_transit = core->state == space_asset_state::in_transit;
+            m.storm      = space_asset_storm_struck(w, *core);
             m.node_index = static_cast<int>(ni);
             m.r          = k_station_r0 + k_station_step * static_cast<float>(st.level);
             here.push_back(m);
@@ -91,6 +94,7 @@ std::vector<circum_asset_mark> layout_circum_assets(const world& w,
             m.owner      = a.owner;
             m.role       = a.role;
             m.in_transit = a.state == space_asset_state::in_transit;
+            m.storm      = space_asset_storm_struck(w, a);
             m.node_index = static_cast<int>(ni);
             m.r          = k_sat_r;
             here.push_back(m);
@@ -258,6 +262,8 @@ void draw_circum_assets(ImDrawList* dl, const std::vector<circum_asset_mark>& ma
             icons::satellite_marker(dl, m.pos, m.r, m.role, fill, m.in_transit);
         const highlight h = resolve_highlight(m.id == selected, m.id == hovered, false);
         draw_body_highlight(dl, m.pos, m.r + 1.0f, h);
+        if (m.storm) // BL-1609: the quarter's solar storm darkens it / stops its modules
+            icons::storm_bolt(dl, {m.pos.x + m.r * 0.9f, m.pos.y - m.r * 0.9f}, 4.5f, palette::space_storm);
     }
 }
 
@@ -357,6 +363,11 @@ void draw_space_asset_summary(const world& w, entity_id id)
             ImGui::TextDisabled("State: lost");
             break;
     }
+    // BL-1609: the quarter's solar storm (EVENTS.md § Solar storms).
+    if (space_asset_storm_struck(w, *a))
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::space_storm), "%s",
+                           st != nullptr ? "Solar storm: every module stopped this quarter"
+                                         : "Solar storm: dark this quarter");
 }
 
 void draw_circum_asset_card(const world& w, entity_id id, ImVec2 mouse)

@@ -149,6 +149,9 @@ The rung draws the anchor's part of the orbital graph
 | Satellites | A small glyph at its node, in its owner's colour, with its role's icon. |
 | Stations | A larger glyph at its node, in its owner's colour, sized by its grid. |
 | In transit | A short dashed segment along the link the asset travels, with a marker at its share of the way. |
+| Fleets | One mark per nation per node: a pointed hull in the owner's colour carrying the lead unit's hull mark, the fleet's size as a badge. On a ring's upper side, or above a diamond. In transit, on its segment at its share of the way. |
+| Debris | A small cluster of shards beside a node whose debris level is above the floor, larger for more; the level is on the node's hover card. |
+| Solar storm | A bolt at the upper right of a satellite the quarter's storm darkens, or a station whose modules it stops (`../EVENTS.md` § Solar storms). |
 
 **Hover** a node: its name, its free slots, and the thrust cost and days from the player's home
 surface. **Hover** a satellite or station: its owner, class or role, and state. **Press** a satellite
@@ -156,3 +159,7 @@ or station: it becomes `selected_entity`, and the Selection band shows its card;
 station opens the Space ledger's designer on it. A node is not a selectable entity.
 
 **Space units** draw at nodes and in transit in the same idiom (`../military/SPACE_FLEETS.md`).
+**Hover** a fleet: the lead unit's card — hull, owner, node or transit, Δv budget, propellant, hull
+points. **Press** it: the lead unit becomes `selected_entity`, and the Selection band carries its
+orders (`SELECTION.md` § The space-unit element). A fleet wins the pointer over a satellite or
+station, which wins over a body.
