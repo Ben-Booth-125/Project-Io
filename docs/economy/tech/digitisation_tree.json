@@ -2073,14 +2073,9 @@
    "advantage": "activity fog lifts on every market you trade with; Comms satellites may be launched",
    "effects": [
     {
-     "kind": "unread",
-     "what": "activity fog lifts on every market you trade with",
-     "waits_on": "activity fog"
-    },
-    {
      "kind": "mechanic",
      "key": "space_role_comms",
-     "what": "Comms satellites may be launched"
+     "what": "Comms satellites may be launched; while one is active, the activity fog lifts on every market you trade with"
     }
    ],
    "cost_units": 6
