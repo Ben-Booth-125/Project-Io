@@ -9,6 +9,7 @@
 #include "space_programme.hpp" // BL-644: space_programme_params — the tenth budget line's purchase lumps
 #include "space_assets.hpp"    // BL-1327: space_asset_params — launch, reach, travel and upkeep dials
 #include "stations.hpp"        // BL-1583/BL-1585: station_params — module roster, core, astronaut dials
+#include "space_units.hpp"     // BL-1594/BL-1595: space_unit_params — launch, repair, depot, upkeep-loss dials
 #include "nation_tax.hpp"       // BL-1335: tax_params — the tax tiers and Discontent dials
 #include "air_params.hpp"  // BL-1449: air_params — the air theatre's authored numbers
 #include "land_recon_params.hpp" // BL-1453: land_recon_params — land recon's authored rates
@@ -1305,6 +1306,10 @@ public:
     /// yet: every registry carries station_params' first-cut defaults.
     const station_params& stations() const { return m_stations; }
 
+    /// BL-1594 / BL-1595 space-unit dials (space_units.hpp). No Lua key yet: every
+    /// registry carries space_unit_params' first-cut defaults.
+    const space_unit_params& space_units() const { return m_space_units; }
+
     /// BL-1335 the tax tiers and Discontent dials (economy.tax in Lua;
     /// nation_tax.hpp). Defaults are tax_params' own (the shipped values); every
     /// authored value is range-checked at load and rejected by key.
@@ -1595,6 +1600,7 @@ public:
     void set_space_programme(const space_programme_params& p) { m_space_programme = p; }
     void set_space_assets(const space_asset_params& p) { m_space_assets = p; } // BL-1327
     void set_stations(const station_params& p) { m_stations = p; }             // BL-1583
+    void set_space_units(const space_unit_params& p) { m_space_units = p; }    // BL-1594
     void set_tax(const tax_params& p) { m_tax = p; } // BL-1335
     /// BL-743: the firm-exit trigger (economy.firm_exit in Lua; inert defaults).
     const firm_exit_params& firm_exit() const { return m_firm_exit; }
@@ -1888,6 +1894,7 @@ private:
     space_programme_params m_space_programme = {};
     space_asset_params m_space_assets = {}; // BL-1327
     station_params     m_stations     = {}; // BL-1583 / BL-1585
+    space_unit_params  m_space_units  = {}; // BL-1594 / BL-1595
     tax_params m_tax = {}; // BL-1335
 
     /// BL-743 firm-exit trigger (economy.firm_exit). Inert defaults: an

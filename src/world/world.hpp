@@ -14,6 +14,7 @@
 #include "space_assets.hpp" // space_asset (BL-1327: nations' space assets, below)
 #include "stations.hpp"     // space_station, station_template (BL-1583, below)
 #include "space_command.hpp" // space_order (BL-1587/BL-1588: the signal-delay queue, below)
+#include "space_units.hpp"  // space_unit, space_design (BL-1594/BL-1595, below)
 #include "war.hpp"          // war_record, peace_offer (BL-1459/BL-1428 wars, below)
 
 #include <atomic>
@@ -1058,11 +1059,22 @@ struct world
     /// BL-1587 / BL-1588 — the PENDING near-space orders: commands to a station or a
     /// satellite outside its nation's comms coverage, waiting one quarter for a signal
     /// (space_command.hpp). Issue order (ids ascend); applied and removed by
-    /// `run_space_orders` in the nation step. SERIALISED (world_save.cpp, v82) and
+    /// `run_space_orders` in the nation step. SERIALISED (world_save.cpp, v83) and
     /// folded into `state_hash` when non-empty.
     std::vector<space_order> space_orders;
-    /// The next pending order's id. SERIALISED (v82); hashed when non-zero.
+    /// The next pending order's id. SERIALISED (v83); hashed when non-zero.
     uint32_t next_space_order_id = 0;
+    /// BL-1594 / BL-1595 — every live space unit, keyed by its id (space_units.hpp;
+    /// SPACE_FLEETS.md). A lost unit is erased. SERIALISED (v84) and hashed when non-empty.
+    std::map<entity_id, space_unit> space_units;
+
+    /// BL-1594 — each nation's live space-unit design per hull (`space_hull` value),
+    /// nation then hull ascending; no empty inner map. SERIALISED (v84), hashed when non-empty.
+    std::map<entity_id, std::map<uint8_t, space_design>> space_unit_designs;
+
+    /// BL-1595 — each station's Fuel-depot propellant stock (good units), ascending
+    /// station id; only stations holding stock > 0. SERIALISED (v84), hashed when non-empty.
+    std::map<entity_id, float> station_depot_stock;
 
     /// Enacted and un-enacted laws (BL-343). A world-level list rather than a
     /// per-corp one: a law is enacted over the world and charged to whoever it

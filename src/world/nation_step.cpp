@@ -16,6 +16,7 @@
 #include "space_assets.hpp"      // BL-1327: the quarterly space-asset step
 #include "stations.hpp"          // BL-1583/BL-1585: the station step, astronaut training
 #include "space_effects.hpp"     // BL-1584/BL-1586: module and satellite effects
+#include "space_units.hpp"       // BL-1594/BL-1595: the space units' quarter
 #include "space_programme.hpp"   // BL-644: the space_programme line's consumer
 #include "survey_system.hpp"
 #include "unit_roster.hpp" // BL-571: resolve_unit_upkeep, unit_upkeep_params
@@ -227,6 +228,11 @@ void run_nation_step(world& w, const recipe_registry& reg, economy_report& repor
     // No asset and no station does nothing, so such a world ticks as before.
     run_space_effects(w, space_effects_params{}, reg.stations(), reg.price_band().reservation_mult,
                       econ_tick, &report.space_effects);
+    // ---- 7d. Space units (BL-1594 / BL-1595, SPACE_FLEETS.md) — after the station
+    // step, so a lost station's depot stock is dropped: each unit's upkeep (unpaid
+    // counts, lost at the dial), then each station's Fuel-depot fill off its owner's
+    // home shelf. Empty stores do nothing, so a world without them ticks as before.
+    run_space_unit_quarter(w, reg.space_units(), reg.stations(), econ_tick);
 
     // ---- 8. The tax tier (BL-1335) — LAST, so the scorer reads this quarter's
     // whole budget (rationed lines, the research line) and the Discontent the
