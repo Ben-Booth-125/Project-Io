@@ -737,6 +737,14 @@ blockaded market's prices. A convoy already at sea finishes its leg, and a block
 hostile cargo as a raider does. A cargo not yet at sea, bound through a closed port, waits at its loading
 port. A closed port makes no Logistic Points either. Lose the province and the port reopens that day.
 
+**A blockade moves prices both ways (Ben, 2026-11-10, NR-1156).** No extra price rule is laid on a closed
+port; its bite is what the closure does to the trade through it. What the market **imports** through the
+port stops landing, so a good it cannot replace climbs. What the market **re-ships** through the port is no
+longer bought for the voyage out, so that buying leaves the market's demand faster than its landings leave
+its supply, and the good gluts and falls. A blockaded entrepôt therefore reads both at once: dear on what it
+lacks, cheap on what it can no longer send. One closed port among several mostly reroutes; the cost lands
+hardest where a market has no other way in or out.
+
 **Landings carry armies over the ocean (Ben, 2026-11-05).** Open ocean bars a land unit except aboard a
 transport (§ Domains and traversal). A land unit standing on or beside an own open port
 **embarks** on a transport lying at that port's mouth, up to the transport's capacity: two land units at

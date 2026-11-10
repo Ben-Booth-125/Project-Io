@@ -563,14 +563,15 @@
   },
   {
    "id": "NR-1156",
-   "title": "A blockade does not move the blockaded market's price",
+   "title": "A blockade moves prices both ways: what it re-ships falls, what it imports rises",
    "raised": "2026-11-10",
    "kind": "question",
-   "status": "open",
+   "status": "resolved",
    "source": "NAVAL_WAR_READING (BL-1535)",
-   "what": "MILITARY.md § Blockade says the cost of a closed port lands on the blockaded market's prices. On the three library seeds where a blockade closed a port, it did not. Blockaded price against its own price the tick before closing, netted of the other markets' move over the same span: seed 0 0.998 vs 1.040, seed 31 1.038 vs 1.038, seed 60 1.055 vs 1.026 (110, 864, 880 readings). The blockaded markets read 14-24% below other markets, but they were cheap before closing. Likely cause, unconfirmed: each market has other ports or land routes, so one closed port reroutes trade without shortage.",
-   "options": "A) Accept: one port closing is a reroute, and only a coast-wide blockade should bite. B) Measure first: read the closed market's other ports and land share, then decide. C) Make a closure bite: the market loses the port's trade points and supply, so its price rises.",
-   "taken": null
+   "what": "MILITARY.md § Blockade says the cost of a closed port lands on the blockaded market's prices. On the three library seeds where a blockade closed a port, it did not. Blockaded price against its own price the tick before closing, netted of the other markets' move over the same span: seed 0 0.998 vs 1.040, seed 31 1.038 vs 1.038, seed 60 1.055 vs 1.026 (110, 864, 880 readings). The blockaded markets read 14-24% below other markets, but they were cheap before closing. Likely cause, unconfirmed: each market has other ports or land routes, so one closed port reroutes trade without shortage. CORRECTED 2026-11-10 (Ben chose C, \"Make closure bite\"; the reading below came after, and changes the premise). The all-goods mean hid two opposite moves. Each closure shut 1 of its market's 5-7 ports. On seed 31 it cut landings 67% (sea 1041 -> 108 a tick) but cut the market's own buying faster: steel demand 73 -> 21 against supply 27 -> 11, all of it in the construction/upkeep/trade channel (no household, background or processor steel), so steel fell 20% against +8% elsewhere and silica's shelf grew 14 -> 34. Likely cause, unproven: the closed port's trade points went, so the owner's outbound trades stopped buying there. Pure imports did rise: seed 60 tobacco +88% against +53% elsewhere. Open oddity: seed 31 machinery fell 473 -> 370 with supply 1.7 -> 0.1 and demand flat; not yet explained.",
+   "options": "A) Accept: a blockade already bites both ways (an entrepot gluts on what it re-ships, starves on what it imports); correct the reading and leave the code. B) Bite harder on imports only: a closure leaves outbound trades bidding, their cargo waiting at the quay as the doc says, so demand holds while supply falls. C) Measure first which channel the lost demand is, then choose.",
+   "taken": "A (Ben, 2026-11-10: \"Accept as is\"). No extra price rule; MILITARY.md § Blockade now says a blockade moves prices both ways. The machinery oddity is filed as BL-1615 (price falls as supply vanishes).",
+   "resolved": "2026-11-10"
   }
  ]
 }

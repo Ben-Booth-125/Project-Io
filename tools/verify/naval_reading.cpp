@@ -19,6 +19,7 @@
 //
 // Build: bash tools/verify/build_lua_harness.sh naval_reading. Run from the repo root.
 
+#include "world/resource_names.hpp"
 #include "harness_params.hpp"
 #include "scripting/lua_state.hpp"
 #include "world/campaign_settle.hpp"
@@ -126,6 +127,16 @@ void run_seed(std::uint32_t seed, int last_tick)
     std::map<entity_id, std::size_t> closed_since; ///< market -> history index before it closed
     double own_move_sum = 0.0, ctrl_move_sum = 0.0;
     long long move_n = 0;
+    // What lands at each market a tick, sea and overland, aligned with history.
+    using landed_row = std::map<entity_id, std::pair<double, double>>; // market -> (sea, land)
+    std::vector<landed_row> landed_hist;
+    using good_row = std::map<std::pair<entity_id, int>, double>; // (market, good) -> units landed
+    std::vector<good_row> goods_hist;
+    std::vector<std::map<entity_id, std::vector<float>>> stock_hist; // market -> inventory
+    std::vector<std::map<entity_id, std::vector<float>>> demand_hist, supply_hist, house_hist, back_hist, proc_hist;
+    struct closure { entity_id market; std::size_t before, last; int ports, closed; };
+    std::vector<closure> closures;
+    std::map<entity_id, std::size_t> open_closure; ///< market -> index into closures
 
     constexpr int k_days = 90;
     for (int step = k_campaign_settle_ticks, k = 1; step <= last_tick; ++step, ++k)
@@ -145,12 +156,16 @@ void run_seed(std::uint32_t seed, int last_tick)
             if (x.outcome == interception_outcome::raid_prize) { ++raids_prize; raid_value += v; }
         }
         std::map<uint32_t, flight> now = snapshot();
+        landed_row tick_landed;
+        good_row tick_goods;
         for (const auto& [id, f] : in_flight)
         {
             if (now.count(id) != 0 || cut.count(id) != 0)
                 continue;
             const bool sea = f.port_a != null_entity;
             landed += f.value; ++convoys_landed;
+            (sea ? tick_landed[f.dst].first : tick_landed[f.dst].second) += f.value;
+            tick_goods[{ f.dst, static_cast<int>(f.res) }] += f.qty;
             if (sea)
             {
                 landed_sea += f.value; ++convoys_sea;
@@ -194,9 +209,24 @@ void run_seed(std::uint32_t seed, int last_tick)
                     closed_now.insert(m);
             for (auto it = closed_since.begin(); it != closed_since.end();)
                 it = closed_now.count(it->first) ? std::next(it) : closed_since.erase(it);
+            for (auto it = open_closure.begin(); it != open_closure.end();)
+                it = closed_now.count(it->first) ? std::next(it) : open_closure.erase(it);
             for (const entity_id m : closed_now)
+            {
                 if (closed_since.count(m) == 0 && !history.empty())
                     closed_since[m] = history.size() - 1;
+                if (open_closure.count(m) == 0 && !history.empty())
+                {
+                    int ports = 0, shut = 0;
+                    for (const auto& [bid, b] : w.buildings)
+                        if (b.type == building_type::port && b.ticks_remaining <= 0 && !b.decommissioned
+                            && market_for_tile(w, b.tile) == m)
+                        { ++ports; if (w.closed_ports.count(b.tile) != 0) ++shut; }
+                    open_closure[m] = closures.size();
+                    closures.push_back({ m, history.size() - 1, history.size(), ports, shut });
+                }
+                closures[open_closure[m]].last = history.size();
+            }
             for (const auto& [m, at] : closed_since)
             {
                 const price_row& base = history[at];
@@ -213,6 +243,30 @@ void run_seed(std::uint32_t seed, int last_tick)
                 }
             }
             history.push_back(std::move(row));
+            landed_hist.push_back(std::move(tick_landed));
+            goods_hist.push_back(std::move(tick_goods));
+            std::map<entity_id, std::vector<float>> stocks;
+            for (const auto& [mid, mc] : w.markets)
+                stocks[mid] = std::vector<float>(std::begin(mc.inventory), std::end(mc.inventory));
+            stock_hist.push_back(std::move(stocks));
+            std::map<entity_id, std::vector<float>> dem, sup;
+            for (const auto& [mid, mc] : w.markets)
+            {
+                dem[mid] = std::vector<float>(std::begin(mc.demand), std::end(mc.demand));
+                sup[mid] = std::vector<float>(std::begin(mc.supply), std::end(mc.supply));
+            }
+            demand_hist.push_back(std::move(dem));
+            std::map<entity_id, std::vector<float>> hh, bg, pr;
+            for (const auto& [mid, mc] : w.markets)
+            {
+                hh[mid] = std::vector<float>(std::begin(mc.household_bid), std::end(mc.household_bid));
+                bg[mid] = std::vector<float>(std::begin(mc.background_bid), std::end(mc.background_bid));
+                pr[mid] = std::vector<float>(std::begin(mc.processor_want), std::end(mc.processor_want));
+            }
+            house_hist.push_back(std::move(hh));
+            back_hist.push_back(std::move(bg));
+            proc_hist.push_back(std::move(pr));
+            supply_hist.push_back(std::move(sup));
         }
 
         // A closed port's market: its price against the same good's mean elsewhere.
@@ -275,6 +329,63 @@ void run_seed(std::uint32_t seed, int last_tick)
                 seed, landed_food.size(), food_end_n, food_end_n ? double(food_land) / food_end_n : 0.0,
                 food_end_n ? double(food_end) / food_end_n : 0.0,
                 food_end_n ? double(share_end) / food_end_n : 0.0, crew_bill, fleet_treasury, fleet_owners.size());
+    for (const closure& c : closures)
+    {
+        double bs = 0, bl = 0, ds = 0, dl = 0; int bn = 0, dn = 0;
+        for (std::size_t i = c.before >= 3 ? c.before - 3 : 0; i <= c.before; ++i, ++bn)
+            if (const auto it = landed_hist[i].find(c.market); it != landed_hist[i].end())
+            { bs += it->second.first; bl += it->second.second; }
+        for (std::size_t i = c.before + 1; i <= c.last && i < landed_hist.size(); ++i, ++dn)
+            if (const auto it = landed_hist[i].find(c.market); it != landed_hist[i].end())
+            { ds += it->second.first; dl += it->second.second; }
+        std::printf("seed %u closure: market %u, %d of its %d port(s) closed, %d tick(s); landed a tick "
+                    "before sea %.0f land %.0f, during sea %.0f land %.0f\n", seed, (unsigned)c.market,
+                    c.closed, c.ports, dn, bn ? bs / bn : 0.0, bn ? bl / bn : 0.0, dn ? ds / dn : 0.0,
+                    dn ? dl / dn : 0.0);
+        // Good by good: units landed a tick, shelf stock and price, before against during.
+        struct row { int g; double lb, ld, sb, sd, pb, pd, ctrl, db = 0, dd = 0, ub = 0, ud = 0, hb = 0, hd = 0, gb = 0, gd = 0, qb = 0, qd = 0; };
+        std::vector<row> rows;
+        for (int g = 0; g < static_cast<int>(resource_count); ++g)
+        {
+            row x{ g, 0, 0, 0, 0, 0, 0, 0 };
+            int bn2 = 0, dn2 = 0;
+            for (std::size_t i = c.before >= 3 ? c.before - 3 : 0; i <= c.before; ++i, ++bn2)
+            {
+                if (const auto it = goods_hist[i].find({ c.market, g }); it != goods_hist[i].end()) x.lb += it->second;
+                x.sb += stock_hist[i].at(c.market)[g];
+                x.db += demand_hist[i].at(c.market)[g]; x.ub += supply_hist[i].at(c.market)[g];
+                x.hb += house_hist[i].at(c.market)[g]; x.gb += back_hist[i].at(c.market)[g]; x.qb += proc_hist[i].at(c.market)[g];
+            }
+            for (std::size_t i = c.before + 1; i <= c.last && i < goods_hist.size(); ++i, ++dn2)
+            {
+                if (const auto it = goods_hist[i].find({ c.market, g }); it != goods_hist[i].end()) x.ld += it->second;
+                x.sd += stock_hist[i].at(c.market)[g];
+                x.dd += demand_hist[i].at(c.market)[g]; x.ud += supply_hist[i].at(c.market)[g];
+                x.hd += house_hist[i].at(c.market)[g]; x.gd += back_hist[i].at(c.market)[g]; x.qd += proc_hist[i].at(c.market)[g];
+            }
+            if (bn2) { x.lb /= bn2; x.sb /= bn2; x.db /= bn2; x.ub /= bn2; x.hb /= bn2; x.gb /= bn2; x.qb /= bn2; }
+            if (dn2) { x.ld /= dn2; x.sd /= dn2; x.dd /= dn2; x.ud /= dn2; x.hd /= dn2; x.gd /= dn2; x.qd /= dn2; }
+            const std::size_t end = std::min(c.last, history.size() - 1);
+            x.pb = history[c.before].at(c.market)[g];
+            x.pd = history[end].at(c.market)[g];
+            double cs = 0; int cn = 0;
+            for (const auto& [om, pr] : history[end])
+                if (om != c.market && history[c.before].count(om) && history[c.before].at(om)[g] > 0 && pr[g] > 0)
+                { cs += pr[g] / history[c.before].at(om)[g]; ++cn; }
+            x.ctrl = cn ? cs / cn : 0;
+            if (x.lb > 0 || x.ld > 0) rows.push_back(x);
+        }
+        std::sort(rows.begin(), rows.end(), [](const row& a, const row& b) { return (a.lb - a.ld) > (b.lb - b.ld); });
+        for (std::size_t i = 0; i < rows.size() && i < 6; ++i)
+        {
+            const row& x = rows[i];
+            std::printf("seed %u   good %-22s landed %.1f -> %.1f, shelf %.1f -> %.1f, demand %.1f -> %.1f, supply %.1f -> %.1f, price %.2f -> %.2f (x%.3f, others x%.3f)\n",
+                        seed, resource_names::name_of(static_cast<resource_type>(x.g)).c_str(), x.lb, x.ld, x.sb, x.sd, x.db, x.dd, x.ub, x.ud, x.pb, x.pd,
+                        x.pb > 0 ? x.pd / x.pb : 0.0, x.ctrl);
+            std::printf("seed %u     of the demand: households %.1f -> %.1f, background %.1f -> %.1f, processors %.1f -> %.1f, rest %.1f -> %.1f\n",
+                        seed, x.hb, x.hd, x.gb, x.gd, x.qb, x.qd, x.db - x.hb - x.gb - x.qb, x.dd - x.hd - x.gd - x.qd);
+        }
+    }
     std::fflush(stdout);
 }
 

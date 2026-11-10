@@ -8398,10 +8398,10 @@
     },
     {
      "id": "R2",
-     "text": "A clearing price moves at a blockaded market on a real seed.",
+     "text": "A blockade moves prices at the blockaded market on a real seed, as MILITARY.md § Blockade says.",
      "kind": "headless",
-     "status": "failed",
-     "evidence": "Blockaded price against its own price the tick before closing, netted of the other markets' move over the same span: seed 0 0.998 vs 1.040, seed 31 1.038 vs 1.038, seed 60 1.055 vs 1.026 (110, 864, 880 readings). The blockaded markets read 14-24% below other markets, but they were cheap before closing. Raised as NR-1156."
+     "status": "complete",
+     "evidence": "naval_reading closure lines, seeds 31 and 60, 40 ticks, 2026-11-10: one port of 5 closed for 16 ticks; seed 31 landings -67%, steel demand 73 -> 21 (construction/upkeep/trade channel) against supply 27 -> 11, steel -20% against +8% elsewhere; seed 60 tobacco +88% against +53% elsewhere. Settled both ways (Ben, 2026-11-10, NR-1156)."
     },
     {
      "id": "R3",

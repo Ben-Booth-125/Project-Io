@@ -1341,7 +1341,7 @@
     "tools/session/rulings/sprint-64.json"
    ],
    "title": "Close the sprint on a measured war at sea and the one re-bless",
-   "design": "v0.3.0 needs the naval system and a playtest with a few wars. Sweep the library: fleets raised, raids landed, ports closed, landings made, treasuries under fleet upkeep. Then the sprint's one re-bless, described by rebless_shape_probe, ruling-check, and a live war played to a landing. It also owes the one reading the blockade could not show on a fixture: a clearing price moving at a blockaded market on a real seed. It also owes a landed army on a real seed: its stocks running down with no port, and holding once it takes one. PROGRESS 2026-11-10: the re-bless is taken (f48be3f6, 16/16). Library sweep (2026-11-10 naval_reading, sixteen library seeds, 40 ticks, after the re-bless (f48be3f6)): Raids material on two seeds only (seed 54 4.1% of sea value, seed 0 2.0%); a blockade ran on seeds 0, 31, 60, one port closed each; 5 units landed (seeds 31, 60), all at full LP share, so food held at 1000; 7 rival ship hires on 4 seeds; crew wages 42 to 210 a tick against fleet treasuries 21k to 286k. Blockade price: Blockaded price against its own price the tick before closing, netted of the other markets' move over the same span: seed 0 0.998 vs 1.040, seed 31 1.038 vs 1.038, seed 60 1.055 vs 1.026 (110, 864, 880 readings). The blockaded markets read 14-24% below other markets, but they were cheap before closing. So the blockade does not move a clearing price on these seeds: NR-1156 (blockade price). Still owed: a staged landing with no port (none arose uncovered), ruling-check, a live war played to a landing."
+   "design": "v0.3.0 needs the naval system and a playtest with a few wars. Sweep the library: fleets raised, raids landed, ports closed, landings made, treasuries under fleet upkeep. Then the sprint's one re-bless, described by rebless_shape_probe, ruling-check, and a live war played to a landing. It also owes the one reading the blockade could not show on a fixture: a clearing price moving at a blockaded market on a real seed. It also owes a landed army on a real seed: its stocks running down with no port, and holding once it takes one. PROGRESS 2026-11-10: the re-bless is taken (f48be3f6, 16/16). Library sweep (2026-11-10 naval_reading, sixteen library seeds, 40 ticks, after the re-bless (f48be3f6)): Raids material on two seeds only (seed 54 4.1% of sea value, seed 0 2.0%); a blockade ran on seeds 0, 31, 60, one port closed each; 5 units landed (seeds 31, 60), all at full LP share, so food held at 1000; 7 rival ship hires on 4 seeds; crew wages 42 to 210 a tick against fleet treasuries 21k to 286k. Blockade price: Blockaded price against its own price the tick before closing, netted of the other markets' move over the same span: seed 0 0.998 vs 1.040, seed 31 1.038 vs 1.038, seed 60 1.055 vs 1.026 (110, 864, 880 readings). The blockaded markets read 14-24% below other markets, but they were cheap before closing. So the blockade does not move a clearing price on these seeds: NR-1156 (blockade price). Still owed: a staged landing with no port (none arose uncovered), ruling-check, a live war played to a landing. 2026-11-10: the blockade price is settled (Ben, NR-1156, \"Accept as is\"): a closure moves prices both ways, written in MILITARY.md § Blockade. naval_reading closure lines, seeds 31 and 60, 40 ticks, 2026-11-10: one port of 5 closed for 16 ticks; seed 31 landings -67%, steel demand 73 -> 21 (construction/upkeep/trade channel) against supply 27 -> 11, steel -20% against +8% elsewhere; seed 60 tobacco +88% against +53% elsewhere."
   },
   {
    "status": "complete",
@@ -1469,6 +1469,28 @@
    ],
    "title": "A minor's garrisons are cut to what its income pays at the handoff",
    "design": "MILITARY.md § Nation garrisons. Income at the force ceiling share pays the men; the capital keeps a 20-man token; border posts split the rest or stand down. The opening cut reserves only the token's pay."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": "64",
+   "version_goal": "v0.3.0",
+   "written": "2026-11-10",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session (naval_reading, 2026-11-10)",
+   "category": "Economy",
+   "authority_doc": "docs/economy/MARKETS.md",
+   "id": "BL-1615",
+   "short_name": "PRICE_FALLS_AS_SUPPLY_VANISHES",
+   "requires": [],
+   "priority": "B",
+   "difficulty": 2,
+   "files": [
+    "src/world/market_clearing.cpp"
+   ],
+   "title": "A price falls as its supply vanishes, with demand flat",
+   "design": "MARKETS.md § Price resolution: target = base x sqrt(demand / supply), and base x ceil_mult with no supply, so a price should climb as supply falls toward zero. Read on seed 31 at the blockaded market 47921 (naval_reading, 40 ticks, 2026-11-10): machinery supply 1.7 -> 0.1 a tick, demand 7.5 flat (all background), yet the price fell 473.43 -> 370.00 while other markets moved x0.969. A price of 473 standing above what looks like the band ceiling (370) means a price is written outside resolve_price, or the ceiling moved. Find which, and whether it is a defect or a rule the doc does not state. Read before changing anything."
   }
  ]
 }
