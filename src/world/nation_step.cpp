@@ -14,6 +14,7 @@
 #include "province.hpp"          // BL-572: province_holder_for, province lookup
 #include "recipe_registry.hpp"
 #include "space_assets.hpp"      // BL-1327: the quarterly space-asset step
+#include "stations.hpp"          // BL-1583/BL-1585: the station step, astronaut training
 #include "space_programme.hpp"   // BL-644: the space_programme line's consumer
 #include "survey_system.hpp"
 #include "unit_roster.hpp" // BL-571: resolve_unit_upkeep, unit_upkeep_params
@@ -203,6 +204,13 @@ void run_nation_step(world& w, const recipe_registry& reg, economy_report& repor
     // counted unpaid (decaying, then lost). Ascending asset id; an empty store
     // does nothing, so a world that never launched ticks as before.
     run_space_asset_step(w, reg.space_assets(), econ_tick, &report.space_assets);
+
+    // ---- 7b. Stations and astronauts (BL-1583 / BL-1585, SPACE_ASSETS.md) —
+    // after the asset step, so a part lost there is swept here: training centres
+    // fill the astronaut pools, a lost core loses its station, a lost module frees
+    // its slot, refits complete, and the budgets are counted. No station and no
+    // centre does nothing, so a world without them ticks as before.
+    run_station_step(w, reg.stations(), econ_tick, &report.stations);
 
     // ---- 8. The tax tier (BL-1335) — LAST, so the scorer reads this quarter's
     // whole budget (rationed lines, the research line) and the Discontent the

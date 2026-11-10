@@ -19,6 +19,7 @@ bool space_launch_legal(space_asset_class cls, space_reach reach)
         case space_asset_class::rover:          return !orbit; // surfaces are never home
         case space_asset_class::crewed_mission: return !home;
         case space_asset_class::station_module:
+        case space_asset_class::station_core:
             return reach == space_reach::home_orbit || reach == space_reach::moon_orbit;
     }
     return false;
@@ -32,6 +33,7 @@ bool space_slot_legal(space_asset_class cls, space_slot slot)
         case space_asset_class::rover:          return slot == space_slot::surface;
         case space_asset_class::crewed_mission: return slot == space_slot::orbit || slot == space_slot::surface;
         case space_asset_class::station_module: return slot == space_slot::orbit;
+        case space_asset_class::station_core:   return slot == space_slot::orbit;
     }
     return false;
 }
@@ -72,6 +74,11 @@ float heliocentric_au(const world& w, entity_id body)
 }
 
 } // namespace
+
+float space_heliocentric_au(const world& w, entity_id body)
+{
+    return heliocentric_au(w, body);
+}
 
 space_launch_quote quote_space_launch(const world& w, const space_asset_params& p,
                                       entity_id nation, space_asset_class cls,

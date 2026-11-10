@@ -720,7 +720,28 @@ inline constexpr uint32_t k_world_save_version_pre_recruits = 71;
 /// PREFIX of v80 and is read too (`k_world_save_version_pre_research_books`), as a world
 /// whose returns booked none. Below v80 a building site's `days_remaining` is on the old
 /// build days, so the reader rescales it (`rescale_site_days_to_research_books`).
-inline constexpr uint32_t world_save_version = 80;
+///
+/// **81 (BL-1583 station model, BL-1585 astronauts; SPACE_ASSETS.md § Space stations,
+/// § Astronauts) — THE STATIONS.** `space_asset_class` gains `station_core` (4), read in
+/// the v51 asset section from v81 only; `building_type` gains `astronaut_training_centre`
+/// (14). Appended last, each after a u32 count: (1) every station ascending id, as (id,
+/// owner, core, node body, u8 node kind, u8 level, u32 n = width x height, n x slot id);
+/// (2) every asset whose station fields differ from the defaults, ascending id, as (id,
+/// station, i32 slot, u8 module, i32 crew, i32 refit_done_tick); (3) every nation holding
+/// templates, ascending, as (id, u32 m, m x (str name, u8 level, u32 n, n x u8 kind)),
+/// names strictly ascending; (4) every nation with astronauts, ascending, as (id, i32
+/// count in [1, k_astronaut_pool_max]). Cross-checked whole: a station's core is its own
+/// station_core asset at its node, centred; each slot names a live module of the station
+/// at that index; a live module or truss names a live station; refused whole otherwise.
+/// v80 is a STRICT PREFIX of v81 and is read too (`k_world_save_version_pre_stations`),
+/// as a world with no station, no template and empty pools.
+inline constexpr uint32_t world_save_version = 81;
+
+/// BL-1583: the first version carrying the station section (see above).
+inline constexpr uint32_t k_world_save_version_stations = 81;
+
+/// BL-1583: v80, a strict prefix of v81.
+inline constexpr uint32_t k_world_save_version_pre_stations = k_world_save_version_stations - 1;
 
 /// BL-1539: the first version carrying the research-books section (see above).
 inline constexpr uint32_t k_world_save_version_research_books = 80;
@@ -947,6 +968,10 @@ std::size_t world_save_defend_section_bytes(const world& w);
 /// 4 per return for each nation it lists. The LAST section of a v80 stream.
 std::size_t world_save_research_books_section_bytes(const world& w);
 
+/// BL-1583: the byte length of the v81 station section `w` writes. The LAST section
+/// of a v81 stream.
+std::size_t world_save_station_section_bytes(const world& w);
+
 /// BL-1422, widened by BL-1436: the bytes ALL SIX kit goods' extra elements add to
 /// every per-resource array of the stream `w` writes - the widening from 49 to today's
 /// width: (the v74 stream less the v73 stream, the five goods) plus
@@ -1075,6 +1100,9 @@ void write_world_snapshot_pre_defend(const world& w, std::ostream& out);
 
 /// VERIFICATION ONLY (BL-1539): the v79 stream shape - no research-books section.
 void write_world_snapshot_pre_research_books(const world& w, std::ostream& out);
+
+/// VERIFICATION ONLY (BL-1583): the v80 stream shape - no station section.
+void write_world_snapshot_pre_stations(const world& w, std::ostream& out);
 
 /// BL-1453: the recon stock a battle loaded from a pre-v67 stream is given — enough to
 /// see every defending unit in full (twice the stealthiest defender's kit stealth, in

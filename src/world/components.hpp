@@ -702,6 +702,10 @@ enum class building_type : uint8_t
                  ///< its tile gain defence and hardness, scaled by its `condition_permille`;
                  ///< artillery in a battle there and strategic bombing degrade it, and the
                  ///< one repair pass mends it. One to a tile.
+    astronaut_training_centre = 14, ///< BL-1585 (SPACE_ASSETS.md § Astronauts): turns its staffed
+                                    ///< workforce into astronauts each quarter, into its owner's
+                                    ///< pool up to a cap (stations.hpp, run_astronaut_training).
+                                    ///< Produces no good; staffed at construction like the institute.
 };
 
 /// One past the last building type — the wire parser's range gate (BL-396:
@@ -711,7 +715,7 @@ enum class building_type : uint8_t
 /// enum's tail, the same way resource_count derives from resource_type::count:
 /// appending a type means moving this with it.
 static constexpr uint8_t building_type_count =
-    static_cast<uint8_t>(building_type::bunker) + 1;
+    static_cast<uint8_t>(building_type::astronaut_training_centre) + 1;
 
 /// Infrastructure is every building that is not a producer (PRODUCTION.md §
 /// Infrastructure buildings): ports, logistics hubs, railway stations, the
@@ -2728,6 +2732,11 @@ struct nation_component
     /// ports (`run_recruitment`) up to 15 quarters of their output. Nothing spends it
     /// until ships are raised. Saved (world_save_version 73) and hashed only when non-zero.
     int32_t sea_recruits  = 0;
+    /// BL-1585 (SPACE_ASSETS.md § Astronauts): the trained astronaut pool, a count, not
+    /// people. Filled by Astronaut Training Centres (`run_astronaut_training`), spent by a
+    /// crewed station launch (stations.hpp). In [0, k_astronaut_pool_max]. Saved
+    /// (world_save_version 81) and hashed only when non-zero.
+    int32_t astronauts    = 0;
 };
 
 /// BL-1460 fix round: the capital a nation's generated identity reads —

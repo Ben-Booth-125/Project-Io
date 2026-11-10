@@ -46,7 +46,7 @@ constexpr auto max_cover      = terrain_cover::urban;
 constexpr auto max_landform   = terrain_landform::rift;
 constexpr auto max_body_type  = body_type::star;
 constexpr auto max_atmosphere = atmosphere_class::thick;
-constexpr auto max_building   = building_type::bunker; // BL-1426 (no bump: an older reader refuses the new type at this gate); BL-1449 (v65); BL-1255 (v49); BL-1266 (v46); BL-615 before it.
+constexpr auto max_building   = building_type::astronaut_training_centre; // BL-1585 (v81); BL-1426 (no bump: an older reader refuses the new type at this gate); BL-1449 (v65); BL-1255 (v49); BL-1266 (v46); BL-615 before it.
                                                            // A WIDENED range gate, not a format
                                                            // change: no serialised array is sized
                                                            // by building_type (unlike resource_
@@ -534,6 +534,13 @@ bool nation_has_research_books(const nation_component& nc)
         if (q.research != 0.0f)
             return true;
     return false;
+}
+
+/// BL-1583: an asset whose station fields are worth writing (any off its default).
+bool asset_has_station_fields(const space_asset& a)
+{
+    return a.station != null_entity || a.station_slot != -1 || a.module != k_no_station_module
+        || a.crew != 0 || a.refit_done_tick != -1;
 }
 
 /// BL-1407: a nation carries v56 book state worth writing.
@@ -2136,6 +2143,89 @@ void write_world_snapshot_at(const world& w, std::ostream& out, uint32_t version
                 w_f32(out, q.research);
         }
     }
+
+    // world_save_version 81 (BL-1583, BL-1585): THE STATIONS, the last section — the
+    // station store, the assets' station fields, the templates and the astronaut pools.
+    if (version >= k_world_save_version_stations)
+    {
+        w_u32(out, static_cast<uint32_t>(w.stations.size()));
+        for (const auto& [sid, st] : w.stations)
+        {
+            w_id(out, sid);
+            w_id(out, st.owner);
+            w_id(out, st.core);
+            w_id(out, st.node.body);
+            w_enum(out, st.node.kind);
+            w_u8(out, st.level);
+            w_ids(out, st.slots);
+        }
+        uint32_t fielded = 0;
+        for (const auto& [aid, a] : w.space_assets)
+            fielded += asset_has_station_fields(a) ? 1u : 0u;
+        w_u32(out, fielded);
+        for (const auto& [aid, a] : w.space_assets)
+        {
+            if (!asset_has_station_fields(a))
+                continue;
+            w_id(out, aid);
+            w_id(out, a.station);
+            w_i32(out, a.station_slot);
+            w_u8(out, a.module);
+            w_i32(out, a.crew);
+            w_i32(out, a.refit_done_tick);
+        }
+        w_u32(out, static_cast<uint32_t>(w.station_templates.size()));
+        for (const auto& [nid, ts] : w.station_templates)
+        {
+            w_id(out, nid);
+            w_u32(out, static_cast<uint32_t>(ts.size()));
+            for (const auto& [name, t] : ts)
+            {
+                w_str(out, name);
+                w_u8(out, t.level);
+                w_bytes(out, t.kinds);
+            }
+        }
+        uint32_t crewed = 0;
+        for (const auto& [nid, nc] : w.nations)
+            crewed += nc.astronauts != 0 ? 1u : 0u;
+        w_u32(out, crewed);
+        for (const auto& [nid, nc] : w.nations) // std::map: ascending
+            if (nc.astronauts != 0)
+            {
+                w_id(out, nid);
+                w_i32(out, nc.astronauts);
+            }
+    }
+}
+
+void write_world_snapshot_pre_stations(const world& w, std::ostream& out)
+{
+    // VERIFICATION ONLY (BL-1583): the v80 stream shape - no station section.
+    write_world_snapshot_at(w, out, k_world_save_version_pre_stations);
+}
+
+std::size_t world_save_station_section_bytes(const world& w)
+{
+    std::size_t n = 4;
+    for (const auto& [sid, st] : w.stations)
+        n += 4 + 4 + 4 + 4 + 1 + 1 + 4 + 4 * st.slots.size();
+    n += 4;
+    for (const auto& [aid, a] : w.space_assets)
+        if (asset_has_station_fields(a))
+            n += 4 + 4 + 4 + 1 + 4 + 4;
+    n += 4;
+    for (const auto& [nid, ts] : w.station_templates)
+    {
+        n += 4 + 4;
+        for (const auto& [name, t] : ts)
+            n += 4 + name.size() + 1 + 4 + t.kinds.size();
+    }
+    n += 4;
+    for (const auto& [nid, nc] : w.nations)
+        if (nc.astronauts != 0)
+            n += 8;
+    return n;
 }
 
 void write_world_snapshot_pre_defend(const world& w, std::ostream& out)
@@ -2543,7 +2633,8 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
             && version != k_world_save_version_pre_contributors // BL-1470: v76, no provenance
             && version != k_world_save_version_pre_occupation // BL-1502: v77, nothing occupied
             && version != k_world_save_version_pre_defend     // BL-1504: v78, no defend orders
-            && version != k_world_save_version_pre_research_books)) // BL-1539: v79, nothing booked
+            && version != k_world_save_version_pre_research_books // BL-1539: v79, nothing booked
+            && version != k_world_save_version_pre_stations)) // BL-1583: v80, no stations
         return false; // mismatched version -- refuse rather than misread
 
     // BL-1422: a stream before the kit goods carries every per-resource array 49 wide;
@@ -2932,7 +3023,9 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
             space_asset a;
             entity_id   aid = null_entity;
             if (!r_id(in, aid) || !r_id(in, a.owner)
-                || !r_enum(in, a.cls, space_asset_class::station_module)
+                || !r_enum(in, a.cls, version >= k_world_save_version_stations
+                                          ? space_asset_class::station_core // BL-1583: v81 on
+                                          : space_asset_class::station_module)
                 || !r_id(in, a.dest.body)
                 || !r_enum(in, a.dest.slot, space_slot::surface)
                 || !r_enum(in, a.state, space_asset_state::lost)
@@ -4312,6 +4405,200 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
     else
     {
         rescale_site_days_to_research_books(s);
+    }
+
+    // v81 (BL-1583, BL-1585): the stations. Untrusted, and cross-checked whole once all
+    // four parts are read: every id ascending and never null; a station's owner a
+    // nation, its node an orbital node of a non-star body, its level in range and its
+    // slot count its grid's; its core its own id, a station_core asset of the same owner
+    // at the node's body, in the centre slot and nowhere else; every other slot null or
+    // a station_module asset of the station, of a fittable kind, not lost, at that index,
+    // and in one slot only; a truss names its station (or a lost one) and no slot; a live
+    // module or truss names a live station; crew in [0, pool max]; a refit -1 or >= 0; a
+    // template's nation a nation, its names 1..64 bytes strictly ascending, at most 64,
+    // each a level in range, one fittable-or-empty kind per slot and the centre empty;
+    // a pool in [1, max]. Refused whole otherwise. A v80 (and older) stream ends before it.
+    if (version >= k_world_save_version_stations)
+    {
+        uint32_t count = 0;
+        if (!r_u32(in, count) || count > s.space_assets.size())
+            return false;
+        entity_id prev = null_entity;
+        for (uint32_t k = 0; k < count; ++k)
+        {
+            space_station st;
+            entity_id sid = null_entity;
+            if (!r_id(in, sid) || !r_id(in, st.owner) || !r_id(in, st.core) || !r_id(in, st.node.body)
+                || !r_enum(in, st.node.kind, orbital_node_kind::l5) || !r_u8(in, st.level)
+                || !r_ids(in, st.slots))
+                return false;
+            if (sid == null_entity || (k > 0 && sid <= prev) || st.core != sid
+                || s.nations.count(st.owner) == 0 || !orbital_node_is_orbital(st.node.kind)
+                || st.level > k_station_max_level
+                || st.slots.size() != static_cast<std::size_t>(st.width() * st.height()))
+                return false;
+            const auto bit = s.bodies.find(st.node.body);
+            if (bit == s.bodies.end() || bit->second.type == body_type::star)
+                return false;
+            prev  = sid;
+            st.id = sid;
+            s.stations.emplace_hint(s.stations.end(), sid, std::move(st));
+        }
+
+        if (!r_u32(in, count) || count > s.space_assets.size())
+            return false;
+        prev = null_entity;
+        for (uint32_t k = 0; k < count; ++k)
+        {
+            entity_id aid = null_entity, station = null_entity;
+            int32_t slot = 0, crew = 0, refit = 0;
+            uint8_t module = 0;
+            if (!r_id(in, aid) || !r_id(in, station) || !r_i32(in, slot) || !r_u8(in, module)
+                || !r_i32(in, crew) || !r_i32(in, refit))
+                return false;
+            const auto ait = s.space_assets.find(aid);
+            if (aid == null_entity || (k > 0 && aid <= prev) || ait == s.space_assets.end()
+                || slot < -1 || slot > std::numeric_limits<int16_t>::max()
+                || crew < 0 || crew > k_astronaut_pool_max || refit < -1)
+                return false;
+            prev = aid;
+            space_asset& a = ait->second;
+            a.station = station;
+            a.station_slot = static_cast<int16_t>(slot);
+            a.module = module;
+            a.crew = crew;
+            a.refit_done_tick = refit;
+            if (!asset_has_station_fields(a)) // a record of all defaults is never written
+                return false;
+        }
+
+        if (!r_u32(in, count) || count > s.nations.size())
+            return false;
+        prev = null_entity;
+        for (uint32_t k = 0; k < count; ++k)
+        {
+            entity_id nid = null_entity;
+            uint32_t  m = 0;
+            if (!r_id(in, nid) || nid == null_entity || (k > 0 && nid <= prev)
+                || s.nations.count(nid) == 0 || !r_u32(in, m) || m == 0
+                || m > k_station_templates_per_nation)
+                return false;
+            prev = nid;
+            auto& mine = s.station_templates[nid];
+            std::string last;
+            for (uint32_t j = 0; j < m; ++j)
+            {
+                std::string name;
+                station_template t;
+                if (!r_str(in, name) || !r_u8(in, t.level) || !r_bytes(in, t.kinds))
+                    return false;
+                if (name.empty() || name.size() > k_station_template_name_max
+                    || (j > 0 && !(last < name)) || t.level > k_station_max_level)
+                    return false;
+                const int lw = station_grid_width(t.level), lh = station_grid_height(t.level);
+                if (t.kinds.size() != static_cast<std::size_t>(lw * lh)
+                    || t.kinds[static_cast<std::size_t>((lh / 2) * lw + lw / 2)] != k_no_station_module)
+                    return false;
+                for (const uint8_t kd : t.kinds)
+                    if (kd != k_no_station_module && kd >= station_fittable_kind_count)
+                        return false;
+                last = name;
+                mine.emplace_hint(mine.end(), std::move(name), std::move(t));
+            }
+        }
+
+        if (!r_u32(in, count) || count > s.nations.size())
+            return false;
+        prev = null_entity;
+        for (uint32_t k = 0; k < count; ++k)
+        {
+            entity_id nid = null_entity;
+            int32_t   n = 0;
+            if (!r_id(in, nid) || nid == null_entity || (k > 0 && nid <= prev) || !r_i32(in, n)
+                || n < 1 || n > k_astronaut_pool_max)
+                return false;
+            prev = nid;
+            const auto nit = s.nations.find(nid);
+            if (nit == s.nations.end())
+                return false;
+            nit->second.astronauts = n;
+        }
+
+        // The cross-check. Each station's slots, then each asset's own claim.
+        std::set<entity_id> slotted;
+        for (const auto& [sid, st] : s.stations)
+        {
+            const auto cit = s.space_assets.find(sid);
+            if (cit == s.space_assets.end() || cit->second.cls != space_asset_class::station_core
+                || cit->second.owner != st.owner || cit->second.dest.body != st.node.body
+                || cit->second.state == space_asset_state::lost || cit->second.station != sid
+                || cit->second.station_slot != st.centre())
+                return false;
+            for (int i = 0; i < static_cast<int>(st.slots.size()); ++i)
+            {
+                const entity_id e = st.slots[static_cast<std::size_t>(i)];
+                if (i == st.centre())
+                {
+                    if (e != sid)
+                        return false;
+                    continue;
+                }
+                if (e == null_entity)
+                    continue;
+                const auto mit = s.space_assets.find(e);
+                if (mit == s.space_assets.end() || !slotted.insert(e).second)
+                    return false;
+                const space_asset& a = mit->second;
+                if (a.cls != space_asset_class::station_module || a.station != sid || a.owner != st.owner
+                    || a.dest.body != st.node.body || a.station_slot != i
+                    || a.module >= station_fittable_kind_count || a.state == space_asset_state::lost)
+                    return false;
+            }
+        }
+        for (const auto& [aid, a] : s.space_assets)
+        {
+            const bool station_class = a.cls == space_asset_class::station_core
+                                    || a.cls == space_asset_class::station_module;
+            if (!station_class)
+            {
+                // Only a station's parts carry station fields (crew included, for now).
+                if (asset_has_station_fields(a))
+                    return false;
+                continue;
+            }
+            if (a.refit_done_tick >= 0 && (a.cls != space_asset_class::station_module
+                                           || a.station_slot < 0))
+                return false;
+            const bool lost = a.state == space_asset_state::lost;
+            if (a.cls == space_asset_class::station_core)
+            {
+                // A live core is its station's (checked above); a lost one has none.
+                if (a.module != k_no_station_module || a.station != aid
+                    || (!lost && s.stations.count(aid) == 0) || (lost && s.stations.count(aid) != 0))
+                    return false;
+                continue;
+            }
+            // A station_module: a module, a truss, or (a pre-station record) neither.
+            if (a.station == null_entity)
+            {
+                if (a.module != k_no_station_module || a.station_slot != -1)
+                    return false;
+                continue;
+            }
+            if (a.module == static_cast<uint8_t>(station_module_kind::truss))
+            {
+                if (a.station_slot != -1 || (!lost && s.stations.count(a.station) == 0))
+                    return false;
+                continue;
+            }
+            if (a.module >= station_fittable_kind_count)
+                return false;
+            // A live module sits in its station's slot (checked above); a lost one in none.
+            if (!lost && slotted.count(aid) == 0)
+                return false;
+            if (lost && slotted.count(aid) != 0)
+                return false;
+        }
     }
 
     // BL-1266 (v46): every manual trade names a live owner and two distinct
