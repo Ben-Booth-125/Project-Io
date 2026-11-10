@@ -20,6 +20,7 @@
 #include "orbital_node.hpp" // orbital_node (BL-1598 space_debris, below)
 #include "space_bombard.hpp" // space_bombard_order (BL-1599, below)
 #include "offworld_base.hpp" // offworld_base (BL-1601, below)
+#include "space_firsts.hpp"  // space_first_record (BL-1606, below)
 #include "war.hpp"          // war_record, peace_offer (BL-1459/BL-1428 wars, below)
 
 #include <atomic>
@@ -192,6 +193,7 @@ enum class history_topic : uint8_t
     agency,      ///< A BL-079/BL-202 agency_event (reflex or strategic tier).
     trade_route, ///< A trade_route's FIRST establishment (not repeat traffic on an existing lane).
     war,         ///< BL-1480: a declaration or a peace - one entry per party, `corp` = that party's nation.
+    space_first, ///< BL-1606: a nation takes a first in space (ERAS.md § Firsts) - one entry, `corp` = that nation.
 };
 
 /// One entry in `world::history_log`. `timestamp`'s UNIT DEPENDS ON TOPIC —
@@ -1114,6 +1116,10 @@ struct world
     /// heads), keyed by the unit's id. SERIALISED with the bases (live units only),
     /// hashed when non-empty.
     std::map<entity_id, int32_t> space_colonists;
+    /// BL-1606 — the space firsts taken, keyed by `space_first_kind` (space_firsts.hpp;
+    /// ERAS.md § Firsts): who took each and when. A first is never taken twice.
+    /// SERIALISED (world_save.hpp's BL-1606 block), hashed when non-empty.
+    std::map<uint8_t, space_first_record> space_firsts;
 
     /// Enacted and un-enacted laws (BL-343). A world-level list rather than a
     /// per-corp one: a law is enacted over the world and charged to whoever it

@@ -1152,6 +1152,19 @@ uint64_t world::state_hash(int tick) const
                     fnv1a_u32(h, static_cast<uint32_t>(n));
                 }
         }
+        // BL-1606: the space firsts taken — folded only when any is, so a world
+        // where none is taken hashes as before.
+        if (!space_firsts.empty())
+        {
+            fnv1a_u32(h, 0x1606u); // tag
+            fnv1a_u32(h, static_cast<uint32_t>(space_firsts.size()));
+            for (const auto& [k, f] : space_firsts) // ascending kind
+            {
+                fnv1a_u32(h, k);
+                fnv1a_u32(h, f.nation);
+                fnv1a_u32(h, static_cast<uint32_t>(f.day_tick));
+            }
+        }
     }
 
     // Province holder (BL-569). UNLIKE `provinces` itself (generation output,

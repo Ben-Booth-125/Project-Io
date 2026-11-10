@@ -1397,6 +1397,12 @@ economy = {
         -- market on the home body must hold on its shelf before the Early Space
         -- tree opens to a nation. 1.0 = one launch's draw (launch_draw_per_convoy).
         space_gate_min_propellant   = 1.0,
+        -- BL-1606 (ERAS.md § Firsts): the one-time research grant, in RP, the
+        -- first nation to do each space deed earns (first satellite, crew in
+        -- orbit, station core, crew on a moon, off-world base, space convoy).
+        -- 400 = two cost units at the age's opening price (rp_per_cost_unit),
+        -- a bit over three quarters of base_rp_per_nation. Unmeasured first cut.
+        space_first_grant_rp        = 400.0,
     },
 
     -- BL-545/BL-546: the relational substrate's DECAY (sentiment.hpp). Each

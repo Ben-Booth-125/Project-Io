@@ -933,7 +933,6 @@ inline constexpr uint32_t k_world_save_version_pre_space_bombard = k_world_save_
 /// nobody aboard. MERGE NOTE: a parallel lane's bump renumbers this block (this
 /// paragraph, the three constants below, the accepted-version line in
 /// `read_world_snapshot`, and the one section at the end of the writer and reader).
-inline constexpr uint32_t world_save_version = 90;
 
 /// BL-1601: the first version carrying the off-world base section (see above).
 inline constexpr uint32_t k_world_save_version_offworld_bases = 90;
@@ -941,6 +940,25 @@ inline constexpr uint32_t k_world_save_version_offworld_bases = 90;
 /// BL-1601: v89, a strict prefix of v90.
 inline constexpr uint32_t k_world_save_version_pre_offworld_bases = k_world_save_version_offworld_bases - 1;
 /// ===== END BL-1601 VERSION BUMP =================================================
+/// ===== BEGIN BL-1606 VERSION BUMP (space firsts) — ONE BLOCK ====================
+/// **91 (BL-1606; ERAS.md § Firsts) — THE FIRSTS TAKEN.** Appended last, after a u32
+/// count: every `world::space_firsts` record ascending kind, as (u8 kind, nation,
+/// i32 day_tick) — 9 bytes. At most `space_first_kind_count` records; kinds strictly
+/// ascending and in range; each names a nation in the stream's nation store; the
+/// day tick >= 0. Refused whole otherwise. The grant rides the research pool and the
+/// entry the history log, both already saved. v90 is a STRICT PREFIX of v91 and is
+/// read too (`k_world_save_version_pre_space_firsts`), as a world where no first is
+/// taken. MERGE NOTE: a parallel lane's bump renumbers this block (this paragraph,
+/// `world_save_version`, the two constants below, the accepted-version line in
+/// `read_world_snapshot`, and the one section at the end of the writer and reader).
+inline constexpr uint32_t world_save_version = 91;
+
+/// BL-1606: the first version carrying the space-firsts section (see above).
+inline constexpr uint32_t k_world_save_version_space_firsts = 91;
+
+/// BL-1606: v90, a strict prefix of v91.
+inline constexpr uint32_t k_world_save_version_pre_space_firsts = k_world_save_version_space_firsts - 1;
+/// ===== END BL-1606 VERSION BUMP =================================================
 
 /// BL-1612: the first version carrying the Early Space tree section (see above).
 inline constexpr uint32_t k_world_save_version_early_space = 82;
@@ -1210,6 +1228,11 @@ std::size_t world_save_space_convoy_section_bytes(const world& w);
 /// BL-1601: the byte length of the v88 off-world base section `w` writes - 4 + 12 per
 /// base, 4 + 8 per colonist entry of a live unit. The LAST section of a v88 stream.
 std::size_t world_save_offworld_base_section_bytes(const world& w);
+/// BL-1606: VERIFICATION ONLY - the v90 stream shape (no space-firsts section).
+void write_world_snapshot_pre_space_firsts(const world& w, std::ostream& out);
+/// BL-1606: the byte length of the v91 space-firsts section `w` writes - 4 + 9 per
+/// first taken. The LAST section of a v91 stream.
+std::size_t world_save_space_firsts_section_bytes(const world& w);
 
 /// BL-1599: VERIFICATION ONLY - the v87 stream shape (no bombard-order section).
 void write_world_snapshot_pre_space_bombard(const world& w, std::ostream& out);
