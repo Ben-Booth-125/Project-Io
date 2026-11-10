@@ -1489,6 +1489,14 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
                 const front* f = front_named(fr, cmd.tile);
                 if (f == nullptr)
                     return corp_command_result::rejected_invalid; // no front of the actor's holds it
+                // BL-1602 (MILITARY.md § Space, "A war spans every body"): a land unit
+                // never crosses between bodies on its own, so a front on another body
+                // than the one it stands on is one it could never reach. Read only where
+                // both bodies are known; on a world with one body of ground it never fires.
+                const auto ut = w.tiles.find(uit->second.position);
+                const auto kt = w.tiles.find(f->key);
+                if (ut != w.tiles.end() && kt != w.tiles.end() && ut->second.body != kt->second.body)
+                    return corp_command_result::rejected_invalid;
                 key = f->key;
             }
             if (uit->second.front == key)

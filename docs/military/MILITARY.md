@@ -711,6 +711,32 @@ where their fleets meet is a battle (`SPACE_FLEETS.md`). Nothing confines a war 
 declared on. The fronts on other bodies are reached through the pinned-items panel's front pins
 (`../ui/LAYOUT.md` § Pinned items — right column, middle).
 
+**On the ground, every body is fought as the home world is (Ben, 2026-11-10; BL-1602, war spans
+bodies).** A nation's ground on another body is its off-world base and what it claims
+(`../politics/NATIONS.md` § Off-world bases). Nothing in the land war is special there:
+
+- **Fronts** derive on every body from the same territory map and occupation layer (§ Fronts). Two
+  nations with neighbouring ground on one moon have a front toward each other there, and a front on
+  one body is never joined to a front on another.
+- **A land unit fights on the body it stands on.** It never marches between bodies; reaching
+  another body is the space layer's job (`SPACE_FLEETS.md`). So a unit is assigned only to a front
+  on its own body: an assignment to a front on another body is refused. A unit reaches a moon by
+  being raised there, at a military base on the nation's ground on that body (§ The muster
+  interface), or by the space layer.
+- **A garrison on a base** is any of the nation's units standing on its ground there. It holds,
+  defends its province (§ Defend province) and is drawn into battle as at home.
+- **Battles, occupation and the holder** follow § Battles and § Occupation unchanged: a march onto a
+  held tile is an attack, a won tile is occupied at war, and the province holder moves when the
+  beaten side has no unit left in the province.
+- **War goals and peace** take any land province of the other side, on any body. When an attacked
+  stack stands off the defender's ground, the goal falls back to the defender's capital **on that
+  body** — its base there — and to its capital only where it has none. A ceded capital moves to the
+  nation's remaining ground **on the same body** while any land province remains there; only then
+  does it leave the body.
+
+Rivals' scorers are unchanged by this: they assign units only to fronts a march would accept, which
+already confines each unit to its own body.
+
 *Owners: BL-1421 (soft hard resolver), BL-1422 (land classes and kit), BL-1423 (refit and
 retreat), BL-1424 (soldiers from labour), BL-1425 (unit counter render), BL-1426 (bunkers),
 BL-1427 (fronts), BL-1449 (air combat core), BL-1430 (sea theatre), BL-1431 (missiles and
