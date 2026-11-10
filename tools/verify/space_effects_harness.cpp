@@ -23,7 +23,8 @@
 //   F1  a Microgravity factory buys a silicon lot and sells an electronics lot;
 //       an empty silicon shelf idles it with nothing moved.
 //   S1  a Survey satellite maps its body only while covered: hidden -> scanning,
-//       four regions a quarter, surveyed in two quarters; uncovered maps none.
+//       four regions a quarter, mapped whole in two quarters (not surveyed: that
+//       needs prospecting, BL-1600); uncovered maps none.
 //   O1  an Observatory maps every unsurveyed body in its owner's coverage.
 //   N1  a Navigation satellite's factor: 0.9 for its owner on its body, 1 for
 //       another nation, another body, or an asset not active.
@@ -50,6 +51,7 @@
 #include "world/space_coverage.hpp"
 #include "world/space_effects.hpp"
 #include "world/stations.hpp"
+#include "world/survey_system.hpp"
 #include "world/world.hpp"
 #include "world/world_save.hpp"
 
@@ -422,9 +424,14 @@ void rows_survey()
                   && s.regions_total == 8, "S1b",
               fmt("covered: hidden -> scanning, %d of %d regions", s.regions_done, s.regions_total));
         step(f.w, 3);
-        check(f.w.bodies.at(f.moon).survey.phase == survey_phase::surveyed, "S1c", "the last region surveys it");
+        // BL-1600: mapping alone never surveys a body - prospecting must follow.
+        const survey_state& s3 = f.w.bodies.at(f.moon).survey;
+        check(s3.phase == survey_phase::scanning && s3.regions_done == 8
+                  && s3.ticks_remaining == k_survey_ticks_orbit_mapped
+                  && !survey_body_surveyed_for(f.w, f.a, f.moon), "S1c",
+              "the last region maps it whole; not surveyed until prospected");
         const auto r4 = step(f.w, 4);
-        check(r4.survey_regions == 0, "S1d", "a surveyed body maps nothing more");
+        check(r4.survey_regions == 0, "S1d", "a fully mapped body maps nothing more");
     }
     {
         fixture f; build(f);
@@ -572,8 +579,9 @@ void rows_inert_and_determinism()
     check(x.w.state_hash(0) == y.w.state_hash(0) && to_bytes(x.w) == to_bytes(y.w), "D1",
           fmt("two identical programmes: equal hash %016llx and stream",
               static_cast<unsigned long long>(x.w.state_hash(0))));
-    check(x.w.bodies.at(x.moon).survey.phase == survey_phase::surveyed && pool(x.w, x.a) > 0, "D1b",
-          "the programme did something (moon surveyed, RP earned)");
+    const body_survey_knowledge* xk = survey_knowledge_of(x.w, x.a, x.moon);
+    check(xk != nullptr && xk->regions_mapped == xk->regions_total && pool(x.w, x.a) > 0, "D1b",
+          "the programme did something (moon mapped, RP earned)");
 }
 
 } // namespace

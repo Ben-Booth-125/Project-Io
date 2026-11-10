@@ -792,7 +792,7 @@ inline constexpr uint32_t k_world_save_version_pre_recruits = 71;
 /// designs, no units and empty depots. MERGE NOTE: a parallel lane's bump renumbers
 /// this block (the paragraph, the two constants below, the accepted-version line in
 /// `read_world_snapshot`, and the one section at the end of the writer and reader).
-inline constexpr uint32_t world_save_version = 84;
+inline constexpr uint32_t world_save_version = 85; // BL-1600 (mapping then prospecting): see the BL-1600 block below
 
 /// BL-1594: the first version carrying the space-unit section (see above).
 inline constexpr uint32_t k_world_save_version_space_units = 84;
@@ -800,6 +800,26 @@ inline constexpr uint32_t k_world_save_version_space_units = 84;
 /// BL-1594: v83, a strict prefix of v84.
 inline constexpr uint32_t k_world_save_version_pre_space_units = k_world_save_version_space_units - 1;
 /// ===== END BL-1594 / BL-1595 VERSION BUMP ======================================
+
+/// ===== BEGIN BL-1600 VERSION BUMP (mapping then prospecting) — ONE BLOCK ========
+/// **85 (BL-1600; DISCOVERY.md § Mapping, then prospecting) — SURVEY KNOWLEDGE.**
+/// Appended last, after a u32 count: every (nation, body) record of
+/// `world::survey_knowledge`, keys strictly ascending, as (nation, body, i32
+/// regions_total, i32 regions_mapped, regions_total x u8 prospected). Each names a
+/// nation and a body survey knowledge applies to (`survey_knowledge_applies`: not the
+/// star, not the home world, a grid); regions_total equals the body's
+/// `survey_region_count`; regions_mapped in [1, regions_total]; each prospected byte
+/// 0 or 1, and 1 only below regions_mapped. Refused whole otherwise. v84 is a STRICT
+/// PREFIX of v85 and is read too (`k_world_save_version_pre_prospecting`), as a world
+/// nobody has mapped off the home world. MERGE NOTE: a parallel lane's bump renumbers
+/// this block (this paragraph, `world_save_version`, the two constants below, the
+/// accepted-version line in `read_world_snapshot`, and the one section at the end of
+/// the writer and reader).
+inline constexpr uint32_t k_world_save_version_prospecting = 85;
+
+/// BL-1600: v84, a strict prefix of v85.
+inline constexpr uint32_t k_world_save_version_pre_prospecting = k_world_save_version_prospecting - 1;
+/// ===== END BL-1600 VERSION BUMP ================================================
 
 /// BL-1612: the first version carrying the Early Space tree section (see above).
 inline constexpr uint32_t k_world_save_version_early_space = 82;
@@ -1061,6 +1081,9 @@ std::size_t world_save_space_node_section_bytes(const world& w);
 /// section of a v84 stream.
 std::size_t world_save_space_unit_section_bytes(const world& w);
 
+/// BL-1600: the byte size of the v85 survey-knowledge section (the stream's tail).
+std::size_t world_save_prospecting_section_bytes(const world& w);
+
 /// BL-1422, widened by BL-1436: the bytes ALL SIX kit goods' extra elements add to
 /// every per-resource array of the stream `w` writes - the widening from 49 to today's
 /// width: (the v74 stream less the v73 stream, the five goods) plus
@@ -1200,6 +1223,9 @@ void write_world_snapshot_pre_space_nodes(const world& w, std::ostream& out);
 
 /// VERIFICATION ONLY (BL-1594): the v83 stream shape - no space-unit section.
 void write_world_snapshot_pre_space_units(const world& w, std::ostream& out);
+
+/// VERIFICATION ONLY (BL-1600): write the v84 shape - no survey-knowledge section.
+void write_world_snapshot_pre_prospecting(const world& w, std::ostream& out);
 
 /// BL-1453: the recon stock a battle loaded from a pre-v67 stream is given — enough to
 /// see every defending unit in full (twice the stealthiest defender's kit stealth, in

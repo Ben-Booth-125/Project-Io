@@ -118,3 +118,82 @@ survey_dispatch_result dispatch_survey(world& w, entity_id body,
 /// (in_transit → scanning → surveyed) and bump `regions_done` as scan-phase region
 /// boundaries pass. Deterministic; `hidden` and `surveyed` bodies are untouched.
 void advance_surveys(world& w, int days);
+
+// ---------------------------------------------------------------------------
+// Mapping, then prospecting (BL-1600) — DISCOVERY.md § Mapping, then prospecting
+// ---------------------------------------------------------------------------
+// Off the home world a survey reveals in two steps, PER NATION: a region is first
+// MAPPED (its tiles and terrain readable to that nation) from orbit — by a Survey
+// satellite at one of the body's nodes or a working station Observatory with the
+// body in its owner's comms coverage (space_effects.hpp) — and only then
+// PROSPECTED (its deposit bands readable to that nation) on the ground, by an
+// ACTIVE rover or a LANDED Lander at the body's surface.
+//
+// THE STORE is `world::survey_knowledge`, keyed (nation, body): the mapped
+// regions are the raster prefix [0, regions_mapped), the prospected regions a
+// byte per region, set only inside the mapped prefix. The home world and the star
+// are never recorded: the home world is surveyed for every nation, the star has
+// no ground.
+//
+// PROSPECTING ORDER. One region at a time, nearest the landing first. No landing
+// TILE is modelled (a Lander lands at a body's surface NODE, space_units.hpp), so
+// the landing stands at region 0 — the first region mapping reaches — and the
+// nearest unprospected mapped region is the one with the least squared distance
+// in region cells from it, ties to the lower raster index. Deterministic.
+//
+// THE PLAYER'S MIRROR. The canvases draw the player's geographic fog from the one
+// per-body store, `body_component::survey`. So mapping or prospecting for the
+// PLAYER'S nation also writes that store, where no dispatched probe owns it (the
+// body is `hidden`, or already being mapped from orbit): `scanning` with
+// `regions_done` = the mapped count and `ticks_remaining` =
+// `k_survey_ticks_orbit_mapped` (no probe schedule: `advance_surveys` leaves it),
+// and `surveyed` once every region is both mapped and prospected. Another
+// nation's mapping never writes it.
+// ---------------------------------------------------------------------------
+
+/// `survey_state::ticks_remaining` of a body being mapped from orbit for the
+/// player: no probe schedule runs, so `advance_surveys` does not step it.
+inline constexpr int k_survey_ticks_orbit_mapped = -1;
+
+/// Is @p body one survey knowledge may be recorded for? A non-star body with a
+/// grid, other than the home world.
+bool survey_knowledge_applies(const world& w, entity_id body);
+
+/// @p nation's record for @p body, or null (nothing mapped yet, or the home world).
+const body_survey_knowledge* survey_knowledge_of(const world& w, entity_id nation, entity_id body);
+
+/// Has @p nation mapped region @p region of @p body? The home world: always.
+bool survey_region_mapped(const world& w, entity_id nation, entity_id body, int region);
+
+/// Has @p nation prospected region @p region of @p body? The home world: always.
+bool survey_region_prospected(const world& w, entity_id nation, entity_id body, int region);
+
+/// Is tile (col, row) of @p body mapped for @p nation — its terrain readable?
+bool survey_tile_mapped(const world& w, entity_id nation, entity_id body, int col, int row);
+
+/// Is tile (col, row) of @p body prospected for @p nation — its deposit band
+/// readable? Only ever true on mapped ground.
+bool survey_tile_prospected(const world& w, entity_id nation, entity_id body, int col, int row);
+
+/// Is @p body surveyed for @p nation — every region mapped and prospected?
+bool survey_body_surveyed_for(const world& w, entity_id nation, entity_id body);
+
+/// Map up to @p k more regions of @p body for @p nation, in raster order. Returns
+/// the regions mapped (0 on the home world, the star, a body with no grid, or one
+/// already fully mapped by @p nation).
+int survey_map_regions(world& w, entity_id nation, entity_id body, int k);
+
+/// Why a prospecting step did or did not prospect.
+enum class survey_prospect_result
+{
+    prospected,     ///< One region prospected.
+    not_mapped,     ///< Refused: no mapped region left unprospected (nothing mapped, or all done).
+    complete,       ///< Every region already mapped and prospected.
+    invalid         ///< The home world, the star, a body with no grid, or no such nation.
+};
+
+/// Prospect ONE region of @p body for @p nation: the unprospected mapped region
+/// nearest the landing (see above). Refused (`not_mapped`) when no mapped region
+/// is left to prospect — prospecting never runs ahead of mapping.
+survey_prospect_result survey_prospect_region(world& w, entity_id nation, entity_id body,
+                                              int* region_out = nullptr);

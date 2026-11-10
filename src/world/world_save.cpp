@@ -12,6 +12,7 @@
 #include "carried_supplies.hpp" // BL-1452: k_starvation_days — the stocks section's range check
 #include "war.hpp"         // BL-1459: the war section
 #include "hex_neighbors.hpp" // BL-1502: a front key across the line
+#include "survey_system.hpp" // BL-1600: survey_knowledge_applies, survey_region_count - the v85 checks
 #include "unit_roster.hpp" // BL-1437: unit_roster_table — the obsolete flips' range check // BL-1407: fold_legacy_firms -- a pre-v56 stream's corporations
 
 #include <sstream>
@@ -2307,6 +2308,37 @@ void write_world_snapshot_at(const world& w, std::ostream& out, uint32_t version
         }
     }
     // ===== END BL-1594 / BL-1595 =====
+    // ===== BEGIN BL-1600 (v85): SURVEY KNOWLEDGE, the last section =====
+    // Each (nation, body) record ascending: (nation, body, i32 regions_total,
+    // i32 regions_mapped, regions_total x u8 prospected).
+    if (version >= k_world_save_version_prospecting)
+    {
+        w_u32(out, static_cast<uint32_t>(w.survey_knowledge.size()));
+        for (const auto& [key, k] : w.survey_knowledge)
+        {
+            w_id(out, key.first);
+            w_id(out, key.second);
+            w_i32(out, k.regions_total);
+            w_i32(out, k.regions_mapped);
+            for (const uint8_t b : k.prospected)
+                w_u8(out, b);
+        }
+    }
+    // ===== END BL-1600 =====
+}
+
+void write_world_snapshot_pre_prospecting(const world& w, std::ostream& out)
+{
+    // VERIFICATION ONLY (BL-1600): the v84 stream shape - no survey-knowledge section.
+    write_world_snapshot_at(w, out, k_world_save_version_pre_prospecting);
+}
+
+std::size_t world_save_prospecting_section_bytes(const world& w)
+{
+    std::size_t n = 4;
+    for (const auto& [key, k] : w.survey_knowledge)
+        n += 16 + k.prospected.size();
+    return n;
 }
 
 void write_world_snapshot_pre_space_units(const world& w, std::ostream& out)
@@ -2796,7 +2828,8 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
             // ---- sprint 65 save bumps: append each parallel lane's prefix version here ----
             && version != k_world_save_version_pre_early_space // BL-1612: v81, no Early Space progress
             && version != k_world_save_version_pre_space_nodes // BL-1581: v82, nodes derived, no orders
-            && version != k_world_save_version_pre_space_units)) // BL-1594: v83, no space units
+            && version != k_world_save_version_pre_space_units // BL-1594: v83, no space units
+            && version != k_world_save_version_pre_prospecting)) // BL-1600: v84, nothing mapped off-world
         return false; // mismatched version -- refuse rather than misread
 
     // BL-1422: a stream before the kit goods carries every per-resource array 49 wide;
@@ -5002,6 +5035,42 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
         }
     }
     // ===== END BL-1594 / BL-1595 =====
+    // ===== BEGIN BL-1600 (v85): survey knowledge. Untrusted, refused whole on any
+    // breach of world_save.hpp's v85 paragraph. A v84 (and older) stream ends
+    // before it: nothing mapped off the home world. =====
+    if (version >= k_world_save_version_prospecting)
+    {
+        uint32_t count = 0;
+        if (!r_u32(in, count) || count > (1u << 20))
+            return false;
+        std::pair<entity_id, entity_id> prev{null_entity, null_entity};
+        for (uint32_t k = 0; k < count; ++k)
+        {
+            std::pair<entity_id, entity_id> key{null_entity, null_entity};
+            body_survey_knowledge kn;
+            if (!r_id(in, key.first) || !r_id(in, key.second) || !r_i32(in, kn.regions_total)
+                || !r_i32(in, kn.regions_mapped))
+                return false;
+            if ((k > 0 && !(prev < key)) || s.nations.count(key.first) == 0
+                || !survey_knowledge_applies(s, key.second))
+                return false;
+            prev = key;
+            const body_component& bc = s.bodies.at(key.second);
+            if (kn.regions_total != survey_region_count(bc.grid_width, bc.grid_height)
+                || kn.regions_mapped < 1 || kn.regions_mapped > kn.regions_total)
+                return false;
+            kn.prospected.resize(static_cast<std::size_t>(kn.regions_total));
+            for (int r = 0; r < kn.regions_total; ++r)
+            {
+                uint8_t b = 0;
+                if (!r_u8(in, b) || b > 1 || (b == 1 && r >= kn.regions_mapped))
+                    return false;
+                kn.prospected[static_cast<std::size_t>(r)] = b;
+            }
+            s.survey_knowledge.emplace_hint(s.survey_knowledge.end(), key, std::move(kn));
+        }
+    }
+    // ===== END BL-1600 =====
 
     // BL-1266 (v46): every manual trade names a live owner and two distinct
     // standing markets, and holds an id below the next one to be issued, all

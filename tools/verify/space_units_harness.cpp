@@ -801,7 +801,7 @@ int main()
               "U16a", fmt("round-trip: %zu units, %zu design nations, %zu depots; equal hash, byte-identical",
                           w2.space_units.size(), w2.space_unit_designs.size(), w2.station_depot_stock.size()));
 
-        const std::size_t sec = world_save_space_unit_section_bytes(w);
+        const std::size_t sec = (world_save_space_unit_section_bytes(w) + world_save_prospecting_section_bytes(w));
         std::ostringstream os82(std::ios::binary);
         write_world_snapshot_pre_space_units(w, os82);
         const std::string b82 = os82.str();

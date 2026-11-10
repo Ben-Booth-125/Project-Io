@@ -1076,6 +1076,12 @@ struct world
     /// station id; only stations holding stock > 0. SERIALISED (v84), hashed when non-empty.
     std::map<entity_id, float> station_depot_stock;
 
+    /// BL-1600 — each nation's mapped and prospected regions of each body off the
+    /// home world, keyed (nation, body) ascending (components.hpp
+    /// `body_survey_knowledge`; survey_system.hpp § Mapping, then prospecting).
+    /// SERIALISED (world_save.cpp, the BL-1600 section) and hashed when non-empty.
+    std::map<std::pair<entity_id, entity_id>, body_survey_knowledge> survey_knowledge;
+
     /// Enacted and un-enacted laws (BL-343). A world-level list rather than a
     /// per-corp one: a law is enacted over the world and charged to whoever it
     /// applies to, which is what makes it a governing-body instrument rather

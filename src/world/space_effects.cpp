@@ -84,43 +84,6 @@ float sell_onto_shelf(world& w, entity_id nation, entity_id market, resource_typ
     return earned;
 }
 
-/// Map up to @p k regions of @p body (DISCOVERY.md § Mapping, then prospecting:
-/// orbit maps). Returns the regions mapped. Never the home world or the star.
-int map_regions(world& w, entity_id body, int k)
-{
-    if (k <= 0 || body == null_entity || body == w.home_body || body == w.star_body)
-        return 0;
-    const auto bit = w.bodies.find(body);
-    if (bit == w.bodies.end() || bit->second.type == body_type::star)
-        return 0;
-    survey_state& s = bit->second.survey;
-    if (s.phase == survey_phase::surveyed || s.phase == survey_phase::in_transit)
-        return 0;
-    if (s.phase == survey_phase::hidden)
-    {
-        // Start the scan as a dispatched probe's would on arrival: the schedule's
-        // region count, and the day gap to its first region boundary.
-        const survey_schedule sched = survey_compute_schedule(w, body);
-        if (sched.regions_total <= 0)
-            return 0;
-        s.phase           = survey_phase::scanning;
-        s.regions_total   = sched.regions_total;
-        s.regions_done    = 0;
-        s.ticks_remaining = static_cast<int>(
-            std::lround(1.0 / sched.regions_total * static_cast<double>(sched.scan_ticks)));
-    }
-    if (s.regions_total <= 0)
-        return 0;
-    const int before = s.regions_done;
-    s.regions_done = std::min(s.regions_total, s.regions_done + k);
-    if (s.regions_done >= s.regions_total)
-    {
-        s.phase           = survey_phase::surveyed;
-        s.ticks_remaining = 0;
-    }
-    return s.regions_done - before;
-}
-
 /// The bodies with any node in @p cov, ascending.
 std::vector<entity_id> covered_bodies(const std::set<orbital_node>& cov)
 {
@@ -218,7 +181,7 @@ bool space_comms_lifts_activity_fog(const world& w, entity_id nation)
 void run_space_effects(world& w, const space_effects_params& p, const station_params& stp,
                        float reservation_mult, int econ_tick, space_effects_report* out)
 {
-    if (w.space_assets.empty() && w.stations.empty())
+    if (w.space_assets.empty() && w.stations.empty() && w.space_units.empty())
         return; // a world that never launched ticks as before
     space_effects_report rep;
 
@@ -350,8 +313,8 @@ void run_space_effects(world& w, const space_effects_params& p, const station_pa
         }
         for (const sat_map& s : sats)
             if (coverage(s.owner).count(s.node) != 0)
-                rep.survey_regions += map_regions(w, space_served_body(s.node),
-                                                  p.survey_regions_per_quarter);
+                rep.survey_regions += survey_map_regions(w, s.owner, space_served_body(s.node),
+                                                         p.survey_regions_per_quarter);
     }
 
     // ---- Observatories (5). -------------------------------------------------
@@ -359,7 +322,45 @@ void run_space_effects(world& w, const space_effects_params& p, const station_pa
         for (const entity_id aid : sw.working)
             if (w.space_assets.at(aid).module == static_cast<uint8_t>(station_module_kind::observatory))
                 for (const entity_id body : covered_bodies(coverage(sw.owner)))
-                    rep.observatory_regions += map_regions(w, body, p.observatory_regions_per_quarter);
+                    rep.observatory_regions += survey_map_regions(w, sw.owner, body,
+                                                                  p.observatory_regions_per_quarter);
+
+    // ---- Prospecting (6). ---------------------------------------------------
+    // BL-1600 (DISCOVERY.md § Mapping, then prospecting): each ACTIVE rover, then
+    // each LANDED Lander, prospects `prospect_regions_per_quarter` mapped regions
+    // of its body for its owner. Rovers ascending asset id, then Landers ascending
+    // unit id. Never ahead of mapping.
+    {
+        struct prospector { entity_id owner; entity_id body; };
+        std::vector<prospector> ground;
+        for (const auto& [id, a] : w.space_assets) // ascending id
+        {
+            (void)id;
+            if (a.cls == space_asset_class::rover && a.state == space_asset_state::active
+                && a.node.kind == orbital_node_kind::surface)
+                ground.push_back({a.owner, a.node.body});
+        }
+        for (const auto& [id, u] : w.space_units) // ascending id
+        {
+            (void)id;
+            if (u.hull == space_hull::lander && u.state == space_unit_state::landed
+                && u.node.kind == orbital_node_kind::surface)
+                ground.push_back({u.owner, u.node.body});
+        }
+        for (const prospector& g : ground)
+            for (int k = 0; k < p.prospect_regions_per_quarter; ++k)
+            {
+                const survey_prospect_result pr = survey_prospect_region(w, g.owner, g.body);
+                if (pr == survey_prospect_result::prospected)
+                    ++rep.prospected_regions;
+                else
+                {
+                    if (pr == survey_prospect_result::not_mapped)
+                        ++rep.prospect_unmapped;
+                    break;
+                }
+            }
+    }
 
     if (out)
         *out = rep;
