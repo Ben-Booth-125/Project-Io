@@ -402,16 +402,24 @@ bool nation_ended(const world& w, entity_id nation);
 
 /// ELIMINATION (BL-1562, NATIONS.md § Elimination; Ben 2026-11-09). Run once, by a
 /// concluded cession that left @p ended owning no land province, after the ground moved;
-/// @p gainer took that last province. In order: every tile @p ended still owns (its
-/// coastal water) passes to @p gainer by `cede_provinces`; its other wars close as white
+/// @p gainer took that last province (@p ceded: the provinces that peace ceded). In
+/// order: every province @p ended still OWNS (its coastal water) passes to @p gainer by
+/// `cede_provinces`; a tile it owns inside a province another nation owns passes alone
+/// (owner, tile lists, deposits, track), with no holder write and no cession record;
+/// its buildings and its space assets pass to @p gainer; its other wars close as white
 /// peace with NO truce; its peace and friendship offers drop; hostility, friendship,
 /// embargo rows, truces, refusals and sentiment rows to and from it are removed (and its
 /// queued conduct), and the laws it enacted (its tariffs) go; its units, wings, musters,
-/// front orders and battles end, its convoys and trades are cancelled; a positive
-/// treasury passes to @p gainer and a debt is written off; it is flagged `ended`, its
-/// live capital cleared (the generation capital stays its identity); the history log
-/// writes one entry. A no-op for an unknown or already-ended nation.
-void eliminate_nation(world& w, const sentiment_params& p, entity_id ended, entity_id gainer);
+/// front orders and battles end, its convoys and trades are cancelled; a land unit of a
+/// nation not at war with @p gainer left on the provinces @p gainer just gained
+/// (@p ceded and the residual ones) withdraws by the retreat rule; a positive treasury
+/// passes to @p gainer, BOOKED on its next return as a refund-style receipt (so a
+/// return's net still equals its balance change), and a debt is written off; it is
+/// flagged `ended`, its live capital cleared (the generation capital stays its
+/// identity); the history log writes one entry. A no-op for an unknown or already-ended
+/// nation.
+void eliminate_nation(world& w, const sentiment_params& p, entity_id ended, entity_id gainer,
+                      const std::vector<uint32_t>& ceded = {});
 
 // ---------------------------------------------------------------------------
 // Passes

@@ -3938,9 +3938,21 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
                 return false;
             // BL-1562 (RELATIONS.md § 7, Ben 2026-11-09): a declaration of war makes BOTH
             // sides hostile, so the defender's row stands whether or not it answered. A
-            // stream written before that ruling carries an unanswered war with one row;
-            // it loads with both. (The friendship the declarer's row already excludes.)
-            s.corp_hostile_pairs.insert({ r.defender, r.declarer });
+            // stream of that format must carry it: one without is refused. A stream
+            // written before that ruling carries an unanswered war with one row; it loads
+            // with both, and the defender's row is written as `write_hostility` writes it:
+            // a standing friendship offer between the pair drops either way. (The
+            // friendship itself the declarer's row already excludes.)
+            if (version >= k_world_save_version_ended)
+            {
+                if (s.corp_hostile_pairs.count({ r.defender, r.declarer }) == 0)
+                    return false;
+            }
+            else if (s.corp_hostile_pairs.insert({ r.defender, r.declarer }).second)
+            {
+                s.corp_friend_offers.erase({ r.defender, r.declarer });
+                s.corp_friend_offers.erase({ r.declarer, r.defender });
+            }
             r.answered = answered == 1;
             const std::pair<entity_id, entity_id> key{r.declarer, r.defender};
             if (!s.wars.empty() && !(s.wars.rbegin()->first < key))
@@ -4351,8 +4363,13 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
 
     // v81 (BL-1562): the ended nations. Untrusted: each names a nation of the stream,
     // strictly ascending, never null, that owns no tile, fields no unit and is party to
-    // no open war - what elimination leaves. Refused whole otherwise. A v80 (and older)
-    // stream ends before it: no nation has ended.
+    // no open war - what elimination leaves - and (fix round, cold review) that keeps
+    // nothing else elimination clears: no hostility, friendship, friendship-offer,
+    // embargo or peace-offer row and no sentiment row naming it; no law it enacted, no
+    // trade, convoy, wing, muster or front order of its own; no building or space asset;
+    // no positive treasury; no live capital. Refused whole otherwise (the scratch world
+    // is dropped, so nothing lands). A v80 (and older) stream ends before it: no nation
+    // has ended.
     if (version >= k_world_save_version_ended)
     {
         uint32_t count = 0;
@@ -4377,6 +4394,47 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
             for (const auto& [key, war] : s.wars)
                 if (key.first == nid || key.second == nid)
                     return false;
+            const auto names = [nid](const std::pair<entity_id, entity_id>& k) {
+                return k.first == nid || k.second == nid;
+            };
+            for (const auto* table : { &s.corp_hostile_pairs, &s.corp_friend_pairs, &s.corp_friend_offers,
+                                       &s.nation_embargoes })
+                for (const auto& k : *table)
+                    if (names(k))
+                        return false;
+            for (const auto& [k, o] : s.peace_offers)
+                if (names(k))
+                    return false;
+            for (const auto& [k, v] : s.sentiment.pairs)
+                if (names(k))
+                    return false;
+            for (const auto& [k, v] : s.sentiment.contributions)
+                if (names(k))
+                    return false;
+            for (const law& l : s.laws)
+                if (l.enacting_nation == nid)
+                    return false;
+            for (const standing_trade& t : s.trades)
+                if (t.owner == nid)
+                    return false;
+            for (const convoy_component& c : s.convoys)
+                if (c.corp == nid)
+                    return false;
+            for (const auto& [wid, wg] : s.wings)
+                if (wg.owner == nid)
+                    return false;
+            for (const muster_order& m : s.musters)
+                if (m.owner == nid)
+                    return false;
+            for (const front_order_entry& f : s.front_orders)
+                if (f.nation == nid)
+                    return false;
+            for (const auto& [aid, a] : s.space_assets)
+                if (a.owner == nid)
+                    return false;
+            const nation_component& enc = nit->second;
+            if (!enc.state_assets.empty() || enc.treasury > 0.0f || enc.capital_tile != null_entity)
+                return false;
             nit->second.ended = true;
         }
     }

@@ -285,7 +285,9 @@ void draw_war_notices(const world& w, ui_state& ui, float left, float right)
     if (!ns.armed)
     {
         // The wars already standing on a new world or a load are not news; nor is a
-        // nation already ended there.
+        // nation already ended there. The PLAYER's own end is the exception (fix round,
+        // cold review): a save taken with the campaign lost re-opens the notice on load,
+        // unless the player had chosen to spectate.
         ns.seen.clear();
         ns.open.clear();
         ns.ended_seen.clear();
@@ -294,7 +296,11 @@ void draw_war_notices(const world& w, ui_state& ui, float left, float right)
             ns.seen.insert(key);
         for (const auto& [nid, nc] : w.nations)
             if (nc.ended)
+            {
                 ns.ended_seen.insert(nid);
+                if (nid == me && !ui.spectating)
+                    ns.ended_open.push_back(nid);
+            }
         ns.armed = true;
         return;
     }

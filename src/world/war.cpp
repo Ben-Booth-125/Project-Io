@@ -896,7 +896,7 @@ void conclude_peace(world& w, const sentiment_params& p, std::pair<entity_id, en
     {
         const entity_id loser = terms.gainer == war.declarer ? war.defender : war.declarer;
         if (provinces_owned(w, loser) == 0)
-            eliminate_nation(w, p, loser, terms.gainer);
+            eliminate_nation(w, p, loser, terms.gainer, terms.provinces);
     }
 }
 
@@ -947,7 +947,8 @@ bool nation_ended(const world& w, entity_id nation)
     return it != w.nations.end() && it->second.ended;
 }
 
-void eliminate_nation(world& w, const sentiment_params& p, entity_id ended, entity_id gainer)
+void eliminate_nation(world& w, const sentiment_params& p, entity_id ended, entity_id gainer,
+                      const std::vector<uint32_t>& ceded)
 {
     const auto eit = w.nations.find(ended);
     if (eit == w.nations.end() || eit->second.ended || ended == gainer)
@@ -955,31 +956,46 @@ void eliminate_nation(world& w, const sentiment_params& p, entity_id ended, enti
     const bool has_gainer = gainer != null_entity && w.nations.count(gainer) != 0;
 
     // 0. ITS LAST GROUND. A nation owns its coastal water as well as its land; with its
-    //    last land province gone, every province it still holds a tile of passes to the
-    //    conqueror with it (by the cession path, so buildings, track and units follow), and
-    //    a tile in no province passes alone. Ascending province, then ascending tile.
+    //    last land province gone, every province it still OWNS passes to the conqueror
+    //    by the cession path (so buildings, track and units follow). A tile it owns inside
+    //    a province another nation owns (fix round, cold review) passes ALONE: owner, tile
+    //    lists, deposit profile and track, with no holder write and no cession record, so
+    //    the conqueror is never handed a third nation's province. The owners are read
+    //    before anything moves. Ascending province, then ascending tile.
+    std::vector<uint32_t> gained; // the provinces the gainer holds by this end: ceded + residual
     if (has_gainer)
     {
         std::set<uint32_t> residual;
-        std::vector<entity_id> loose;
         for (const entity_id t : eit->second.tiles)
             if (const auto o = w.tile_to_nation.find(t); o != w.tile_to_nation.end() && o->second == ended)
             {
                 const uint32_t pid = w.provinces.province_of(t);
-                if (pid != 0 && pid != no_province)
+                if (pid != 0 && pid != no_province && province_owner(w, pid) == ended)
                     residual.insert(pid);
-                else
-                    loose.push_back(t);
             }
-        if (!residual.empty())
-            cede_provinces(w, ended, gainer, std::vector<uint32_t>(residual.begin(), residual.end()));
-        std::sort(loose.begin(), loose.end());
+        gained.assign(residual.begin(), residual.end());
+        if (!gained.empty())
+            cede_provinces(w, ended, gainer, gained);
         nation_component& loser = w.nations.at(ended);
         nation_component& to    = w.nations.at(gainer);
+        std::vector<entity_id> loose;
+        for (const entity_id t : loser.tiles)
+            if (const auto o = w.tile_to_nation.find(t); o != w.tile_to_nation.end() && o->second == ended)
+                loose.push_back(t);
+        std::sort(loose.begin(), loose.end());
+        loose.erase(std::unique(loose.begin(), loose.end()), loose.end());
         for (const entity_id t : loose)
         {
             w.set_tile_nation(t, gainer);
             to.tiles.push_back(t);
+            if (const auto tc = w.tiles.find(t); tc != w.tiles.end())
+                for (std::size_t r = 0; r < resource_count; ++r)
+                {
+                    loser.resource_abundance[r] = std::max(0.0f, loser.resource_abundance[r] - tc->second.resource_deposit[r]);
+                    to.resource_abundance[r] += tc->second.resource_deposit[r];
+                }
+            if (const auto rt = w.rail_track.find(t); rt != w.rail_track.end() && rt->second == ended)
+                rt->second = gainer;
         }
         loser.tiles.erase(std::remove_if(loser.tiles.begin(), loser.tiles.end(),
                                          [&](entity_id t) {
@@ -987,9 +1003,16 @@ void eliminate_nation(world& w, const sentiment_params& p, entity_id ended, enti
                                              return o == w.tile_to_nation.end() || o->second != ended;
                                          }),
                           loser.tiles.end());
-        // Whatever it still owns off its ground (nothing, on a generated world) passes too.
+        // Whatever it still owns off its ground (nothing, on a generated world) passes too:
+        // its remaining buildings, and its space assets (Ben, 2026-11-09), ascending id.
         to.state_assets.insert(to.state_assets.end(), loser.state_assets.begin(), loser.state_assets.end());
         loser.state_assets.clear();
+        for (auto& [sid, sa] : w.space_assets)
+            if (sa.owner == ended)
+                sa.owner = gainer;
+        gained.insert(gained.end(), ceded.begin(), ceded.end());
+        std::sort(gained.begin(), gained.end());
+        gained.erase(std::unique(gained.begin(), gained.end()), gained.end());
     }
 
     // 1. ITS WARS CLOSE: every other war it is party to, as a white peace with no truce.
@@ -1076,14 +1099,53 @@ void eliminate_nation(world& w, const sentiment_params& p, entity_id ended, enti
                                   [&](const standing_trade& t) { return t.owner == ended; }),
                    w.trades.end());
 
+    // 3b. NO THIRD PARTY STANDS AT PEACE ON THE NEW GROUND (fix round, cold review): with
+    //    the ended nation's wars closed, a land unit of a nation NOT at war with the gainer
+    //    left on a province the gainer just gained (the ceded and the residual ones)
+    //    withdraws by the retreat rule, as a peace's own withdrawal does.
+    if (has_gainer && !gained.empty())
+    {
+        const auto& rows = unit_roster_table();
+        std::vector<entity_id> leaving;
+        for (const auto& [uid, u] : w.units) // collected; withdraw_units walks ascending
+        {
+            if (u.owner == gainer || u.owner == ended || u.count <= 0 || u.position == null_entity
+                || u.type >= rows.size() || (rows[u.type].domains & domain_bit(traversal_domain::land)) == 0)
+                continue;
+            if (at_war(w, u.owner, gainer))
+                continue;
+            const auto tn = w.tile_to_nation.find(u.position);
+            if (tn == w.tile_to_nation.end() || tn->second != gainer)
+                continue;
+            const uint32_t pid = w.provinces.province_of(u.position);
+            if (std::binary_search(gained.begin(), gained.end(), pid))
+                leaving.push_back(uid);
+        }
+        if (!leaving.empty())
+            (void)withdraw_units(w, leaving, gained, peace_day_stamp(w));
+    }
+
     // 4. ITS TREASURY PASSES TO THE CONQUEROR: a positive balance is an actor-to-actor
-    //    transfer that conserves; a debt is written off, not inherited.
+    //    transfer that conserves; a debt is written off, not inherited. The receipt is
+    //    BOOKED (fix round, cold review) through the refund mechanism (BL-1539): the
+    //    gainer's next return lists it, so its net still equals its balance change. The
+    //    ended nation's own unbooked amounts go with it: it files no return again.
     nation_component& nc = w.nations.at(ended);
     if (has_gainer && nc.treasury > 0.0f)
-        w.nations.at(gainer).treasury += nc.treasury;
-    nc.treasury      = 0.0f;
-    nc.trade_reserve = 0.0f;
-    nc.trade_points  = 0.0f;
+    {
+        nation_component& to = w.nations.at(gainer);
+        if (to.refund_unbooked == 0.0f)
+            to.refund_opening = to.treasury;
+        to.refund_unbooked += nc.treasury;
+        to.treasury        += nc.treasury;
+    }
+    nc.treasury          = 0.0f;
+    nc.trade_reserve     = 0.0f;
+    nc.trade_points      = 0.0f;
+    nc.refund_unbooked   = 0.0f;
+    nc.refund_opening    = 0.0f;
+    nc.research_unbooked = 0.0;
+    nc.upkeep_unbooked   = 0.0;
 
     // 5. IT STAYS A RECORD: id, name and history kept, flagged ended. Its generated
     //    capital stays its identity; its live capital names no tile it owns.

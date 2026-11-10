@@ -16,6 +16,7 @@
 // The process exits non-zero if any assertion FAILs.
 
 #include "world/battle_system.hpp"
+#include "world/budget_system.hpp" // fix round: apply_budget files the conqueror's return
 #include "world/components.hpp"
 #include "world/corp_ai.hpp"      // BL-1461: score_nation_war, war_ai_trace_sink
 #include "world/corp_command.hpp"
@@ -35,6 +36,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <functional>
 #include <map>
 #include <sstream>
 #include <string>
@@ -1092,6 +1094,31 @@ int main()
               "E6 its units disband where they stand; its convoys and trades are cancelled; A's stand");
         check(w.nations.at(f.B).treasury == 0.0f && w.nations.at(f.A).treasury == a_before + 5000.0f,
               "E7 its positive treasury (5000) passes to the conqueror, exactly");
+        {
+            // Fix round (cold review): the inheritance is BOOKED. The conqueror's next
+            // return lists it as a refund-style receipt and its net is its balance change.
+            world wb = w;
+            const std::size_t a_rows = wb.nations.at(f.A).returns.size();
+            const std::size_t b_rows = wb.nations.at(f.B).returns.size();
+            const nation_component& bn = wb.nations.at(f.B);
+            const bool b_books_clear = bn.refund_unbooked == 0.0f && bn.research_unbooked == 0.0
+                                    && bn.upkeep_unbooked == 0.0;
+            apply_budget(wb, reg, {}, {});
+            const nation_component& an = wb.nations.at(f.A);
+            bool booked = an.returns.size() == a_rows + 1 && wb.nations.at(f.B).returns.size() == b_rows;
+            if (booked)
+            {
+                const quarterly_return& r = an.returns.back();
+                booked = r.refunds == 5000.0f
+                      && r.net == static_cast<double>(an.treasury) - static_cast<double>(a_before)
+                      && r.balance == an.treasury;
+                std::printf("    E7b A's return: refunds %.1f net %.3f balance %.1f (was %.1f)\n",
+                            r.refunds, r.net, r.balance, a_before);
+            }
+            check(booked && b_books_clear,
+                  "E7b the inheritance is BOOKED: A's next return carries it (refunds 5000) and its net "
+                  "equals its balance less its previous balance; B's unbooked amounts are zero and it files no return");
+        }
         // A's stub convoy and trade were controls for E6 only: they name no market, which
         // the loader (rightly) refuses, so they go before the save rows below.
         w.convoys.clear();
@@ -1146,6 +1173,43 @@ int main()
             check(!from_bytes(to_bytes(bad), back2) && back2.nations.empty(),
                   "E13 a stream marking a nation with ground ended is refused whole on load");
         }
+        {
+            // Fix round (cold review): an ended nation that keeps anything elimination clears
+            // is refused whole, the destination untouched. Each corruption is applied to the
+            // honest ended world, one at a time.
+            // (A stub trade, convoy, wing, muster, front order or space asset is refused by its
+            // own table's validator, so it cannot show this check; the loader holds those too.)
+            const entity_id B = f.B, C = f.C;
+            const entity_id some_tile = w.provinces.find(f.provs[f.A][0])->tiles.front();
+            const entity_id a_building = w.nations.at(f.A).state_assets.empty()
+                                       ? null_entity : w.nations.at(f.A).state_assets.front();
+            struct corrupt { const char* what; std::function<void(world&)> apply; };
+            std::vector<corrupt> rows = {
+                { "hostility row",   [&](world& x) { x.corp_hostile_pairs.insert({ C, B }); } },
+                { "friendship row",  [&](world& x) { x.corp_friend_pairs.insert(canonical_pair(B, C)); } },
+                { "friend offer",    [&](world& x) { x.corp_friend_offers.insert({ C, B }); } },
+                { "embargo row",     [&](world& x) { x.nation_embargoes.insert({ C, B }); } },
+                { "sentiment row",   [&](world& x) { x.sentiment.pairs[{ C, B }] = sentiment_value{ 0.0f, 1.0f, 0.0f }; } },
+                { "law",             [&](world& x) { law l; l.id = "LAW-X"; l.name = "x"; l.effect = law_effect_kind::import_tariff;
+                                                     l.enacted = true; l.enacting_nation = B; l.rate = 0.1f; x.laws.push_back(l); } },
+                { "positive treasury", [&](world& x) { x.nations.at(B).treasury = 1.0f; } },
+                { "live capital",    [&](world& x) { x.nations.at(B).capital_tile = some_tile; } },
+            };
+            if (a_building != null_entity)
+                rows.push_back({ "building", [&](world& x) { x.nations.at(B).state_assets.push_back(a_building);
+                                                             auto& v = x.nations.at(f.A).state_assets; v.erase(v.begin()); } });
+            for (const corrupt& c : rows)
+            {
+                world bad = w;
+                c.apply(bad);
+                world dest = w; // a live destination: a refusal must leave it exactly as it was
+                const std::string before = to_bytes(dest);
+                const bool refused = !from_bytes(to_bytes(bad), dest);
+                check(refused && to_bytes(dest) == before,
+                      std::string("E13b a stream whose ended nation keeps a ") + c.what
+                          + " is refused whole, the destination untouched");
+            }
+        }
     }
     {
         // An old save's unanswered war (one row) loads with both rows.
@@ -1160,6 +1224,67 @@ int main()
         check(read_world_snapshot(old, in) && is_hostile(old, f.A, f.B) && is_hostile(old, f.B, f.A)
                   && !old.wars.at({ f.A, f.B }).answered,
               "E14 an old save's unanswered war (one hostility row) loads with both rows, still unanswered");
+        // Fix round (cold review): the upgrade is the OLD format's only. A current stream
+        // missing the defender's row is refused whole.
+        world dest;
+        check(!from_bytes(to_bytes(w), dest) && dest.nations.empty(),
+              "E14b a current-format stream with an unanswered war missing the defender's row is refused");
+        // ... and the upgrade writes the row as write_hostility does: a standing friendship
+        // offer between the pair drops.
+        w.corp_friend_offers.insert({ f.B, f.A });
+        std::ostringstream o2(std::ios::binary);
+        write_world_snapshot_pre_ended(w, o2);
+        world old2;
+        std::istringstream in2(o2.str(), std::ios::binary);
+        const bool loaded2 = read_world_snapshot(old2, in2);
+        check(loaded2 && is_hostile(old2, f.B, f.A) && old2.corp_friend_offers.count({ f.B, f.A }) == 0,
+              "E14c the old-format upgrade drops a standing friendship offer between the war's parties");
+    }
+    {
+        // Fix round (cold review): a mixed province, and a third party at peace with the
+        // conqueror. B keeps one province (bp[0]) and ONE tile inside bp[1], which is C's by
+        // plurality. D, at war with B, has a unit on B's last province; F, at war with A,
+        // has one there too.
+        fixture f; build(f);
+        world& w = f.w;
+        const std::vector<uint32_t> bp = f.provs[f.B];
+        for (std::size_t i = 1; i < bp.size(); ++i)
+            for (const entity_id t : w.provinces.find(bp[i])->tiles) w.set_tile_nation(t, f.C);
+        const entity_id stray = w.provinces.find(bp[1])->tiles.front();
+        w.set_tile_nation(stray, f.B);
+        const uint32_t last = bp[0];
+        const entity_id holder1 = province_holder_for(w, bp[1]);
+        check(province_owner(w, bp[1]) == f.C && w.tile_to_nation.at(stray) == f.B,
+              "E17 (bp[1] is C's by plurality, with one tile still B's)");
+        check(declare_war(w, sp, f.A, f.B, { last }) == war_result::applied
+                  && declare_war(w, sp, f.D, f.B, { last }) == war_result::applied
+                  && declare_war(w, sp, f.F, f.A, { f.provs[f.A][0] }) == war_result::applied,
+              "E17 (A and D at war with B; F at war with A)");
+        const std::vector<entity_id>& lt = w.provinces.find(last)->tiles;
+        const entity_id du = w.create_entity();
+        { unit_component uc{}; uc.position = lt.back(); uc.owner = f.D; uc.count = 300; uc.establishment = 300; w.units[du] = uc; }
+        const entity_id fu = w.create_entity();
+        { unit_component uc{}; uc.position = lt.back(); uc.owner = f.F; uc.count = 300; uc.establishment = 300; w.units[fu] = uc; }
+        w.province_holder[holder_index(w, last)] = f.A;
+        w.wars.at({ f.A, f.B }).defender_men_lost = 10;
+        const std::size_t cessions_before = w.province_cessions.size();
+        peace_terms cede; cede.kind = peace_kind::cession; cede.gainer = f.A; cede.provinces = { last };
+        check(impose_peace(w, sp, f.A, f.B, cede) == war_result::applied && nation_ended(w, f.B),
+              "E17 (A imposes the cession of B's last province; B ends)");
+        bool no_record = true;
+        for (std::size_t i = cessions_before; i < w.province_cessions.size(); ++i)
+            no_record = no_record && w.province_cessions[i].province != bp[1];
+        check(w.tile_to_nation.at(stray) == f.A && province_owner(w, bp[1]) == f.C
+                  && province_holder_for(w, bp[1]) == holder1 && no_record,
+              "E17 a tile B owned inside C's province passes ALONE: the tile is A's, the province stays C's, "
+              "its holder is unwritten and no cession is recorded");
+        const auto in_last = [&](entity_id uid) {
+            return w.units.count(uid) != 0 && w.provinces.province_of(w.units.at(uid).position) == last;
+        };
+        check(w.units.count(du) == 1 && !in_last(du),
+              "E18 D's unit (at war with B, at peace with A) withdraws off A's new ground");
+        check(in_last(fu),
+              "E18b control: F's unit, at war with A, stays where it stands");
     }
     {
         // A debt is written off, not inherited.
