@@ -890,7 +890,6 @@ inline constexpr uint32_t k_world_save_version_pre_space_convoys = k_world_save_
 /// renumbers this block (this paragraph, `world_save_version`, the two constants
 /// below, the accepted-version line in `read_world_snapshot`, and the one section at
 /// the end of the writer and reader).
-inline constexpr uint32_t world_save_version = 88;
 
 /// BL-1598: the first version carrying the debris section (see above).
 inline constexpr uint32_t k_world_save_version_debris = 88;
@@ -898,6 +897,28 @@ inline constexpr uint32_t k_world_save_version_debris = 88;
 /// BL-1598: v87, a strict prefix of v88.
 inline constexpr uint32_t k_world_save_version_pre_debris = k_world_save_version_debris - 1;
 /// ===== END BL-1598 VERSION BUMP =================================================
+/// ===== BEGIN BL-1599 VERSION BUMP (blockade and bombardment) — ONE BLOCK ========
+/// **89 (BL-1599; SPACE_FLEETS.md § Bombardment and fire at orbit) — THE STANDING
+/// BOMBARD ORDERS.** Appended last, after a u32 count: every `space_bombard_order`
+/// ascending unit id, as (unit id, u8 kind, u32 target) — 9 bytes. Each names a live
+/// space unit whose owner is a nation; the kind in range; the target non-zero. (The
+/// target's existence and hostility are re-read each day, which drops an order whose
+/// target is gone, so the stream does not require them.) Blockade is derived and the
+/// battery is a building in the building store: neither adds bytes. Refused whole
+/// otherwise. v88 is a STRICT PREFIX of v89 and is read too
+/// (`k_world_save_version_pre_space_bombard`), as a world with no orders. The
+/// building-type gate now admits `orbital_defence_battery` (no older writer can name
+/// it; the BL-1426 precedent). MERGE NOTE: a parallel lane's bump renumbers this block (this
+/// paragraph, the three constants below, the accepted-version line in
+/// `read_world_snapshot`, and the one section at the end of the writer and reader).
+inline constexpr uint32_t world_save_version = 89;
+
+/// BL-1599: the first version carrying the bombard-order section (see above).
+inline constexpr uint32_t k_world_save_version_space_bombard = 89;
+
+/// BL-1599: v88, a strict prefix of v89.
+inline constexpr uint32_t k_world_save_version_pre_space_bombard = k_world_save_version_space_bombard - 1;
+/// ===== END BL-1599 VERSION BUMP =================================================
 
 /// BL-1612: the first version carrying the Early Space tree section (see above).
 inline constexpr uint32_t k_world_save_version_early_space = 82;
@@ -1164,6 +1185,12 @@ std::size_t world_save_prospecting_section_bytes(const world& w);
 /// BL-1596: the byte length of the v87 space-convoy section `w` writes - 4 + 32 per
 /// record. The LAST section of a v87 stream.
 std::size_t world_save_space_convoy_section_bytes(const world& w);
+
+/// BL-1599: VERIFICATION ONLY - the v87 stream shape (no bombard-order section).
+void write_world_snapshot_pre_space_bombard(const world& w, std::ostream& out);
+/// BL-1599: the byte length of the v88 bombard-order section `w` writes - 4 + 9 per
+/// order. The LAST section of a v88 stream.
+std::size_t world_save_space_bombard_section_bytes(const world& w);
 
 /// BL-1422, widened by BL-1436: the bytes ALL SIX kit goods' extra elements add to
 /// every per-resource array of the stream `w` writes - the widening from 49 to today's

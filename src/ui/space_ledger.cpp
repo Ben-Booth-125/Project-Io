@@ -130,6 +130,7 @@ const char* launch_refusal(space_launch_result r)
         case space_launch_result::rejected_no_slot:               return "Every slot at that node is held.";
         case space_launch_result::rejected_no_route:              return "No path reaches that node from your home surface.";
         case space_launch_result::rejected_shelf:                 return "The home market's shelf cannot fill the goods.";
+        case space_launch_result::rejected_blockaded:             return "Your home body is blockaded: no launch reaches orbit.";
     }
     return "Refused.";
 }

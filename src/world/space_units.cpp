@@ -7,6 +7,7 @@
 #include "space_battle.hpp"  // BL-1597: an engaged unit's move is a withdrawal
 #include "space_assets.hpp"    // space_home_body_of, k_space_quarters_to_loss_ceiling
 #include "space_convoy.hpp"     // BL-1596: run_space_convoy_day, prune_space_hauls
+#include "space_bombard.hpp"    // BL-1599: space_blockaded, prune_space_bombard_orders
 #include "space_tech_keys.hpp"
 #include "world.hpp"
 
@@ -499,6 +500,12 @@ space_unit_op raise_space_unit_at_pad(world& w, const space_unit_params& p, enti
         op.result = space_unit_result::rejected_no_pad;
         return op;
     }
+    // BL-1599 (SPACE_FLEETS.md § Blockade): no launch from a blockaded body reaches orbit.
+    if (space_blockaded(w, nation, body))
+    {
+        op.result = space_unit_result::rejected_blockaded;
+        return op;
+    }
     const space_design_stats st = evaluate_space_design(h, *space_unit_design_of(w, nation, h));
     const double climb = orbital_climb_dv(w, orbital_graph_params{}, body);
     const float rate = std::isfinite(p.launch_propellant_per_dv) ? std::max(0.0f, p.launch_propellant_per_dv) : 0.0f;
@@ -734,6 +741,12 @@ space_unit_op refuel_space_unit(world& w, const space_unit_params& p, const stat
         op.result = space_unit_result::rejected_no_pad;
         return op;
     }
+    // BL-1599: the propellant climbs through the pad - a launch a blockade stops.
+    if (space_blockaded(w, nation, u.node.body))
+    {
+        op.result = space_unit_result::rejected_blockaded;
+        return op;
+    }
     if (!(need > 0.0f))
     {
         op.result = space_unit_result::rejected_no_fuel;
@@ -890,6 +903,7 @@ void run_space_unit_quarter(world& w, const space_unit_params& p, const station_
 
     // BL-1596: a hauler lost above takes its cargo (and any trade riding it) with it.
     prune_space_hauls(w);
+    prune_space_bombard_orders(w); // BL-1599: and its standing bombard order
 
     // 2. Depot stock: a station gone takes its stock with it.
     for (auto it = w.station_depot_stock.begin(); it != w.station_depot_stock.end();)

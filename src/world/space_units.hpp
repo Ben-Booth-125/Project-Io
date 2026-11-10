@@ -75,8 +75,10 @@ struct world;
 // is recorded there as a withdrawal. Cargo and convoys are space_convoy.hpp's (BL-1596).
 //
 // DEBRIS is debris.hpp's (BL-1598): its day step reads `arrivals` below.
+// BLOCKADE AND BOMBARDMENT are space_bombard.hpp's (BL-1599): a launch at a pad and a refuel
+// over one are refused `rejected_blockaded` on a body blockaded for the nation.
 //
-// WHAT IS NOT HERE: bombardment, any AI, any UI, the agent seam. The seams left for them: the
+// WHAT IS NOT HERE: any AI, any UI, the agent seam. The seams left for them: the
 // armed-unit list at a node (`space_armed_units_at`) and each unit's readable hull
 // points, firepower and armour (`space_unit_firepower`, `space_unit_armour`).
 //
@@ -259,6 +261,10 @@ enum class space_unit_result : uint8_t
     // BL-1596 (space convoys), appended:
     rejected_hostile,           ///< An armed unit of a nation at war with the owner stands at the node.
     rejected_cargo,             ///< Load/unload: not a carrier, another good aboard, over the bay, nothing aboard, on a trade.
+    // BL-1599 (blockade and bombardment), appended:
+    rejected_blockaded,         ///< The body is blockaded (space_bombard.hpp): no launch, load or unload there.
+    rejected_not_armed,         ///< Bombard: the unit carries no orbital-missile armament.
+    rejected_target,            ///< Bombard: nothing there the nation may strike (none, or none hostile).
 };
 
 /// What a raise, a move or a refuel did.
@@ -346,6 +352,7 @@ struct space_convoy_day_report
 {
     int   departed = 0, unloaded = 0, home = 0, lost = 0, stopped = 0, stranded = 0, waiting = 0;
     float cargo_lost = 0.0f;
+    int   battles = 0; ///< BL-1599: battles an escorted Hauler's meeting opened.
 };
 
 /// What one day did — reported, never stored.

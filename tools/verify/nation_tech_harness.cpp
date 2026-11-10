@@ -1047,7 +1047,7 @@ void rows_es()
         std::stringstream in81(s81, std::ios::in | std::ios::binary);
         const bool ok81 = read_world_snapshot(old, in81);
         check(world_save_version >= k_world_save_version_space_nodes
-                  && s81.size() + world_save_early_space_section_bytes(f.w) + (world_save_space_node_section_bytes(f.w) + (world_save_space_unit_section_bytes(f.w) + (world_save_space_battle_section_bytes(f.w) + (world_save_prospecting_section_bytes(f.w) + (world_save_space_convoy_section_bytes(f.w) + world_save_debris_section_bytes(f.w)))))) == bytes.size()
+                  && s81.size() + world_save_early_space_section_bytes(f.w) + (world_save_space_node_section_bytes(f.w) + (world_save_space_unit_section_bytes(f.w) + (world_save_space_battle_section_bytes(f.w) + (world_save_prospecting_section_bytes(f.w) + (world_save_space_convoy_section_bytes(f.w) + (world_save_debris_section_bytes(f.w) + world_save_space_bombard_section_bytes(f.w))))))) == bytes.size()
                   && ok81 && old.nation_tech.at(f.nation).es_empty(),
               "ES8b v81 is v83 less its last two sections, and reads as no Early Space progress");
 
@@ -1083,7 +1083,7 @@ void rows_es()
 
         // Byte tampers on the tail itself. The section: count 0, then record 0 at 4 as
         // (id 4, node count 8, held words 12...).
-        const std::size_t sec = bytes.size() - world_save_early_space_section_bytes(f.w) - (world_save_space_node_section_bytes(f.w) + (world_save_space_unit_section_bytes(f.w) + (world_save_space_battle_section_bytes(f.w) + (world_save_prospecting_section_bytes(f.w) + (world_save_space_convoy_section_bytes(f.w) + world_save_debris_section_bytes(f.w))))));
+        const std::size_t sec = bytes.size() - world_save_early_space_section_bytes(f.w) - (world_save_space_node_section_bytes(f.w) + (world_save_space_unit_section_bytes(f.w) + (world_save_space_battle_section_bytes(f.w) + (world_save_prospecting_section_bytes(f.w) + (world_save_space_convoy_section_bytes(f.w) + (world_save_debris_section_bytes(f.w) + world_save_space_bombard_section_bytes(f.w)))))));
         auto tampered = [&](std::size_t off, std::uint32_t v) {
             std::string tb = bytes;
             std::memcpy(&tb[off], &v, 4);
@@ -1421,12 +1421,18 @@ void rows_t2(const recipe_registry& reg)
             // (SPACE_ASSETS.md § Astronauts), not a structure unlock; checked below.
             if (static_cast<building_type>(ty) == building_type::astronaut_training_centre)
                 continue;
+            // BL-1599: the Orbital Defence Battery is gated by its mechanic key alike.
+            if (static_cast<building_type>(ty) == building_type::orbital_defence_battery)
+                continue;
             all_types = all_types && structure_unlocked(f.w, f.corp2, static_cast<building_type>(ty));
         }
         check(open && all_types, "T2l no node names propellant or a structure: propellant and every other building type open to every nation");
         check(structure_unlocked(f.w, f.corp2, building_type::astronaut_training_centre)
                   == nation_has_mechanic(f.w, owner_home_nation(f.w, f.corp2), space_keys::astronaut_training),
               "T2l2 the Astronaut Training Centre opens exactly with its mechanic key");
+        check(structure_unlocked(f.w, f.corp2, building_type::orbital_defence_battery)
+                  == nation_has_mechanic(f.w, owner_home_nation(f.w, f.corp2), space_keys::orbital_defence_battery),
+              "T2l3 the Orbital Defence Battery opens exactly with its mechanic key (BL-1599)");
     }
 
     // (e2) Wind Power (Ben, 2026-11-05): the one recipe a node opens. Closed to both

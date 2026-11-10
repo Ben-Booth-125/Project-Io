@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*57 entries — 54 open, 3 resolved.*
+*59 entries — 56 open, 3 resolved.*
 
 ---
 
@@ -681,6 +681,34 @@ Debris per node grows from every orbital loss (battle, upkeep, wear), wears asse
 > **Recommendation:** Confirm.
 
 *Files: `src/world/debris.cpp`, `src/world/space_battle.cpp`, `docs/military/SPACE_FLEETS.md`, `docs/economy/SPACE_ASSETS.md`*
+
+### NR-1195 — Blockade and bombardment built with four calls taken on your behalf
+*decision taken on your behalf · raised 2026-11-10 · from BL-1599 lane report*
+
+(1) A bombardment strike charges the existing force_used Alarm path; there is no separate missile Alarm code. (2) The orbital defence battery is a new building type, number 15, opened by its own Early Space node; it fires at hostile units in its body's low orbit. (3) Strikes spend no munitions; the cost is the unit's upkeep and its exposure to the battery. (4) A unit the battery kills does not raise debris, unlike a battle loss. Save v89 carries the standing bombard orders; blockade is derived and adds no bytes.
+
+**Why it matters.** Calls (1), (3) and (4) shape how costly orbital war is.
+
+- Accept all four
+- Give strikes a munitions cost
+- Feed battery kills into debris
+
+> **Recommendation:** Accept for v0.5.0; feeding battery kills into debris is a one-line follow-up if wanted.
+
+*Files: `src/world/space_bombard.cpp`, `docs/military/SPACE_FLEETS.md`*
+
+### NR-1196 — Rivals cannot bombard or blockade yet: no AI uses the new verbs
+*novel-work · raised 2026-11-10 · from BL-1599 lane report*
+
+The bombard order and the battery are player-and-script only. Rival use belongs to BL-1608 (rival far-space AI), which is open; the 2026-11-10 grant covers it.
+
+**Why it matters.** The spectator check will show rivals never striking until BL-1608 lands.
+
+- Leave it to BL-1608 (rival far-space AI)
+
+> **Recommendation:** Leave it to BL-1608.
+
+*Files: `src/world/corp_ai.cpp`*
 
 ---
 

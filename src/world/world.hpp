@@ -18,6 +18,7 @@
 #include "space_battle.hpp" // space_battle (BL-1597, below)
 #include "space_convoy.hpp" // space_haul (BL-1596, below)
 #include "orbital_node.hpp" // orbital_node (BL-1598 space_debris, below)
+#include "space_bombard.hpp" // space_bombard_order (BL-1599, below)
 #include "war.hpp"          // war_record, peace_offer (BL-1459/BL-1428 wars, below)
 
 #include <atomic>
@@ -1099,6 +1100,10 @@ struct world
     /// SERIALISED (world_save.hpp's BL-1598 block, with each asset's wear and each
     /// open battle's quiet days); hashed when any is non-empty.
     std::map<orbital_node, float> space_debris;
+    /// BL-1599 — each space unit's standing bombard order, keyed by the unit's id
+    /// (space_bombard.hpp; SPACE_FLEETS.md § Bombardment and fire at orbit).
+    /// SERIALISED (world_save.hpp's BL-1599 block), hashed when non-empty.
+    std::map<entity_id, space_bombard_order> space_bombard_orders;
 
     /// Enacted and un-enacted laws (BL-343). A world-level list rather than a
     /// per-corp one: a law is enacted over the world and charged to whoever it

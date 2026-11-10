@@ -2,6 +2,7 @@
 #include "space_units.hpp" // BL-1595: run_space_unit_day
 #include "space_battle.hpp" // BL-1597: run_space_battle_day
 #include "debris.hpp"       // BL-1598: run_space_debris_day
+#include "space_bombard.hpp" // BL-1599: run_space_strike_day
 #include "war.hpp" // BL-1428: note_war_battles, run_war_quarter
 #include "logistic_points.hpp"
 
@@ -5092,6 +5093,7 @@ void run_space_day(world& w, const recipe_registry& reg)
     space_battle_day_report bd;
     run_space_unit_day(w, reg.space_units(), reg.stations(), &ud);
     run_space_battle_day(w, reg.space_units(), reg.stations(), reg.space_battles(), &bd);
+    run_space_strike_day(w, reg.space_battles()); // BL-1599: standing bombard orders and battery fire
     run_space_debris_day(w, reg.space_debris(), ud, bd);
 }
 } // namespace

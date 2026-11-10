@@ -1114,6 +1114,19 @@ uint64_t world::state_hash(int tick) const
                 }
             }
         }
+        // BL-1599: the standing bombard orders — folded only when any is held, so a
+        // world without them hashes as before.
+        if (!space_bombard_orders.empty())
+        {
+            fnv1a_u32(h, 0x1599u); // tag
+            fnv1a_u32(h, static_cast<uint32_t>(space_bombard_orders.size()));
+            for (const auto& [uid, o] : space_bombard_orders)
+            {
+                fnv1a_u32(h, uid);
+                fnv1a_u32(h, static_cast<uint32_t>(o.kind));
+                fnv1a_u32(h, o.target);
+            }
+        }
     }
 
     // Province holder (BL-569). UNLIKE `provinces` itself (generation output,

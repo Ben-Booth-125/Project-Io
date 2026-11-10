@@ -4,6 +4,7 @@
 #include "market_clearing.hpp" // market_for_tile (BL-1582: the home market)
 #include "nation_tech.hpp"     // nation_has_mechanic (BL-1582: the launch gate)
 #include "orbital_graph.hpp"   // orbital_path, orbital_slot_capacity (BL-1581)
+#include "space_bombard.hpp"    // BL-1599: space_blockaded
 #include "space_tech_keys.hpp"
 #include "world.hpp"
 
@@ -274,6 +275,12 @@ space_launch_quote quote_space_launch(const world& w, const space_asset_params& 
     if (!space_has_staffed_pad(w, nation, home))
     {
         q.result = space_launch_result::rejected_no_launchpad;
+        return q;
+    }
+    // BL-1599 (SPACE_FLEETS.md § Blockade): no launch from a blockaded body reaches orbit.
+    if (space_blockaded(w, nation, home))
+    {
+        q.result = space_launch_result::rejected_blockaded;
         return q;
     }
     // BL-1581: a slot-holding class needs a free slot at the node.

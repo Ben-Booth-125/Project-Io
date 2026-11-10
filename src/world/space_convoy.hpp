@@ -44,12 +44,14 @@ struct world;
 // THE DAY (`run_space_convoy_day`, inside `run_space_unit_day` after arrivals):
 // each record, ascending unit id, whose Hauler is idle at a node —
 //   1. INTERDICTION: an armed unit of a nation at war with the owner at the node
-//      stops it. With an armed unit of its own there (an escort) it waits there for
-//      the battle; with none it is LOST with its cargo: the unit, the record and
+//      stops it. With an armed unit of its own there (an escort) it OPENS the battle
+//      with each such nation that is hostile to it (`open_space_battle`, BL-1599) and
+//      waits there until it is decided; with none it is LOST with its cargo: the unit, the record and
 //      the riding convoy are erased (battles are SPACE_FLEETS.md § Battles', and an
 //      unarmed, unescorted hull has nothing to fight with).
 //   2. At the destination's low orbit, outbound: it unloads — the descent's
-//      propellant off the destination shelf (waits a day when that cannot be paid)
+//      propellant off the destination shelf (waits a day when that cannot be paid,
+//      or while the destination is blockaded - BL-1599, space_bombard.hpp)
 //      and the convoy is released ARRIVED — then tops up where it may and turns
 //      home. At home, returning: the record ends.
 //   3. Otherwise it orders the next hop of the cheapest path to where it is going

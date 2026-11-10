@@ -1028,6 +1028,45 @@
     "docs/military/SPACE_FLEETS.md",
     "docs/economy/SPACE_ASSETS.md"
    ]
+  },
+  {
+   "raised": "2026-11-10",
+   "status": "open",
+   "resolution": null,
+   "id": "NR-1195",
+   "title": "Blockade and bombardment built with four calls taken on your behalf",
+   "kind": "decision-taken",
+   "source": "BL-1599 lane report",
+   "what": "(1) A bombardment strike charges the existing force_used Alarm path; there is no separate missile Alarm code. (2) The orbital defence battery is a new building type, number 15, opened by its own Early Space node; it fires at hostile units in its body's low orbit. (3) Strikes spend no munitions; the cost is the unit's upkeep and its exposure to the battery. (4) A unit the battery kills does not raise debris, unlike a battle loss. Save v89 carries the standing bombard orders; blockade is derived and adds no bytes.",
+   "why_it_matters": "Calls (1), (3) and (4) shape how costly orbital war is.",
+   "options": [
+    "Accept all four",
+    "Give strikes a munitions cost",
+    "Feed battery kills into debris"
+   ],
+   "recommendation": "Accept for v0.5.0; feeding battery kills into debris is a one-line follow-up if wanted.",
+   "files": [
+    "src/world/space_bombard.cpp",
+    "docs/military/SPACE_FLEETS.md"
+   ]
+  },
+  {
+   "raised": "2026-11-10",
+   "status": "open",
+   "resolution": null,
+   "id": "NR-1196",
+   "title": "Rivals cannot bombard or blockade yet: no AI uses the new verbs",
+   "kind": "novel-work",
+   "source": "BL-1599 lane report",
+   "what": "The bombard order and the battery are player-and-script only. Rival use belongs to BL-1608 (rival far-space AI), which is open; the 2026-11-10 grant covers it.",
+   "why_it_matters": "The spectator check will show rivals never striking until BL-1608 lands.",
+   "options": [
+    "Leave it to BL-1608 (rival far-space AI)"
+   ],
+   "recommendation": "Leave it to BL-1608.",
+   "files": [
+    "src/world/corp_ai.cpp"
+   ]
   }
  ]
 }

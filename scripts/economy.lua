@@ -366,6 +366,22 @@ economy = {
             build_duration_days = 240,
             resource_costs = { steel = 35.0 },
         },
+        -- BL-1599 (SPACE_FLEETS.md § Bombardment and fire at orbit): Orbital
+        -- Defence Battery — fires each day at hostile units in its body's low
+        -- orbit (its fire is space_battle_params' battery_firepower, scaled by
+        -- its condition; space_bombard.hpp). Produces nothing and staffs at
+        -- zero, as the bunker. Opened by the Early Space tree's Orbital Defence
+        -- Battery mechanic. First cut priced above the bunker: a gun and its
+        -- magazine; its maintenance stands in for the munitions it fires.
+        orbital_defence_battery = {
+            era         = "industrial",
+            base_rate   = 0.0,
+            maintenance = 20.0,
+            base_wage   = 0.0,
+            build_cost  = 400.0,
+            build_duration_days = 240,
+            resource_costs = { steel = 30.0, ordnance = 10.0 },
+        },
         -- BL-615: Schooling — the education building any settlement can host.
         -- Same passive shape as research_institute (base_rate 0, staffs at
         -- zero); its qualification-raising effect is a separate seam

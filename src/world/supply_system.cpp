@@ -8,6 +8,7 @@
 #include "orbital_system.hpp"
 #include "space_effects.hpp"    // BL-1586: the Navigation satellite's haul factor
 #include "space_convoy.hpp"     // BL-1596: inter-body trade ships as a Hauler
+#include "space_bombard.hpp"    // BL-1599: a blockaded body ships nothing between bodies
 #include "stance.hpp"
 #include "sentiment_emitters.hpp" // BL-1458: trade_conducted at landing
 
@@ -1190,6 +1191,11 @@ convoy_leg price_trade_leg(world& w, const recipe_registry& reg,
     // BL-1402 (NATIONS.md § What a nation owns): a corporation's pad or a
     // nation's state one; a nation holding no pad still keeps its trade on the body.
     if (!owner_has_launchpad_on(w, corp_id, src_body))
+        return leg;
+    // BL-1599 (SPACE_FLEETS.md § Blockade): a blockaded body's space trade stops - no
+    // Hauler and no straight-line lane loads at a blockaded source or unloads at a
+    // blockaded destination. False at once in a world with no space units.
+    if (space_trade_blockaded(w, home, src_market, dest_market_id))
         return leg;
     // BL-1596 (SPACE_FLEETS.md § Space convoys): A SPACE CONVOY IS A HAULER. A nation
     // holding a live Hauler design ships its inter-body trade as one: a Hauler readied
