@@ -10,6 +10,18 @@ sessions can be scoped and paced with less waste.
 
 ---
 
+## 2026-11-10 — Sprint 64 closed: the war at sea; the merge's calls kept as built
+
+**Runtime:** short; Corpus (sprint close).
+
+- Sprint 64 closed and archived: 16 items delivered. The one carried, untagged, is BL-1618 (price falls as supply vanishes), an investigation not yet started.
+- BL-1535 (naval war reading) closed on its recorded reading. The re-bless it also carried is set aside (Ben, 2026-11-10).
+- Ben kept four review calls as built. NR-1154: an eliminated nation's debt is written off, and a rival may end the player. NR-1155: centres may demote on their first bad quarter. NR-1193: an ended nation's fleet disbands. NR-1194: the domain-row wording stands. Provenance written into NATIONS.md § Elimination.
+- ACTIONS.json: the elimination flag now cites world save v83 (the war lane's renumbered version), not v81.
+- Register sprint-64: the opening-fleet entry now anchors the 2026-11-07 ruling (fixed fleet, MILITARY.md), which overturned the 2026-11-05 one. 6 rulings, 0 failing.
+
+---
+
 ## 2026-11-10 — Sprint 63 closed: the opening, war's end, a save that keeps its economy
 
 **Runtime:** a long session across two days, Delivery Full in worktree lanes with cold reviews; Ben live-checking.

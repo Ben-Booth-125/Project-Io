@@ -565,6 +565,44 @@
           "Motion took three rounds: the first two smoothed the wrong discontinuity, and no scripted check can see motion within a day."
         ]
       }
+    },
+    "64": {
+      "id": "64",
+      "theme": "The war at sea",
+      "state": "landed",
+      "status_line": "CLOSED 2026-11-10, no version cut. 16 of 17 items delivered and archived; one carried (price falls as supply vanishes). Ships patrol, escort, raid, blockade and land armies for every nation; forces are paid, equipped and sized from income. Merged onto main the same day (world save v88, envelope v29). The re-bless is set aside on Ben's word.",
+      "opened_date": "2026-11-06",
+      "closed_date": "2026-11-10",
+      "author": "Ben (2026-11-05)",
+      "goal": "Ships patrol, escort, raid, blockade and land armies, for the player and every rival, so that a war can be won or lost on the water.",
+      "planned": [
+        "MEASURE FIRST: BL-1526 (sea trade reading).",
+        "CORE: BL-1430 (sea theatre), then BL-1527 (ship kit) and BL-1528 (naval branch).",
+        "THE WATER: BL-1529 (patrol escort raid), BL-1530 (sea control and blockade), BL-1531 (troop landings).",
+        "THE SURFACE: BL-1534 (sea UI).",
+        "THE WORLD: BL-1532 (opening fleets), BL-1533 (rival fleets).",
+        "CLOSE: BL-1535 (naval war reading), with the one re-bless."
+      ],
+      "notes": "BL-1522 (offshore drilling) stays out of this sprint (Ben, 2026-11-05). BL-1431 (missiles and satellites) stays out: ship armament uses plain attack until it lands.",
+      "retro": {
+        "landed": [
+          "SEA: BL-1430 (sea theatre), BL-1527 (ship kit), BL-1528 (naval branch), BL-1529 (patrol, escort, raid), BL-1530 (sea control and blockade), BL-1531 (troop landings), BL-1532 (opening fleets), BL-1533 (rival fleets), BL-1534 (sea UI).",
+          "FORCE: BL-1550 (force pay), BL-1551 (force equipment), BL-1552 (force sizing), BL-1617 (garrison income), BL-1616 (minor plant floor).",
+          "READINGS: BL-1526 (sea trade reading: median 82% of a major's trade by value goes by sea), BL-1535 (naval war reading: a blockade closed one port of five for 16 ticks; landings and prices moved).",
+          "CALLS (Ben, 2026-11-10): NR-1193 (an ended nation's fleet disbands, everyone aboard) and NR-1194 (the domain-row wording) kept as built."
+        ],
+        "carried": [
+          "BL-1618 (price falls as supply vanishes): untagged; an investigation, not started.",
+          "The re-bless: set aside (Ben, 2026-11-10)."
+        ],
+        "went_well": [
+          "The core had no money dependency, so it ran beside sprint 63 from day one and merged the day 63 closed.",
+          "The merge check held: sea_theatre 435/0, fronts, war and save round trip green, the march probe 0 slower."
+        ],
+        "went_badly": [
+          "Parallel lanes collided on ids: world save v81 with the war lane, and NR-1181..1192 with the space branch. Ids were renumbered at the merge."
+        ]
+      }
     }
   }
 }

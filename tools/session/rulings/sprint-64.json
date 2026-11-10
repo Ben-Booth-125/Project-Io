@@ -39,10 +39,12 @@
   "owner": "sprint 64 (BL-1528, naval branch)"
  },
  {
-  "ruling": "A nation opens with the fleet its history left it, sized to its chest (Ben, 2026-11-05)",
-  "doc": "docs/generation/NATION_GENERATION.md",
-  "anchor": "A nation opens with the fleet its history left it \\(Ben, 2026-11-05\\)",
-  "stale": [],
+  "ruling": "A major's opening fleet is fixed, as its army is (Ben, 2026-11-07; overturns the 2026-11-05 fleet sized to its chest)",
+  "doc": "docs/military/MILITARY.md",
+  "anchor": "A major's opening fleet is fixed \\(Ben, 2026-11-07\\)",
+  "stale": [
+   "A nation opens with the fleet its history left it"
+  ],
   "owner": "sprint 64 (BL-1532, opening fleets)"
  },
  {

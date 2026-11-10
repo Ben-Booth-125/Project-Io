@@ -151,19 +151,20 @@ of that peace, after the ground has moved:
 - **Its relations clear.** Hostility, friendship, embargo and tariff rows to and from it are
   removed, and nobody's sentiment toward it is read again.
 - **Its force ends.** Its units and its ships disband where they stand (a ship with everyone
-  aboard), and its convoys and trades are cancelled.
+  aboard; Ben, 2026-11-10, NR-1193), and its convoys and trades are cancelled.
   A land unit of a nation at peace with the conqueror, left on the ground the conqueror just
   gained, withdraws as at any peace.
 - **Its treasury passes to the conqueror.** A positive balance goes to the nation that took its
   last province, an actor-to-actor transfer that conserves (§ 2 of the settled rulings). The
   conqueror's next return books it, so the return's net is still its balance change. A debt is
-  written off, not inherited.
+  written off, not inherited (Ben, 2026-11-10, NR-1154: the write-off creates money, and that is
+  accepted).
 - **It stays a record.** The nation keeps its id, name and history, flagged as ended, so saves and
   the history log stay readable. It drops out of every scorer, ledger, lens and picker. The history
   log writes one entry, and every nation reads it as a public event.
 
-**The player's nation can end.** Then the campaign is lost: a notice says so, and the session goes
-on as a spectator (`../ui/LAYOUT.md` § War notice).
+**The player's nation can end** (Ben, 2026-11-10, NR-1154: a rival's imposed peace may take its
+last province). Then the campaign is lost: a notice says so, and the session goes on as a spectator (`../ui/LAYOUT.md` § War notice).
 
 ### GDP
 

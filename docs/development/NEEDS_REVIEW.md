@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*52 entries — 45 open, 7 resolved.*
+*52 entries — 41 open, 11 resolved.*
 
 ---
 
@@ -343,37 +343,6 @@ Ben asked to design elimination of a landless nation. Taken: wars close as white
 
 *Files: `docs/politics/NATIONS.md`, `docs/politics/RELATIONS.md`*
 
-### NR-1154 — Elimination as built: five calls, and rivals may now end the player
-*decision taken on your behalf · raised 2026-11-10 · from war lane building BL-1562 (war both hostile, elimination), commit 0eba4369*
-
-Taken while building: (1) elimination fires on no LAND province; coastal-water provinces pass to the conqueror with the cession; (2) every truce naming the ended nation is erased, including the one just written with the conqueror; (3) sentiment rows to and from it are deleted, generation grudge seeds kept as history; (4) its live capital is cleared, its generation capital kept as identity; (5) a debt written off sets the treasury to 0, which creates money outside the money books. Consequence of the legal verb under the existing AI grant: a rival imposing peace at 100 can now cede the last province and end any nation, the player included. Rival defenders push from the declaration rather than after answering.
-
-**Why it matters.** Call 5 breaks money conservation; the AI consequence means a campaign can be lost to a rival peace term.
-
-- Keep all as built
-- Debt passes to the conqueror (conserves money)
-- Rivals may not impose a last-province cession on the player
-
-> **Recommendation:** Keep 1-4. Ben to choose on 5 and on the rival ending the player.
-
-*Files: `src/world/war.cpp`, `docs/politics/NATIONS.md`*
-
-### NR-1155 — Population growth as built: 1.18%/yr pooled, and centres demote on their first bad quarter
-*question · raised 2026-11-10 · from population lane building POPULATION_GROWTH_RATE (growth as a rate), commit 317c6bfe*
-
-16 seeds, 40 quarters: pooled growth -0.22 -> 1.18%/yr (target about 2%); a third of centre-ticks still fail a floor and shed 1.6%/yr. Seeds 92/17/27/13 grow 2.0-2.3%; seed 64 is flat. Handoff shape: centre heads +3.5%; villages 245 -> 305, towns 274 -> 249, cities 248 -> 212. Cause of the shift: generation seeds every centre at exactly its rung headcount, and the first failing quarter now sheds 0.4% and demotes at once (the old step waited 10 quarters). No nation reaches qualification 0.8 on any library seed.
-
-**Why it matters.** The opening map loses a seventh of its cities to a rounding edge, and growth runs below the anchor.
-
-- Add a demotion margin (demote below e.g. 90% of the rung)
-- Seed centres above their rung at generation
-- Calibrate growth: staples floor, decline rate or staple supply
-- Accept as built
-
-> **Recommendation:** A demotion margin first, then re-measure growth before touching the dials.
-
-*Files: `src/world/economy_system.cpp`, `src/world/population_generation.cpp`, `docs/economy/POPULATION.md`*
-
 ### NR-1141 — Naval design details I filled in behind your form
 *decision taken on your behalf · raised 2026-11-05 · from SEA_THEATRE (BL-1430), MILITARY.md § Sea*
 
@@ -445,35 +414,6 @@ Two calls. Income is the mean of the last four returns of income plus taxes less
 
 Three calls. The plant floor visits every nation, because majors are not known until after the walk; the kit then replaces a major's floor firm. Garrisons are paid at the 0.50 force ceiling, not the threat-scaled share, so a minor is not stripped by its first reading. The opening chest cut now reserves only the 20-man token's pay. Measured on four seeds: 22 of 112 minors still open plantless, and 15 of the 23 broke rivals at tick 40 are among those. World digests moved and wait on the re-bless.
 
-### NR-1193 — Naval merge: an ended nation's fleet disbands with everyone aboard
-*decision taken on your behalf · raised 2026-11-10 · from naval merge fix-up 2de15672 (elimination predates ships)*
-
-When a nation ends (NATIONS.md Elimination), its ships are erased where they stand with everyone aboard, its sightings and every sighting of its ships go, and its ship designs clear. The save refuses an ended nation that still owns a ship, a sighting or a design.
-
-**Why it matters.** A transport at sea when its nation ends loses its embarked army outright.
-
-- Keep: the fleet ends with the nation
-- Ships pass to the conqueror like other property
-- Ships at sea return to the nearest friendly port first
-
-> **Recommendation:** Keep; it matches units disbanding where they stand.
-
-*Files: `src/world/war.cpp`, `docs/politics/NATIONS.md`*
-
-### NR-1194 — Naval merge: MILITARY.md domain rows reworded where both lines changed them
-*decision taken on your behalf · raised 2026-11-10 · from naval merge 62277745 (conflict in the MILITARY.md domain table)*
-
-Main's land-only march ruling (Ben, 2026-11-09) and the naval branch's transport rows met in one table. Merged wording: coastal_water "No, bridges excepted (Ben, 2026-11-09); crossed only aboard a transport"; open_ocean "Only aboard a transport".
-
-**Why it matters.** The table is the authority for where a land unit may stand.
-
-- Keep the merged wording
-- Reword
-
-> **Recommendation:** Keep.
-
-*Files: `docs/military/MILITARY.md`*
-
 ---
 
 ## Resolved
@@ -508,6 +448,41 @@ docs/economy/RESEARCH.md gains a sentence for a major that needs one node of eac
 
 > **RESOLVED.** Ben, 2026-11-09: keep the new shape (one node of each arm).
 
+### NR-1154 — Elimination as built: five calls, and rivals may now end the player
+*decision taken on your behalf · raised 2026-11-10 · from war lane building BL-1562 (war both hostile, elimination), commit 0eba4369*
+
+Taken while building: (1) elimination fires on no LAND province; coastal-water provinces pass to the conqueror with the cession; (2) every truce naming the ended nation is erased, including the one just written with the conqueror; (3) sentiment rows to and from it are deleted, generation grudge seeds kept as history; (4) its live capital is cleared, its generation capital kept as identity; (5) a debt written off sets the treasury to 0, which creates money outside the money books. Consequence of the legal verb under the existing AI grant: a rival imposing peace at 100 can now cede the last province and end any nation, the player included. Rival defenders push from the declaration rather than after answering.
+
+**Why it matters.** Call 5 breaks money conservation; the AI consequence means a campaign can be lost to a rival peace term.
+
+- Keep all as built
+- Debt passes to the conqueror (conserves money)
+- Rivals may not impose a last-province cession on the player
+
+> **Recommendation:** Keep 1-4. Ben to choose on 5 and on the rival ending the player.
+
+> **RESOLVED.** Ben, 2026-11-10: keep as built. A debt is written off at elimination (money is created; accepted). A rival's imposed peace may end the player. The land-only trigger, erased truces, deleted sentiment and the cleared capital stand. Written into NATIONS.md § Elimination.
+
+*Files: `src/world/war.cpp`, `docs/politics/NATIONS.md`*
+
+### NR-1155 — Population growth as built: 1.18%/yr pooled, and centres demote on their first bad quarter
+*question · raised 2026-11-10 · from population lane building POPULATION_GROWTH_RATE (growth as a rate), commit 317c6bfe*
+
+16 seeds, 40 quarters: pooled growth -0.22 -> 1.18%/yr (target about 2%); a third of centre-ticks still fail a floor and shed 1.6%/yr. Seeds 92/17/27/13 grow 2.0-2.3%; seed 64 is flat. Handoff shape: centre heads +3.5%; villages 245 -> 305, towns 274 -> 249, cities 248 -> 212. Cause of the shift: generation seeds every centre at exactly its rung headcount, and the first failing quarter now sheds 0.4% and demotes at once (the old step waited 10 quarters). No nation reaches qualification 0.8 on any library seed.
+
+**Why it matters.** The opening map loses a seventh of its cities to a rounding edge, and growth runs below the anchor.
+
+- Add a demotion margin (demote below e.g. 90% of the rung)
+- Seed centres above their rung at generation
+- Calibrate growth: staples floor, decline rate or staple supply
+- Accept as built
+
+> **Recommendation:** A demotion margin first, then re-measure growth before touching the dials.
+
+> **RESOLVED.** Ben, 2026-11-10: accept as built. Centres may demote on their first bad quarter; pooled growth 1.18%/yr stands; no demotion margin and no seeding headroom.
+
+*Files: `src/world/economy_system.cpp`, `src/world/population_generation.cpp`, `docs/economy/POPULATION.md`*
+
 ### NR-1142 — Does offshore drilling join sprint 64?
 *question · raised 2026-11-05 · from OFFSHORE_DRILLING (BL-1522)*
 
@@ -539,4 +514,37 @@ MILITARY.md § The muster interface says rival nations hire land units through t
 *question · raised 2026-11-10 · from NAVAL_WAR_READING (BL-1535)*
 
 MILITARY.md § Blockade says the cost of a closed port lands on the blockaded market's prices. On the three library seeds where a blockade closed a port, it did not. Blockaded price against its own price the tick before closing, netted of the other markets' move over the same span: seed 0 0.998 vs 1.040, seed 31 1.038 vs 1.038, seed 60 1.055 vs 1.026 (110, 864, 880 readings). The blockaded markets read 14-24% below other markets, but they were cheap before closing. Likely cause, unconfirmed: each market has other ports or land routes, so one closed port reroutes trade without shortage. CORRECTED 2026-11-10 (Ben chose C, "Make closure bite"; the reading below came after, and changes the premise). The all-goods mean hid two opposite moves. Each closure shut 1 of its market's 5-7 ports. On seed 31 it cut landings 67% (sea 1041 -> 108 a tick) but cut the market's own buying faster: steel demand 73 -> 21 against supply 27 -> 11, all of it in the construction/upkeep/trade channel (no household, background or processor steel), so steel fell 20% against +8% elsewhere and silica's shelf grew 14 -> 34. Likely cause, unproven: the closed port's trade points went, so the owner's outbound trades stopped buying there. Pure imports did rise: seed 60 tobacco +88% against +53% elsewhere. Open oddity: seed 31 machinery fell 473 -> 370 with supply 1.7 -> 0.1 and demand flat; not yet explained.
+
+### NR-1193 — Naval merge: an ended nation's fleet disbands with everyone aboard
+*decision taken on your behalf · raised 2026-11-10 · from naval merge fix-up 2de15672 (elimination predates ships)*
+
+When a nation ends (NATIONS.md Elimination), its ships are erased where they stand with everyone aboard, its sightings and every sighting of its ships go, and its ship designs clear. The save refuses an ended nation that still owns a ship, a sighting or a design.
+
+**Why it matters.** A transport at sea when its nation ends loses its embarked army outright.
+
+- Keep: the fleet ends with the nation
+- Ships pass to the conqueror like other property
+- Ships at sea return to the nearest friendly port first
+
+> **Recommendation:** Keep; it matches units disbanding where they stand.
+
+> **RESOLVED.** Ben, 2026-11-10: keep. An ended nation's ships disband where they stand, everyone aboard. Written into NATIONS.md § Elimination.
+
+*Files: `src/world/war.cpp`, `docs/politics/NATIONS.md`*
+
+### NR-1194 — Naval merge: MILITARY.md domain rows reworded where both lines changed them
+*decision taken on your behalf · raised 2026-11-10 · from naval merge 62277745 (conflict in the MILITARY.md domain table)*
+
+Main's land-only march ruling (Ben, 2026-11-09) and the naval branch's transport rows met in one table. Merged wording: coastal_water "No, bridges excepted (Ben, 2026-11-09); crossed only aboard a transport"; open_ocean "Only aboard a transport".
+
+**Why it matters.** The table is the authority for where a land unit may stand.
+
+- Keep the merged wording
+- Reword
+
+> **Recommendation:** Keep.
+
+> **RESOLVED.** Ben, 2026-11-10: keep the merged MILITARY.md domain-row wording for coastal water and open ocean.
+
+*Files: `docs/military/MILITARY.md`*
 

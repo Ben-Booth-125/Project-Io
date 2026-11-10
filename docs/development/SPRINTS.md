@@ -59,20 +59,7 @@ and/or a version goal (v0.1.1 etc.).
 
 ## Open now
 
-### Sprint 64 — The war at sea
-*Open · opened 2026-11-06 · Ben (2026-11-05)*
-
-**Goal.** Ships patrol, escort, raid, blockade and land armies, for the player and every rival, so that a war can be won or lost on the water.
-
-**Planned.**
-- MEASURE FIRST: BL-1526 (sea trade reading).
-- CORE: BL-1430 (sea theatre), then BL-1527 (ship kit) and BL-1528 (naval branch).
-- THE WATER: BL-1529 (patrol escort raid), BL-1530 (sea control and blockade), BL-1531 (troop landings).
-- THE SURFACE: BL-1534 (sea UI).
-- THE WORLD: BL-1532 (opening fleets), BL-1533 (rival fleets).
-- CLOSE: BL-1535 (naval war reading), with the one re-bless.
-
-BL-1522 (offshore drilling) stays out of this sprint (Ben, 2026-11-05). BL-1431 (missiles and satellites) stays out: ship armament uses plain attack until it lands.
+*Nothing open.*
 
 ## Where things stand
 
@@ -160,10 +147,10 @@ BL-1522 (offshore drilling) stays out of this sprint (Ben, 2026-11-05). BL-1431 
 | 61 | diplomacy and war | CLOSED 2026-11-05, no version cut (v0.3.0 still needs the naval system and a war playtest). Wars are records with goals, a score, exhaustion and a peace that may cede ground; rivals declare, answer, impose peace and embargo; Alarm is the third sentiment dimension; the Diplomacy ledger is slot 9. Military kit, recruits, refit, bunkers and the kit in the age tree. Seed library re-curated. Three re-pins. |
 | 62 | equal starts for majors | CLOSED 2026-11-04, no version cut (sprint 61 targets v0.3.0). Every major opens on the Rich-core kit, 12,000 credits and a fixed eight-unit army; the logistics cap keeps the nodes that cover the kit and re-sites what it strands; the kit stocks its processors' inputs. Treasury spread at 20:4 21x -> 1.63x; men spread 1.00x; no major loses money; 569 of 578 kit processors run. Wizard default 30 nations. Three re-pins. |
 | 63 | UI, QOL and the opening | CLOSED 2026-11-10, no version cut. 42 of 46 items delivered and archived; four carried (UI scale, the clip it gates, the lighter tileset, tech pacing). The opening is a climb on equal credits; war ends in elimination; the save keeps its economy; population grows at an Earth-anchored rate; marches take their own fastest route on six sides. The naval branch merged onto main the same day. The one re-bless is owed on Ben's go. |
-| 64 | The war at sea | OPEN 2026-11-06 (Ben: start delivering). Beside sprint 63. The core has no money dependency, so it starts now; the sea trade reading and the tuning still wait on 63's economy wave. |
+| 64 | The war at sea | CLOSED 2026-11-10, no version cut. 16 of 17 items delivered and archived; one carried (price falls as supply vanishes). Ships patrol, escort, raid, blockade and land armies for every nation; forces are paid, equipped and sized from income. Merged onto main the same day (world save v88, envelope v29). The re-bless is set aside on Ben's word. |
 
 **Next up.** SPRINT 61 CLOSED 2026-11-05 (no version cut). v0.3.0 needs the naval system and a playtest with a few wars. BL-1470 (sentiment contributors) passed its live click 2026-11-05; BL-1490 (province resource clip) waits on BL-1495 (UI scale down); BL-1494 (new-library tick-50 stall) leads the economy work. SPRINT 63 (UI, QOL and the opening) OPEN 2026-11-05: Ben's playtest list is filed; the payback census has read: research is the missing money and the door quotes mirages on scarce goods.
 
 **The standing debt out of P1**, worth repeating here because it spans four items: nothing built in that sprint was ever *rendered*. The session ran in a container that cannot build the GUI, so every UI half is compile-clean and arithmetically checked and visually unseen, and no golden was blessed. For a sprint whose own method note is *build it, look at it, then rule*, that is the thing to fix first.
 
-*82 sprints archived cold; 1 open/gated in the hot store.*
+*83 sprints archived cold; 0 open/gated in the hot store.*

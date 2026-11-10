@@ -69,27 +69,7 @@
   "**Sprint-number ceiling advanced to 35 (Ben, 2026-09-08: “We will open sprint 35 looking at the startup budget”).** The 2026-08-24 ceiling stands in spirit — author no sprint past the one Ben opens — with 35 now the horizon. One sprint is open, well inside the three-sprint cap. This is the first sprint authored after the same day's board clear, and it is deliberately four items: the board was emptied because too many items hung off sprint plans that should have been better planned, so the corrective is fewer items with their preconditions stated, not the same list under a new number.",
   "**The startup-budget chain is dropped outright (Ben, 2026-09-08): “drop it — a watched wait needs no budget”.** Sprint 35 was authored that morning around the 72–73 s warm start and re-authored the same day around generation visibility. BL-813/814/815 are deleted under the 2026-08-24 unstarted-plans policy. The ruling is not that startup time stopped mattering — it is that a wait the player is WATCHING is content rather than cost, so the obligation moves from a stopwatch to whether the thing on screen is worth looking at."
  ],
- "sprints": [
-  {
-   "id": "64",
-   "theme": "The war at sea",
-   "state": "open",
-   "status_line": "OPEN 2026-11-06 (Ben: start delivering). Beside sprint 63. The core has no money dependency, so it starts now; the sea trade reading and the tuning still wait on 63's economy wave.",
-   "opened_date": "2026-11-06",
-   "closed_date": null,
-   "author": "Ben (2026-11-05)",
-   "goal": "Ships patrol, escort, raid, blockade and land armies, for the player and every rival, so that a war can be won or lost on the water.",
-   "planned": [
-    "MEASURE FIRST: BL-1526 (sea trade reading).",
-    "CORE: BL-1430 (sea theatre), then BL-1527 (ship kit) and BL-1528 (naval branch).",
-    "THE WATER: BL-1529 (patrol escort raid), BL-1530 (sea control and blockade), BL-1531 (troop landings).",
-    "THE SURFACE: BL-1534 (sea UI).",
-    "THE WORLD: BL-1532 (opening fleets), BL-1533 (rival fleets).",
-    "CLOSE: BL-1535 (naval war reading), with the one re-bless."
-   ],
-   "notes": "BL-1522 (offshore drilling) stays out of this sprint (Ben, 2026-11-05). BL-1431 (missiles and satellites) stays out: ship armament uses plain attack until it lands."
-  }
- ],
+ "sprints": [],
  "next_up": "SPRINT 61 CLOSED 2026-11-05 (no version cut). v0.3.0 needs the naval system and a playtest with a few wars. BL-1470 (sentiment contributors) passed its live click 2026-11-05; BL-1490 (province resource clip) waits on BL-1495 (UI scale down); BL-1494 (new-library tick-50 stall) leads the economy work. SPRINT 63 (UI, QOL and the opening) OPEN 2026-11-05: Ben's playtest list is filed; the payback census has read: research is the missing money and the door quotes mirages on scarce goods.",
  "footer_notes": [
   "**The standing debt out of P1**, worth repeating here because it spans four items: nothing built in that sprint was ever *rendered*. The session ran in a container that cannot build the GUI, so every UI half is compile-clean and arithmetically checked and visually unseen, and no golden was blessed. For a sprint whose own method note is *build it, look at it, then rule*, that is the thing to fix first."

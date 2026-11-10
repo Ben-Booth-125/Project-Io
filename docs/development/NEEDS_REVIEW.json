@@ -538,7 +538,7 @@
    "title": "Elimination as built: five calls, and rivals may now end the player",
    "raised": "2026-11-10",
    "kind": "decision-taken",
-   "status": "open",
+   "status": "resolved",
    "source": "war lane building BL-1562 (war both hostile, elimination), commit 0eba4369",
    "what": "Taken while building: (1) elimination fires on no LAND province; coastal-water provinces pass to the conqueror with the cession; (2) every truce naming the ended nation is erased, including the one just written with the conqueror; (3) sentiment rows to and from it are deleted, generation grudge seeds kept as history; (4) its live capital is cleared, its generation capital kept as identity; (5) a debt written off sets the treasury to 0, which creates money outside the money books. Consequence of the legal verb under the existing AI grant: a rival imposing peace at 100 can now cede the last province and end any nation, the player included. Rival defenders push from the declaration rather than after answering.",
    "why_it_matters": "Call 5 breaks money conservation; the AI consequence means a campaign can be lost to a rival peace term.",
@@ -552,14 +552,15 @@
     "src/world/war.cpp",
     "docs/politics/NATIONS.md"
    ],
-   "resolution": null
+   "resolution": "Ben, 2026-11-10: keep as built. A debt is written off at elimination (money is created; accepted). A rival's imposed peace may end the player. The land-only trigger, erased truces, deleted sentiment and the cleared capital stand. Written into NATIONS.md § Elimination.",
+   "resolved": "2026-11-10"
   },
   {
    "id": "NR-1155",
    "title": "Population growth as built: 1.18%/yr pooled, and centres demote on their first bad quarter",
    "raised": "2026-11-10",
    "kind": "question",
-   "status": "open",
+   "status": "resolved",
    "source": "population lane building POPULATION_GROWTH_RATE (growth as a rate), commit 317c6bfe",
    "what": "16 seeds, 40 quarters: pooled growth -0.22 -> 1.18%/yr (target about 2%); a third of centre-ticks still fail a floor and shed 1.6%/yr. Seeds 92/17/27/13 grow 2.0-2.3%; seed 64 is flat. Handoff shape: centre heads +3.5%; villages 245 -> 305, towns 274 -> 249, cities 248 -> 212. Cause of the shift: generation seeds every centre at exactly its rung headcount, and the first failing quarter now sheds 0.4% and demotes at once (the old step waited 10 quarters). No nation reaches qualification 0.8 on any library seed.",
    "why_it_matters": "The opening map loses a seventh of its cities to a rounding edge, and growth runs below the anchor.",
@@ -575,7 +576,8 @@
     "src/world/population_generation.cpp",
     "docs/economy/POPULATION.md"
    ],
-   "resolution": null
+   "resolution": "Ben, 2026-11-10: accept as built. Centres may demote on their first bad quarter; pooled growth 1.18%/yr stands; no demotion margin and no seeding headroom.",
+   "resolved": "2026-11-10"
   },
   {
    "id": "NR-1141",
@@ -749,7 +751,7 @@
    "title": "Naval merge: an ended nation's fleet disbands with everyone aboard",
    "raised": "2026-11-10",
    "kind": "decision-taken",
-   "status": "open",
+   "status": "resolved",
    "source": "naval merge fix-up 2de15672 (elimination predates ships)",
    "what": "When a nation ends (NATIONS.md Elimination), its ships are erased where they stand with everyone aboard, its sightings and every sighting of its ships go, and its ship designs clear. The save refuses an ended nation that still owns a ship, a sighting or a design.",
    "why_it_matters": "A transport at sea when its nation ends loses its embarked army outright.",
@@ -763,14 +765,15 @@
     "src/world/war.cpp",
     "docs/politics/NATIONS.md"
    ],
-   "resolution": null
+   "resolution": "Ben, 2026-11-10: keep. An ended nation's ships disband where they stand, everyone aboard. Written into NATIONS.md § Elimination.",
+   "resolved": "2026-11-10"
   },
   {
    "id": "NR-1194",
    "title": "Naval merge: MILITARY.md domain rows reworded where both lines changed them",
    "raised": "2026-11-10",
    "kind": "decision-taken",
-   "status": "open",
+   "status": "resolved",
    "source": "naval merge 62277745 (conflict in the MILITARY.md domain table)",
    "what": "Main's land-only march ruling (Ben, 2026-11-09) and the naval branch's transport rows met in one table. Merged wording: coastal_water \"No, bridges excepted (Ben, 2026-11-09); crossed only aboard a transport\"; open_ocean \"Only aboard a transport\".",
    "why_it_matters": "The table is the authority for where a land unit may stand.",
@@ -782,7 +785,8 @@
    "files": [
     "docs/military/MILITARY.md"
    ],
-   "resolution": null
+   "resolution": "Ben, 2026-11-10: keep the merged MILITARY.md domain-row wording for coastal water and open ocean.",
+   "resolved": "2026-11-10"
   }
  ]
 }
