@@ -2,6 +2,7 @@
 
 #include "components.hpp"
 #include "nation_tech.hpp"     // nation_has_mechanic (BL-1582: module and upgrade keys)
+#include "solar_storm.hpp"     // BL-1605: a storm stops a struck station's modules
 #include "space_tech_keys.hpp"
 #include "world.hpp"
 
@@ -516,6 +517,14 @@ station_budget evaluate_station_budget(const world& w, const station_params& stp
     if (!b.core_in_place)
         return b;
 
+    // BL-1605: a solar storm at the station's node stops every module for the
+    // quarter (solar_storm.hpp). The core's own budget is still evaluated below.
+    if (solar_storm_strikes(w, st.node, econ_tick))
+    {
+        b.storm_struck = true;
+        b.stormed.swap(cand);
+    }
+
     // Newest first stops, until the rest are covered.
     for (;;)
     {
@@ -682,6 +691,7 @@ void run_station_step(world& w, const station_params& stp, int econ_tick, statio
         const station_budget b = evaluate_station_budget(w, stp, sid, econ_tick);
         r.modules_working += static_cast<int>(b.working.size());
         r.modules_stopped += static_cast<int>(b.stopped.size());
+        r.modules_stormed += static_cast<int>(b.stormed.size());
     }
     if (out != nullptr)
         *out = r;

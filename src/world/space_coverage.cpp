@@ -1,6 +1,7 @@
 #include "space_coverage.hpp"
 
 #include "orbital_graph.hpp"
+#include "solar_storm.hpp" // BL-1605: a struck Comms satellite is dark
 #include "space_assets.hpp"
 #include "stations.hpp"
 #include "world.hpp"
@@ -22,6 +23,10 @@
 // yet) at `w.current_econ_tick`. Life-support starvation (space_effects.cpp) is
 // a step-local consequence and does not reach here — a relay needs no crew, so
 // it would not stop one anyway.
+//
+// BL-1605: a solar storm at `w.current_econ_tick` darkens a struck Comms
+// satellite and stops a struck station's relay (solar_storm.hpp), so neither
+// covers anything for that quarter.
 //
 // DERIVED, NEVER STORED; deterministic: assets and stations are std::maps
 // walked ascending, the links come back ordered, the result is a std::set.
@@ -78,7 +83,8 @@ std::set<orbital_node> space_coverage(const world& w, entity_id nation)
     {
         (void)id;
         if (a.owner != nation || a.cls != space_asset_class::satellite
-            || a.role != space_satellite_role::comms || a.state != space_asset_state::active)
+            || a.role != space_satellite_role::comms || a.state != space_asset_state::active
+            || solar_storm_satellite_dark(w, a, w.current_econ_tick))
             continue;
         add_body_nodes(w, a.node.body, out);
     }

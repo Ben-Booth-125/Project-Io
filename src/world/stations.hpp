@@ -252,6 +252,10 @@ struct station_budget
     std::vector<entity_id> idle_edge; ///< Edge-only modules no longer on the edge.
     std::vector<entity_id> refitting;
     std::vector<entity_id> not_ready; ///< In transit, decaying or otherwise not active.
+    /// BL-1605 (solar_storm.hpp): a storm strikes the station's node this quarter.
+    bool storm_struck = false;
+    /// BL-1605: the modules that would have been candidates, stopped by the storm. Ascending id.
+    std::vector<entity_id> stormed;
 };
 
 station_budget evaluate_station_budget(const world& w, const station_params& stp,
@@ -268,6 +272,7 @@ struct station_step_report
     int refits_done        = 0;
     int modules_working    = 0;
     int modules_stopped    = 0;
+    int modules_stormed    = 0; ///< BL-1605: stopped by a solar storm this quarter.
 };
 
 /// BL-1585: the training centres' quarter. Ascending nation id; integer arithmetic.

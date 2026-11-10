@@ -75,6 +75,14 @@ void post_battle_dispatches(const world& w, const std::vector<battle_dispatch>& 
 /// campaign never re-announces its past wars.
 void post_war_dispatches(const world& w, std::size_t& cursor, ui::chat_state& chat, int day_tick);
 
+/// Solar storm notices (BL-1605; EVENTS.md § Solar storms): the player's nation is
+/// told, as a system line on the Field channel, when a storm strikes its satellites
+/// or stations this quarter, and when a working Observatory of its sees next
+/// quarter's. Only its own row of `report.solar_storms`: a rival's assets stay in
+/// the fog. Presentation only.
+void post_solar_storm_notices(const world& w, const economy_report& report,
+                              ui::chat_state& chat, int day_tick);
+
 /// Persona counsel (BL-207 slice 1): every corp due at this strategic-eval
 /// boundary gets its seated bench's read of its own blackboard, posted to a
 /// per-corp Counsel channel (lazily created on first use). Advisory only.

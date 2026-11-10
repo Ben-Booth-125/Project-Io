@@ -5,6 +5,7 @@
 #include "nation_tech.hpp"     // nation_has_mechanic, nation_tech_state, k_milli_per_rp
 #include "space_assets.hpp"
 #include "space_coverage.hpp"
+#include "solar_storm.hpp"     // BL-1605: a struck satellite is dark
 #include "space_tech_keys.hpp"
 #include "stations.hpp"
 #include "survey_system.hpp"
@@ -21,10 +22,13 @@
 
 namespace {
 
-bool is_active_sat(const space_asset& a, entity_id nation, space_satellite_role role)
+/// An ACTIVE satellite of @p nation in @p role that no solar storm darkens at
+/// the world's current econ tick (BL-1605, solar_storm.hpp).
+bool is_active_sat(const world& w, const space_asset& a, entity_id nation, space_satellite_role role)
 {
     return a.owner == nation && a.cls == space_asset_class::satellite && a.role == role
-        && a.state == space_asset_state::active;
+        && a.state == space_asset_state::active
+        && !solar_storm_satellite_dark(w, a, w.current_econ_tick);
 }
 
 const station_module_spec& spec_of(const station_params& stp, uint8_t kind)
@@ -160,7 +164,7 @@ float space_navigation_factor(const world& w, entity_id nation, entity_id body,
     for (const auto& [id, a] : w.space_assets)
     {
         (void)id;
-        if (is_active_sat(a, nation, space_satellite_role::navigation)
+        if (is_active_sat(w, a, nation, space_satellite_role::navigation)
             && space_served_body(a.node) == body)
         {
             const float f = p.navigation_logistics_factor;
@@ -178,7 +182,7 @@ bool space_observation_lifts_vision(const world& w, entity_id nation, entity_id 
     for (const auto& [id, a] : w.space_assets)
     {
         (void)id;
-        if (is_active_sat(a, nation, space_satellite_role::observation)
+        if (is_active_sat(w, a, nation, space_satellite_role::observation)
             && space_served_body(a.node) == body)
         {
             any = true;
@@ -191,7 +195,7 @@ bool space_observation_lifts_vision(const world& w, entity_id nation, entity_id 
     for (const auto& [id, a] : w.space_assets)
     {
         (void)id;
-        if (is_active_sat(a, nation, space_satellite_role::observation)
+        if (is_active_sat(w, a, nation, space_satellite_role::observation)
             && space_served_body(a.node) == body && cov.count(a.node) != 0)
             return true;
     }
@@ -206,7 +210,7 @@ bool space_comms_lifts_activity_fog(const world& w, entity_id nation)
     for (const auto& [id, a] : w.space_assets)
     {
         (void)id;
-        if (is_active_sat(a, nation, space_satellite_role::comms))
+        if (is_active_sat(w, a, nation, space_satellite_role::comms))
         {
             sat = true;
             break;
@@ -345,7 +349,8 @@ void run_space_effects(world& w, const space_effects_params& p, const station_pa
         {
             (void)id;
             if (a.cls == space_asset_class::satellite && a.role == space_satellite_role::survey
-                && a.state == space_asset_state::active)
+                && a.state == space_asset_state::active
+                && !solar_storm_satellite_dark(w, a, econ_tick)) // BL-1605: dark in a storm
                 sats.push_back({a.owner, a.node});
         }
         for (const sat_map& s : sats)

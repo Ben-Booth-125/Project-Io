@@ -127,6 +127,19 @@ from the world seed and the tick, so it is seeded and replayable. It strikes eve
 satellite outside a planet's shelter — at a Lagrange point, or at an asteroid's nodes — and stops their modules and roles for one quarter. A station Observatory sees a storm a
 quarter ahead, and its owner is told.
 
+- **The schedule.** Time runs in **solar cycles** of twelve quarters. A cycle carries at most one
+  storm; a seeded draw per cycle says whether it does and in which quarter. So storms never bunch,
+  and a decade holds about three.
+- **Shelter.** A planet's or a moon's low and high orbit are sheltered. Every Lagrange point and
+  every orbit of an asteroid is exposed. Exposure is all or nothing; no module shields a station.
+- **What stops.** A struck satellite is dark: it gives no role effect and no coverage. A struck
+  station's modules all stop. Nothing is worn or lost, upkeep is still paid, and the next quarter
+  works as before.
+- **Nothing is saved.** The storm is derived from the world seed and the tick, so a world with
+  nothing in space is untouched.
+- **Who is told.** The struck owner is told what went dark; an Observatory's owner is warned. A
+  rival's losses stay in the fog.
+
 **2. Economic** — a glut, a shortage, a supplier's failure. Reads market state and procurement.
 Effects land on price, or on a contract's terms. Riskiest to balance, because the economy is
 already the most tuned part of the game.
@@ -275,6 +288,7 @@ event record carries a successor and a chain-grain cooldown.
 | The effect | `src/world/modifier_set.hpp` § `apply_scalar_modifier` |
 
 | The seeded-stream precedent | `src/world/campaign_battle.cpp` |
+| Solar storms | `src/world/solar_storm.{hpp,cpp}` |
 | The surface | `src/ui/chat_panel.cpp` (the comms dock) |
 | Authored event data | `scripts/`, alongside the recipes and the tech tree |
 | The trigger | the economy tick, once per scope in sorted order |
