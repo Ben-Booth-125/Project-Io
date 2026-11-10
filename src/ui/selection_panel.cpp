@@ -2587,14 +2587,10 @@ province_pop_table province_population(const world& w, const recipe_registry& re
         r.habitability = pc.habitability;
         r.here         = (tit->second == tile_id);
         r.razed        = pc.razed;
-        // The body habitability the growth pass gates on (the last report's);
-        // a body the report has not seen reads 1.0, as the pass does.
-        float hab = 1.0f;
-        if (const auto tc = w.tiles.find(tit->second); tc != w.tiles.end())
-            if (const auto bh = report.body_habitability.find(tc->second.body);
-                bh != report.body_habitability.end())
-                hab = bh->second;
-        r.growth       = read_centre_growth(w, reg, cid, hab);
+        // The pass's own gatherer (read_centre_growth): the last report's body
+        // habitability, or, before any report exists, the figure the next pass
+        // will compute -- never a stand-in 1.0.
+        r.growth       = read_centre_growth(w, reg, cid, &report);
         t.total       += pc.population;
         t.rows.push_back(r);
     }

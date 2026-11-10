@@ -1000,8 +1000,15 @@ population_fill population_basket_fill(const world& w, const recipe_registry& re
     }
     if (bids_something && !(s_w + u_w > 0.0f))
         out.recorded = false;
-    out.staples = (s_w > 0.0f) ? s_acc / s_w : 1.0f;
     out.upper   = (u_w > 0.0f) ? u_acc / u_w : 0.0f;
+    // Review fix (fix round): upper goods bid with NO staple priced or bid is
+    // not "nothing unmet" — the people are buying cloth with no food. Staples
+    // then read 0, and the staples floor fails. Only a market with nothing bid
+    // at all keeps population_met_ratio's 1.0.
+    if (s_w > 0.0f)
+        out.staples = s_acc / s_w;
+    else
+        out.staples = (u_w > 0.0f) ? 0.0f : 1.0f;
     return out;
 }
 

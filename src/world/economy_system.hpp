@@ -1249,15 +1249,33 @@ struct centre_growth_reading
     bool  grows() const { return staples_ok && hab_ok; }
 };
 
+/// One market's household fill split for growth (`population_basket_fill`,
+/// market_clearing.hpp, documents each field).
+struct population_fill
+{
+    float staples  = 1.0f;
+    float upper    = 0.0f;
+    bool  recorded = true;
+};
+
 /// The pure rule over its inputs (no world read).
 centre_growth_reading centre_growth_from(float staples_fill, float upper_fill, bool recorded,
                                          float habitability, float qualification,
                                          const growth_params& gp);
 
-/// The reading for centre @p cid: its catchment market's household fill
-/// (`population_basket_fill`), its owning nation's qualification, and
-/// @p body_habitability (the economy report's `body_habitability` for its body,
-/// what the pass gates on). A centre whose body has no market reads its staples
-/// met and no bonus.
+/// The body habitability the growth pass gates a centre on: @p report's
+/// `body_habitability` for @p body when it holds one, otherwise the same
+/// figure computed the same way (the scale-weighted mean over the body's
+/// non-razed centres, ascending id, 1.0 for a body with none) — so a card
+/// read before any report exists shows what the next pass will use.
+float growth_body_habitability(const world& w, const economy_report* report, entity_id body);
+
+/// THE one input gatherer for centre @p cid, read by the growth pass and the
+/// centre's card alike: its catchment market's household fill
+/// (`population_basket_fill`), its owning nation's qualification, and its
+/// body's habitability (`growth_body_habitability`). A centre whose body has no
+/// market reads its staples met and no bonus. @p fill_memo (optional) caches
+/// each market's fill for a caller reading many centres in one pass.
 centre_growth_reading read_centre_growth(const world& w, const recipe_registry& reg, entity_id cid,
-                                         float body_habitability);
+                                         const economy_report* report,
+                                         std::map<entity_id, population_fill>* fill_memo = nullptr);
