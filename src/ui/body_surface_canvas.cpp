@@ -34,6 +34,7 @@
 #include "world/stance.hpp"           // is_hostile: right-click attack vs declare (BL-1443)
 #include "world/river_generation.hpp"   // BL-1340: hex_side_for_offset — a road draws across its edge
 #include "world/survey_system.hpp"   // survey_tile_visible (region mask, BL-067)
+#include "prospect_view.hpp"          // BL-1610: deposits hidden until prospected
 #include "world/workforce.hpp"       // workforce_efficiency (Population lens, BL-069)
 
 #include <algorithm>
@@ -695,11 +696,15 @@ void toggle_lens_resource(ui_state& state, resource_type r)
         v.push_back(r);
 }
 
-/// The toggled resources this tile carries (deposit > 0), in toggle order.
-int lens_resources_on_tile(const ui_state& state, const tile_component& tile,
+/// The toggled resources this tile carries (deposit > 0), in toggle order. None on
+/// ground whose deposits the player has not prospected (BL-1610, @p pv): the lens,
+/// its hit test and its outline all read this, so none can draw a hidden band.
+int lens_resources_on_tile(const prospect_view& pv, const ui_state& state, const tile_component& tile,
                            resource_type out[ui_state::k_lens_resource_cap])
 {
     int n = 0;
+    if (tile.body == pv.body && !pv.readable(tile.grid_x, tile.grid_y))
+        return 0;
     for (const resource_type r : state.lens_resources)
     {
         const std::size_t i = static_cast<std::size_t>(r);
@@ -980,20 +985,35 @@ void draw_resource_key(const world& w, ui_state& state)
     // The goods present on this body, in k_extractable order. Recomputed only when
     // the body changes: deposits are generation data and never move in play.
     // Keyed on the world and its tile count too: a new game can reuse a body id.
+    // BL-1610: only PROSPECTED ground offers its goods (prospect_view.hpp), so the
+    // key is keyed on how much of the body is prospected too: one more region
+    // prospected re-derives it.
+    const prospect_view pv = prospect_view_of(w, state.active_body, state.spectating && state.god_view);
+    long long prospect_stamp = pv.all ? -1 : 0;
+    if (!pv.all)
+    {
+        if (pv.k != nullptr)
+            for (const uint8_t b : pv.k->prospected)
+                prospect_stamp += b;
+        if (pv.probe && pv.s != nullptr)
+            prospect_stamp += 1000000LL * (1 + pv.s->regions_done);
+    }
     static const world*               s_world = nullptr;
     static std::size_t                s_tiles = 0;
     static entity_id                  s_body  = null_entity;
+    static long long                  s_stamp = -2;
     static std::vector<resource_type> s_present;
-    if (s_body != state.active_body || s_world != &w || s_tiles != w.tiles.size())
+    if (s_body != state.active_body || s_world != &w || s_tiles != w.tiles.size() || s_stamp != prospect_stamp)
     {
         s_world = &w;
         s_tiles = w.tiles.size();
         s_body  = state.active_body;
+        s_stamp = prospect_stamp;
         s_present.clear();
         std::array<bool, resource_count> seen{};
         for (const auto& [tid, t] : w.tiles)
         {
-            if (t.body != state.active_body)
+            if (t.body != state.active_body || !pv.readable(t.grid_x, t.grid_y))
                 continue;
             for (std::size_t i = 0; i < resource_count; ++i)
                 if (t.resource_deposit[i] > 0.0f)
@@ -1015,6 +1035,7 @@ void draw_resource_key(const world& w, ui_state& state)
         for (char& ch : needle) ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
         return name.find(needle) != std::string::npos;
     };
+    state.prospect_drawn.key_rows = static_cast<int>(s_present.size()); // BL-1610, for the verify API
     std::vector<resource_type> rows;
     for (const resource_type r : s_present)
         if (matches(r))
@@ -1061,7 +1082,9 @@ void draw_resource_key(const world& w, ui_state& state)
                       ImGuiWindowFlags_NoBackground);
     const bool full = static_cast<int>(state.lens_resources.size()) >= ui_state::k_lens_resource_cap;
     if (rows.empty())
-        ImGui::TextDisabled("%s", s_present.empty() ? "No deposits on this body" : "No match");
+        ImGui::TextDisabled("%s", !s_present.empty() ? "No match"
+                                  : pv.all ? "No deposits on this body"
+                                           : "No deposits prospected on this body");
     for (const resource_type res : rows)
     {
         const bool on      = lens_resource_on(state, res);
@@ -1886,7 +1909,9 @@ structure_kind lens_structure_of_tile(const world& w, const ui_state& state,
         if (tit == w.tiles.end())
             return structure_kind::none;
         resource_type on_tile[ui_state::k_lens_resource_cap];
-        const int n = lens_resources_on_tile(state, tit->second, on_tile);
+        const int n = lens_resources_on_tile(prospect_view_of(w, tit->second.body,
+                                                              state.spectating && state.god_view),
+                                             state, tit->second, on_tile);
         if (n == 0)
             return structure_kind::none;
         const int k = (pointer != nullptr) ? lens_wedge_at(*pointer, n) : 0;
@@ -2921,6 +2946,10 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     // in this pass. Only ever true under spectate — the pair is the gate — so a
     // played session evaluates a single && and renders byte-identical to before.
     const bool god_view_lift = state.spectating && state.god_view;
+    // BL-1610: the player's deposit knowledge of this body (prospect_view.hpp). A
+    // mapped region draws its terrain; only a prospected one draws its deposits.
+    const prospect_view prospect = prospect_view_of(w, state.active_body, god_view_lift);
+    state.prospect_drawn.washed = 0;
 
     float title_h = 0.0f;
     if (draw_title)
@@ -2928,7 +2957,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         title_h = ImGui::GetTextLineHeightWithSpacing();
         // Survey status suffix (BL-067): a surveyed body shows none; others read
         // their phase so the locked surface is explained in the header.
-        char survey_note[48] = "";
+        char survey_note[64] = "";
         switch (body.survey.phase)
         {
             case survey_phase::hidden:
@@ -2939,6 +2968,16 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 std::snprintf(survey_note, sizeof survey_note, "  -  Surveying %d/%d",
                     body.survey.regions_done, body.survey.regions_total); break;
             case survey_phase::surveyed: break;
+        }
+        // BL-1610: a body the player maps from orbit and prospects on the ground
+        // reads both steps' progress (DISCOVERY.md § Mapping, then prospecting).
+        if (!prospect.all && prospect.k != nullptr && !prospect.probe)
+        {
+            int done = 0;
+            for (const uint8_t b : prospect.k->prospected)
+                done += b != 0 ? 1 : 0;
+            std::snprintf(survey_note, sizeof survey_note, "  -  Mapped %d/%d  -  Prospected %d/%d",
+                prospect.k->regions_mapped, prospect.k->regions_total, done, prospect.k->regions_total);
         }
         char title[176];
         std::snprintf(title, sizeof(title), "%s  -  %s  (%dx%d)%s",
@@ -4156,7 +4195,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         if (state.overlay == overlay_mode::resource)
         {
             resource_type on_tile[ui_state::k_lens_resource_cap];
-            if (lens_resources_on_tile(state, tile, on_tile) > 0)
+            if (lens_resources_on_tile(prospect, state, tile, on_tile) > 0)
                 fill = presentation_of(on_tile[0]).colour | IM_COL32_A_MASK;
             else
                 fill = washed_resource_ground(fill, placement_rules::is_water_tile(tile.substrate));
@@ -4357,7 +4396,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         if (ov == overlay_mode::resource)
         {
             resource_type on_tile[ui_state::k_lens_resource_cap];
-            if (lens_resources_on_tile(state, tile, on_tile) > 0)
+            if (lens_resources_on_tile(prospect, state, tile, on_tile) > 0)
                 return with_alpha(presentation_of(on_tile[0]).colour, k_lens_wash_categorical);
             const ImU32 pale = placement_rules::is_water_tile(tile.substrate)
                                    ? IM_COL32(206, 216, 230, 255) : IM_COL32(244, 242, 236, 255);
@@ -5864,7 +5903,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 {
                     resource_type on_tile[ui_state::k_lens_resource_cap];
                     const int n_res = (state.overlay == overlay_mode::resource && !coarse_fill)
-                        ? lens_resources_on_tile(state, tile_of(), on_tile) : 0;
+                        ? lens_resources_on_tile(prospect, state, tile_of(), on_tile) : 0;
                     if (n_res >= 2)
                     {
                         // A split tile: equal wedges, each at the wash strength.
@@ -5945,6 +5984,13 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                          : sc == 1 ? with_alpha(palette::site_valid, 0.30f)
                                    : with_alpha(palette::site_no_logistics, 0.40f));
                 }
+                // BL-1610: the second step of the survey mask — mapped ground the
+                // player has not prospected (prospect_view.hpp), under its wash.
+                if (!prospect.all && !prospect.readable(t_col, t_row))
+                {
+                    wash(with_alpha(palette::unprospected, palette::unprospected_alpha));
+                    ++state.prospect_drawn.washed;
+                }
                 if (vision < 1.0f)
                 {
                     // fog_dim's wash (lerp toward (8,10,16) by k_fog_strength*(1-vision)),
@@ -5977,6 +6023,23 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 prim_blended_hex(dl, blend_verts, { cx, cy }, fill, corner_col);
             else
                 dl->AddConvexPolyFilled(verts, 6, fill);
+            // BL-1610: the off-bake path's half of the second survey step — the
+            // same wash over a mapped, unprospected tile's fill (the bake's is in
+            // its wash list above). Unmapped ground keeps its locked fill alone.
+            if (!on_bake && surveyed && !prospect.all && !prospect.readable(t_col, t_row))
+            {
+                const ImU32 uw = with_alpha(palette::unprospected, palette::unprospected_alpha);
+                ++state.prospect_drawn.washed;
+                if (coarse_fill)
+                {
+                    const float step = draw_r + 1.0f;
+                    const float hw   = kSqrt3 * step * 0.5f - 0.5f;
+                    const float hh   = 1.5f   * step * 0.5f - 0.5f;
+                    dl->AddRectFilled({ cx - hw, cy - hh }, { cx + hw, cy + hh }, uw);
+                }
+                else
+                    dl->AddConvexPolyFilled(verts, 6, uw);
+            }
 
             // Resource lens split (Ben, 2026-10-04): a surveyed tile carrying two or
             // more toggled resources is cut into equal pie wedges from the centre,
@@ -5986,7 +6049,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             if (state.overlay == overlay_mode::resource && surveyed && !coarse_fill && !on_bake)
             {
                 resource_type on_tile[ui_state::k_lens_resource_cap];
-                const int n = lens_resources_on_tile(state, tile_of(), on_tile);
+                const int n = lens_resources_on_tile(prospect, state, tile_of(), on_tile);
                 if (n >= 2)
                 {
                     ImU32 cols[ui_state::k_lens_resource_cap];
@@ -6044,7 +6107,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             if (state.overlay == overlay_mode::resource && surveyed && !coarse_fill && raster_ok)
             {
                 resource_type tmp[ui_state::k_lens_resource_cap];
-                if (lens_resources_on_tile(state, tile_of(), tmp) > 0)
+                if (lens_resources_on_tile(prospect, state, tile_of(), tmp) > 0)
                 {
                     const ImVec2* ev = shade.blend ? blend_verts : verts;
                     const float   lw = std::max(1.5f, draw_r * 0.16f);
@@ -6061,7 +6124,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                             {
                                 const auto nit = w.tiles.find(nid);
                                 nb_on = nit != w.tiles.end()
-                                     && lens_resources_on_tile(state, nit->second, tmp) > 0;
+                                     && lens_resources_on_tile(prospect, state, nit->second, tmp) > 0;
                             }
                         }
                         if (!nb_on)
@@ -6105,7 +6168,8 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                               const std::size_t ri =
                                   static_cast<std::size_t>(state.hovered_structure - 1u);
                               return ri < std::size(tile_of().resource_deposit)
-                                  && tile_of().resource_deposit[ri] > 0.0f;
+                                  && tile_of().resource_deposit[ri] > 0.0f
+                                  && prospect.readable(t_col, t_row); // BL-1610
                           }()
                         : (sk == state.hovered_structure_kind
                            && tile_struct == state.hovered_structure);

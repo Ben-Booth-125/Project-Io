@@ -163,6 +163,14 @@ inline constexpr ImU32 site_valid        = IM_COL32( 96, 210, 120, 255); ///< A 
 inline constexpr ImU32 site_no_logistics = IM_COL32(236, 168,  56, 255); ///< Accepted, but no Logistic Points reach it.
 inline constexpr ImU32 site_dim          = IM_COL32(  0,   0,   0, 255); ///< Every other tile, darkened toward this.
 
+// --- the two-step survey mask (BL-1610; PLANETARY.md § Survey mask) ---
+// Off the home world a region is mapped, then prospected (DISCOVERY.md). Mapped
+// ground the player has not prospected draws its terrain under a cool slate wash
+// at `unprospected_alpha`, distinct from the vision fog's near-black; the locked
+// fill is unmapped ground's.
+inline constexpr ImU32 unprospected      = IM_COL32( 92, 112, 150, 255); ///< Mapped, deposits not yet read.
+inline constexpr float unprospected_alpha = 0.30f;
+
 // --- the station designer's grid (Space ledger; docs/ui/ledgers/space.md) ---
 // An empty slot, a fitted module, the core, the outer-ring (edge) mark, and the
 // two states a fitted module can be stopped in: by a shortfall (red) or because

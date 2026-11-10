@@ -1031,11 +1031,11 @@
   ],
   [
    "gameplay.space_embark_colonists",
-   "In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam; the verb is offworld_base.hpp's. No UI surface yet. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed)."
+   "The Selection band's space-unit card for the player's own Lander with passenger berths (SELECTION.md § The space-unit element): the Embark colonists press, the count slider and Confirm embark. In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam; the verb is offworld_base.hpp's. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed)."
   ],
   [
    "gameplay.space_found_base",
-   "In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam; the verb is offworld_base.hpp's. No UI surface yet. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed)."
+   "The Selection band's space-unit card for the player's own Lander landed on another body's surface (SELECTION.md § The space-unit element): the Found base press, the colonists and base-kit lines, the site list and Confirm found base. In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam; the verb is offworld_base.hpp's. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed)."
   ],
   [
    "canvas.space_fleet_select",

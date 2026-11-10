@@ -6,6 +6,11 @@
 #include "presentation.hpp"
 
 #include "world/debris.hpp"
+#include "world/offworld_base.hpp"  // BL-1610: the base orders (embark, found) and their dials
+#include "world/space_assets.hpp"   // space_home_body_of: where colonists board
+#include "world/space_convoy.hpp"   // space_haul: the base kit held aboard a landed Lander
+#include "world/space_tech_keys.hpp" // space_keys::base_founding
+#include "world/survey_system.hpp"  // survey_tile_mapped / _prospected: a site's two survey steps
 #include "world/nation_tech.hpp"   // nation_has_mechanic: which items the designer offers
 #include "world/province.hpp"      // province_holder_for: whose ground a bombard row strikes
 #include "world/orbital_graph.hpp"
@@ -20,6 +25,7 @@
 #include <cstdio>
 #include <limits>
 #include <map>
+#include <set>
 #include <tuple>
 
 namespace ui {
@@ -359,6 +365,9 @@ void draw_space_unit_summary(const world& w, entity_id id)
                 static_cast<double>(space_unit_max_hull_points(*u)));
     if (st.cargo > 0.0f)
         ImGui::Text("Cargo: %.0f of %.0f", static_cast<double>(u->cargo), static_cast<double>(st.cargo));
+    if (st.passengers > 0) // BL-1610: a passenger bay's colonists, in thousands
+        ImGui::Text("Colonists: %d thousand of %d berths", static_cast<int>(space_unit_colonists(w, id)),
+                    static_cast<int>(st.passengers));
     if (st.firepower > 0.0f)
         ImGui::Text("Firepower %.0f, armour %.0f", static_cast<double>(st.firepower), static_cast<double>(st.armour));
     const auto bo = w.space_bombard_orders.find(id);
@@ -387,7 +396,10 @@ bool draw_space_unit_selection(const world& w, ui_state& ui)
     f.presses.clear();
     f.dest_rows.clear();
     f.target_rows.clear();
+    f.site_rows.clear();
     f.preview_dv = f.preview_budget = -1.0f;
+    f.colonists_aboard = f.free_berths = f.colonists_here = f.colonists_need = -1;
+    f.kit_here = f.kit_need = -1.0f;
 
     // Two columns: the summary (and the fleet here) on the left, the orders on the
     // right, so an armed list has the band's height rather than what the summary
@@ -483,6 +495,7 @@ bool draw_space_unit_selection(const world& w, ui_state& ui)
             f.move_armed = !f.move_armed;
             f.dest_set   = false;
             f.bombard_armed = false;
+            f.embark_armed = f.found_armed = false; // BL-1610: one armed list at a time
         }
         if (lit) ImGui::PopStyleColor();
         if (ImGui::IsItemHovered())
@@ -544,6 +557,7 @@ bool draw_space_unit_selection(const world& w, ui_state& ui)
             else
                 f.bombard_armed = !f.bombard_armed;
             f.move_armed = false;
+            f.embark_armed = f.found_armed = false; // BL-1610: one armed list at a time
         }
         if (lit) ImGui::PopStyleColor();
         ImGui::EndDisabled();
@@ -553,6 +567,215 @@ bool draw_space_unit_selection(const world& w, ui_state& ui)
                                             : "Needs an orbital-missile armament, in a body's low orbit.");
         publish("bombard", can_bombard || has_order,
                 can_bombard || has_order ? nullptr : "no orbital-missile armament in low orbit");
+    }
+
+    // ── BL-1610 (NATIONS.md § Off-world bases; SELECTION.md § The space-unit element):
+    // a Lander's base orders, each a toggle that arms its own list. EMBARK COLONISTS
+    // boards people from the nation's home centres into a passenger bay's berths, a
+    // thousand to a berth, at its home body (idle in the low orbit, or landed). FOUND
+    // BASE, landed on another body's surface, lists the ground a founding could take
+    // there - a Lander lands at the body's surface node, not on a tile, so the player
+    // picks the site - and confirms it through the seam, refused with its reason.
+    if (u->hull == space_hull::lander)
+    {
+        const offworld_base_params bp{};
+        const space_design_stats ust = evaluate_space_design(u->hull, u->design);
+        const int       berths = ust.passengers;
+        const int       aboard = static_cast<int>(space_unit_colonists(w, id));
+        const entity_id home   = space_home_body_of(w, me);
+        const entity_id body   = u->node.body;
+        const bool      landed = u->state == space_unit_state::landed && u->node.kind == orbital_node_kind::surface;
+
+        if (berths > 0)
+        {
+            const int free = std::max(0, berths - aboard);
+            f.colonists_aboard = aboard;
+            f.free_berths      = free;
+            const bool at_home = home != null_entity && body == home
+                && ((u->state == space_unit_state::idle && u->node.kind == orbital_node_kind::low_orbit) || landed);
+            const bool pad = at_home && space_staffed_pad_on(w, me, home) != null_entity;
+            const char* why = !at_home  ? "board at your home body: idle in its low orbit, or landed"
+                            : !pad      ? "no staffed Launchpad of yours on your home body"
+                            : free == 0 ? "every berth is taken"
+                                        : nullptr;
+            if (why != nullptr)
+                f.embark_armed = false; // nothing to confirm: the list cannot stay lit
+            const bool lit = f.embark_armed;
+            ImGui::BeginDisabled(why != nullptr);
+            if (lit) ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
+            if (ImGui::Button("Embark colonists"))
+            {
+                f.embark_armed = !f.embark_armed;
+                f.embark_count = std::max(1, free); // every free berth, the most a founding can use
+                f.found_armed = f.move_armed = f.bombard_armed = false;
+            }
+            if (lit) ImGui::PopStyleColor();
+            ImGui::EndDisabled();
+            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+                ImGui::SetTooltip("%s", why != nullptr ? why
+                                        : "Board colonists from your most populous home centre, a thousand to a berth.");
+            publish("embark", why == nullptr, why);
+            if (f.embark_armed)
+            {
+                f.embark_count = std::clamp(f.embark_count, 1, std::max(1, free));
+                ImGui::SetNextItemWidth(std::min(160.0f, list_width()));
+                ImGui::SliderInt("thousand##embark_n", &f.embark_count, 1, std::max(1, free));
+                f.embark_count = std::clamp(f.embark_count, 1, std::max(1, free));
+                char lbl[64];
+                std::snprintf(lbl, sizeof lbl, "Confirm embark %d thousand", f.embark_count);
+                if (ImGui::Button(lbl))
+                {
+                    queue(space_verb::embark_colonists, [&](space_command& c) { c.slot = f.embark_count; });
+                    f.embark_armed = false;
+                }
+                publish("confirm_embark", true, nullptr);
+            }
+        }
+
+        if (landed && body != home && body != w.home_body)
+        {
+            // What the nation's Landers landed here carry, as the founding counts it
+            // (offworld_base.cpp): every colonist aboard, and the kit good held aboard.
+            int   here = 0;
+            float kit  = 0.0f;
+            for (const auto& [oid, o] : w.space_units)
+            {
+                if (o.owner != me || o.hull != space_hull::lander || o.state != space_unit_state::landed
+                    || o.node.body != body || o.node.kind != orbital_node_kind::surface)
+                    continue;
+                here += static_cast<int>(space_unit_colonists(w, oid));
+                const auto hit = w.space_hauls.find(oid);
+                if (hit != w.space_hauls.end() && hit->second.phase == space_haul_phase::held
+                    && hit->second.cargo_res == bp.kit_res)
+                    kit += std::max(0.0f, o.cargo);
+            }
+            const int need = std::max<int32_t>(1, bp.min_colonists);
+            f.colonists_here = here;
+            f.colonists_need = need;
+            f.kit_here       = kit;
+            f.kit_need       = bp.kit_qty;
+            const bool tech = nation_has_mechanic(w, me, space_keys::base_founding);
+            if (!tech)
+                f.found_armed = false;
+            const bool lit = f.found_armed;
+            if (berths > 0)
+                ImGui::SameLine();
+            ImGui::BeginDisabled(!tech);
+            if (lit) ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
+            if (ImGui::Button("Found base"))
+            {
+                f.found_armed = !f.found_armed;
+                f.found_tile  = null_entity;
+                f.embark_armed = f.move_armed = f.bombard_armed = false;
+            }
+            if (lit) ImGui::PopStyleColor();
+            ImGui::EndDisabled();
+            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+                ImGui::SetTooltip("%s", tech ? "Choose mapped ground here for a base: it claims its province."
+                                             : "Needs Off-World Bases researched.");
+            publish("found_base", tech, tech ? nullptr : "needs Off-World Bases researched");
+
+            if (f.found_armed)
+            {
+                const ImU32 ok_col  = palette::positive;
+                const ImU32 bad_col = palette::negative;
+                ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(here >= need ? ok_col : bad_col),
+                                   "Colonists landed here: %d of %d thousand", here, need);
+                ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(kit >= bp.kit_qty ? ok_col : bad_col),
+                                   "Base kit landed here: %.0f of %.0f %s", static_cast<double>(kit),
+                                   static_cast<double>(bp.kit_qty), presentation_of(bp.kit_res).name);
+
+                // The ground a founding could take: land this nation has MAPPED here,
+                // nobody's, with no centre or building on it, in a province no nation
+                // holds. One row per province - the founding claims the whole of it -
+                // at its most habitable such tile (ties to the lower row, then column).
+                std::set<entity_id> occupied;
+                for (const auto& [cid, t] : w.population_centre_tile)
+                    occupied.insert(t);
+                for (const auto& [bid, b] : w.buildings)
+                    occupied.insert(b.tile);
+                struct site { uint32_t pid; entity_id tile; int col, row; float hab; bool prospected; };
+                std::map<uint32_t, site> best;
+                for (const auto& [tid, t] : w.tiles)
+                {
+                    if (t.body != body || is_water(t.substrate)
+                        || !survey_tile_mapped(w, me, body, t.grid_x, t.grid_y)
+                        || w.tile_to_nation.count(tid) != 0 || occupied.count(tid) != 0)
+                        continue;
+                    const uint32_t pid = w.provinces.province_of(tid);
+                    if (pid != 0 && province_holder_for(w, pid) != null_entity)
+                        continue;
+                    const site s{pid, tid, t.grid_x, t.grid_y, t.habitability,
+                                 survey_tile_prospected(w, me, body, t.grid_x, t.grid_y)};
+                    const auto it = best.find(pid);
+                    if (it == best.end() || s.hab > it->second.hab
+                        || (s.hab == it->second.hab
+                            && std::tie(s.row, s.col) < std::tie(it->second.row, it->second.col)))
+                        best[pid] = s;
+                }
+                std::vector<site> sites;
+                for (const auto& [pid, s] : best)
+                    sites.push_back(s);
+                std::stable_sort(sites.begin(), sites.end(),
+                                 [](const site& a, const site& b) { return a.hab > b.hab; });
+                bool chosen_listed = false;
+                for (const site& s : sites)
+                    chosen_listed = chosen_listed || s.tile == f.found_tile;
+                if (!chosen_listed)
+                    f.found_tile = null_entity; // the ground was taken, or the list moved
+
+                ImGui::TextDisabled("Mapped ground to found on:");
+                ImGui::BeginChild("##fleet_found", ImVec2(list_width(), list_height(f.found_tile != null_entity ? 2 : 0)),
+                                  ImGuiChildFlags_Borders);
+                for (const site& s : sites)
+                {
+                    // The tile names the row (a province id means nothing to the
+                    // player); the state that decides the pick follows it.
+                    char label[160];
+                    std::snprintf(label, sizeof label, "(%d, %d)  habitability %.2f  %s%s", s.col, s.row,
+                                  static_cast<double>(s.hab), s.prospected ? "prospected" : "deposits unknown",
+                                  s.pid == 0 ? "  unpartitioned" : "");
+                    const bool chosen = s.tile == f.found_tile;
+                    ImGui::PushID(static_cast<int>(s.tile));
+                    if (ImGui::Selectable(label, chosen))
+                        f.found_tile = chosen ? null_entity : s.tile; // the toggle: a chosen row un-picks
+                    ImGui::PopID();
+                    space_fleet_ui_state::site_row r;
+                    r.name = label;
+                    r.x = (ImGui::GetItemRectMin().x + ImGui::GetItemRectMax().x) * 0.5f;
+                    r.y = (ImGui::GetItemRectMin().y + ImGui::GetItemRectMax().y) * 0.5f;
+                    r.col = s.col;
+                    r.row = s.row;
+                    r.chosen = chosen;
+                    r.prospected = s.prospected;
+                    f.site_rows.push_back(r);
+                }
+                if (sites.empty())
+                    ImGui::TextDisabled("No mapped, unclaimed ground here.");
+                ImGui::EndChild();
+
+                if (f.found_tile != null_entity)
+                {
+                    const char* why = here < need ? "too few colonists landed here"
+                                    : !(kit >= bp.kit_qty) ? "too little base kit landed here"
+                                                           : nullptr;
+                    ImGui::BeginDisabled(why != nullptr);
+                    if (ImGui::Button("Confirm found base"))
+                    {
+                        const entity_id tile = f.found_tile;
+                        queue(space_verb::found_base, [&](space_command& c) { c.subject = tile; });
+                        f.found_armed = false;
+                        f.found_tile  = null_entity;
+                    }
+                    ImGui::EndDisabled();
+                    if (why != nullptr && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+                        ImGui::SetTooltip("%s", why);
+                    publish("confirm_found", why == nullptr, why);
+                    if (why != nullptr)
+                        ImGui::TextDisabled("Refused: %s.", why);
+                }
+            }
+        }
     }
 
     if (f.move_armed)

@@ -31,6 +31,10 @@
 #include "ui/construction_panel.hpp"
 #include "ui/construction_sites.hpp" // the site finder (Ben, 2026-10-25): construction_sites.lua
 #include "ui/selection_panel.hpp"
+#include "ui/prospect_view.hpp"  // BL-1610: verify.prospect_mask, the two-step survey mask as drawn
+#include "world/offworld_base.hpp"   // BL-1610: the base fixture's dials
+#include "world/space_convoy.hpp"    // BL-1610: the base kit held aboard
+#include "world/space_tech_keys.hpp" // BL-1610: space_keys::base_founding
 #include "ui/stat_grid.hpp"      // BL-1454: verify.stat_grids, the grids on screen
 #include "ui/alerts.hpp"        // BL-1515: verify.alerts
 #include "ui/header_panel.hpp"   // BL-1472: verify.header_recruits, the header's readouts
@@ -4182,6 +4186,159 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         }
         out["dest_rows"] = dests;
         return out;
+    });
+    // BL-1610: the space-unit card's base orders as the Selection band LAST DREW
+    // them - an armed Found base's site rows (label, centre, the site tile's grid
+    // position, chosen, whether its deposits are read), the colonists and kit lines
+    // (-1 where the card drew none), and whether each order is lit. Only what the
+    // card draws; the presses themselves are fleet_card().presses.
+    v.set_function("base_card", [this](sol::this_state ts) -> sol::table {
+        sol::state_view lua(ts);
+        const auto& f = m_ui.fleet;
+        sol::table out = lua.create_table();
+        out["unit"]             = static_cast<unsigned>(f.unit);
+        out["embark_armed"]     = f.embark_armed;
+        out["embark_count"]     = f.embark_count;
+        out["found_armed"]      = f.found_armed;
+        out["colonists_aboard"] = f.colonists_aboard;
+        out["free_berths"]      = f.free_berths;
+        out["colonists_here"]   = f.colonists_here;
+        out["colonists_need"]   = f.colonists_need;
+        out["kit_here"]         = f.kit_here;
+        out["kit_need"]         = f.kit_need;
+        sol::table sites = lua.create_table();
+        int i = 1;
+        for (const auto& r : f.site_rows)
+        {
+            sol::table row = lua.create_table();
+            row["name"] = r.name; row["x"] = r.x; row["y"] = r.y;
+            row["col"] = r.col; row["row"] = r.row;
+            row["chosen"] = r.chosen; row["prospected"] = r.prospected;
+            sites[i++] = row;
+        }
+        out["sites"] = sites;
+        return out;
+    });
+    // BL-1610: the two-step survey mask as the Planetary canvas LAST DREW it on the
+    // active body - tiles under the mapped-not-prospected wash, goods the Resource
+    // lens's key offered (-1 before it drew), and the mapped / prospected / total
+    // region counts its title reads for the player (all = true where no mask
+    // applies: the home world, the star, a surveyed body). Only what is drawn.
+    v.set_function("prospect_mask", [this](sol::this_state ts) -> sol::table {
+        sol::state_view lua(ts);
+        sol::table out = lua.create_table();
+        out["washed"]   = m_ui.prospect_drawn.washed;
+        out["key_rows"] = m_ui.prospect_drawn.key_rows;
+        const ui::prospect_view pv = ui::prospect_view_of(m_world, m_ui.active_body);
+        out["all"] = pv.all;
+        int mapped = 0, prospected = 0, total = 0;
+        if (pv.k != nullptr)
+        {
+            mapped = pv.k->regions_mapped;
+            total  = pv.k->regions_total;
+            for (const uint8_t b : pv.k->prospected)
+                prospected += b != 0 ? 1 : 0;
+        }
+        out["mapped"] = mapped; out["prospected"] = prospected; out["total"] = total;
+        return out;
+    });
+    // BL-1610: a verify-only STAGING fixture for the base and prospecting UI. It
+    // writes straight into the stores (no launch, research or haul verb: those are
+    // not what the card check is about), on the home body's first gridded moon:
+    // grants the player nation the Off-World Bases key; clears the moon's mirror and
+    // MAPS every region of it for the player (prospecting none); lands two player
+    // Landers on its surface - a passenger Lander carrying the founding's colonists
+    // and a cargo Lander holding the base kit - and puts a third, empty passenger
+    // Lander idle in the home low orbit. Returns the moon's name and the three unit
+    // ids (selection is by the real press), nothing else.
+    v.set_function("base_prospect_fixture", [this](sol::this_state ts) -> sol::table {
+        sol::state_view lua(ts);
+        sol::table out = lua.create_table();
+        out["staged"] = false;
+        const entity_id pn   = player_nation(m_world);
+        const entity_id home = m_world.home_body;
+        if (pn == null_entity || !m_world.bodies.count(home))
+            return out;
+        entity_id moon = null_entity;
+        for (const auto& [bid, b] : m_world.bodies)
+            if (b.parent == home && survey_knowledge_applies(m_world, bid)) { moon = bid; break; }
+        if (moon == null_entity)
+            return out;
+
+        nation_tech_state& ts_ = m_world.nation_tech[pn];
+        for (const io::es::effect& e : io::es::effects)
+            if (e.kind == io::es::effect_kind::mechanic && e.node >= 0 && e.node < io::es::node_count
+                && std::string_view(e.target) == space_keys::base_founding)
+                ts_.es_held.set(static_cast<std::size_t>(e.node));
+
+        m_world.bodies.at(moon).survey = {};
+        m_world.survey_knowledge.erase({pn, moon});
+        survey_map_regions(m_world, pn, moon, 1 << 20);
+
+        const auto& cat = space_item_catalogue();
+        const auto design_of = [&](const char* bay) {
+            space_design d;
+            d.fill(k_no_space_item);
+            const std::pair<space_unit_slot, const char*> items[] = {
+                {space_unit_slot::drive, "drive.chemical"}, {space_unit_slot::tanks, "tanks.extended"},
+                {space_unit_slot::bay, bay}};
+            for (const auto& [slot, iid] : items)
+                for (std::size_t i = 0; i < cat.size(); ++i)
+                    if (std::string_view(cat[i].id) == iid)
+                        d[static_cast<std::size_t>(slot)] = static_cast<uint8_t>(i);
+            return d;
+        };
+        const auto stage = [&](const char* bay, orbital_node node, space_unit_state state) {
+            space_unit u;
+            u.id     = m_world.create_entity();
+            u.owner  = pn;
+            u.hull   = space_hull::lander;
+            u.design = design_of(bay);
+            u.state  = state;
+            u.node   = node;
+            u.dest   = node;
+            const space_design_stats st = evaluate_space_design(u.hull, u.design);
+            u.hull_points = st.hull_points;
+            u.propellant  = st.tank;
+            u.crew        = st.crew;
+            u.upkeep      = st.upkeep;
+            m_world.space_units.emplace(u.id, u);
+            return u.id;
+        };
+        const offworld_base_params bp{};
+        const orbital_node surface{moon, orbital_node_kind::surface};
+        const entity_id passenger = stage("bay.passenger", surface, space_unit_state::landed);
+        const entity_id carrier   = stage("bay.cargo", surface, space_unit_state::landed);
+        const entity_id at_home   = stage("bay.passenger", {home, orbital_node_kind::low_orbit}, space_unit_state::idle);
+        m_world.space_colonists[passenger] = std::max<int32_t>(1, bp.min_colonists);
+        m_world.space_units.at(carrier).cargo = bp.kit_qty;
+        space_haul h;
+        h.owner     = pn;
+        h.phase     = space_haul_phase::held;
+        h.cargo_res = bp.kit_res;
+        h.target    = surface;
+        h.home      = surface;
+        m_world.space_hauls[carrier] = h;
+
+        out["staged"]    = true;
+        out["body"]      = m_world.bodies.at(moon).name;
+        out["passenger"] = static_cast<unsigned>(passenger);
+        out["carrier"]   = static_cast<unsigned>(carrier);
+        out["at_home"]   = static_cast<unsigned>(at_home);
+        return out;
+    });
+    // BL-1610: a verify-only STAGING call - prospect up to @p n regions of the active
+    // body for the player nation, by the prospecting rule itself (nearest the
+    // landing first, never ahead of mapping). Returns how many it prospected.
+    v.set_function("stage_prospect", [this](int n) -> int {
+        int done = 0;
+        for (int i = 0; i < n; ++i)
+            if (survey_prospect_region(m_world, player_nation(m_world), m_ui.active_body)
+                == survey_prospect_result::prospected)
+                ++done;
+            else
+                break;
+        return done;
     });
     // BL-1609: the Design tab's Space theatre as drawn - each hull row (name, centre,
     // whether a live design stands), the open hull (-1 none) and its Save press.

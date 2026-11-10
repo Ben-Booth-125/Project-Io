@@ -9,7 +9,7 @@ space**, with the backlog item that demanded it. The pair is required. Enforceme
 authorship, not machinery — there is deliberately no audit check against this file
 (BL-260, Ben 2026-08-01: *"the docs are the audit"*).
 
-**89 surfaces** — 4 settled, 85 awaiting Ben's wording.
+**91 surfaces** — 4 settled, 87 awaiting Ben's wording.
 
 ---
 
@@ -410,6 +410,14 @@ THE SEAM'S ANSWER IS SHOWN, because set_trade validates what the form cannot (bo
 
 *Demanded by BL-1315, BL-1316 · `src/ui/body_surface_canvas.cpp`, `src/ui/market_ledger.cpp` · id `planetary_market_labels`*
 
+### The second step of the Planetary canvas's survey mask off the home world: mapped ground the player's nation has not prospected draws its terrain under a cool slate wash and no deposits - not in the Resource lens or its key, the hover card, the tile summary, or the province's and deposit's tables; the title reads 'Mapped k/N - Prospected p/N', and the body's Selection card reads both counts and what is prospecting there.
+
+**Answers:** What ground on this body do I know the terrain of, which of it have I actually prospected, and how far along is it?
+
+**Because:** Off the home world a survey reveals in two steps (DISCOVERY.md § Mapping, then prospecting): orbit maps terrain, the ground reads deposits. A deposit drawn before it is prospected would tell the player what the system says they cannot yet know, and would hide why a Lander on the surface matters. The wash marks where the next landing earns its keep, and the counts say when the body will be read.
+
+*Demanded by BL-1610 · `src/ui/prospect_view.hpp`, `src/ui/body_surface_canvas.cpp`, `src/ui/hover_content.cpp`, `src/ui/entity_summary.cpp`, `src/ui/selection_panel.cpp`, `src/ui/presentation.hpp` · id `planetary_prospect_mask`*
+
 ### Roads and sea lanes (Planetary canvas, always-on: painted into the ground at every rung; drawn as strokes only under the Logistics lens, which takes the painted surface off the ground while it is up)
 
 **Answers:** Where can traffic move cheaply on this body - which ground is roaded, at what tier, and which water carries a lane?
@@ -513,6 +521,14 @@ THE SEAM'S ANSWER IS SHOWN, because set_trade validates what the form cannot (bo
 **Because:** Near space became a system with launches, slots, roles, stations, crew and signal delay, and every one of its verbs lived only on the command seam: a player could not launch, see what was up there, or fit a station. It is a broad ledger - every asset, every station, the whole pool - which is MENU.md's test for a rail slot, and Space is a curated system, so it is inserted after Diplomacy rather than appended below the developer tail. Launch is the act the ledger exists for, so it opens there: the class and role picked first, the destination list showing only nodes with a slot free and the path's thrust cost, and the quote with the seam's own refusal, so a refused launch says why before the press. Assets is the inventory - class, role, node, state, upkeep, coverage - because coverage decides whether an order lands now or waits a quarter. The designer draws the grid as it is, core at the centre and the edge marked, because edge-only modules and the budgets are spatial facts a list cannot carry; the budgets sit above it as supply against demand so a shortfall is read before a module is fitted. Crew is its own view because the pool gates every crewed launch and its cap is set on the ground. The pending line sits under the tabs on every view because an order waiting on a signal is invisible otherwise. The canvas draws the nodes; the ledger is the list and the designer, not a second card (docs/ui/ledgers/space.md).
 
 *Demanded by BL-1591 · `src/ui/space_ledger.cpp`, `src/ui/nav_pane.cpp`, `src/ui/icons.cpp` · id `space_ledger`*
+
+### A Lander's base orders on the space-unit Selection element: Embark colonists (a toggle: the count in thousands, a berth each, and Confirm embark; greyed with its reason away from the home body, without a staffed Launchpad, or with no free berth) and Found base (a toggle on a Lander landed on another body: the colonists and base kit landed there against what a founding needs, a site list of one row per province with mapped, unclaimed land - its most habitable tile, its habitability, whether its deposits are prospected - and Confirm found base, greyed with the shortfall). The summary reads the colonists aboard against the berths.
+
+**Answers:** Can I found a base here yet, where should it stand, and what is still missing?
+
+**Because:** A base is the only way a nation holds ground on another body (NATIONS.md § Off-world bases), and the founding is refused whole unless colonists, the kit, the research and mapped, unclaimed ground all line up across several Landers. Reading each requirement against what is landed turns a silent refusal into a checklist. A Lander lands at a body's surface, not a tile, so the player must choose the site; a row per province - the founding claims the whole province - with its habitability and prospecting state is that choice at the grain it is made.
+
+*Demanded by BL-1610 · `src/ui/circum_units.cpp`, `src/ui/ui_state.hpp`, `src/ui/space_ledger.cpp` · id `space_unit_base_orders`*
 
 ### The space-unit Selection element: the shared space-unit summary (owner, hull, design, node or transit, propellant against its tank, docking, standing bombard order) and, for the player's own unit, its orders - Move (a toggle opening the reachable destinations, each with its delta-v against the propellant held, an unaffordable one disabled; a chosen destination previews 'Move costs delta-v x of y' and a Confirm), a Whole fleet checkbox, Dock (only where a player station stands), Undock, Refuel, and Bombard (a toggle listing the provinces on the body that hold a target, or lifting a standing order)
 
