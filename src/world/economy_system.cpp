@@ -3110,16 +3110,19 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
     // field (negative values round-trip — save_roundtrip R10), so BL-616 adds
     // no persistent state.
     //
-    //  - GROWTH: every k_growth_step_ticks of sustained met conditions the
-    //    population takes a step of max(1, pop / k_growth_step_divisor) — real
-    //    heads, integer thousands, superseding the old set-to-scalex10 proxy.
+    //  - GROWTH (POPULATION_GROWTH_RATE, Ben 2026-11-10, superseding the old
+    //    every-10-ticks pop/25 step): each tick the heads move by a quarter of
+    //    an annual RATE (centre_growth_from below) — base(q) falling with the
+    //    owning nation's qualification, times (1 + bonus x upper-rung fill)
+    //    while the staples and habitability floors hold, else -decline_rate —
+    //    with the fractional thousands carried in `growth_carry`.
     //  - PROMOTION: population held above the NEXT tier's rung
     //    (k_population_for_scale, population_generation.hpp) with conditions
     //    met for at least k_promotion_window_ticks promotes ONE scale tier;
     //    the streak restarts. Since centres anchor provinces (BL-611),
     //    promotion moves the political map's value during play.
-    //  - DECLINE: every k_decline_step_ticks of sustained failure sheds the
-    //    same-shaped step, and a population below its CURRENT tier's rung
+    //  - DECLINE: a failing tick sheds at the decline rate (above), and a
+    //    population below its CURRENT tier's rung
     //    demotes one tier. Asymmetric by design: passive failure only shrinks
     //    — scale floors at 1, population floors at 1, the centre is NEVER
     //    destroyed, and its urban ground (BL-612) is never unstamped. Outright
@@ -3128,11 +3131,7 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
     // The met-supply is read from last tick's cleared market (this step precedes
     // clear_markets in the tick), so it is deterministic and price-consistent.
     // Step sizes/windows are first-cut tuning constants, not commitments.
-    constexpr int k_growth_step_ticks      = 10; ///< qualifying ticks per growth step.
-    constexpr int k_growth_step_divisor    = 25; ///< step = max(1, pop/25) — ~4% per step.
     constexpr int k_promotion_window_ticks = 50; ///< sustained ticks above the rung to promote.
-    constexpr int k_decline_step_ticks     = 10; ///< failing ticks per shed step.
-    constexpr int k_decline_step_divisor   = 25; ///< shed = max(1, pop/25).
     /// BL-624 (razed settlement tier): sustained-met ticks to RE-SETTLE a
     /// razed centre back to scale 1 with a village-rung seed population.
     /// HALF the promotion window, by design ("rebuilding there is cheap" —
@@ -3140,7 +3139,6 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
     /// less patience than climbing a tier). First-cut constant, derived from
     /// the window rather than chosen fresh.
     constexpr int k_resettle_window_ticks  = k_promotion_window_ticks / 2;
-    const growth_params& growth_sp = reg.growth();
 
     // BL-1163 (play villages decline): the met ratio is judged PER CENTRE, at
     // the centre's own market, over the household basket it bids there
@@ -3150,17 +3148,9 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
     // order reaches the result (each entry is a pure function of its market).
     // Review fix (household stack): the memo also carries whether the market
     // has a recorded household bid at all (population_met_ratio's `recorded`).
-    std::map<entity_id, std::pair<float, bool>> market_met;
-    auto met_at = [&](entity_id mid) {
-        const auto it = market_met.find(mid);
-        if (it != market_met.end())
-            return it->second;
-        bool recorded = true;
-        const float m = population_met_ratio(w, reg, mid, &recorded);
-        const std::pair<float, bool> v{m, recorded};
-        market_met.emplace(mid, v);
-        return v;
-    };
+    // POPULATION_GROWTH_RATE (Ben, 2026-11-10): the fill splits into staples and
+    // upper rungs (population_basket_fill), so the memo holds the split.
+    std::map<entity_id, population_fill> market_met;
 
     // centre_ids (sorted above): per-centre integer arithmetic, but walk in
     // ascending id anyway so any future cross-centre coupling stays ordered.
@@ -3174,28 +3164,24 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
         const auto tc_it = w.tiles.find(tile_it->second);
         if (tc_it == w.tiles.end())
             continue;
-        const entity_id body = tc_it->second.body;
 
-        const auto hit = report.body_habitability.find(body);
-        const float hab = (hit != report.body_habitability.end()) ? hit->second : 1.0f;
-
-        // The household met ratio at this centre's catchment market (BL-1163):
-        // the share of the population channel's own bid the last clear filled.
-        // A centre whose body has no market bids nothing and reads fully met.
-        const entity_id centre_market = market_for_tile(w, tile_it->second);
-        const std::pair<float, bool> met =
-            (centre_market != null_entity) ? met_at(centre_market) : std::pair<float, bool>{1.0f, true};
-        const float met_ratio = met.first;
+        // The household fill at this centre's catchment market (BL-1163), the
+        // owning nation's qualification and the body habitability this step's
+        // report holds — gathered by read_centre_growth, the SAME function the
+        // centre's card reads (review fix: one gatherer, so the card cannot
+        // drift from the pass). A centre whose body has no market reads met.
+        const centre_growth_reading gr = read_centre_growth(w, reg, cid, &report, &market_met);
         // Review fix (household stack): a market made since the last clear has
         // recorded no household bid, so its 1.0 is no reading at all. CARRY the
         // streak -- no growth, decline, promotion or re-settle step this tick --
         // rather than let one spurious met tick reset a decline streak. A centre
         // whose body has no market keeps reading met (centre_market null above).
-        if (!met.second)
+        if (!gr.recorded)
             continue;
 
-        const bool conditions_met = (hab >= 0.5f)
-                                 && (met_ratio >= growth_sp.growth_met_threshold);
+        // POPULATION_GROWTH_RATE: the floors are the staples (not the whole
+        // basket) and habitability; the upper rungs only raise the rate.
+        const bool conditions_met = gr.grows();
 
         // BL-624: a RAZED centre sits outside the ordinary ladder — nothing
         // to grow, shed or demote (the decline arm's max(1, ...) floor would
@@ -3215,6 +3201,7 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
                     pcc.scale              = 1;
                     pcc.population         = k_population_for_scale[0];
                     pcc.growth_accumulator = 0; // the ladder restarts settled
+                    pcc.growth_carry       = 0.0f;
                 }
             }
             else
@@ -3224,12 +3211,40 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
             continue;
         }
 
+        // POPULATION_GROWTH_RATE (Ben, 2026-11-10; POPULATION.md § Growth,
+        // decline and razing): heads move by a quarter of the signed annual rate
+        // EVERY tick, both ways, the fractional thousands carried in
+        // `growth_carry` (kept in [0, 1) by the floor). Double arithmetic on one
+        // centre's own fields: no cross-centre accumulation, so no order reaches
+        // it. The population floors at 1 (passive failure never destroys).
+        // Review fix: a centre ALREADY at 0 heads (drained by recruiting,
+        // recruits.cpp take_heads) takes no rate step at all — a rate of
+        // nothing is nothing, and the floor would conjure a head every tick.
+        if (pcc.population > 0)
+        {
+            const double total = static_cast<double>(pcc.growth_carry)
+                               + static_cast<double>(pcc.population)
+                                     * static_cast<double>(gr.annual_rate) / 4.0;
+            const double whole = std::floor(total);
+            int   add   = static_cast<int>(whole);
+            float carry = static_cast<float>(total - whole);
+            // Review fix: a fraction just under 1 can ROUND to 1.0f in the
+            // narrowing. That is a whole head: add it, and carry nothing.
+            if (!(carry < 1.0f))
+            {
+                add  += 1;
+                carry = 0.0f;
+            }
+            if (!(carry >= 0.0f))
+                carry = 0.0f;
+            pcc.population   = std::max(1, pcc.population + add);
+            pcc.growth_carry = carry;
+        }
+
         if (conditions_met)
         {
             // Extend (or restart) the positive streak.
             pcc.growth_accumulator = std::max(pcc.growth_accumulator, 0) + 1;
-            if (pcc.growth_accumulator % k_growth_step_ticks == 0)
-                pcc.population += std::max(1, pcc.population / k_growth_step_divisor);
             // PROMOTION: population held above the next rung for the window.
             if (pcc.scale >= 1 && pcc.scale < 5
                 && pcc.population >= k_population_for_scale[pcc.scale] // index scale == next tier's rung
@@ -3243,9 +3258,6 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
         {
             // Extend (or restart) the negative streak.
             pcc.growth_accumulator = std::min(pcc.growth_accumulator, 0) - 1;
-            if ((-pcc.growth_accumulator) % k_decline_step_ticks == 0)
-                pcc.population = std::max(1, pcc.population
-                                              - std::max(1, pcc.population / k_decline_step_divisor));
             // DEMOTION: population below the CURRENT tier's rung. Floors at
             // scale 1 / population 1 — passive failure never destroys a centre
             // (BL-616's asymmetry), and its urban ground stays stamped.
@@ -5163,3 +5175,95 @@ int advance_quarter_to(world& w, const recipe_registry& reg, int day_in_quarter,
 // background corporations (corporation_generation.cpp's
 // generate_background_firms) trading through the normal recipe/workforce/
 // market pipeline. See docs/economy/MARKETS.md.
+
+centre_growth_reading centre_growth_from(float staples_fill, float upper_fill, bool recorded,
+                                         float habitability, float qualification,
+                                         const growth_params& gp)
+{
+    // POPULATION_GROWTH_RATE (Ben, 2026-11-10; POPULATION.md § Growth, decline and
+    // razing, "Growth is a rate, anchored on Earth's history").
+    centre_growth_reading r;
+    r.recorded      = recorded;
+    r.staples_fill  = staples_fill;
+    r.upper_fill    = std::clamp(upper_fill, 0.0f, 1.0f);
+    r.habitability  = habitability;
+    r.qualification = std::clamp(qualification, 0.0f, 1.0f);
+    r.staples_ok    = staples_fill >= gp.growth_met_threshold;
+    r.hab_ok        = habitability >= 0.5f;
+    // The demographic transition: a straight line from the raw base at q = 0 to
+    // the qualified base at q = 1.
+    r.base_rate  = gp.base_rate_raw + (gp.base_rate_qualified - gp.base_rate_raw) * r.qualification;
+    r.bonus_rate = r.base_rate * gp.consumer_bonus * r.upper_fill;
+    r.annual_rate = r.grows() ? (r.base_rate + r.bonus_rate) : -gp.decline_rate;
+    return r;
+}
+
+float growth_body_habitability(const world& w, const economy_report* report, entity_id body)
+{
+    if (report != nullptr)
+        if (const auto hit = report->body_habitability.find(body); hit != report->body_habitability.end())
+            return hit->second;
+    // No report entry: the figure the pass's BL-048A aggregate would compute —
+    // the scale-weighted mean over the body's non-razed centres, accumulated in
+    // ascending centre id (the pass's own order, so bit-identical), 1.0 for a
+    // body with none (the pass's fallback for a body it holds no entry for).
+    std::vector<entity_id> ids;
+    ids.reserve(w.population_centres.size());
+    for (const auto& [cid, pcc] : w.population_centres)
+    {
+        (void)pcc;
+        ids.push_back(cid);
+    }
+    std::sort(ids.begin(), ids.end());
+    float sum = 0.0f, weight = 0.0f;
+    for (const entity_id cid : ids)
+    {
+        const population_centre_component& pcc = w.population_centres.at(cid);
+        if (pcc.razed)
+            continue;
+        const auto tit = w.population_centre_tile.find(cid);
+        if (tit == w.population_centre_tile.end())
+            continue;
+        const auto tc = w.tiles.find(tit->second);
+        if (tc == w.tiles.end() || tc->second.body != body)
+            continue;
+        const float ws = static_cast<float>(std::max(1, pcc.scale));
+        sum    += pcc.habitability * ws;
+        weight += ws;
+    }
+    return (weight > 0.0f) ? sum / weight : 1.0f;
+}
+
+centre_growth_reading read_centre_growth(const world& w, const recipe_registry& reg, entity_id cid,
+                                         const economy_report* report,
+                                         std::map<entity_id, population_fill>* fill_memo)
+{
+    population_fill fill;
+    float qual = 0.0f;
+    float hab  = 1.0f;
+    if (const auto tit = w.population_centre_tile.find(cid); tit != w.population_centre_tile.end())
+    {
+        const entity_id mid = market_for_tile(w, tit->second);
+        if (mid != null_entity)
+        {
+            if (fill_memo != nullptr)
+            {
+                const auto it = fill_memo->find(mid);
+                if (it != fill_memo->end())
+                    fill = it->second;
+                else
+                    fill = fill_memo->emplace(mid, population_basket_fill(w, reg, mid)).first->second;
+            }
+            else
+            {
+                fill = population_basket_fill(w, reg, mid);
+            }
+        }
+        if (const auto tn = w.tile_to_nation.find(tit->second); tn != w.tile_to_nation.end())
+            if (const auto nit = w.nations.find(tn->second); nit != w.nations.end())
+                qual = nit->second.qualification;
+        if (const auto tc = w.tiles.find(tit->second); tc != w.tiles.end())
+            hab = growth_body_habitability(w, report, tc->second.body);
+    }
+    return centre_growth_from(fill.staples, fill.upper, fill.recorded, hab, qual, reg.growth());
+}

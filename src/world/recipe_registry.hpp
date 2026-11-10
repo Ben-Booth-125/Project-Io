@@ -363,9 +363,22 @@ building_upkeep_goods(const building_upkeep_params& p, building_type bt, era_ban
 /// retired the gate's own `demand_basket`: the growth basket IS the household
 /// basket a centre bids (`population_demand_basket()`, read through
 /// `population_met_ratio`), so there is no second list — only the threshold.
+///
+/// POPULATION_GROWTH_RATE (Ben, 2026-11-10; POPULATION.md § Growth, decline and
+/// razing, "Growth is a rate, anchored on Earth's history"): growth is an annual
+/// RATE, a quarter of it a tick. base(q) = base_rate_raw + (base_rate_qualified -
+/// base_rate_raw) x q, multiplied by (1 + consumer_bonus x upper-rung fill);
+/// below either floor the centre declines at decline_rate a year. Defaults match
+/// scripts/economy.lua; the loader refuses an out-of-range value, never clamps.
 struct growth_params
 {
-    float growth_met_threshold = 0.50f; ///< household met ratio a centre needs to grow.
+    /// The STAPLES floor: the shared tranche's fill a centre needs to grow
+    /// (the name predates the split; it gated the whole basket before it).
+    float growth_met_threshold = 0.50f;
+    float base_rate_raw        = 0.030f; ///< annual base at qualification 0.
+    float base_rate_qualified  = 0.003f; ///< annual base at qualification 1.
+    float consumer_bonus       = 0.50f;  ///< base x (1 + this x upper-rung fill).
+    float decline_rate         = 0.016f; ///< annual decline below either floor.
 };
 
 /// BL-617 (population migration) tunables, authored in scripts/economy.lua

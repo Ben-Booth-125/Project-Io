@@ -1522,7 +1522,18 @@ economy = {
         -- at the centre's own market as the share of that bid the last clear
         -- filled (POPULATION.md § Growth, decline and razing). Only the
         -- threshold stays here.
-        growth_met_threshold = 0.50, -- household met ratio a centre needs to grow
+        -- POPULATION_GROWTH_RATE (Ben, 2026-11-10): the basket splits in two.
+        -- The STAPLES (the shared tranche: food rations, agricultural produce,
+        -- water) are the floor; the band's tranche above them is the bonus.
+        growth_met_threshold = 0.50, -- staples fill a centre needs to grow
+        -- Growth is an annual RATE, a quarter of it each quarter, anchored on
+        -- Earth's history (POPULATION.md § Growth, decline and razing): the base
+        -- falls in a line with the nation's qualification (the demographic
+        -- transition), and the upper rungs' fill multiplies it.
+        base_rate_raw       = 0.030, -- a year, at qualification 0 (Earth's late industrialisers)
+        base_rate_qualified = 0.003, -- a year, at qualification 1 (the first industrialisers)
+        consumer_bonus      = 0.50,  -- base x (1 + this x upper-rung fill)
+        decline_rate        = 0.016, -- a year, below the staples or habitability floor (the old step's pace)
     },
 
     -- BL-617 (population migration; docs/economy/POPULATION.md § Migration).

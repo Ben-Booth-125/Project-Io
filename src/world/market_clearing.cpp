@@ -969,6 +969,49 @@ float population_met_ratio(const world& w, const recipe_registry& reg, entity_id
     return (weight > 0.0f) ? acc / weight : 1.0f;
 }
 
+population_fill population_basket_fill(const world& w, const recipe_registry& reg, entity_id market)
+{
+    population_fill out;
+    const auto mit = w.markets.find(market);
+    if (mit == w.markets.end())
+        return out;
+    const market_component& mc = mit->second;
+    // The folded vector the households bid by, and the shared tranche inside it.
+    const std::array<float, resource_count>& basket = reg.population_demand_basket();
+    const std::array<float, resource_count>& shared = reg.population_demand().demand_basket;
+    float s_acc = 0.0f, s_w = 0.0f, u_acc = 0.0f, u_w = 0.0f;
+    bool  bids_something = false;
+    for (std::size_t r = 0; r < resource_count; ++r) // ascending: fixed float order
+    {
+        const float bw = basket[r];
+        if (bw <= 0.0f || mc.base_price[r] <= 0.0f)
+            continue; // not in the bid (inject_population_demand's two skips)
+        bids_something = true;
+        const float bid = mc.household_bid[r];
+        if (bid <= 0.0f)
+            continue;
+        const float share = std::min(1.0f, mc.household_fill[r] / bid);
+        // A good's weight splits by tranche: its shared-tranche weight is a
+        // staple, whatever a band row adds on top of it is an upper rung.
+        const float sw = std::clamp(shared[r], 0.0f, bw);
+        const float uw = bw - sw;
+        s_acc += sw * share; s_w += sw;
+        u_acc += uw * share; u_w += uw;
+    }
+    if (bids_something && !(s_w + u_w > 0.0f))
+        out.recorded = false;
+    out.upper   = (u_w > 0.0f) ? u_acc / u_w : 0.0f;
+    // Review fix (fix round): upper goods bid with NO staple priced or bid is
+    // not "nothing unmet" — the people are buying cloth with no food. Staples
+    // then read 0, and the staples floor fails. Only a market with nothing bid
+    // at all keeps population_met_ratio's 1.0.
+    if (s_w > 0.0f)
+        out.staples = s_acc / s_w;
+    else
+        out.staples = (u_w > 0.0f) ? 0.0f : 1.0f;
+    return out;
+}
+
 void inject_background_demand(world& w, const recipe_registry& reg)
 {
     // BL-340/BL-365: the offstage economy's own pull on the mid-chain

@@ -65,6 +65,23 @@ void inject_population_demand(world& w, const recipe_registry& reg);
 float population_met_ratio(const world& w, const recipe_registry& reg, entity_id market,
                            bool* recorded = nullptr);
 
+/// POPULATION_GROWTH_RATE (Ben, 2026-11-10; POPULATION.md § Growth, decline and
+/// razing): the same household fill, split in two. `staples` is the
+/// weight-averaged fill over the SHARED tranche (`population_demand().
+/// demand_basket`: food rations, agricultural produce, water — wanted in every
+/// band); `upper` over everything else the era-folded basket names (the band's
+/// tranche: clean water, medical supplies, consumer goods in the industrial
+/// band; cloth, ceramics, the fuels and woods in the ancient). Each good capped
+/// at 1, as population_met_ratio. `staples` reads 1.0 when NOTHING was bid
+/// (nothing unmet, population_met_ratio's convention), but 0.0 when upper goods
+/// were bid and no staple was priced or bid (the people buy goods and no food,
+/// so the staples floor fails); `upper` reads 0.0 when no
+/// upper good was bid (no bonus earned on goods nobody could buy). `recorded`
+/// carries population_met_ratio's no-reading case exactly. Pure; deterministic.
+/// (`population_fill` itself lives in economy_system.hpp, beside the growth
+/// reading that consumes it, because this header includes that one.)
+population_fill population_basket_fill(const world& w, const recipe_registry& reg, entity_id market);
+
 /// BL-1196 (households consume; POPULATION.md § Population demand): every
 /// market's households TAKE their bid off its shelf — `household_fill[r] =
 /// min(household_bid[r], inventory[r])`, decremented from `inventory`. No money
