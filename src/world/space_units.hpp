@@ -70,8 +70,9 @@ struct world;
 // unpaid quarter; at `quarters_to_loss` consecutive unpaid quarters it is LOST:
 // erased from the store, its crew with it. A paid quarter clears the count.
 //
-// WHAT IS NOT HERE: battles, convoys and trade dispatch, unloading cargo, debris,
-// bombardment, any AI, any UI, the agent seam. The seams left for them: the
+// WHAT IS NOT HERE: battles, debris,
+// bombardment, any AI, any UI, the agent seam; cargo and convoys are space_convoy.hpp's
+// (BL-1596). The seams left for the rest: the
 // armed-unit list at a node (`space_armed_units_at`) and each unit's readable hull
 // points, firepower and armour (`space_unit_firepower`, `space_unit_armour`).
 //
@@ -136,7 +137,7 @@ struct space_unit
     int32_t          days_remaining = 0;  ///< In transit: >= 1. Otherwise 0.
     entity_id        station = null_entity; ///< Docked: the station. Otherwise null.
     float            propellant  = 0.0f;  ///< Good units aboard, in [0, tank].
-    float            cargo       = 0.0f;  ///< Mass units carried, in [0, cargo cap]. (Loading is a convoy's; owed.)
+    float            cargo       = 0.0f;  ///< Mass units carried, in [0, cargo cap]; its good is the unit's `space_haul` (space_convoy.hpp).
     float            hull_points = 0.0f;  ///< In (0, max].
     int32_t          crew        = 0;     ///< Astronauts aboard.
     float            upkeep      = 0.0f;  ///< Credits a quarter, fixed at raise.
@@ -251,6 +252,9 @@ enum class space_unit_result : uint8_t
     rejected_surface,           ///< A surface node for a hull other than a Lander.
     rejected_insufficient_dv,   ///< The budget cannot pay the move.
     rejected_no_fuel,           ///< Refuel: nothing to draw (no working depot, empty stock, full tank).
+    // BL-1596 (space convoys), appended:
+    rejected_hostile,           ///< An armed unit of a nation at war with the owner stands at the node.
+    rejected_cargo,             ///< Load/unload: not a carrier, another good aboard, over the bay, nothing aboard, on a trade.
 };
 
 /// What a raise, a move or a refuel did.
@@ -320,11 +324,19 @@ float space_unit_firepower(const space_unit& u);
 float space_unit_armour(const space_unit& u);
 float space_unit_max_hull_points(const space_unit& u);
 
+/// What one convoy day did (BL-1596, space_convoy.hpp) — reported, never stored.
+struct space_convoy_day_report
+{
+    int   departed = 0, unloaded = 0, home = 0, lost = 0, stopped = 0, stranded = 0, waiting = 0;
+    float cargo_lost = 0.0f;
+};
+
 /// What one day did — reported, never stored.
 struct space_unit_day_report
 {
     int   arrived  = 0;
     float repaired = 0.0f;
+    space_convoy_day_report convoy; ///< BL-1596: the convoys' share of the day.
 };
 
 /// ONE DAY: ascending id, every in-transit unit counts a day off and arrives at
@@ -350,6 +362,20 @@ struct space_unit_quarter_report
 /// that no longer exists. Empty stores do nothing at all.
 void run_space_unit_quarter(world& w, const space_unit_params& p, const station_params& stp,
                             int econ_tick, space_unit_quarter_report* out = nullptr);
+
+// ---- BL-1596: the lot arithmetic's public faces, for the convoy seam (space_convoy.cpp).
+
+/// Price @p lot whole off @p market's shelf under `p.reservation_mult`'s ceiling.
+/// False when any good cannot be filled whole; otherwise @p credits is its value.
+bool space_quote_lot(const world& w, const space_unit_params& p, entity_id market,
+                     const std::array<float, resource_count>& lot, float* credits);
+/// Draw a quoted lot off the shelf (market-direct) and debit @p nation's treasury.
+void space_take_lot(world& w, entity_id nation, entity_id market,
+                    const std::array<float, resource_count>& lot, float credits);
+/// The market @p tile clears against, else the lowest-id market on @p body.
+entity_id space_market_on_body(const world& w, entity_id tile, entity_id body);
+/// A raise's common gate (nation, hull, live design, keys) without the site.
+space_unit_result space_raise_ready(const world& w, entity_id nation, space_hull h);
 
 /// Ceilings the save reader holds the stream to.
 inline constexpr float k_space_depot_stock_max = 1.0e9f;

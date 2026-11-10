@@ -792,7 +792,6 @@ inline constexpr uint32_t k_world_save_version_pre_recruits = 71;
 /// designs, no units and empty depots. MERGE NOTE: a parallel lane's bump renumbers
 /// this block (the paragraph, the two constants below, the accepted-version line in
 /// `read_world_snapshot`, and the one section at the end of the writer and reader).
-inline constexpr uint32_t world_save_version = 84;
 
 /// BL-1594: the first version carrying the space-unit section (see above).
 inline constexpr uint32_t k_world_save_version_space_units = 84;
@@ -800,6 +799,32 @@ inline constexpr uint32_t k_world_save_version_space_units = 84;
 /// BL-1594: v83, a strict prefix of v84.
 inline constexpr uint32_t k_world_save_version_pre_space_units = k_world_save_version_space_units - 1;
 /// ===== END BL-1594 / BL-1595 VERSION BUMP ======================================
+
+/// ===== BEGIN BL-1596 VERSION BUMP (space convoys) — ONE BLOCK ===================
+/// **85 (BL-1596; SPACE_FLEETS.md § Space convoys) — THE CARGO ABOARD.** Appended
+/// last, after a u32 count: every `space_haul` ascending unit id, as (unit id, owner,
+/// u8 phase, u8 cargo good, src_market, u32 convoy, dest_market, target body, u8
+/// target kind, home body, u8 home kind) — 32 bytes. Each names a live space unit of
+/// its owner (a nation); a carrier (Hauler or Lander); a good in range; a live source
+/// market; nodes of non-star bodies. HELD: cargo aboard > 0, convoy 0, no destination.
+/// OUTBOUND: a Hauler with cargo > 0, a live destination market, its convoy a live,
+/// unarrived SPACE convoy of the owner at speed 0 carrying exactly the cargo aboard to
+/// that market and named by no other record, target and home both low orbits.
+/// RETURNING: a Hauler with no cargo, convoy 0, a live destination market, target ==
+/// home, a low orbit. Refused whole otherwise. (Cargo with no record is inert mass, as
+/// a v84 stream's staged cargo reads.) v84 is a STRICT PREFIX of v85 and is read too
+/// (`k_world_save_version_pre_space_convoys`), as a world with nothing aboard.
+/// MERGE NOTE: a parallel lane's bump renumbers this block (this paragraph, the three
+/// constants below, the accepted-version line in `read_world_snapshot`, and the one
+/// section at the end of the writer and reader).
+inline constexpr uint32_t world_save_version = 85;
+
+/// BL-1596: the first version carrying the space-convoy section (see above).
+inline constexpr uint32_t k_world_save_version_space_convoys = 85;
+
+/// BL-1596: v84, a strict prefix of v85.
+inline constexpr uint32_t k_world_save_version_pre_space_convoys = k_world_save_version_space_convoys - 1;
+/// ===== END BL-1596 VERSION BUMP =================================================
 
 /// BL-1612: the first version carrying the Early Space tree section (see above).
 inline constexpr uint32_t k_world_save_version_early_space = 82;
@@ -1057,9 +1082,13 @@ std::size_t world_save_early_space_section_bytes(const world& w);
 std::size_t world_save_space_node_section_bytes(const world& w);
 
 /// BL-1594: the byte length of the v84 space-unit section `w` writes - 4 + per design
-/// nation (8 + 7 per design), 4 + 58 per unit, 4 + 8 per stocked station. The LAST
-/// section of a v84 stream.
+/// nation (8 + 7 per design), 4 + 58 per unit, 4 + 8 per stocked station. The last
+/// section of a v84 stream (v85 appends the space-convoy section).
 std::size_t world_save_space_unit_section_bytes(const world& w);
+
+/// BL-1596: the byte length of the v85 space-convoy section `w` writes - 4 + 32 per
+/// record. The LAST section of a v85 stream.
+std::size_t world_save_space_convoy_section_bytes(const world& w);
 
 /// BL-1422, widened by BL-1436: the bytes ALL SIX kit goods' extra elements add to
 /// every per-resource array of the stream `w` writes - the widening from 49 to today's
@@ -1200,6 +1229,9 @@ void write_world_snapshot_pre_space_nodes(const world& w, std::ostream& out);
 
 /// VERIFICATION ONLY (BL-1594): the v83 stream shape - no space-unit section.
 void write_world_snapshot_pre_space_units(const world& w, std::ostream& out);
+
+/// VERIFICATION ONLY (BL-1596): the v84 stream shape - no space-convoy section.
+void write_world_snapshot_pre_space_convoys(const world& w, std::ostream& out);
 
 /// BL-1453: the recon stock a battle loaded from a pre-v67 stream is given — enough to
 /// see every defending unit in full (twice the stealthiest defender's kit stealth, in

@@ -15,6 +15,7 @@
 #include "stations.hpp"     // space_station, station_template (BL-1583, below)
 #include "space_command.hpp" // space_order (BL-1587/BL-1588: the signal-delay queue, below)
 #include "space_units.hpp"  // space_unit, space_design (BL-1594/BL-1595, below)
+#include "space_convoy.hpp" // space_haul (BL-1596, below)
 #include "war.hpp"          // war_record, peace_offer (BL-1459/BL-1428 wars, below)
 
 #include <atomic>
@@ -1075,6 +1076,11 @@ struct world
     /// BL-1595 — each station's Fuel-depot propellant stock (good units), ascending
     /// station id; only stations holding stock > 0. SERIALISED (v84), hashed when non-empty.
     std::map<entity_id, float> station_depot_stock;
+
+    /// BL-1596 — the cargo aboard each space unit carrying any, and each trade
+    /// Hauler's trip, keyed by the unit's id (space_convoy.hpp; SPACE_FLEETS.md
+    /// § Space convoys). SERIALISED (world_save.hpp's BL-1596 block), hashed when non-empty.
+    std::map<entity_id, space_haul> space_hauls;
 
     /// Enacted and un-enacted laws (BL-343). A world-level list rather than a
     /// per-corp one: a law is enacted over the world and charged to whoever it

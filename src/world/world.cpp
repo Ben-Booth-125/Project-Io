@@ -999,6 +999,27 @@ uint64_t world::state_hash(int tick) const
                 fnv1a_f32(h, stock);
             }
         }
+        // BL-1596: the cargo aboard and the trade Haulers' trips — folded only when
+        // any is held, so a world without them hashes as before.
+        if (!space_hauls.empty())
+        {
+            fnv1a_u32(h, 0x5F18u); // tag
+            fnv1a_u32(h, static_cast<uint32_t>(space_hauls.size()));
+            for (const auto& [uid, sh] : space_hauls)
+            {
+                fnv1a_u32(h, uid);
+                fnv1a_u32(h, sh.owner);
+                fnv1a_u32(h, static_cast<uint32_t>(sh.phase));
+                fnv1a_u32(h, static_cast<uint32_t>(sh.cargo_res));
+                fnv1a_u32(h, sh.src_market);
+                fnv1a_u32(h, sh.convoy);
+                fnv1a_u32(h, sh.dest_market);
+                fnv1a_u32(h, sh.target.body);
+                fnv1a_u32(h, static_cast<uint32_t>(sh.target.kind));
+                fnv1a_u32(h, sh.home.body);
+                fnv1a_u32(h, static_cast<uint32_t>(sh.home.kind));
+            }
+        }
     }
 
     // Province holder (BL-569). UNLIKE `provinces` itself (generation output,

@@ -196,6 +196,12 @@ struct convoy_leg
     /// or a cost that is not a finite number. Nothing was mutated.
     bool        viable       = false;
     convoy_mode mode         = convoy_mode::land;
+    /// BL-1596 (SPACE_FLEETS.md § Space convoys): a space leg flown by a Hauler — the
+    /// trader is a nation holding a live Hauler design. Its cost is the physical
+    /// space side (the hull readied, the cargo's lift and descent propellant) per
+    /// unit of the cargo the Hauler can carry, and `commit_trade_shipment` charges it
+    /// as bought rather than as `cost`.
+    bool        hauler       = false;
     float       cost         = 0.0f; ///< Total credits the haul costs (already node-discounted).
     int         travel_ticks = 1;    ///< Econ ticks the leg takes; convoy speed is 1/this.
     /// BL-1195: the route's waypoints, copied onto the convoy at commit so its lane

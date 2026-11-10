@@ -91,6 +91,35 @@ ordered to travel with a convoy.
 **Orbit to ground is a landing.** Cargo between a low orbit and a surface market moves by the body's
 Launchpad (up) and by a Lander or the Launchpad (down), at that body's climb cost.
 
+**Loading and unloading.** A carrier — a Hauler or a Lander — idle in a body's low orbit **loads**
+goods off that body's shelf through its owner's staffed Launchpad there, buying the goods and the
+lift's propellant: the climb's Δv × the launch rate × the cargo's mass. It **unloads** its whole
+cargo down through a staffed Launchpad on the body below, buying the descent's propellant the same
+way off that market. Unloaded cargo **lands** on that market and is sold there, as any convoy's
+cargo is (`../economy/SUPPLY.md` § A shipment). A carrier holds one good at a time. Neither happens
+while a hostile armed unit stands at the node.
+
+**How a trade's Hauler runs** (the first cut; the dials are the space-unit dials):
+
+- **The hull.** An idle, empty Hauler of the trading nation already in the source's low orbit
+  takes the trade, refuelled over the source's Launchpad; with none, one is raised at that pad.
+  So a nation's yard of Haulers grows only as fast as its trade outruns them.
+- **The cap.** A Hauler carries no more than lets its laden outbound trip **and** its empty
+  return both fit one tank. How much a trade can carry between two bodies is a number the player
+  reads off the design, not a guess.
+- **The flight.** It flies the cheapest path **hop by hop**, standing at every node of it, so
+  every node of the path is a place it can be met.
+- **The cost.** The trade pays the space side as it is bought — the hull readied, the lift at the
+  source's climb and the descent at the destination's — rather than a priced haul. The cargo is
+  bought and sold as any trade's.
+- **Interdiction.** At a node holding an armed unit of a nation at war with its owner, a Hauler
+  with no armed unit of its own there is **lost with its cargo** (an unarmed hull has nothing to
+  fight with). With an escort there, it **waits** at that node until the battle is decided, then
+  flies on.
+- **Who ships this way.** A nation holding a live Hauler design ships every inter-body trade as a
+  Hauler. A nation holding none keeps the older straight-line space lane
+  (`../economy/SUPPLY.md` § Logistical cost).
+
 ## Battles (Ben, 2026-11-10)
 
 **A battle happens at a node** when armed units of two nations at war are both there. It is fought
