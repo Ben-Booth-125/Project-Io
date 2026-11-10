@@ -10,6 +10,15 @@ sessions can be scoped and paced with less waste.
 
 ---
 
+## 2026-11-10 — v0.3.0 marked reached; six stale items cancelled
+
+**Runtime:** short; Light.
+
+- ROADMAP: v0.3.0 (a working military system) is reached (Ben, 2026-11-10). Its done-definition is "the systems work", with no long playtest; the owed-definition line is removed. The v0.2.5 changelog and README lines now say v0.2.5 completes it.
+- Cancelled unbuilt and archived (Ben, 2026-11-10): BL-1414 (trade-flow room without rivals), BL-1477 (upkeep doc drift), BL-1491 (kit pull pairs), BL-1492 (rescue grid gate), BL-1493 (grudge G7f), BL-1494 (new library t50 stall). Each was left in a closed sprint 61 or 62. Seven open items remain.
+
+---
+
 ## 2026-11-10 — Cut v0.2.5 (version 0.2.5): diplomacy, equal starts, the opening and the war at sea
 
 **Runtime:** short; Light (release cut).

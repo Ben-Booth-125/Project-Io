@@ -66,7 +66,10 @@ player can feel, not a list of items.
   to their nation's capital (`../economy/LOGISTICS.md`). Ben judged it reached on 2026-10-22,
   with the routing work of sprint 55; it is cut when that sprint closes.
 - **v0.3.0 — a working military system.** The campaign's force (`../military/MILITARY.md`)
-  working as a system a player uses. Its done-definition is owed and is Ben's to set.
+  working as a system a player uses. Its done-definition is **the systems work** (Ben,
+  2026-11-10): land, air and sea forces are raised, paid, supplied and fought, and a war runs from
+  declaration to a peace that can end a nation. Ben judged it reached on 2026-11-10, with the war
+  at sea of sprint 64. A long playtest is not part of it.
 
 ---
 
@@ -140,8 +143,6 @@ by [`../tech/TECH_FOUNDATIONS.md`](../tech/TECH_FOUNDATIONS.md), not by this doc
 
 - **The ancient product's own done-definition** — the commercial cut's bar, distinct from the
   *space* game's, which stays parked with it (NR-177).
-- **v0.3.0's done-definition** — what "a working military system" must show (Ben, 2026-10-22:
-  "we can work on the specifics later").
 - **The product's name.** Io is a moon of Jupiter.
 
 ---

@@ -18,8 +18,8 @@ release.
 a peace that may cede ground, and a nation that loses its last province ends. Every major opens on
 the same kit, credits and army. Ships patrol, escort, raid, blockade and land armies, for the
 player and every rival. The save keeps its economy, population grows at a set rate, and a march
-takes its own fastest route across all six sides of a hex. v0.3.0 still waits on a playtest with
-a few wars.*
+takes its own fastest route across all six sides of a hex. It completes v0.3.0, a working
+military system (Ben, 2026-11-10).*
 
 ### Added
 

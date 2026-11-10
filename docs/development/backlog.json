@@ -15,29 +15,6 @@
   {
    "status": "proposed",
    "glyph": "○",
-   "sprint": 61,
-   "written": "2026-10-26",
-   "parked": true,
-   "blocked_on": null,
-   "author": "main session (sprint 57 close review, 2026-10-26)",
-   "requires": [],
-   "difficulty": 2,
-   "priority": "B",
-   "id": "BL-1414",
-   "short_name": "TRADE_FLOW_ROOM_WITHOUT_RIVALS",
-   "category": "UI",
-   "authority_doc": "docs/ui/LENSES.md",
-   "files": [
-    "src/ui/body_surface_canvas.cpp",
-    "docs/ui/LENSES.md",
-    "docs/ui/DISCOVERY.md"
-   ],
-   "title": "The Trade-flow lens computes no-room without rivals' cargo in flight",
-   "design": "Ben, 2026-10-26 (NR-980 B): the lens computes a market's room without other nations' cargo in flight to it, so no-room never reveals a rival's shipments. The dispatcher keeps its own room figure; write in LENSES.md that the lens figure is the player's own view and may differ.  PARKED (Ben, 2026-11-03, NR-1108 C): until trade capacity is next touched."
-  },
-  {
-   "status": "proposed",
-   "glyph": "○",
    "sprint": null,
    "version_goal": "v0.3.0",
    "written": "2026-10-26",
@@ -56,29 +33,6 @@
    ],
    "title": "Missiles as munitions, interceptor defence, tactical nuclear use, and military satellites",
    "design": "MILITARY.md § Missiles and § Space. Missiles are goods fired by launchers and consumed; interceptors thin short-range attacks; tactical nuclear use permitted with a severe Alarm cost, strategic never fired. Recon satellites lift fog (SPACE_ASSETS, BL-1329 satellites and rovers). The nuclear cost reading depends on Ben's call on the era catastrophe (2026-10-26)."
-  },
-  {
-   "status": "proposed",
-   "glyph": "○",
-   "sprint": 62,
-   "version_goal": "v0.3.0",
-   "written": "2026-11-02",
-   "parked": false,
-   "blocked_on": null,
-   "author": "main session (Ben, starter-package form, 2026-11-02)",
-   "requires": [],
-   "id": "BL-1477",
-   "short_name": "UPKEEP_DOC_DRIFT",
-   "category": "Docs",
-   "authority_doc": "docs/military/MILITARY.md",
-   "priority": "C",
-   "difficulty": 1,
-   "files": [
-    "docs/military/MILITARY.md",
-    "scripts/economy.lua"
-   ],
-   "title": "MILITARY.md § Upkeep says every rate is zero; economy.lua charges them",
-   "design": "Doc and code disagree: § Upkeep's table and 'authored at zero, deliberately' against economy.military.unit_upkeep (credits_per_head 0.1041, ordnance 0.000875, food 0.00625, decay 50, recovery 100; BL-1191 stopgap). One of them is wrong; the opening army's wage (BL-1474) is priced off the code's figures."
   },
   {
    "status": "proposed",
@@ -104,103 +58,6 @@
    ],
    "title": "The province card's resource names clip to 4 px",
    "design": "Found 2026-11-04 merging BL-1488 (Industry lens retired); fails identically on b2b2502b without it. text_overflow_floor: 13 selection.province.resource names (Iron Ore 57 px needed, Rare Earth Ore 103 px) get 4 px on the overflow_shell and overflow_selection_building frames. Check: text_overflow_floor passes with no floor lowered. CARRIED at the sprint 61 close (2026-11-05): built and merged; Ben's live click is owed, and at 1280x720 the deposit column still clips at the right edge and the Province title overlaps the population figure. LIVE CLICK 2026-11-05: not passed. Ben's answer to the remaining clipping is to scale the UI down, so this stays open until BL-1495 (UI scale down) lands and the card is clicked again. Carried at the sprint 63 close (2026-11-10): the clip waits on a live click of the scaled-down UI."
-  },
-  {
-   "status": "proposed",
-   "glyph": "○",
-   "sprint": 61,
-   "version_goal": "v0.3.0",
-   "written": "2026-11-04",
-   "parked": false,
-   "blocked_on": null,
-   "author": "main session (Ben, 2026-11-04: \"Accept it\")",
-   "requires": [
-    "BL-1486"
-   ],
-   "id": "BL-1491",
-   "short_name": "KIT_PULL_PAIRS",
-   "category": "AI",
-   "authority_doc": "docs/ai/AI_OPPONENT.md",
-   "priority": "C",
-   "difficulty": 2,
-   "files": [
-    "src/world/nation_ai.cpp",
-    "tools/verify/nation_tech_harness.cpp"
-   ],
-   "title": "With kit worth, no rival takes a pick-one pair by year 20",
-   "design": "Ben, 2026-11-04 (on BL-1486, kit research worth): ACCEPTED as the honest result of the grant. Every kit node is pair-free, so kit worth summed through reach (choose_research_node) pulls each rival onto kit branches; the R7 age sweep (--ai 20 --age-only --seeds 4) took no pick-one pair by year 20 (8 nations took DG-ST-AC-Ab before). R7c was made honest (fails when no pair is taken) and now FAILS; it is a calibration reading, not a defect to fix around. Re-read it when the research dials are next calibrated: whether pairs should appear by year 20, and if so what moves them (cold review: the kit term mostly acts through reach, and the units half of the weight saturates at ~16 groups, so the military_research axis is weakly expressed; a kit item is a catalogue row per unit class, so one rifle on three chassis counts 3)."
-  },
-  {
-   "status": "proposed",
-   "glyph": "○",
-   "sprint": 61,
-   "version_goal": "v0.3.0",
-   "written": "2026-11-04",
-   "parked": false,
-   "blocked_on": null,
-   "author": "main session (Ben, 2026-11-04: \"Gate it now\")",
-   "requires": [
-    "BL-1485"
-   ],
-   "id": "BL-1492",
-   "short_name": "RESCUE_GRID_GATE",
-   "category": "Economy",
-   "authority_doc": "docs/economy/PRODUCTION.md",
-   "priority": "A",
-   "difficulty": 2,
-   "files": [
-    "src/world/economy_system.cpp",
-    "tools/verify/market_viability.cpp",
-    "docs/economy/PRODUCTION.md"
-   ],
-   "title": "The loss reflex's recipe rescue retools to power only on a grid that is short",
-   "design": "Found by BL-1485 (power grid measure), 2026-11-04: 59 of 60 play-built power plants by t50 are not builds but the loss reflex's cross-group recipe rescue (economy_system.cpp, 'Recipe rescue'): a floored steel plant retools to power because power's price/base beats a floored output, on grids the measure reads as not short (55 of 59; mean power price 0.75 of base; seed 37: draw 143.7 vs output 738, six steel plants switch in one tick). RULED (Ben, 2026-11-04): gate the rescue now on the same grid measure (body_power_grid_gap, own buildings live, others nominal), for every nation including the player's - the rescue is a mechanical reflex, not a strategic act. A rescue onto power is refused unless the target grid is short. Check: market_viability full tier (G1t50 >= 84, power plants decommissioned at t50 and the PW line against the BL-1485 reading), world_determinism, building_upkeep. MEASURED 2026-11-04 (Lane W): the gate cut play-built power plants 71 -> 15 (none decommissioned) but G1t50 fell to 83.6 (floor 84): the steel plants it no longer rescues stay idle. Parked on branch bl1492-rescue-grid-gate-g1t50-fail (7316da4e). RULED (Ben, 2026-11-04): rescue elsewhere - a refused power rescue tries the next-best non-power recipe before idling; then re-gate. The loss reflex keeps skipping the player's nation (Ben, 2026-11-04: keep the skip), so the gate binds rivals only. RULING (Ben, 2026-11-05): keep parked. Rescue elsewhere on bl1492-rescue-elsewhere (79ff0984) cuts play-built power 71 -> 15 but G1t50 83.6 < 84: floored steel plants refused a power retool idle. Revisit with seed re-curation (BL-1413)."
-  },
-  {
-   "status": "proposed",
-   "glyph": "○",
-   "sprint": 61,
-   "version_goal": "v0.3.0",
-   "written": "2026-11-04",
-   "parked": false,
-   "blocked_on": null,
-   "author": "main session (found verifying BL-1470, 2026-11-04)",
-   "requires": [],
-   "id": "BL-1493",
-   "short_name": "GRUDGE_G7F",
-   "category": "Generation",
-   "authority_doc": "docs/politics/RELATIONS.md",
-   "priority": "C",
-   "difficulty": 1,
-   "files": [
-    "tools/verify/grudge_sentiment_harness.cpp"
-   ],
-   "title": "grudge_sentiment_harness G7f fails: the history is not unchanged with grudge weights zeroed",
-   "design": "Found 2026-11-04 verifying BL-1470 (sentiment contributors): G7f ('the history is UNCHANGED - the sim's scorer reads no grudge', BL-827) fails identically on 41ad4e7c and 286bd8b6, so it predates BL-1470. Lane Y's unconfirmed guess: the check zeroes four grudge weights but not the treaty-broken and faith-sundered ones. Diagnose which is wrong - the check or a scorer that now reads a grudge - before changing anything; never weaken it to pass."
-  },
-  {
-   "status": "proposed",
-   "glyph": "○",
-   "sprint": 61,
-   "version_goal": "v0.3.0",
-   "written": "2026-11-05",
-   "parked": false,
-   "blocked_on": null,
-   "author": "main session (Ben, 2026-11-05: \"Keep 84, file work\")",
-   "requires": [],
-   "category": "Economy",
-   "priority": "B",
-   "difficulty": 3,
-   "id": "BL-1494",
-   "short_name": "NEW_LIBRARY_T50_STALL",
-   "authority_doc": "docs/economy/PRODUCTION.md",
-   "files": [
-    "tools/verify/market_viability.cpp",
-    "src/world/corporation_generation.cpp",
-    "src/world/state_industry.cpp"
-   ],
-   "title": "Processors stop running by tick 50 on the re-curated library's colonial, rich and roadless worlds",
-   "design": "Found 2026-11-05 re-curating the seed library (BL-1413): market_viability G1t50 pools 82.3 on the new sixteen against the 84 floor, where the old sixteen read 84.2 on the same code; handoff G1 is 94.8, so processors start running and stop by tick 50. Per seed: 92 (colonial) 72.8, 64 (colonial-undone) 74.3, 46 (rich) 77.3, 7 (wealth at home) 77.5, 63 (roadless) 77.8, 54 (road world) 79.3, 0+60 80.4, 29 82.8; 13 84.9, 3 87.1, 2 87.6, 22 87.7, 27 89.0, 17 90.4, 31 90.7. Ben kept the floor at 84 (2026-11-05): the broader library exposes a real stall, it is not a calibration to move. THE WORK: read the low seeds' tick-50 idle reasons (market_viability's per-seed idle census and the BR/PW lines) and name the cause before any change. Check: G1t50 >= 84 pooled on the library, every other gate held."
   },
   {
    "status": "proposed",
