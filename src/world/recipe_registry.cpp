@@ -1406,6 +1406,13 @@ void recipe_registry::load_from_lua(lua_state& lua)
         read_checked(t, "base_reserve",       np.base_reserve,       0.0, 1.0, ctx);
         read_checked(t, "calm_reserve_bonus", np.calm_reserve_bonus, 0.0, 1.0, ctx);
 
+        // BL-1608 the far-space pick's dials (nation_ai.hpp § The far-space pick).
+        read_checked(t, "far_space_bases_max",            np.far_space_bases_max,            0, 1024, ctx);
+        read_checked(t, "far_space_colonists",            np.far_space_colonists,            1, 1 << 16, ctx);
+        read_checked(t, "far_space_warships_per_hostile", np.far_space_warships_per_hostile, 0, 1024, ctx);
+        read_checked(t, "far_space_warships_max",         np.far_space_warships_max,         0, 1024, ctx);
+        read_checked(t, "far_space_keep_base_home",       np.far_space_keep_base_home,       0, 1, ctx);
+
         m_nation_ai = np;
     }
 

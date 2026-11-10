@@ -10,6 +10,9 @@
 #include "world/space_assets.hpp"           // BL-1589: the space census
 #include "world/space_tech_keys.hpp"        // BL-1589: the space census's key flags
 #include "world/stations.hpp"               // BL-1589: the space census's stations
+#include "world/offworld_base.hpp"          // BL-1608: the far-space census's bases
+#include "world/space_battle.hpp"           // BL-1608: the far-space census's battles
+#include "world/space_units.hpp"            // BL-1608: the far-space census's units and designs
 #include "world/spawn_seat.hpp"             // BL-1325: seat_player_corporation
 #include "world/nation_step.hpp"
 #include "world/corp_ai.hpp"
@@ -476,6 +479,7 @@ int run_spectate_headless(int until_year, std::uint32_t seed, const std::string&
     // met. `space_block` is filled from each quarter's report (last wins).
     std::map<entity_id, int> space_block; // a space_ai_block; absent = no row (the player's nation)
     std::map<entity_id, int> space_quote; // BL-1615: the refused quote's space_launch_result (0 = none)
+    std::map<entity_id, int> far_block;   // BL-1608: the last far_space_block met (0 = acted)
     static const char* const k_block_names[] = {"acted", "no_rocketry", "no_launchpad", "pending_order",
                                                 "crew_short", "reserve", "refused", "nothing_wanted"};
     struct space_census
@@ -576,6 +580,40 @@ int run_spectate_headless(int until_year, std::uint32_t seed, const std::string&
         }
         std::printf("[space] %d total nations=%zu rocketry=%d pad=%d launches=%d\n", year, nation_ids.size(),
                     rocketry, pads, launches);
+        // BL-1608: the far-space census - one line per nation holding a design, a
+        // unit or a base (every nation at the last year), then the year's totals.
+        int far_units = 0, far_bases = 0, far_designs = 0;
+        for (const entity_id n : nation_ids)
+        {
+            int units[space_hull_count] = {}, designs = 0, colonists = 0, bombard = 0, bases = 0;
+            if (const auto dit = w.space_unit_designs.find(n); dit != w.space_unit_designs.end())
+                designs = static_cast<int>(dit->second.size());
+            for (const auto& [uid, u] : w.space_units)
+                if (u.owner == n)
+                {
+                    ++units[static_cast<std::size_t>(u.hull)];
+                    colonists += space_unit_colonists(w, uid);
+                    bombard += w.space_bombard_orders.count(uid) != 0 ? 1 : 0;
+                }
+            for (const auto& [cid, b] : w.offworld_bases)
+            {
+                const entity_id t = offworld_base_tile(w, cid);
+                const auto nt = w.tile_to_nation.find(t);
+                if (nt != w.tile_to_nation.end() && nt->second == n) ++bases;
+            }
+            int total = 0;
+            for (const int k : units) total += k;
+            far_units += total; far_bases += bases; far_designs += designs;
+            if (!all && designs == 0 && total == 0 && bases == 0) continue;
+            const auto fb = far_block.find(n);
+            std::printf("[space-far] %d id=%u name=%s designs=%d units(hauler/lander/tug/frigate/cruiser)=%d/%d/%d/%d/%d "
+                        "colonists=%d bombard_orders=%d bases=%d block=%d\n",
+                        year, static_cast<unsigned>(n), w.nations.at(n).name.c_str(), designs, units[0], units[1],
+                        units[2], units[3], units[4], colonists, bombard, bases,
+                        fb != far_block.end() ? fb->second : -1);
+        }
+        std::printf("[space-far] %d total designs=%d units=%d bases=%d battles=%zu hauls=%zu\n", year, far_designs,
+                    far_units, far_bases, w.space_battles.size(), w.space_hauls.size());
         std::fflush(stdout);
     };
 
@@ -691,6 +729,24 @@ int run_spectate_headless(int until_year, std::uint32_t seed, const std::string&
                             static_cast<unsigned>(sp.nation), static_cast<int>(sp.action),
                             static_cast<int>(sp.module), static_cast<unsigned>(sp.node.body),
                             static_cast<int>(sp.node.kind), sp.cost, static_cast<int>(sp.result));
+        }
+        // BL-1608: each far-space action and each refusal, one line. A nation meeting
+        // a wall it met last quarter is not reprinted (the year line carries it).
+        for (const far_space_pick& fp : tick.report.far_space_picks)
+        {
+            const int blk = static_cast<int>(fp.block);
+            const bool changed = far_block.count(fp.nation) == 0 || far_block.at(fp.nation) != blk;
+            far_block[fp.nation] = blk;
+            if (fp.action == far_space_action::none && (!changed || fp.block == far_space_block::no_rocketry
+                                                        || fp.block == far_space_block::no_hull))
+                continue;
+            std::printf("[space-far-act] day=%d id=%u action=%d block=%d hull=%d unit=%u from=%u/%d to=%u/%d tile=%u "
+                        "target=%u count=%d cost=%.0f result=%d\n",
+                        day, static_cast<unsigned>(fp.nation), static_cast<int>(fp.action), blk,
+                        static_cast<int>(fp.hull), static_cast<unsigned>(fp.unit), static_cast<unsigned>(fp.from.body),
+                        static_cast<int>(fp.from.kind), static_cast<unsigned>(fp.to.body), static_cast<int>(fp.to.kind),
+                        static_cast<unsigned>(fp.tile), static_cast<unsigned>(fp.target), fp.count, fp.cost,
+                        static_cast<int>(fp.result));
         }
 
         if (k % 4 != 0) continue;

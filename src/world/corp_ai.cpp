@@ -25,6 +25,9 @@
 #include "recipe_registry.hpp"
 #include "space_assets.hpp"    // BL-1615: space_home_body_of (the pad's body)
 #include "space_tech_keys.hpp" // BL-1615: the Rocketry and astronaut-training keys
+#include "offworld_base.hpp"   // BL-1608: a base province kept home (NR-1206, dial OFF)
+#include "space_battle.hpp"    // BL-1608: space_hostile (the battery's reason)
+#include "space_units.hpp"     // BL-1608: space_armed_units_at (the battery's reason)
 #include "supply_system.hpp"   // price_convoy_leg / commit_convoy (BL-600, the shared dispatch seam)
 #include "survey_system.hpp"
 #include "nation_tech.hpp"     // recipe_unlocked, nation_scalar (BL-1273; BL-588 before it)
@@ -1570,6 +1573,26 @@ entity_id nearest_fed_ground(world& w, const recipe_registry& reg, unit_draw_mem
     return null_entity;
 }
 
+/// BL-1608 / NR-1206: does @p tile stand in the province of one of @p nation's
+/// off-world bases (a base centre whose tile it holds)? Read only when the
+/// `far_space_keep_base_home` dial is on.
+static bool base_province_of(const world& w, entity_id nation, entity_id tile)
+{
+    const uint32_t pid = w.provinces.province_of(tile);
+    if (pid == 0)
+        return false;
+    for (const auto& [cid, b] : w.offworld_bases)
+    {
+        (void)b;
+        const entity_id bt = offworld_base_tile(w, cid);
+        const auto nt = w.tile_to_nation.find(bt);
+        if (bt != null_entity && nt != w.tile_to_nation.end() && nt->second == nation
+            && w.provinces.province_of(bt) == pid)
+            return true;
+    }
+    return false;
+}
+
 void score_nation_fronts(world& w, const recipe_registry& reg, entity_id nation, int tick)
 {
     const std::vector<front> fronts = nation_fronts(w, nation); // a copy: the verbs below may re-anchor
@@ -1706,6 +1729,9 @@ void score_nation_fronts(world& w, const recipe_registry& reg, entity_id nation,
         if (u.defend_province != no_province) // BL-1504: it has its order
             continue;
         if (capital_prov != 0 && w.provinces.province_of(u.position) == capital_prov)
+            continue;
+        // BL-1608 / NR-1206 (RAISED, NOT GRANTED; dial OFF): a base province is a home kept too.
+        if (reg.nation_ai().far_space_keep_base_home != 0 && base_province_of(w, nation, u.position))
             continue;
         // BL-1441 (front edge cases): only a front the unit can REACH (`front_reachable`:
         // a march onto its lone slot the game would accept). Assigning one it cannot
@@ -2422,7 +2448,7 @@ space_ground_pick score_nation_space_ground(world& w, const recipe_registry& reg
         return pick;
     }
 
-    bool any_pad = false, done_pad = false, any_centre = false;
+    bool any_pad = false, done_pad = false, any_centre = false, any_battery = false;
     {
         std::vector<entity_id> own = w.nations.at(nation).state_assets;
         std::sort(own.begin(), own.end());
@@ -2434,6 +2460,13 @@ space_ground_pick score_nation_space_ground(world& w, const recipe_registry& reg
             const building_component& b = bit->second;
             if (b.type == building_type::astronaut_training_centre)
                 any_centre = true;
+            if (b.type == building_type::orbital_defence_battery)
+            {
+                const auto bt = w.tiles.find(b.tile);
+                if (bt != w.tiles.end() && bt->second.body == home)
+                    any_battery = true;
+                continue;
+            }
             if (b.type != building_type::launchpad)
                 continue;
             const auto tit = w.tiles.find(b.tile);
@@ -2445,8 +2478,31 @@ space_ground_pick score_nation_space_ground(world& w, const recipe_registry& reg
         }
     }
 
+    // BL-1608 (the same grant: "space combat"; SPACE_FLEETS.md § Bombardment and fire at
+    // orbit): a BATTERY first, while an armed unit of a nation hostile to it stands in its
+    // home body's low orbit and it has no battery of its own on that body.
+    bool orbit_held = false;
+    if (!any_battery && nation_has_mechanic(w, nation, space_keys::orbital_defence_battery)
+        && reg.building_available(building_type::orbital_defence_battery))
+    {
+        std::vector<entity_id> others;
+        for (const auto& [oid, onc] : w.nations)
+            if (oid != nation)
+                others.push_back(oid);
+        std::sort(others.begin(), others.end());
+        for (const entity_id o : others)
+            if (space_hostile(w, nation, o)
+                && !space_armed_units_at(w, o, orbital_node{home, orbital_node_kind::low_orbit}).empty())
+            {
+                orbit_held = true;
+                break;
+            }
+    }
+
     building_type type = building_type::none;
-    if (!any_pad && reg.building_available(building_type::launchpad))
+    if (orbit_held)
+        type = building_type::orbital_defence_battery;
+    else if (!any_pad && reg.building_available(building_type::launchpad))
         type = building_type::launchpad;
     else if (done_pad && !any_centre && nation_has_mechanic(w, nation, space_keys::astronaut_training)
              && reg.building_available(building_type::astronaut_training_centre))

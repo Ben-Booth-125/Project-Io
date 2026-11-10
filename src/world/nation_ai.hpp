@@ -6,6 +6,7 @@
 #include "orbital_node.hpp"  // BL-1589: the space pick's node
 #include "space_assets.hpp"  // BL-1589: station_module_kind, k_no_station_module
 #include "space_command.hpp" // BL-1589: space_command_result
+#include "space_units.hpp"   // BL-1608: space_design (the far-space pick's design)
 
 #include <array>
 
@@ -275,6 +276,24 @@ struct nation_ai_params
         static_cast<uint8_t>(station_module_kind::fuel_depot),
         static_cast<uint8_t>(station_module_kind::cargo_hold),
     }};
+
+    // --- The far-space pick (BL-1608; AI_OPPONENT.md § 11, Ben 2026-11-10) ---
+    // Lua: economy.nation_ai (scripts/economy.lua). The reserve rule above
+    // (`space_reserve_*`) prices every far-space spend as it prices a launch.
+    /// Off-world bases a rival keeps founding toward. At the count it stops
+    /// raising Landers for a base (its prospecting and its bases go on).
+    int far_space_bases_max = 1;
+    /// Colonists (thousands) one embark boards: at least the founding minimum,
+    /// at most the Lander's free berths.
+    int far_space_colonists = 4;
+    /// Armed hulls a rival keeps per nation it is hostile to, and its ceiling in
+    /// all: a war is the reason to raise one, and the count is how many.
+    int far_space_warships_per_hostile = 2;
+    int far_space_warships_max         = 6;
+    /// NR-1206 (RAISED, NOT GRANTED): when 1, the land-front scorer keeps a
+    /// rival's off-world base province garrisoned as it keeps its capital's.
+    /// Defaults OFF until Ben rules.
+    int far_space_keep_base_home = 0;
 };
 
 /// The three terms, per nation, exactly as they were computed. Reported, never
@@ -525,6 +544,122 @@ space_ai_pick choose_space_action(const world& w, const recipe_registry& reg, en
 /// through `apply_space_command`. Returns how many commands applied or queued.
 int run_nation_space_ai(world& w, const recipe_registry& reg,
                         std::vector<space_ai_pick>* out = nullptr);
+
+// ---------------------------------------------------------------------------
+// BL-1608 — THE FAR-SPACE PICK (AI_OPPONENT.md § 11, "Rival nations go to space
+// as the player does", Ben 2026-11-10; SPACE_FLEETS.md; NATIONS.md § Off-world
+// bases; DISCOVERY.md § Mapping, then prospecting). The near-space pick's sibling
+// faculty: at most ONE far-space verb per nation per quarter, the same verbs the
+// player holds (space_units.hpp, space_convoy.hpp, space_bombard.hpp, the
+// found_base / embark_colonists seam), chosen on the world as it stands. In
+// order, the first that is wanted and legal:
+//
+//   1. DESIGN    a researched hull with no live design, or whose best design
+//                (below) differs from the live one: `set_space_unit_design`.
+//                Every slot takes the best item it holds the key for (drive:
+//                exhaust; tanks: capacity; armament: firepower; armour: armour;
+//                ties to the lowest catalogue id). A Lander's bay follows the
+//                need: passenger while it has no Lander with berths and its
+//                base programme is open, else cargo. One live design per class.
+//   2. WAR       (hostile to someone, `space_hostile`):
+//      a. BOMBARD   an own missile-armed unit idle in a hostile-held body's low
+//                   orbit, with no standing order: `order_space_bombard` on the
+//                   hostile building there in best condition (ties lowest id).
+//      b. FLEET     its idle armed units at one node (lowest unit id first) to
+//                   the war's node: the low orbit of a body where its own ground
+//                   is blockaded, else of a hostile's base body, else of a
+//                   hostile's home body; `order_space_fleet`.
+//      c. RAISE     a Frigate at its home pad while it keeps fewer armed hulls
+//                   than `far_space_warships_per_hostile` x hostiles (ceiling
+//                   `far_space_warships_max`).
+//   3. BASE AND PROSPECT (a Lander design):
+//      TARGET is the body (survey knowledge applies, not home, no base of its
+//      own there) it has mapped most of, ties to the lowest id, whose surface
+//      the Lander design can reach from home low orbit on a full tank.
+//      a. FOUND     its landed Landers on the target carry the colonists and the
+//                   kit: `found_base` on the prospected, unclaimed land tile
+//                   with the most deposit (ties lowest id).
+//      b. EMBARK    a passenger Lander at home with empty berths.
+//      c. LOAD      a cargo Lander idle at home low orbit with no kit: the kit.
+//      d. MOVE      a Lander idle at home low orbit carrying colonists or the
+//                   kit (or any Lander, without the base key: to prospect) to
+//                   the target's surface; a full tank first when the move
+//                   cannot be paid (`refuel_space_unit`, a fifth action).
+//      e. RAISE     a Lander when it has none, or (base key held, under
+//                   `far_space_bases_max`) none of the bay the live design has.
+//
+// CONVOYS are the trade scorer's: a nation holding a live Hauler design ships
+// its inter-body trade as a Hauler (space_convoy.hpp), raising one at the pad
+// when none is idle, on the margin the trade scorer already prices. So the
+// Hauler's design is this pick's whole share of a convoy.
+//
+// Every spend passes the near pick's reserve rule (`space_reserve_*`) on a quote
+// of its own (the raise lot, the load lot, the refuel). The fair-price ceiling
+// is the registry's, as the launch seam copies it.
+//
+// NEVER the player's nation — not under spectate either. Not in the settle.
+// Ascending nation id, no memory, no plan: every step reads the world as it is.
+// ---------------------------------------------------------------------------
+
+enum class far_space_action : uint8_t
+{
+    none = 0,
+    design,
+    bombard,
+    fleet_move,
+    raise_warship,
+    found_base,
+    embark,
+    load_kit,
+    lander_move,
+    refuel,
+    raise_lander,
+};
+
+/// Why a nation took no far-space action this quarter (the first wall it met).
+enum class far_space_block : uint8_t
+{
+    none = 0,        ///< It acted.
+    no_rocketry,     ///< `space_dispatch` not held.
+    no_hull,         ///< No far-space hull key held.
+    no_pad,          ///< A raise, embark or load wanted a staffed home pad it lacks.
+    no_target,       ///< A Lander has no reachable mapped body to fly to.
+    no_dv,           ///< A wanted move cannot be paid and no refuel is possible.
+    reserve,         ///< The wanted spend would breach the treasury reserve.
+    shelf_short,     ///< The wanted lot is not on the shelf (or over the ceiling).
+    crew_short,      ///< The wanted raise needs crew the pool lacks.
+    blockaded,       ///< The home body is blockaded for it.
+    refused,         ///< The verb refused what the pick chose.
+    nothing_wanted,  ///< Nothing far-space is wanted now.
+};
+
+/// What the far-space pick did for one nation. Reported, never stored.
+struct far_space_pick
+{
+    entity_id        nation = null_entity;
+    far_space_action action = far_space_action::none;
+    far_space_block  block  = far_space_block::nothing_wanted;
+    uint8_t          hull   = 0xFF;        ///< space_hull, when a hull is named.
+    entity_id        unit   = null_entity; ///< The unit acted on (or raised, once applied).
+    orbital_node     from{}, to{};         ///< A move.
+    entity_id        tile   = null_entity; ///< found_base.
+    entity_id        target = null_entity; ///< bombard: the building.
+    float            cost   = 0.0f;        ///< The quote (credits), where a spend.
+    int32_t          count  = 0;           ///< embark: colonists; load: kit units; fleet_move: units.
+    bool             fleet  = false;       ///< fleet_move: the whole fleet at `from` (every unit there armed).
+    space_design     design{};             ///< design: the design set.
+    uint8_t          result = 0;           ///< The verb's own result code (space_unit_result / offworld_base_result).
+};
+
+/// The pick @p nation would make now — PURE (reads @p w, writes nothing).
+far_space_pick choose_far_space_action(const world& w, const recipe_registry& reg, entity_id nation,
+                                       const nation_ai_params& p);
+
+/// The quarterly pass, right after the near-space pick: every non-player nation,
+/// ascending id, issues its far-space pick through the verb it names. Returns
+/// how many verbs applied.
+int run_nation_far_space_ai(world& w, const recipe_registry& reg,
+                            std::vector<far_space_pick>* out = nullptr);
 
 // ---------------------------------------------------------------------------
 // BL-1335 — THE NATION'S TAX TIER (NATIONS.md § Taxes and Discontent; the
