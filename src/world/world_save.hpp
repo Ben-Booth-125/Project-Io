@@ -830,7 +830,6 @@ inline constexpr uint32_t k_world_save_version_space_battles = 85;
 /// BL-1597: v84, a strict prefix of v85.
 inline constexpr uint32_t k_world_save_version_pre_space_battles = k_world_save_version_space_battles - 1;
 /// ===== END BL-1597 VERSION BUMP ================================================
-=======
 /// ===== BEGIN BL-1600 VERSION BUMP (mapping then prospecting) — ONE BLOCK ========
 /// **86 (BL-1600; DISCOVERY.md § Mapping, then prospecting) — SURVEY KNOWLEDGE.**
 /// Appended last, after a u32 count: every (nation, body) record of

@@ -613,7 +613,7 @@ int main()
         const std::string& b = mid_bytes;
         // `saved` has fought one more day since mid_bytes; the section's shape is
         // the one S10b measured: 8 + 80 + 9 + 8.
-        const std::size_t s0 = b.size() - (8 + 80 + 9 + 8) - world_save_prospecting_section_bytes(f.w); // v86 follows
+        const std::size_t s0 = b.size() - (8 + 80 + 9 + 8) - 4; // the v86 survey-knowledge section follows, empty here (4 bytes)
         const std::size_t b0 = s0 + 8;
         const auto refused = [&](std::string bad) {
             world t;

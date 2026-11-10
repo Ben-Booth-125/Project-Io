@@ -1038,6 +1038,8 @@ uint64_t world::state_hash(int tick) const
                     fnv1a_u32(h, mid);
                     fnv1a_f32(h, dmg);
                 }
+            }
+        }
         // BL-1600: each nation's mapped and prospected regions off the home world —
         // folded only when non-empty, so a world nobody mapped hashes as before.
         if (!survey_knowledge.empty())
