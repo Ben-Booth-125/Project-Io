@@ -1167,6 +1167,7 @@ void draw_construction_panel(world& w,
     ui.site_finder.live = false;
     ui.site_finder.drawn.clear();
     ui.site_finder.picker_x = ui.site_finder.picker_y = -1.0f;
+    ui.site_finder.tab_x    = ui.site_finder.tab_y    = -1.0f;
 
     if (p_open && !*p_open)
     {
@@ -1199,7 +1200,10 @@ void draw_construction_panel(world& w,
         ui.construction_ui.tab_y[0] = p1.y + h * 0.5f;
         // THE FINDER'S OWN TAB (Ben, 2026-11-09): "they're hiding manual construction."
         ImGui::SameLine();
+        const ImVec2 p2 = ImGui::GetCursorScreenPos();
         ui::nav_button("Site Finder", 2, view, p_open);
+        ui.site_finder.tab_x = p2.x + ImGui::GetItemRectSize().x * 0.5f;
+        ui.site_finder.tab_y = p2.y + h * 0.5f;
     }
     ImGui::Separator();
 

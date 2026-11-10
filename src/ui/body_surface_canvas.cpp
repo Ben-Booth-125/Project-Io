@@ -8022,12 +8022,14 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     // THE RETURN OVER THE TILE (Ben, 2026-11-09): the table's own Net, in green, in the
     // chrome range so the camera's squash leaves the digits upright. Only where the figure
     // fits the hex: at a coarser rung the wash alone reads.
+    state.site_finder.net_labels.clear();
     for (const site_net_label& lab : site_net_labels)
     {
         const std::string txt = fmt::abbreviate(static_cast<double>(lab.net));
         const ImVec2 ts = ImGui::CalcTextSize(txt.c_str());
         if (ts.x + 4.0f > draw_r * 1.73f)
             continue;
+        state.site_finder.net_labels.push_back(txt); // the text as drawn, never where
         const float y = tilt_pivot + (lab.y - draw_r * 0.42f - tilt_pivot) * tilt_sy;
         const ImVec2 at{lab.x - ts.x * 0.5f, y - ts.y * 0.5f};
         dl->AddRectFilled({at.x - 2.0f, at.y}, {at.x + ts.x + 2.0f, at.y + ts.y}, IM_COL32(8, 14, 10, 170), 2.0f);
