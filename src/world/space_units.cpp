@@ -4,6 +4,7 @@
 #include "market_clearing.hpp" // market_for_tile
 #include "nation_tech.hpp"     // nation_has_mechanic
 #include "orbital_graph.hpp"
+#include "space_battle.hpp"  // BL-1597: an engaged unit's move is a withdrawal
 #include "space_assets.hpp"    // space_home_body_of, k_space_quarters_to_loss_ceiling
 #include "space_tech_keys.hpp"
 #include "world.hpp"
@@ -271,8 +272,11 @@ space_unit_result raise_gate(const world& w, entity_id nation, space_hull h)
     return space_unit_result::ok;
 }
 
-/// The move every order makes, over @p ids (ascending). Refused whole.
-space_unit_op order_units(world& w, const std::vector<entity_id>& ids, orbital_node from, orbital_node to)
+/// The move every order makes, over @p ids (ascending). Refused whole. With
+/// @p commit false it is the check alone: the op says what the move would do and
+/// nothing is written.
+space_unit_op order_units(world& w, const std::vector<entity_id>& ids, orbital_node from, orbital_node to,
+                          bool commit = true)
 {
     space_unit_op op;
     if (!node_ok(w, to) || !node_ok(w, from))
@@ -317,6 +321,11 @@ space_unit_op order_units(world& w, const std::vector<entity_id>& ids, orbital_n
         1, static_cast<int32_t>(std::min(std::ceil(path.days), 1.0e6)));
     for (std::size_t i = 0; i < ids.size(); ++i)
     {
+        if (!commit)
+        {
+            op.propellant += burns[i];
+            continue;
+        }
         space_unit& u = w.space_units.at(ids[i]);
         u.propellant     = std::max(0.0f, u.propellant - burns[i]);
         u.state          = space_unit_state::in_transit;
@@ -330,6 +339,25 @@ space_unit_op order_units(world& w, const std::vector<entity_id>& ids, orbital_n
     op.unit   = ids.empty() ? null_entity : ids.front();
     op.dv     = dv;
     op.days   = days;
+    return op;
+}
+
+/// BL-1597 (SPACE_FLEETS.md § Battles, "withdrawal is an order to move away"): a
+/// move ordered for units engaged in an open battle is checked whole, then
+/// RECORDED: they take one more day of fire and leave after it (the battle day
+/// flies them). Every other move flies at once.
+space_unit_op order_or_withdraw(world& w, const std::vector<entity_id>& ids, orbital_node from, orbital_node to)
+{
+    bool engaged = false;
+    for (const entity_id id : ids)
+        engaged = engaged || space_unit_engaged(w, id);
+    if (!engaged)
+        return order_units(w, ids, from, to);
+    space_unit_op op = order_units(w, ids, from, to, /*commit=*/false);
+    if (op.result != space_unit_result::ok)
+        return op;
+    record_space_withdrawal(w, ids, to);
+    op.withdrawing = true;
     return op;
 }
 
@@ -550,7 +578,7 @@ space_unit_op order_space_unit(world& w, const space_unit_params& p, entity_id n
         op.result = space_unit_result::rejected_busy;
         return op;
     }
-    return order_units(w, {unit}, uit->second.node, to);
+    return order_or_withdraw(w, {unit}, uit->second.node, to);
 }
 
 space_unit_op order_space_fleet(world& w, const space_unit_params& p, entity_id nation,
@@ -571,6 +599,23 @@ space_unit_op order_space_fleet(world& w, const space_unit_params& p, entity_id 
     {
         op.result = space_unit_result::rejected_unknown_unit;
         return op;
+    }
+    return order_or_withdraw(w, ids, from, to);
+}
+
+space_unit_op depart_space_units(world& w, const std::vector<entity_id>& ids, orbital_node from,
+                                 orbital_node to)
+{
+    for (const entity_id id : ids)
+    {
+        const auto uit = w.space_units.find(id);
+        if (uit == w.space_units.end() || in_transit(uit->second) || uit->second.node != from)
+        {
+            space_unit_op op;
+            op.result = space_unit_result::rejected_unknown_unit;
+            op.unit = id;
+            return op;
+        }
     }
     return order_units(w, ids, from, to);
 }

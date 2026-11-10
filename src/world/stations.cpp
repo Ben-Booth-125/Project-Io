@@ -153,6 +153,8 @@ void lose_asset(space_asset& a)
 
 } // namespace
 
+void lose_station_asset(space_asset& a) { lose_asset(a); }
+
 station_op quote_found_station(const world& w, const space_asset_params& sp, const station_params& stp,
                                entity_id nation, orbital_node node)
 {
