@@ -24,7 +24,7 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 > **Generated file.** Produced by `node tools/session/render_actions.js`.
 > Edit the JSON, then re-run; hand edits here are overwritten.
 
-*254 entries — 68 gameplay · 41 canvas · 15 lens · 87 ledger · 43 chrome.*
+*257 entries — 70 gameplay · 42 canvas · 15 lens · 87 ledger · 43 chrome.*
 
 ---
 
@@ -710,7 +710,7 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 - The seat has a home nation (rejected_state otherwise).
 - The named node is queued, or (for the last-entry sentinel) the queue is not empty (rejected_state otherwise; nothing touched).
 
-**Expected output.** The node comes off the nation's research queue together with every LATER entry that needs it - an entry with a requirement group that loses its only queued-or-held member (so a press on Field Practice II also takes off Seismic Survey behind it, and keeps Field Practice I ahead of it). The rest of the queue keeps its order. RP in hand stay: the pool is the head's progress, so nothing researched is stranded. With the last-entry sentinel, only the last entry comes off.
+**Expected output.** The node comes off the nation's research queue together with every LATER entry that needs it - an entry with a requirement group that loses its only queued-or-held member (so a press on Field Practice II also takes off Seismic Survey behind it, and keeps Field Practice I ahead of it). The rest of the queue keeps its order. RP in hand stay: the pool is the head's progress, so nothing researched is stranded. With the last-entry sentinel, only the last entry comes off. BL-1613: the last-entry sentinel drops the last entry of the ONE queue - the Early Space tail's last when it has one (gameplay.unqueue_space_research), else the Digitisation queue's.
 
 **Reason to select.** Undo part of the plan: the toggle on the node you queued takes its dependents with it, so the queue never holds an entry that can no longer open.
 
@@ -722,9 +722,9 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 - BL-1406 (Ben, 2026-10-23: the player IS its nation; corporations and companies are retired - docs/CONCEPT.md § Player identity, docs/GLOSSARY.md): THE ACTOR IS THE NATION. On the wire a session acts as its nation - `COMMAND corp=<nation> nation=<nation> ...` (the seam's nation-self form, corp_command::as_nation == corp). The session corporation's id is still accepted as the actor's NAME and, once the world is folded (every campaign start), re-pointed to its nation before the seam; any other actor is rejected_not_owner. The app files the player's press the same way (app::player_command). Money is the treasury's UNCOMMITTED part - a nation never runs into debt (rejected_funds past it) - and what the verb makes or moves is the nation's (its state_assets, units, trades).
 - `corp` is the SEAT (world::player_entity): the player reaches its nation's queue as the nation's operating champion. Any other corporation is refused (rejected_state) - a rival does not plan its nation's research.
 - The seat has a home nation (rejected_state otherwise).
-- The queue is not empty (rejected_state; the button is disabled).
+- The queue - Digitisation entries or the Early Space tail - is not empty (rejected_state; the button is disabled).
 
-**Expected output.** The nation's research queue is emptied. RP in hand stay and keep accruing; with nothing queued the research line spends nothing.
+**Expected output.** The nation's research queue is emptied - the Early Space tail with it (BL-1613: one queue). RP in hand stay and keep accruing; with nothing queued the research line spends nothing.
 
 **Reason to select.** Start the plan over, or stop the research line spending the treasury.
 
@@ -1313,6 +1313,44 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 
 **Reason to select.** Wear down a hostile nation's industry, trade or defences on a body your fleet holds the orbit of - at the price of Trust and Alarm in the nation struck.
 
+### `gameplay.queue_space_research` — The research panel's Early Space tree (the 'Early Space' tab, top-right of the research canvas): SHIFT + left click on a node. A corp_verb (55, `queue_space_research`), so an agent issues it through the same seam.
+
+**Press.** Open the research panel (nav slot 4 or F9), press the 'Early Space' tab, then hold Shift and left-click a node. Holding Shift over a node first rings what the click would queue; the hover card says the count and RP, or why it is refused.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `order` | `uint32` | The Early Space node: its INDEX in io::es::nodes - store order of docs/economy/tech/early_space_tree.json, generated into src/world/early_space_tree_data.hpp, where each row carries its index. 0..53. The MCP server refuses anything else before the wire; the seam range-checks it again (rejected_invalid). |
+
+**Valid when:**
+- BL-1406 (Ben, 2026-10-23: the player IS its nation; corporations and companies are retired - docs/CONCEPT.md § Player identity, docs/GLOSSARY.md): THE ACTOR IS THE NATION. On the wire a session acts as its nation - `COMMAND corp=<nation> nation=<nation> ...` (the seam's nation-self form, corp_command::as_nation == corp). The session corporation's id is still accepted as the actor's NAME and, once the world is folded (every campaign start), re-pointed to its nation before the seam; any other actor is rejected_not_owner. The app files the player's press the same way (app::player_command). Money is the treasury's UNCOMMITTED part - a nation never runs into debt (rejected_funds past it) - and what the verb makes or moves is the nation's (its state_assets, units, trades).
+- `corp` is the SEAT (world::player_entity): the player reaches its nation's queue as the nation's operating champion. Any other corporation is refused (rejected_state) - a rival does not plan its nation's research.
+- The seat has a home nation (rejected_state otherwise).
+- The gate into space is met (ERAS.md § Era 1 -> Era 2 gate): the nation holds Rocketry, owns a completed, staffed Launchpad on its home body, and a market on that body holds the gate's propellant on its shelf. Unmet: rejected_state, nothing queued; the tree draws locked and its caption names what the gate still needs.
+- The node's branch is keyed: the nation holds the Digitisation quest that names it (RESEARCH.md § Quests key the next age) - or, while that quest's deed is unread, the quest's own major. Unkeyed: rejected_state; the branch header reads 'Needs <node>'.
+- The node is not already held or queued (rejected_state; a shift-click on a queued node is the unqueue toggle, gameplay.unqueue_space_research). A refusal queues nothing.
+
+**Expected output.** The nation's ONE research queue gains the node with its unheld requirements ahead of it, on the Early Space tail - behind every Digitisation entry, so the pool reaches it only once no Digitisation entry waits on funding (RESEARCH.md § The research queue). The column lists it after the Digitisation entries, numbered on, with its arrival quarter at the nation's current RP rate. A quest (every Early Space deed is unread) waits in the queue.
+
+**Reason to select.** Plan into the next age once the nation has reached space: one press queues the whole path to a far-space technology.
+
+### `gameplay.unqueue_space_research` — The research panel's Early Space tree: SHIFT + left click on a QUEUED node (the toggle rule). A corp_verb (56, `unqueue_space_research`). 'Remove last' (gameplay.unqueue_research's last-entry form) also drops the Early Space tail's last entry first, since it is the last of the one queue.
+
+**Press.** Hold Shift and left-click a queued node on the Early Space tree (it carries a white ring and its queue position).
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `order` | `uint32` | The queued Early Space node to take off: its INDEX in io::es::nodes (0..53, as queue_space_research). There is no last-entry form; any value outside the tree is rejected_invalid. |
+
+**Valid when:**
+- BL-1406 (Ben, 2026-10-23: the player IS its nation; corporations and companies are retired - docs/CONCEPT.md § Player identity, docs/GLOSSARY.md): THE ACTOR IS THE NATION. On the wire a session acts as its nation - `COMMAND corp=<nation> nation=<nation> ...` (the seam's nation-self form, corp_command::as_nation == corp). The session corporation's id is still accepted as the actor's NAME and, once the world is folded (every campaign start), re-pointed to its nation before the seam; any other actor is rejected_not_owner. The app files the player's press the same way (app::player_command). Money is the treasury's UNCOMMITTED part - a nation never runs into debt (rejected_funds past it) - and what the verb makes or moves is the nation's (its state_assets, units, trades).
+- `corp` is the SEAT (world::player_entity): the player reaches its nation's queue as the nation's operating champion. Any other corporation is refused (rejected_state) - a rival does not plan its nation's research.
+- The seat has a home nation (rejected_state otherwise).
+- The named node is on the Early Space tail (rejected_state otherwise; nothing touched).
+
+**Expected output.** The node comes off the Early Space tail together with every LATER tail entry that needs it (a press on Cryogenics II also takes off Remote Prospecting behind it, and keeps Cryogenics I). The rest of the queue keeps its order; RP in hand stay.
+
+**Reason to select.** Undo part of an Early Space plan without touching the Digitisation queue ahead of it.
+
 ---
 
 ## Canvas — looking around: navigation, selection, hover, time
@@ -1635,7 +1673,7 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 **Valid when:**
 - The app is in-game and no ImGui text field has keyboard focus.
 
-**Expected output.** Toggles the research panel (the same flag as nav rail slot 4). The research panel: the Digitisation tree drawn as three trees in a ring (Production, Network, State; three branches each; four cost rings inside out; no centre node) on the canvas, and in the fold-out column the seat's nation with its RP a quarter, RP in hand and held count, and its research queue with each entry's arrival quarter, Remove last and Clear - always shown while the seat's nation exists. Shift + left click on a node queues it; shift-click on a queued node takes it off with the entries that need it. Every node, every requirement link (an AND link - a node with two or more requirement groups - in the accent), pick-one pairs outlined in red with a dashed tie, quests as amber diamonds, placeholders dashed and muted; held nodes green, queued nodes ringed with their queue position. Hovering a node opens the shared hover card: name, tier, ring, RP cost, exact advantage, "Requires: A + B" (groups joined by +, members by or), a quest's deed and the next-age branch it keys, a pair's sibling, and the node's state. Opening it closes any other ledger; pressing F9 again closes it (toggle rule). Sim, view, and selection untouched.
+**Expected output.** Toggles the research panel (the same flag as nav rail slot 4). The research panel: the Digitisation tree drawn as three trees in a ring (Production, Network, State; three branches each; four cost rings inside out; no centre node) on the canvas, and in the fold-out column the seat's nation with its RP a quarter, RP in hand and held count, and its research queue with each entry's arrival quarter, Remove last and Clear - always shown while the seat's nation exists. Shift + left click on a node queues it; shift-click on a queued node takes it off with the entries that need it. Every node, every requirement link (an AND link - a node with two or more requirement groups - in the accent), pick-one pairs outlined in red with a dashed tie, quests as amber diamonds, placeholders dashed and muted; held nodes green, queued nodes ringed with their queue position. Hovering a node opens the shared hover card: name, tier, ring, RP cost, exact advantage, "Requires: A + B" (groups joined by +, members by or), a quest's deed and the next-age branch it keys, a pair's sibling, and the node's state. Opening it closes any other ledger; pressing F9 again closes it (toggle rule). Sim, view, and selection untouched. BL-1613: the canvas carries an age switch (canvas.tech_tree_age_tab) between the Digitisation ring and the Early Space tree; the column adds an Early Space line (held count when the gate into space is met, else what the gate needs) and lists ONE queue - the Digitisation entries, then the Early Space tail behind them, numbered on, each with its arrival quarter.
 
 **Reason to select.** Read which technologies the nation can reach and what each gives, and shift-click nodes to plan its research queue.
 
@@ -1900,6 +1938,21 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 **Expected output.** Toggles the province as a goal, at most three; the click is consumed (no selection). The declaration's goal list, justifications and price update on the next frame. Nothing is sent.
 
 **Reason to select.** Name the ground the war is for: the goals are what the war score counts and what a peace can cede.
+
+### `canvas.tech_tree_age_tab` — The research canvas's age switch: two tabs top-right, 'Digitisation' and 'Early Space' (read 'Early Space (locked)' while the gate into space is unmet).
+
+**Press.** Click a tab. Clicking the tab already shown closes the research panel (the toggle rule: re-clicking the active sub-view tab closes it).
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `age` | `one of Digitisation | Early Space` | Which age's tree the canvas draws. |
+
+**Valid when:**
+- The research panel is open (nav slot 4 or F9).
+
+**Expected output.** Digitisation: the ring (as canvas.tech_tree_key describes). Early Space: the next age's tree, three branch columns (In-Situ Propellant, Interplanetary Convoys, Space Force) flowing top to bottom, the same glyphs, links and press idiom as the ring; each column's header names its branch and what keys it ('Keyed: <node> held' in green, or 'Needs <node>' in red). Before the gate into space is met every node draws locked and the caption reads 'Locked: the gate into space needs ...' naming the missing conditions (Rocketry; a staffed Launchpad on the home body; propellant on a home-body market's shelf); the tree stays readable by hover. The camera resets on a switch. Sim untouched.
+
+**Reason to select.** Read the next age: what reaching space opens, what keys each branch, and whether the gate is met.
 
 ---
 
@@ -2496,7 +2549,7 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 **Valid when:**
 - In-game
 
-**Expected output.** Toggles the research panel open; re-click closes; opening closes any other ledger. The research panel: the Digitisation tree drawn as three trees in a ring (Production, Network, State; three branches each; four cost rings inside out; no centre node) on the canvas, and in the fold-out column the seat's nation with its RP a quarter, RP in hand and held count, and its research queue with each entry's arrival quarter, Remove last and Clear - always shown while the seat's nation exists. Shift + left click on a node queues it; shift-click on a queued node takes it off with the entries that need it. Every node, every requirement link (an AND link - a node with two or more requirement groups - in the accent), pick-one pairs outlined in red with a dashed tie, quests as amber diamonds, placeholders dashed and muted; held nodes green, queued nodes ringed with their queue position. Hovering a node opens the shared hover card: name, tier, ring, RP cost, exact advantage, "Requires: A + B" (groups joined by +, members by or), a quest's deed and the next-age branch it keys, a pair's sibling, and the node's state.
+**Expected output.** Toggles the research panel open; re-click closes; opening closes any other ledger. The research panel: the Digitisation tree drawn as three trees in a ring (Production, Network, State; three branches each; four cost rings inside out; no centre node) on the canvas, and in the fold-out column the seat's nation with its RP a quarter, RP in hand and held count, and its research queue with each entry's arrival quarter, Remove last and Clear - always shown while the seat's nation exists. Shift + left click on a node queues it; shift-click on a queued node takes it off with the entries that need it. Every node, every requirement link (an AND link - a node with two or more requirement groups - in the accent), pick-one pairs outlined in red with a dashed tie, quests as amber diamonds, placeholders dashed and muted; held nodes green, queued nodes ringed with their queue position. Hovering a node opens the shared hover card: name, tier, ring, RP cost, exact advantage, "Requires: A + B" (groups joined by +, members by or), a quest's deed and the next-age branch it keys, a pair's sibling, and the node's state. BL-1613: the canvas carries an age switch (canvas.tech_tree_age_tab) between the Digitisation ring and the Early Space tree; the column adds an Early Space line (held count when the gate into space is met, else what the gate needs) and lists ONE queue - the Digitisation entries, then the Early Space tail behind them, numbered on, each with its arrival quarter.
 
 **Reason to select.** Answers "which technologies can my nation reach, what does each give, and when will my plan arrive?"
 
@@ -3448,7 +3501,7 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 - App is in game.
 - Not while an ImGui widget owns the keyboard.
 
-**Expected output.** Toggles the research panel (nav slot 4) and its fold-out column. The research panel: the Digitisation tree drawn as three trees in a ring (Production, Network, State; three branches each; four cost rings inside out; no centre node) on the canvas, and in the fold-out column the seat's nation with its RP a quarter, RP in hand and held count, and its research queue with each entry's arrival quarter, Remove last and Clear - always shown while the seat's nation exists. Shift + left click on a node queues it; shift-click on a queued node takes it off with the entries that need it. Every node, every requirement link (an AND link - a node with two or more requirement groups - in the accent), pick-one pairs outlined in red with a dashed tie, quests as amber diamonds, placeholders dashed and muted; held nodes green, queued nodes ringed with their queue position. Hovering a node opens the shared hover card: name, tier, ring, RP cost, exact advantage, "Requires: A + B" (groups joined by +, members by or), a quest's deed and the next-age branch it keys, a pair's sibling, and the node's state. Opening it closes any other ledger; F9 again closes it.
+**Expected output.** Toggles the research panel (nav slot 4) and its fold-out column. The research panel: the Digitisation tree drawn as three trees in a ring (Production, Network, State; three branches each; four cost rings inside out; no centre node) on the canvas, and in the fold-out column the seat's nation with its RP a quarter, RP in hand and held count, and its research queue with each entry's arrival quarter, Remove last and Clear - always shown while the seat's nation exists. Shift + left click on a node queues it; shift-click on a queued node takes it off with the entries that need it. Every node, every requirement link (an AND link - a node with two or more requirement groups - in the accent), pick-one pairs outlined in red with a dashed tie, quests as amber diamonds, placeholders dashed and muted; held nodes green, queued nodes ringed with their queue position. Hovering a node opens the shared hover card: name, tier, ring, RP cost, exact advantage, "Requires: A + B" (groups joined by +, members by or), a quest's deed and the next-age branch it keys, a pair's sibling, and the node's state. Opening it closes any other ledger; F9 again closes it. BL-1613: the canvas carries an age switch (canvas.tech_tree_age_tab) between the Digitisation ring and the Early Space tree; the column adds an Early Space line (held count when the gate into space is met, else what the gate needs) and lists ONE queue - the Digitisation entries, then the Early Space tail behind them, numbered on, each with its arrival quarter.
 
 **Reason to select.** Answers "which technologies can my nation reach, what does each give, and when will my plan arrive?" - the route to the queue_research press.
 

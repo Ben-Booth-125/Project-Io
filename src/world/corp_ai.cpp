@@ -489,6 +489,9 @@ const char* corp_verb_label(corp_verb v)
         case corp_verb::set_trade:          return "trade";
         case corp_verb::clear_trade:        return "trade withdrawal";
         case corp_verb::set_trade_reserve:  return "trade reserve";
+        // BL-1613: the seat's Early Space verbs; no scorer issues them.
+        case corp_verb::queue_space_research:   return "Early Space research";
+        case corp_verb::unqueue_space_research: return "Early Space unqueue";
     }
     return "action";
 }

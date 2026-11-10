@@ -2112,8 +2112,8 @@
    "design": "ERAS.md § Era 1 -> Era 2 gate, § Far-space technology. A nation's tech state holds one held set and one queue sized to the Digitisation tree; add per-tree state (held set + queue for the Early Space tree) with its save leg, a pure gate query (Rocketry held, a staffed home Launchpad, propellant on the home shelf), and branch availability keyed by the Digitisation quest that keys each branch. Quest deeds are all declared unread today, so a branch key also needs its quest's deed read (or a stand-in the gate opens). Done when a harness researches an Early Space node after the gate and is refused before it."
   },
   {
-   "status": "designed",
-   "glyph": "○",
+   "status": "complete",
+   "glyph": "●",
    "sprint": 66,
    "version_goal": "v0.5.0",
    "written": "2026-11-10",
@@ -2136,7 +2136,7 @@
     "docs/ai/ACTIONS.json"
    ],
    "title": "The Early Space tree reachable by the player and the rivals: verb, panel, AI picker, modifiers read",
-   "design": "BL-1612 made the tree researchable in the model only. Owed: a queue verb for Early Space nodes with its ACTIONS.json entry; the tech tree panel shows the second tree once the gate is met; the rival research picker weighs Early Space nodes (its scorer is Digitisation-indexed today); nation_scalar folds Early Space modifier rows; remove/clear/unqueue and arrival projection cover the Early Space queue."
+   "design": "BL-1612 made the tree researchable in the model only. Owed: a queue verb for Early Space nodes with its ACTIONS.json entry; the tech tree panel shows the second tree once the gate is met; the rival research picker weighs Early Space nodes (its scorer is Digitisation-indexed today); nation_scalar folds Early Space modifier rows; remove/clear/unqueue and arrival projection cover the Early Space queue. Live click owed: the Early Space tab and a shift-click queue in the built app."
   },
   {
    "status": "designed",
@@ -2215,6 +2215,28 @@
    ],
    "title": "Rivals with a staffed pad can buy a launch: spacecraft components and propellant reach the home shelf, and pads finish in reasonable time",
    "design": "The BL-1615 spectate (seed 0 to 1995) ends with 4 staffed rival pads and 0 launches. Three padded nations are refused rejected_shelf: their home market holds no spacecraft_components or propellant lot (components_lump 25, propellant_lump 50), though treasuries are 50 to 88k. The plants exist (recipes spacecraft_components, spacecraft_components_heavy, propellant_atmospheric) but nothing builds them: no demand shows before a launch. Second gap: pads take 5 to 9 years, some sites at rate 0 for want of materials. Fix as an in-world force, not a term in the agent: the space programme demand must be visible to the nation build scorer (2026-10-23 grant, own ground only) so it builds the plants, or the launch buy must post a standing order the market and builders can see. Done when a spectated run shows rival launches before 2000."
+  },
+  {
+   "status": "designed",
+   "glyph": "○",
+   "sprint": 66,
+   "version_goal": "v0.5.0",
+   "written": "2026-11-10",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Claude (BL-1613 lane report)",
+   "requires": [],
+   "category": "AI",
+   "priority": "C",
+   "difficulty": 1,
+   "id": "BL-1631",
+   "short_name": "MCP_RESEARCH_NODE_COUNT",
+   "authority_doc": "docs/ai/AI_OPPONENT.md",
+   "files": [
+    "tools/mcp/server.js"
+   ],
+   "title": "The MCP server range-checks research orders against 160 nodes; the Digitisation tree has 194",
+   "design": "tools/mcp/server.js holds RESEARCH_NODE_COUNT = 160. Read the count from the generated tree data (or the store) instead of a literal, so valid orders 160..193 are not refused before the wire."
   }
  ]
 }

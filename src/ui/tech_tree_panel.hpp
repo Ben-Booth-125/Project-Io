@@ -20,6 +20,13 @@ namespace ui {
 //     the node off with the entries that need it (Ben, 2026-10-10; NR-1033). A
 //     plain click only inspects.
 //
+// BL-1613: the canvas carries an age switch (two tabs, top-right) between the
+// Digitisation ring and the Early Space tree (`io::es`) - three branch columns
+// in the ring's own glyphs and press idiom, drawn locked with the gate's missing
+// conditions named until the gate into space is met. Its presses are
+// `queue_space_research` / `unqueue_space_research`; the column lists the one
+// queue, the Early Space tail behind the Digitisation entries.
+//
 // The panel reads the world and never writes it: a press is a `corp_command`
 // (`queue_research` / `unqueue_research` / `clear_research`) pushed onto
 // `ui_state::pending_research_commands`, applied by `app::render` through

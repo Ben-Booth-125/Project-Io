@@ -236,6 +236,16 @@ enum class corp_verb : uint8_t
     // Appended after set_embargo, same append-only rule. Any nation on its OWN unit; a
     // rival's scorer issues it by the grant in AI_OPPONENT.md § 11.
     defend_province,      ///< Order unit `subject` to defend province `province` (`no_province` clears the order); the unit stores it and its post, and leaves any front. The post is the tile it stands on when inside the province, else the nearest tile of the province the actor owns that a march reaches. rejected_invalid (no such unit or province, a unit no land class, a province with no land the actor owns, no reachable post) / rejected_not_owner (not the actor's unit) / rejected_state (already so).
+    // --- BL-1613: the Early Space tree joins the seam (RESEARCH.md § The research queue) ---
+    // Appended after defend_province, same append-only rule. The Early Space tree
+    // (`io::es`) is a second tree on the ONE queue: its entries stand behind every
+    // Digitisation entry (`nation_tech_state::es_queue`). The seat's nation only, as
+    // queue_research; `clear_research` and `unqueue_research`'s `unqueue_last` already
+    // cover the whole logical queue. `order` is an `io::es::nodes` index, range-checked
+    // before any use. A rival's picks go through `enqueue_early_space_node` directly
+    // (run_nation_research_ai), never this verb.
+    queue_space_research,   ///< The seat's nation queues Early Space node `order` with its unheld requirements ahead of it, on the Early Space tail (`enqueue_early_space_node`). rejected_invalid for an out-of-tree `order`; rejected_state when already held/queued, or locked (the gate into space unmet, or the node's branch not keyed). A refusal mutates nothing.
+    unqueue_space_research, ///< The seat's nation takes queued Early Space node `order` off the tail with every later tail entry that needs it (the toggle). rejected_invalid for an out-of-tree `order`; rejected_state when the node is not queued.
 };
 
 /// One past the highest verb — the wire parser's range gate (BL-396: run_serve
@@ -245,7 +255,7 @@ enum class corp_verb : uint8_t
 /// appending a verb means moving this with it — and only this, since existing
 /// values never renumber.
 inline constexpr uint8_t corp_verb_count =
-    static_cast<uint8_t>(corp_verb::defend_province) + 1;
+    static_cast<uint8_t>(corp_verb::unqueue_space_research) + 1;
 
 /// `unqueue_research`'s "the last entry" sentinel for `corp_command::order`
 /// (the MCP boundary's -1). UINT32_MAX, never a node index.

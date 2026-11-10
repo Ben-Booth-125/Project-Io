@@ -1705,12 +1705,31 @@
     "src/ui/nav_pane.cpp",
     "src/world/nation_tech.cpp"
    ],
-   "summary": "Rail slot 4 / F9: the Digitisation tree as three trees in a ring on the canvas — every node in its tier's glyph (travel dot, minor ring, major disc, quest diamond, pair outlined red, placeholder dashed, joint/mastery accent ring), AND links in the accent, held / open / locked / queued states, rim majors and branches labelled — with the shared hover card on a node. The column holds the seat's nation with its RP a quarter and the queue with each entry's arrival quarter, Remove last and Clear. SHIFT + left click on a node queues it with its requirements (queue_research); on a queued node it takes it off with the entries that need it (unqueue_research). Each tree's name sits in its own sector.",
+   "summary": "Rail slot 4 / F9: the Digitisation tree as three trees in a ring on the canvas — every node in its tier's glyph (travel dot, minor ring, major disc, quest diamond, pair outlined red, placeholder dashed, joint/mastery accent ring), AND links in the accent, held / open / locked / queued states, rim majors and branches labelled — with the shared hover card on a node. The column holds the seat's nation with its RP a quarter and the queue with each entry's arrival quarter, Remove last and Clear. SHIFT + left click on a node queues it with its requirements (queue_research); on a queued node it takes it off with the entries that need it (unqueue_research). Each tree's name sits in its own sector. An age switch (two tabs, top-right) moves the canvas between the Digitisation ring and the Early Space tree (UI-148); the column lists the one queue, Digitisation entries then the Early Space tail.",
    "interesting_question": "The arrival quarter is a projection at today's treasury and today's buildings, and quests never complete until their deeds have readers. Is a date that will move a promise the panel cannot keep?",
    "resolution": "It is labelled as what it is: the projection runs the quarterly pass's own accrual and queue flow on a copy of the state, holding the treasury where it stands, so it is the date AT THE CURRENT RATE (RESEARCH.md § The research queue: 'every entry shows its arrival date at the current research rate'). An entry that cannot complete says so ('on its deed', 'after a deed') instead of printing a date.",
    "checks": [
     "tech_tree_panel",
     "wind_power_links"
+   ]
+  },
+  {
+   "id": "UI-148",
+   "name": "Research panel: Early Space tree",
+   "kind": "view",
+   "parent": "UI-108",
+   "source": [
+    "docs/economy/RESEARCH.md",
+    "docs/economy/tech/EARLY_SPACE_TREE.md",
+    "docs/economy/ERAS.md",
+    "src/ui/tech_tree_panel.cpp",
+    "src/world/nation_tech.cpp"
+   ],
+   "summary": "The research canvas's Early Space tab: the next age's 54 nodes as three branch columns (In-Situ Propellant, Interplanetary Convoys, Space Force), each flowing top to bottom by depth, in the ring's own glyphs, links and states; majors and masteries named; each column headed by its branch and what keys it (Keyed / Needs <node>). Before the gate into space is met the tab reads \"Early Space (locked)\", every node draws locked and the caption names the missing gate conditions. SHIFT + left click queues a node on the Early Space tail (queue_space_research); on a queued node it takes it off with the tail entries that need it (unqueue_space_research). The shared hover card reads a node, its deed and keys, and why a press would be refused.",
+   "interesting_question": "Before the gate is met every node is locked. Is a whole tree of locked nodes worth drawing, or is it a poster of things the player cannot have?",
+   "resolution": "It is drawn, and drawn readable: the player plans toward the gate from it - what each far-space node opens, which Digitisation major keys each branch - and the caption says exactly which gate condition is missing (Rocketry; a staffed Launchpad on the home body; propellant on a home-body market's shelf), so the locked tree is a list of what to build next, not a closed door.",
+   "checks": [
+    "early_space_tree"
    ]
   },
   {

@@ -1107,6 +1107,45 @@
     "docs/development/backlog.json",
     "src/world/world_save.hpp"
    ]
+  },
+  {
+   "raised": "2026-11-10",
+   "status": "open",
+   "resolution": null,
+   "id": "NR-1199",
+   "title": "Grant reading: the rival research picker also picks Early Space nodes",
+   "kind": "decision-taken",
+   "source": "BL-1613 lane report",
+   "what": "The research grant covers one frontier node at a time over the nation's own tree. Once a rival meets the gate into space, the picker also scores Early Space nodes it can queue alone (quests excluded), by the same rule; a tie keeps the Digitisation node. The lane read the second tree as the same verb on the same queue.",
+   "why_it_matters": "A second tree may be a new subject under AI_OPPONENT.md § 11.",
+   "options": [
+    "Confirm: same verb, same queue",
+    "Treat it as a new grant and write it into § 11"
+   ],
+   "recommendation": "Confirm, with one dated line in § 11.",
+   "files": [
+    "src/world/nation_ai.cpp",
+    "docs/ai/AI_OPPONENT.md"
+   ]
+  },
+  {
+   "raised": "2026-11-10",
+   "status": "open",
+   "resolution": null,
+   "id": "NR-1200",
+   "title": "Research age tabs: re-clicking the active tab closes the panel",
+   "kind": "decision-taken",
+   "source": "BL-1613 lane report",
+   "what": "The research canvas has Digitisation and Early Space tabs. Per the toggle rule, re-clicking the active tab closes the research panel. If the tabs count as a cross-cutting selector (exempt), that press should do nothing instead. The Early Space tree draws as three branch columns, not a ring (the lane's layout call).",
+   "why_it_matters": "A small UX call, and a layout you have not seen.",
+   "options": [
+    "Keep: toggle closes",
+    "Exempt the tabs"
+   ],
+   "recommendation": "Keep; it matches every other sub-view tab.",
+   "files": [
+    "src/ui/tech_tree_panel.cpp"
+   ]
   }
  ]
 }

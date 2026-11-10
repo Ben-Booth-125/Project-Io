@@ -189,10 +189,18 @@ two records of one link, held equal by the tree's check (Ben, 2026-11-03).
   and it completes when its deed is met and its cost is paid.
 - **Pick-one pairs are guarded**: a queue holding one side refuses the other.
 - **Every entry shows its arrival date** at the current research rate.
+- **The next age's tree shares the one queue** (BL-1612, early space researchable). Once its gate
+  is met and a branch is keyed, that branch's nodes queue **behind every entry of the current age's
+  tree**, and the one
+  pool reaches them only when no current-age entry waits on funding. Remove last, Clear and the
+  arrival dates read the whole queue, the next age's tail included. A next-age entry whose gate
+  lapses is passed over, not blocking, like a quest waiting on its deed.
 
 **An AI nation's queue is filled by its scorer (Ben, 2026-10-10).** The scorer appends one frontier
 node at a time, chosen by the relief it gives the nation's binding terms; it plans nothing beyond the
-next node and issues no verb but *queue*. The grant is recorded in `../ai/AI_OPPONENT.md` § 11.
+next node and issues no verb but *queue*. Once the nation meets the next age's gate, that tree's open
+nodes are weighed beside the current tree's by the same rule, and a tie keeps the current tree's
+node. The grant is recorded in `../ai/AI_OPPONENT.md` § 11.
 
 ---
 

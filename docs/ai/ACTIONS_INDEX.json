@@ -1016,6 +1016,18 @@
   [
    "gameplay.space_bombard",
    "No UI surface yet (the circumplanetary canvas's fleet controls are the UI lane's). In-process: src/world/space_bombard.hpp, the space-unit seam beside order_space_unit / load_space_cargo. Not on apply_space_command or the --serve / MCP transport yet (a SPACE line beside COMMAND is owed)."
+  ],
+  [
+   "gameplay.queue_space_research",
+   "The research panel's Early Space tree (the 'Early Space' tab, top-right of the research canvas): SHIFT + left click on a node. A corp_verb (55, `queue_space_research`), so an agent issues it through the same seam."
+  ],
+  [
+   "gameplay.unqueue_space_research",
+   "The research panel's Early Space tree: SHIFT + left click on a QUEUED node (the toggle rule). A corp_verb (56, `unqueue_space_research`). 'Remove last' (gameplay.unqueue_research's last-entry form) also drops the Early Space tail's last entry first, since it is the last of the one queue."
+  ],
+  [
+   "canvas.tech_tree_age_tab",
+   "The research canvas's age switch: two tabs top-right, 'Digitisation' and 'Early Space' (read 'Early Space (locked)' while the gate into space is unmet)."
   ]
  ]
 }

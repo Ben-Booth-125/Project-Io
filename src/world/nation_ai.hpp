@@ -15,6 +15,7 @@
 #include <vector>
 
 struct world;
+struct research_params; // BL-1613: research_queue_idle's gate dial (nation_tech.hpp)
 class recipe_registry;
 struct economy_report;
 
@@ -400,6 +401,9 @@ struct research_ai_pick
     std::int64_t score_milli  = 0; ///< relief - cost.
     int          candidates   = 0; ///< Legal frontier nodes weighed.
     bool         queued       = false; ///< `enqueue_node` returned `queued`.
+    /// BL-1613: `node` is an Early Space (`io::es`) index, queued through
+    /// `enqueue_early_space_node`, rather than a Digitisation one.
+    bool         early_space  = false;
 };
 
 /// The frontier node @p nation would queue next, and why — PURE (reads @p w,
@@ -411,12 +415,21 @@ struct research_ai_pick
 /// sides are both candidates until one is held or queued; the score picks the
 /// side, and a tie between them breaks by the nation's own seed. The scoring
 /// rule is the comment over the definition (nation_ai.cpp).
+///
+/// BL-1613: once the nation meets the gate into space, the Early Space nodes it
+/// could queue alone (`preview_enqueue_early_space` plans just the node; no quest,
+/// every Early Space deed being unread) are candidates beside the Digitisation
+/// ones, scored by the same rule; a tie keeps the Digitisation node.
 research_ai_pick choose_research_node(const world& w, const recipe_registry& reg,
                                       entity_id nation, const nation_ai_params& p);
 
 /// Whether @p nation's queue holds no entry research can flow into — empty, or
-/// only quests waiting on unmet deeds. The pick runs only then.
+/// only quests waiting on unmet deeds. The pick runs only then. BL-1613: an Early
+/// Space tail entry flows while the gate is met (@p rp's dial) and it is not a
+/// quest; a tail locked by a lapsed gate leaves the queue idle, so the nation
+/// keeps picking rather than waiting on ground it has lost.
 bool research_queue_idle(const world& w, entity_id nation);
+bool research_queue_idle(const world& w, entity_id nation, const research_params& rp);
 
 /// The quarterly pass: for every nation (ascending id) whose queue is idle,
 /// queue `choose_research_node`'s pick through `enqueue_node`. NEVER the

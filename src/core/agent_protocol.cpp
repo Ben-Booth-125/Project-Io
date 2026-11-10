@@ -169,6 +169,8 @@ bool wire_nation_verb(corp_verb v)
         case corp_verb::queue_research:
         case corp_verb::unqueue_research:
         case corp_verb::clear_research:
+        case corp_verb::queue_space_research:   // BL-1613: the seat's nation; the seam checks the node
+        case corp_verb::unqueue_space_research: // BL-1613
         case corp_verb::lay_track:
         case corp_verb::set_logistics_shares:
         case corp_verb::set_tax_tier:

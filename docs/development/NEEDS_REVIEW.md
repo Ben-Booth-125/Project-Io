@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*61 entries — 58 open, 3 resolved.*
+*63 entries — 60 open, 3 resolved.*
 
 ---
 
@@ -737,6 +737,34 @@ This branch minted BL-1580..1615 and NR-1181..1183; main now holds BL ids up to 
 > **Recommendation:** Renumber this branch at the merge; its versions stack on top of main's.
 
 *Files: `docs/development/backlog.json`, `src/world/world_save.hpp`*
+
+### NR-1199 — Grant reading: the rival research picker also picks Early Space nodes
+*decision taken on your behalf · raised 2026-11-10 · from BL-1613 lane report*
+
+The research grant covers one frontier node at a time over the nation's own tree. Once a rival meets the gate into space, the picker also scores Early Space nodes it can queue alone (quests excluded), by the same rule; a tie keeps the Digitisation node. The lane read the second tree as the same verb on the same queue.
+
+**Why it matters.** A second tree may be a new subject under AI_OPPONENT.md § 11.
+
+- Confirm: same verb, same queue
+- Treat it as a new grant and write it into § 11
+
+> **Recommendation:** Confirm, with one dated line in § 11.
+
+*Files: `src/world/nation_ai.cpp`, `docs/ai/AI_OPPONENT.md`*
+
+### NR-1200 — Research age tabs: re-clicking the active tab closes the panel
+*decision taken on your behalf · raised 2026-11-10 · from BL-1613 lane report*
+
+The research canvas has Digitisation and Early Space tabs. Per the toggle rule, re-clicking the active tab closes the research panel. If the tabs count as a cross-cutting selector (exempt), that press should do nothing instead. The Early Space tree draws as three branch columns, not a ring (the lane's layout call).
+
+**Why it matters.** A small UX call, and a layout you have not seen.
+
+- Keep: toggle closes
+- Exempt the tabs
+
+> **Recommendation:** Keep; it matches every other sub-view tab.
+
+*Files: `src/ui/tech_tree_panel.cpp`*
 
 ---
 
