@@ -2307,6 +2307,60 @@ void write_world_snapshot_at(const world& w, std::ostream& out, uint32_t version
         }
     }
     // ===== END BL-1594 / BL-1595 =====
+    // ===== BEGIN BL-1597 (v85): THE SPACE BATTLES, the last section =====
+    if (version >= k_world_save_version_space_battles)
+    {
+        w_u32(out, w.next_space_battle_id);
+        w_u32(out, static_cast<uint32_t>(w.space_battles.size()));
+        for (const auto& [bid, b] : w.space_battles) // std::map: ascending
+        {
+            w_u32(out, bid);
+            w_id(out, b.node.body);
+            w_enum(out, b.node.kind);
+            w_enum(out, b.state);
+            w_i32(out, b.opened_tick);
+            w_i32(out, b.days);
+            w_f32(out, b.mass_destroyed);
+            for (const space_battle_side& s : b.sides)
+            {
+                w_id(out, s.nation);
+                w_i32(out, s.units_lost);
+                w_i32(out, s.crew_lost);
+                w_i32(out, s.modules_lost);
+                w_i32(out, s.stations_lost);
+                w_f32(out, s.damage_landed);
+                w_enum(out, s.end);
+            }
+            w_u32(out, static_cast<uint32_t>(b.withdrawing.size()));
+            for (const space_battle_withdrawal& e : b.withdrawing)
+            {
+                w_id(out, e.unit);
+                w_id(out, e.dest.body);
+                w_enum(out, e.dest.kind);
+            }
+            w_u32(out, static_cast<uint32_t>(b.module_damage.size()));
+            for (const auto& [mid, dmg] : b.module_damage)
+            {
+                w_id(out, mid);
+                w_f32(out, dmg);
+            }
+        }
+    }
+    // ===== END BL-1597 =====
+}
+
+void write_world_snapshot_pre_space_battles(const world& w, std::ostream& out)
+{
+    // VERIFICATION ONLY (BL-1597): the v84 stream shape - no space-battle section.
+    write_world_snapshot_at(w, out, k_world_save_version_pre_space_battles);
+}
+
+std::size_t world_save_space_battle_section_bytes(const world& w)
+{
+    std::size_t n = 8;
+    for (const auto& [bid, b] : w.space_battles)
+        n += 80 + 9 * b.withdrawing.size() + 8 * b.module_damage.size();
+    return n;
 }
 
 void write_world_snapshot_pre_space_units(const world& w, std::ostream& out)
@@ -2796,7 +2850,8 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
             // ---- sprint 65 save bumps: append each parallel lane's prefix version here ----
             && version != k_world_save_version_pre_early_space // BL-1612: v81, no Early Space progress
             && version != k_world_save_version_pre_space_nodes // BL-1581: v82, nodes derived, no orders
-            && version != k_world_save_version_pre_space_units)) // BL-1594: v83, no space units
+            && version != k_world_save_version_pre_space_units // BL-1594: v83, no space units
+            && version != k_world_save_version_pre_space_battles)) // BL-1597: v84, no space battles
         return false; // mismatched version -- refuse rather than misread
 
     // BL-1422: a stream before the kit goods carries every per-resource array 49 wide;
@@ -5002,6 +5057,108 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
         }
     }
     // ===== END BL-1594 / BL-1595 =====
+    // ===== BEGIN BL-1597 (v85): the space battles. Untrusted, refused whole on any
+    // breach of the rules world_save.hpp's v85 paragraph lists. A v84 (and older)
+    // stream ends before it: no battles. =====
+    if (version >= k_world_save_version_space_battles)
+    {
+        const auto body_ok = [&s](entity_id b) {
+            const auto bit = s.bodies.find(b);
+            return bit != s.bodies.end() && bit->second.type != body_type::star;
+        };
+        const auto fin0 = [](float v) { return std::isfinite(v) && v >= 0.0f; };
+        uint32_t next_id = 0, count = 0;
+        if (!r_u32(in, next_id) || !r_u32(in, count) || count > k_space_battles_max || count > next_id)
+            return false;
+        std::set<std::tuple<entity_id, uint8_t, entity_id, entity_id>> open_keys;
+        uint32_t prev = 0;
+        for (uint32_t k = 0; k < count; ++k)
+        {
+            space_battle b;
+            if (!r_u32(in, b.id) || (k > 0 && b.id <= prev) || b.id >= next_id
+                || !r_id(in, b.node.body) || !r_enum(in, b.node.kind, orbital_node_kind::l5)
+                || !r_enum(in, b.state, space_battle_state::peace) || !r_i32(in, b.opened_tick)
+                || !r_i32(in, b.days) || !r_f32(in, b.mass_destroyed))
+                return false;
+            prev = b.id;
+            if (!body_ok(b.node.body) || b.opened_tick < 0 || b.days < 0 || !fin0(b.mass_destroyed))
+                return false;
+            for (space_battle_side& sd : b.sides)
+            {
+                if (!r_id(in, sd.nation) || !r_i32(in, sd.units_lost) || !r_i32(in, sd.crew_lost)
+                    || !r_i32(in, sd.modules_lost) || !r_i32(in, sd.stations_lost)
+                    || !r_f32(in, sd.damage_landed) || !r_enum(in, sd.end, space_battle_end::withdrew))
+                    return false;
+                if (s.nations.count(sd.nation) == 0 || sd.units_lost < 0 || sd.crew_lost < 0
+                    || sd.modules_lost < 0 || sd.stations_lost < 0 || !fin0(sd.damage_landed))
+                    return false;
+            }
+            const entity_id n0 = b.sides[0].nation, n1 = b.sides[1].nation;
+            if (!(n0 < n1))
+                return false;
+            const bool held0 = b.sides[0].end == space_battle_end::holding;
+            const bool held1 = b.sides[1].end == space_battle_end::holding;
+            const bool open  = b.state == space_battle_state::open;
+            if (b.state == space_battle_state::decided ? (held0 && held1) : !(held0 && held1))
+                return false;
+            if (open && !open_keys.emplace(b.node.body, static_cast<uint8_t>(b.node.kind), n0, n1).second)
+                return false;
+
+            uint32_t n = 0;
+            if (!r_u32(in, n) || n > k_space_battle_list_max || (!open && n != 0))
+                return false;
+            b.withdrawing.reserve(n);
+            for (uint32_t j = 0; j < n; ++j)
+            {
+                space_battle_withdrawal e;
+                if (!r_id(in, e.unit) || !r_id(in, e.dest.body) || !r_enum(in, e.dest.kind, orbital_node_kind::l5))
+                    return false;
+                if (e.unit == null_entity || (j > 0 && e.unit <= b.withdrawing.back().unit)
+                    || !body_ok(e.dest.body) || e.dest == b.node)
+                    return false;
+                // A unit lost since the order (its upkeep) is skipped at departure; a
+                // live one is a side's, at the node, not in transit.
+                const auto uit = s.space_units.find(e.unit);
+                if (uit != s.space_units.end()
+                    && ((uit->second.owner != n0 && uit->second.owner != n1) || uit->second.node != b.node
+                        || uit->second.state == space_unit_state::in_transit
+                        || (e.dest.kind == orbital_node_kind::surface && uit->second.hull != space_hull::lander)))
+                    return false;
+                b.withdrawing.push_back(e);
+            }
+            uint32_t m = 0;
+            if (!r_u32(in, m) || m > k_space_battle_list_max || (!open && m != 0))
+                return false;
+            b.module_damage.reserve(m);
+            for (uint32_t j = 0; j < m; ++j)
+            {
+                entity_id mid = null_entity;
+                float     dmg = 0.0f;
+                if (!r_id(in, mid) || !r_f32(in, dmg))
+                    return false;
+                if (mid == null_entity || (j > 0 && mid <= b.module_damage.back().first) || !std::isfinite(dmg)
+                    || !(dmg > 0.0f) || dmg > 1.0e9f)
+                    return false;
+                // A module removed or lost since is pruned on the next battle day; a
+                // live one is a Defence module of a side's station at the node.
+                const auto ait = s.space_assets.find(mid);
+                if (ait != s.space_assets.end() && ait->second.state != space_asset_state::lost)
+                {
+                    if (ait->second.module != static_cast<uint8_t>(station_module_kind::defence))
+                        return false;
+                    const auto sit = s.stations.find(ait->second.station);
+                    if (sit == s.stations.end() || (sit->second.owner != n0 && sit->second.owner != n1)
+                        || sit->second.node != b.node)
+                        return false;
+                }
+                b.module_damage.emplace_back(mid, dmg);
+            }
+            const uint32_t id = b.id;
+            s.space_battles.emplace_hint(s.space_battles.end(), id, std::move(b));
+        }
+        s.next_space_battle_id = next_id;
+    }
+    // ===== END BL-1597 =====
 
     // BL-1266 (v46): every manual trade names a live owner and two distinct
     // standing markets, and holds an id below the next one to be issued, all

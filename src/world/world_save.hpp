@@ -792,7 +792,6 @@ inline constexpr uint32_t k_world_save_version_pre_recruits = 71;
 /// designs, no units and empty depots. MERGE NOTE: a parallel lane's bump renumbers
 /// this block (the paragraph, the two constants below, the accepted-version line in
 /// `read_world_snapshot`, and the one section at the end of the writer and reader).
-inline constexpr uint32_t world_save_version = 84;
 
 /// BL-1594: the first version carrying the space-unit section (see above).
 inline constexpr uint32_t k_world_save_version_space_units = 84;
@@ -800,6 +799,37 @@ inline constexpr uint32_t k_world_save_version_space_units = 84;
 /// BL-1594: v83, a strict prefix of v84.
 inline constexpr uint32_t k_world_save_version_pre_space_units = k_world_save_version_space_units - 1;
 /// ===== END BL-1594 / BL-1595 VERSION BUMP ======================================
+
+/// ===== BEGIN BL-1597 VERSION BUMP (space battles) — ONE BLOCK ===================
+/// **85 (BL-1597; SPACE_FLEETS.md § Battles) — THE SPACE BATTLES.** Appended last,
+/// after the space units: u32 `next_space_battle_id`, then after a u32 count every
+/// battle ascending id as (u32 id, node body, u8 node kind, u8 state, i32 opened_tick,
+/// i32 days, f32 mass_destroyed, 2 x side (nation, i32 units_lost, i32 crew_lost, i32
+/// modules_lost, i32 stations_lost, f32 damage_landed, u8 end), u32 n, n x withdrawal
+/// (unit, dest body, u8 dest kind), u32 m, m x (module, f32 damage)). Cross-checked
+/// whole: ids strictly ascend below `next_space_battle_id`, at most
+/// `k_space_battles_max`; the node a non-star body's, every enum in range; the two
+/// nations distinct, ascending, both nations; every tally >= 0, every float finite
+/// >= 0; an OPEN battle has both ends `holding` and is the only open one for its
+/// (node, pair); a DECIDED one has at least one end not `holding`; a PEACE one both
+/// `holding`; only an open battle carries withdrawals or module damage; a withdrawal
+/// names a unit, ascending, its dest a valid node unlike the battle's, and the unit,
+/// when it still exists (upkeep may have lost it), is one side's, at the node, not in
+/// transit (a surface dest for a Lander only); a damage row names a module, ascending,
+/// its damage in (0, 1e9], and the module, when it still exists and is not lost, is a
+/// Defence module of a station of one side at the node. Refused whole otherwise. v84 is a STRICT PREFIX of v85 and is read too
+/// (`k_world_save_version_pre_space_battles`), as a world with no battles. MERGE NOTE:
+/// a parallel lane's bump renumbers this block (the paragraph, the version, the two
+/// constants below, the accepted-version line in `read_world_snapshot`, and the one
+/// section at the end of the writer and reader).
+inline constexpr uint32_t world_save_version = 85;
+
+/// BL-1597: the first version carrying the space-battle section (see above).
+inline constexpr uint32_t k_world_save_version_space_battles = 85;
+
+/// BL-1597: v84, a strict prefix of v85.
+inline constexpr uint32_t k_world_save_version_pre_space_battles = k_world_save_version_space_battles - 1;
+/// ===== END BL-1597 VERSION BUMP ================================================
 
 /// BL-1612: the first version carrying the Early Space tree section (see above).
 inline constexpr uint32_t k_world_save_version_early_space = 82;
@@ -1200,6 +1230,13 @@ void write_world_snapshot_pre_space_nodes(const world& w, std::ostream& out);
 
 /// VERIFICATION ONLY (BL-1594): the v83 stream shape - no space-unit section.
 void write_world_snapshot_pre_space_units(const world& w, std::ostream& out);
+
+/// VERIFICATION ONLY (BL-1597): the v84 stream shape - no space-battle section.
+void write_world_snapshot_pre_space_battles(const world& w, std::ostream& out);
+
+/// BL-1597: the byte length of the v85 space-battle section `w` writes - 8, plus per
+/// battle 80 + 9 per withdrawal + 8 per damaged module. The LAST section of a v85 stream.
+std::size_t world_save_space_battle_section_bytes(const world& w);
 
 /// BL-1453: the recon stock a battle loaded from a pre-v67 stream is given — enough to
 /// see every defending unit in full (twice the stealthiest defender's kit stealth, in

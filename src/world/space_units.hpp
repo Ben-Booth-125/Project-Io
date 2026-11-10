@@ -70,7 +70,10 @@ struct world;
 // unpaid quarter; at `quarters_to_loss` consecutive unpaid quarters it is LOST:
 // erased from the store, its crew with it. A paid quarter clears the count.
 //
-// WHAT IS NOT HERE: battles, convoys and trade dispatch, unloading cargo, debris,
+// BATTLES are space_battle.hpp's (BL-1597); a move ordered for an engaged unit
+// is recorded there as a withdrawal.
+//
+// WHAT IS NOT HERE: convoys and trade dispatch, unloading cargo, debris,
 // bombardment, any AI, any UI, the agent seam. The seams left for them: the
 // armed-unit list at a node (`space_armed_units_at`) and each unit's readable hull
 // points, firepower and armour (`space_unit_firepower`, `space_unit_armour`).
@@ -264,6 +267,11 @@ struct space_unit_op
     float     dv      = 0.0f;                  ///< A move: the path's Δv.
     int32_t   days    = 0;                     ///< A move: transit days.
     entity_id market  = null_entity;           ///< The shelf bought from.
+    /// BL-1597: the units are engaged in a battle, so the move is RECORDED as a
+    /// withdrawal (checked whole, nothing paid yet): they take one more day of fire
+    /// and the battle day flies them (space_battle.hpp). `propellant` is the burn
+    /// the move would make now.
+    bool      withdrawing = false;
 };
 
 /// THE DESIGN VERB. Rejected whole: unknown nation, hull out of range, a design
@@ -292,11 +300,19 @@ float space_unit_burn_for(const space_unit& u, float dv);
 /// THE MOVE VERBS. One unit, or the fleet: every unit of @p nation at @p from not
 /// in transit. The path is `orbital_path` from the units' node; each unit pays it
 /// from its own budget; refused WHOLE when any unit cannot. A docked unit undocks
-/// as it leaves. A surface destination is a Lander's only.
+/// as it leaves. A surface destination is a Lander's only. BL-1597: a unit engaged
+/// in an open battle (`space_unit_engaged`) does not leave at once — the checked
+/// move is recorded as its WITHDRAWAL (`space_unit_op::withdrawing`).
 space_unit_op order_space_unit(world& w, const space_unit_params& p, entity_id nation,
                                entity_id unit, orbital_node to);
 space_unit_op order_space_fleet(world& w, const space_unit_params& p, entity_id nation,
                                 orbital_node from, orbital_node to);
+
+/// BL-1597: the move itself, flown now — the battle day's departure of a recorded
+/// withdrawal. Every id must be a unit at @p from not in transit; then the move
+/// verbs' check and payment, refused whole.
+space_unit_op depart_space_units(world& w, const std::vector<entity_id>& ids, orbital_node from,
+                                 orbital_node to);
 
 /// Dock @p unit (idle at @p station's node) at the station: the same nation's, a
 /// working Dock, a free berth (`berths_per_dock` per working Dock).
@@ -313,7 +329,7 @@ int space_station_docked(const world& w, entity_id station);
 space_unit_op refuel_space_unit(world& w, const space_unit_params& p, const station_params& stp,
                                 entity_id nation, entity_id unit);
 
-/// The seams for battles (not built here): the nation's units at @p node with a
+/// The seams battles read (space_battle.hpp): the nation's units at @p node with a
 /// firepower above zero and not in transit, ascending id; and a unit's figures.
 std::vector<entity_id> space_armed_units_at(const world& w, entity_id nation, orbital_node node);
 float space_unit_firepower(const space_unit& u);

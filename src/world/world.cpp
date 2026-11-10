@@ -999,6 +999,47 @@ uint64_t world::state_hash(int tick) const
                 fnv1a_f32(h, stock);
             }
         }
+        // BL-1597: the space battles and their id counter — folded only when either
+        // is non-empty, so a world that never fought in space hashes as before.
+        if (!space_battles.empty() || next_space_battle_id != 0)
+        {
+            fnv1a_u32(h, 0xBA77u); // tag
+            fnv1a_u32(h, next_space_battle_id);
+            fnv1a_u32(h, static_cast<uint32_t>(space_battles.size()));
+            for (const auto& [bid, b] : space_battles)
+            {
+                fnv1a_u32(h, bid);
+                fnv1a_u32(h, b.node.body);
+                fnv1a_u32(h, static_cast<uint32_t>(b.node.kind));
+                fnv1a_u32(h, static_cast<uint32_t>(b.state));
+                fnv1a_i32(h, b.opened_tick);
+                fnv1a_i32(h, b.days);
+                fnv1a_f32(h, b.mass_destroyed);
+                for (const space_battle_side& s : b.sides)
+                {
+                    fnv1a_u32(h, s.nation);
+                    fnv1a_i32(h, s.units_lost);
+                    fnv1a_i32(h, s.crew_lost);
+                    fnv1a_i32(h, s.modules_lost);
+                    fnv1a_i32(h, s.stations_lost);
+                    fnv1a_f32(h, s.damage_landed);
+                    fnv1a_u32(h, static_cast<uint32_t>(s.end));
+                }
+                fnv1a_u32(h, static_cast<uint32_t>(b.withdrawing.size()));
+                for (const space_battle_withdrawal& e : b.withdrawing)
+                {
+                    fnv1a_u32(h, e.unit);
+                    fnv1a_u32(h, e.dest.body);
+                    fnv1a_u32(h, static_cast<uint32_t>(e.dest.kind));
+                }
+                fnv1a_u32(h, static_cast<uint32_t>(b.module_damage.size()));
+                for (const auto& [mid, dmg] : b.module_damage)
+                {
+                    fnv1a_u32(h, mid);
+                    fnv1a_f32(h, dmg);
+                }
+            }
+        }
     }
 
     // Province holder (BL-569). UNLIKE `provinces` itself (generation output,

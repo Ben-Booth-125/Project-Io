@@ -802,11 +802,13 @@ int main()
                           w2.space_units.size(), w2.space_unit_designs.size(), w2.station_depot_stock.size()));
 
         const std::size_t sec = world_save_space_unit_section_bytes(w);
+        const std::size_t tail = world_save_space_battle_section_bytes(w); // BL-1597 (v85) follows
         std::ostringstream os82(std::ios::binary);
         write_world_snapshot_pre_space_units(w, os82);
         const std::string b82 = os82.str();
-        check(b82.size() + sec == b.size(),
-              "U16b", fmt("section %zu bytes; v82 prefix %zu + %zu == %zu", sec, b82.size(), sec, b.size()));
+        check(b82.size() + sec + tail == b.size(),
+              "U16b", fmt("section %zu bytes; v82 prefix %zu + %zu (+ %zu battles) == %zu", sec, b82.size(), sec,
+                          tail, b.size()));
         // The v82 prefix of a unit-free world reads, as a world with none.
         fixture e;
         build(e);
@@ -819,7 +821,7 @@ int main()
               "U16c", "a unit-free world's v82 prefix reads with no designs, units or depots; equal hash");
 
         // Tampered tails. Offsets within the section.
-        const std::size_t s0 = b.size() - sec;
+        const std::size_t s0 = b.size() - sec - tail;
         std::size_t off_units = s0 + 4;
         for (const auto& [nid, ds] : w.space_unit_designs) off_units += 8 + 7 * ds.size();
         const std::size_t u0 = off_units + 4; // the first unit's record

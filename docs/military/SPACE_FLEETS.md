@@ -105,6 +105,30 @@ and take damage last; a station with no working module left is lost.
 **Withdrawal** is an order to move away; a unit leaving pays its move's Δv and takes one more day of
 fire.
 
+**The rules in full** (BL-1597 (space battles), first cut, 2026-11-10):
+
+- **Who fights.** "At war" is the hostility the ground war reads: either nation hostile to the other
+  (`../politics/RELATIONS.md` § 1). A nation is **armed** at a node when it has an armed unit there
+  that is not in transit, or a station there with a working Defence module. A battle is between two
+  nations at one node; every unit of either side at the node takes part each day, so a fleet that
+  arrives joins it.
+- **The day.** Battles open, then each is fought once. Each side's **pool** is fixed at the day's
+  start: its units' firepower plus each working Defence module's fire. The two pools land at once.
+  On each target in order the pool first spends the target's armour, then lands up to its hull
+  points; a destroyed target passes the rest of the pool on, and a pool that cannot clear a target's
+  armour stops there. So armour is paid once per target per day.
+- **Defence modules** carry their own fire, armour and hull points in a battle. A module at zero is
+  lost. A station is lost when its side has no armed unit left at the node, it has no working
+  Defence module, and the enemy is still armed there.
+- **A withdrawal is checked whole** when ordered, as any move is, and refused if the budget cannot
+  pay it. It flies after the next day's fire, paying its Δv then. A side whose units have all left
+  **withdrew**; one with no armed party left otherwise is **destroyed**. Peace closes a battle before
+  the day's fire, and a recorded withdrawal flies at once.
+- **The battle report** is the closed battle's record: per side, units, crew, Defence modules and
+  stations lost and damage landed; days fought; and the **mass destroyed** — each lost unit's dry mass
+  and cargo, and a fixed mass per lost module and core. Debris is made from that mass
+  (`../economy/SPACE_ASSETS.md` § Debris).
+
 ## Blockade (Ben, 2026-11-10)
 
 **A body is blockaded** when an armed fleet of a nation at war with the body's holder sits at the

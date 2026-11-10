@@ -270,6 +270,10 @@ struct station_step_report
     int modules_stopped    = 0;
 };
 
+/// BL-1597: mark @p a lost as the quarterly step's loss does (its crew stay on the
+/// record; the step frees its slot, or takes its station when it is a core).
+void lose_station_asset(space_asset& a);
+
 /// BL-1585: the training centres' quarter. Ascending nation id; integer arithmetic.
 int run_astronaut_training(world& w, const station_params& stp);
 
