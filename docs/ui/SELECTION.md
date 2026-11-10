@@ -231,6 +231,12 @@ a tile keep the shared header (§ Layout & chrome).
    no **Manage Buildings** button: the building grid *is* the tile's buildings. **While a
    building is expanded, the grid retargets to that building's actions** (§ The building
    element's layout).
+   **Every cell carries a hover tooltip, enabled or not** (Ben, 2026-11-09): an enabled one
+   says what it does; a disabled one says why it is disabled. A disabled **Construct** names
+   the placement rules' own refusal (`placement_reason_text`) — the tile's shared gate where
+   one refused (not your nation's ground, a site already under way, no road reaches it, the
+   province full, out of logistics reach), since that bars every type at once; else the
+   first type's refusal. The same holds on the building and unit grids.
 
 **What retired, and why** (Ben, 2026-10-13):
 
