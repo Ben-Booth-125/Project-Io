@@ -749,7 +749,35 @@ inline constexpr uint32_t k_world_save_version_pre_recruits = 71;
 /// above, `world_save_version`, the two `k_world_save_version_*early_space` constants
 /// below, the one accepted-version line in `read_world_snapshot`, and the one section
 /// at the end of the writer and of the reader. A parallel bump renumbers these only.
-inline constexpr uint32_t world_save_version = 82;
+///
+/// ===== BEGIN BL-1594 / BL-1595 VERSION BUMP (space units) — ONE BLOCK ===========
+/// **83 (BL-1594 designs, BL-1595 movement; SPACE_FLEETS.md) — THE SPACE UNITS.**
+/// Appended last, each after a u32 count: (1) every nation holding a space-unit design,
+/// ascending id, as (id, u32 m, m x (u8 hull, 6 x u8 item))), hulls strictly ascending;
+/// (2) every space unit ascending id, as (id, owner, u8 hull, 6 x u8 item, u8 state,
+/// node body, u8 node kind, dest body, u8 dest kind, i32 days_remaining, station, f32
+/// propellant, f32 cargo, f32 hull_points, i32 crew, f32 upkeep, i32 unpaid_quarters);
+/// (3) every station with Fuel-depot stock, ascending id, as (id, f32 stock). Each
+/// design is a well-formed design of its hull (`evaluate_space_design(...).valid`); a
+/// unit names a nation, a node of a non-star body, its state consistent (in transit:
+/// days >= 1 and a valid dest unlike its node; otherwise days 0 and dest == node;
+/// docked: a station of its owner at its node; otherwise no station; landed: a Lander
+/// at a surface; idle: an orbital node), propellant in [0, tank], cargo in [0, cap],
+/// hull points in (0, max], crew in [0, pool max], upkeep finite >= 0, unpaid in
+/// [0, k_space_quarters_to_loss_ceiling); a stock names a live station, finite, in
+/// (0, k_space_depot_stock_max]. Refused whole otherwise. v82 is a STRICT PREFIX of
+/// v83 and is read too (`k_world_save_version_pre_space_units`), as a world with no
+/// designs, no units and empty depots. MERGE NOTE: a parallel lane's bump renumbers
+/// this block (the paragraph, the two constants below, the accepted-version line in
+/// `read_world_snapshot`, and the one section at the end of the writer and reader).
+inline constexpr uint32_t world_save_version = 83;
+
+/// BL-1594: the first version carrying the space-unit section (see above).
+inline constexpr uint32_t k_world_save_version_space_units = 83;
+
+/// BL-1594: v82, a strict prefix of v83.
+inline constexpr uint32_t k_world_save_version_pre_space_units = k_world_save_version_space_units - 1;
+/// ===== END BL-1594 / BL-1595 VERSION BUMP ======================================
 
 /// BL-1612: the first version carrying the Early Space tree section (see above).
 inline constexpr uint32_t k_world_save_version_early_space = 82;
@@ -997,6 +1025,11 @@ std::size_t world_save_station_section_bytes(const world& w);
 /// The LAST section of a v82 stream.
 std::size_t world_save_early_space_section_bytes(const world& w);
 
+/// BL-1594: the byte length of the v83 space-unit section `w` writes - 4 + per design
+/// nation (8 + 7 per design), 4 + 58 per unit, 4 + 8 per stocked station. The LAST
+/// section of a v83 stream.
+std::size_t world_save_space_unit_section_bytes(const world& w);
+
 /// BL-1422, widened by BL-1436: the bytes ALL SIX kit goods' extra elements add to
 /// every per-resource array of the stream `w` writes - the widening from 49 to today's
 /// width: (the v74 stream less the v73 stream, the five goods) plus
@@ -1131,6 +1164,9 @@ void write_world_snapshot_pre_stations(const world& w, std::ostream& out);
 
 /// VERIFICATION ONLY (BL-1612): the v81 stream shape - no Early Space section.
 void write_world_snapshot_pre_early_space(const world& w, std::ostream& out);
+
+/// VERIFICATION ONLY (BL-1594): the v82 stream shape - no space-unit section.
+void write_world_snapshot_pre_space_units(const world& w, std::ostream& out);
 
 /// BL-1453: the recon stock a battle loaded from a pre-v67 stream is given — enough to
 /// see every defending unit in full (twice the stealthiest defender's kit stealth, in

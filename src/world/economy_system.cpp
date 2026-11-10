@@ -1,4 +1,5 @@
 #include "economy_system.hpp"
+#include "space_units.hpp" // BL-1595: run_space_unit_day
 #include "war.hpp" // BL-1428: note_war_battles, run_war_quarter
 #include "logistic_points.hpp"
 
@@ -5092,8 +5093,15 @@ int advance_quarter_to(world& w, const recipe_registry& reg, int day_in_quarter,
     // completes on day d is under the march from that day on, on every path alike.
     for (int d = from + 1; d <= to; ++d)
     {
+        // BL-1595 (SPACE_FLEETS.md § Where a space unit is): the space units' day -
+        // transit counts down, docked units repair. Independent of the ground's day,
+        // so its place in the day is free; an empty store does nothing.
+        run_space_unit_day(w, reg.space_units(), reg.stations());
         if (!military_active(w, reg, quarter_first_day_tick + d))
         {
+            // The space units walk the days the skip below jumps, one at a time.
+            for (int k = d + 1; k <= to && !w.space_units.empty(); ++k)
+                run_space_unit_day(w, reg.space_units(), reg.stations());
             // Nothing military left to walk: construction takes the rest in one call,
             // which walks the identical days (advance_construction_to is days-outer).
             advance_construction_to(w, reg, to);

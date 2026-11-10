@@ -2224,6 +2224,70 @@ void write_world_snapshot_at(const world& w, std::ostream& out, uint32_t version
             w_vec(out, st.es_queue, [](std::ostream& s, const uint16_t& q) { w_u16(s, q); });
         }
     }
+
+    // ===== BEGIN BL-1594 / BL-1595 (v83): THE SPACE UNITS, the last section =====
+    // The designs (nation, then hull, ascending), the units (ascending id) and the
+    // Fuel-depot stocks (ascending station id). All three stores are std::maps.
+    if (version >= k_world_save_version_space_units)
+    {
+        w_u32(out, static_cast<uint32_t>(w.space_unit_designs.size()));
+        for (const auto& [nid, ds] : w.space_unit_designs)
+        {
+            w_id(out, nid);
+            w_u32(out, static_cast<uint32_t>(ds.size()));
+            for (const auto& [hull, d] : ds)
+            {
+                w_u8(out, hull);
+                for (const uint8_t it : d)
+                    w_u8(out, it);
+            }
+        }
+        w_u32(out, static_cast<uint32_t>(w.space_units.size()));
+        for (const auto& [uid, u] : w.space_units)
+        {
+            w_id(out, uid);
+            w_id(out, u.owner);
+            w_enum(out, u.hull);
+            for (const uint8_t it : u.design)
+                w_u8(out, it);
+            w_enum(out, u.state);
+            w_id(out, u.node.body);
+            w_enum(out, u.node.kind);
+            w_id(out, u.dest.body);
+            w_enum(out, u.dest.kind);
+            w_i32(out, u.days_remaining);
+            w_id(out, u.station);
+            w_f32(out, u.propellant);
+            w_f32(out, u.cargo);
+            w_f32(out, u.hull_points);
+            w_i32(out, u.crew);
+            w_f32(out, u.upkeep);
+            w_i32(out, u.unpaid_quarters);
+        }
+        w_u32(out, static_cast<uint32_t>(w.station_depot_stock.size()));
+        for (const auto& [sid, stock] : w.station_depot_stock)
+        {
+            w_id(out, sid);
+            w_f32(out, stock);
+        }
+    }
+    // ===== END BL-1594 / BL-1595 =====
+}
+
+void write_world_snapshot_pre_space_units(const world& w, std::ostream& out)
+{
+    // VERIFICATION ONLY (BL-1594): the v82 stream shape - no space-unit section.
+    write_world_snapshot_at(w, out, k_world_save_version_pre_space_units);
+}
+
+std::size_t world_save_space_unit_section_bytes(const world& w)
+{
+    std::size_t n = 4;
+    for (const auto& [nid, ds] : w.space_unit_designs)
+        n += 8 + 7 * ds.size();
+    n += 4 + 58 * w.space_units.size();
+    n += 4 + 8 * w.station_depot_stock.size();
+    return n;
 }
 
 void write_world_snapshot_pre_early_space(const world& w, std::ostream& out)
@@ -2678,7 +2742,8 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
             && version != k_world_save_version_pre_defend     // BL-1504: v78, no defend orders
             && version != k_world_save_version_pre_research_books // BL-1539: v79, nothing booked
             && version != k_world_save_version_pre_stations   // BL-1583: v80, no stations
-            && version != k_world_save_version_pre_early_space)) // BL-1612: v81, no Early Space progress
+            && version != k_world_save_version_pre_early_space // BL-1612: v81, no Early Space progress
+            && version != k_world_save_version_pre_space_units)) // BL-1594: v82, no space units
         return false; // mismatched version -- refuse rather than misread
 
     // BL-1422: a stream before the kit goods carries every per-resource array 49 wide;
@@ -4696,6 +4761,125 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
                 return false; // the writer never writes an empty record
         }
     }
+
+    // ===== BEGIN BL-1594 / BL-1595 (v83): the space units. Untrusted, refused whole
+    // on any breach of the rules world_save.hpp's v83 paragraph lists. A v82 (and
+    // older) stream ends before it: no designs, no units, empty depots. =====
+    if (version >= k_world_save_version_space_units)
+    {
+        const auto body_ok = [&s](entity_id b) {
+            const auto bit = s.bodies.find(b);
+            return bit != s.bodies.end() && bit->second.type != body_type::star;
+        };
+        const auto kind_ok = [](orbital_node_kind k) {
+            return static_cast<uint8_t>(k) < static_cast<uint8_t>(orbital_node_kind_count);
+        };
+        uint32_t count = 0;
+        if (!r_u32(in, count) || count > s.nations.size())
+            return false;
+        entity_id prev = null_entity;
+        for (uint32_t k = 0; k < count; ++k)
+        {
+            entity_id nid = null_entity;
+            uint32_t  m = 0;
+            if (!r_id(in, nid) || nid == null_entity || (k > 0 && nid <= prev) || !r_u32(in, m)
+                || m == 0 || m > space_hull_count || s.nations.count(nid) == 0)
+                return false;
+            prev = nid;
+            auto& mine = s.space_unit_designs[nid];
+            int last = -1;
+            for (uint32_t j = 0; j < m; ++j)
+            {
+                uint8_t hull = 0;
+                space_design d{};
+                if (!r_u8(in, hull) || hull >= space_hull_count || static_cast<int>(hull) <= last)
+                    return false;
+                for (uint8_t& it : d)
+                    if (!r_u8(in, it))
+                        return false;
+                if (!evaluate_space_design(static_cast<space_hull>(hull), d).valid)
+                    return false;
+                last = hull;
+                mine.emplace_hint(mine.end(), hull, d);
+            }
+        }
+
+        if (!r_u32(in, count) || count > (1u << 24))
+            return false;
+        prev = null_entity;
+        for (uint32_t k = 0; k < count; ++k)
+        {
+            space_unit u;
+            entity_id  uid = null_entity;
+            if (!r_id(in, uid) || uid == null_entity || (k > 0 && uid <= prev) || !r_id(in, u.owner)
+                || !r_enum(in, u.hull, space_hull::cruiser))
+                return false;
+            prev = uid;
+            for (uint8_t& it : u.design)
+                if (!r_u8(in, it))
+                    return false;
+            if (!r_enum(in, u.state, space_unit_state::landed)
+                || !r_id(in, u.node.body) || !r_enum(in, u.node.kind, orbital_node_kind::l5)
+                || !r_id(in, u.dest.body) || !r_enum(in, u.dest.kind, orbital_node_kind::l5)
+                || !r_i32(in, u.days_remaining) || !r_id(in, u.station) || !r_f32(in, u.propellant)
+                || !r_f32(in, u.cargo) || !r_f32(in, u.hull_points) || !r_i32(in, u.crew)
+                || !r_f32(in, u.upkeep) || !r_i32(in, u.unpaid_quarters))
+                return false;
+            u.id = uid;
+            const space_design_stats st = evaluate_space_design(u.hull, u.design);
+            if (!st.valid || s.nations.count(u.owner) == 0 || !body_ok(u.node.body) || !kind_ok(u.node.kind))
+                return false;
+            const auto fin = [](float v) { return std::isfinite(v); };
+            if (!fin(u.propellant) || u.propellant < 0.0f || u.propellant > st.tank
+                || !fin(u.cargo) || u.cargo < 0.0f || u.cargo > st.cargo
+                || !fin(u.hull_points) || !(u.hull_points > 0.0f) || u.hull_points > st.hull_points
+                || u.crew < 0 || u.crew > k_astronaut_pool_max
+                || !fin(u.upkeep) || u.upkeep < 0.0f
+                || u.unpaid_quarters < 0 || u.unpaid_quarters >= k_space_quarters_to_loss_ceiling)
+                return false;
+            if (u.state == space_unit_state::in_transit)
+            {
+                if (u.days_remaining < 1 || !body_ok(u.dest.body) || !kind_ok(u.dest.kind) || u.dest == u.node
+                    || u.station != null_entity)
+                    return false;
+                if (u.dest.kind == orbital_node_kind::surface && u.hull != space_hull::lander)
+                    return false;
+            }
+            else
+            {
+                if (u.days_remaining != 0 || u.dest != u.node)
+                    return false;
+                if (u.state == space_unit_state::docked)
+                {
+                    const auto sit = s.stations.find(u.station);
+                    if (sit == s.stations.end() || sit->second.owner != u.owner || sit->second.node != u.node)
+                        return false;
+                }
+                else if (u.station != null_entity)
+                    return false;
+                const bool surface = u.node.kind == orbital_node_kind::surface;
+                if (u.state == space_unit_state::landed ? (!surface || u.hull != space_hull::lander) : surface)
+                    return false;
+            }
+            s.space_units.emplace_hint(s.space_units.end(), uid, u);
+        }
+
+        if (!r_u32(in, count) || count > s.stations.size())
+            return false;
+        prev = null_entity;
+        for (uint32_t k = 0; k < count; ++k)
+        {
+            entity_id sid = null_entity;
+            float     stock = 0.0f;
+            if (!r_id(in, sid) || sid == null_entity || (k > 0 && sid <= prev) || !r_f32(in, stock)
+                || s.stations.count(sid) == 0 || !std::isfinite(stock) || !(stock > 0.0f)
+                || stock > k_space_depot_stock_max)
+                return false;
+            prev = sid;
+            s.station_depot_stock.emplace_hint(s.station_depot_stock.end(), sid, stock);
+        }
+    }
+    // ===== END BL-1594 / BL-1595 =====
 
     // BL-1266 (v46): every manual trade names a live owner and two distinct
     // standing markets, and holds an id below the next one to be issued, all

@@ -446,7 +446,9 @@ int main()
                                + world_save_recruits_section_bytes(w) + world_save_sea_recruits_section_bytes(w) + world_save_refusals_section_bytes(w) /* BL-1480 (v75) */
                                + world_save_contributors_section_bytes(w) + world_save_occupation_section_bytes(w) // v77, v78
                                + world_save_defend_section_bytes(w) + world_save_research_books_section_bytes(w)   // v79, v80
-                               + world_save_station_section_bytes(w); // BL-1583 (v81), last    // BL-1463 (v72), last
+                               + world_save_station_section_bytes(w)      // BL-1583 (v81)
+                               + world_save_early_space_section_bytes(w)  // BL-1612 (v82)
+                               + world_save_space_unit_section_bytes(w); // BL-1594 (v83), last
         const std::string b55 = v55_of(w);
         std::string v50 = b55.substr(0, b55.size() - tail55_of(w));
         const std::uint32_t pre = k_world_save_version_pre_space;

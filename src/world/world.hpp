@@ -13,6 +13,7 @@
 #include "sentiment.hpp"    // sentiment_table (BL-545 relational substrate, below)
 #include "space_assets.hpp" // space_asset (BL-1327: nations' space assets, below)
 #include "stations.hpp"     // space_station, station_template (BL-1583, below)
+#include "space_units.hpp"  // space_unit, space_design (BL-1594/BL-1595, below)
 #include "war.hpp"          // war_record, peace_offer (BL-1459/BL-1428 wars, below)
 
 #include <atomic>
@@ -1053,6 +1054,18 @@ struct world
     /// BL-1583 — each nation's named station templates, nation then name ascending.
     /// No empty inner map is kept. SERIALISED (v81) and hashed when non-empty.
     std::map<entity_id, std::map<std::string, station_template>> station_templates;
+
+    /// BL-1594 / BL-1595 — every live space unit, keyed by its id (space_units.hpp;
+    /// SPACE_FLEETS.md). A lost unit is erased. SERIALISED (v83) and hashed when non-empty.
+    std::map<entity_id, space_unit> space_units;
+
+    /// BL-1594 — each nation's live space-unit design per hull (`space_hull` value),
+    /// nation then hull ascending; no empty inner map. SERIALISED (v83), hashed when non-empty.
+    std::map<entity_id, std::map<uint8_t, space_design>> space_unit_designs;
+
+    /// BL-1595 — each station's Fuel-depot propellant stock (good units), ascending
+    /// station id; only stations holding stock > 0. SERIALISED (v83), hashed when non-empty.
+    std::map<entity_id, float> station_depot_stock;
 
     /// Enacted and un-enacted laws (BL-343). A world-level list rather than a
     /// per-corp one: a law is enacted over the world and charged to whoever it

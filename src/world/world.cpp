@@ -918,6 +918,52 @@ uint64_t world::state_hash(int tick) const
                     fnv1a_i32(h, nc.astronauts);
                 }
         }
+        // BL-1594 / BL-1595: the space units, their designs and the depot stocks —
+        // folded only when any is non-empty, so a world without them hashes as before.
+        if (!space_units.empty() || !space_unit_designs.empty() || !station_depot_stock.empty())
+        {
+            fnv1a_u32(h, 0x5F17u); // tag: cannot alias the station run above
+            fnv1a_u32(h, static_cast<uint32_t>(space_unit_designs.size()));
+            for (const auto& [nid, ds] : space_unit_designs)
+            {
+                fnv1a_u32(h, nid);
+                fnv1a_u32(h, static_cast<uint32_t>(ds.size()));
+                for (const auto& [hull, d] : ds)
+                {
+                    fnv1a_u32(h, hull);
+                    for (const uint8_t it : d)
+                        fnv1a_u32(h, it);
+                }
+            }
+            fnv1a_u32(h, static_cast<uint32_t>(space_units.size()));
+            for (const auto& [uid, u] : space_units)
+            {
+                fnv1a_u32(h, uid);
+                fnv1a_u32(h, u.owner);
+                fnv1a_u32(h, static_cast<uint32_t>(u.hull));
+                for (const uint8_t it : u.design)
+                    fnv1a_u32(h, it);
+                fnv1a_u32(h, static_cast<uint32_t>(u.state));
+                fnv1a_u32(h, u.node.body);
+                fnv1a_u32(h, static_cast<uint32_t>(u.node.kind));
+                fnv1a_u32(h, u.dest.body);
+                fnv1a_u32(h, static_cast<uint32_t>(u.dest.kind));
+                fnv1a_i32(h, u.days_remaining);
+                fnv1a_u32(h, u.station);
+                fnv1a_f32(h, u.propellant);
+                fnv1a_f32(h, u.cargo);
+                fnv1a_f32(h, u.hull_points);
+                fnv1a_i32(h, u.crew);
+                fnv1a_f32(h, u.upkeep);
+                fnv1a_i32(h, u.unpaid_quarters);
+            }
+            fnv1a_u32(h, static_cast<uint32_t>(station_depot_stock.size()));
+            for (const auto& [sid, stock] : station_depot_stock)
+            {
+                fnv1a_u32(h, sid);
+                fnv1a_f32(h, stock);
+            }
+        }
     }
 
     // Province holder (BL-569). UNLIKE `provinces` itself (generation output,
