@@ -2,6 +2,7 @@
 
 #include "components.hpp" // building_type
 #include "digitisation_tree_data.hpp"
+#include "early_space_tree_data.hpp"
 #include "entity.hpp"
 #include "modifier_set.hpp"
 
@@ -327,6 +328,27 @@ bool node_has_mechanic(int node, std::string_view key);
 /// convoy dispatches only for a corp whose home nation holds it — read in
 /// price_convoy_leg's inter-body branch, beside the launchpad check.
 bool nation_mechanic(const world& w, entity_id nation, std::string_view key);
+
+/// BL-1592: whether @p nation holds a node carrying the read `mechanic` key
+/// @p key - the query every space unlock goes through, with a constant from
+/// space_tech_keys.hpp. Unlike `nation_mechanic`, a key no held node carries is
+/// CLOSED: an unknown key, or a far-space key (`space_keys::far_space`, the Early
+/// Space tree's), is false for every nation. Pure; unknown nation: false.
+bool nation_has_mechanic(const world& w, entity_id nation, std::string_view key);
+
+/// BL-1607: the Early Space tree (`io::es`, early_space_tree_data.hpp) is keyed
+/// branch by branch by the Digitisation quests (RESEARCH.md: Quests key the next
+/// age). The `io::dg` index of the quest whose `keys_next_branch` names Early
+/// Space branch @p es_branch (an `io::es::branches` index), or -1.
+int early_space_branch_key_node(int es_branch);
+
+/// Whether @p nation holds the Digitisation quest that keys Early Space branch
+/// @p es_branch. The KEY half of a branch's availability only: the Era 1 -> Era 2
+/// gate half (ERAS.md: Rocketry, a staffed home Launchpad, propellant on the home
+/// shelf) has no pure query, and `nation_tech_state` holds one tree's held set
+/// and queue, so no nation can research an Early Space node until a second held
+/// set and queue (and their save leg) exist.
+bool early_space_branch_keyed(const world& w, entity_id nation, int es_branch);
 
 /// Whether @p corp may build @p type: true unless a node with a read
 /// `unlock_structure` effect naming the type is not held by the corp's home

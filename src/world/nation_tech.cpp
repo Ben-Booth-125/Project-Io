@@ -5,6 +5,7 @@
 #include "nation_budget.hpp"
 #include "recipe_registry.hpp"
 #include "resource_names.hpp"
+#include "space_tech_keys.hpp"
 #include "world.hpp"
 
 #include <algorithm>
@@ -418,9 +419,14 @@ constexpr modifier_subject k_read_subjects[] = {
     modifier_subject::alarm_decay,
 };
 
-/// Mechanic keys with a reader. `space_dispatch` (Rocketry, Ben 2026-10-10):
-/// read by price_convoy_leg's inter-body branch through `nation_mechanic`.
-constexpr std::string_view k_read_mechanics[] = { "space_dispatch" };
+/// Mechanic keys with a reader: the Digitisation tree's space keys
+/// (space_tech_keys.hpp, `space_keys::near_space`; BL-1592). `space_dispatch`
+/// (Rocketry, Ben 2026-10-10) is read by price_convoy_leg's inter-body branch
+/// through `nation_mechanic`; every other near-space key is read through
+/// `nation_has_mechanic` by the space layer that launches, fits or builds the
+/// thing it names (SPACE_ASSETS.md). tech_tree_store.js --check holds the list
+/// to the store's mechanic keys both ways.
+constexpr const auto& k_read_mechanics = space_keys::near_space;
 
 /// Named extraction sites a scope may name (`extraction_site_name`).
 constexpr std::string_view k_sites[] = { "farm", "fishing_wharf", "well" };
@@ -759,6 +765,35 @@ bool nation_mechanic(const world& w, entity_id nation, std::string_view key)
             return true;
     }
     return !named;
+}
+
+bool nation_has_mechanic(const world& w, entity_id nation, std::string_view key)
+{
+    // Only a HELD node opens a key: unlike nation_mechanic, a key no Digitisation
+    // node carries is closed (a far-space key is the Early Space tree's, which no
+    // nation holds any of: nation_tech_state carries one tree; see the header).
+    for (const resolved_mechanic& m : tables().mechanics)
+        if (m.key == key && nation_holds(w, nation, static_cast<int>(m.node)))
+            return true;
+    return false;
+}
+
+int early_space_branch_key_node(int es_branch)
+{
+    if (es_branch < 0 || es_branch >= io::es::branch_count)
+        return -1;
+    const std::string_view name = io::es::branches[static_cast<std::size_t>(es_branch)].name;
+    for (int i = 0; i < io::dg::node_count; ++i)
+        if (io::dg::nodes[static_cast<std::size_t>(i)].is_quest
+            && name == io::dg::keys_next_branch[static_cast<std::size_t>(i)])
+            return i;
+    return -1;
+}
+
+bool early_space_branch_keyed(const world& w, entity_id nation, int es_branch)
+{
+    const int quest = early_space_branch_key_node(es_branch);
+    return quest >= 0 && nation_holds(w, nation, quest);
 }
 
 bool structure_unlocked(const world& w, entity_id corp, building_type type)

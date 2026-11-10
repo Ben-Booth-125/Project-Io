@@ -1,0 +1,1317 @@
+{
+ "_schema": "early_space_tree.json — the Early Space tech tree store (EARLY_SPACE_TREE.md is the authority; this file holds every node). Same schema as digitisation_tree.json: requires = AND over groups, each group satisfied by ANY member; cost_units = tier base x ring; advantage is the player-facing prose, effects its machine form. Each branch carries keyed_by, the Digitisation quest that opens it (RESEARCH.md § Quests key the next age); reserved_branches names the branches the Digitisation quests key that this cut does not yet author.",
+ "_note": "First cut (BL-1607): one branch in each of the three trees. Every advantage, cost and deed is a placeholder to be re-priced in play. Validate with node tools/session/tech_tree_store.js early_space --check.",
+ "tree": "early_space",
+ "age": "Early Space",
+ "keyed_by_tree": "digitisation",
+ "tiers": {
+  "travel": 1,
+  "minor": 2,
+  "major": 6,
+  "quest": 3
+ },
+ "trees": [
+  {
+   "key": "PR",
+   "name": "Production",
+   "thesis": "what the nation can extract and make off-world",
+   "branches": [
+    {
+     "key": "PR-IP",
+     "name": "In-Situ Propellant",
+     "travel_theme": "+1% propellant output",
+     "keyed_by": "DG-PR-EN-Q"
+    }
+   ]
+  },
+  {
+   "key": "NE",
+   "name": "Network",
+   "thesis": "how far and fast the nation moves goods between bodies",
+   "branches": [
+    {
+     "key": "NE-IC",
+     "name": "Interplanetary Convoys",
+     "travel_theme": "-1% launch propellant",
+     "keyed_by": "DG-NE-SO-Q"
+    }
+   ]
+  },
+  {
+   "key": "ST",
+   "name": "State",
+   "thesis": "what the nation can field and hold in space",
+   "branches": [
+    {
+     "key": "ST-SF",
+     "name": "Space Force",
+     "travel_theme": "+1% strength for every space unit",
+     "keyed_by": "DG-ST-FO-Q"
+    }
+   ]
+  }
+ ],
+ "reserved_branches": [
+  "Asteroid Prospecting",
+  "Orbital Assembly",
+  "Off-World Exchange",
+  "Orbital Port & Depots",
+  "Settlement Charters",
+  "Planetary Accords"
+ ],
+ "placeholders": {},
+ "nodes": [
+  {
+   "id": "ES-PR-IP-T1",
+   "name": "Cryogenics I",
+   "tier": "travel",
+   "ring": 1,
+   "tree": "PR",
+   "branch": "PR-IP",
+   "requires": [],
+   "advantage": "+1% propellant output",
+   "effects": [
+    {
+     "kind": "modifier",
+     "subject": "processing_yield",
+     "scope": "resource:propellant",
+     "op": "multiply",
+     "value": 1.01
+    }
+   ],
+   "cost_units": 1
+  },
+  {
+   "id": "ES-PR-IP-T2",
+   "name": "Cryogenics II",
+   "tier": "travel",
+   "ring": 1,
+   "tree": "PR",
+   "branch": "PR-IP",
+   "requires": [
+    [
+     "ES-PR-IP-T1"
+    ]
+   ],
+   "advantage": "+1% propellant output",
+   "effects": [
+    {
+     "kind": "modifier",
+     "subject": "processing_yield",
+     "scope": "resource:propellant",
+     "op": "multiply",
+     "value": 1.01
+    }
+   ],
+   "cost_units": 1
+  },
+  {
+   "id": "ES-PR-IP-A1",
+   "name": "Remote Prospecting",
+   "tier": "minor",
+   "ring": 1,
+   "tree": "PR",
+   "branch": "PR-IP",
+   "requires": [
+    [
+     "ES-PR-IP-T2"
+    ]
+   ],
+   "advantage": "a surveyed body may be prospected for its deposits",
+   "effects": [
+    {
+     "kind": "mechanic",
+     "key": "prospecting",
+     "what": "a surveyed body may be prospected for its deposits"
+    }
+   ],
+   "cost_units": 2
+  },
+  {
+   "id": "ES-PR-IP-A2",
+   "name": "Habitat Shielding",
+   "tier": "minor",
+   "ring": 1,
+   "tree": "PR",
+   "branch": "PR-IP",
+   "requires": [
+    [
+     "ES-PR-IP-T2"
+    ]
+   ],
+   "advantage": "off-world base upkeep -10%",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "off-world base upkeep -10%",
+     "waits_on": "off-world bases"
+    }
+   ],
+   "cost_units": 2
+  },
+  {
+   "id": "ES-PR-IP-A",
+   "name": "Off-World Bases",
+   "tier": "major",
+   "ring": 2,
+   "tree": "PR",
+   "branch": "PR-IP",
+   "requires": [
+    [
+     "ES-PR-IP-A1"
+    ],
+    [
+     "ES-PR-IP-A2"
+    ]
+   ],
+   "advantage": "a base may be founded on another body",
+   "effects": [
+    {
+     "kind": "mechanic",
+     "key": "base_founding",
+     "what": "a base may be founded on another body"
+    }
+   ],
+   "cost_units": 12
+  },
+  {
+   "id": "ES-PR-IP-T3",
+   "name": "Cryogenics III",
+   "tier": "travel",
+   "ring": 2,
+   "tree": "PR",
+   "branch": "PR-IP",
+   "requires": [
+    [
+     "ES-PR-IP-A"
+    ]
+   ],
+   "advantage": "+1% propellant output",
+   "effects": [
+    {
+     "kind": "modifier",
+     "subject": "processing_yield",
+     "scope": "resource:propellant",
+     "op": "multiply",
+     "value": 1.01
+    }
+   ],
+   "cost_units": 2
+  },
+  {
+   "id": "ES-PR-IP-T4",
+   "name": "Cryogenics IV",
+   "tier": "travel",
+   "ring": 3,
+   "tree": "PR",
+   "branch": "PR-IP",
+   "requires": [
+    [
+     "ES-PR-IP-T3"
+    ]
+   ],
+   "advantage": "+1% propellant output",
+   "effects": [
+    {
+     "kind": "modifier",
+     "subject": "processing_yield",
+     "scope": "resource:propellant",
+     "op": "multiply",
+     "value": 1.01
+    }
+   ],
+   "cost_units": 3
+  },
+  {
+   "id": "ES-PR-IP-T5",
+   "name": "Cryogenics V",
+   "tier": "travel",
+   "ring": 2,
+   "tree": "PR",
+   "branch": "PR-IP",
+   "requires": [
+    [
+     "ES-PR-IP-A"
+    ]
+   ],
+   "advantage": "+1% propellant output",
+   "effects": [
+    {
+     "kind": "modifier",
+     "subject": "processing_yield",
+     "scope": "resource:propellant",
+     "op": "multiply",
+     "value": 1.01
+    }
+   ],
+   "cost_units": 2
+  },
+  {
+   "id": "ES-PR-IP-T6",
+   "name": "Cryogenics VI",
+   "tier": "travel",
+   "ring": 3,
+   "tree": "PR",
+   "branch": "PR-IP",
+   "requires": [
+    [
+     "ES-PR-IP-T5"
+    ]
+   ],
+   "advantage": "+1% propellant output",
+   "effects": [
+    {
+     "kind": "modifier",
+     "subject": "processing_yield",
+     "scope": "resource:propellant",
+     "op": "multiply",
+     "value": 1.01
+    }
+   ],
+   "cost_units": 3
+  },
+  {
+   "id": "ES-PR-IP-B1",
+   "name": "Regolith Drilling",
+   "tier": "minor",
+   "ring": 3,
+   "tree": "PR",
+   "branch": "PR-IP",
+   "requires": [
+    [
+     "ES-PR-IP-T4"
+    ]
+   ],
+   "advantage": "off-world extraction rate +5%",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "off-world extraction rate +5%",
+     "waits_on": "off-world extraction"
+    }
+   ],
+   "cost_units": 6
+  },
+  {
+   "id": "ES-PR-IP-B2",
+   "name": "Thermal Ice Mining",
+   "tier": "minor",
+   "ring": 3,
+   "tree": "PR",
+   "branch": "PR-IP",
+   "requires": [
+    [
+     "ES-PR-IP-T4"
+    ]
+   ],
+   "advantage": "Ice Extractor water output +5%",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "Ice Extractor water output +5%",
+     "waits_on": "off-world extraction"
+    }
+   ],
+   "cost_units": 6
+  },
+  {
+   "id": "ES-PR-IP-B",
+   "name": "Ice Extraction",
+   "tier": "major",
+   "ring": 4,
+   "tree": "PR",
+   "branch": "PR-IP",
+   "requires": [
+    [
+     "ES-PR-IP-B1"
+    ],
+    [
+     "ES-PR-IP-B2"
+    ]
+   ],
+   "advantage": "unlocks the Ice Extractor: water from an icy body",
+   "effects": [
+    {
+     "kind": "mechanic",
+     "key": "ice_extractor",
+     "what": "the Ice Extractor may be built on an icy body"
+    }
+   ],
+   "cost_units": 24
+  },
+  {
+   "id": "ES-PR-IP-C1",
+   "name": "Cryogenic Transfer",
+   "tier": "minor",
+   "ring": 3,
+   "tree": "PR",
+   "branch": "PR-IP",
+   "requires": [
+    [
+     "ES-PR-IP-T6"
+    ]
+   ],
+   "advantage": "off-world propellant holding losses -25%",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "off-world propellant holding losses -25%",
+     "waits_on": "holding losses by nation"
+    }
+   ],
+   "cost_units": 6
+  },
+  {
+   "id": "ES-PR-IP-C2",
+   "name": "Solar Electrolysis",
+   "tier": "minor",
+   "ring": 3,
+   "tree": "PR",
+   "branch": "PR-IP",
+   "requires": [
+    [
+     "ES-PR-IP-T6"
+    ]
+   ],
+   "advantage": "Electrolysis Plant power draw -10%",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "Electrolysis Plant power draw -10%",
+     "waits_on": "building fuel draw"
+    }
+   ],
+   "cost_units": 6
+  },
+  {
+   "id": "ES-PR-IP-C",
+   "name": "Electrolysis Plants",
+   "tier": "major",
+   "ring": 4,
+   "tree": "PR",
+   "branch": "PR-IP",
+   "requires": [
+    [
+     "ES-PR-IP-C1"
+    ],
+    [
+     "ES-PR-IP-C2"
+    ]
+   ],
+   "advantage": "unlocks the Electrolysis Plant: water and power into propellant on its body’s market",
+   "effects": [
+    {
+     "kind": "mechanic",
+     "key": "electrolysis_plant",
+     "what": "the Electrolysis Plant may be built"
+    }
+   ],
+   "cost_units": 24
+  },
+  {
+   "id": "ES-PR-IP-M",
+   "name": "Closed Propellant Loop",
+   "tier": "travel",
+   "ring": 4,
+   "tree": "PR",
+   "branch": "PR-IP",
+   "requires": [
+    [
+     "ES-PR-IP-B"
+    ],
+    [
+     "ES-PR-IP-C"
+    ]
+   ],
+   "advantage": "+3% propellant output",
+   "effects": [
+    {
+     "kind": "modifier",
+     "subject": "processing_yield",
+     "scope": "resource:propellant",
+     "op": "multiply",
+     "value": 1.03
+    }
+   ],
+   "cost_units": 4,
+   "mastery": true
+  },
+  {
+   "id": "ES-PR-IP-Q",
+   "name": "Refuelled Off-World",
+   "tier": "quest",
+   "ring": 4,
+   "tree": "PR",
+   "branch": "PR-IP",
+   "requires": [
+    [
+     "ES-PR-IP-C"
+    ]
+   ],
+   "advantage": "propellant output +10%",
+   "effects": [
+    {
+     "kind": "modifier",
+     "subject": "processing_yield",
+     "scope": "resource:propellant",
+     "op": "multiply",
+     "value": 1.1
+    }
+   ],
+   "cost_units": 12,
+   "deed": "a space unit of yours refuels on propellant made off your home world",
+   "keys_next_branch": "Outer-System Propellant",
+   "deed_effect": {
+    "kind": "unread",
+    "waits_on": "deed history"
+   }
+  },
+  {
+   "id": "ES-NE-IC-T1",
+   "name": "Transfer Orbits I",
+   "tier": "travel",
+   "ring": 1,
+   "tree": "NE",
+   "branch": "NE-IC",
+   "requires": [],
+   "advantage": "-1% launch propellant",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "-1% launch propellant",
+     "waits_on": "launch draw by nation"
+    }
+   ],
+   "cost_units": 1
+  },
+  {
+   "id": "ES-NE-IC-T2",
+   "name": "Transfer Orbits II",
+   "tier": "travel",
+   "ring": 1,
+   "tree": "NE",
+   "branch": "NE-IC",
+   "requires": [
+    [
+     "ES-NE-IC-T1"
+    ]
+   ],
+   "advantage": "-1% launch propellant",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "-1% launch propellant",
+     "waits_on": "launch draw by nation"
+    }
+   ],
+   "cost_units": 1
+  },
+  {
+   "id": "ES-NE-IC-A1",
+   "name": "Storable Propellants",
+   "tier": "minor",
+   "ring": 1,
+   "tree": "NE",
+   "branch": "NE-IC",
+   "requires": [
+    [
+     "ES-NE-IC-T2"
+    ]
+   ],
+   "advantage": "opens standard propellant tanks (space hull tanks)",
+   "effects": [
+    {
+     "kind": "mechanic",
+     "key": "space_tanks_standard",
+     "what": "standard propellant tanks for a space hull"
+    }
+   ],
+   "cost_units": 2
+  },
+  {
+   "id": "ES-NE-IC-A2",
+   "name": "Restartable Engines",
+   "tier": "minor",
+   "ring": 1,
+   "tree": "NE",
+   "branch": "NE-IC",
+   "requires": [
+    [
+     "ES-NE-IC-T2"
+    ]
+   ],
+   "advantage": "opens the chemical drive (space hull drive)",
+   "effects": [
+    {
+     "kind": "mechanic",
+     "key": "space_drive_chemical",
+     "what": "the chemical drive for a space hull"
+    }
+   ],
+   "cost_units": 2
+  },
+  {
+   "id": "ES-NE-IC-A",
+   "name": "Space Haulers",
+   "tier": "major",
+   "ring": 2,
+   "tree": "NE",
+   "branch": "NE-IC",
+   "requires": [
+    [
+     "ES-NE-IC-A1"
+    ],
+    [
+     "ES-NE-IC-A2"
+    ]
+   ],
+   "advantage": "opens the Hauler hull: the space convoy",
+   "effects": [
+    {
+     "kind": "mechanic",
+     "key": "space_hull_hauler",
+     "what": "the Hauler hull may be designed and raised"
+    }
+   ],
+   "cost_units": 12
+  },
+  {
+   "id": "ES-NE-IC-T3",
+   "name": "Transfer Orbits III",
+   "tier": "travel",
+   "ring": 2,
+   "tree": "NE",
+   "branch": "NE-IC",
+   "requires": [
+    [
+     "ES-NE-IC-A"
+    ]
+   ],
+   "advantage": "-1% launch propellant",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "-1% launch propellant",
+     "waits_on": "launch draw by nation"
+    }
+   ],
+   "cost_units": 2
+  },
+  {
+   "id": "ES-NE-IC-T4",
+   "name": "Transfer Orbits IV",
+   "tier": "travel",
+   "ring": 3,
+   "tree": "NE",
+   "branch": "NE-IC",
+   "requires": [
+    [
+     "ES-NE-IC-T3"
+    ]
+   ],
+   "advantage": "-1% launch propellant",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "-1% launch propellant",
+     "waits_on": "launch draw by nation"
+    }
+   ],
+   "cost_units": 3
+  },
+  {
+   "id": "ES-NE-IC-T5",
+   "name": "Transfer Orbits V",
+   "tier": "travel",
+   "ring": 2,
+   "tree": "NE",
+   "branch": "NE-IC",
+   "requires": [
+    [
+     "ES-NE-IC-A"
+    ]
+   ],
+   "advantage": "-1% launch propellant",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "-1% launch propellant",
+     "waits_on": "launch draw by nation"
+    }
+   ],
+   "cost_units": 2
+  },
+  {
+   "id": "ES-NE-IC-T6",
+   "name": "Transfer Orbits VI",
+   "tier": "travel",
+   "ring": 3,
+   "tree": "NE",
+   "branch": "NE-IC",
+   "requires": [
+    [
+     "ES-NE-IC-T5"
+    ]
+   ],
+   "advantage": "-1% launch propellant",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "-1% launch propellant",
+     "waits_on": "launch draw by nation"
+    }
+   ],
+   "cost_units": 3
+  },
+  {
+   "id": "ES-NE-IC-B1",
+   "name": "Extended Tankage",
+   "tier": "minor",
+   "ring": 3,
+   "tree": "NE",
+   "branch": "NE-IC",
+   "requires": [
+    [
+     "ES-NE-IC-T4"
+    ]
+   ],
+   "advantage": "opens extended propellant tanks (space hull tanks)",
+   "effects": [
+    {
+     "kind": "mechanic",
+     "key": "space_tanks_extended",
+     "what": "extended propellant tanks for a space hull"
+    }
+   ],
+   "cost_units": 6
+  },
+  {
+   "id": "ES-NE-IC-B2",
+   "name": "Precision Landing",
+   "tier": "minor",
+   "ring": 3,
+   "tree": "NE",
+   "branch": "NE-IC",
+   "requires": [
+    [
+     "ES-NE-IC-T4"
+    ]
+   ],
+   "advantage": "Lander descent propellant -10%",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "Lander descent propellant -10%",
+     "waits_on": "space unit propellant draw"
+    }
+   ],
+   "cost_units": 6
+  },
+  {
+   "id": "ES-NE-IC-B",
+   "name": "Landers",
+   "tier": "major",
+   "ring": 4,
+   "tree": "NE",
+   "branch": "NE-IC",
+   "requires": [
+    [
+     "ES-NE-IC-B1"
+    ],
+    [
+     "ES-NE-IC-B2"
+    ]
+   ],
+   "advantage": "opens the Lander hull: cargo, crew and colonists down to a surface and back",
+   "effects": [
+    {
+     "kind": "mechanic",
+     "key": "space_hull_lander",
+     "what": "the Lander hull may be designed and raised"
+    }
+   ],
+   "cost_units": 24
+  },
+  {
+   "id": "ES-NE-IC-C1",
+   "name": "Rendezvous and Capture",
+   "tier": "minor",
+   "ring": 3,
+   "tree": "NE",
+   "branch": "NE-IC",
+   "requires": [
+    [
+     "ES-NE-IC-T6"
+    ]
+   ],
+   "advantage": "opens the debris arm (Tug payload)",
+   "effects": [
+    {
+     "kind": "mechanic",
+     "key": "space_debris_arm",
+     "what": "the debris arm for a Tug"
+    }
+   ],
+   "cost_units": 6
+  },
+  {
+   "id": "ES-NE-IC-C2",
+   "name": "Nuclear Thermal Rockets",
+   "tier": "minor",
+   "ring": 3,
+   "tree": "NE",
+   "branch": "NE-IC",
+   "requires": [
+    [
+     "ES-NE-IC-T6"
+    ]
+   ],
+   "advantage": "opens the nuclear thermal drive (space hull drive)",
+   "effects": [
+    {
+     "kind": "mechanic",
+     "key": "space_drive_nuclear_thermal",
+     "what": "the nuclear thermal drive for a space hull"
+    }
+   ],
+   "cost_units": 6
+  },
+  {
+   "id": "ES-NE-IC-C",
+   "name": "Orbital Tugs",
+   "tier": "major",
+   "ring": 4,
+   "tree": "NE",
+   "branch": "NE-IC",
+   "requires": [
+    [
+     "ES-NE-IC-C1"
+    ],
+    [
+     "ES-NE-IC-C2"
+    ]
+   ],
+   "advantage": "opens the Tug hull: clears debris, moves an unpowered asset",
+   "effects": [
+    {
+     "kind": "mechanic",
+     "key": "space_hull_tug",
+     "what": "the Tug hull may be designed and raised"
+    }
+   ],
+   "cost_units": 24
+  },
+  {
+   "id": "ES-NE-IC-M",
+   "name": "Transfer Network",
+   "tier": "travel",
+   "ring": 4,
+   "tree": "NE",
+   "branch": "NE-IC",
+   "requires": [
+    [
+     "ES-NE-IC-B"
+    ],
+    [
+     "ES-NE-IC-C"
+    ]
+   ],
+   "advantage": "-3% launch propellant",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "-3% launch propellant",
+     "waits_on": "launch draw by nation"
+    }
+   ],
+   "cost_units": 4,
+   "mastery": true
+  },
+  {
+   "id": "ES-NE-IC-Q",
+   "name": "Interplanetary Trade",
+   "tier": "quest",
+   "ring": 2,
+   "tree": "NE",
+   "branch": "NE-IC",
+   "requires": [
+    [
+     "ES-NE-IC-A"
+    ]
+   ],
+   "advantage": "launch propellant -5%",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "launch propellant -5%",
+     "waits_on": "launch draw by nation"
+    }
+   ],
+   "cost_units": 6,
+   "deed": "a Hauler of yours delivers cargo between two bodies, neither your home world",
+   "keys_next_branch": "Deep-Space Convoys",
+   "deed_effect": {
+    "kind": "unread",
+    "waits_on": "deed history"
+   }
+  },
+  {
+   "id": "ES-ST-SF-T1",
+   "name": "Orbital Drill I",
+   "tier": "travel",
+   "ring": 1,
+   "tree": "ST",
+   "branch": "ST-SF",
+   "requires": [],
+   "advantage": "+1% strength for every space unit",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "+1% strength for every space unit",
+     "waits_on": "space combat"
+    }
+   ],
+   "cost_units": 1
+  },
+  {
+   "id": "ES-ST-SF-T2",
+   "name": "Orbital Drill II",
+   "tier": "travel",
+   "ring": 1,
+   "tree": "ST",
+   "branch": "ST-SF",
+   "requires": [
+    [
+     "ES-ST-SF-T1"
+    ]
+   ],
+   "advantage": "+1% strength for every space unit",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "+1% strength for every space unit",
+     "waits_on": "space combat"
+    }
+   ],
+   "cost_units": 1
+  },
+  {
+   "id": "ES-ST-SF-A1",
+   "name": "Kinetic Interceptors",
+   "tier": "minor",
+   "ring": 1,
+   "tree": "ST",
+   "branch": "ST-SF",
+   "requires": [
+    [
+     "ES-ST-SF-T2"
+    ]
+   ],
+   "advantage": "opens kinetic armament (warship armament)",
+   "effects": [
+    {
+     "kind": "mechanic",
+     "key": "space_armament_kinetic",
+     "what": "kinetic armament for a warship"
+    }
+   ],
+   "cost_units": 2
+  },
+  {
+   "id": "ES-ST-SF-A2",
+   "name": "Whipple Shielding",
+   "tier": "minor",
+   "ring": 1,
+   "tree": "ST",
+   "branch": "ST-SF",
+   "requires": [
+    [
+     "ES-ST-SF-T2"
+    ]
+   ],
+   "advantage": "opens Whipple shielding (warship armour)",
+   "effects": [
+    {
+     "kind": "mechanic",
+     "key": "space_armour_whipple",
+     "what": "Whipple shielding for a warship"
+    }
+   ],
+   "cost_units": 2
+  },
+  {
+   "id": "ES-ST-SF-A",
+   "name": "Frigates",
+   "tier": "major",
+   "ring": 2,
+   "tree": "ST",
+   "branch": "ST-SF",
+   "requires": [
+    [
+     "ES-ST-SF-A1"
+    ],
+    [
+     "ES-ST-SF-A2"
+    ]
+   ],
+   "advantage": "opens the Frigate hull: escort and interception",
+   "effects": [
+    {
+     "kind": "mechanic",
+     "key": "space_hull_frigate",
+     "what": "the Frigate hull may be designed and raised"
+    }
+   ],
+   "cost_units": 12
+  },
+  {
+   "id": "ES-ST-SF-T3",
+   "name": "Orbital Drill III",
+   "tier": "travel",
+   "ring": 2,
+   "tree": "ST",
+   "branch": "ST-SF",
+   "requires": [
+    [
+     "ES-ST-SF-A"
+    ]
+   ],
+   "advantage": "+1% strength for every space unit",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "+1% strength for every space unit",
+     "waits_on": "space combat"
+    }
+   ],
+   "cost_units": 2
+  },
+  {
+   "id": "ES-ST-SF-K1",
+   "name": "Orbital Missiles",
+   "tier": "minor",
+   "ring": 2,
+   "tree": "ST",
+   "branch": "ST-SF",
+   "requires": [
+    [
+     "ES-ST-SF-T3"
+    ]
+   ],
+   "advantage": "opens orbital missiles (warship armament)",
+   "effects": [
+    {
+     "kind": "mechanic",
+     "key": "space_armament_missile",
+     "what": "missile armament for a warship"
+    }
+   ],
+   "cost_units": 4
+  },
+  {
+   "id": "ES-ST-SF-K2",
+   "name": "Composite Hull Armour",
+   "tier": "minor",
+   "ring": 2,
+   "tree": "ST",
+   "branch": "ST-SF",
+   "requires": [
+    [
+     "ES-ST-SF-T3"
+    ]
+   ],
+   "advantage": "opens composite hull armour (warship armour)",
+   "effects": [
+    {
+     "kind": "mechanic",
+     "key": "space_armour_composite",
+     "what": "composite armour for a warship"
+    }
+   ],
+   "cost_units": 4
+  },
+  {
+   "id": "ES-ST-SF-K",
+   "name": "Orbital Bombardment",
+   "tier": "major",
+   "ring": 3,
+   "tree": "ST",
+   "branch": "ST-SF",
+   "requires": [
+    [
+     "ES-ST-SF-K1"
+    ],
+    [
+     "ES-ST-SF-K2"
+    ]
+   ],
+   "advantage": "an armed unit in low orbit may bombard a province or a building below. Trap: every strike raises Alarm as a missile strike does",
+   "effects": [
+    {
+     "kind": "mechanic",
+     "key": "orbital_bombardment",
+     "what": "an armed space unit in low orbit may bombard the ground"
+    }
+   ],
+   "cost_units": 18
+  },
+  {
+   "id": "ES-ST-SF-T4",
+   "name": "Orbital Drill IV",
+   "tier": "travel",
+   "ring": 3,
+   "tree": "ST",
+   "branch": "ST-SF",
+   "requires": [
+    [
+     "ES-ST-SF-K"
+    ]
+   ],
+   "advantage": "+1% strength for every space unit",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "+1% strength for every space unit",
+     "waits_on": "space combat"
+    }
+   ],
+   "cost_units": 3
+  },
+  {
+   "id": "ES-ST-SF-T5",
+   "name": "Orbital Drill V",
+   "tier": "travel",
+   "ring": 2,
+   "tree": "ST",
+   "branch": "ST-SF",
+   "requires": [
+    [
+     "ES-ST-SF-A"
+    ]
+   ],
+   "advantage": "+1% strength for every space unit",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "+1% strength for every space unit",
+     "waits_on": "space combat"
+    }
+   ],
+   "cost_units": 2
+  },
+  {
+   "id": "ES-ST-SF-T6",
+   "name": "Orbital Drill VI",
+   "tier": "travel",
+   "ring": 3,
+   "tree": "ST",
+   "branch": "ST-SF",
+   "requires": [
+    [
+     "ES-ST-SF-T5"
+    ]
+   ],
+   "advantage": "+1% strength for every space unit",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "+1% strength for every space unit",
+     "waits_on": "space combat"
+    }
+   ],
+   "cost_units": 3
+  },
+  {
+   "id": "ES-ST-SF-B1",
+   "name": "Space Surveillance",
+   "tier": "minor",
+   "ring": 3,
+   "tree": "ST",
+   "branch": "ST-SF",
+   "requires": [
+    [
+     "ES-ST-SF-T4"
+    ]
+   ],
+   "advantage": "hostile space units seen at every node in your comms coverage",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "hostile space units seen at every node in your comms coverage",
+     "waits_on": "space combat"
+    }
+   ],
+   "cost_units": 6
+  },
+  {
+   "id": "ES-ST-SF-B2",
+   "name": "Ground-Launched Interceptors",
+   "tier": "minor",
+   "ring": 3,
+   "tree": "ST",
+   "branch": "ST-SF",
+   "requires": [
+    [
+     "ES-ST-SF-T4"
+    ]
+   ],
+   "advantage": "orbital defence battery fire +10%",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "orbital defence battery fire +10%",
+     "waits_on": "space combat"
+    }
+   ],
+   "cost_units": 6
+  },
+  {
+   "id": "ES-ST-SF-B",
+   "name": "Orbital Defence Battery",
+   "tier": "major",
+   "ring": 4,
+   "tree": "ST",
+   "branch": "ST-SF",
+   "requires": [
+    [
+     "ES-ST-SF-B1"
+    ],
+    [
+     "ES-ST-SF-B2"
+    ]
+   ],
+   "advantage": "unlocks the orbital defence battery: the ground fires at hostile units in low orbit",
+   "effects": [
+    {
+     "kind": "mechanic",
+     "key": "orbital_defence_battery",
+     "what": "the orbital defence battery may be built"
+    }
+   ],
+   "cost_units": 24
+  },
+  {
+   "id": "ES-ST-SF-C1",
+   "name": "Orbital Shipyards",
+   "tier": "minor",
+   "ring": 3,
+   "tree": "ST",
+   "branch": "ST-SF",
+   "requires": [
+    [
+     "ES-ST-SF-T6"
+    ]
+   ],
+   "advantage": "station Shipyard modules may be fitted",
+   "effects": [
+    {
+     "kind": "mechanic",
+     "key": "space_module_shipyard",
+     "what": "Shipyard modules may be fitted"
+    }
+   ],
+   "cost_units": 6
+  },
+  {
+   "id": "ES-ST-SF-C2",
+   "name": "Heavy Truss",
+   "tier": "minor",
+   "ring": 3,
+   "tree": "ST",
+   "branch": "ST-SF",
+   "requires": [
+    [
+     "ES-ST-SF-T6"
+    ]
+   ],
+   "advantage": "station grids may be upgraded to 9 x 7",
+   "effects": [
+    {
+     "kind": "mechanic",
+     "key": "space_grid_9x7",
+     "what": "a station grid may be upgraded from 7 x 5 to 9 x 7"
+    }
+   ],
+   "cost_units": 6
+  },
+  {
+   "id": "ES-ST-SF-C",
+   "name": "Cruisers",
+   "tier": "major",
+   "ring": 4,
+   "tree": "ST",
+   "branch": "ST-SF",
+   "requires": [
+    [
+     "ES-ST-SF-C1"
+    ],
+    [
+     "ES-ST-SF-C2"
+    ]
+   ],
+   "advantage": "opens the Cruiser hull: the capital ship, built at a Shipyard only",
+   "effects": [
+    {
+     "kind": "mechanic",
+     "key": "space_hull_cruiser",
+     "what": "the Cruiser hull may be designed and raised at a Shipyard"
+    }
+   ],
+   "cost_units": 24
+  },
+  {
+   "id": "ES-ST-SF-M",
+   "name": "Space Superiority",
+   "tier": "travel",
+   "ring": 4,
+   "tree": "ST",
+   "branch": "ST-SF",
+   "requires": [
+    [
+     "ES-ST-SF-B"
+    ],
+    [
+     "ES-ST-SF-C"
+    ]
+   ],
+   "advantage": "+3% strength for every space unit",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "+3% strength for every space unit",
+     "waits_on": "space combat"
+    }
+   ],
+   "cost_units": 4,
+   "mastery": true
+  },
+  {
+   "id": "ES-ST-SF-Q",
+   "name": "Orbit Held",
+   "tier": "quest",
+   "ring": 2,
+   "tree": "ST",
+   "branch": "ST-SF",
+   "requires": [
+    [
+     "ES-ST-SF-A"
+    ]
+   ],
+   "advantage": "space unit upkeep -5%",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "space unit upkeep -5%",
+     "waits_on": "space combat"
+    }
+   ],
+   "cost_units": 6,
+   "deed": "an armed fleet of yours holds your home world’s low orbit for 4 quarters",
+   "keys_next_branch": "Deep-Space Fleets",
+   "deed_effect": {
+    "kind": "unread",
+    "waits_on": "deed history"
+   }
+  }
+ ]
+}

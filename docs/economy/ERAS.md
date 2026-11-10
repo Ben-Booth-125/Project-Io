@@ -300,7 +300,7 @@ the space race's successes made visible (§ The point of an Era: *"we want to en
 
 ### Far-space technology (Ben, 2026-11-10)
 
-**Far space is researched in the next age's tree** (`RESEARCH.md` § Quests key the next age): its
+**Far space is researched in the next age's tree** (`tech/EARLY_SPACE_TREE.md`; `RESEARCH.md` § Quests key the next age): its
 hull classes and drives, landers and tugs, prospecting, base founding, the propellant loop's
 buildings, the orbital defence battery, and the station's last grid upgrade. A nation reaches it
 through the Digitisation tree's space quests, as every age's tree is reached.
