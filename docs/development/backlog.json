@@ -1343,8 +1343,8 @@
    "design": "SPACE_ASSETS.md § The orbital graph. Pure function of the bodies, never saved. Done when: every non-star body has surface/low/high nodes; every planet-moon and star-planet pair has L1/L2/L4/L5 with live positions; cheapest-path cost and travel days are deterministic and a harness proves a small airless body is cheaper to leave than the home world."
   },
   {
-   "status": "designed",
-   "glyph": "○",
+   "status": "complete",
+   "glyph": "●",
    "sprint": 65,
    "version_goal": "v0.4.0",
    "written": "2026-11-10",
@@ -1368,8 +1368,8 @@
    "design": "SPACE_ASSETS.md § Orbital slots. A space asset destination becomes an orbital node; a full node refuses a launch whole; a lost asset frees its slot. Done when a harness fills a node and the next launch is refused with nothing touched."
   },
   {
-   "status": "designed",
-   "glyph": "○",
+   "status": "complete",
+   "glyph": "●",
    "sprint": 65,
    "version_goal": "v0.4.0",
    "written": "2026-11-10",
@@ -1420,8 +1420,8 @@
    "design": "SPACE_ASSETS.md § Space stations. A station is not a body. Fit/remove/refit verbs, templates as saved layouts queuing one launch per unfilled slot, upgrades 5x3 -> 7x5 -> 9x7, Dock and Shipyard edge-only and idle when enclosed, budgets stop the newest module first, solar falloff by square of orbital radius. Saved. Done when a harness covers each rule and a save round-trips a fitted station."
   },
   {
-   "status": "designed",
-   "glyph": "○",
+   "status": "complete",
+   "glyph": "●",
    "sprint": 65,
    "version_goal": "v0.4.0",
    "written": "2026-11-10",
@@ -1473,8 +1473,8 @@
    "design": "SPACE_ASSETS.md § Astronauts. Astronaut Training Centre building turns staffed workforce into astronauts per quarter up to a cap; crewed launches draw crew and are refused when short; crew are lost with their asset. Done when a harness trains, launches and loses crew."
   },
   {
-   "status": "designed",
-   "glyph": "○",
+   "status": "complete",
+   "glyph": "●",
    "sprint": 65,
    "version_goal": "v0.4.0",
    "written": "2026-11-10",
@@ -1500,8 +1500,8 @@
    "design": "SPACE_ASSETS.md § Satellites. A role chosen at launch and saved. Comms puts its body in coverage and (with Communication Satellites) lifts activity fog on traded markets; Navigation cuts logistics cost on its body; Observation lifts vision fog there; Survey surveys its body. Done when a harness shows each effect on and off with the satellite."
   },
   {
-   "status": "designed",
-   "glyph": "○",
+   "status": "complete",
+   "glyph": "●",
    "sprint": 65,
    "version_goal": "v0.4.0",
    "written": "2026-11-10",
@@ -1525,8 +1525,8 @@
    "design": "SPACE_ASSETS.md § Signal delay. Coverage set per nation from home orbits, comms satellites and relay modules; a pending-order queue for out-of-coverage space orders, saved; research, observation and survey data earned only in coverage. Done when a harness shows an order waiting one quarter outside coverage and landing at once inside it."
   },
   {
-   "status": "designed",
-   "glyph": "○",
+   "status": "complete",
+   "glyph": "●",
    "sprint": 65,
    "version_goal": "v0.4.0",
    "written": "2026-11-10",

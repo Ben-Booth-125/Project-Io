@@ -738,6 +738,66 @@
     "src/world/nation_tech.cpp",
     "docs/economy/RESEARCH.md"
    ]
+  },
+  {
+   "raised": "2026-11-10",
+   "status": "open",
+   "resolution": null,
+   "id": "NR-1170",
+   "title": "A new near-space command seam (space_command.*) beside the nation command path",
+   "kind": "novel-work",
+   "source": "BL-1588 lane report",
+   "what": "Space verbs (launch, move, fit, retire, set role and so on; 11 gameplay.space_* entries in ACTIONS.json) go through a new space_command seam. It holds a pending-order queue for signal delay: an order outside comms coverage waits one quarter, then applies or is dropped if it is no longer legal. The seam validates as an untrusted boundary, but no --serve/MCP transport carries it yet.",
+   "why_it_matters": "It is a second command path; the AI and the wire must both use it.",
+   "options": [
+    "Keep it separate (space orders carry delay; ground orders do not)",
+    "Fold it into the nation command path later"
+   ],
+   "recommendation": "Keep; file the --serve/MCP transport as v0.5.0 work.",
+   "files": [
+    "src/world/space_command.hpp",
+    "docs/ai/ACTIONS.json"
+   ]
+  },
+  {
+   "raised": "2026-11-10",
+   "status": "open",
+   "resolution": null,
+   "id": "NR-1171",
+   "title": "Launch cost formula and slot use: base + 250 per dv + goods value; slots only for satellites and cores",
+   "kind": "decision-taken",
+   "source": "BL-1581/BL-1582 lane report",
+   "what": "Launch cost = base + 250 credits per unit of delta-v climbed + the market value of the goods bought off the home shelf. Only satellites and station cores take an orbital slot. A station core may launch to any orbital node, including L-points. Launch and move debits are paid but are not yet booked as a line in the nation return.",
+   "why_it_matters": "It sets how expensive space is, and the return under-reports the spend.",
+   "options": [
+    "Keep these numbers for v0.4.0 and tune after the spectator run",
+    "Book the debits as a return line now"
+   ],
+   "recommendation": "Keep the numbers; book the return line with the Space ledger item, BL-1591 (space ledger and designer).",
+   "files": [
+    "src/world/space_command.cpp",
+    "docs/economy/SPACE_ASSETS.md"
+   ]
+  },
+  {
+   "raised": "2026-11-10",
+   "status": "open",
+   "resolution": null,
+   "id": "NR-1172",
+   "title": "Station and satellite effect dials and stand-ins taken by the effects lane",
+   "kind": "decision-taken",
+   "source": "BL-1584/BL-1586 lane report",
+   "what": "Life support keeps no memory: a station either buys its rations this quarter or starves. Electronics stands in as the factory module's output good. An Observation satellite lifts only the vision fog, not the activity fog. Survey satellites start the mapping, at a stand-in rate until prospecting lands (v0.5.0). Dials: navigation factor 0.9, research module 50 RP a quarter; the rest are in space_effects.hpp.",
+   "why_it_matters": "These are first numbers; the spectator run will show whether they matter.",
+   "options": [
+    "Accept as first cut",
+    "Revisit any dial"
+   ],
+   "recommendation": "Accept; revisit after the spectator observation.",
+   "files": [
+    "src/world/space_effects.cpp",
+    "docs/economy/SPACE_ASSETS.md"
+   ]
   }
  ]
 }
