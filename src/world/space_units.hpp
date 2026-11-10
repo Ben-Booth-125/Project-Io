@@ -9,6 +9,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 struct world;
@@ -73,7 +74,9 @@ struct world;
 // BATTLES are space_battle.hpp's (BL-1597); a move ordered for an engaged unit
 // is recorded there as a withdrawal. Cargo and convoys are space_convoy.hpp's (BL-1596).
 //
-// WHAT IS NOT HERE: debris, bombardment, any AI, any UI, the agent seam. The seams left for them: the
+// DEBRIS is debris.hpp's (BL-1598): its day step reads `arrivals` below.
+//
+// WHAT IS NOT HERE: bombardment, any AI, any UI, the agent seam. The seams left for them: the
 // armed-unit list at a node (`space_armed_units_at`) and each unit's readable hull
 // points, firepower and armour (`space_unit_firepower`, `space_unit_armour`).
 //
@@ -350,6 +353,9 @@ struct space_unit_day_report
 {
     int   arrived  = 0;
     float repaired = 0.0f;
+    /// BL-1598: each unit that arrived today and the node it left, ascending unit id
+    /// (the debris day charges the nodes its path passed through).
+    std::vector<std::pair<entity_id, orbital_node>> arrivals;
     space_convoy_day_report convoy; ///< BL-1596: the convoys' share of the day.
 };
 

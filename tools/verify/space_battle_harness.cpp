@@ -584,7 +584,7 @@ int main()
         std::ostringstream o84(std::ios::binary);
         write_world_snapshot_pre_space_battles(f.w, o84);
         const std::size_t sec = world_save_space_battle_section_bytes(f.w);
-        check(o84.str().size() + sec + world_save_prospecting_section_bytes(f.w) + world_save_space_convoy_section_bytes(f.w) == mid_bytes.size() && sec == 8 + 80 + 9 + 8,
+        check(o84.str().size() + sec + world_save_prospecting_section_bytes(f.w) + (world_save_space_convoy_section_bytes(f.w) + world_save_debris_section_bytes(f.w)) == mid_bytes.size() && sec == 8 + 80 + 9 + 8,
               "S10b", fmt("the section is %zu bytes (8 + 80 + 9 + 8); v84 prefix %zu + %zu == %zu", sec,
                           o84.str().size(), sec, mid_bytes.size()));
         // Both fight the next day identically.
@@ -613,7 +613,7 @@ int main()
         const std::string& b = mid_bytes;
         // `saved` has fought one more day since mid_bytes; the section's shape is
         // the one S10b measured: 8 + 80 + 9 + 8.
-        const std::size_t s0 = b.size() - (8 + 80 + 9 + 8) - 4 - 4; // the v86 survey and v87 convoy sections follow, both empty here (4 bytes each)
+        const std::size_t s0 = b.size() - (8 + 80 + 9 + 8) - 4 - 4 - 12; // the v86 survey and v87 convoy sections follow, both empty here (4 bytes each), then the v88 debris section (BL-1598), empty: 12 bytes
         const std::size_t b0 = s0 + 8;
         const auto refused = [&](std::string bad) {
             world t;
@@ -625,7 +625,7 @@ int main()
             std::memcpy(&bad[at], v, n);
             return bad;
         };
-        const uint8_t bad_state = 3, bad_end = 3, bad_kind = 9, decided = 1;
+        const uint8_t bad_state = 4 /* BL-1598: 3 is the standoff */, bad_end = 3, bad_kind = 9, decided = 1;
         const uint32_t ghost = 0x00FFFFFFu, zero = 0;
         const float nan = std::nanf(""), neg = -1.0f;
         uint32_t next_id = 0, a_id = 0, b_id = 0;

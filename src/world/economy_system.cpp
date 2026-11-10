@@ -1,6 +1,7 @@
 #include "economy_system.hpp"
 #include "space_units.hpp" // BL-1595: run_space_unit_day
 #include "space_battle.hpp" // BL-1597: run_space_battle_day
+#include "debris.hpp"       // BL-1598: run_space_debris_day
 #include "war.hpp" // BL-1428: note_war_battles, run_war_quarter
 #include "logistic_points.hpp"
 
@@ -5082,6 +5083,19 @@ military_day_result run_military_day(world& w, const recipe_registry& reg, int d
     return out;
 }
 
+namespace {
+/// One space day: the units (transit, docks, convoys), the battles, then the debris
+/// (BL-1595 / BL-1597 / BL-1598). Every step on empty stores does nothing.
+void run_space_day(world& w, const recipe_registry& reg)
+{
+    space_unit_day_report   ud;
+    space_battle_day_report bd;
+    run_space_unit_day(w, reg.space_units(), reg.stations(), &ud);
+    run_space_battle_day(w, reg.space_units(), reg.stations(), reg.space_battles(), &bd);
+    run_space_debris_day(w, reg.space_debris(), ud, bd);
+}
+} // namespace
+
 int advance_quarter_to(world& w, const recipe_registry& reg, int day_in_quarter,
                        int quarter_first_day_tick, std::vector<battle_dispatch>* dispatches)
 {
@@ -5097,18 +5111,18 @@ int advance_quarter_to(world& w, const recipe_registry& reg, int day_in_quarter,
         // BL-1595 (SPACE_FLEETS.md § Where a space unit is): the space units' day -
         // transit counts down, docked units repair. Independent of the ground's day,
         // so its place in the day is free; an empty store does nothing.
-        run_space_unit_day(w, reg.space_units(), reg.stations());
         // BL-1597 (SPACE_FLEETS.md § Battles): then the battles at the nodes - fought
         // after the day's arrivals, so a fleet that arrives joins the day's fire.
-        run_space_battle_day(w, reg.space_units(), reg.stations(), reg.space_battles());
+        // BL-1598 (SPACE_ASSETS.md § Debris): then the debris - the battles' wrecks
+        // deposited, the units at (and passing through) a fouled node damaged.
+        run_space_day(w, reg);
         if (!military_active(w, reg, quarter_first_day_tick + d))
         {
             // The space units walk the days the skip below jumps, one at a time.
             // (Stations count: two hostile defended stations at one node fight.)
             for (int k = d + 1; k <= to && (!w.space_units.empty() || !w.stations.empty()); ++k)
             {
-                run_space_unit_day(w, reg.space_units(), reg.stations());
-                run_space_battle_day(w, reg.space_units(), reg.stations(), reg.space_battles());
+                run_space_day(w, reg);
             }
             // Nothing military left to walk: construction takes the rest in one call,
             // which walks the identical days (advance_construction_to is days-outer).

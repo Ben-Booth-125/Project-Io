@@ -17,6 +17,7 @@
 #include "space_units.hpp"  // space_unit, space_design (BL-1594/BL-1595, below)
 #include "space_battle.hpp" // space_battle (BL-1597, below)
 #include "space_convoy.hpp" // space_haul (BL-1596, below)
+#include "orbital_node.hpp" // orbital_node (BL-1598 space_debris, below)
 #include "war.hpp"          // war_record, peace_offer (BL-1459/BL-1428 wars, below)
 
 #include <atomic>
@@ -1093,6 +1094,11 @@ struct world
     /// Hauler's trip, keyed by the unit's id (space_convoy.hpp; SPACE_FLEETS.md
     /// § Space convoys). SERIALISED (world_save.hpp's BL-1596 block), hashed when non-empty.
     std::map<entity_id, space_haul> space_hauls;
+    /// BL-1598 — the debris level at each orbital node holding any (debris.hpp;
+    /// SPACE_ASSETS.md § Debris), node order; only levels above `k_space_debris_floor`.
+    /// SERIALISED (world_save.hpp's BL-1598 block, with each asset's wear and each
+    /// open battle's quiet days); hashed when any is non-empty.
+    std::map<orbital_node, float> space_debris;
 
     /// Enacted and un-enacted laws (BL-343). A world-level list rather than a
     /// per-corp one: a law is enacted over the world and charged to whoever it

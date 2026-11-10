@@ -163,7 +163,31 @@ void trim_history(world& w, const space_battle_params& bp)
     }
 }
 
+/// BL-1598: is the newest record of the pair (@p a < @p c) at @p node a standoff?
+bool latest_is_standoff(const world& w, orbital_node node, entity_id a, entity_id c)
+{
+    for (auto it = w.space_battles.rbegin(); it != w.space_battles.rend(); ++it) // newest first
+    {
+        const space_battle& b = it->second;
+        if (b.node == node && b.sides[0].nation == a && b.sides[1].nation == c)
+            return b.state == space_battle_state::standoff;
+    }
+    return false;
+}
+
 } // namespace
+
+bool space_fire_could_land(const world& w, const station_params& stp, const space_battle_params& bp,
+                           orbital_node node, entity_id a, entity_id b)
+{
+    space_battle t;
+    t.node = node;
+    t.sides[0].nation = a;
+    t.sides[1].nation = b;
+    std::vector<target> ta = targets_of(w, stp, bp, t, a);
+    std::vector<target> tb = targets_of(w, stp, bp, t, b);
+    return land_fire(pool_of(w, stp, bp, t, a), tb) > 0.0f || land_fire(pool_of(w, stp, bp, t, b), ta) > 0.0f;
+}
 
 bool space_hostile(const world& w, entity_id a, entity_id b)
 {
@@ -236,6 +260,9 @@ void run_space_battle_day(world& w, const space_unit_params& p, const station_pa
         return;
     }
 
+    const int32_t stall = std::clamp(bp.stall_days, 0, k_space_battle_stall_max);
+    const bool stall_on = stall > 0;
+
     // 1. OPEN. The nations present at each node (units not in transit, stations with
     // a core in place), node then nation ascending; every hostile, both-armed pair
     // with no open battle there opens one.
@@ -265,6 +292,9 @@ void run_space_battle_day(world& w, const space_unit_params& p, const station_pa
                     exists = exists || (b.state == space_battle_state::open && b.node == node
                                         && b.sides[0].nation == a && b.sides[1].nation == c);
                 if (exists)
+                    continue;
+                // BL-1598: a standoff holds until one side's fire could land.
+                if (stall_on && latest_is_standoff(w, node, a, c) && !space_fire_could_land(w, stp, bp, node, a, c))
                     continue;
                 space_battle b;
                 b.id = w.next_space_battle_id++;
@@ -315,6 +345,7 @@ void run_space_battle_day(world& w, const space_unit_params& p, const station_pa
             depart(left);
             b.state = space_battle_state::peace;
             b.module_damage.clear();
+            b.quiet_days = 0;
             ++r.closed;
             continue;
         }
@@ -340,6 +371,11 @@ void run_space_battle_day(world& w, const space_unit_params& p, const station_pa
         b.sides[0].damage_landed += landed_on1;
         b.sides[1].damage_landed += landed_on0;
         r.landed += landed_on0 + landed_on1;
+        // BL-1598: the stall's count — a day that landed nothing on either side.
+        if (landed_on0 > 0.0f || landed_on1 > 0.0f)
+            b.quiet_days = 0;
+        else if (b.quiet_days < k_space_battle_stall_max)
+            ++b.quiet_days;
 
         // LOSSES, side 0 then side 1, in target order.
         float mass = 0.0f;
@@ -437,7 +473,19 @@ void run_space_battle_day(world& w, const space_unit_params& p, const station_pa
         const bool armed0 = space_armed_at(w, stp, n0, b.node);
         const bool armed1 = space_armed_at(w, stp, n1, b.node);
         if (armed0 && armed1)
+        {
+            // BL-1598: THE STALL — both still armed, and `stall` quiet days in a row.
+            if (stall_on && b.quiet_days >= stall)
+            {
+                b.state = space_battle_state::standoff;
+                b.withdrawing.clear();
+                b.module_damage.clear();
+                b.quiet_days = 0;
+                ++r.closed;
+                ++r.standoffs;
+            }
             continue;
+        }
         if (!armed0)
             b.sides[0].end = left[0] ? space_battle_end::withdrew : space_battle_end::destroyed;
         if (!armed1)
@@ -445,6 +493,7 @@ void run_space_battle_day(world& w, const space_unit_params& p, const station_pa
         b.state = space_battle_state::decided;
         b.withdrawing.clear();
         b.module_damage.clear();
+        b.quiet_days = 0;
         ++r.closed;
     }
     if (r.closed > 0)

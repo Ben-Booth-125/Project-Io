@@ -865,7 +865,6 @@ inline constexpr uint32_t k_world_save_version_pre_prospecting = k_world_save_ve
 /// MERGE NOTE: a parallel lane's bump renumbers this block (this paragraph, the three
 /// constants below, the accepted-version line in `read_world_snapshot`, and the one
 /// section at the end of the writer and reader).
-inline constexpr uint32_t world_save_version = 87;
 
 /// BL-1596: the first version carrying the space-convoy section (see above).
 inline constexpr uint32_t k_world_save_version_space_convoys = 87;
@@ -873,6 +872,32 @@ inline constexpr uint32_t k_world_save_version_space_convoys = 87;
 /// BL-1596: v86, a strict prefix of v87.
 inline constexpr uint32_t k_world_save_version_pre_space_convoys = k_world_save_version_space_convoys - 1;
 /// ===== END BL-1596 VERSION BUMP =================================================
+/// ===== BEGIN BL-1598 VERSION BUMP (debris) — ONE BLOCK ===========================
+/// **88 (BL-1598; SPACE_ASSETS.md § Debris, SPACE_FLEETS.md § Battles) — DEBRIS AND
+/// THE STALL.** Appended last, three lists each after a u32 count: (1) every debris
+/// level ascending node, as (body, u8 kind, f32 level) — 9 bytes; (2) every space
+/// asset with wear above zero ascending id, as (id, f32 wear) — 8 bytes; (3) every
+/// battle with quiet days above zero ascending id, as (u32 id, i32 quiet_days) — 8
+/// bytes. A level names an orbital node (not a surface) of a non-star body, nodes
+/// strictly ascending, at most `k_space_debris_nodes_max`, finite in
+/// (`k_space_debris_floor`, `k_space_debris_max`]; a wear names a satellite or
+/// station core, ids strictly ascending, finite in (0, 1); a quiet count names an
+/// OPEN battle, ids strictly ascending, in [1, `k_space_battle_stall_max`]. The
+/// space-battle section accepts the `standoff` state (3) from this version on (both
+/// ends holding, nothing withdrawing, no module damage). Refused whole otherwise. v87
+/// is a STRICT PREFIX of v88 and is read too (`k_world_save_version_pre_debris`), as a
+/// world with no debris, no wear and no quiet days. MERGE NOTE: a parallel lane's bump
+/// renumbers this block (this paragraph, `world_save_version`, the two constants
+/// below, the accepted-version line in `read_world_snapshot`, and the one section at
+/// the end of the writer and reader).
+inline constexpr uint32_t world_save_version = 88;
+
+/// BL-1598: the first version carrying the debris section (see above).
+inline constexpr uint32_t k_world_save_version_debris = 88;
+
+/// BL-1598: v87, a strict prefix of v88.
+inline constexpr uint32_t k_world_save_version_pre_debris = k_world_save_version_debris - 1;
+/// ===== END BL-1598 VERSION BUMP =================================================
 
 /// BL-1612: the first version carrying the Early Space tree section (see above).
 inline constexpr uint32_t k_world_save_version_early_space = 82;
@@ -1290,6 +1315,11 @@ std::size_t world_save_space_battle_section_bytes(const world& w);
 void write_world_snapshot_pre_prospecting(const world& w, std::ostream& out);
 /// VERIFICATION ONLY (BL-1596): the v86 stream shape - no space-convoy section.
 void write_world_snapshot_pre_space_convoys(const world& w, std::ostream& out);
+/// VERIFICATION ONLY (BL-1598): the v87 stream shape - no debris section.
+void write_world_snapshot_pre_debris(const world& w, std::ostream& out);
+/// BL-1598: the byte length of the v88 debris section `w` writes - 12, plus 9 per
+/// debris node, 8 per worn asset, 8 per battle with quiet days. The last section.
+std::size_t world_save_debris_section_bytes(const world& w);
 
 /// BL-1453: the recon stock a battle loaded from a pre-v67 stream is given — enough to
 /// see every defending unit in full (twice the stealthiest defender's kit stealth, in
