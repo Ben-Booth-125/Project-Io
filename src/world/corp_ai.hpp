@@ -544,6 +544,43 @@ int64_t rival_air_province_score(const world& w, entity_id nation, air_mission m
 /// Called by run_corp_strategic_step for each due nation; exported for the harness.
 void score_nation_bunkers(world& w, const recipe_registry& reg, entity_id nation, int tick);
 
+/// BL-1615: why the space-groundwork pass built nothing (none = it built).
+enum class space_ground_block : uint8_t
+{
+    none = 0,       ///< A build was applied.
+    not_scored,     ///< The player's nation, an unknown nation, or the settle.
+    no_rocketry,    ///< It does not hold Rocketry (`space_keys::dispatch`).
+    no_home,        ///< It has no home body.
+    nothing_wanted, ///< It has its pad (and its centre, or not the key / no completed pad yet).
+    no_site,        ///< No tile of its own ground on the home body admits the building.
+    treasury,       ///< Its uncommitted treasury holds less than twice the capex.
+    refused,        ///< The build verb refused the command.
+};
+
+/// One evaluation of the space-groundwork pass, for the harness and the census.
+struct space_ground_pick
+{
+    entity_id           nation = null_entity;
+    building_type       type   = building_type::none; ///< launchpad / astronaut_training_centre / none
+    entity_id           tile   = null_entity;
+    float               cost   = 0.0f;                ///< construction_capex at the tile
+    space_ground_block  block  = space_ground_block::not_scored;
+    corp_command_result result = corp_command_result::rejected_invalid;
+};
+
+/// BL-1615 (AI_OPPONENT.md § 11, "Rival nations go to space as the player does", Ben
+/// 2026-11-10; SPACE_ASSETS.md § Launching, § Astronauts): a rival nation's space
+/// groundwork - in live play, at most ONE build an evaluation through the build verb:
+/// a Launchpad on its own ground on its home body once it holds Rocketry and has none
+/// there; else an Astronaut Training Centre once it holds the astronaut-training key,
+/// has a completed pad and no centre. The admitted tile nearest its capital, ties to
+/// the lowest id; only while its uncommitted treasury holds twice the capex. Never for
+/// the player's nation. Called by run_corp_strategic_step for each due nation;
+/// exported for the harness. @p apply false is a PREVIEW: the same pick, no verb
+/// issued (the reach-field cache may warm; no state the hash reads moves).
+space_ground_pick score_nation_space_ground(world& w, const recipe_registry& reg, entity_id nation, int tick,
+                                            bool apply = true);
+
 /// BL-1461 (AI_OPPONENT.md § 11: the stance grant covers a rival declaring war; "Rival
 /// nations wage war whole" covers the rest; RELATIONS.md § 7): a rival nation's war
 /// pass over its OWN wars - answer a declaration against it, impose at a score of 100

@@ -110,6 +110,17 @@ place two nations compete for room in space — a Trade question before it is a 
 **A launch needs a staffed Launchpad on the nation's home body**, and the nation must hold the
 **Rocketry** technology (`RESEARCH.md`; the Digitisation tree's `DG-NE-SO-B`).
 
+**One Launchpad per nation per body.** Every nation may stand its own pad on a body, and none a
+second there; another nation's pad does not stand in its way. The refusal reads *"Your nation
+already has a launchpad on this body"*.
+
+**A rival lays its own groundwork** (`../ai/AI_OPPONENT.md` § 11, "Rival nations go to space as
+the player does"). Once it holds Rocketry and has no pad on its home body, it builds one on its own
+ground, on the admitted tile nearest its capital. Once it also holds the astronaut-training
+technology and that pad is complete, it builds one Astronaut Training Centre the same way. One such
+build at a time, paid from the treasury, and only while the uncommitted treasury holds twice the
+build's cost. Never for the player's nation.
+
 **A launch buys its goods off the home market's shelf** — `spacecraft_components` and
 `propellant`, at the market's price, debited from the treasury. A shelf that cannot fill the whole
 lot refuses the launch whole; nothing is half-bought. The lot scales with the payload's class and

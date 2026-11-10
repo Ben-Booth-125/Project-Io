@@ -475,6 +475,7 @@ int run_spectate_headless(int until_year, std::uint32_t seed, const std::string&
     // near space now, what it has launched, and the last space-pick wall it
     // met. `space_block` is filled from each quarter's report (last wins).
     std::map<entity_id, int> space_block; // a space_ai_block; absent = no row (the player's nation)
+    std::map<entity_id, int> space_quote; // BL-1615: the refused quote's space_launch_result (0 = none)
     static const char* const k_block_names[] = {"acted", "no_rocketry", "no_launchpad", "pending_order",
                                                 "crew_short", "reserve", "refused", "nothing_wanted"};
     struct space_census
@@ -484,6 +485,9 @@ int run_spectate_headless(int until_year, std::uint32_t seed, const std::string&
         float launch_spend = 0.0f, upkeep_q = 0.0f;
         bool  rocketry = false, pad = false;
         int   astronauts = 0;
+        int   pad_sites = 0, centres = 0; ///< BL-1615: own pads / training centres, built or building
+        int   pad_days = -1, pad_rate = -1; ///< BL-1615: an unfinished pad's days left and build rate (permille)
+        int   ground = -1; float ground_cost = 0.0f; ///< BL-1615: the groundwork preview's space_ground_block, capex
         int   to_rocketry = -1; ///< Nodes on the queue's route to Rocketry; 0 held; -1 none.
         int   rocketry_units = 0; ///< Their cost units.
     };
@@ -509,6 +513,28 @@ int run_spectate_headless(int until_year, std::uint32_t seed, const std::string&
         const entity_id hb = space_home_body_of(w, n);
         c.pad        = hb != null_entity && space_has_staffed_pad(w, n, hb);
         c.astronauts = w.nations.at(n).astronauts;
+        for (const entity_id bid : w.nations.at(n).state_assets) // BL-1615: the groundwork
+            if (const auto bit = w.buildings.find(bid); bit != w.buildings.end() && !bit->second.decommissioned)
+            {
+                if (bit->second.type == building_type::launchpad)
+                {
+                    ++c.pad_sites;
+                    if (bit->second.ticks_remaining > 0) // a pad still building: how far, how fast
+                    {
+                        c.pad_days = bit->second.days_remaining;
+                        c.pad_rate = bit->second.build_rate_permille;
+                    }
+                }
+                if (bit->second.type == building_type::astronaut_training_centre) ++c.centres;
+            }
+        // BL-1615: a Rocketry nation with no pad yet - what the groundwork pass would
+        // meet now (a preview: no verb issued).
+        if (c.rocketry && c.pad_sites == 0)
+        {
+            const space_ground_pick g = score_nation_space_ground(w, reg, n, w.current_econ_tick, /*apply=*/false);
+            c.ground = static_cast<int>(g.block);
+            c.ground_cost = g.cost;
+        }
         if (const auto tit = w.nation_tech.find(n);
             tit != w.nation_tech.end() && k_rocketry >= 0 && tit->second.held.test(static_cast<std::size_t>(k_rocketry)))
             c.to_rocketry = 0;
@@ -539,13 +565,14 @@ int run_spectate_headless(int until_year, std::uint32_t seed, const std::string&
             pads     += c.pad ? 1 : 0;
             launches += c.launches;
             if (!all && !c.rocketry && c.launches == 0) continue;
-            std::printf("[space] %d id=%u name=%s rocketry=%d pad=%d sats(comms/nav/obs/survey)=%d/%d/%d/%d "
+            std::printf("[space] %d id=%u name=%s rocketry=%d pad=%d pad_sites=%d pad_days=%d pad_rate=%d centres=%d sats(comms/nav/obs/survey)=%d/%d/%d/%d "
                         "stations=%d modules=%d astronauts=%d launches=%d lost=%d launch_spend=%.0f upkeep_q=%.0f "
-                        "treasury=%.0f to_rocketry=%d/%du block=%s\n",
+                        "treasury=%.0f to_rocketry=%d/%du block=%s quote=%d ground=%d ground_cost=%.0f\n",
                         year, static_cast<unsigned>(n), w.nations.at(n).name.c_str(), c.rocketry ? 1 : 0,
-                        c.pad ? 1 : 0, c.sats[1], c.sats[2], c.sats[3], c.sats[4], c.stations, c.modules,
+                        c.pad ? 1 : 0, c.pad_sites, c.pad_days, c.pad_rate, c.centres, c.sats[1], c.sats[2], c.sats[3], c.sats[4], c.stations, c.modules,
                         c.astronauts, c.launches, c.lost, c.launch_spend, c.upkeep_q, w.nations.at(n).treasury,
-                        c.to_rocketry, c.rocketry_units, block_name(n));
+                        c.to_rocketry, c.rocketry_units, block_name(n),
+                        space_quote.count(n) != 0 ? space_quote.at(n) : 0, c.ground, c.ground_cost);
         }
         std::printf("[space] %d total nations=%zu rocketry=%d pad=%d launches=%d\n", year, nation_ids.size(),
                     rocketry, pads, launches);
@@ -658,6 +685,7 @@ int run_spectate_headless(int until_year, std::uint32_t seed, const std::string&
         for (const space_ai_pick& sp : tick.report.space_picks) // BL-1589
         {
             space_block[sp.nation] = static_cast<int>(sp.block);
+            space_quote[sp.nation] = static_cast<int>(sp.quote);
             if (sp.action != space_ai_action::none)
                 std::printf("[space-act] day=%d id=%u action=%d module=%d node=%u/%d cost=%.0f result=%d\n", day,
                             static_cast<unsigned>(sp.nation), static_cast<int>(sp.action),
