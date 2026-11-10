@@ -1083,6 +1083,11 @@ struct world
     std::map<uint32_t, space_battle> space_battles;
     /// BL-1597 — the next battle id. SERIALISED; hashed with the battles when non-zero.
     uint32_t next_space_battle_id = 0;
+    /// BL-1600 — each nation's mapped and prospected regions of each body off the
+    /// home world, keyed (nation, body) ascending (components.hpp
+    /// `body_survey_knowledge`; survey_system.hpp § Mapping, then prospecting).
+    /// SERIALISED (world_save.cpp, the BL-1600 section) and hashed when non-empty.
+    std::map<std::pair<entity_id, entity_id>, body_survey_knowledge> survey_knowledge;
 
     /// Enacted and un-enacted laws (BL-343). A world-level list rather than a
     /// per-corp one: a law is enacted over the world and charged to whoever it

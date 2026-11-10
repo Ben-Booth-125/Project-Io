@@ -14,11 +14,12 @@ struct station_params;
 // docs/economy/SPACE_ASSETS.md § Satellites, § Space stations (the module
 // roster), § Signal delay. What an ACTIVE satellite and a WORKING module DO.
 //
-// EVERYTHING HERE IS DERIVED; NOTHING NEW IS SAVED. The effects either read
-// state live (the reads below: a Navigation satellite's logistics discount, an
-// Observation satellite's vision lift, a Comms satellite's activity-fog lift)
-// or move state that is already saved (a nation's treasury and research pool,
-// a market's inventory, a body's survey). The quarterly step runs once per
+// NOTHING HERE IS SAVED OF ITS OWN. The effects either read state live (the
+// reads below: a Navigation satellite's logistics discount, an Observation
+// satellite's vision lift, a Comms satellite's activity-fog lift) or move state
+// saved elsewhere (a nation's treasury and research pool, a market's inventory,
+// a body's survey, and each nation's survey knowledge — BL-1600's store,
+// survey_system.hpp). The quarterly step runs once per
 // econ tick, inside the nation step, right after the station step.
 //
 // THE STEP, in order:
@@ -38,22 +39,27 @@ struct station_params;
 //      onto it, both at the posted price. The resource roster has no orbit-only
 //      good; electronics from silicon is the stand-in (see the report).
 //   4. Survey satellites. Each ACTIVE Survey satellite whose node is covered maps
-//      `survey_regions_per_quarter` regions of the body it serves.
+//      `survey_regions_per_quarter` regions of the body it serves, for its owner.
 //   5. Observatory. Each working, not starved Observatory maps
 //      `observatory_regions_per_quarter` regions of every body in its owner's
-//      comms coverage that is not yet surveyed.
+//      comms coverage that its owner has not yet fully mapped.
+//   6. Prospecting. Each ACTIVE rover and each LANDED Lander prospects
+//      `prospect_regions_per_quarter` of its owner's mapped, unprospected regions
+//      of its body, nearest the landing first; nothing when nothing is mapped.
 //
-// Mapping a region uses the one survey store (`body_component::survey`): a
-// hidden body starts scanning as a dispatched probe's would, and a scanning
-// body's `regions_done` advances; the last region surveys the body. A survey in
-// transit is left to its probe. The home world and the star are never touched.
+// Mapping and prospecting write the per-nation store `world::survey_knowledge`
+// (survey_system.hpp § Mapping, then prospecting): what one nation maps is that
+// nation's alone. For the PLAYER'S nation it is mirrored into the per-body view
+// the canvases draw (`body_component::survey`) where no dispatched probe owns
+// it. The home world and the star are never touched. Prospecting needs no comms
+// coverage (SPACE_ASSETS.md § Signal delay names no ground prospector).
 //
 // Defence, Dock, Fuel depot, Shipyard, Cargo hold and Market do nothing here
 // (their effects belong to space fleets and space convoys, SPACE_FLEETS.md).
 //
 // DETERMINISM. Stations walked in ascending id (std::map), assets in ascending
 // id (std::map), coverage is an ordered set; RP in integer milli-RP; no RNG, no
-// clock. A world with no space assets and no stations does nothing at all.
+// clock. A world with no space assets, stations or space units does nothing at all.
 // ---------------------------------------------------------------------------
 
 /// The dials. First-cut, in-band calibration (see the report); not yet a Lua key.
@@ -80,6 +86,10 @@ struct space_effects_params
 
     /// Observatory: regions mapped per quarter on each body in coverage.
     int observatory_regions_per_quarter = 2;
+
+    /// Rover / landed Lander: regions prospected per quarter (BL-1600; "one at a
+    /// time", DISCOVERY.md § Mapping, then prospecting).
+    int prospect_regions_per_quarter = 1;
 };
 
 /// What one quarterly effects step did — reported, never stored.
@@ -96,6 +106,8 @@ struct space_effects_report
     float        factory_earned    = 0.0f; ///< Credits for output lots.
     int          survey_regions    = 0;    ///< Regions mapped by Survey satellites.
     int          observatory_regions = 0;  ///< Regions mapped by Observatories.
+    int          prospected_regions  = 0;  ///< Regions prospected by rovers and Landers.
+    int          prospect_unmapped   = 0;  ///< Ground prospectors refused: nothing mapped left to prospect.
 };
 
 /// The body an orbital asset at @p node serves: the node's body. An L-point is

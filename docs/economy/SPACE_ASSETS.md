@@ -31,8 +31,8 @@ made them.
 The near-space classes:
 
 - **Satellites** — uncrewed orbital instruments, each with one **role** (§ Satellites).
-- **Rovers** — uncrewed surface units landed on another body; they move and survey off any nation's
-  tile grid.
+- **Rovers** — uncrewed surface units landed on another body; they move and **prospect** its mapped
+  ground off any nation's tile grid (`../ui/DISCOVERY.md` § Mapping, then prospecting).
 - **Crewed missions** — a crew sent to a body and returned, first to the home world's moon.
 - **Station cores** and **station modules** — crewed orbital platforms (§ Space stations).
 - **Launch infrastructure** — the ground side: launch sites, tracking stations and the industry that
@@ -128,7 +128,7 @@ the node has no free slot.
 | **Comms** | Puts its body's nodes inside its owner's comms coverage (§ Signal delay). With the *Communication Satellites* technology, it also lifts the activity fog on every market its owner trades with. |
 | **Navigation** | Cuts its owner's logistics cost on the body it orbits. |
 | **Observation** | Lifts the vision fog over the body it orbits, for its owner. |
-| **Survey** | Surveys the body it orbits from orbit (`../ui/DISCOVERY.md` § The geographic fog). |
+| **Survey** | **Maps** the body it orbits, for its owner: four regions a quarter, in raster order (`../ui/DISCOVERY.md` § Mapping, then prospecting). |
 
 **A role works from where the satellite sits.** A satellite's body is the body whose node it
 occupies; an L-point satellite serves the pair's smaller body.
@@ -196,7 +196,7 @@ yields less further out.
 | **Fuel depot** | Holds propellant, for refuelling docked space units. |
 | **Shipyard** | Builds space units too large to launch from a surface. Edge only. |
 | **Microgravity factory** | Turns goods bought off the home shelf into goods only orbit can make, sold onto the home market. |
-| **Observatory** | Surveys a body faster: a survey of any body in its owner's comms coverage completes sooner. |
+| **Observatory** | **Maps** every body in its owner's comms coverage that its owner has not mapped whole: two regions a quarter on each (`../ui/DISCOVERY.md` § Mapping, then prospecting). |
 | **Comms relay** | Puts the nodes around its station inside its owner's comms coverage (§ Signal delay). |
 | **Cargo hold** | A stockpile in orbit, for space convoys (`../military/SPACE_FLEETS.md`). |
 | **Market** | Makes the station a market centre, trading with its owner's home market by convoy. |

@@ -584,7 +584,7 @@ int main()
         std::ostringstream o84(std::ios::binary);
         write_world_snapshot_pre_space_battles(f.w, o84);
         const std::size_t sec = world_save_space_battle_section_bytes(f.w);
-        check(o84.str().size() + sec == mid_bytes.size() && sec == 8 + 80 + 9 + 8,
+        check(o84.str().size() + sec + world_save_prospecting_section_bytes(f.w) == mid_bytes.size() && sec == 8 + 80 + 9 + 8,
               "S10b", fmt("the section is %zu bytes (8 + 80 + 9 + 8); v84 prefix %zu + %zu == %zu", sec,
                           o84.str().size(), sec, mid_bytes.size()));
         // Both fight the next day identically.
@@ -613,7 +613,7 @@ int main()
         const std::string& b = mid_bytes;
         // `saved` has fought one more day since mid_bytes; the section's shape is
         // the one S10b measured: 8 + 80 + 9 + 8.
-        const std::size_t s0 = b.size() - (8 + 80 + 9 + 8);
+        const std::size_t s0 = b.size() - (8 + 80 + 9 + 8) - world_save_prospecting_section_bytes(f.w); // v86 follows
         const std::size_t b0 = s0 + 8;
         const auto refused = [&](std::string bad) {
             world t;

@@ -982,6 +982,21 @@ struct survey_state
     int          ticks_remaining = 0;  ///< Days until the next phase / region boundary.
 };
 
+/// BL-1600 — ONE NATION'S KNOWLEDGE OF ONE BODY off the home world
+/// (DISCOVERY.md § Mapping, then prospecting). Keyed (nation, body) in
+/// `world::survey_knowledge`; a record exists once the nation has mapped at least
+/// one region. Regions are the survey partition (survey_system.hpp): mapping
+/// runs in raster order, so the mapped regions are always the prefix
+/// [0, regions_mapped); prospecting runs only inside it, nearest the landing
+/// first, so the prospected regions are a set, one byte each.
+/// SERIALISED (world_save.cpp, the BL-1600 section) and hashed when non-empty.
+struct body_survey_knowledge
+{
+    int32_t              regions_total  = 0; ///< survey_region_count of the body's grid.
+    int32_t              regions_mapped = 0; ///< Mapped regions: the raster prefix [0, n).
+    std::vector<uint8_t> prospected;          ///< regions_total entries, 0 or 1; 1 only below regions_mapped.
+};
+
 /// A celestial body — the primary unit of territorial control and the location
 /// where extraction, market activity, and conflict occur.
 ///

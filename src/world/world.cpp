@@ -1038,6 +1038,20 @@ uint64_t world::state_hash(int tick) const
                     fnv1a_u32(h, mid);
                     fnv1a_f32(h, dmg);
                 }
+        // BL-1600: each nation's mapped and prospected regions off the home world —
+        // folded only when non-empty, so a world nobody mapped hashes as before.
+        if (!survey_knowledge.empty())
+        {
+            fnv1a_u32(h, 0x1600u); // tag
+            fnv1a_u32(h, static_cast<uint32_t>(survey_knowledge.size()));
+            for (const auto& [key, k] : survey_knowledge)
+            {
+                fnv1a_u32(h, key.first);
+                fnv1a_u32(h, key.second);
+                fnv1a_i32(h, k.regions_total);
+                fnv1a_i32(h, k.regions_mapped);
+                if (!k.prospected.empty())
+                    fnv1a_bytes(h, k.prospected.data(), k.prospected.size());
             }
         }
     }
