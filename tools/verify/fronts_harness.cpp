@@ -1533,6 +1533,70 @@ int main()
               "F12aa run_military_day wakes the defender and walks it at the stack, on its order");
     }
     {
+        // THE CHASE MEETS (MILITARY.md § Defend province): a defender closing on a stack
+        // that is pushing through its province meets it. The pusher is the LOWER id, so
+        // the visit order alone would step it first every day; the push prefers empty
+        // tiles, so a defender aimed at the pusher's dawn tile would walk onto the tile it
+        // just left, day after day, and never fight. At war, so the push goes on.
+        fixture f; build(f);
+        // One province for all of B's ground, so the push has room to run inside it.
+        {
+            auto& ps = f.w.provinces.provinces;
+            province* whole = nullptr;
+            for (province& p : ps) if (p.id == f.block(0)) whole = &p;
+            for (int k = 1; k < 4; ++k)
+                for (const province& p : ps)
+                    if (p.id == f.block(k)) whole->tiles.insert(whole->tiles.end(), p.tiles.begin(), p.tiles.end());
+            std::sort(whole->tiles.begin(), whole->tiles.end());
+            for (const entity_id t : whole->tiles) f.w.provinces.tile_province[t] = f.block(0);
+            const uint32_t keep = f.block(0);
+            ps.erase(std::remove_if(ps.begin(), ps.end(), [&](const province& p) {
+                return p.id != keep && p.id >= static_cast<uint32_t>(f.block(1)); }), ps.end());
+        }
+        war_record rec; rec.declarer = f.A; rec.defender = f.B; rec.declarer_goals = { f.block(1) };
+        f.w.wars[{ f.A, f.B }] = rec;
+        (void)declare_hostile(f.w, f.A, f.B);
+        (void)declare_hostile(f.w, f.B, f.A);
+        reanchor_fronts(f.w);
+        const entity_id pusher = add_unit(f, f.A, f.at(0, 2), 40);
+        const entity_id d      = add_unit(f, f.B, f.at(8, 5), 40);
+        (void)cmd_assign(f.w, reg, f.A, pusher, f.at(0, 2));
+        (void)cmd_order(f.w, reg, f.A, nation_fronts(f.w, f.A).front().key, 1);
+        corp_command c; c.corp = f.B; c.as_nation = f.B; c.verb = corp_verb::defend_province;
+        c.subject = d; c.province = f.block(0);
+        const bool ordered = apply_corp_command(f.w, reg, c) == corp_command_result::applied;
+        world twin = f.w;
+        const auto met_by = [&](world& w) {
+            for (int day = 0; day < 16; ++day) // 16 days: without the rule it chases all of them
+            {
+                for (const active_battle& b : w.battles)
+                {
+                    const bool has_d = std::find(b.attacker_units.begin(), b.attacker_units.end(), d) != b.attacker_units.end()
+                                    || std::find(b.defender_units.begin(), b.defender_units.end(), d) != b.defender_units.end();
+                    const bool has_p = std::find(b.attacker_units.begin(), b.attacker_units.end(), pusher) != b.attacker_units.end()
+                                    || std::find(b.defender_units.begin(), b.defender_units.end(), pusher) != b.defender_units.end();
+                    if (has_d && has_p)
+                        return day;
+                }
+                advance_fronts(w, reg);
+                advance_defenders(w, reg);
+                (void)run_unit_march(w, reg);
+                reanchor_fronts(w);
+            }
+            return -1;
+        };
+        const int met = met_by(f.w);
+        std::printf("    chase: battle on day %d; pusher at (%d,%d), defender at (%d,%d), %zu battle(s)\n", met,
+                    f.w.tiles.at(f.w.units.at(pusher).position).grid_x, f.w.tiles.at(f.w.units.at(pusher).position).grid_y,
+                    f.w.tiles.at(f.w.units.at(d).position).grid_x, f.w.tiles.at(f.w.units.at(d).position).grid_y,
+                    f.w.battles.size());
+        check(ordered && pusher < d && met >= 0 && met <= 5 && f.w.units.at(d).defend_province == f.block(0),
+              "F12ab a defender chasing a lower-id pushing stack meets it in battle within 5 days, its order kept");
+        const int met_twin = met_by(twin);
+        check(met_twin == met && twin.state_hash(5) == f.w.state_hash(5),
+              "F12ac the chase replays: a twin meets on the same day, to the same hash");
+    }
+    {
         // THE START ORDER: a major's units in its capital province, and nobody else's.
         fixture f; build(f);
         f.w.nations.at(f.B).is_major = true;

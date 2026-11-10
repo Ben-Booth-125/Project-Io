@@ -617,6 +617,13 @@ a front does not cover: a landing from the sea, or a province a nation cannot su
 defending unit reacts only inside its province. It marches to a hostile stack there and otherwise
 returns to its post. It does not pursue out of the province.
 
+**A defender steps last in the day's march, and aims where the enemy now stands.** Every defending
+unit is visited after every other unit, in the march's own order within each group. Just before
+the first of them steps, each re-aims at the nearest hostile stack in its province as the day's
+steps have left them. So a defender closing on a pushing stack meets it: it never walks onto the
+tile the stack has just left. A stack entering the province that day draws the defender the same
+day. The rule is deterministic, ordered by unit id like the rest of the march.
+
 **Units can start on it at the capital province.** This does not assign a front, so § Nation garrisons'
 no-default-assignment rule stands. Every move is a legal `march_unit`, under the grant in
 `../ai/AI_OPPONENT.md` § 11.

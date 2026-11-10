@@ -4836,7 +4836,18 @@ unit_march_tick run_unit_march(world& w, const recipe_registry& reg, int day_tic
     if (w.units.empty())
         return out;
 
-    const std::vector<entity_id> ids = march_visit_order(w);
+    std::vector<entity_id> ids = march_visit_order(w);
+
+    // A DEFENDER STEPS LAST, AND AIMS WHERE THE ENEMY NOW STANDS (MILITARY.md § Defend
+    // province). Every unit on a defend order is visited after every other unit, the
+    // visit order kept within each group, and the defenders re-aim (`advance_defenders`)
+    // just before the first of them steps. A defender aimed at the tile a pushing stack
+    // stood on at dawn would otherwise walk onto the tile it just left, every day, and
+    // the two would never meet.
+    const auto first_defender = std::stable_partition(ids.begin(), ids.end(), [&](entity_id id) {
+        return w.units.at(id).defend_province == no_province;
+    });
+    const std::size_t defenders_from = static_cast<std::size_t>(first_defender - ids.begin());
 
     const military_capability_params& mil = reg.military();
 
@@ -4880,8 +4891,11 @@ unit_march_tick run_unit_march(world& w, const recipe_registry& reg, int day_tic
     std::vector<tile_attack> attacks;
     bool occupation_batch = false; // BL-1502: the fronts re-anchor once, after the pass
 
-    for (const entity_id id : ids)
+    for (std::size_t vi = 0; vi < ids.size(); ++vi)
     {
+        const entity_id id = ids[vi];
+        if (vi == defenders_from)
+            (void)advance_defenders(w, reg); // the re-aim, against where today's steps left them
         unit_component& u = w.units.at(id);
         if (u.order.dest == null_entity)
             continue; // halted / never ordered

@@ -561,10 +561,8 @@ int main()
         check(r == corp_command_result::applied && f.w.units.at(garrison).defend_province == f.base_prov[1]
                   && post != null_entity && f.w.tiles.at(post).body == f.moon,
               "W4a", "Beta's garrison is ordered to defend its base province: applies, its post on the moon");
-        // The garrison then holds its tile (no defend order) so W6's attack finds it
-        // where it stands; a defender chasing a stack that steps away is § Defend
-        // province's own behaviour, the same on every body.
-        (void)cmd(f.w, reg, corp_verb::defend_province, f.b, garrison, null_entity, 0, no_province);
+        // The garrison keeps its defend order into W6: a defender closing on a pushing
+        // stack meets it (§ Defend province), the same on every body.
         const uint32_t goal = attack_goal_province(f.w, f.b, f.base_tile[0]);
         const uint32_t home_goal = attack_goal_province(f.w, f.b, f.home_cap[0]);
         check(goal == f.base_prov[1]
