@@ -53,6 +53,11 @@
 //       credit_processing_outputs; research through advance_research;
 //       Rocketry's space_dispatch; logistics_cost through price_trade_leg on
 //       one generated world (haul only, never port handling).
+//   SK  (BL-1592/BL-1607) the space keys (space_tech_keys.hpp): every near-space
+//       key on one Digitisation node, closed until held and for that holder only;
+//       every far-space key an Early Space node's and closed to all; an unknown
+//       key closed under nation_has_mechanic; each Early Space branch keyed by
+//       the Digitisation quest that names it.
 //
 // BL-1324, rising tech prices (RESEARCH.md § Cost, Ben 2026-10-15):
 //   R5  fixture rows: the price index (integer, compounded quarterly from the
@@ -88,6 +93,7 @@
 #include "world/nation_tech.hpp"
 #include "world/recipe_registry.hpp"
 #include "world/resource_names.hpp"
+#include "world/space_tech_keys.hpp" // BL-1592 SK1-SK4
 #include "world/spawn_seat.hpp"
 #include "world/supply_system.hpp"
 #include "world/world.hpp"
@@ -1199,6 +1205,61 @@ void rows_t2(const recipe_registry& reg)
         check(closed && holder && other,
               "T2m Rocketry: space_dispatch is closed to every nation at the start, open to its holder only");
         check(nation_mechanic(f.w, f.nation, "no_such_mechanic"), "T2n a mechanic no node names is open");
+    }
+
+    // (g) BL-1592 / BL-1607: the space keys (space_tech_keys.hpp) through nation_has_mechanic.
+    {
+        fixture f = make_fixture();
+        // Every near-space key: closed at the start, open to the holder of its one node only.
+        int near_ok = 0, near_n = 0;
+        for (const std::string_view key : space_keys::near_space)
+        {
+            ++near_n;
+            int carrier = -1, carriers = 0;
+            for (int i = 0; i < io::dg::node_count; ++i)
+                if (node_has_mechanic(i, key)) { carrier = i; ++carriers; }
+            if (carriers != 1)
+            {
+                std::printf("     near-space key %.*s sits on %d nodes\n", static_cast<int>(key.size()), key.data(), carriers);
+                continue;
+            }
+            fixture g = make_fixture();
+            const bool closed = !nation_has_mechanic(g.w, g.nation, key) && !nation_has_mechanic(g.w, g.other, key);
+            g.w.nation_tech[g.nation].held.set(static_cast<std::size_t>(carrier));
+            const bool open = nation_has_mechanic(g.w, g.nation, key) && !nation_has_mechanic(g.w, g.other, key);
+            near_ok += closed && open ? 1 : 0;
+        }
+        check(near_n > 0 && near_ok == near_n,
+              "SK1 every near-space key sits on one Digitisation node: closed at the start, open to its holder only");
+        // Far-space keys are the Early Space tree's: no Digitisation node carries one, and
+        // nation_has_mechanic is closed for them even holding the whole Digitisation tree.
+        f.w.nation_tech[f.nation].held.set();
+        bool far_closed = true;
+        for (const std::string_view key : space_keys::far_space)
+        {
+            bool on_es = false;
+            for (const io::es::effect& e : io::es::effects)
+                on_es = on_es || (e.kind == io::es::effect_kind::mechanic && key == e.target);
+            for (int i = 0; i < io::dg::node_count; ++i)
+                far_closed = far_closed && !node_has_mechanic(i, key);
+            far_closed = far_closed && on_es && !nation_has_mechanic(f.w, f.nation, key);
+        }
+        check(far_closed, "SK2 every far-space key is an Early Space node's, and closed to a nation holding all of Digitisation");
+        check(!nation_has_mechanic(f.w, f.nation, "no_such_mechanic"),
+              "SK3 nation_has_mechanic: a key no node carries is closed (unlike nation_mechanic)");
+        // Each Early Space branch is keyed by the Digitisation quest naming it.
+        bool keyed = io::es::branch_count == 3;
+        for (int b = 0; b < io::es::branch_count; ++b)
+        {
+            const int q = early_space_branch_key_node(b);
+            keyed = keyed && q >= 0 && io::dg::nodes[static_cast<std::size_t>(q)].is_quest;
+            fixture g = make_fixture();
+            keyed = keyed && !early_space_branch_keyed(g.w, g.nation, b);
+            if (q >= 0) g.w.nation_tech[g.nation].held.set(static_cast<std::size_t>(q));
+            keyed = keyed && early_space_branch_keyed(g.w, g.nation, b) && !early_space_branch_keyed(g.w, g.other, b);
+        }
+        check(keyed && early_space_branch_key_node(-1) == -1 && early_space_branch_key_node(io::es::branch_count) == -1,
+              "SK4 each Early Space branch is keyed by the Digitisation quest that names it, for its holder only");
     }
 }
 
