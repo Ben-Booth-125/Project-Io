@@ -222,8 +222,9 @@ if (!fs.existsSync(src)) die(`tools/verify/${name}.cpp does not exist`);
 // a compile and a wrong hypothesis.
 if (/^\s*#\s*include\s+"[^"]*core\/save_game\.hpp"/m.test(fs.readFileSync(src, 'utf8'))) {
   die(`${name} includes core/save_game.hpp, which links imgui — neither headless builder\n` +
-      '  compiles src/core/save_game.cpp. Build it through CMake:\n' +
-      `    cmake --build build --target ${name}       (from a Developer Prompt / after vcvars)`);
+      '  compiles src/core/save_game.cpp. Build it with the envelope builder:\n' +
+      `    bash tools/verify/build_env_harness.sh ${name}\n` +
+      `  or through CMake: cmake --build build --target ${name}   (after vcvars)`);
 }
 
 const luaSite = luaSymbolSite(src);

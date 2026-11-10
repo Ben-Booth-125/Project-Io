@@ -231,6 +231,12 @@ a tile keep the shared header (§ Layout & chrome).
    no **Manage Buildings** button: the building grid *is* the tile's buildings. **While a
    building is expanded, the grid retargets to that building's actions** (§ The building
    element's layout).
+   **Every cell carries a hover tooltip, enabled or not** (Ben, 2026-11-09): an enabled one
+   says what it does; a disabled one says why it is disabled. A disabled **Construct** names
+   the placement rules' own refusal (`placement_reason_text`) — the tile's shared gate where
+   one refused (not your nation's ground, a site already under way, no road reaches it, the
+   province full, out of logistics reach), since that bars every type at once; else the
+   first type's refusal. The same holds on the building and unit grids.
 
 **What retired, and why** (Ben, 2026-10-13):
 
@@ -563,9 +569,10 @@ selection holds. What the player may see of another nation's convoy follows the 
 
 **The marker's scale and count (Ben, 2026-11-09).** A convoy marker is a zoomed size: it grows with
 the map, at a quarter of the hex radius, with a floor so it stays legible zoomed out. Where several
-convoys share a tile the count sits **in a rectangle beside the circle**, sized from its own number
-and scaling with the marker, rather than floating behind it. The press answers on the whole of what
-is drawn, circle and rectangle alike.
+convoys share a tile **one rectangle holds the convoy glyph and the count together** (Ben,
+2026-11-09: *"make them larger so they cover the convoy icon as well"*), sized from the glyph and
+its own number and scaling with the marker, so the number reads as the marker's. The press answers
+on the whole of what is drawn: the circle alone, or the rectangle.
 
 ### The front element
 

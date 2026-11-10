@@ -417,6 +417,8 @@ a filled five-point star with the family's dark outline ([ICONS.md](ICONS.md) §
   where a political mark competes with the field the lens is about.
 - **Fogs:** the survey mask owns it (no star on unsurveyed ground); it is not vision-fogged — a
   public mark, as the Logistics lens's source ring is.
+- **Under the units:** unit counters, standing and marching, draw over the star (Ben,
+  2026-11-09: *"render the capital icon below units"*), so a force at the capital stays readable.
 
 ## Layers — what draws on this canvas
 

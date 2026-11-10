@@ -22,8 +22,12 @@
 --   G8  a press on a tile the finder does not mark builds nothing and keeps the selection.
 --   G9  Esc disarms the choice and leaves the ledger open.
 --
--- A map press is what G7-G9 prove; the green Net figures over the tiles are a capture read
--- (site_grid_net_over_tiles), since no verify read reports a label.
+--   G10 the green Net figures over the tiles: some are drawn at the close rung, and every
+--       one is a figure the table's rows carry (the tenth verify grant, Ben 2026-11-09: the
+--       labels' count and text, never where).
+--
+-- The ledger's Site Finder TAB is pressed where it drew (verify.site_finder().tab_x/y),
+-- not opened by a view call, so the tab a player presses is the one under test.
 --
 -- Run with: ProjectIo --verify scripts/verify/site_grid.lua
 
@@ -32,9 +36,31 @@ verify.goto_surface("home")
 verify.econ_step(2)
 verify.set_balance(5000000.0)
 verify.show_panel("build", true)
-verify.construction_view(2) -- the finder's own tab (Ben, 2026-11-09)
+verify.frames(2)
+
+-- The finder's own tab (Ben, 2026-11-09), pressed where it drew. A press on the ACTIVE
+-- tab closes the ledger (the toggle rule), so it is pressed only when another view shows.
+local function open_finder_tab(where)
+  local s = verify.site_finder()
+  verify.expect(s.tab_ok, where .. ": the Site Finder tab is drawn and published")
+  if s.picker_x < 0 and s.tab_ok then
+    verify.click(s.tab_x, s.tab_y)
+    verify.frames(3)
+  end
+  verify.expect(verify.site_finder().picker_x >= 0, where .. ": the tab opens the finder")
+end
+open_finder_tab("open")
 verify.clear_selection() -- the home surface opens with a tile selected, which would scope G1
 verify.frames(3)
+
+-- fmt::abbreviate, as the canvas formats a label.
+local function abbreviate(v)
+  local m = math.abs(v)
+  for _, sfx in ipairs({ { 1e12, "T" }, { 1e9, "B" }, { 1e6, "M" }, { 1e3, "k" } }) do
+    if m >= sfx[1] then return string.format("%.1f%s", v / sfx[1], sfx[2]) end
+  end
+  return string.format("%.0f", v)
+end
 
 local opts = verify.site_options()
 local by_name = {}
@@ -194,6 +220,35 @@ verify.expect(aim.ok, "G7: the site is on screen")
 local sx, sy = aim.x, aim.y
 verify.hover(sx, sy, 2)
 shot("site_grid_net_over_tiles")
+
+-- G10: the labels over the tiles are the table's figures.
+do
+  local s = verify.site_finder()
+  print(string.format("[site_grid] G10: %d Net labels drawn over tiles, %d rows", s.n_net_labels, s.n_rows))
+  verify.expect(s.n_net_labels > 0, "G10: the close rung draws Net figures over the sites")
+  local figures = {}
+  for _, r in ipairs(s.rows) do
+    if r.priced then figures[abbreviate(r.profit)] = true end
+  end
+  -- Each drawn row's Net hover names the same whole credits its label is formatted from.
+  local text_agrees = 0
+  for _, d in ipairs(s.drawn) do
+    local n = tonumber(string.match(d.net_text or "", "Est%. net ([%+%-]?%d+)"))
+    if n ~= nil and figures[abbreviate(n)] then text_agrees = text_agrees + 1 end
+  end
+  verify.expect(s.n_drawn == 0 or text_agrees > 0,
+                string.format("G10: the rows' Net text carries the labels' figures (%d of %d rows)",
+                              text_agrees, s.n_drawn))
+  local strays = 0
+  for _, t in ipairs(s.net_labels) do
+    if not figures[t] then
+      strays = strays + 1
+      if strays <= 3 then print("[site_grid] G10: label '" .. t .. "' is no row's figure") end
+    end
+  end
+  verify.expect(strays == 0, string.format("G10: every label is a row's Net (%d strays of %d)",
+                                           strays, s.n_net_labels))
+end
 verify.click(sx, sy)
 verify.frames(4)
 local after_build = verify.site_finder()
@@ -237,8 +292,8 @@ verify.site_clear()
 verify.window(1280, 720)
 verify.frames(3)
 verify.show_panel("build", true)
-verify.construction_view(2)
-verify.frames(3)
+verify.frames(2)
+open_finder_tab("1280")
 local narrow = verify.site_finder()
 verify.expect(narrow.n_picker_rows == #opts, "1280: every option draws")
 for _, o in ipairs(narrow.picker_rows) do

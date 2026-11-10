@@ -1245,7 +1245,9 @@ bool tile_icon_button(const char* id, ImVec2 sz, bool enabled, const char* tip,
                                                   : IM_COL32(215, 215, 220, 255);
     glyph(ImGui::GetWindowDrawList(), {p.x + sz.x * 0.5f, p.y + sz.y * 0.5f},
           std::min(sz.x, sz.y) * 0.5f, gcol);
-    if (ImGui::IsItemHovered() && tip)
+    // A disabled button says why (Ben, 2026-11-09): ImGui reports no hover on a disabled
+    // item unless asked, which silently hid every refusal reason these grids carry.
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled) && tip)
         ImGui::SetTooltip("%s", tip);
     return clicked && enabled;
 }
@@ -4189,31 +4191,35 @@ void draw_tile_selection(world& w, const recipe_registry& reg, const economy_rep
         // never enabled on ground the press would be refused on.
         const entity_id actor = player_actor(w);
         bool any_placeable = false;
+        // Every probe's refusal, kept so a disabled Construct can say WHY (Ben, 2026-11-09:
+        // "hovering the construction button should explain why it's greyed out"). The
+        // reasons are the placement rules' own; none is invented here.
+        std::vector<placement_rules::placement_reason> refusals;
+        const auto probe = [&](building_type bt, resource_type target) {
+            const placement_rules::placement_result r = placement_rules::can_place_in_world(
+                w, sel, bt, target, ui.max_logistics_reach, actor);
+            if (!r.ok())
+                refusals.push_back(r.reason);
+            return r.ok();
+        };
         if (water)
         {
-            any_placeable = placement_rules::can_place_in_world(
-                                w, sel, building_type::port, resource_type::iron_ore,
-                                ui.max_logistics_reach, actor).ok();
+            any_placeable = probe(building_type::port, resource_type::iron_ore);
         }
         else
         for (const resource_type er : placement_rules::k_extractable)
             if (tile.resource_deposit[static_cast<std::size_t>(er)] > 0.0f &&
-                placement_rules::can_place_in_world(w, sel, building_type::extraction_site, er,
-                                                   ui.max_logistics_reach, actor).ok())
+                probe(building_type::extraction_site, er))
             { any_placeable = true; break; }
         // BL-1198: a Well needs no deposit, so the loop above cannot see it.
         if (!any_placeable && !water
             && placement_rules::is_well_site(w, sel, resource_type::water)
-            && placement_rules::can_place_in_world(w, sel, building_type::extraction_site,
-                                                   resource_type::water, ui.max_logistics_reach,
-                                                   actor).ok())
+            && probe(building_type::extraction_site, resource_type::water))
             any_placeable = true;
         // BL-1199: nor a Fishing Wharf (coastal, no produce deposit).
         if (!any_placeable && !water
             && placement_rules::is_wharf_site(w, sel, resource_type::agricultural_produce)
-            && placement_rules::can_place_in_world(w, sel, building_type::extraction_site,
-                                                   resource_type::agricultural_produce,
-                                                   ui.max_logistics_reach, actor).ok())
+            && probe(building_type::extraction_site, resource_type::agricultural_produce))
             any_placeable = true;
         if (!any_placeable && !water)
         {
@@ -4224,9 +4230,23 @@ void draw_tile_selection(world& w, const recipe_registry& reg, const economy_rep
                                            building_type::planetary_marketplace,
                                            building_type::military_base,
                                            building_type::research_institute})
-                if (placement_rules::can_place_in_world(w, sel, bt, resource_type::iron_ore,
-                                                       ui.max_logistics_reach, actor).ok())
+                if (probe(bt, resource_type::iron_ore))
                 { any_placeable = true; break; }
+        }
+        // The reason a disabled Construct names: the TILE's gate where one refused a
+        // probe - own ground, a site already under way, no road, a full province, out of
+        // reach - since that bars every type at once; else the first type's own refusal.
+        std::string construct_why;
+        if (!any_placeable && !refusals.empty())
+        {
+            using pr = placement_rules::placement_reason;
+            pr why = refusals.front();
+            for (const pr gate : {pr::not_own_ground, pr::site_under_construction, pr::needs_road,
+                                  pr::province_full, pr::out_of_logistics_range})
+                if (std::find(refusals.begin(), refusals.end(), gate) != refusals.end())
+                { why = gate; break; }
+            construct_why = std::string("Nothing can be built here: ")
+                          + placement_rules::placement_reason_text(why);
         }
 
         bool building_underway = false;
@@ -4259,7 +4279,8 @@ void draw_tile_selection(world& w, const recipe_registry& reg, const economy_rep
                                  ? (w.tile_to_nation.count(sel) != 0
                                         ? "Only a port stands on water, and not on this water"
                                         : "Unowned water: a port needs a shore its owner holds")
-                                 : "Nothing can be built on this tile",
+                                 : (construct_why.empty() ? "Nothing can be built on this tile"
+                                                          : construct_why.c_str()),
                              glyph_hammer))
         {
             // A DOOR onto the one construction element, not a toggle — its
@@ -4273,16 +4294,19 @@ void draw_tile_selection(world& w, const recipe_registry& reg, const economy_rep
         // No Manage Buildings (BL-1312): the tile card's building grid IS the
         // tile's buildings, one press from each.
         tile_icon_button("##act_history", bsz, /*enabled=*/false,
-                         "History (not yet available)", glyph_clock);
+                         "History - what has happened on this tile. Not available: no history "
+                         "surface exists", glyph_clock);
 
         tile_icon_button("##act_supply", bsz, /*enabled=*/false,
-                         "Supply (not yet available)", ui::icons::supply);
+                         "Supply - what moves through this tile. Not available here: the "
+                         "Supply lens shows it", ui::icons::supply);
         ImGui::SameLine();
-        tile_icon_button("##act_reserved1", bsz, /*enabled=*/false, "Reserved", glyph_reserved);
+        constexpr const char* k_reserved_tip = "Reserved - an empty slot that keeps the grid's shape";
+        tile_icon_button("##act_reserved1", bsz, /*enabled=*/false, k_reserved_tip, glyph_reserved);
 
-        tile_icon_button("##act_reserved2", bsz, /*enabled=*/false, "Reserved", glyph_reserved);
+        tile_icon_button("##act_reserved2", bsz, /*enabled=*/false, k_reserved_tip, glyph_reserved);
         ImGui::SameLine();
-        tile_icon_button("##act_reserved3", bsz, /*enabled=*/false, "Reserved", glyph_reserved);
+        tile_icon_button("##act_reserved3", bsz, /*enabled=*/false, k_reserved_tip, glyph_reserved);
 
         ImGui::EndChild();
     }

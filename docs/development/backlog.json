@@ -1291,6 +1291,32 @@
    ],
    "title": "The save carries the last building report",
    "design": "Ben, 2026-11-09: \"Everything recalculates after the first tick. It would be good to load building profit info into the save.\" Overturns the save header's deliberate exclusion of m_last_econ_report. The report rows go into the save envelope behind a version bump; old saves open empty as before. Check: field-exact roundtrip, and a saved-and-loaded run matching an unbroken one."
+  },
+  {
+   "status": "in_progress",
+   "glyph": "◐",
+   "sprint": 63,
+   "version_goal": null,
+   "written": "2026-11-10",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session (Ben, 2026-11-10: build now)",
+   "requires": [],
+   "category": "Economy",
+   "priority": "B",
+   "difficulty": 3,
+   "id": "BL-1567",
+   "short_name": "POPULATION_GROWTH_RATE",
+   "authority_doc": "docs/economy/POPULATION.md",
+   "files": [
+    "src/world/economy_system.cpp",
+    "src/world/market_clearing.cpp",
+    "src/world/recipe_registry.hpp",
+    "scripts/economy.lua",
+    "src/ui/selection_panel.cpp"
+   ],
+   "title": "Population grows at a historical rate with a consumer bonus",
+   "design": "Ben, 2026-11-10: model growth on Earth's history, with bonuses for consumer needs met. Design in POPULATION.md section Growth, decline and razing. Base 3.0%/yr falling to 0.3% with qualification; times one plus half the upper rungs' fill; staples and habitability floor, else 1.6%/yr decline. Dials are in-band calibration (targets: about 2%/yr pooled over the first decade, low-q near 3%, high-q under 1%). Likely moves the handoff digests: re-bless at sprint close on Ben's go."
   }
  ]
 }

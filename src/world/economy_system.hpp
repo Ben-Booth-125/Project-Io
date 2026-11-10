@@ -75,7 +75,8 @@ struct building_report
 
     /// Processing: what this draw filed with the market this tick, per good, split as
     /// `run_processing` split it: `wanted` bid on the price, `suppressed` was silenced
-    /// by the fair-price ceiling. Report-only, read by `quote_site` alone: never saved.
+    /// by the fair-price ceiling. Report-only, read by `quote_site` alone; saved with the
+    /// app's last report (save_game.hpp part 5), never in the world snapshot.
     std::array<float, resource_count> wanted{};
     std::array<float, resource_count> suppressed{};
 };
