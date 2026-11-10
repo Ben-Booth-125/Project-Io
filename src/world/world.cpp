@@ -1165,6 +1165,27 @@ uint64_t world::state_hash(int tick) const
                 fnv1a_u32(h, static_cast<uint32_t>(f.day_tick));
             }
         }
+        // BL-1614: each in-transit asset's recorded origin and departure tick —
+        // folded only when any is recorded, so a world with nothing travelling
+        // (or saved before the field) hashes as before.
+        {
+            uint32_t from_n = 0;
+            for (const auto& [aid, a] : space_assets)
+                from_n += space_asset_has_transit_origin(a) ? 1u : 0u;
+            if (from_n != 0)
+            {
+                fnv1a_u32(h, 0x1614u); // tag
+                fnv1a_u32(h, from_n);
+                for (const auto& [aid, a] : space_assets)
+                    if (space_asset_has_transit_origin(a))
+                    {
+                        fnv1a_u32(h, aid);
+                        fnv1a_u32(h, a.transit_from.body);
+                        fnv1a_u32(h, static_cast<uint32_t>(a.transit_from.kind));
+                        fnv1a_i32(h, a.depart_tick);
+                    }
+            }
+        }
     }
 
     // Province holder (BL-569). UNLIKE `provinces` itself (generation output,

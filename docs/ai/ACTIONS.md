@@ -24,7 +24,7 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 > **Generated file.** Produced by `node tools/session/render_actions.js`.
 > Edit the JSON, then re-run; hand edits here are overwritten.
 
-*259 entries — 72 gameplay · 42 canvas · 15 lens · 87 ledger · 43 chrome.*
+*265 entries — 76 gameplay · 43 canvas · 15 lens · 88 ledger · 43 chrome.*
 
 ---
 
@@ -1391,6 +1391,73 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 
 **Reason to select.** Open ground on another body: build, extract and trade there as at home.
 
+### `gameplay.space_unit_move` — The Selection band's space-unit card (SELECTION.md § The space-unit element): the Move press, the 'Whole fleet' tick, the destination list, the 'Move costs delta-v x of y' line and Confirm move.
+
+**Press.** Press Move: a TOGGLE - lit, it lists every node the unit can be sent to with the path's delta-v and days (greyed '(over budget)' where the budget cannot pay); pressing it again while lit disarms it. Press a destination row (a toggle: the chosen row un-picks) to see the move's delta-v against the budget, then Confirm move. Tick 'Whole fleet' to send every unit of the fleet, held to the weakest budget. Applied through apply_space_command (src/world/space_command.hpp, the near-space seam the Space ledger's presses take), validated whole as the value that lands; a unit verb is never delayed or queued. Not yet on the --serve wire. Verb move_unit (13) or move_fleet (14), subject = the unit, node = the destination.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `subject` | `entity_id` | The unit; for the fleet form, any unit of it (its nation's units at its node, not in transit). |
+| `node` | `orbital node (body, kind)` | The destination. A surface is a Lander's only. |
+
+**Valid when:**
+- The unit is the player nation's own and not in transit (a unit in transit cannot be ordered until it arrives).
+- The path exists on the default orbital graph and its delta-v fits every moving unit's budget (refused whole otherwise: rejected_insufficient_dv).
+
+**Expected output.** The unit (or the fleet) leaves at once: propellant burned for the path, in transit with the path's days; on the canvas it draws on a dashed segment from where it was, its mark advancing each day. A unit engaged in a battle does not leave at once: the move is recorded as its withdrawal and flies after the next day's fire (SPACE_FLEETS.md § Battles). A refusal answers on the card's message line with the seam's reason.
+
+**Reason to select.** Reposition a fleet - to escort, contest an orbit, lift a blockade or reach a target - knowing before the press what the trip costs the tanks.
+
+### `gameplay.space_unit_dock` — The Selection band's space-unit card: the Dock press (Undock while docked).
+
+**Press.** Press Dock to berth the unit at the player's station at its node; press Undock to release a docked unit. One-shot verbs, not toggles: the card's state line says which it is. Applied through apply_space_command (src/world/space_command.hpp, the near-space seam the Space ledger's presses take), validated whole as the value that lands; a unit verb is never delayed or queued. Not yet on the --serve wire. Verb dock_unit (15), target = the station; undock_unit (16).
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `subject` | `entity_id` | The unit. |
+| `target` | `entity_id (station)` | Dock: the station, the player's own at the unit's node. |
+
+**Valid when:**
+- The unit is the player nation's own and not in transit (a unit in transit cannot be ordered until it arrives).
+- Dock: a station of the player's at the unit's node with a working Dock and a free berth (two a Dock). Off when no such station stands there ('No station of yours at this node.').
+
+**Expected output.** Docked: the unit berths (it may refuel from a Fuel depot, unload into a Cargo hold, and is repaired a little each day). Undocked: it is idle at the node.
+
+**Reason to select.** Berth a ship for repair and refuelling at your own station.
+
+### `gameplay.space_unit_refuel` — The Selection band's space-unit card: the Refuel press.
+
+**Press.** Press Refuel. Applied through apply_space_command (src/world/space_command.hpp, the near-space seam the Space ledger's presses take), validated whole as the value that lands; a unit verb is never delayed or queued. Not yet on the --serve wire. Verb refuel_unit (17).
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `subject` | `entity_id` | The unit. |
+
+**Valid when:**
+- The unit is the player nation's own and not in transit (a unit in transit cannot be ordered until it arrives).
+- Docked at a station with a working Fuel depot holding stock, or idle in a body's low orbit over a staffed Launchpad of the player's there (bought off that body's shelf; refused whole when the shelf or treasury is short, or the body is blockaded).
+
+**Expected output.** The tanks fill (to full where the stock and money allow); the card's delta-v budget rises.
+
+**Reason to select.** Restore a ship's reach before a long move.
+
+### `gameplay.space_unit_bombard` — The Selection band's space-unit card: the Bombard press and its list of hostile ground below.
+
+**Press.** Press Bombard: a TOGGLE - lit, it lists the hostile ground on the body below ('<Nation> ground: <building>'); press a row to set the standing order. While an order stands the button stays lit, and pressing it lifts the order. Applied through apply_space_command (src/world/space_command.hpp, the near-space seam the Space ledger's presses take), validated whole as the value that lands; a unit verb is never delayed or queued. Not yet on the --serve wire. Verb bombard (18), target_kind 1 (province), target = the province; clear = lift.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `subject` | `entity_id` | The unit. |
+| `target` | `province id` | The ground struck: each day the hostile building in best condition there. |
+
+**Valid when:**
+- The unit is the player nation's own and not in transit (a unit in transit cannot be ordered until it arrives).
+- The unit carries the orbital-missile armament and stands in the body's low orbit; the nation holds the Orbital Bombardment key; something hostile stands below (SPACE_FLEETS.md § Bombardment and fire at orbit). Off otherwise.
+
+**Expected output.** A standing order: once a day the unit strikes the hostile building in best condition in the province, lowering its condition; the struck owner's Alarm rises. The order lapses when the unit leaves, the target or the hostility is gone.
+
+**Reason to select.** Wear an enemy's ground from orbit while your fleet holds it.
+
 ---
 
 ## Canvas — looking around: navigation, selection, hover, time
@@ -1500,7 +1567,7 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 
 **Reason to select.** Compare where around a planet there is room to place an orbital asset, and what reaching each place costs from home, before committing to one.
 
-### `canvas.space_asset_select` — The Circumplanetary canvas (primary view only): a satellite mark (a small round plate in its owner nation's colour, a solar wing out of each side, its role's mark on the plate) or a station mark (a larger square core on a truss between two solar panels, in its owner's colour, larger for a larger grid), drawn at the orbital node it occupies - down the side of a ring, or in a row under a diamond. One in transit draws at its destination at half strength (CIRCUMPLANETARY.md § Orbital nodes and what sits at them).
+### `canvas.space_asset_select` — The Circumplanetary canvas (primary view only): a satellite mark (a small round plate in its owner nation's colour, a solar wing out of each side, its role's mark on the plate) or a station mark (a larger square core on a truss between two solar panels, in its owner's colour, larger for a larger grid), drawn at the orbital node it occupies - down the side of a ring, or in a row under a diamond. One in transit draws at its destination at half strength, with a dashed segment back to the node it left and a solid marker at its share of the way when that node is on the rung (CIRCUMPLANETARY.md § Orbital nodes and what sits at them).
 
 **Press.** Hover a mark for its card; left-click it to select it.
 
@@ -1512,7 +1579,7 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 - The app is in-game with the Circumplanetary rung primary.
 - Every nation's satellites and stations at the rung's nodes draw, the player's and rivals' alike.
 
-**Expected output.** Hover: the shared hover card - the title ("Observation satellite", "Station"), the owner nation in its colour, the role (a satellite) or modules of the grid's slots and crew (a station), the node, and the state (in place; decaying with the unpaid quarters; in transit with the quarters to arrival). Press: the asset becomes the selection, its mark is ringed, and the Selection band shows the same summary. No world change.
+**Expected output.** Hover: the shared hover card - the title ("Observation satellite", "Station"), the owner nation in its colour, the role (a satellite) or modules of the grid's slots and crew (a station), the node, and the state (in place; decaying with the unpaid quarters; in transit with the node it left and the quarters to arrival). Press: the asset becomes the selection, its mark is ringed, and the Selection band shows the same summary. No world change.
 
 **Reason to select.** See who holds which place around a planet and what each satellite there does, before choosing where to launch or move your own.
 
@@ -1993,6 +2060,22 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 **Expected output.** Digitisation: the ring (as canvas.tech_tree_key describes). Early Space: the next age's tree, three branch columns (In-Situ Propellant, Interplanetary Convoys, Space Force) flowing top to bottom, the same glyphs, links and press idiom as the ring; each column's header names its branch and what keys it ('Keyed: <node> held' in green, or 'Needs <node>' in red). Before the gate into space is met every node draws locked and the caption reads 'Locked: the gate into space needs ...' naming the missing conditions (Rocketry; a staffed Launchpad on the home body; propellant on a home-body market's shelf); the tree stays readable by hover. The camera resets on a switch. Sim untouched.
 
 **Reason to select.** Read the next age: what reaching space opens, what keys each branch, and whether the gate is met.
+
+### `canvas.space_fleet_select` — The Circumplanetary canvas (primary view only): a fleet mark - a pointed hull in its owner nation's colour carrying the lead unit's hull mark, the fleet's size as a badge - one per nation per node, on a ring's upper side or above a diamond; a unit in transit on a dashed segment from the node it left to its destination, at its share of the way. The Solar canvas (primary view only): one mark per nation per body at the body's upper left, and an inter-body move on a segment between the two bodies (CIRCUMPLANETARY.md, SOLAR.md § Space fleets).
+
+**Press.** Hover a fleet mark for its card; left-click it to select its lead unit (the lowest id). A fleet mark wins the pointer over a satellite or station, which wins over a body.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `unit` | `entity_id` | The lead unit of the fleet under the pointer: the lowest id of one nation's units at that node (or travelling together). |
+
+**Valid when:**
+- In-game with the Circumplanetary or Solar rung primary.
+- Every nation's space units draw, the player's and rivals' alike.
+
+**Expected output.** Hover: the shared hover card - the hull ('Frigate'), the owner nation in its colour, the node (or the node it left and the one it is bound for, with the days to go), the delta-v budget against its capacity, propellant, hull points, cargo, firepower and armour, and a standing bombard order. Press: the lead unit becomes the selection, its mark is ringed, and the Selection band shows the same summary, the fleet's units as rows (a row selects that unit), and - for the player's own unit - its orders. No world change.
+
+**Reason to select.** See whose ships are where, how far each can still go, and pick one up to order it.
 
 ---
 
@@ -2946,19 +3029,19 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 
 **Reason to select.** A front does nothing without units on it: assigned units spread along the span, fill gaps and push when ordered.
 
-### `ledger.military_theatre_tab` — Military ledger (nav rail slot 7), Recruit and Design tabs: the row of theatre tabs under them, 'Land N', 'Air N' and 'Sea N' - each names its theatre and counts its rows (Recruit Land: the land types shown; Recruit Air and Design Air: the six air classes; Design Land: the seven land classes; Sea: 0). The active one is lit.
+### `ledger.military_theatre_tab` — Military ledger (nav rail slot 7), Recruit and Design tabs: the row of theatre tabs under them, 'Land N', 'Air N' and 'Sea N', and under Design a fourth, 'Space N' - each names its theatre and counts its rows (Recruit Land: the land types shown; Recruit Air and Design Air: the six air classes; Design Land: the seven land classes; Sea: 0; Design Space: the five hulls). The active one is lit.
 
 **Press.** Click a theatre tab. A SELECTOR, not a toggle (ledgers/military.md § Grouped by theatre, Ben 2026-11-02): re-pressing the active tab does nothing. Each of Recruit and Design keeps its own theatre; Land by default.
 
 | Arg | Type | Meaning |
 |---|---|---|
 | `tab` | `0 Recruit, 1 Design` | The tab the theatre row sits under. |
-| `theatre` | `0 Land, 1 Air, 2 Sea` | The theatre tab pressed. |
+| `theatre` | `0 Land, 1 Air, 2 Sea, 3 Space (Design only)` | The theatre tab pressed. |
 
 **Valid when:**
 - The Military ledger is open (nav rail slot 7).
 
-**Expected output.** The view lists that theatre alone. Recruit's Land holds the military-base picker, the land roster and the muster queue; Recruit's Air holds the airbase picker, the six air rows and the player's wings; Recruit's Sea is a stub - 'Ships are not raised yet.' and one row per completed port of your nation under a picker (the first chosen; choosing one is a target selection with no other effect), or 'No port'. Design's Land holds the land classes and the obsolete toggles; Design's Air the six air classes; Design's Sea reads 'Ships are not designed yet.'. No world change.
+**Expected output.** The view lists that theatre alone. Recruit's Land holds the military-base picker, the land roster and the muster queue; Recruit's Air holds the airbase picker, the six air rows and the player's wings; Recruit's Sea is a stub - 'Ships are not raised yet.' and one row per completed port of your nation under a picker (the first chosen; choosing one is a target selection with no other effect), or 'No port'. Design's Land holds the land classes and the obsolete toggles; Design's Air the six air classes; Design's Sea reads 'Ships are not designed yet.'; Design's Space lists the five space hulls (ledger.military_space_design). No world change.
 
 **Reason to select.** Work one theatre at a time: the ledger column is narrow, and land and air together are long.
 
@@ -3422,6 +3505,23 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 **Expected output.** Issues gameplay.refuse_peace; the offer is erased and the war goes on. The press queues a corp_command that app::render sends at the frame's end through player_command - the same apply_corp_command an agent reaches, with its full re-validation; the result is the line at the ledger's head.
 
 **Reason to select.** Fight on for better terms.
+
+### `ledger.military_space_design` — Military ledger (nav rail slot 7), Design tab, Space theatre: one row per hull class - Hauler, Lander, Tug, Frigate, Cruiser - with its live design's delta-v, cargo, firepower, armour and hull points, or 'No live design' (the Cruiser 'built at a Shipyard only').
+
+**Press.** Press a hull row: a TOGGLE that expands it in place to a picker per slot (Drive, Tanks, and the hull's payload: Armament, Armour, Bay or Debris arm; items not yet researched are greyed) and a Save design press; pressing the open row folds it. Save design queues set_unit_design through apply_space_command (verb 11, cls = the hull, design = an item per slot).
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `hull` | `0 Hauler, 1 Lander, 2 Tug, 3 Frigate, 4 Cruiser` | The hull designed. |
+| `design` | `an item id per slot kind` | Every slot the hull has must hold an item that fits it. |
+
+**Valid when:**
+- The Military ledger is open on Design, Space theatre.
+- Save: every slot filled, and the nation holds the hull's key and every item's key (refused whole otherwise: rejected_tech_locked).
+
+**Expected output.** The hull's live design is the drafted one: units raised from now on take it (a unit keeps the design it was raised to). The row's figures update.
+
+**Reason to select.** Trade reach against payload and armour before raising a ship.
 
 ---
 

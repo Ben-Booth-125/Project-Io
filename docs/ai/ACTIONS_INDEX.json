@@ -131,7 +131,7 @@
   ],
   [
    "canvas.space_asset_select",
-   "The Circumplanetary canvas (primary view only): a satellite mark (a small round plate in its owner nation's colour, a solar wing out of each side, its role's mark on the plate) or a station mark (a larger square core on a truss between two solar panels, in its owner's colour, larger for a larger grid), drawn at the orbital node it occupies - down the side of a ring, or in a row under a diamond. One in transit draws at its destination at half strength (CIRCUMPLANETARY.md § Orbital nodes and what sits at them)."
+   "The Circumplanetary canvas (primary view only): a satellite mark (a small round plate in its owner nation's colour, a solar wing out of each side, its role's mark on the plate) or a station mark (a larger square core on a truss between two solar panels, in its owner's colour, larger for a larger grid), drawn at the orbital node it occupies - down the side of a ring, or in a row under a diamond. One in transit draws at its destination at half strength, with a dashed segment back to the node it left and a solid marker at its share of the way when that node is on the rung (CIRCUMPLANETARY.md § Orbital nodes and what sits at them)."
   ],
   [
    "canvas.construction_site_card",
@@ -803,7 +803,7 @@
   ],
   [
    "ledger.military_theatre_tab",
-   "Military ledger (nav rail slot 7), Recruit and Design tabs: the row of theatre tabs under them, 'Land N', 'Air N' and 'Sea N' - each names its theatre and counts its rows (Recruit Land: the land types shown; Recruit Air and Design Air: the six air classes; Design Land: the seven land classes; Sea: 0). The active one is lit."
+   "Military ledger (nav rail slot 7), Recruit and Design tabs: the row of theatre tabs under them, 'Land N', 'Air N' and 'Sea N', and under Design a fourth, 'Space N' - each names its theatre and counts its rows (Recruit Land: the land types shown; Recruit Air and Design Air: the six air classes; Design Land: the seven land classes; Sea: 0; Design Space: the five hulls). The active one is lit."
   ],
   [
    "chrome.header_recruit_hover",
@@ -1036,6 +1036,30 @@
   [
    "gameplay.space_found_base",
    "In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam; the verb is offworld_base.hpp's. No UI surface yet. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed)."
+  ],
+  [
+   "canvas.space_fleet_select",
+   "The Circumplanetary canvas (primary view only): a fleet mark - a pointed hull in its owner nation's colour carrying the lead unit's hull mark, the fleet's size as a badge - one per nation per node, on a ring's upper side or above a diamond; a unit in transit on a dashed segment from the node it left to its destination, at its share of the way. The Solar canvas (primary view only): one mark per nation per body at the body's upper left, and an inter-body move on a segment between the two bodies (CIRCUMPLANETARY.md, SOLAR.md § Space fleets)."
+  ],
+  [
+   "gameplay.space_unit_move",
+   "The Selection band's space-unit card (SELECTION.md § The space-unit element): the Move press, the 'Whole fleet' tick, the destination list, the 'Move costs delta-v x of y' line and Confirm move."
+  ],
+  [
+   "gameplay.space_unit_dock",
+   "The Selection band's space-unit card: the Dock press (Undock while docked)."
+  ],
+  [
+   "gameplay.space_unit_refuel",
+   "The Selection band's space-unit card: the Refuel press."
+  ],
+  [
+   "gameplay.space_unit_bombard",
+   "The Selection band's space-unit card: the Bombard press and its list of hostile ground below."
+  ],
+  [
+   "ledger.military_space_design",
+   "Military ledger (nav rail slot 7), Design tab, Space theatre: one row per hull class - Hauler, Lander, Tug, Frigate, Cruiser - with its live design's delta-v, cargo, firepower, armour and hull points, or 'No live design' (the Cruiser 'built at a Shipyard only')."
   ]
  ]
 }

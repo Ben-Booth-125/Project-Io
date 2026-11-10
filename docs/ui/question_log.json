@@ -1340,10 +1340,13 @@
    "status": "drafted"
   },
   "circumplanetary_space_assets": {
-   "surface": "Circumplanetary space assets: every nation's satellites (owner colour, role mark) and stations (a larger square-cored mark sized by its grid) drawn at the node they occupy, one in transit at half strength at its destination; slot pips filled in the holder's colour; a hover card and a Selection band card sharing one summary - owner, role or modules and crew, node, state",
+   "surface": "Circumplanetary space assets: every nation's satellites (owner colour, role mark) and stations (a larger square-cored mark sized by its grid) drawn at the node they occupy, one in transit at half strength at its destination with a dashed segment back to the node it left and a marker at its share of the way (BL-1614); slot pips filled in the holder's colour; a hover card and a Selection band card sharing one summary - owner, role or modules and crew, node, state, and for one in transit where it left from",
    "answers": "Who holds the places around this planet, what is each satellite there doing, and is my station there in working order?",
-   "because": "Slots are scarce (SPACE_ASSETS.md § Orbital slots), so the question the node pips raise - how full is it - is followed at once by whose it is. A satellite's role decides what its owner gains on that body (comms coverage, cheaper logistics, lifted fog, a survey), so a rival's observation satellite over the home planet is a fact the player acts on; the role mark carries that at a glance and the card carries the rest. A station is the largest near-space investment and is told apart from a satellite by size and silhouette. The ghost at the destination shows a slot already spoken for by something not yet in place.",
-   "backlog_item": "BL-1590",
+   "because": "Slots are scarce (SPACE_ASSETS.md § Orbital slots), so the question the node pips raise - how full is it - is followed at once by whose it is. A satellite's role decides what its owner gains on that body (comms coverage, cheaper logistics, lifted fog, a survey), so a rival's observation satellite over the home planet is a fact the player acts on; the role mark carries that at a glance and the card carries the rest. A station is the largest near-space investment and is told apart from a satellite by size and silhouette. The ghost at the destination shows a slot already spoken for by something not yet in place; the segment back to its origin, with the marker at its share, answers how far along it is and where it came from - a satellite moved out of a contested orbit reads differently from a fresh launch.",
+   "backlog_item": [
+    "BL-1590",
+    "BL-1614"
+   ],
    "files": [
     "src/ui/circum_assets.hpp",
     "src/ui/circum_assets.cpp",
@@ -1380,6 +1383,65 @@
     "src/ui/tech_tree_panel.cpp",
     "src/world/nation_tech.cpp",
     "src/world/corp_command.cpp"
+   ],
+   "status": "drafted"
+  },
+  "circumplanetary_space_fleets": {
+   "surface": "Space fleets on the Circumplanetary and Solar rungs: every nation's space units grouped per node and owner into one fleet mark - a kite hull in the owner's colour carrying its hull's mark and a count badge - drawn at the node it holds, or, travelling, as a ghost at its destination with the shared dashed segment back to where it set out and a marker at its share of the way; on the Solar rung a body's fleets ring the body. A hover card names owner, hull, count, node, state, propellant and docking; a press selects the fleet's lead",
+   "answers": "Whose warships are around this planet, how many, of what kind, and which are on their way somewhere?",
+   "because": "Blockade, bombardment and space battle are all decided at a node by who holds force there (SPACE_FLEETS.md), so the node is where the player must read force. One mark per owner per node keeps a crowded orbit legible while the count badge keeps the size honest; the hull mark separates a frigate screen from a carrier group. A fleet in transit is a threat that has not arrived yet - drawing it on the link with its share answers when it lands. The Solar rung shows the same marks around each body because a fleet bound for another planet is a far-space decision read at that scale.",
+   "backlog_item": [
+    "BL-1609"
+   ],
+   "files": [
+    "src/ui/circum_units.hpp",
+    "src/ui/circum_units.cpp",
+    "src/ui/circumplanetary_canvas.cpp",
+    "src/ui/solar_system_canvas.cpp",
+    "src/ui/icons.cpp"
+   ],
+   "status": "drafted"
+  },
+  "space_unit_card": {
+   "surface": "The space-unit Selection element: the shared space-unit summary (owner, hull, design, node or transit, propellant against its tank, docking, standing bombard order) and, for the player's own unit, its orders - Move (a toggle opening the reachable destinations, each with its delta-v against the propellant held, an unaffordable one disabled; a chosen destination previews 'Move costs delta-v x of y' and a Confirm), a Whole fleet checkbox, Dock (only where a player station stands), Undock, Refuel, and Bombard (a toggle listing the provinces on the body that hold a target, or lifting a standing order)",
+   "answers": "What can this warship do from here, and what will a move cost it before I commit?",
+   "because": "A space move spends propellant that only a station or a pad restores (SPACE_FLEETS.md § Thrust - the delta-v budget), so a burn is the one order that can strand a fleet. Showing the cost against the budget before Confirm is the whole safeguard; a disabled row with its reason says why a destination is out of reach. Dock, refuel and bombard are the other verbs the seam offers a unit, and each is offered only where it can succeed, so the card is also the list of what the position allows.",
+   "backlog_item": [
+    "BL-1609"
+   ],
+   "files": [
+    "src/ui/circum_units.hpp",
+    "src/ui/circum_units.cpp",
+    "src/ui/selection_panel.cpp",
+    "src/ui/selection.cpp"
+   ],
+   "status": "drafted"
+  },
+  "military_space_designer": {
+   "surface": "The Military ledger's Design tab gains a Space theatre: one row per space hull, each a toggle that expands in place to the hull's slots, each slot a list of the modules it takes (a module whose research is missing is greyed with the node that opens it), and a Save design press",
+   "answers": "What will my next space units carry, and what research would widen the choice?",
+   "because": "A space unit is raised from its nation's saved design for its hull (SPACE_FLEETS.md § A space unit is raised to a design), so without a designer every unit is the default fit. The rows expand in place (DRILL_THROUGH.md) because a hull has at most six slots - a full canvas would be space without content. Greyed modules with their node tell the player what space research buys.",
+   "backlog_item": [
+    "BL-1609"
+   ],
+   "files": [
+    "src/ui/circum_units.cpp",
+    "src/ui/military_ledger.cpp"
+   ],
+   "status": "drafted"
+  },
+  "circumplanetary_debris_storm": {
+   "surface": "Near-space hazard marks: a debris mark (three shards) beside each node whose debris is above zero, with the level on the node's hover card; a storm bolt on a satellite gone dark or a station stormed by an active solar storm, with a line on its card",
+   "answers": "Which orbits around this planet are fouled, and which of my assets is out of action right now?",
+   "because": "Debris raises the loss risk of everything that enters a node and is left by battles and failed launches (SPACE_ASSETS.md § Debris), so it is a reason not to move through an orbit and must be read where the move is chosen. A storm silences a satellite's effect or a station's work for a span (EVENTS.md, solar storms); the bolt explains why a role the player paid for is not paying, without a separate alert.",
+   "backlog_item": [
+    "BL-1609"
+   ],
+   "files": [
+    "src/ui/circum_units.cpp",
+    "src/ui/circum_assets.cpp",
+    "src/ui/circum_nodes.cpp",
+    "src/ui/icons.cpp"
    ],
    "status": "drafted"
   }

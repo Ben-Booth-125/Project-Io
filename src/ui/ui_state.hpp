@@ -491,6 +491,42 @@ struct pinned_items_state
 /// control. VIEW state, not serialised. Every press queues a `space_command` on
 /// `pending`, which app::render sends through `apply_space_command` — the one
 /// near-space seam an agent's command takes too.
+/// BL-1609 (SELECTION.md § The space-unit element): what the space-unit card has
+/// armed for the selected unit, and the Military ledger's Space designer draft.
+/// Re-set when the selection moves to another unit. Every list below is published
+/// each frame the surface draws, for the verify API.
+struct space_fleet_ui_state
+{
+    entity_id unit = null_entity;   ///< The unit the armed state belongs to.
+    bool      move_armed    = false; ///< Move is lit: the destination list shows (a toggle).
+    bool      move_fleet    = false; ///< "Whole fleet": the move takes every unit of the fleet.
+    bool      dest_set      = false; ///< A destination row is chosen (a toggle).
+    entity_id dest_body     = null_entity;
+    int       dest_kind     = 1;
+    bool      bombard_armed = false; ///< Bombard is lit: the target list shows (a toggle).
+
+    /// The Design tab's Space theatre: the hull expanded in place (-1 none) and its draft.
+    int design_hull = -1;
+    std::array<uint8_t, 6> draft{0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+
+    // ── Published each frame; empty when the surface did not draw. ──
+    struct press { std::string name; float x = -1.0f, y = -1.0f; bool enabled = false; std::string reason; };
+    std::vector<press> presses;        ///< move, dock / undock, refuel, bombard, confirm_move.
+    std::vector<press> target_rows;    ///< Bombard's targets.
+    struct dest_row
+    {
+        std::string node;
+        float x = -1.0f, y = -1.0f;
+        float dv = 0.0f, budget = 0.0f;
+        bool  affordable = false, chosen = false;
+    };
+    std::vector<dest_row> dest_rows;
+    float preview_dv = -1.0f, preview_budget = -1.0f;
+    bool  preview_ok = false;
+    std::vector<press> hull_rows;      ///< The designer's hull rows; `enabled` = a live design stands.
+    std::vector<press> design_presses; ///< The open hull's Save press.
+};
+
 struct space_ledger_state
 {
     /// 0 = Launch (default), 1 = Assets, 2 = Stations, 3 = Crew.
@@ -2044,9 +2080,51 @@ struct ui_state
         bool        in_transit = false;
         float       x = 0.0f, y = 0.0f, r = 0.0f;
         std::string node;                  ///< The node it is drawn at.
+        bool        storm = false;         ///< BL-1609: the quarter's solar storm strikes it (the bolt draws).
     };
     std::vector<circum_asset_drawn> circum_assets_drawn;
     entity_id                       circum_asset_hovered = null_entity;
+
+    /// BL-1614: each transit segment as the rung drew it this frame (primary view
+    /// only) — its asset, both ends and the marker's share, for
+    /// `verify.circum_transits()`. What the screen shows; nothing else.
+    struct circum_transit_drawn
+    {
+        entity_id id = null_entity;
+        float     x0 = 0.0f, y0 = 0.0f, x1 = 0.0f, y1 = 0.0f;
+        float     share = 0.0f;
+    };
+    std::vector<circum_transit_drawn> circum_transits_drawn;
+
+    /// BL-1609: each fleet mark as the Circumplanetary (and Solar) rung drew it
+    /// this frame, primary view only — for `verify.circum_fleets()` /
+    /// `verify.solar_fleets()`. What the screen shows; nothing else.
+    struct fleet_drawn
+    {
+        entity_id   lead  = null_entity;
+        entity_id   owner = null_entity;
+        int         hull  = 0;
+        int         count = 0;
+        bool        in_transit = false;
+        float       x = 0.0f, y = 0.0f, r = 0.0f;
+        std::string node;
+        float       share = 0.0f;
+    };
+    std::vector<fleet_drawn> circum_fleets_drawn;
+    std::vector<fleet_drawn> solar_fleets_drawn;
+    entity_id                circum_fleet_hovered = null_entity; ///< The hovered fleet's lead (either rung).
+
+    /// BL-1609: each node's debris mark as drawn (`verify.circum_debris()`).
+    struct debris_drawn
+    {
+        std::string node;
+        float       level = 0.0f;
+        float       x = 0.0f, y = 0.0f;
+    };
+    std::vector<debris_drawn> circum_debris_drawn;
+
+    /// BL-1609: the space-unit card and the Design tab's Space theatre.
+    space_fleet_ui_state fleet;
 
     /// Research-queue presses from the panel (queue a node, remove the last,
     /// clear), applied by `app::render` through `apply_corp_command` — the

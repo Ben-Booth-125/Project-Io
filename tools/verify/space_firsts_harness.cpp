@@ -411,9 +411,10 @@ void rows_save()
                     x.w.space_firsts.size(), ok ? 1 : 0));
 
     const std::size_t sec = world_save_space_firsts_section_bytes(x.w);
+    const std::size_t after = world_save_transit_origin_section_bytes(x.w); // BL-1614 (v92) follows
     std::ostringstream o90(std::ios::binary);
     write_world_snapshot_pre_space_firsts(x.w, o90);
-    check(o90.str().size() + sec == b.size() && sec == 4 + 9 * 3, "S1b",
+    check(o90.str().size() + sec + after == b.size() && sec == 4 + 9 * 3, "S1b",
           fmt("the section is the tail: v90 prefix %zu + %zu == %zu", o90.str().size(), sec, b.size()));
     {
         world wp;
@@ -431,7 +432,7 @@ void rows_save()
     }
 
     // Tampers. Section: u32 n, then (u8 kind, u32 nation, i32 day_tick) per record.
-    const std::size_t s0 = b.size() - sec;
+    const std::size_t s0 = b.size() - sec - after;
     const std::size_t r0 = s0 + 4;
     const auto refused = [&](std::string bad) {
         world wb;

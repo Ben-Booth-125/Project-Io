@@ -2616,4 +2616,80 @@ void station_marker(ImDrawList* dl, ImVec2 c, float r, ImU32 fill, bool in_trans
                       outline);
 }
 
+void space_fleet_marker(ImDrawList* dl, ImVec2 c, float r, int hull, ImU32 fill, int count, bool in_transit)
+{
+    const ImU32 col = in_transit ? half_alpha(fill) : fill;
+    // The kite hull, nose up: outlined by a slightly larger kite underneath.
+    const auto kite = [&](float s, ImU32 k) {
+        const ImVec2 pts[4] = { { c.x, c.y - r * s }, { c.x + r * 0.62f * s, c.y + r * 0.35f * s },
+                                { c.x, c.y + r * 0.78f * s }, { c.x - r * 0.62f * s, c.y + r * 0.35f * s } };
+        dl->AddConvexPolyFilled(pts, 4, k);
+    };
+    kite(1.0f + 1.6f / std::max(r, 1.0f), outline);
+    kite(1.0f, col);
+    const float t = std::max(1.0f, r * 0.14f);
+    const ImVec2 m{ c.x, c.y + r * 0.1f };
+    switch (hull)
+    {
+        case 0: // hauler: a hold box
+            dl->AddRect({ m.x - r * 0.24f, m.y - r * 0.24f }, { m.x + r * 0.24f, m.y + r * 0.24f }, outline, 0.0f, 0, t);
+            break;
+        case 1: // lander: two legs
+            dl->AddLine({ m.x - r * 0.12f, m.y }, { m.x - r * 0.36f, m.y + r * 0.42f }, outline, t);
+            dl->AddLine({ m.x + r * 0.12f, m.y }, { m.x + r * 0.36f, m.y + r * 0.42f }, outline, t);
+            break;
+        case 2: // tug: a claw
+            dl->PathArcTo(m, r * 0.26f, 0.2f, 2.94f, 10);
+            dl->PathStroke(outline, 0, t);
+            break;
+        case 3: // frigate: one stripe
+            dl->AddLine({ m.x - r * 0.34f, m.y }, { m.x + r * 0.34f, m.y }, outline, t);
+            break;
+        case 4: // cruiser: two stripes
+            dl->AddLine({ m.x - r * 0.38f, m.y - r * 0.14f }, { m.x + r * 0.38f, m.y - r * 0.14f }, outline, t);
+            dl->AddLine({ m.x - r * 0.30f, m.y + r * 0.16f }, { m.x + r * 0.30f, m.y + r * 0.16f }, outline, t);
+            break;
+        default:
+            dl->AddCircleFilled(m, t, outline);
+            break;
+    }
+    if (count > 1)
+    {
+        char buf[8];
+        std::snprintf(buf, sizeof buf, "%d", std::min(count, 99));
+        const ImVec2 ts = ImGui::CalcTextSize(buf);
+        const ImVec2 p{ c.x + r * 0.55f, c.y + r * 0.25f };
+        dl->AddRectFilled({ p.x - 1.0f, p.y - 1.0f }, { p.x + ts.x + 1.0f, p.y + ts.y }, IM_COL32(18, 20, 26, 230), 2.0f);
+        dl->AddText(p, IM_COL32(235, 235, 235, 255), buf); // fit-exempt: glyph badge sized from its own text
+    }
+}
+
+void debris(ImDrawList* dl, ImVec2 c, float r, ImU32 colour)
+{
+    const float s = std::max(r, 4.0f);
+    const float shards[3][3] = { { -0.55f, -0.35f, 0.42f }, { 0.45f, -0.15f, 0.36f }, { -0.05f, 0.5f, 0.32f } };
+    for (int i = 0; i < 3; ++i)
+    {
+        const ImVec2 o{ c.x + shards[i][0] * s, c.y + shards[i][1] * s };
+        const float  k = shards[i][2] * s;
+        const ImVec2 tri[3] = { { o.x - k, o.y + k * 0.6f }, { o.x + k * 0.2f, o.y - k }, { o.x + k, o.y + k * 0.4f } };
+        dl->AddTriangleFilled(tri[0], tri[1], tri[2], colour);
+        dl->AddTriangle(tri[0], tri[1], tri[2], outline, 1.0f);
+    }
+}
+
+void storm_bolt(ImDrawList* dl, ImVec2 c, float r, ImU32 colour)
+{
+    const float s = std::max(r, 4.0f);
+    // Two convex halves of a zig-zag bolt, outlined, then filled.
+    const ImVec2 top[4] = { { c.x + s * 0.15f, c.y - s }, { c.x - s * 0.45f, c.y + s * 0.15f },
+                            { c.x + s * 0.05f, c.y + s * 0.15f }, { c.x + s * 0.45f, c.y - s } };
+    const ImVec2 bot[4] = { { c.x - s * 0.05f, c.y - s * 0.15f }, { c.x - s * 0.15f, c.y + s },
+                            { c.x + s * 0.45f, c.y - s * 0.15f }, { c.x - s * 0.05f, c.y - s * 0.15f } };
+    dl->AddPolyline(top, 4, outline, ImDrawFlags_Closed, 2.0f);
+    dl->AddPolyline(bot, 3, outline, ImDrawFlags_Closed, 2.0f);
+    dl->AddConvexPolyFilled(top, 4, colour);
+    dl->AddTriangleFilled(bot[0], bot[1], bot[2], colour);
+}
+
 } // namespace ui::icons

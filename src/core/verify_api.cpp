@@ -63,6 +63,8 @@
 #include "world/state_industry.hpp" // BL-1255: state_uncommitted_treasury (rail_state)
 #include "ui/rail_tool.hpp"          // BL-1255: rail_player_nation
 #include "world/orbital_graph.hpp"   // BL-1590: orbital_slot_capacity - the near-space fixture
+#include "ui/circum_units.hpp"      // BL-1609: space_hull_label, the fleet reads
+#include "world/space_units.hpp"     // BL-1609: the space fleet fixture
 #include "world/market_clearing.hpp" // BL-1241: stage_one mirrors place_building's market emergence
 #include "world/trade.hpp"           // BL-1516: market_trade_points, corp_trade_markets - the gate check
 #include "world/placement_rules.hpp"
@@ -1769,6 +1771,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             case ui::selection_kind::corporation: k = "corporation"; break;
             case ui::selection_kind::wing:        k = "wing";        break; // BL-1450
             case ui::selection_kind::space_asset: k = "space_asset"; break; // BL-1590
+            case ui::selection_kind::space_unit:  k = "space_unit";  break; // BL-1609
             default:                              k = "none";        break;
             }
             // BL-1427: a front is a fourth non-entity channel; the band draws it
@@ -3408,20 +3411,20 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         // shows; then the Air picker's airbases, every air row's Raise press, the
         // player's wing rows, the Design tab's air class rows and the Sea stub's
         // ports. On screen already.
-        static const char* const k_theatres[3] = {"land", "air", "sea"};
+        static const char* const k_theatres[4] = {"land", "air", "sea", "space"}; // BL-1609: Design adds Space
         sol::table ttabs = st.create_table();
         k = 0;
         for (const auto& h : m.theatre_tabs)
         {
             sol::table e = st.create_table();
             e["tab"] = h.tab;
-            e["theatre"] = std::string(k_theatres[std::clamp(h.theatre, 0, 2)]);
+            e["theatre"] = std::string(k_theatres[std::clamp(h.theatre, 0, 3)]);
             e["x"] = h.x; e["y"] = h.y; e["active"] = h.active; e["count"] = h.count;
             ttabs[++k] = e;
         }
         out["theatre_tabs"]   = ttabs;
         out["recruit_theatre"] = std::string(k_theatres[std::clamp(m.theatre[0], 0, 2)]);
-        out["design_theatre"]  = std::string(k_theatres[std::clamp(m.theatre[1], 0, 2)]);
+        out["design_theatre"]  = std::string(k_theatres[std::clamp(m.theatre[1], 0, 3)]);
         sol::table ports = st.create_table();
         k = 0;
         for (const auto& b : m.ports)
@@ -4068,14 +4071,222 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     v.set_function("circum_asset_hovered", [this]() -> unsigned {
         return static_cast<unsigned>(m_ui.circum_asset_hovered);
     });
+    // BL-1614: each transit segment as the rung LAST DREW it - the asset's id,
+    // the segment's two screen ends and the marker's share of the way. Only what
+    // the screen draws.
+    v.set_function("circum_transits", [this](sol::this_state ts) -> sol::table {
+        sol::state_view lua(ts);
+        sol::table out = lua.create_table();
+        int i = 1;
+        for (const auto& s : m_ui.circum_transits_drawn)
+        {
+            sol::table row = lua.create_table();
+            row["id"]    = static_cast<unsigned>(s.id);
+            row["x0"]    = s.x0;
+            row["y0"]    = s.y0;
+            row["x1"]    = s.x1;
+            row["y1"]    = s.y1;
+            row["share"] = s.share;
+            out[i++] = row;
+        }
+        return out;
+    });
+    // BL-1609 (fleet UI): each fleet mark as the Circumplanetary rung LAST DREW it -
+    // its lead unit, owner, hull, count, whether it travels, its screen centre and
+    // radius, the node it sits at (or is bound for) and, travelling, its share of the
+    // way. Only what the screen draws. `circum_fleet_hovered()` is the hovered lead.
+    auto fleet_rows = [](sol::state_view lua, const std::vector<ui_state::fleet_drawn>& rows) {
+        sol::table out = lua.create_table();
+        int i = 1;
+        for (const auto& f : rows)
+        {
+            sol::table row = lua.create_table();
+            row["lead"]       = static_cast<unsigned>(f.lead);
+            row["owner"]      = static_cast<unsigned>(f.owner);
+            row["hull"]       = std::string(ui::space_hull_label(f.hull));
+            row["count"]      = f.count;
+            row["in_transit"] = f.in_transit;
+            row["x"]          = f.x;
+            row["y"]          = f.y;
+            row["r"]          = f.r;
+            row["node"]       = f.node;
+            row["share"]      = f.share;
+            out[i++] = row;
+        }
+        return out;
+    };
+    v.set_function("circum_fleets", [this, fleet_rows](sol::this_state ts) -> sol::table {
+        return fleet_rows(sol::state_view(ts), m_ui.circum_fleets_drawn);
+    });
+    v.set_function("solar_fleets", [this, fleet_rows](sol::this_state ts) -> sol::table {
+        return fleet_rows(sol::state_view(ts), m_ui.solar_fleets_drawn);
+    });
+    v.set_function("circum_fleet_hovered", [this]() -> unsigned {
+        return static_cast<unsigned>(m_ui.circum_fleet_hovered);
+    });
+    // BL-1609: each node's debris mark as drawn - the node's name, its level (the
+    // node's hover card prints it) and the mark's centre.
+    v.set_function("circum_debris", [this](sol::this_state ts) -> sol::table {
+        sol::state_view lua(ts);
+        sol::table out = lua.create_table();
+        int i = 1;
+        for (const auto& d : m_ui.circum_debris_drawn)
+        {
+            sol::table row = lua.create_table();
+            row["node"]  = d.node;
+            row["level"] = d.level;
+            row["x"]     = d.x;
+            row["y"]     = d.y;
+            out[i++] = row;
+        }
+        return out;
+    });
+    // BL-1609: the space-unit card's presses as the Selection band LAST DREW them -
+    // each press's name, centre, whether it is on and its refusal; the destination
+    // rows of an armed Move (node, centre, the path's delta-v, the budget, whether it
+    // fits, whether chosen); the preview; the target rows of an armed Bombard; and
+    // the seam's last message. Only what the card draws.
+    auto press_rows = [](sol::state_view lua, const std::vector<space_fleet_ui_state::press>& ps) {
+        sol::table out = lua.create_table();
+        int i = 1;
+        for (const auto& p : ps)
+        {
+            sol::table row = lua.create_table();
+            row["name"] = p.name; row["x"] = p.x; row["y"] = p.y;
+            row["enabled"] = p.enabled; row["reason"] = p.reason;
+            out[i++] = row;
+        }
+        return out;
+    };
+    v.set_function("fleet_card", [this, press_rows](sol::this_state ts) -> sol::table {
+        sol::state_view lua(ts);
+        const auto& f = m_ui.fleet;
+        sol::table out = lua.create_table();
+        out["unit"]           = static_cast<unsigned>(f.unit);
+        out["move_armed"]     = f.move_armed;
+        out["bombard_armed"]  = f.bombard_armed;
+        out["preview_dv"]     = f.preview_dv;
+        out["preview_budget"] = f.preview_budget;
+        out["message"]        = m_ui.space.message;
+        out["presses"]        = press_rows(lua, f.presses);
+        out["targets"]        = press_rows(lua, f.target_rows);
+        sol::table dests = lua.create_table();
+        int i = 1;
+        for (const auto& r : f.dest_rows)
+        {
+            sol::table row = lua.create_table();
+            row["node"] = r.node; row["x"] = r.x; row["y"] = r.y;
+            row["dv"] = r.dv; row["budget"] = r.budget;
+            row["affordable"] = r.affordable; row["chosen"] = r.chosen;
+            dests[i++] = row;
+        }
+        out["dest_rows"] = dests;
+        return out;
+    });
+    // BL-1609: the Design tab's Space theatre as drawn - each hull row (name, centre,
+    // whether a live design stands), the open hull (-1 none) and its Save press.
+    v.set_function("space_designs", [this, press_rows](sol::this_state ts) -> sol::table {
+        sol::state_view lua(ts);
+        sol::table out = lua.create_table();
+        out["hull_rows"]      = press_rows(lua, m_ui.fleet.hull_rows);
+        out["design_presses"] = press_rows(lua, m_ui.fleet.design_presses);
+        out["open_hull"]      = m_ui.fleet.design_hull;
+        return out;
+    });
+    // BL-1609: a verify-only STAGING fixture for the fleet draw. It writes straight
+    // into the stores (no raise verb: the pad, the shelf and the keys are not what
+    // the canvas check is about): the player's Frigate design; two player Frigates
+    // idle in the home low orbit, tanks full; a third in transit from the home low
+    // orbit to the first moon's low orbit, a third of the way; a rival Frigate idle
+    // in the home high orbit; and debris at the home high orbit. Returns the counts
+    // it staged and the player nation's id, nothing else.
+    v.set_function("space_fleet_fixture", [this](sol::this_state ts) -> sol::table {
+        sol::state_view lua(ts);
+        sol::table out = lua.create_table();
+        out["units"] = 0;
+        out["in_transit"] = 0;
+        out["debris"] = false;
+        const entity_id pn   = player_nation(m_world);
+        const entity_id home = m_world.home_body;
+        if (pn == null_entity || !m_world.bodies.count(home))
+            return out;
+        out["player"] = static_cast<unsigned>(pn);
+        entity_id rival = null_entity;
+        for (const auto& [nid, n] : m_world.nations)
+            if (nid != pn) { rival = nid; break; }
+        entity_id moon = null_entity;
+        for (const auto& [bid, b] : m_world.bodies)
+            if (b.parent == home) { moon = bid; break; }
+
+        // The cheapest Frigate design the catalogue fits: the first item per slot.
+        space_design d{};
+        d.fill(k_no_space_item);
+        const auto& cat = space_item_catalogue();
+        for (std::size_t s = 0; s < space_unit_slot_count; ++s)
+        {
+            if (!space_hull_has_slot(space_hull::frigate, static_cast<space_unit_slot>(s)))
+                continue;
+            for (std::size_t i = 0; i < cat.size(); ++i)
+                if (static_cast<std::size_t>(cat[i].slot) == s
+                    && (cat[i].hull_mask & (1u << static_cast<unsigned>(space_hull::frigate))) != 0)
+                {
+                    d[s] = static_cast<uint8_t>(i);
+                    break;
+                }
+        }
+        const space_design_stats st = evaluate_space_design(space_hull::frigate, d);
+        if (!st.valid)
+            return out;
+        m_world.space_unit_designs[pn][static_cast<uint8_t>(space_hull::frigate)] = d;
+
+        int units = 0, moving = 0;
+        auto stage = [&](entity_id owner, orbital_node at, bool transit, orbital_node to) {
+            if (owner == null_entity || !m_world.bodies.count(at.body))
+                return;
+            space_unit u;
+            u.id    = m_world.create_entity();
+            u.owner = owner;
+            u.hull  = space_hull::frigate;
+            u.design = d;
+            u.node  = at;
+            u.dest  = transit ? to : at;
+            u.state = transit ? space_unit_state::in_transit : space_unit_state::idle;
+            if (transit)
+            {
+                const orbital_path_result p = orbital_path(m_world, orbital_graph_params{}, at, to);
+                const int days = std::max(1, static_cast<int>(std::ceil(p.ok ? p.days : 3.0)));
+                u.days_remaining = std::max(1, days - std::max(1, days / 3));
+                ++moving;
+            }
+            u.propellant  = st.tank;
+            u.hull_points = st.hull_points;
+            u.crew        = st.crew;
+            u.upkeep      = st.upkeep;
+            m_world.space_units.emplace(u.id, u);
+            ++units;
+        };
+        const orbital_node low  {home, orbital_node_kind::low_orbit};
+        const orbital_node high {home, orbital_node_kind::high_orbit};
+        stage(pn, low, false, low);
+        stage(pn, low, false, low);
+        if (moon != null_entity)
+            stage(pn, low, true, {moon, orbital_node_kind::low_orbit});
+        stage(rival, high, false, high);
+        m_world.space_debris[high] = 25.0f;
+        out["units"]      = units;
+        out["in_transit"] = moving;
+        out["debris"]     = true;
+        return out;
+    });
     // BL-1590 part 2: a verify-only STAGING fixture for the near-space draw. It
     // writes straight into the stores (no launch verb: the gate, the shelf and
     // the treasury are not what the canvas check is about) and puts, at the home
     // body's nodes where a slot is free: two player satellites in low orbit
     // (observation, comms), a player station core in high orbit with one
     // research module, a rival nation's navigation satellite in high orbit, and
-    // a player survey satellite in transit to the first moon's L4 (two quarters
-    // out). Returns the counts it staged and nothing else.
+    // a player survey satellite in transit to the first moon's L4 (BL-1614: left
+    // the home low orbit a quarter ago, a quarter to go, its origin recorded).
+    // Returns the counts it staged and nothing else.
     v.set_function("near_space_fixture", [this](sol::this_state ts) -> sol::table {
         sol::state_view lua(ts);
         sol::table out = lua.create_table();
@@ -4109,6 +4320,15 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             a.state = transit ? space_asset_state::in_transit : space_asset_state::active;
             a.launch_tick  = m_world.current_econ_tick;
             a.arrival_tick = m_world.current_econ_tick + (transit ? 2 : 0);
+            if (transit)
+            {
+                // BL-1614: a move out of the home low orbit, one quarter gone of
+                // two, so the rung draws its segment with the marker half-way.
+                a.launch_tick  = m_world.current_econ_tick - 1;
+                a.depart_tick  = a.launch_tick;
+                a.arrival_tick = m_world.current_econ_tick + 1;
+                a.transit_from = {home, orbital_node_kind::low_orbit};
+            }
             const entity_id id = a.id;
             m_world.space_assets.emplace(id, a);
             return id;

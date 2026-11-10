@@ -394,6 +394,10 @@ space_launch_quote launch_space_asset(world& w, const space_asset_params& p,
     a.upkeep       = p.upkeep[static_cast<std::size_t>(cls)];
     a.unpaid_quarters = 0;
     a.launch_cost     = q.cost;
+    // BL-1614: the transit leaves the home surface at the launch tick. A travel-0
+    // launch arrives in this same quarter's step, which clears it again.
+    a.transit_from = {space_home_body_of(w, nation), orbital_node_kind::surface};
+    a.depart_tick  = econ_tick;
 
     draw_goods(w, q);
     w.nations.at(nation).treasury -= q.cost;
@@ -544,6 +548,9 @@ satellite_order move_satellite(world& w, const space_asset_params& p, entity_id 
     draw_goods(w, q);
     w.nations.at(nation).treasury -= q.cost;
     space_asset& a = w.space_assets.at(asset);
+    // BL-1614: the transit leaves the node it sat at, now.
+    a.transit_from = a.node;
+    a.depart_tick  = std::max(w.current_econ_tick, a.launch_tick);
     a.node  = to;
     a.dest  = {to.body, space_slot_of(to.kind)};
     a.state = space_asset_state::in_transit; // its old slot frees now; the new one is held
@@ -575,6 +582,8 @@ void run_space_asset_step(world& w, const space_asset_params& p, int econ_tick,
             if (econ_tick < a.arrival_tick)
                 continue; // still travelling; no upkeep in transit
             a.state = space_asset_state::active;
+            a.transit_from = {}; // BL-1614: arrived — no transit to draw
+            a.depart_tick  = 0;
             ++r.arrived;
         }
 

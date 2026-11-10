@@ -42,6 +42,10 @@ enum class selection_kind
     /// its core asset's; a station's modules are not selectable on their own. Its
     /// card is the shared space-asset summary (circum_assets.hpp).
     space_asset,
+    /// BL-1609: a SPACE UNIT (`world::space_units`), pressed as its fleet's lead on
+    /// the Circumplanetary or Solar rung. Its id comes from `create_entity`. Its card
+    /// is the shared space-unit summary with the player's orders (circum_units.hpp).
+    space_unit,
     // Future kinds (logistics vessel, …) slot in here once their component
     // stores exist; see SELECTION.md (§ Polymorphism).
 };

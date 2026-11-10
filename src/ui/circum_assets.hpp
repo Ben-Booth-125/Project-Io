@@ -23,12 +23,13 @@
 // its equator — the low orbit's right side, the high orbit's left, mirroring
 // the pip rows on its top. Under a diamond, in a row centred below it.
 //
-// IN TRANSIT HAS NO SEGMENT. The rung would draw a dashed run along the link
-// with a marker at its share of the way, but an asset in the world carries
-// only where it is going and when it arrives: a satellite's move keeps its
-// first launch's tick and no origin node, so neither end of the run nor its
-// share can be drawn honestly. The ghost at the destination is what the world
-// can answer.
+// IN TRANSIT (BL-1614). An asset in transit still draws its ghost at the
+// DESTINATION (it already holds that slot), and — where the world recorded where
+// the transit left from (`space_asset::transit_from`, `depart_tick`) and both
+// ends are on this rung — a dashed segment from the origin to the ghost, with a
+// solid marker at the share of the way travelled. A ring node's end sits on its
+// ring, facing the other end; a surface's end is its body's centre. An origin
+// off this rung, or a save from before the field, draws the ghost alone.
 //
 // Immediate-mode: laid out from the live world each frame and never kept.
 // ---------------------------------------------------------------------------
@@ -43,6 +44,7 @@ struct circum_asset_mark
     bool      station = false;
     space_satellite_role role = space_satellite_role::none; ///< Satellites only.
     bool      in_transit = false;
+    bool      storm      = false;     ///< BL-1609: a dark satellite / a stormed station (the bolt draws).
     int       node_index = -1;        ///< Into the node marks it was laid against.
     ImVec2    pos {0.0f, 0.0f};
     float     r = 0.0f;               ///< Drawn half-extent, px.
@@ -53,6 +55,46 @@ struct circum_asset_mark
 /// first.
 std::vector<circum_asset_mark> layout_circum_assets(const world& w,
                                                     const std::vector<circum_node_mark>& nodes);
+
+/// One transit segment as laid out this frame (BL-1614).
+struct circum_transit_mark
+{
+    entity_id id    = null_entity;   ///< The asset (a station's core id is its station's).
+    entity_id owner = null_entity;
+    ImVec2    from {0.0f, 0.0f};     ///< The origin's end.
+    ImVec2    to   {0.0f, 0.0f};     ///< The destination's end (the ghost mark).
+    float     share = 0.0f;          ///< Of the way travelled, in [0, 1].
+    ImVec2    marker {0.0f, 0.0f};   ///< from + (to − from) × share.
+};
+
+/// The share of an econ-tick transit travelled: quarters elapsed since
+/// @p depart_tick plus @p quarter_frac (the day within the quarter, [0, 1)),
+/// over the quarters from departure to arrival; clamped to [0, 1]. A zero-length
+/// transit reads 1. Pure.
+float space_transit_share(int depart_tick, int arrival_tick, int econ_tick, float quarter_frac);
+
+/// The quarter's elapsed fraction the transit share reads off the live day tick.
+float circum_quarter_fraction(const world& w);
+
+/// Where node @p n meets a segment on this rung, aimed toward @p toward: a ring
+/// node's point on its ring, a diamond's centre, a surface's body centre. False
+/// when @p n is not on this rung.
+bool circum_node_endpoint(const std::vector<circum_node_mark>& nodes, orbital_node n, ImVec2 toward,
+                          ImVec2* out);
+
+/// Lay out a segment for every in-transit satellite and station core in
+/// @p marks whose origin is recorded and on this rung.
+std::vector<circum_transit_mark> layout_circum_transits(const world& w,
+                                                        const std::vector<circum_node_mark>& nodes,
+                                                        const std::vector<circum_asset_mark>& marks);
+
+/// THE TRANSIT IDIOM (BL-1614, shared with space units and the Solar rung): a
+/// dashed run from @p from to @p to at half strength of @p colour, and a solid
+/// dot at @p share of the way. Constant pixel size.
+void draw_space_transit(ImDrawList* dl, ImVec2 from, ImVec2 to, float share, ImU32 colour);
+
+/// Draw the segments. Under the asset marks.
+void draw_circum_transits(ImDrawList* dl, const std::vector<circum_transit_mark>& segs);
 
 /// Draw the marks; @p hovered and @p selected (ids) ring theirs.
 void draw_circum_assets(ImDrawList* dl, const std::vector<circum_asset_mark>& marks,

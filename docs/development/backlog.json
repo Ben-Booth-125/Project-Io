@@ -1992,8 +1992,8 @@
    "design": "ERAS.md § Far-space technology; RESEARCH.md grammar. Hulls, drives, landers, tugs, prospecting, base founding, propellant loop, orbital defence battery, the 9x7 grid upgrade; reached through the Digitisation space quests."
   },
   {
-   "status": "designed",
-   "glyph": "○",
+   "status": "complete",
+   "glyph": "●",
    "sprint": 66,
    "version_goal": "v0.5.0",
    "written": "2026-11-10",
@@ -2016,8 +2016,8 @@
    "design": "AI_OPPONENT.md § 11, the 2026-11-10 grant. One live design per class; one space action at a time; never a plan. Also (BL-1599 lane): rivals should issue bombard orders and build the orbital defence battery. Also (BL-1601 lane): rivals found bases (the grant names off-world bases); the verbs are found_base and embark_colonists."
   },
   {
-   "status": "designed",
-   "glyph": "○",
+   "status": "complete",
+   "glyph": "●",
    "sprint": 66,
    "version_goal": "v0.5.0",
    "written": "2026-11-10",
@@ -2036,7 +2036,7 @@
    "authority_doc": "docs/military/SPACE_FLEETS.md",
    "files": [],
    "title": "Fleets on the canvases, fleet orders, the space hull designer, debris drawn",
-   "design": "Circumplanetary and Solar draw fleets at nodes and in transit; select a fleet and order a move (showing the Δv cost against the budget), dock, refuel, bombard; the Military designer gains space hulls. Needs a live click. Also (BL-1605 lane): mark a satellite dark and a station stormed on the circumplanetary canvas during a solar storm. Also (BL-1598 lane): no surface reads debris yet; draw it per node. Also (BL-1606 lane): show a space first in the player's dispatch (history_topic::space_first; the dispatch filters only war entries)."
+   "design": "Circumplanetary and Solar draw fleets at nodes and in transit; select a fleet and order a move (showing the Δv cost against the budget), dock, refuel, bombard; the Military designer gains space hulls. Needs a live click. Also (BL-1605 lane): mark a satellite dark and a station stormed on the circumplanetary canvas during a solar storm. Also (BL-1598 lane): no surface reads debris yet; draw it per node. Also (BL-1606 lane): show a space first in the player's dispatch (history_topic::space_first; the dispatch filters only war entries). Live click owed: seven presses (fleet mark, Move with preview and confirm, re-press disarms, Dock/Undock, Refuel, Bombard and lift, Military Design Space save, Solar fleet press)."
   },
   {
    "status": "designed",
@@ -2139,8 +2139,8 @@
    "design": "BL-1612 made the tree researchable in the model only. Owed: a queue verb for Early Space nodes with its ACTIONS.json entry; the tech tree panel shows the second tree once the gate is met; the rival research picker weighs Early Space nodes (its scorer is Digitisation-indexed today); nation_scalar folds Early Space modifier rows; remove/clear/unqueue and arrival projection cover the Early Space queue. Live click owed: the Early Space tab and a shift-click queue in the built app."
   },
   {
-   "status": "designed",
-   "glyph": "○",
+   "status": "complete",
+   "glyph": "●",
    "sprint": 66,
    "version_goal": "v0.5.0",
    "written": "2026-11-10",

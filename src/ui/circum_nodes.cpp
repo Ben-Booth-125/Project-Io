@@ -263,6 +263,10 @@ void draw_circum_node_card(const world& w, const circum_node_mark& m, ImVec2 mou
     draw_hover_card(mouse, [&]() {
         ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "%s", name.c_str());
         ImGui::Text("Free slots: %d of %d", m.capacity - m.held, m.capacity);
+        // BL-1609: the node's debris level (SPACE_ASSETS.md § Debris), where any lies.
+        if (const auto dit = w.space_debris.find(m.node); dit != w.space_debris.end())
+            ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::space_debris), "Debris: %.1f",
+                               static_cast<double>(dit->second));
 
         const orbital_node home = { w.home_body, orbital_node_kind::surface };
         const auto hb = w.bodies.find(w.home_body);

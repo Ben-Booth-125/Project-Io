@@ -541,7 +541,7 @@ int main()
                                + world_save_contributors_section_bytes(w) + world_save_occupation_section_bytes(w) // v77, v78
                                + world_save_defend_section_bytes(w) + world_save_research_books_section_bytes(w)   // v79, v80
                                + world_save_station_section_bytes(w) + world_save_early_space_section_bytes(w) // BL-1583 (v81), BL-1612 (v82)
-                               + (world_save_space_node_section_bytes(w) + (world_save_space_unit_section_bytes(w) + (world_save_space_battle_section_bytes(w) + (world_save_prospecting_section_bytes(w) + (world_save_space_convoy_section_bytes(w) + (world_save_debris_section_bytes(w) + (world_save_space_bombard_section_bytes(w) + (world_save_offworld_base_section_bytes(w) + world_save_space_firsts_section_bytes(w))))))))); // BL-1581 (v83), last
+                               + (world_save_space_node_section_bytes(w) + (world_save_space_unit_section_bytes(w) + (world_save_space_battle_section_bytes(w) + (world_save_prospecting_section_bytes(w) + (world_save_space_convoy_section_bytes(w) + (world_save_debris_section_bytes(w) + (world_save_space_bombard_section_bytes(w) + (world_save_offworld_base_section_bytes(w) + (world_save_space_firsts_section_bytes(w) + world_save_transit_origin_section_bytes(w)))))))))); // BL-1581 (v83), last
         // BL-1582: the launch-gate staging (a gridless tile, its pad, the shelf) predates
         // v53 tiles; the v50 rows read the world without it.
         const auto unstaged = [](world x) {
@@ -812,7 +812,7 @@ int main()
                       && back.space_orders[0].cmd.role == retask.role && back.next_space_order_id == kw.next_space_order_id
                       && back.state_hash(0) == kw.state_hash(0) && to_bytes(back) == b,
                   "A14", "a pending order round-trips (fields, equal state_hash, byte-identical re-serialise)");
-            const std::size_t sec = b.size() - (world_save_space_node_section_bytes(kw) + (world_save_space_unit_section_bytes(kw) + (world_save_space_battle_section_bytes(kw) + (world_save_prospecting_section_bytes(kw) + (world_save_space_convoy_section_bytes(kw) + (world_save_debris_section_bytes(kw) + (world_save_space_bombard_section_bytes(kw) + (world_save_offworld_base_section_bytes(kw) + world_save_space_firsts_section_bytes(kw)))))))));
+            const std::size_t sec = b.size() - (world_save_space_node_section_bytes(kw) + (world_save_space_unit_section_bytes(kw) + (world_save_space_battle_section_bytes(kw) + (world_save_prospecting_section_bytes(kw) + (world_save_space_convoy_section_bytes(kw) + (world_save_debris_section_bytes(kw) + (world_save_space_bombard_section_bytes(kw) + (world_save_offworld_base_section_bytes(kw) + (world_save_space_firsts_section_bytes(kw) + world_save_transit_origin_section_bytes(kw))))))))));
             const std::size_t ord = sec + 4 + kw.space_assets.size() * 10 + 4 + 4; // the first order
             auto refused = [&](std::size_t off, const void* v, std::size_t n) {
                 std::string t = b;
@@ -840,7 +840,7 @@ int main()
             write_world_snapshot_pre_space_nodes(kw, o81);
             world old;
             const bool ok81 = from_bytes(o81.str(), old);
-            check(ok81 && o81.str().size() + (world_save_space_node_section_bytes(kw) + (world_save_space_unit_section_bytes(kw) + (world_save_space_battle_section_bytes(kw) + (world_save_prospecting_section_bytes(kw) + (world_save_space_convoy_section_bytes(kw) + (world_save_debris_section_bytes(kw) + (world_save_space_bombard_section_bytes(kw) + (world_save_offworld_base_section_bytes(kw) + world_save_space_firsts_section_bytes(kw))))))))) == b.size()
+            check(ok81 && o81.str().size() + (world_save_space_node_section_bytes(kw) + (world_save_space_unit_section_bytes(kw) + (world_save_space_battle_section_bytes(kw) + (world_save_prospecting_section_bytes(kw) + (world_save_space_convoy_section_bytes(kw) + (world_save_debris_section_bytes(kw) + (world_save_space_bombard_section_bytes(kw) + (world_save_offworld_base_section_bytes(kw) + (world_save_space_firsts_section_bytes(kw) + world_save_transit_origin_section_bytes(kw)))))))))) == b.size()
                       && old.space_orders.empty() && old.space_assets.at(lm.asset).node == LO(k.moon)
                       && old.space_assets.at(lm.asset).role == space_satellite_role::none,
                   "A14", "a v82 stream (the v83 prefix) reads: nodes derived (moon low orbit), roles none, no pending orders");
@@ -987,6 +987,97 @@ int main()
         const std::uint64_t h1 = g.w.state_hash(0);
         g.w.space_assets.at(q.asset).state = space_asset_state::active;
         check(h0 != h1 && g.w.state_hash(0) == h0, "A8", "state_hash folds the store (a state flip moves it, the flip back restores it)");
+    }
+
+    // ---- A15 the transit origin (BL-1614) -----------------------------------
+    std::printf("--- A15 transit origin (BL-1614) ---\n");
+    {
+        fixture x;
+        build(x);
+        x.w.current_econ_tick = 3;
+        const space_launch_quote lq = L(x.w, p, x.a, space_asset_class::satellite, LO(x.moon));
+        check(lq.result == space_launch_result::launched && lq.travel_quarters >= 1, "A15a",
+              fmt("fixture: a satellite launched to the moon's low orbit, %d quarters out", lq.travel_quarters));
+        const entity_id sid = lq.asset;
+        const space_asset* sa = x.w.space_assets.count(sid) ? &x.w.space_assets.at(sid) : nullptr;
+        check(sa != nullptr && sa->transit_from == SURF(x.home) && sa->depart_tick == 3
+                  && space_asset_has_transit_origin(*sa),
+              "A15a", "a launch records the home surface and the launch tick as its transit's origin");
+
+        // Save: round-trips; the v89 prefix is the stream less the section; a v89
+        // stream reads as a world with no origin, hashing as the origin-free world.
+        const std::string b = to_bytes(x.w);
+        world r;
+        const bool ok = from_bytes(b, r);
+        check(ok && to_bytes(r) == b && r.state_hash(0) == x.w.state_hash(0)
+                  && r.space_assets.at(sid).transit_from == SURF(x.home) && r.space_assets.at(sid).depart_tick == 3,
+              "A15b", fmt("the origin round-trips byte-identical (%zu bytes, v%u)", b.size(),
+                          static_cast<unsigned>(world_save_version)));
+        const std::size_t sec = world_save_transit_origin_section_bytes(x.w);
+        std::ostringstream o89(std::ios::binary);
+        write_world_snapshot_pre_transit_origin(x.w, o89);
+        world old;
+        const bool ok89 = from_bytes(o89.str(), old);
+        world cleared = x.w;
+        cleared.space_assets.at(sid).transit_from = {};
+        cleared.space_assets.at(sid).depart_tick  = 0;
+        check(sec == 4 + 13 && o89.str().size() + sec == b.size() && ok89
+                  && !space_asset_has_transit_origin(old.space_assets.at(sid))
+                  && old.state_hash(0) == cleared.state_hash(0) && cleared.state_hash(0) != x.w.state_hash(0),
+              "A15c", fmt("the section is the tail (v89 %zu + %zu == %zu); a v89 stream reads with no origin, "
+                          "hashing as the origin-free world; the origin is folded only when set",
+                          o89.str().size(), sec, b.size()));
+
+        // Tampered tails are refused whole, destination untouched.
+        const std::size_t s0 = b.size() - sec;
+        const auto refused = [&](const std::string& bad) {
+            world t;
+            t.nations.emplace(999, nation_component{});
+            return !from_bytes(bad, t) && t.nations.size() == 1 && t.nations.count(999) == 1;
+        };
+        const auto poke = [&](std::size_t at, const void* v, std::size_t n) {
+            std::string bad = b;
+            std::memcpy(&bad[at], v, n);
+            return bad;
+        };
+        const uint8_t  bad_kind = 9, own_kind = static_cast<uint8_t>(orbital_node_kind::low_orbit);
+        const uint32_t ghost = 0x00FFFFF2u, many = 0x7FFFFFFFu;
+        const int32_t  late = sa->arrival_tick + 1, early = sa->launch_tick - 1;
+        bool all = true;
+        std::string why;
+        const auto expect = [&](bool c, const char* what) { all = all && c; if (!c) { why += " "; why += what; } };
+        expect(refused(poke(s0 + 0, &many, 4)), "count");
+        expect(refused(poke(s0 + 4, &ghost, 4)), "ghost-asset");
+        expect(refused(poke(s0 + 8, &x.star, 4)), "star-origin");
+        expect(refused(poke(s0 + 8, &ghost, 4)), "ghost-body");
+        expect(refused(poke(s0 + 12, &bad_kind, 1)), "kind");
+        expect(refused(poke(s0 + 13, &late, 4)), "after-arrival");
+        expect(refused(poke(s0 + 13, &early, 4)), "before-launch");
+        {
+            // The origin its own destination.
+            std::string bad = poke(s0 + 8, &x.moon, 4);
+            std::memcpy(&bad[s0 + 12], &own_kind, 1);
+            expect(refused(bad), "origin-is-destination");
+        }
+        expect(refused(b.substr(0, b.size() - 1)), "truncated");
+        expect(!refused(b), "clean");
+        check(all, "A15d", "tampered tails refused whole (count, ghost asset, star or ghost origin, kind, a tick outside "
+                           "[launch, arrival], origin == destination, truncation); the clean stream reads" +
+                               (why.empty() ? std::string() : " — FAILED:" + why));
+
+        // Arrival clears it; a move records the node it left.
+        for (int t = 3; t <= sa->arrival_tick; ++t)
+            run_space_asset_step(x.w, p, t);
+        const space_asset& arrived = x.w.space_assets.at(sid);
+        check(arrived.state == space_asset_state::active && !space_asset_has_transit_origin(arrived)
+                  && arrived.depart_tick == 0,
+              "A15e", "arrival clears the origin: only a travelling asset carries one");
+        x.w.current_econ_tick = arrived.arrival_tick + 1;
+        const satellite_order mv = move_satellite(x.w, p, x.a, sid, HO(x.moon));
+        const space_asset& moved = x.w.space_assets.at(sid);
+        check(mv.result == satellite_order_result::ok && moved.transit_from == LO(x.moon)
+                  && moved.depart_tick == x.w.current_econ_tick,
+              "A15f", fmt("a move records the node it left and the order's tick (result %d)", static_cast<int>(mv.result)));
     }
 
     // ---- A9 determinism ----------------------------------------------------

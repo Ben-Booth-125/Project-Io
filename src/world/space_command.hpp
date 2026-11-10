@@ -6,6 +6,7 @@
 #include "space_assets.hpp"
 #include "stations.hpp"
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <string>
@@ -67,8 +68,26 @@ enum class space_verb : uint8_t
     // BL-1601 (NATIONS.md § Off-world bases), appended:
     found_base       = 11, ///< subject = the TILE the base is founded on (offworld_base.hpp).
     embark_colonists = 12, ///< subject = the nation's Lander, slot = colonists (thousands) to board.
+    // ---- BL-1609 (fleet UI): the space-unit verbs (space_units.hpp, space_bombard.hpp),
+    // appended. NONE is delayed: a unit order is not a near-space asset order
+    // (SPACE_ASSETS.md § Signal delay names stations and satellites), so none is ever
+    // queued — and the save reader refuses a queued verb that is not delayed.
+    set_unit_design  = 13, ///< cls = space_hull, design.
+    raise_unit       = 14, ///< cls = space_hull; at a pad: node_body = the body; at a shipyard: subject = station.
+    move_unit        = 15, ///< subject = unit, node = destination.
+    move_fleet       = 16, ///< subject = any unit of the fleet (its nation's units at its node), node = destination.
+    dock_unit        = 17, ///< subject = unit, target = station.
+    undock_unit      = 18, ///< subject = unit.
+    refuel_unit      = 19, ///< subject = unit.
+    bombard          = 20, ///< subject = unit, target_kind = space_bombard_target, target; clear = lift the order.
 };
-inline constexpr uint8_t space_verb_count = static_cast<uint8_t>(space_verb::embark_colonists) + 1;
+inline constexpr uint8_t space_verb_count = static_cast<uint8_t>(space_verb::bombard) + 1;
+
+/// BL-1609: is @p v one of the space-unit verbs?
+inline bool space_verb_is_unit(space_verb v)
+{
+    return static_cast<uint8_t>(v) >= static_cast<uint8_t>(space_verb::set_unit_design);
+}
 
 /// Does @p v wait for a signal outside coverage?
 inline bool space_verb_delayed(space_verb v)
@@ -104,6 +123,11 @@ struct space_command
     uint8_t   module    = k_no_station_module;   ///< fit: a station_module_kind.
     std::string      name;                       ///< apply / save / delete template.
     station_template layout;                     ///< save_template.
+    // ---- BL-1609: the space-unit verbs' fields. Never saved: no unit verb is queued.
+    std::array<uint8_t, 6> design{0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF}; ///< set_unit_design: an item id per slot kind, 0xFF none.
+    uint32_t  target      = 0;                   ///< dock: a station; bombard: a building or province id.
+    uint8_t   target_kind = 0;                   ///< bombard: a space_bombard_target.
+    bool      clear       = false;               ///< bombard: lift the unit's standing order.
 };
 
 /// A command waiting for a signal. SERIALISED (v82).
@@ -142,6 +166,12 @@ struct space_command_outcome
     int                    skipped   = 0;           ///< apply_template: slots skipped.
     offworld_base_result   base      = offworld_base_result::rejected_invalid; ///< BL-1601: found_base / embark_colonists.
     entity_id              base_centre = null_entity; ///< BL-1601: found_base: the base's population centre.
+    // ---- BL-1609: a space-unit verb's answer (space_units.hpp).
+    uint8_t                unit      = 0xFF;        ///< A space_unit_result; 0xFF when no unit verb ran.
+    entity_id              unit_id   = null_entity; ///< The unit raised or ordered.
+    float                  unit_dv   = 0.0f;        ///< A move: the path's Δv.
+    int32_t                unit_days = 0;           ///< A move: transit days.
+    bool                   withdrawing = false;     ///< A move recorded as a battle withdrawal.
 };
 
 /// PURE. Validate @p c field by field as the value that lands (see the file

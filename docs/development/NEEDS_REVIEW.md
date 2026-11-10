@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*70 entries — 67 open, 3 resolved.*
+*72 entries — 69 open, 3 resolved.*
 
 ---
 
@@ -866,6 +866,34 @@ corp_ai.cpp keeps the capital province's units at home, reading only the home ca
 > **Recommendation:** Accept; tune the 400 in playtest.
 
 *Files: `src/world/space_firsts.cpp`, `docs/economy/ERAS.md`*
+
+### NR-1208 — Fleet UI: nine calls taken, and seven new verify reads to grant
+*decision taken on your behalf · raised 2026-11-10 · from BL-1609 / BL-1614 lane report*
+
+Calls: (1) unit orders are not signal-delayed; (2) orders sit on the Selection card, not a right-click; (3) bombard targets whole provinces, listed where a building can be struck; (4) one fleet mark per (node, owner), a press selects the lowest-id lead, "Whole fleet" moves them all; (5) an asset's transit share is quarters gone plus day/90, a unit's from path days; (6) the card has two columns, destinations cheapest first; (7) the space designer expands rows in place; Recruit has no Space tab; (8) theatre_tabs became a template for four Design tabs; (9) a digest from a world with assets in transit may move (the origin is hashed). The space_command seam gained eight unit verbs (13-20) from a UI item. New verify reads, each reporting what the screen draws (screen positions included): verify.circum_transits, circum_fleets, solar_fleets, circum_fleet_hovered, circum_debris, fleet_card, space_designs; STAGING verify.space_fleet_fixture writes a Frigate design, four units and debris 25 (returns counts and the player id); circum_assets rows gain a storm flag. A solar storm cannot be staged (derived from the seed), so no capture shows the storm mark.
+
+**Why it matters.** The verify reads touch the no-tile-data rule (io-standing-rules § Determinism & data model); each needs your grant like the ten before it.
+
+- Grant the reads as an eleventh scoped exception
+- Narrow them
+
+> **Recommendation:** Grant: they report only what the canvas draws.
+
+*Files: `src/core/verify_api.cpp`, `src/world/space_command.hpp`, `.claude/rules/io-standing-rules.md`*
+
+### NR-1209 — Rival far-space AI: five calls taken; rivals design but raise nothing (the NR-1203 wall)
+*decision taken on your behalf · raised 2026-11-10 · from BL-1608 lane report*
+
+One far-space verb per rival per quarter, first wanted and legal of: design (best researched item per slot, redesign when a better one is researched), war (bombard from low orbit, move the fleet whole only when every unit there is armed, raise Frigates up to 2 per hostile, max 6), base (embark, load kit, move, found on the most-deposit prospected tile; max 1 base). Calls: (1) a base trip a full Lander cannot make with the 20-unit kit is refused (14.6 dv loaded vs 21.7 empty), so a heavy moon never gets a base; (2) once a rival holds a Hauler design the existing trade code ships its inter-body trade by Hauler, which moves the world from ~2020 (BL-1596's design); (3) Tugs and Cruisers get designs but are never raised; no shipyard or docking used; (4) the pick pays at the fair-price ceiling; (5) the pick's priority order is written only in nation_ai.hpp, not AI_OPPONENT.md. NR-1206 keep-home is wired behind far_space_keep_base_home = 0 (OFF). Spectate seed 0 to 2030: 9 designs held by three rivals by 2030, no unit raised (Teishe at war meets shelf_short for its Frigate), 1 launch all game.
+
+**Why it matters.** The far-space AI exists and is correct in harness, but the world never lets it act: everything waits on NR-1203.
+
+- Accept the calls
+- Write the priority order into AI_OPPONENT.md
+
+> **Recommendation:** Accept; rule NR-1203 first, then re-spectate (BL-1611).
+
+*Files: `src/world/nation_ai.cpp`, `src/world/corp_ai.cpp`, `docs/ai/AI_OPPONENT.md`*
 
 ---
 

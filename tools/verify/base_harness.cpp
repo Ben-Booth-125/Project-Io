@@ -592,7 +592,7 @@ void rows_determinism_and_save()
     const std::size_t sec = world_save_offworld_base_section_bytes(x.w);
     std::ostringstream o87(std::ios::binary);
     write_world_snapshot_pre_offworld_bases(x.w, o87);
-    check(o87.str().size() + sec + world_save_space_firsts_section_bytes(x.w) == b.size() && sec == 8 + 12 + 8, "S1b", // BL-1606 (v91) follows
+    check(o87.str().size() + sec + (world_save_space_firsts_section_bytes(x.w) + world_save_transit_origin_section_bytes(x.w)) == b.size() && sec == 8 + 12 + 8, "S1b", // BL-1606 (v91) follows
           fmt("the section is the tail: v87 prefix %zu + %zu == %zu", o87.str().size(), sec, b.size()));
     {
         fixture e; build(e);
@@ -605,7 +605,7 @@ void rows_determinism_and_save()
     }
 
     // Tampers. Section: u32 n, (centre, i32 founded, i32 unfed), u32 n, (unit, i32 count).
-    const std::size_t s0 = b.size() - sec - world_save_space_firsts_section_bytes(x.w); // BL-1606 (v91) follows
+    const std::size_t s0 = b.size() - sec - (world_save_space_firsts_section_bytes(x.w) + world_save_transit_origin_section_bytes(x.w)); // BL-1606 (v91) follows
     const std::size_t base0 = s0 + 4;
     const std::size_t col0 = s0 + 4 + 12 + 4;
     const auto refused = [&](std::string bad) {

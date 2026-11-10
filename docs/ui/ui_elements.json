@@ -288,9 +288,9 @@
     "src/ui/circumplanetary_canvas.cpp",
     "src/ui/icons.cpp"
    ],
-   "summary": "Every nation's satellites and stations at the node they occupy: a satellite as a round plate in its owner's colour with solar wings and its role's mark, a station as a larger square core on a truss between two panels, sized by its grid; one in transit draws at its destination at half strength. Held slot pips fill in the holder's colour. Hovering a mark opens the shared hover card (owner, role or modules and crew, node, state); a press selects it and the Selection band shows the same summary.",
+   "summary": "Every nation's satellites and stations at the node they occupy: a satellite as a round plate in its owner's colour with solar wings and its role's mark, a station as a larger square core on a truss between two panels, sized by its grid; one in transit draws at its destination at half strength, with a dashed segment back to the node it left and a solid marker at its share of the way. Held slot pips fill in the holder's colour. Hovering a mark opens the shared hover card (owner, role or modules and crew, node, state, and where a transit left from); a press selects it and the Selection band shows the same summary.",
    "interesting_question": "The world records an asset's destination and arrival tick but not where a move set out from or when, so the in-transit segment along the link cannot be placed; is the ghost at the destination enough?",
-   "resolution": "Open.",
+   "resolution": "Closed by BL-1614 (space transit segment): the asset records its transit's origin node and departure tick (saved, v90), and the rung draws the segment from the origin to the ghost with the marker at the quarters gone plus the day within the quarter. An origin off this rung, or a save from before the field, still draws the ghost alone.",
    "checks": [
     "near_space_assets"
    ]
@@ -2312,6 +2312,100 @@
    "resolution": "No: the budget is evaluate_station_budget's, which counts only modules in place; an in-transit module draws dim in its slot so the fit is visible before it counts.",
    "checks": [
     "space_ledger"
+   ]
+  },
+  {
+   "id": "UI-149",
+   "name": "Space fleets (Circumplanetary)",
+   "kind": "sub-element",
+   "parent": "UI-009",
+   "source": [
+    "docs/ui/CIRCUMPLANETARY.md § Orbital nodes and what sits at them",
+    "docs/military/SPACE_FLEETS.md",
+    "src/ui/circum_units.hpp",
+    "src/ui/circum_units.cpp",
+    "src/ui/circumplanetary_canvas.cpp",
+    "src/ui/icons.cpp"
+   ],
+   "summary": "Every nation's space units grouped per node and owner into one kite-hull mark in the owner's colour, the hull's mark inside and a count badge; one in transit draws as a ghost at its destination with the dashed segment back to the node it left and a marker at its share. Hover opens the fleet card; a press selects the fleet's lead into the Selection band.",
+   "interesting_question": "A fleet is drawn per (node, owner), but orders are given per unit; is pressing the lead the right grain?",
+   "resolution": "Yes for the prototype: the card's Whole fleet checkbox carries a move to every unit of that owner at the node, and dock, refuel and bombard are per unit. A split control is left until a fleet mixes hulls in play.",
+   "checks": [
+    "space_fleets_ui"
+   ]
+  },
+  {
+   "id": "UI-150",
+   "name": "Space fleets (Solar)",
+   "kind": "sub-element",
+   "parent": "UI-001",
+   "source": [
+    "docs/ui/SOLAR.md",
+    "src/ui/circum_units.cpp",
+    "src/ui/solar_system_canvas.cpp"
+   ],
+   "summary": "The same fleet marks ringed around each body on the Solar rung, travelling fleets on the segment between bodies; hover opens the fleet card and a press selects the lead (a press beside it still selects the body).",
+   "interesting_question": "At Solar scale the node is invisible; does a ring of marks around the body still say where the fleet is?",
+   "resolution": "It says which body, and the card names the node. A move between bodies is the far-space question this rung exists to answer.",
+   "checks": [
+    "space_fleets_ui"
+   ]
+  },
+  {
+   "id": "UI-151",
+   "name": "Space-unit card (Selection)",
+   "kind": "sub-element",
+   "parent": "UI-043",
+   "source": [
+    "docs/ui/SELECTION.md § The space-unit element",
+    "docs/military/SPACE_FLEETS.md",
+    "src/ui/circum_units.cpp",
+    "src/ui/selection_panel.cpp"
+   ],
+   "summary": "The selected space unit's summary and, for the player's own, its orders: a Move toggle with the destinations and their delta-v against propellant, a preview and a Confirm; Whole fleet; Dock, Undock, Refuel; a Bombard toggle listing provinces with a target, or lifting a standing order. Every order goes through the space-command seam.",
+   "interesting_question": "Should a move be ordered by pressing the destination node on the canvas instead of a list?",
+   "resolution": "Taken as a list for now: every destination shows its burn against the budget before the press, which a canvas click cannot. A canvas pick can join it later.",
+   "checks": [
+    "space_fleets_ui"
+   ]
+  },
+  {
+   "id": "UI-152",
+   "name": "Space hull designer (Military ledger)",
+   "kind": "sub-element",
+   "parent": "UI-132",
+   "source": [
+    "docs/ui/ledgers/military.md § The designer",
+    "docs/military/SPACE_FLEETS.md § A space unit is raised to a design",
+    "src/ui/circum_units.cpp",
+    "src/ui/military_ledger.cpp"
+   ],
+   "summary": "The Design tab's Space theatre: one toggle row per space hull, expanding in place to its slots' module lists (missing research greyed) and a Save design press that queues set_unit_design for the hull.",
+   "interesting_question": "The land designer is a full canvas; why is the space one rows in place?",
+   "resolution": "A space hull has no image yet and at most six slots, so the rows hold everything; it takes the canvas when hull art exists.",
+   "checks": [
+    "space_fleets_ui"
+   ]
+  },
+  {
+   "id": "UI-153",
+   "name": "Debris and storm marks (Circumplanetary)",
+   "kind": "sub-element",
+   "parent": "UI-009",
+   "source": [
+    "docs/ui/CIRCUMPLANETARY.md § Orbital nodes and what sits at them",
+    "docs/economy/SPACE_ASSETS.md § Debris",
+    "docs/EVENTS.md",
+    "src/ui/circum_units.cpp",
+    "src/ui/circum_assets.cpp",
+    "src/ui/circum_nodes.cpp",
+    "src/ui/icons.cpp"
+   ],
+   "summary": "Three shards beside each node with debris, the level on the node's hover card; a storm bolt on a satellite gone dark or a station stormed by an active solar storm, with a line on its card.",
+   "interesting_question": "A storm is derived from the seed and the tick and is never saved, so a verify fixture cannot stage one; is a reported flag enough?",
+   "resolution": "The draw reports the flag per asset; the storm capture waits for a seed or a staging call that raises one.",
+   "checks": [
+    "space_fleets_ui"
    ]
   }
  ]

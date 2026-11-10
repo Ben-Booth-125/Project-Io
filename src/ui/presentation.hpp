@@ -139,6 +139,10 @@ inline constexpr ImU32 order_declare = IM_COL32(240, 150,  60, 240); ///< An att
 inline constexpr ImU32 air_assigned = IM_COL32(140, 150, 255, 235); ///< A province the selected wing flies over; its right-click assign preview.
 inline constexpr ImU32 air_refused  = IM_COL32(232,  84,  72, 240); ///< A right-click the seam would refuse (order_attack's red).
 
+// BL-1609: the near-space hazards (CIRCUMPLANETARY.md § Orbital nodes and what sits at them).
+inline constexpr ImU32 space_debris = IM_COL32(176, 150, 120, 255); ///< Debris shards at a node — rust-grey wreckage.
+inline constexpr ImU32 space_storm  = IM_COL32(250, 214,  70, 255); ///< A solar storm's bolt on a struck asset — storm yellow.
+
 // --- the declaration's goal picking (docs/ui/ledgers/diplomacy.md § The declaration) ---
 // A possible goal reads as the declare-and-attack's orange; a chosen one as the
 // attack's red, thicker, so "may be a goal" and "is a goal" never share a stroke.
