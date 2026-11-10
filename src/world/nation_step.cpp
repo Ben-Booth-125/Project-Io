@@ -17,6 +17,7 @@
 #include "stations.hpp"          // BL-1583/BL-1585: the station step, astronaut training
 #include "space_effects.hpp"     // BL-1584/BL-1586: module and satellite effects
 #include "space_units.hpp"       // BL-1594/BL-1595: the space units' quarter
+#include "debris.hpp"            // BL-1598: the debris quarter
 #include "space_programme.hpp"   // BL-644: the space_programme line's consumer
 #include "survey_system.hpp"
 #include "unit_roster.hpp" // BL-571: resolve_unit_upkeep, unit_upkeep_params
@@ -219,6 +220,9 @@ void run_nation_step(world& w, const recipe_registry& reg, economy_report& repor
     // placed asset's quarterly upkeep paid whole from its owner's treasury or
     // counted unpaid (decaying, then lost). Ascending asset id; an empty store
     // does nothing, so a world that never launched ticks as before.
+    // BL-1598 (SPACE_ASSETS.md § Debris): what stands in orbit before the space
+    // steps, so step 7e can leave debris for whatever they lose.
+    const space_loss_watch debris_watch = watch_space_losses(w);
     run_space_asset_step(w, reg.space_assets(), econ_tick, &report.space_assets);
 
     // ---- 7b. Stations and astronauts (BL-1583 / BL-1585, SPACE_ASSETS.md) —
@@ -240,6 +244,13 @@ void run_nation_step(world& w, const recipe_registry& reg, economy_report& repor
     // counts, lost at the dial), then each station's Fuel-depot fill off its owner's
     // home shelf. Empty stores do nothing, so a world without them ticks as before.
     run_space_unit_quarter(w, reg.space_units(), reg.stations(), econ_tick);
+
+    // ---- 7e. Debris (BL-1598, SPACE_ASSETS.md § Debris) — after every space step,
+    // so the quarter's losses (upkeep, a fallen station's sweep) leave their debris:
+    // then wear on the satellites and station cores (the worn-out add theirs — the
+    // cascade), the idle Tugs clear, and drag thins low orbit. An empty store with
+    // nothing lost does nothing, so a world without debris ticks as before.
+    run_space_debris_quarter(w, reg.space_debris(), debris_watch);
 
     // ---- 8. The tax tier (BL-1335) — LAST, so the scorer reads this quarter's
     // whole budget (rationed lines, the research line) and the Discontent the

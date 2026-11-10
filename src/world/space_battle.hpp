@@ -56,7 +56,15 @@ struct station_params;
 // THE DEBRIS SEAM (BL-1598 owns debris): every loss adds its mass — a unit's dry mass
 // plus its cargo, `defence_module_mass` per module, `station_core_mass` per core — to
 // the battle's `mass_destroyed` and to the day report's per-node list. Nothing here
-// makes debris.
+// makes debris: the debris day (debris.hpp) deposits the report's list.
+//
+// THE STALL (BL-1598; SPACE_FLEETS.md § Battles). A day of fire on which neither side
+// lands anything counts a QUIET day; a day that lands anything resets the count. At
+// `stall_days` quiet days in a row, with both sides still armed, the battle closes as
+// a STANDOFF (both ends holding; a recorded withdrawal flies at once). The same pair
+// does not re-engage at that node while its newest record there is that standoff and
+// neither side's fire could land (`space_fire_could_land`): a fleet arriving, or a
+// module coming to work, is what breaks it.
 //
 // DETERMINISM. Every store is a std::map or a sorted vector walked ascending; float
 // arithmetic over saved inputs in a fixed order; no RNG, no clock.
@@ -75,7 +83,13 @@ struct space_battle_params
     float   defence_module_mass = 6.0f;  ///< Mass a lost module adds to `mass_destroyed`.
     float   station_core_mass   = 20.0f; ///< Mass a lost core adds.
     int32_t report_history      = 16;    ///< Closed reports kept; clamped into [0, k_space_battle_history_max].
+    /// BL-1598 (SPACE_FLEETS.md § Battles, the stall): consecutive days of fire that
+    /// land nothing on either side before the battle closes as a STANDOFF. 0 = off.
+    /// Clamped into [0, k_space_battle_stall_max].
+    int32_t stall_days          = 10;
 };
+
+inline constexpr int32_t k_space_battle_stall_max = 100000;
 
 inline constexpr int32_t     k_space_battle_history_max = 256;
 /// Ceilings the save reader holds the stream to.
@@ -88,6 +102,7 @@ enum class space_battle_state : uint8_t
     open    = 0,
     decided = 1, ///< A side is out (destroyed or withdrew).
     peace   = 2, ///< Neither side is hostile to the other any more.
+    standoff = 3, ///< BL-1598: `stall_days` days of fire landed nothing; both sides hold.
 };
 
 /// How a side stands at the close. Append-only (saved).
@@ -131,6 +146,7 @@ struct space_battle
     int32_t            opened_tick = 0;  ///< Econ tick (quarter) it opened.
     int32_t            days        = 0;  ///< Days fought.
     float              mass_destroyed = 0.0f; ///< The debris seam (BL-1598).
+    int32_t            quiet_days     = 0;    ///< BL-1598: open only — consecutive days that landed nothing. Saved in the BL-1598 section.
     std::vector<space_battle_withdrawal> withdrawing; ///< Open only; ascending unit id.
     std::vector<std::pair<entity_id, float>> module_damage; ///< Open only; Defence module id ascending, damage taken.
 
@@ -155,10 +171,16 @@ bool space_unit_engaged(const world& w, entity_id unit);
 /// the caller). A unit already withdrawing takes the new destination.
 void record_space_withdrawal(world& w, const std::vector<entity_id>& ids, orbital_node dest);
 
+/// BL-1598: would either side's fire land anything on the other at @p node today —
+/// each pool walked down the other's target order, as a battle day fires? Pure.
+bool space_fire_could_land(const world& w, const station_params& stp, const space_battle_params& bp,
+                           orbital_node node, entity_id a, entity_id b);
+
 /// What one battle day did — reported, never stored.
 struct space_battle_day_report
 {
     int   opened = 0, fought = 0, closed = 0;
+    int   standoffs = 0;           ///< BL-1598: closed as a standoff today (counted in `closed` too).
     int   units_lost = 0, crew_lost = 0, modules_lost = 0, stations_lost = 0;
     int   departed = 0;            ///< Withdrawing units that left.
     int   departures_failed = 0;   ///< A recorded move the unit could no longer pay; it stays.

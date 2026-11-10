@@ -240,6 +240,21 @@ damage in proportion to the debris there. All of it is arithmetic on the level: 
 and the Lagrange points never clear by themselves. A **Tug** with a debris arm at a node removes a
 fixed amount each quarter (`../military/SPACE_FLEETS.md`).
 
+**The rules in full** (BL-1598 (debris), first cut, 2026-11-10):
+
+- **The level** is a mass, held per orbital node; a surface holds none. A loss adds its mass: a
+  unit's dry mass and cargo, a fixed mass per satellite, station core and module. Losses count
+  whatever their cause — a battle, wear, debris damage, or unpaid upkeep — since the wreck stays in
+  orbit either way. A module its owner removes is taken away, not lost, and leaves nothing.
+- **Wear** is read each quarter off the level as it stood at the quarter's start. What it destroys
+  adds its debris after the pass, so a cascade grows quarter on quarter, never within one.
+- **Hull damage** is daily: a unit idle or docked at a node takes damage in proportion to the level,
+  and a unit that arrives takes one day's damage at each node its path passed through. A docked
+  unit's repair still runs, so a Dock can hold a fouled node.
+- **A Tug clears where it is parked**, idle at a node: moving it there is the order, so clearing has
+  no verb of its own. Each quarter runs wear, then the Tugs, then drag; a level that falls to nearly
+  nothing is gone.
+
 ## Open
 
 **The Market module's trade link** waits on space convoys (`../military/SPACE_FLEETS.md`). Until

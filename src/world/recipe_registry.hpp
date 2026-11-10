@@ -10,6 +10,7 @@
 #include "space_assets.hpp"    // BL-1327: space_asset_params — launch, reach, travel and upkeep dials
 #include "stations.hpp"        // BL-1583/BL-1585: station_params — module roster, core, astronaut dials
 #include "space_units.hpp"     // BL-1594/BL-1595: space_unit_params — launch, repair, depot, upkeep-loss dials
+#include "debris.hpp"          // BL-1598: space_debris_params — debris yield, wear, drag, tugs
 #include "space_battle.hpp"    // BL-1597: space_battle_params — Defence module fire, report history
 #include "nation_tax.hpp"       // BL-1335: tax_params — the tax tiers and Discontent dials
 #include "air_params.hpp"  // BL-1449: air_params — the air theatre's authored numbers
@@ -1315,6 +1316,10 @@ public:
     /// registry carries space_battle_params' first-cut defaults.
     const space_battle_params& space_battles() const { return m_space_battles; }
 
+    /// BL-1598 debris dials (debris.hpp). No Lua key yet: every registry carries
+    /// space_debris_params' first-cut defaults.
+    const space_debris_params& space_debris() const { return m_space_debris; }
+
     /// BL-1335 the tax tiers and Discontent dials (economy.tax in Lua;
     /// nation_tax.hpp). Defaults are tax_params' own (the shipped values); every
     /// authored value is range-checked at load and rejected by key.
@@ -1607,6 +1612,7 @@ public:
     void set_stations(const station_params& p) { m_stations = p; }             // BL-1583
     void set_space_units(const space_unit_params& p) { m_space_units = p; }    // BL-1594
     void set_space_battles(const space_battle_params& p) { m_space_battles = p; } // BL-1597
+    void set_space_debris(const space_debris_params& p) { m_space_debris = p; }   // BL-1598
     void set_tax(const tax_params& p) { m_tax = p; } // BL-1335
     /// BL-743: the firm-exit trigger (economy.firm_exit in Lua; inert defaults).
     const firm_exit_params& firm_exit() const { return m_firm_exit; }
@@ -1902,6 +1908,7 @@ private:
     station_params     m_stations     = {}; // BL-1583 / BL-1585
     space_unit_params  m_space_units  = {}; // BL-1594 / BL-1595
     space_battle_params m_space_battles = {}; // BL-1597
+    space_debris_params m_space_debris  = {}; // BL-1598
     tax_params m_tax = {}; // BL-1335
 
     /// BL-743 firm-exit trigger (economy.firm_exit). Inert defaults: an

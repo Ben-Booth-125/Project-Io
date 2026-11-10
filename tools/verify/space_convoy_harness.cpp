@@ -707,7 +707,7 @@ int main()
         const std::size_t sec = world_save_space_convoy_section_bytes(x);
         std::ostringstream o84(std::ios::binary);
         write_world_snapshot_pre_space_convoys(x, o84);
-        check(o84.str().size() + sec == b.size() && sec == 4 + 32 * x.space_hauls.size(), "C10b",
+        check(o84.str().size() + sec + world_save_debris_section_bytes(x) == b.size() && sec == 4 + 32 * x.space_hauls.size(), "C10b", // BL-1598 (v88) follows
               fmt("section %zu bytes; v84 prefix %zu + %zu == %zu", sec, o84.str().size(), sec, b.size()));
         fixture e;
         build(e);
@@ -718,7 +718,7 @@ int main()
                   && world_save_space_convoy_section_bytes(e.w) == 4,
               "C10c", "a hauler-free world's v84 prefix reads with nothing aboard; equal hash");
 
-        const std::size_t s0 = b.size() - sec + 4; // the first record
+        const std::size_t s0 = b.size() - sec - world_save_debris_section_bytes(x) + 4; // the first record (BL-1598's v88 section follows)
         const auto refused = [&](std::string bad) {
             world t;
             t.nations.emplace(999, nation_component{});

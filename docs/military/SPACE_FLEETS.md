@@ -157,6 +157,14 @@ fire.
   stations lost and damage landed; days fought; and the **mass destroyed** — each lost unit's dry mass
   and cargo, and a fixed mass per lost module and core. Debris is made from that mass
   (`../economy/SPACE_ASSETS.md` § Debris).
+- **The stall** (BL-1598 (debris), first cut, 2026-11-10; NR-1178). A day of fire on which neither
+  side lands anything — each pool spent on the other's armour — is a **quiet day**; a day that lands
+  anything resets the count. After a set number of quiet days in a row (a dial, first cut ten), with
+  both sides still armed, the battle closes as a **standoff**: both sides hold, a recorded withdrawal
+  flies at once, and the report is kept like any other. The same two nations do not re-engage at that
+  node while their newest battle there is that standoff and neither side's fire could land; a fleet
+  arriving, or a Defence module coming to work, is what breaks it. Why: two fleets that cannot hurt
+  each other would otherwise hold each other engaged for ever, every move a withdrawal.
 
 ## Blockade (Ben, 2026-11-10)
 

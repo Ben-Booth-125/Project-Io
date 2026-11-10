@@ -180,6 +180,11 @@ struct space_asset
     // folded into state_hash with the asset. `dest` is derived from `node`.
     orbital_node node{};                          ///< The orbital node it occupies (or travels to).
     space_satellite_role role = space_satellite_role::none; ///< Satellites only; none otherwise.
+
+    // ---- BL-1598 (SPACE_ASSETS.md § Debris): a satellite's or station core's
+    // debris WEAR, in [0, 1); lost at 1 (debris.hpp). SERIALISED in the BL-1598
+    // section only where above zero; folded into state_hash there.
+    float wear = 0.0f;
 };
 
 /// The hard ceiling on `space_asset_params::quarters_to_loss`. The step clamps

@@ -12,6 +12,7 @@
 #include "carried_supplies.hpp" // BL-1452: k_starvation_days — the stocks section's range check
 #include "war.hpp"         // BL-1459: the war section
 #include "hex_neighbors.hpp" // BL-1502: a front key across the line
+#include "debris.hpp"        // BL-1598: the debris section's ceilings
 #include "survey_system.hpp" // BL-1600: survey_knowledge_applies, survey_region_count - the v85 checks
 #include "unit_roster.hpp" // BL-1437: unit_roster_table — the obsolete flips' range check // BL-1407: fold_legacy_firms -- a pre-v56 stream's corporations
 
@@ -2385,6 +2386,40 @@ void write_world_snapshot_at(const world& w, std::ostream& out, uint32_t version
         }
     }
     // ===== END BL-1596 =====
+    // ===== BEGIN BL-1598 (v88): DEBRIS AND THE STALL, the last section =====
+    // The levels (body, u8 kind, f32), the worn assets (id, f32), the quiet battles
+    // (u32 id, i32), each ascending after a u32 count.
+    if (version >= k_world_save_version_debris)
+    {
+        w_u32(out, static_cast<uint32_t>(w.space_debris.size()));
+        for (const auto& [node, lv] : w.space_debris) // std::map: ascending
+        {
+            w_id(out, node.body);
+            w_enum(out, node.kind);
+            w_f32(out, lv);
+        }
+        uint32_t worn = 0;
+        for (const auto& [aid, a] : w.space_assets)
+            worn += a.wear != 0.0f ? 1u : 0u;
+        w_u32(out, worn);
+        for (const auto& [aid, a] : w.space_assets)
+            if (a.wear != 0.0f)
+            {
+                w_id(out, aid);
+                w_f32(out, a.wear);
+            }
+        uint32_t quiet = 0;
+        for (const auto& [bid, b] : w.space_battles)
+            quiet += b.quiet_days != 0 ? 1u : 0u;
+        w_u32(out, quiet);
+        for (const auto& [bid, b] : w.space_battles)
+            if (b.quiet_days != 0)
+            {
+                w_u32(out, bid);
+                w_i32(out, b.quiet_days);
+            }
+    }
+    // ===== END BL-1598 =====
 }
 
 void write_world_snapshot_pre_space_battles(const world& w, std::ostream& out)
@@ -2424,6 +2459,22 @@ void write_world_snapshot_pre_space_convoys(const world& w, std::ostream& out)
 std::size_t world_save_space_convoy_section_bytes(const world& w)
 {
     return 4 + 32 * w.space_hauls.size();
+}
+
+void write_world_snapshot_pre_debris(const world& w, std::ostream& out)
+{
+    // VERIFICATION ONLY (BL-1598): the v87 stream shape - no debris section.
+    write_world_snapshot_at(w, out, k_world_save_version_pre_debris);
+}
+
+std::size_t world_save_debris_section_bytes(const world& w)
+{
+    std::size_t n = 12 + 9 * w.space_debris.size();
+    for (const auto& [aid, a] : w.space_assets)
+        n += a.wear != 0.0f ? 8 : 0;
+    for (const auto& [bid, b] : w.space_battles)
+        n += b.quiet_days != 0 ? 8 : 0;
+    return n;
 }
 
 void write_world_snapshot_pre_space_units(const world& w, std::ostream& out)
@@ -2916,7 +2967,8 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
             && version != k_world_save_version_pre_space_units // BL-1594: v83, no space units
             && version != k_world_save_version_pre_space_battles // BL-1597: v84, no space battles
             && version != k_world_save_version_pre_prospecting // BL-1600: v85, nothing mapped off-world
-            && version != k_world_save_version_pre_space_convoys)) // BL-1596: v86, nothing aboard
+            && version != k_world_save_version_pre_space_convoys // BL-1596: v86, nothing aboard
+            && version != k_world_save_version_pre_debris)) // BL-1598: v87, no debris, wear or quiet days
         return false; // mismatched version -- refuse rather than misread
 
     // BL-1422: a stream before the kit goods carries every per-resource array 49 wide;
@@ -5142,7 +5194,9 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
             space_battle b;
             if (!r_u32(in, b.id) || (k > 0 && b.id <= prev) || b.id >= next_id
                 || !r_id(in, b.node.body) || !r_enum(in, b.node.kind, orbital_node_kind::l5)
-                || !r_enum(in, b.state, space_battle_state::peace) || !r_i32(in, b.opened_tick)
+                || !r_enum(in, b.state, version >= k_world_save_version_debris ? space_battle_state::standoff // BL-1598
+                                                                              : space_battle_state::peace)
+                || !r_i32(in, b.opened_tick)
                 || !r_i32(in, b.days) || !r_f32(in, b.mass_destroyed))
                 return false;
             prev = b.id;
@@ -5320,6 +5374,62 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
         }
     }
     // ===== END BL-1596 =====
+    // ===== BEGIN BL-1598 (v88): debris and the stall. Untrusted, refused whole on any
+    // breach of world_save.hpp's v88 paragraph. A v87 (and older) stream ends before
+    // it: no debris, no wear, no quiet days. =====
+    if (version >= k_world_save_version_debris)
+    {
+        uint32_t count = 0;
+        if (!r_u32(in, count) || count > k_space_debris_nodes_max)
+            return false;
+        for (uint32_t k = 0; k < count; ++k)
+        {
+            orbital_node node{};
+            float        lv = 0.0f;
+            if (!r_id(in, node.body) || !r_enum(in, node.kind, orbital_node_kind::l5) || !r_f32(in, lv))
+                return false;
+            const auto bit = s.bodies.find(node.body);
+            if (bit == s.bodies.end() || bit->second.type == body_type::star || !orbital_node_is_orbital(node.kind)
+                || !std::isfinite(lv) || !(lv > k_space_debris_floor) || lv > k_space_debris_max
+                || (k > 0 && !(std::prev(s.space_debris.end())->first < node)))
+                return false;
+            s.space_debris.emplace_hint(s.space_debris.end(), node, lv);
+        }
+        if (!r_u32(in, count) || count > s.space_assets.size())
+            return false;
+        entity_id prev = null_entity;
+        for (uint32_t k = 0; k < count; ++k)
+        {
+            entity_id aid = null_entity;
+            float     wv  = 0.0f;
+            if (!r_id(in, aid) || !r_f32(in, wv) || (k > 0 && aid <= prev))
+                return false;
+            prev = aid;
+            const auto ait = s.space_assets.find(aid);
+            if (ait == s.space_assets.end()
+                || (ait->second.cls != space_asset_class::satellite && ait->second.cls != space_asset_class::station_core)
+                || !std::isfinite(wv) || !(wv > 0.0f) || !(wv < 1.0f))
+                return false;
+            ait->second.wear = wv;
+        }
+        if (!r_u32(in, count) || count > s.space_battles.size())
+            return false;
+        uint32_t prev_b = 0;
+        for (uint32_t k = 0; k < count; ++k)
+        {
+            uint32_t bid = 0;
+            int32_t  q   = 0;
+            if (!r_u32(in, bid) || !r_i32(in, q) || (k > 0 && bid <= prev_b))
+                return false;
+            prev_b = bid;
+            const auto bit = s.space_battles.find(bid);
+            if (bit == s.space_battles.end() || bit->second.state != space_battle_state::open || q < 1
+                || q > k_space_battle_stall_max)
+                return false;
+            bit->second.quiet_days = q;
+        }
+    }
+    // ===== END BL-1598 =====
 
     // BL-1266 (v46): every manual trade names a live owner and two distinct
     // standing markets, and holds an id below the next one to be issued, all

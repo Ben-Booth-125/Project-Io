@@ -1077,6 +1077,41 @@ uint64_t world::state_hash(int tick) const
                 fnv1a_u32(h, static_cast<uint32_t>(sh.home.kind));
             }
         }
+        // BL-1598: debris per node, each asset's wear, each open battle's quiet days
+        // — folded only when any is held, so a world without debris hashes as before.
+        {
+            std::vector<std::pair<entity_id, float>> wear;
+            for (const auto& [aid, a] : space_assets)
+                if (a.wear != 0.0f)
+                    wear.emplace_back(aid, a.wear);
+            std::vector<std::pair<uint32_t, int32_t>> quiet;
+            for (const auto& [bid, b] : space_battles)
+                if (b.quiet_days != 0)
+                    quiet.emplace_back(bid, b.quiet_days);
+            if (!space_debris.empty() || !wear.empty() || !quiet.empty())
+            {
+                fnv1a_u32(h, 0x1598u); // tag
+                fnv1a_u32(h, static_cast<uint32_t>(space_debris.size()));
+                for (const auto& [node, lv] : space_debris)
+                {
+                    fnv1a_u32(h, node.body);
+                    fnv1a_u32(h, static_cast<uint32_t>(node.kind));
+                    fnv1a_f32(h, lv);
+                }
+                fnv1a_u32(h, static_cast<uint32_t>(wear.size()));
+                for (const auto& [aid, wv] : wear)
+                {
+                    fnv1a_u32(h, aid);
+                    fnv1a_f32(h, wv);
+                }
+                fnv1a_u32(h, static_cast<uint32_t>(quiet.size()));
+                for (const auto& [bid, q] : quiet)
+                {
+                    fnv1a_u32(h, bid);
+                    fnv1a_i32(h, q);
+                }
+            }
+        }
     }
 
     // Province holder (BL-569). UNLIKE `provinces` itself (generation output,

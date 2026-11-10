@@ -820,6 +820,7 @@ void run_space_unit_day(world& w, const space_unit_params& p, const station_para
             if (--u.days_remaining > 0)
                 continue;
             u.days_remaining = 0;
+            r.arrivals.emplace_back(id, u.node); // BL-1598: the node it left
             u.node  = u.dest;
             u.state = (u.node.kind == orbital_node_kind::surface) ? space_unit_state::landed
                                                                    : space_unit_state::idle;
