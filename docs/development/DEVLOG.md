@@ -10,6 +10,17 @@ sessions can be scoped and paced with less waste.
 
 ---
 
+## 2026-11-10 — Cut v0.2.5 (version 0.2.5): diplomacy, equal starts, the opening and the war at sea
+
+**Runtime:** short; Light (release cut).
+
+- Cut v0.2.5 over sprints 61 to 64; no sprint is left open. CHANGELOG `[0.2.5]` and the README release line are stamped, and the tag `v0.2.5` is annotated on the stamp commit.
+- A patch, not v0.3.0: the v0.2.4 note held v0.3.0 for the naval system and a playtest with a few wars. Naval is in; the war playtest is not.
+- No re-pin of the digests (Ben, 2026-11-10). The known red harness rows are listed in the changelog.
+- **Backup:** the tag is the record (DEVELOPMENT_PRACTICES.md § Cutting a release).
+
+---
+
 ## 2026-11-10 — Sprint 64 closed: the war at sea; the merge's calls kept as built
 
 **Runtime:** short; Corpus (sprint close).

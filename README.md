@@ -111,7 +111,9 @@ it against a committed golden image:
 ./build/ProjectIo --verify scripts/verify/corporation_lens.lua
 ```
 
-## Latest releases — v0.2.0 to v0.2.4
+## Latest releases — v0.2.0 to v0.2.5
+
+**v0.2.5 — diplomacy, equal starts and the war at sea.** Wars have goals, a score and a peace that may cede ground, and a nation that loses its last province ends. Every major opens on the same kit, credits and army. Ships patrol, escort, raid, blockade and land armies, for the player and every rival, and forces are paid and sized from income. The save keeps its economy, population grows at a set rate, and a march takes its own fastest route across all six sides of a hex. v0.3.0 waits on a playtest with a few wars.
 
 **v0.2.4 — war in time and on the ground.** Units march by the day at their class speed, and battles run for weeks with no cap and no randomness, decided by numbers, supply, recon and terrain. Armies carry food, ammunition and equipment, drawing supply up to 8 tiles off the road, and an equal, supplied pair entrenches. Armour needs roads through mountains and desert. Air combat arrives: airbases, wings and daily missions, which rival nations run too. v0.3.0 waits for the naval system and a playtest with a few wars.
 

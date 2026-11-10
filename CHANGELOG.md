@@ -12,6 +12,15 @@ release.
 
 ## [Unreleased]
 
+## [0.2.5] — 2026-11-10
+
+*Diplomacy, equal starts, the opening and the war at sea. Wars are records with goals, a score and
+a peace that may cede ground, and a nation that loses its last province ends. Every major opens on
+the same kit, credits and army. Ships patrol, escort, raid, blockade and land armies, for the
+player and every rival. The save keeps its economy, population grows at a set rate, and a march
+takes its own fastest route across all six sides of a hex. v0.3.0 still waits on a playtest with
+a few wars.*
+
 ### Added
 
 - **Every major opens on the same kit** (BL-1473 (major opening kit)): its walk-placed plant is
@@ -26,6 +35,55 @@ release.
 - **The wizard suggests 30 nations** (BL-1476 (wizard default thirty)), with 4 majors.
 - **Opening parity census** (BL-1475 (opening parity census)): `opening_parity` and the
   `opening-parity` skill measure the majors' spread and workability over five years of play.
+- **Wars with goals and a peace** (BL-1459 (war record and declaration), BL-1428 (war goals and
+  peace), BL-1460 (cession moves territory)): a war has goals, a score and exhaustion, and its
+  peace may cede provinces. Rivals declare, answer, impose peace and embargo (BL-1461 (rivals
+  declare war), BL-1481 (rival embargo)).
+- **A nation with no ground ends** (BL-1562 (both sides hostile)): a peace that cedes a nation's
+  last province ends it, and its property and treasury pass to the conqueror. The player's nation
+  can end. World save v83.
+- **Alarm is the third sentiment** (BL-1432 (Alarm as sentiment), BL-1458 (sentiment emitters)),
+  and each row names its largest cause (BL-1470 (sentiment contributors)).
+- **The Diplomacy ledger** (BL-1462 (diplomacy ledger)): slot 9, with Nations and Wars.
+- **Land classes, kit and recruits** (BL-1422 (land classes and kit), BL-1423 (refit and
+  retreat), BL-1426 (bunkers), BL-1436 (kit in the age tree), BL-1463 (recruits)).
+- **The war at sea** (BL-1430 (sea theatre), BL-1527 (ship kit), BL-1528 (naval branch)): four
+  ship classes raised at a port and sent to a mission zone. Patrol, escort and raid (BL-1529),
+  sea control and blockade (BL-1530), troop landings (BL-1531). Majors open with a fixed fleet
+  (BL-1532 (opening fleets)); rivals sail fleets (BL-1533 (rival fleets)); ships on the map with
+  a card to order them (BL-1534 (sea UI)). World save v88, envelope v29.
+- **Forces are paid, equipped and sized from income** (BL-1550 (force pay), BL-1551 (force
+  equipment), BL-1552 (force sizing), BL-1617 (garrison income)).
+- **Shell and map**: convoys on the map (BL-1506), drag select (BL-1508), standing bars
+  (BL-1509), an alert strip (BL-1515), an escape menu and named saves (BL-1519, BL-1559), a site
+  finder tab with Construct at the best site (BL-1553, BL-1556), market auto trades (BL-1557),
+  war notices (BL-1560).
+- **The opening climb** (BL-1497 (opening cost curve), BL-1498 (flat handoff treasury)): build
+  costs and days scale with the opening, and research counts inside net (BL-1539 (research in
+  return)).
+
+### Changed
+
+- **A march takes its own fastest route** (Ben, 2026-11-10): the route is priced by the march's
+  own days per hop, and steps all six sides of a hex. Roads still lie on four.
+- **Population grows as a rate** (BL-1567 (growth as a rate)): pooled growth over the first decade
+  is 1.18%/yr, up from -0.22%.
+- **A consumer quote reads local evidence** (BL-1542 (consumer quote)): median error 225 -> 81.
+- **Motion chases its point**: units and convoys glide without jumps.
+- The seed library is re-curated off a 96-seed pool (BL-1413 (seed re-curation)).
+
+### Fixed
+
+- **The economy stalled after a load** (BL-1565): the registry now loads before the save, and the
+  save carries the last economy report (BL-1566, envelope v27).
+- A broke nation no longer spirals (BL-1482 (broke nation spiral)).
+
+### Known issues
+
+- The handoff digests were not re-pinned for this release (Ben, 2026-11-10).
+- Centres can demote on their first bad quarter, accepted as built (NR-1155).
+- `population_mvp` (7 T-rows), `tile_contact` T13d, `history_sim` R3a2/R3a3,
+  `carried_supplies` S7e, `logistic_points` (18 rows) and `cession` C9 are red.
 
 ## [0.2.4] — 2026-10-30
 
@@ -1834,7 +1892,8 @@ Layer 2 finalisation.
 
 Initial prototype snapshot — application shell, canvases, and the hard-coded world.
 
-[Unreleased]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.2.4...HEAD
+[Unreleased]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.2.5...HEAD
+[0.2.5]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.2.4...v0.2.5
 [0.2.4]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.2.3...v0.2.4
 [0.2.3]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.2.2...v0.2.3
 [0.2.2]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.2.1...v0.2.2
