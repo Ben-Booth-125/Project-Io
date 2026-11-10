@@ -65,6 +65,10 @@ struct space_programme_params
 {
     float components_lump = 0.0f; ///< `spacecraft_components` per purchase.
     float propellant_lump = 0.0f; ///< `propellant` per purchase.
+    /// BL-1630 (SPACE_ASSETS.md § Launching, "A staffed pad bids for its
+    /// launch"): launch lots a launch-ready nation (Rocketry, a staffed pad) bids
+    /// for on its home market each quarter, as POSTED demand. 0 = no standing bid.
+    float standing_lots = 0.0f;
 };
 
 /// One state purchase, from intent to outcome — reported, never stored. The

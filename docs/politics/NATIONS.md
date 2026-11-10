@@ -286,7 +286,9 @@ the fair-price ceiling admits — pays the posted price as a direct, whole-or-no
 and the goods leave the shelf **without landing anywhere** — state demand is terminal. The supplier
 is always a market: no actor holds stock (`../economy/MARKETS.md` § The shelf economy), and
 whoever stocked the shelf was paid when the goods landed. The lump sizes are data
-(`economy.space_programme`, scripts/economy.lua).
+(`economy.space_programme`, scripts/economy.lua). **They are authored at zero**: the launch is the
+space programme's goods buyer, bidding through its staffed pad (`../economy/SPACE_ASSETS.md`
+§ Launching), and a lump consumed with nothing launched would empty the shelf it waits on.
 
 ### Taxes and Discontent (Ben, 2026-10-16)
 

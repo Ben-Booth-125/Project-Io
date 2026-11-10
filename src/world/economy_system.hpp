@@ -636,6 +636,17 @@ void advance_musters(world& w);
 /// advance_musters; exposed so a harness can step it alone.
 void advance_refits(world& w);
 
+/// BL-1630 (SPACE_ASSETS.md § Launching, "A staffed pad bids for its launch"):
+/// every nation holding Rocketry with a staffed Launchpad on its home body posts
+/// @p standing_lots x its standing lot (`space_standing_lot`) as a want on its
+/// home market — `report.wants` (so the clear raises it into `demand`), or
+/// `report.hauler_wants` for a good priced over the fair-price ceiling
+/// (@p reservation_mult; it does not bid). Ascending nation id; inert at
+/// `standing_lots <= 0` and before the research age opens. Called by
+/// run_economy_step after building upkeep; exposed so a harness can run it alone.
+void post_space_launch_wants(const world& w, const space_asset_params& sp, float reservation_mult,
+                             float standing_lots, economy_report& report);
+
 economy_report run_economy_step(world& w, const recipe_registry& reg,
                                 bool spectating = false);
 

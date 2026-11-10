@@ -325,6 +325,16 @@ float space_heliocentric_au(const world& w, entity_id body);
 /// `null_entity` when neither resolves.
 entity_id space_home_body_of(const world& w, entity_id nation);
 
+/// BL-1630 (SPACE_ASSETS.md § Launching, "A staffed pad bids for its launch"):
+/// the standing lot a launch-ready nation bids for on its home market — one
+/// satellite's goods to its home low orbit: `components_lot[satellite]`
+/// `spacecraft_components` and `propellant_per_dv[satellite]` x the path's Δv
+/// of `propellant`, at @p market (`space_home_market`). True only for a nation
+/// holding Rocketry with a staffed Launchpad on its home body, a home market and
+/// a path to its low orbit; false, outputs zeroed, otherwise. Pure.
+bool space_standing_lot(const world& w, const space_asset_params& p, entity_id nation,
+                        entity_id& market, float& components, float& propellant);
+
 /// PURE. Price @p cls to @p node for @p nation and say whether it is legal,
 /// gated open, slotted, stocked and affordable — `result` is what
 /// `launch_space_asset` would return. @p role is a satellite's role (required,
