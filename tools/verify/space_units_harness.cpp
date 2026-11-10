@@ -49,7 +49,9 @@
 // Build: node tools/verify/build_harness.js space_units_harness --run
 // ---------------------------------------------------------------------------
 
+#include "world/digitisation_tree_data.hpp"
 #include "world/early_space_tree_data.hpp"
+#include "world/nation_tech.hpp"
 #include "world/orbital_graph.hpp"
 #include "world/space_assets.hpp"
 #include "world/space_tech_keys.hpp"
@@ -213,7 +215,26 @@ void build(fixture& f)
     f.home_pad = add_pad(w, f.a, f.home_tile, 1.0f);
     f.moon_pad = add_pad(w, f.a, f.moon_tile, 1.0f);
     grant_far_space(w, f.a);
-    w.nation_tech[f.b]; // an entry, holding nothing
+    w.nation_tech[f.b]; // an entry, holding no Early Space node
+    // BL-1582's launch gate (Rocketry, a staffed pad, the core key) stands in front of
+    // every station core since the merge: both nations hold the Digitisation tree's
+    // near-space keys and B gets a staffed home pad, so build_station founds for each.
+    for (entity_id n : {f.a, f.b})
+    {
+        auto& held = w.nation_tech[n].held;
+        held.set();
+        for (int i = 0; i < io::dg::node_count; ++i)
+        {
+            const int ex = io::dg::nodes[static_cast<std::size_t>(i)].excludes;
+            if (ex < 0 || !held.test(static_cast<std::size_t>(i)) || !held.test(static_cast<std::size_t>(ex)))
+                continue;
+            bool keyed = false;
+            for (const std::string_view k : space_keys::near_space)
+                keyed = keyed || node_has_mechanic(i, k);
+            held.reset(static_cast<std::size_t>(keyed ? ex : i));
+        }
+    }
+    add_pad(w, f.b, f.home_tile, 1.0f);
 }
 
 using sk = space_unit_slot;
