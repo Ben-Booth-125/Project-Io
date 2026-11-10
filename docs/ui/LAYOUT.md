@@ -318,7 +318,13 @@ visible while the player works elsewhere.
   shared `entity_summary` stat block — over which single-click selects (the Selection
   band then shows the full action content) and double-click navigates, per the click
   model in `SELECTION.md`. Acting on a pin is one click away, by design. The pin toggle
-  sits on the Selection band header.
+  sits on the Selection band header, at its top-right corner, and shows whenever the band
+  shows an entity; it is a toggle, so pressing it on a pinned subject unpins it.
+- **What is kept.** The player's pins travel in the save's ui slice, in pin order; a pin
+  whose entity is gone drops off. Front pins are derived from the war each frame and are
+  never saved.
+- **The lens key yields nothing.** A count-driven lens key grows up from the minimap into
+  the same residual (`MINIMAP.md` § Lens chrome); the pins stop one margin above it.
 - **No nav-rail slot.** Fixed shell chrome, not a ledger — absent from
   `close_all_panels` / `any_panel_open`, exactly like the comms dock and the Selection
   band.
@@ -330,7 +336,11 @@ pin** for every body where the war has a front (`../military/MILITARY.md` § Spa
 every body"). A front pin is placed and removed by the war itself, not by the player: it appears when
 a front opens and goes when it closes. It shows the body, the enemy and the front's state; a
 double-click takes the canvas to that body's front, so a war on a moon is one click from a war at
-home. Front pins sit above the player's own pins.
+home. Front pins sit above the player's own pins. A single click selects the player's front toward
+that enemy on that body (its front card), or the enemy nation where there is no land front; a
+double click lands on the middle of that front, else a contested province, else the enemy's
+province nearest the player's ground. The front's state is the provinces each side holds there,
+the provinces occupied either way, and the war score from the player's side.
 
 ---
 

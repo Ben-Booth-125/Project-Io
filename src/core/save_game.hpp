@@ -378,7 +378,16 @@ inline constexpr uint32_t save_game_magic =
 /// stream ends before it and opens with an empty report, exactly as every load did
 /// before v27. The rebuilt indices (`building_row`, `logistic_points.fraction` and
 /// `.supply_share`) are never on disk.
-inline constexpr uint32_t save_game_version = 27; // SAVE_BUILDING_REPORT: the last report at the tail
+/// LAYOUT 28 (BL-1603, pinned items) = LAYOUT 27 PLUS ONE ID LIST AT THE ENVELOPE'S TAIL,
+/// after the last report: the player's pins (`ui_state::pinned.pins`, in pin order),
+/// part of the ui slice below - what the player was WATCHING, beside what it was looking
+/// at. At the tail so v27 is a strict prefix: a v27 stream ends before it and opens with
+/// no pins. Front pins are derived from the wars every frame and are never on disk.
+inline constexpr uint32_t save_game_version = 28; // PINNED_ITEMS: the player's pins at the tail
+/// The first layout carrying the player's pins (BL-1603).
+inline constexpr uint32_t save_game_version_pins = 28;
+/// v27: the v28 layout without the pins tail.
+inline constexpr uint32_t save_game_version_pre_pins = 27;
 /// The first layout carrying the last economy report (part 5).
 inline constexpr uint32_t save_game_version_econ_report = 27;
 /// v25: the v27 layout without the last-report tail.
@@ -441,6 +450,8 @@ struct save_envelope
     entity_id        active_body       = null_entity;
     entity_id        selected_entity   = null_entity;
     uint32_t         selected_province = 0;
+    /// The player's pinned items, in pin order (save_game_version 28, BL-1603).
+    std::vector<entity_id> pins;
 
     float solar_zoom      = 1.0f, solar_pan_x = 0.0f, solar_pan_y = 0.0f;
     float circum_zoom     = 1.0f, circum_pan_x = 0.0f, circum_pan_y = 0.0f;

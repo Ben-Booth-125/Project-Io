@@ -1254,6 +1254,10 @@ void w_envelope(std::ostream& o, const save_envelope& e, uint32_t version = save
     // targets, so v25 is a strict prefix. Keep r_envelope in step.
     if (version >= save_game_version_econ_report)
         w_last_report(o, e);
+    // save_game_version 28 (BL-1603): the player's pins, after the report, so v27
+    // is a strict prefix. Keep r_envelope in step.
+    if (version >= save_game_version_pins)
+        w_ids(o, e.pins);
 }
 
 /// Every envelope field a v22 stream carries, in order (defined below).
@@ -1284,7 +1288,15 @@ bool r_envelope(std::istream& i, save_envelope& e, uint32_t version,
     // and opens with an empty report, as every load did before v27.
     if (version < save_game_version_econ_report)
         return true;
-    return r_last_report(i, e, entity_cap);
+    if (!r_last_report(i, e, entity_cap))
+        return false;
+    // save_game_version 28 (BL-1603) -- keep w_envelope in step. A v27 stream ends
+    // here and opens with no pins. Every pin is an id the world issued, so a list
+    // longer than that is corrupt; a pin naming a since-removed entity is not, and
+    // the panel drops it at draw.
+    if (version < save_game_version_pins)
+        return true;
+    return r_vec_capped(i, e.pins, r_idv, k_min_id, entity_cap);
 }
 
 bool r_envelope_v22(std::istream& i, save_envelope& e)
@@ -1350,7 +1362,8 @@ bool write_save_game_at(const std::string& path, const world& w, const save_enve
     // the matching shape - for v23/v22, a v73 world snapshot (every per-resource array 49
     // wide) and an envelope whose endowments and market history are 49 wide (and, for
     // v22, no nation targets). The game writes only `write_save_game`.
-    if (version != save_game_version && version != save_game_version_pre_econ_report
+    if (version != save_game_version && version != save_game_version_pre_pins
+        && version != save_game_version_pre_econ_report
         && version != save_game_version_pre_airframes
         && version != save_game_version_pre_kit_goods
         && version != save_game_version_prefix_compatible)
@@ -1385,11 +1398,12 @@ bool read_save_game(const std::string& path, world& w, save_envelope& env,
 
     uint32_t version = 0;
     if (!r_u32(in, version)
-        || (version != save_game_version && version != save_game_version_pre_econ_report
+        || (version != save_game_version && version != save_game_version_pre_pins
+        && version != save_game_version_pre_econ_report
             && version != save_game_version_pre_airframes
             && version != save_game_version_pre_kit_goods
             && version != save_game_version_prefix_compatible))
-        return false; // LAYOUT 27: v25 has no report tail; v24 reads 54 wide (BL-1436); v23 and v22 49 wide (BL-1422)
+        return false; // LAYOUT 28: v27 has no pins tail; LAYOUT 27: v25 has no report tail; v24 reads 54 wide (BL-1436); v23 and v22 49 wide (BL-1422)
 
     // Both halves build into scratch. `read_world_snapshot` already guarantees
     // this for the world; doing the same for the envelope is what lets a caller

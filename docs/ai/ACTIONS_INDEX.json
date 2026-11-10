@@ -426,6 +426,14 @@
    "War notice, top centre of the canvas area below the alert strip: one per war the player's nation has become party to, by either side's declaration, naming both parties (docs/ui/LAYOUT.md § War notice)."
   ],
   [
+   "chrome.pin_toggle",
+   "The pin toggle: a small pushpin square at the Selection band's top-right corner, over the band's header row, shown whenever the band shows an entity - a body, tile, building, market, unit, nation or air wing (docs/ui/LAYOUT.md § Pinned items)."
+  ],
+  [
+   "chrome.pin_press",
+   "A card in the pinned-items panel, the right chrome column between the time panel and the minimap: front pins first (one per body where a war the player's nation is party to has a front, placed by the war), then the player's own pins in pin order (docs/ui/LAYOUT.md § Pinned items)."
+  ],
+  [
    "chrome.f10_options",
    "Keyboard; opens the centred Options window"
   ],

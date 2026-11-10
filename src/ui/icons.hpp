@@ -702,6 +702,17 @@ void rail_line(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
 /// @param colour Fill colour (the nation's identity colour).
 void capital(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
 
+/// BL-1603 (LAYOUT.md § Pinned items): the PIN glyph - a pushpin leaning right, a
+/// filled round head over a short collar and a needle running down-left to the point.
+/// Stroke family: @p colour fills the head and strokes the needle. The pin toggle on
+/// the Selection band draws it, and every player pin card carries it as its badge.
+///
+/// @param dl     Draw list to render into.
+/// @param centre Glyph centre, screen pixels.
+/// @param r      Half-extent of the glyph, screen pixels.
+/// @param colour Fill and stroke colour (caller - `palette::pinned` when active).
+void pin(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
+
 /// BL-1454 (docs/ui/ledgers/military.md § The stat grid): the STAT glyphs - one per
 /// number a land unit or an air wing fights with, the icon at the left of each stat
 /// grid cell (a cell carries no text label; its name is the hover tooltip). Line

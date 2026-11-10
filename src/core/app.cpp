@@ -38,6 +38,7 @@
 #include "ui/format.hpp"
 #include "ui/frame_stats.hpp" // frame-budget HUD (BL-249, v0.1.0 quality audit)
 #include "ui/alerts.hpp"
+#include "ui/pinned_panel.hpp" // the pinned-items watch list and front pins (BL-1603)
 #include "ui/header_panel.hpp"
 #include "ui/foldout_column.hpp" // shell_column_width — permanent left shell column (BL-122)
 #include "ui/shell_metrics.hpp"  // the shell's rect algebra, one owner (BL-216)
@@ -2223,6 +2224,7 @@ void app::setup_presentation(const world_params& params)
     m_chat = ui::chat_state{};
     m_war_log_cursor = m_world.history_log.size(); // BL-1480: no dispatch for what came before
     m_ui.war_notices = war_notice_state{}; // no notice for what came before
+    m_ui.pinned = pinned_items_state{};    // a new world's ids name nothing of the old one's
     ui::chat_post(m_chat, 0, null_entity, 0,
                   std::to_string(m_world.nations.size()) +
                       " nations on the public channel.");
@@ -2510,6 +2512,7 @@ bool app::save_game_to(const std::string& path)
     env.active_body       = m_ui.active_body;
     env.selected_entity   = m_ui.selected_entity;
     env.selected_province = m_ui.selected_province;
+    env.pins              = m_ui.pinned.pins; // save_game_version 28 (BL-1603)
     env.solar_zoom        = m_ui.solar_zoom;
     env.solar_pan_x       = m_ui.solar_pan_x;
     env.solar_pan_y       = m_ui.solar_pan_y;
@@ -2631,6 +2634,8 @@ bool app::load_game_from(const std::string& path)
     m_ui.active_body       = env.active_body;
     m_ui.selected_entity   = env.selected_entity;
     m_ui.selected_province = env.selected_province;
+    m_ui.pinned            = pinned_items_state{};
+    m_ui.pinned.pins       = env.pins; // save_game_version 28 (BL-1603); stale ids drop at draw
     m_ui.solar_zoom        = env.solar_zoom;
     m_ui.solar_pan_x       = env.solar_pan_x;
     m_ui.solar_pan_y       = env.solar_pan_y;
@@ -3028,6 +3033,12 @@ void app::render()
     // restores whichever tier was last active, wherever it was set.
     ui::draw_time_panel(m_ui, m_sim_loop, m_prev_speed, disp);
 
+    // Pinned items (LAYOUT.md § Pinned items — right column, middle; BL-1603): the
+    // residual middle of the right chrome column, under the time panel just drawn
+    // (whose height it reads) and above the minimap. Front pins first, then the
+    // player's own. A read of the world: it writes only its own ui_state.
+    ui::draw_pinned_panel(m_world, m_ui, disp);
+
     // Corporation profile — top-left corner, above the navigation pane.
     ui::draw_profile_panel(m_world);
 
@@ -3169,6 +3180,9 @@ void app::render()
         m_ui.designer.card_type_x = m_ui.designer.card_type_y = -1.0f; // the unit card republishes it
         ui::draw_selection_band(m_world, m_registry, m_last_econ_report,
                                 m_ui, band_origin, band_size);
+        // The pin toggle (LAYOUT.md § Pinned items): on the band's header row, at its
+        // top-right corner; its own window so it sits over whichever layout drew.
+        ui::draw_pin_toggle(m_world, m_ui, band_origin, band_size);
     }
 
     // The shell fold-out column is ledgers-only (BL-195), and it now really is: the

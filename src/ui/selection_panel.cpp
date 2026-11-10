@@ -4129,6 +4129,10 @@ void draw_tile_selection(world& w, const recipe_registry& reg, const economy_rep
     // ── 3. Tile: its buildings, or one of them expanded ──
     {
         ImGui::BeginChild("##tile_card", {tile_w, total_h}, true, ImGuiWindowFlags_NoSavedSettings);
+        // BL-1603: this element has no header row, so the band's pin toggle ends
+        // the tile column's heading row instead (pinned_panel.cpp draw_pin_toggle).
+        ui.pinned.header_anchor_x = ImGui::GetWindowPos().x + ImGui::GetWindowContentRegionMax().x;
+        ui.pinned.header_anchor_y = ImGui::GetWindowPos().y + ImGui::GetWindowContentRegionMin().y;
         const std::vector<production_stack> stacks = tile_stacks(w, tile_id, god);
         if (expanded != null_entity)
         {

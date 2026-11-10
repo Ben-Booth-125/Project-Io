@@ -452,6 +452,39 @@ struct war_notice_state
     bool armed = false;
 };
 
+/// The pinned-items watch list (LAYOUT.md § Pinned items — right column, middle;
+/// BL-216's pinned slice, BL-1603's front pins). `pins` is the player's own list,
+/// in the order pinned; it travels in the save's ui slice (save_game.hpp, LAYOUT
+/// 28). Front pins are NOT stored: they are derived from the war state each frame.
+/// `drawn` is what the panel and the pin toggle drew last frame, for verify.
+struct pinned_items_state
+{
+    std::vector<entity_id> pins;
+
+    struct card
+    {
+        bool      front  = false;        ///< A front pin (war-placed) rather than a player pin.
+        entity_id id     = null_entity;  ///< The pinned entity; the front's body for a front pin.
+        entity_id enemy  = null_entity;  ///< Front pins: the nation across the front.
+        float     x = 0.0f, y = 0.0f;    ///< Centre of the card as drawn.
+        float     w = 0.0f, h = 0.0f;
+    };
+    struct drawn_state
+    {
+        bool              panel    = false;  ///< The panel drew this frame.
+        float             x = 0.0f, y = 0.0f, w = 0.0f, h = 0.0f;
+        std::vector<card> cards;             ///< Front pins first, then the player's, as drawn.
+        float             toggle_x = -1.0f, toggle_y = -1.0f; ///< Pin toggle centre; -1 = not drawn.
+        bool              toggle_on = false; ///< The toggle's subject is pinned.
+        entity_id         toggle_subject = null_entity;
+    } drawn;
+    /// Where a band layout with NO header row wants the pin toggle this frame: the
+    /// right end (screen x) and top (screen y) of the row it should end. The tile
+    /// element sets it to its tile column's heading (selection_panel.cpp); the toggle
+    /// reads and clears it. -1 = the default, the header row's end.
+    float header_anchor_x = -1.0f, header_anchor_y = -1.0f;
+};
+
 struct diplomacy_ledger_state
 {
     /// 0 = Nations (default), 1 = Wars.
@@ -1448,6 +1481,7 @@ struct ui_state
     /// `no_province` to clear). app::render sends one `defend_province` per pair and clears it.
     std::vector<std::pair<entity_id, uint32_t>> pending_defend_province;
     war_notice_state war_notices; ///< The war notice's bookkeeping (Ben, 2026-11-09).
+    pinned_items_state pinned;    ///< The pinned-items watch list and its front pins (BL-1603).
 
     // --- The selected deposit and plate (BL-659 / BL-660) -----------------
     // Ben, 2026-08-28, choosing option A: follow the battle precedent rather
