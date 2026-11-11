@@ -1,6 +1,7 @@
 #pragma once
 
 #include "world/world.hpp"
+#include "ui_scale.hpp" // BL-1495: px, px_const
 
 #include <vector>
 
@@ -85,6 +86,6 @@ int player_runway_quarters(const world& w, const std::vector<float>& balance_his
 /// Height of the header strip in pixels. Matches the identity card
 /// (profile_panel_height, 92) so the balance bar and the identity tile read as one
 /// level top band across the window; the strip's content is vertically centred.
-inline constexpr float header_panel_height = 92.0f;
+inline constexpr px_const header_panel_height {92.0f};
 
 } // namespace ui

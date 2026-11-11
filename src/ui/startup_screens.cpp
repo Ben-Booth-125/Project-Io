@@ -5,6 +5,7 @@
 /// they simply live beside the other ui surfaces now.
 
 #include "core/app.hpp"
+#include "ui_scale.hpp" // BL-1495: px
 
 #include <imgui.h>
 
@@ -1716,7 +1717,7 @@ void app::draw_main_menu()
         };
         centre_text(title, IM_COL32(225, 230, 240, 255));
         centre_text(tag,   IM_COL32(120, 128, 145, 255));
-        ImGui::Dummy({0.0f, 18.0f});
+        ImGui::Dummy(ui::px(0.0f, 18.0f));
 
         // --- New World (BL-114). The menu sets no world input any more: every
         //     one is set in the wizard, which edits m_pending_world_params and
@@ -1733,7 +1734,7 @@ void app::draw_main_menu()
         // intent reads without implying it works yet.
         ImGui::BeginDisabled();
         int bodies_stub = 5;
-        ImGui::SetNextItemWidth(280.0f);
+        ImGui::SetNextItemWidth(ui::px(280.0f));
         ImGui::SliderInt("##bodies", &bodies_stub, 5, 5, "Bodies: %d (fixed)");
         ImGui::EndDisabled();
         if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
@@ -1744,25 +1745,25 @@ void app::draw_main_menu()
         // taken against a chart of the system as it stands — a slider whose effect
         // you cannot see is a slider you cannot judge.
         {
-            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + 280.0f);
+            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + ui::px(280.0f));
             ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(120, 128, 145, 255));
             ImGui::TextUnformatted("The world's character is chosen during generation.");
             ImGui::PopStyleColor();
             ImGui::PopTextWrapPos();
         }
 
-        ImGui::Dummy({0.0f, 12.0f});
+        ImGui::Dummy(ui::px(0.0f, 12.0f));
 
         const ImVec2 btn = {280.0f, 40.0f};
         if (ImGui::Button("New Game", btn))
             open_new_world_wizard();
-        ImGui::Dummy({0.0f, 6.0f});
+        ImGui::Dummy(ui::px(0.0f, 6.0f));
         if (ImGui::Button("Quick Start", btn))
             open_quick_start();
         if (ImGui::IsItemHovered())
             ImGui::SetTooltip("Set the nations and resources, then build the world\n"
                               "straight through, past the rounds, and choose your corporation.");
-        ImGui::Dummy({0.0f, 6.0f});
+        ImGui::Dummy(ui::px(0.0f, 6.0f));
         {
             // Load (STARTUP.md § Main menu; Ben, 2026-11-09): every save, by name. The
             // list is re-read twice a second while the menu stands, as a press of F5 in
@@ -1822,7 +1823,7 @@ void app::draw_main_menu()
                     m_load_list_open = false;
             }
         }
-        ImGui::Dummy({0.0f, 6.0f});
+        ImGui::Dummy(ui::px(0.0f, 6.0f));
         if (ImGui::Button("Quit", btn))
             m_quit_requested = true;
         if (!m_menu_message.empty())
@@ -2318,8 +2319,8 @@ void app::draw_generation_screen()
     // background-less idiom as draw_main_menu; the render clear colour is the backdrop.
     // Split 1/3 : 2/3 — controls (stage folds, leans, reroll) left, the round's
     // painted preview right, so every reroll is SEEN, not just re-plotted.
-    const float panel_w = std::min(disp.x - 96.0f, 1440.0f);
-    const float panel_h = std::max(420.0f, disp.y - 96.0f);
+    const float panel_w = std::min(disp.x - ui::px(96.0f), 1440.0f);
+    const float panel_h = std::max(ui::px(420.0f), disp.y - ui::px(96.0f));
     ImGui::SetNextWindowPos({disp.x * 0.5f, disp.y * 0.5f}, ImGuiCond_Always, {0.5f, 0.5f});
     ImGui::SetNextWindowSize({panel_w, panel_h}, ImGuiCond_Always);
     constexpr ImGuiWindowFlags flags =
@@ -2363,7 +2364,7 @@ void app::draw_generation_screen()
             const ImVec2 ts = ImGui::CalcTextSize(buf);
             dl->AddText({p.x + avail - ts.x, p.y + (big - ts.y) * 0.5f}, col_dim, buf); // fit-exempt: chrome strip authored to fit at the 1280x720 floor
 
-            ImGui::Dummy({avail, big + 2.0f});
+            ImGui::Dummy({avail, big + ui::px(2.0f)});
         }
         dim_text(wr.question);
 
@@ -2377,13 +2378,13 @@ void app::draw_generation_screen()
             constexpr float pip = 10.0f, gap = 6.0f;
             for (int i = 0; i < wizard_round_count; ++i)
             {
-                const ImVec2 a{p.x + static_cast<float>(i) * (pip + gap), p.y + 4.0f};
+                const ImVec2 a{p.x + static_cast<float>(i) * (pip + gap), p.y + ui::px(4.0f)};
                 const ImVec2 b{a.x + pip, a.y + pip};
                 if (i == m_wiz_round)     dl->AddRectFilled(a, b, col_bright);
                 else if (i < m_wiz_round) dl->AddRectFilled(a, b, col_dim);
                 else                      dl->AddRect(a, b, col_dim);
             }
-            ImGui::Dummy({static_cast<float>(wizard_round_count) * (pip + gap), pip + 8.0f});
+            ImGui::Dummy({static_cast<float>(wizard_round_count) * (pip + gap), pip + ui::px(8.0f)});
         }
         ImGui::Separator();
 
@@ -2426,7 +2427,7 @@ void app::draw_generation_screen()
         // A lapse round fills the cap, and its board and ticker are cut to it
         // below. The scroll bar is never drawn; the wheel still scrolls an
         // expanded fold.
-        const float charts_cap = std::max(60.0f, ImGui::GetContentRegionAvail().y
+        const float charts_cap = std::max(ui::px(60.0f), ImGui::GetContentRegionAvail().y
                                                      - (decide_h + footer_h));
         const float charts_h   = m_wiz_charts_content_h > 0.0f
                                      ? std::min(charts_cap, m_wiz_charts_content_h)
@@ -2509,7 +2510,7 @@ void app::draw_generation_screen()
                     // THE TOP BAND (Ben, 2026-10-08): the bar sits on
                     // ui::loading_bar_y(), so the label is padded to one line
                     // plus the wait's 10 px gap above it -- not 40% down.
-                    ui::pad_to_loading_band(ImGui::GetTextLineHeightWithSpacing() + 10.0f
+                    ui::pad_to_loading_band(ImGui::GetTextLineHeightWithSpacing() + ui::px(10.0f)
                                             + ImGui::GetStyle().ItemSpacing.y);
                     if (w > sz.x)
                         ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (w - sz.x) * 0.5f);
@@ -2747,7 +2748,7 @@ void app::draw_generation_screen()
             m_wiz_charts_content_h = content_h;
             if (lapse_round)
             {
-                const float row_h = ImGui::GetTextLineHeightWithSpacing() + 2.0f;
+                const float row_h = ImGui::GetTextLineHeightWithSpacing() + ui::px(2.0f);
                 const float over  = content_h - charts_cap;
                 int b = m_wiz_fit_board_rows, t = m_wiz_fit_ticker_rows;
                 if (over > 0.0f)
@@ -2929,13 +2930,13 @@ void app::draw_generation_screen()
             const ImVec2 p0 = ImGui::GetCursorScreenPos();
             const bool has_reroll = !culture_round && !setup_round;
             m_wiz_btn_xy[0] = has_reroll ? p0.x + bar_w * 0.5f : -1.0f;
-            m_wiz_btn_xy[1] = has_reroll ? p0.y + 17.0f : -1.0f;
+            m_wiz_btn_xy[1] = has_reroll ? p0.y + ui::px(17.0f) : -1.0f;
         }
         if (culture_round)
         {
             const float row_y = ImGui::GetCursorPosY();
             dim_text("These peoples follow the ground. Reroll the Life round to change them.");
-            ImGui::SetCursorPosY(row_y + 34.0f + style.ItemSpacing.y);
+            ImGui::SetCursorPosY(row_y + ui::px(34.0f) + style.ItemSpacing.y);
         }
         // BL-1279: THE SETUP ROUND CARRIES NO REROLL EITHER. It draws nothing:
         // the seed is hidden, and the Life round's Reroll is how a player asks
@@ -2947,10 +2948,10 @@ void app::draw_generation_screen()
             dim_text(m_wiz_quick_start
                          ? "Begin builds this world straight through to the seat."
                          : "A change here rebuilds every round from Life on.");
-            ImGui::SetCursorPosY(row_y + 34.0f + style.ItemSpacing.y);
+            ImGui::SetCursorPosY(row_y + ui::px(34.0f) + style.ItemSpacing.y);
         }
         // Reroll full-width and first — it is the wizard's main verb now.
-        else if (ImGui::Button("Reroll##wizroll", {bar_w, 34.0f}))
+        else if (ImGui::Button("Reroll##wizroll", {bar_w, ui::px(34.0f)}))
         {
             if (planetology_round)
             {
@@ -2969,11 +2970,11 @@ void app::draw_generation_screen()
         {
             const ImVec2 p0 = ImGui::GetCursorScreenPos();
             m_wiz_btn_xy[2] = p0.x + half * 0.5f;
-            m_wiz_btn_xy[3] = p0.y + 17.0f;
+            m_wiz_btn_xy[3] = p0.y + ui::px(17.0f);
             m_wiz_btn_xy[4] = p0.x + half * 1.5f + style.ItemSpacing.x;
-            m_wiz_btn_xy[5] = p0.y + 17.0f;
+            m_wiz_btn_xy[5] = p0.y + ui::px(17.0f);
         }
-        if (ImGui::Button("Back##wizback", {half, 34.0f}))
+        if (ImGui::Button("Back##wizback", {half, ui::px(34.0f)}))
         {
             // BL-1279: Quick Start's one round steps straight back to the menu.
             if (m_wiz_round == 0 || m_wiz_quick_start)
@@ -3009,7 +3010,7 @@ void app::draw_generation_screen()
         const char* const next_waits = commits ? nullptr : wizard_next_wait_reason(m_wiz_round);
         if (next_waits != nullptr) ImGui::BeginDisabled();
         const bool next_pressed =
-            ImGui::Button(commits ? "Begin##wizgo" : "Next##wizgo", {half, 34.0f});
+            ImGui::Button(commits ? "Begin##wizgo" : "Next##wizgo", {half, ui::px(34.0f)});
         if (next_waits != nullptr)
         {
             ImGui::EndDisabled();
@@ -3086,10 +3087,10 @@ void app::draw_generation_screen()
                                                    : body + "  " + when;
             if (label.empty()) return;
             const ImVec2 ts = ImGui::CalcTextSize(label.c_str());
-            const ImVec2 at{pane_origin.x + fx + 8.0f, pane_origin.y + fy + 6.0f};
+            const ImVec2 at{pane_origin.x + fx + ui::px(8.0f), pane_origin.y + fy + ui::px(6.0f)};
             ImDrawList* dl = ImGui::GetWindowDrawList();
-            dl->AddRectFilled({at.x - 5.0f, at.y - 3.0f},
-                              {at.x + ts.x + 5.0f, at.y + ts.y + 3.0f},
+            dl->AddRectFilled({at.x - ui::px(5.0f), at.y - ui::px(3.0f)},
+                              {at.x + ts.x + ui::px(5.0f), at.y + ts.y + ui::px(3.0f)},
                               IM_COL32(8, 9, 12, 190));
             dl->AddText(at, col_bright, label.c_str()); // fit-exempt: a year stamp sized by CalcTextSize
         };
@@ -3112,7 +3113,7 @@ void app::draw_generation_screen()
             // swap when the new one does.
             if (m_wiz_surface_future.valid())
             {
-                ImGui::SetCursorPosY(ImGui::GetWindowHeight() - 28.0f);
+                ImGui::SetCursorPosY(ImGui::GetWindowHeight() - ui::px(28.0f));
                 ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(120, 128, 145, 255));
                 ImGui::TextUnformatted("  resolving the surface...");
                 ImGui::PopStyleColor();
@@ -3196,7 +3197,7 @@ void app::draw_generation_screen()
                 {
                     int li = m_wiz_history_progress[lapse_index].label.load(std::memory_order_relaxed);
                     if (li < 0 || li >= generation_stage_label_count) li = 0;
-                    ImGui::SetCursorPosY(ImGui::GetWindowHeight() - 28.0f);
+                    ImGui::SetCursorPosY(ImGui::GetWindowHeight() - ui::px(28.0f));
                     ImGui::PushStyleColor(ImGuiCol_Text, col_dim);
                     ImGui::Text("  %s", generation_stage_labels[li]);
                     ImGui::PopStyleColor();

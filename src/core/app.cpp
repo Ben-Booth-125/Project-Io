@@ -33,6 +33,7 @@
 #include "ui/market_ledger.hpp"
 #include "ui/chat_panel.hpp"
 #include "ui/fonts.hpp"
+#include "ui/ui_scale.hpp"
 #include "ui/generation_charts.hpp" // the shared chain-stage charts (BL-211)
 #include "ui/decision_feed.hpp"     // the AI decision feed (BL-407)
 #include "ui/generation_ledger.hpp" // the generation tuning ledger (BL-303)
@@ -271,7 +272,9 @@ app::app()
     // Load the UI font with oversampling so on-canvas labels stay crisp at the
     // fractional positions moving bodies produce. The renderer backend uploads
     // the atlas on the first NewFrame.
-    ui::load_ui_font();
+    // BL-1495: the default UI scale step - the font, ImGui's style and ui::px at one
+    // factor. run() re-applies it once options.cfg is read; --verify keeps the default.
+    apply_ui_scale();
 
     // The unit designer's class art (assets/units/, military.md § The designer).
     ui::unit_art_load(m_renderer);
@@ -284,55 +287,35 @@ app::app()
 }
 
 namespace {
-constexpr std::array<float, 3> k_ui_scale_px = {16.0f, 20.0f, 24.0f}; ///< BL-063 steps: 1.0 / 1.25 / 1.5 of the 16px base.
+/// BL-1495 steps (LAYOUT.md § UI scale; Ben, 2026-11-10): the font px of each Options
+/// step. Step 0, 12 px, is the default and the smallest; chrome scales with it
+/// (ui::ui_scale() = px / 16), so 12 px is 0.75x of the size the chrome was drawn at.
+constexpr std::array<float, 4> k_ui_scale_px = {12.0f, 16.0f, 20.0f, 24.0f};
+constexpr int k_ui_scale_default_step = 0;
 
-/// THE UI SCALE (BL-1495; LAYOUT.md § UI scale; Ben's number to weigh in on). The one
-/// constant: every element, its text and its hard-coded px together, draws at this
-/// share of its size. A 1280 x 720 window lays out as 1463 x 823 UI pixels, and the 16 px
-/// base font lands as 14 screen pixels. Canvases and chrome scale alike.
-constexpr float k_ui_draw_scale = 0.875f;
+/// Map a font px read from options.cfg onto the nearest step.
+int ui_scale_step_for_px(float font_px)
+{
+    int best = k_ui_scale_default_step;
+    for (int i = 0; i < static_cast<int>(k_ui_scale_px.size()); ++i)
+        if (std::abs(k_ui_scale_px[static_cast<std::size_t>(i)] - font_px)
+            < std::abs(k_ui_scale_px[static_cast<std::size_t>(best)] - font_px))
+            best = i;
+    return best;
+}
 } // namespace
-
-float app::shipped_ui_draw_scale() { return k_ui_draw_scale; }
-
-void app::apply_ui_draw_scale_to_frame()
-{
-    if (m_ui_draw_scale == 1.0f)
-        return;
-    ImGuiIO& io = ImGui::GetIO();
-    io.DisplaySize = {io.DisplaySize.x / m_ui_draw_scale, io.DisplaySize.y / m_ui_draw_scale};
-    // The SDL backend queues the pointer in window pixels, and it has no scale to ask.
-    // Once each: an event the trickle queue carried over from last frame was scaled then
-    // (m_ui_scale_event_floor), and scaling it twice moved the pointer off the panel it
-    // was over, so the canvas took the panel's wheel.
-    for (ImGuiInputEvent& e : ImGui::GetCurrentContext()->InputEventsQueue)
-        if (e.Type == ImGuiInputEventType_MousePos && e.MousePos.PosX > -FLT_MAX
-            && e.EventId >= m_ui_scale_event_floor)
-        {
-            e.MousePos.PosX /= m_ui_draw_scale;
-            e.MousePos.PosY /= m_ui_draw_scale;
-        }
-}
-
-void app::render_imgui_scaled()
-{
-    // The backend defers to a render scale already set, and SDL scales the geometry and
-    // the clip rects with it. Back to 1 straight after: a capture reads whole pixels.
-    SDL_SetRenderScale(m_renderer, m_ui_draw_scale, m_ui_draw_scale);
-    ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), m_renderer);
-    SDL_SetRenderScale(m_renderer, 1.0f, 1.0f);
-}
 
 void app::apply_ui_scale()
 {
     const int step = std::clamp(m_settings.ui_scale_step, 0, static_cast<int>(k_ui_scale_px.size()) - 1);
-    ui::reload_ui_font(k_ui_scale_px[static_cast<std::size_t>(step)], m_ui_draw_scale);
+    const float font_px = k_ui_scale_px[static_cast<std::size_t>(step)];
+    ui::apply_ui_scale(font_px); // font, style.ScaleAllSizes and ui::px, one factor
     ImGui_ImplSDLRenderer3_DestroyFontsTexture();
 
-    // The display floor scales with the font (BL-215): BL-063 grows the atlas
-    // without ScaleAllSizes, so the hard-coded px chrome stays at 1.0x while
-    // text grows — at 1.5x the same layout honestly needs 1920x1080.
-    const float s = k_ui_scale_px[static_cast<std::size_t>(step)] / k_ui_scale_px[0];
+    // The display floor scales with the factor (BL-215): the layout is authored at
+    // 1280x720 for 1.0x, and every element moves with the factor, so the floor does
+    // too - 960x540 at the 12 px default, 1920x1080 at 24 px.
+    const float s = ui::ui_scale();
     SDL_SetWindowMinimumSize(m_window,
                              static_cast<int>(1280.0f * s),
                              static_cast<int>(720.0f * s));
@@ -424,7 +407,6 @@ int app::run(autostart_mode autostart)
     // never touches settings, keeping golden captures at the fixed default size.
     load_settings();
     apply_display_settings();
-    m_ui_draw_scale = k_ui_draw_scale; // BL-1495: interactive only, like the settings above
     apply_ui_scale();
 
     m_lua.load("scripts/init.lua");
@@ -1130,14 +1112,14 @@ void app::draw_building_screen()
         // The lead above the bar: the title line, this screen's 10 px gap and
         // the wait surface's own 10 px gap, each with its item spacing.
         const float sp = ImGui::GetStyle().ItemSpacing.y;
-        ui::pad_to_loading_band(ImGui::GetTextLineHeightWithSpacing() + 2.0f * (10.0f + sp));
+        ui::pad_to_loading_band(ImGui::GetTextLineHeightWithSpacing() + 2.0f * (ui::px(10.0f) + sp));
         const char* title = "BUILDING THE WORLD";
         const float tw = ImGui::CalcTextSize(title).x;
-        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (420.0f - tw) * 0.5f);
+        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (ui::px(420.0f) - tw) * 0.5f);
         ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(225, 230, 240, 255));
         ImGui::TextUnformatted(title);
         ImGui::PopStyleColor();
-        ImGui::Dummy({420.0f, 10.0f});
+        ImGui::Dummy(ui::px(420.0f, 10.0f));
 
         // THE ONE WAIT SURFACE (BL-1072): the same bars, caption and elapsed
         // count every wizard loading round draws -- the outer bar weighted by
@@ -1146,9 +1128,9 @@ void app::draw_building_screen()
         // the caption names them from the label table like every other step;
         // while Begin waits on round 6 the sink drawn is that round's.
         generation_progress& sink = building_sink();
-        ui::draw_generation_wait(sink, 420.0f, nullptr, m_golden_dir.empty());
+        ui::draw_generation_wait(sink, ui::px(420.0f), nullptr, m_golden_dir.empty());
 
-        ImGui::Dummy({420.0f, 8.0f});
+        ImGui::Dummy(ui::px(420.0f, 8.0f));
         ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(120, 128, 142, 255));
         const int step = sink.label.load(std::memory_order_relaxed);
         ImGui::TextUnformatted(step == 16 ? "The landscape is searched for the field play opens on."
@@ -1176,7 +1158,7 @@ void app::draw_building_screen()
             const auto secs = [](const std::atomic<int64_t>& ms) {
                 return static_cast<double>(ms.load(std::memory_order_relaxed)) / 1000.0;
             };
-            ImGui::Dummy({420.0f, 6.0f});
+            ImGui::Dummy(ui::px(420.0f, 6.0f));
             ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(104, 112, 126, 255));
             ImGui::Text("world built in %.2f s", secs(m_worldgen_progress.ms_world_total));
             // Same four passes, same order and same names as the harness line,
@@ -1302,17 +1284,17 @@ void app::draw_painting_screen()
     if (ImGui::Begin("##painting", nullptr, flags))
     {
         const float sp = ImGui::GetStyle().ItemSpacing.y;
-        ui::pad_to_loading_band(ImGui::GetTextLineHeightWithSpacing() + 2.0f * (10.0f + sp));
+        ui::pad_to_loading_band(ImGui::GetTextLineHeightWithSpacing() + 2.0f * (ui::px(10.0f) + sp));
         const char* title = m_loading_save ? "LOADING THE SAVE" : "BUILDING THE WORLD";
         const float tw = ImGui::CalcTextSize(title).x;
-        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (420.0f - tw) * 0.5f);
+        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (ui::px(420.0f) - tw) * 0.5f);
         ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(225, 230, 240, 255));
         ImGui::TextUnformatted(title);
         ImGui::PopStyleColor();
-        ImGui::Dummy({420.0f, 10.0f});
-        ui::draw_generation_wait(m_paint_wait, 420.0f, "Painting the ground",
+        ImGui::Dummy(ui::px(420.0f, 10.0f));
+        ui::draw_generation_wait(m_paint_wait, ui::px(420.0f), "Painting the ground",
                                  m_golden_dir.empty());
-        ImGui::Dummy({420.0f, 8.0f});
+        ImGui::Dummy(ui::px(420.0f, 8.0f));
         ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(120, 128, 142, 255));
         ImGui::TextUnformatted("The home world's ground is baked once, for every zoom.");
         ImGui::PopStyleColor();
@@ -1364,7 +1346,7 @@ void app::draw_painting_screen()
 /// publish side and the encoding.
 void app::draw_building_carve()
 {
-    constexpr float map_w = 420.0f;
+    const float map_w = ui::px(420.0f); // BL-1495: chrome scales
 
     const int gw = m_worldgen_progress.grid_w.load(std::memory_order_relaxed);
     const int gh = m_worldgen_progress.grid_h.load(std::memory_order_relaxed);
@@ -1391,7 +1373,7 @@ void app::draw_building_carve()
     const float cell = map_w / static_cast<float>(gw);
     const float map_h = cell * static_cast<float>(gh);
 
-    ImGui::Dummy({map_w, 8.0f});
+    ImGui::Dummy({map_w, ui::px(8.0f)});
     ImDrawList*  dl = ImGui::GetWindowDrawList();
     const ImVec2 tl = ImGui::GetCursorScreenPos();
     ImGui::Dummy({map_w, map_h});
@@ -1492,7 +1474,7 @@ void app::draw_building_carve()
     static const char* const focus_name[3] = { "Extraction", "Processing", "Trade" };
     const int player = m_worldgen_progress.player_slot.load(std::memory_order_relaxed);
 
-    ImGui::Dummy({map_w, 4.0f});
+    ImGui::Dummy({map_w, ui::px(4.0f)});
     for (int c = 0; c < rows && c < generation_progress::max_corp_slots; ++c)
     {
         const int   f   = m_worldgen_progress.corp_focus  [static_cast<std::size_t>(c)].load(std::memory_order_relaxed);
@@ -1500,9 +1482,9 @@ void app::draw_building_carve()
         const float cap = m_worldgen_progress.corp_capital[static_cast<std::size_t>(c)].load(std::memory_order_relaxed);
 
         const ImVec2 sp = ImGui::GetCursorScreenPos();
-        dl->AddRectFilled({sp.x, sp.y + 4.0f}, {sp.x + 8.0f, sp.y + 12.0f},
+        dl->AddRectFilled({sp.x, sp.y + ui::px(4.0f)}, {sp.x + ui::px(8.0f), sp.y + ui::px(12.0f)},
                           ui::palette::corp_colour(c));
-        ImGui::Dummy({14.0f, ImGui::GetTextLineHeightWithSpacing()});
+        ImGui::Dummy({ui::px(14.0f), ImGui::GetTextLineHeightWithSpacing()});
         ImGui::SameLine();
         ImGui::PushStyleColor(ImGuiCol_Text, c == player ? IM_COL32(225, 230, 240, 255)
                                                          : IM_COL32(120, 128, 142, 255));
@@ -2801,13 +2783,11 @@ void app::render()
 
     ImGui_ImplSDLRenderer3_NewFrame();
     ImGui_ImplSDL3_NewFrame();
-    apply_ui_draw_scale_to_frame(); // BL-1495: the frame in UI pixels from here on
     // BL-521: synthetic pointer input, queued LAST so it outranks whatever the SDL
     // backend fed from the OS cursor above (ImGui applies queued events in order,
     // last write wins). A no-op outside the verify harness — see app.hpp
     // § Synthetic pointer input.
     pump_injected_input();
-    m_ui_scale_event_floor = ImGui::GetCurrentContext()->InputEventsNextEventId; // scaled or UI px
     ImGui::NewFrame();
 
     // BL-1246: the ground pool's per-frame pump, on EVERY screen — the home
@@ -2836,14 +2816,14 @@ void app::render()
         // them too — the generation screen's chain preview is exactly the kind of
         // per-frame work worth watching. Nothing here reserves a shell column, so the
         // HUD's first-use anchor is a plain top-left inset.
-        constexpr float hud_inset = 16.0f;
+        const float hud_inset = ui::px(16.0f);
         ui::draw_frame_budget_hud(s_frame_stats, {hud_inset, hud_inset}, m_ui.show_frame_hud);
 
         s_frame_stats.mark_build_end();
         ImGui::Render();
         SDL_SetRenderDrawColor(m_renderer, 15, 15, 20, 255);
         SDL_RenderClear(m_renderer);
-        render_imgui_scaled();
+        ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), m_renderer);
         s_frame_stats.mark_submit_end(*ImGui::GetDrawData());
         if (m_capture_requested)
         {
@@ -2876,7 +2856,7 @@ void app::render()
     // sized off the minimap width so the right-hand column stays aligned.
     ImGuiIO&     io     = ImGui::GetIO();
     const ImVec2 disp   = io.DisplaySize;
-    constexpr float margin = ui::shell_margin;
+    const float margin = ui::shell_margin;
     // Single owner for the shell's rect algebra (BL-216, ui/shell_metrics.hpp).
     // This block used to hand-roll `disp.x - margin - mm_w`, and so did four other
     // places -- the time panel, the system gear, the header's right bound and the
@@ -2898,10 +2878,10 @@ void app::render()
         // canvas occupies the rest. The overlay-lens controls used to sit in a
         // mode bar below the inset — they now live in a bottom-left strip
         // (ui::draw_overlay_controls), so the inset takes the full height here.
-        const float  title_h      = ImGui::GetTextLineHeight() + 6.0f;
+        const float  title_h      = ImGui::GetTextLineHeight() + ui::px(6.0f);
         // BL-093: a lens mode bar occupies the bottom row of the minimap box; the
         // inset canvas is carved down to leave room for it.
-        const float  lens_bar_h   = ImGui::GetFrameHeight() + 6.0f;
+        const float  lens_bar_h   = ImGui::GetFrameHeight() + ui::px(6.0f);
         const ImVec2 inset_origin = { mm_origin.x, mm_origin.y + title_h };
         const ImVec2 inset_size   = { mm_w, mm_h - title_h - lens_bar_h };
 
@@ -3009,7 +2989,7 @@ void app::render()
 
         // Title bar.
         bdl->AddRectFilled(mm_origin, {mm_origin.x + mm_w, mm_origin.y + title_h}, IM_COL32(28, 30, 40, 255));
-        bdl->AddText({mm_origin.x + 5.0f, mm_origin.y + 3.0f}, IM_COL32(220, 225, 235, 255), mm_title); // fit-exempt: chrome strip authored to fit at the 1280x720 floor
+        bdl->AddText({mm_origin.x + ui::px(5.0f), mm_origin.y + ui::px(3.0f)}, IM_COL32(220, 225, 235, 255), mm_title); // fit-exempt: chrome strip authored to fit at the 1280x720 floor
 
         // Lens mode bar along the bottom of the minimap box (BL-093). The bar fill
         // is chrome (drawn here); the interactive seven-glyph row is an ImGui window
@@ -4096,7 +4076,7 @@ void app::render()
     {
         ImGui::SetNextWindowPos(
             ImVec2{disp.x * 0.5f, disp.y * 0.5f}, ImGuiCond_Appearing, ImVec2{0.5f, 0.5f});
-        ImGui::SetNextWindowSize(ImVec2{340.0f, 0.0f}, ImGuiCond_Appearing);
+        ImGui::SetNextWindowSize(ui::px(340.0f, 0.0f), ImGuiCond_Appearing);
         if (ImGui::Begin("Key Bindings", &m_show_help,
                          ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoCollapse))
         {
@@ -4166,7 +4146,7 @@ void app::render()
         // on them, so the press that opened it can close it (the toggle rule).
         if (m_ui.show_system_menu)
         {
-            ImGui::SetNextWindowPos(ImVec2{disp.x * 0.5f - 156.0f, disp.y * 0.5f},
+            ImGui::SetNextWindowPos(ImVec2{disp.x * 0.5f - ui::px(156.0f), disp.y * 0.5f},
                                     ImGuiCond_Appearing, ImVec2{1.0f, 0.5f});
             // No size set: the right-edge pivot reads the window's real width. A set
             // width would seat it from that width on every reopening, over the presses.
@@ -4175,7 +4155,7 @@ void app::render()
         {
             ImGui::SetNextWindowPos(
                 ImVec2{disp.x * 0.5f, disp.y * 0.5f}, ImGuiCond_Appearing, ImVec2{0.5f, 0.5f});
-            ImGui::SetNextWindowSize(ImVec2{320.0f, 0.0f}, ImGuiCond_Appearing);
+            ImGui::SetNextWindowSize(ui::px(320.0f, 0.0f), ImGuiCond_Appearing);
         }
         if (ImGui::Begin("Options", &m_show_options,
                          ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoCollapse))
@@ -4233,7 +4213,8 @@ void app::render()
             }
 
             ImGui::SeparatorText("Accessibility");
-            static const char* ui_scale_labels[] = {"1.0x", "1.25x", "1.5x"};
+            // BL-1495: the step's font px; chrome scales with it.
+            static const char* ui_scale_labels[] = {"12 px", "16 px", "20 px", "24 px"};
             if (ImGui::BeginCombo("UI Scale", ui_scale_labels[m_settings.ui_scale_step]))
             {
                 for (int i = 0; i < IM_ARRAYSIZE(ui_scale_labels); ++i)
@@ -4277,7 +4258,7 @@ void app::render()
     ImGui::Render();
     SDL_SetRenderDrawColor(m_renderer, 15, 15, 20, 255);
     SDL_RenderClear(m_renderer);
-    render_imgui_scaled();
+    ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), m_renderer);
     s_frame_stats.mark_submit_end(*ImGui::GetDrawData());
 
     // Capture before present so the screenshot is the exact composited frame.
@@ -4302,6 +4283,13 @@ void app::load_settings()
     if (!in)
         return; // no file yet — keep defaults
 
+    // BL-1495: the scale persists as its font px (ui_scale_px), which means the same
+    // physical size whatever the step list becomes. An older file carries only
+    // ui_scale_step, an index into {16, 20, 24} px drawn at 0.875: its 0 was the
+    // untouched default and takes the new default; 1 and 2 were chosen, and keep
+    // their font px (20, 24).
+    float ui_px = 0.0f;
+    int legacy_step = -1;
     std::string line;
     while (std::getline(in, line))
     {
@@ -4312,21 +4300,29 @@ void app::load_settings()
         const std::string val = line.substr(eq + 1);
         try
         {
-            if      (key == "window_w")   m_settings.window_w   = std::stoi(val);
+            if      (key == "ui_scale_px") { ui_px = std::stof(val); }
+            else if (key == "window_w")   m_settings.window_w   = std::stoi(val);
             else if (key == "window_h")   m_settings.window_h   = std::stoi(val);
             else if (key == "fullscreen") m_settings.fullscreen = (std::stoi(val) != 0);
             else if (key == "vsync")      m_settings.vsync      = (std::stoi(val) != 0);
-            else if (key == "ui_scale_step") m_settings.ui_scale_step = std::stoi(val);
+            else if (key == "ui_scale_step") legacy_step = std::stoi(val);
         }
         catch (const std::exception&) { /* skip malformed value */ }
     }
 
-    // Clamp to the supported display floor (BL-215: 1280x720 @ 1.0x is the
-    // smallest supported display) so a corrupt or stale file can't open the
-    // shell below the size it is authored against.
-    m_settings.window_w = std::max(1280, m_settings.window_w);
-    m_settings.window_h = std::max(720, m_settings.window_h);
-    m_settings.ui_scale_step = std::clamp(m_settings.ui_scale_step, 0, 2);
+    // Clamp to the supported display floor (BL-215: 1280x720 @ 1.0x, scaled by the
+    // UI scale, so 960x540 at the 12 px step, the smallest) so a corrupt or stale
+    // file can't open the shell below the size it is authored against.
+    // apply_ui_scale holds the live window to the active step's floor.
+    m_settings.window_w = std::max(960, m_settings.window_w);
+    m_settings.window_h = std::max(540, m_settings.window_h);
+    if (ui_px > 0.0f)
+        m_settings.ui_scale_step = ui_scale_step_for_px(ui_px);
+    else if (legacy_step == 1 || legacy_step == 2)
+        m_settings.ui_scale_step = ui_scale_step_for_px(legacy_step == 1 ? 20.0f : 24.0f);
+    else
+        m_settings.ui_scale_step = k_ui_scale_default_step;
+    m_settings.ui_scale_step = std::clamp(m_settings.ui_scale_step, 0, static_cast<int>(k_ui_scale_px.size()) - 1);
 }
 
 void app::save_settings() const
@@ -4341,7 +4337,10 @@ void app::save_settings() const
         << "window_h="   << m_settings.window_h        << '\n'
         << "fullscreen=" << (m_settings.fullscreen ? 1 : 0) << '\n'
         << "vsync="      << (m_settings.vsync ? 1 : 0)      << '\n'
-        << "ui_scale_step=" << m_settings.ui_scale_step     << '\n';
+        << "ui_scale_px="
+        << static_cast<int>(k_ui_scale_px[static_cast<std::size_t>(
+               std::clamp(m_settings.ui_scale_step, 0, static_cast<int>(k_ui_scale_px.size()) - 1))])
+        << '\n';
 }
 
 void app::apply_display_settings()

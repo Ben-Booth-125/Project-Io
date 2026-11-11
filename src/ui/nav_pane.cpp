@@ -1,4 +1,5 @@
 #include "nav_pane.hpp"
+#include "ui_scale.hpp" // BL-1495: px
 
 #include "icons.hpp"
 #include "presentation.hpp"
@@ -140,7 +141,7 @@ void draw_nav_pane(ui_state& state, float top_offset)
         ImGuiWindowFlags_NoSavedSettings;
 
     // Tight padding so square icon slots fill the narrow rail.
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2{6.0f, 8.0f});
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ui::px(6.0f, 8.0f));
     ImGui::Begin("##nav_pane", nullptr, flags);
 
     // NINE curated slots from MENU.md § Menu set and ordering, then a
@@ -247,7 +248,7 @@ void draw_nav_pane(ui_state& state, float top_offset)
     const float avail_y   = ImGui::GetContentRegionAvail().y;
     const float spacing_y = ImGui::GetStyle().ItemSpacing.y;
     const float fit_size  = avail_y / static_cast<float>(tab_count) - spacing_y;
-    const float slot_size = std::max(16.0f, std::min(avail_x, fit_size));
+    const float slot_size = std::max(ui::px(16.0f), std::min(avail_x, fit_size));
     ImDrawList* dl        = ImGui::GetWindowDrawList();
 
     g_slot_centres.clear();

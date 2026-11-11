@@ -548,7 +548,7 @@ private:
         int  window_h   = 1080;
         bool fullscreen = false;  ///< Borderless-desktop fullscreen.
         bool vsync      = true;
-        int  ui_scale_step = 0;   ///< BL-063 discrete UI scale: 0=1.0, 1=1.25, 2=1.5.
+        int  ui_scale_step = 0;   ///< BL-1495 UI scale step: 0..3 = 12 / 16 / 20 / 24 px font; 0 is the default.
     };
 
     /// Read options.cfg into m_settings; a missing/partial file leaves defaults.
@@ -557,28 +557,9 @@ private:
     void save_settings() const;
     /// Apply m_settings to the live SDL window + renderer (size, fullscreen, vsync).
     void apply_display_settings();
-    /// Re-load the UI font atlas at the size for m_settings.ui_scale_step (BL-063) and
-    /// the density for m_ui_draw_scale (BL-1495).
+    /// Apply m_settings.ui_scale_step (BL-1495; LAYOUT.md § UI scale): the font px, ImGui's
+    /// style.ScaleAllSizes and ui::px at one factor, and the window floor scaled by it.
     void apply_ui_scale();
-    /// The UI's draw scale (BL-1495; LAYOUT.md § UI scale): every UI pixel lands on this
-    /// many screen pixels. Set to the shipped constant on the interactive path only;
-    /// --verify stays at 1, the tightest layout, unless a script asks (verify.ui_draw_scale).
-    float m_ui_draw_scale = 1.0f;
-    /// Turn this frame's OS window size and pointer events into UI pixels. Between the
-    /// SDL backend's NewFrame and ImGui's, before the harness's injected pointer, which
-    /// is in UI pixels already.
-    void apply_ui_draw_scale_to_frame();
-    /// The first input event id this frame's scale may touch (Ben, 2026-11-09: scrolling a
-    /// table sometimes zoomed the canvas). ImGui's trickle queue carries a pointer event that
-    /// follows a wheel event in the same frame over to the NEXT frame, still queued; scaled
-    /// again there, the pointer read at 0.875x of itself - off the panel, over the canvas -
-    /// and io.WantCaptureMouse went false for that wheel. Every event below this id has been
-    /// scaled already, or was injected in UI pixels.
-    unsigned int m_ui_scale_event_floor = 0;
-    /// Draw ImGui's frame through the draw scale.
-    void render_imgui_scaled();
-    /// The constant the interactive path draws at.
-    static float shipped_ui_draw_scale();
 
     /// How many rounds the New World wizard walks (BL-167, extended to five by
     /// BL-816 and to SIX by BL-860). Declared here rather than beside the wizard

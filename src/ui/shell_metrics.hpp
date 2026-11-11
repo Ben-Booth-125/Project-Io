@@ -1,6 +1,7 @@
 #pragma once
 
 #include "foldout_column.hpp" // foldout_rect, shell_column_width, minimap_*, comms_dock_rect
+#include "ui_scale.hpp" // BL-1495: px, px_const
 
 #include <imgui.h>
 
@@ -33,7 +34,7 @@ using shell_rect = foldout_rect;
 /// The screen gutter `app.cpp` uses between chrome and the display edges. Same
 /// value as `chrome_margin` (foldout_column.hpp) and deliberately so — the bottom
 /// strip's height derivation assumes the two agree.
-inline constexpr float shell_margin = 8.0f;
+inline constexpr px_const shell_margin {8.0f};
 
 /// Width (px) of the **right chrome column** — the full-height band holding the time
 /// panel on top, the freed middle slot, and the minimap at its foot. Equal to the

@@ -1,4 +1,5 @@
 #include "decision_feed.hpp"
+#include "ui_scale.hpp" // BL-1495: px
 
 #include "foldout_column.hpp" // the shell-column host this ledger draws into
 #include "format.hpp"         // fmt::date_from_day / month_abbrev / ordinal_day
@@ -638,7 +639,7 @@ void draw_decision_feed(const world& w, ui_state& st, bool* open)
             // Bar first, scores after it on the same line: the bar answers "how
             // close was this" at a glance and the numbers are the audit trail
             // behind that answer, so the glance-value goes on the left.
-            const float bar_w = std::max(48.0f, row_w - 118.0f);
+            const float bar_w = std::max(ui::px(48.0f), row_w - ui::px(118.0f));
             draw_conviction_bar(bar_w, m);
             ImGui::SameLine();
 

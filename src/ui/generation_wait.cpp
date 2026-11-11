@@ -1,4 +1,5 @@
 #include "ui/generation_wait.hpp"
+#include "ui_scale.hpp" // BL-1495: px
 
 #include "world/hard_coded_world.hpp" // generation_progress, generation_stage_labels
 
@@ -43,7 +44,7 @@ void pad_to_loading_band(float lead_px)
 void draw_generation_wait(generation_progress& prog, float pane_w, const char* caption,
                           bool live_clock)
 {
-    const float bar_w = std::min(420.0f, std::max(1.0f, pane_w));
+    const float bar_w = std::min(ui::px(420.0f), std::max(1.0f, pane_w));
     const float bar_x = std::max(0.0f, (pane_w - bar_w) * 0.5f);
 
     // The outer bar: weighted by measured step cost, and held at its high-water
@@ -54,7 +55,7 @@ void draw_generation_wait(generation_progress& prog, float pane_w, const char* c
     ImGui::Dummy({pane_w, 10.0f});
     pad_to_loading_band(0.0f); // the bar's top edge on the band (STARTUP.md § Main menu)
     ImGui::SetCursorPosX(ImGui::GetCursorPosX() + bar_x);
-    ImGui::ProgressBar(f, {bar_w, 18.0f}, "");
+    ImGui::ProgressBar(f, {bar_w, ui::px(18.0f)}, "");
 
     // The inner bar: progress WITHIN the step under way -- the span's years,
     // the village walk, the corridors, the validation run's quarters. Drawn
@@ -73,7 +74,7 @@ void draw_generation_wait(generation_progress& prog, float pane_w, const char* c
     {
         // Hold the layout still: the caption must not jump up and down by a bar's
         // height every time a step without an inner count begins.
-        ImGui::Dummy({pane_w, 4.0f + 10.0f});
+        ImGui::Dummy({pane_w, 4.0f + ui::px(10.0f)});
     }
 
     // The caption: the step under way, in generation's own words.

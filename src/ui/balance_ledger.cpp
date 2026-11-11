@@ -1,4 +1,5 @@
 #include "balance_ledger.hpp"
+#include "ui_scale.hpp" // BL-1495: px, px_const
 
 #include "foldout_column.hpp" // shell fold-out column host (BL-122)
 #include "header_panel.hpp"   // player_cargo_value — shared Cargo Value (BL-171)
@@ -37,8 +38,8 @@ float nice_ceil(float v)
 // Short faint dashes across a chart gridline (ImDrawList has no dashed line).
 void dotted_hline(ImDrawList* dl, float x0, float x1, float y, ImU32 col)
 {
-    for (float x = x0; x < x1; x += 6.0f)
-        dl->AddLine({x, y}, {std::min(x + 3.0f, x1), y}, col, 1.0f);
+    for (float x = x0; x < x1; x += ui::px(6.0f))
+        dl->AddLine({x, y}, {std::min(x + ui::px(3.0f), x1), y}, col, 1.0f);
 }
 
 // Profit line chart (BL-171): profit per econ tick over the recent series, in the
@@ -52,11 +53,11 @@ void draw_profit_chart(ImDrawList* dl, ImVec2 mn, ImVec2 mx, const std::vector<f
     const ImU32 label_col = IM_COL32(150, 150, 150, 255);
     const ImU32 line_col  = IM_COL32(212, 175, 55, 255); // gold
 
-    constexpr float gutter = 44.0f;
+    const float gutter = ui::px(44.0f);
     const float plot_x0 = mn.x + gutter;
-    const float plot_x1 = mx.x - 6.0f;
-    const float y_top   = mn.y + 14.0f; // room for the "Profit" caption
-    const float y_bot   = mx.y - 14.0f; // room for the X labels
+    const float plot_x1 = mx.x - ui::px(6.0f);
+    const float y_top   = mn.y + ui::px(14.0f); // room for the "Profit" caption
+    const float y_bot   = mx.y - ui::px(14.0f); // room for the X labels
 
     // "Profit" caption, top-left (the mockup's vertical axis title, kept horizontal).
     dl->AddText({mn.x, mn.y}, label_col, "Profit"); // fit-exempt: axis/tick labels inside a gutter measured by the host
@@ -88,7 +89,7 @@ void draw_profit_chart(ImDrawList* dl, ImVec2 mn, ImVec2 mx, const std::vector<f
         dotted_hline(dl, plot_x0, plot_x1, ty, grid_col);
         char buf[24]; vlabel(v, buf, sizeof buf);
         const ImVec2 ts = ImGui::CalcTextSize(buf);
-        dl->AddText({plot_x0 - 6.0f - ts.x, ty - ts.y * 0.5f}, label_col, buf); // fit-exempt: axis/tick labels inside a gutter measured by the host
+        dl->AddText({plot_x0 - ui::px(6.0f) - ts.x, ty - ts.y * 0.5f}, label_col, buf); // fit-exempt: axis/tick labels inside a gutter measured by the host
     };
     tick(top);
     tick(0.0f);
@@ -110,7 +111,7 @@ void draw_profit_chart(ImDrawList* dl, ImVec2 mn, ImVec2 mx, const std::vector<f
     {
         char buf[8]; std::snprintf(buf, sizeof buf, "%d", i + 1);
         const ImVec2 ts = ImGui::CalcTextSize(buf);
-        dl->AddText({px(i) - ts.x * 0.5f, y_bot + 2.0f}, label_col, buf); // fit-exempt: axis/tick labels inside a gutter measured by the host
+        dl->AddText({px(i) - ts.x * 0.5f, y_bot + ui::px(2.0f)}, label_col, buf); // fit-exempt: axis/tick labels inside a gutter measured by the host
     }
 }
 

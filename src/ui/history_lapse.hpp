@@ -1,6 +1,7 @@
 #pragma once
 
 #include "world/components.hpp"    // terrain_landform, for the packed terrain raster (BL-915)
+#include "ui_scale.hpp" // BL-1495: px, px_const
 #include "world/era_timelapse.hpp"
 #include "world/polity_identity.hpp" // the identity a realm carries by id (BL-1087/1088)
 
@@ -1258,7 +1259,7 @@ std::string lapse_year_label(int year);
 /// must sit where the Culture map's own stamp lands on: a second framing
 /// formula would be the drift a header exists to prevent. Pure geometry;
 /// `draw_lapse_map` calls it for its own frame.
-inline constexpr float lapse_map_nudge_x = 120.0f;
+inline constexpr px_const lapse_map_nudge_x {120.0f};
 ///
 /// THE NUDGE NEVER PUSHES THE MAP OFF THE PANE (BL-1118, 2026-09-25). A map
 /// that fills the pane's width was nudged 120 px past its right edge, where the

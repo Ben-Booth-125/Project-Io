@@ -4,6 +4,7 @@
 /// refuses to draw.
 
 #include "history_lapse.hpp"
+#include "ui_scale.hpp" // BL-1495: px, px_const
 
 #include "generation_preview.hpp" // preview_pack / preview_substrate — the land mask
 #include "presentation.hpp"       // identity colours; they live there, never here
@@ -2302,11 +2303,11 @@ struct legend_layout
     float line = 0.0f, row_h = 0.0f;
 };
 
-constexpr float legend_pad     = 8.0f;  ///< The backing's inset round the block.
-constexpr float legend_gap_top = 10.0f; ///< Map bottom to the backing's top.
-constexpr float legend_sw      = 34.0f; ///< The swatch cell's width.
-constexpr float legend_label   = 7.0f;  ///< Swatch to label.
-constexpr float legend_col_gap = 18.0f; ///< Column to column.
+constexpr px_const legend_pad     {8.0f};  ///< The backing's inset round the block.
+constexpr px_const legend_gap_top {10.0f}; ///< Map bottom to the backing's top.
+constexpr px_const legend_sw      {34.0f}; ///< The swatch cell's width.
+constexpr px_const legend_label   {7.0f};  ///< Swatch to label.
+constexpr px_const legend_col_gap {18.0f}; ///< Column to column.
 
 /// Flow the columns left to right inside @p wrap_w, wrapping to a second band
 /// only where the pane runs out.
@@ -4518,14 +4519,14 @@ void draw_lapse_scoreboard(const history_lapse& h,
     // TableHeadersRow, which neither elides nor reports, so a header wider than
     // its column simply clips ("Popul...") with nothing recording that it did.
     // "People" is the rank column and reads as a share; "Pop" is the headcount.
-    ImGui::TableSetupColumn("#",      ImGuiTableColumnFlags_WidthFixed, 22.0f);
+    ImGui::TableSetupColumn("#",      ImGuiTableColumnFlags_WidthFixed, ui::px(22.0f));
     ImGui::TableSetupColumn(h.peoples ? "Homeland" : "Seat", ImGuiTableColumnFlags_WidthStretch);
-    ImGui::TableSetupColumn("People", ImGuiTableColumnFlags_WidthFixed, 48.0f);
-    ImGui::TableSetupColumn("Land",   ImGuiTableColumnFlags_WidthFixed, 48.0f);
-    ImGui::TableSetupColumn("Pop",    ImGuiTableColumnFlags_WidthFixed, 46.0f);
-    ImGui::TableSetupColumn("Mt",     ImGuiTableColumnFlags_WidthFixed, 24.0f);
+    ImGui::TableSetupColumn("People", ImGuiTableColumnFlags_WidthFixed, ui::px(48.0f));
+    ImGui::TableSetupColumn("Land",   ImGuiTableColumnFlags_WidthFixed, ui::px(48.0f));
+    ImGui::TableSetupColumn("Pop",    ImGuiTableColumnFlags_WidthFixed, ui::px(46.0f));
+    ImGui::TableSetupColumn("Mt",     ImGuiTableColumnFlags_WidthFixed, ui::px(24.0f));
     if (ind_col)
-        ImGui::TableSetupColumn("Ind", ImGuiTableColumnFlags_WidthFixed, 44.0f);
+        ImGui::TableSetupColumn("Ind", ImGuiTableColumnFlags_WidthFixed, ui::px(44.0f));
     ImGui::TableHeadersRow();
 
     const int shown = std::min(board_rows, static_cast<int>(now.size()));

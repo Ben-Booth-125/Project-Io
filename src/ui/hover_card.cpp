@@ -1,4 +1,5 @@
 #include "hover_card.hpp"
+#include "ui_scale.hpp" // BL-1495: px, px_const
 
 #include <imgui_internal.h>
 
@@ -11,15 +12,15 @@ void draw_hover_card(ImVec2 anchor,
                      ImVec2* out_min,
                      ImVec2* out_max)
 {
-    constexpr float kMaxWidth  = 200.0f;
-    constexpr float kPad       = 6.0f;
-    constexpr float kRounding  = 4.0f;
-    constexpr float kYOffset   = 18.0f; // above the anchor point
+    const float kMaxWidth  = ui::px(200.0f);
+    const float kPad       = ui::px(6.0f);
+    const float kRounding  = ui::px(4.0f);
+    const float kYOffset   = ui::px(18.0f); // above the anchor point
 
     // Pinned to the anchor the card was summoned at, NOT the live cursor
     // (BL-228): a card that slides with the pointer cannot be read to the end of
     // a line, and offers nowhere to move the pointer TO in order to dismiss it.
-    const ImVec2 pos = { anchor.x + 4.0f, anchor.y - kYOffset };
+    const ImVec2 pos = { anchor.x + ui::px(4.0f), anchor.y - kYOffset };
 
     ImGui::SetNextWindowPos(pos, ImGuiCond_Always, {0.0f, 1.0f});
     ImGui::SetNextWindowSize({ kMaxWidth, 0.0f }); // 0 height = auto

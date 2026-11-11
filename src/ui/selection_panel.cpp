@@ -1,4 +1,5 @@
 #include "selection_panel.hpp"
+#include "ui_scale.hpp" // BL-1495: px, px_const
 
 #include "core/battle_dispatch_text.hpp" // battle_phase_word — SHARED with BL-468's dispatches
 #include "construction_sites.hpp"
@@ -426,7 +427,7 @@ void draw_building_profit(const world& w, const recipe_registry& reg,
     const std::string exp_s = fmt::credits(exp) + " / qtr";
     const float fig_w  = std::max(ImGui::CalcTextSize(net_s.c_str()).x,
                                   ImGui::CalcTextSize(("Exp " + exp_s).c_str()).x);
-    const float chart_w = std::max(40.0f, box_w - fig_w - style.ItemSpacing.x);
+    const float chart_w = std::max(ui::px(40.0f), box_w - fig_w - style.ItemSpacing.x);
 
     // No per-building profit HISTORY is tracked (the pooled market attribution
     // problem means nothing to reconstruct a past series from), so this is the
@@ -830,8 +831,8 @@ void draw_production_method_section(world& w, const recipe_registry& reg,
         // over the top of it — "Food Rations" with "+7.0/tick" printed through it,
         // both of the row's load-bearing values illegible at once.
         const float  pipr         = row_h * 0.24f;
-        const float  name_x       = 6.0f + pipr * 2.0f + 6.0f;
-        const float  profit_col_w = row_w - glyph_w - 6.0f;
+        const float  name_x       = 6.0f + pipr * 2.0f + ui::px(6.0f);
+        const float  profit_col_w = row_w - glyph_w - ui::px(6.0f);
 
         // Expected profit for a recipe switch: the Build door's quote (obtainable
         // inputs, settling output price, the tile's Logistic Point cover), asked for
@@ -876,8 +877,8 @@ void draw_production_method_section(world& w, const recipe_registry& reg,
         // full string one hover away AND recorded in BL-215's overflow ledger,
         // instead of silently clipping. Box 9 (table_cell): this row is a fixed
         // single line, so eliding is the sanctioned recovery, not wrapping.
-        constexpr float name_gap   = 8.0f;
-        const float     name_max_w = std::max(16.0f, profit_col_w - profit_w - name_gap - name_x);
+        const float name_gap   = ui::px(8.0f);
+        const float     name_max_w = std::max(ui::px(16.0f), profit_col_w - profit_w - name_gap - name_x);
 
         constexpr float name_scale = 1.15f;
         ImGui::SetWindowFontScale(name_scale);
@@ -1316,7 +1317,7 @@ std::string draw_workforce_bar(const building_component& b)
     char        pct[16];
     std::snprintf(pct, sizeof pct, "%d%%", target / 2); // shown as target/2: 200 internal = 100% (BL-1322)
     const float pct_w = ImGui::CalcTextSize("100%").x;
-    const float bar_w = std::max(40.0f, ImGui::GetContentRegionAvail().x - pct_w
+    const float bar_w = std::max(ui::px(40.0f), ImGui::GetContentRegionAvail().x - pct_w
                                             - ImGui::GetStyle().ItemSpacing.x);
     ImGui::ProgressBar(static_cast<float>(target) / static_cast<float>(workforce_target_max),
                        {bar_w, ImGui::GetTextLineHeight()}, "");
@@ -1542,7 +1543,7 @@ void draw_unit_selection_body(const world& w, const recipe_registry& reg, ui_sta
     const float         spacing = style.ItemSpacing.x;
     const float         left_w  = avail * 0.25f;
     const float         right_w = avail * 0.25f;
-    const float       center_w  = std::max(80.0f, avail - left_w - right_w - 2.0f * spacing);
+    const float       center_w  = std::max(ui::px(80.0f), avail - left_w - right_w - 2.0f * spacing);
 
     // ── Left quarter: the class's image (the designer's, assets/units/<class>.png),
     //    or the placeholder soldier where the class has none ──
@@ -1553,8 +1554,8 @@ void draw_unit_selection_body(const world& w, const recipe_registry& reg, ui_sta
         const unit_art& art = unit_art_for(unit_land_class(uit->second));
         if (art.tex != nullptr && art.width > 0 && art.height > 0)
         {
-            const float sc = std::min((left_w - 8.0f) / static_cast<float>(art.width),
-                                      (total_h - 8.0f) / static_cast<float>(art.height));
+            const float sc = std::min((left_w - ui::px(8.0f)) / static_cast<float>(art.width),
+                                      (total_h - ui::px(8.0f)) / static_cast<float>(art.height));
             const float iw = static_cast<float>(art.width) * sc, ih = static_cast<float>(art.height) * sc;
             const ImVec2 i0 = {p.x + (left_w - iw) * 0.5f, p.y + (total_h - ih) * 0.5f};
             dl->AddImage(reinterpret_cast<ImTextureID>(art.tex), i0, {i0.x + iw, i0.y + ih});
@@ -1562,7 +1563,7 @@ void draw_unit_selection_body(const world& w, const recipe_registry& reg, ui_sta
         else
         {
             const ImVec2 gc = {(p.x + mx.x) * 0.5f, (p.y + mx.y) * 0.5f};
-            const float  gr = std::min(left_w, total_h) * 0.5f - 10.0f;
+            const float  gr = std::min(left_w, total_h) * 0.5f - ui::px(10.0f);
             glyph_soldier(dl, gc, std::max(4.0f, gr), IM_COL32(190, 200, 210, 255));
         }
         dl->AddRect(p, mx, IM_COL32(90, 90, 100, 255), 3.0f);
@@ -1653,7 +1654,7 @@ void draw_unit_selection_body(const world& w, const recipe_registry& reg, ui_sta
             if (defending)
             {
                 const ImVec2 pmin = ImGui::GetCursorScreenPos();
-                dl->AddRect({pmin.x - 2.0f, pmin.y - 2.0f}, {pmin.x + bsz.x + 2.0f, pmin.y + bsz.y + 2.0f},
+                dl->AddRect({pmin.x - ui::px(2.0f), pmin.y - ui::px(2.0f)}, {pmin.x + bsz.x + ui::px(2.0f), pmin.y + bsz.y + ui::px(2.0f)},
                            palette::selection, 4.0f, 0, 2.0f);
             }
             if (tile_icon_button("##unit_defend", bsz, owned, tip, glyph_defend) && owned)
@@ -1677,7 +1678,7 @@ void draw_unit_selection_body(const world& w, const recipe_registry& reg, ui_sta
             if (armed)
             {
                 const ImVec2 pmin = ImGui::GetCursorScreenPos();
-                dl->AddRect({pmin.x - 2.0f, pmin.y - 2.0f}, {pmin.x + bsz.x + 2.0f, pmin.y + bsz.y + 2.0f},
+                dl->AddRect({pmin.x - ui::px(2.0f), pmin.y - ui::px(2.0f)}, {pmin.x + bsz.x + ui::px(2.0f), pmin.y + bsz.y + ui::px(2.0f)},
                            palette::selection, 4.0f, 0, 2.0f);
             }
             if (tile_icon_button("##unit_march", bsz, owned, tip, glyph_march) && owned)
@@ -1827,7 +1828,7 @@ void draw_unit_selection_body(const world& w, const recipe_registry& reg, ui_sta
             {
                 // Assigned: the cell wears the primed ring, as March does when armed.
                 const ImVec2 pmin = ImGui::GetCursorScreenPos();
-                dl->AddRect({pmin.x - 2.0f, pmin.y - 2.0f}, {pmin.x + bsz.x + 2.0f, pmin.y + bsz.y + 2.0f},
+                dl->AddRect({pmin.x - ui::px(2.0f), pmin.y - ui::px(2.0f)}, {pmin.x + bsz.x + ui::px(2.0f), pmin.y + bsz.y + ui::px(2.0f)},
                            palette::selection, 4.0f, 0, 2.0f);
             }
             if (tile_icon_button("##unit_front", bsz, owned, tip.c_str(), glyph_front) && owned)
@@ -1863,9 +1864,9 @@ void draw_unit_cell_bar(float share, ImU32 col)
 {
     ImDrawList*  dl = ImGui::GetWindowDrawList();
     const ImVec2 p  = ImGui::GetCursorScreenPos();
-    const float  wd = std::max(8.0f, ImGui::GetContentRegionAvail().x);
+    const float  wd = std::max(ui::px(8.0f), ImGui::GetContentRegionAvail().x);
     const float  lh = ImGui::GetTextLineHeight();
-    const float  bh = std::max(4.0f, lh * 0.40f);
+    const float  bh = std::max(ui::px(4.0f), lh * 0.40f);
     const float  y0 = p.y + (lh - bh) * 0.5f;
     dl->AddRectFilled({p.x, y0}, {p.x + wd, y0 + bh}, IM_COL32(60, 64, 74, 255), 2.0f);
     const float s = std::clamp(share, 0.0f, 1.0f);
@@ -1964,7 +1965,7 @@ void draw_unit_group_selection(const world& w, const recipe_registry& reg, ui_st
         const entity_id player_owner = player_actor(w);
         const ImU32 fill = palette::corp_identity_colour(
             head.owner == player_owner ? w.player_entity : head.owner, w.player_entity);
-        const float r = std::max(6.0f, std::min(left_w / 2.6f, total_h / 1.9f));
+        const float r = std::max(ui::px(6.0f), std::min(left_w / 2.6f, total_h / 1.9f));
         icons::unit_counter(dl, {(p.x + mx.x) * 0.5f, (p.y + mx.y) * 0.5f}, r, fill, n,
                             est > 0 ? static_cast<float>(men) / static_cast<float>(est) : 0.0f,
                             men > 0 ? static_cast<float>(ready_men) / static_cast<float>(men) / 1000.0f : 0.0f,
@@ -1976,7 +1977,7 @@ void draw_unit_group_selection(const world& w, const recipe_registry& reg, ui_st
 
     // ── The group's stat grid (BL-1454): each cell the group's mean, its range beneath ──
     {
-        const float grid_w = std::max(160.0f, (avail - left_w) * 0.52f);
+        const float grid_w = std::max(ui::px(160.0f), (avail - left_w) * 0.52f);
         ImGui::BeginChild("##unit_group_grid", {grid_w, total_h}, false, ImGuiWindowFlags_NoSavedSettings);
         draw_stat_grid("unit_group", unit_group_stat_bands(w, reg, group), ImGui::GetContentRegionAvail().x);
         ImGui::EndChild();
@@ -2270,7 +2271,7 @@ bool draw_convoy_selection(const world& w, ui_state& ui)
                       static_cast<double>(c.progress) * 100.0, eta, eta == 1 ? "" : "s");
     }
     ImGui::SetNextItemWidth(std::min(ImGui::GetContentRegionAvail().x, 320.0f));
-    ImGui::ProgressBar(c.progress, ImVec2{std::min(ImGui::GetContentRegionAvail().x, 320.0f), 0.0f}, overlay);
+    ImGui::ProgressBar(c.progress, ImVec2{std::min(ImGui::GetContentRegionAvail().x, ui::px(320.0f)), 0.0f}, overlay);
     return true;
 }
 
@@ -2847,7 +2848,7 @@ void draw_tile_building_grid(const world& w, const recipe_registry& reg,
     }
     ImGui::TableSetupColumn("##glyph", ImGuiTableColumnFlags_WidthFixed, construction_grid::glyph);
     ImGui::TableSetupColumn("##name",  ImGuiTableColumnFlags_WidthStretch, 1.0f);
-    ImGui::TableSetupColumn("##count", ImGuiTableColumnFlags_WidthFixed, 22.0f);
+    ImGui::TableSetupColumn("##count", ImGuiTableColumnFlags_WidthFixed, ui::px(22.0f));
     ImGui::TableSetupColumn("##makes", ImGuiTableColumnFlags_WidthFixed, construction_grid::makes);
     ImGui::TableSetupColumn("##net",   ImGuiTableColumnFlags_WidthFixed, construction_grid::bar);
     ImGui::TableSetupColumn("##state", ImGuiTableColumnFlags_WidthFixed, construction_grid::state);
@@ -2891,7 +2892,7 @@ void draw_tile_building_grid(const world& w, const recipe_registry& reg,
 
         // ── Column 1: the name, over a row-wide press that expands the stack ──
         ImGui::TableSetColumnIndex(1);
-        const float name_w = std::max(16.0f, ImGui::GetContentRegionAvail().x);
+        const float name_w = std::max(ui::px(16.0f), ImGui::GetContentRegionAvail().x);
         const bool pressed = ImGui::Selectable("##stack", ui.selected_entity == first,
                                                ImGuiSelectableFlags_SpanAllColumns);
         ImGui::SameLine(0.0f, 0.0f);
@@ -3015,7 +3016,7 @@ void draw_tile_building_grid(const world& w, const recipe_registry& reg,
         readout.open   = st.open;
         readout.count  = count;
         readout.first  = first;
-        readout.x      = gp.x + 24.0f;
+        readout.x      = gp.x + ui::px(24.0f);
         readout.y      = gp.y + line_h * 0.5f;
         readout.name_lines  = name_lines;   // BL-1371
         readout.name_elided = name_elided;
@@ -3177,7 +3178,7 @@ void draw_building_recipe_rows(const world& w, const recipe_registry& reg, const
     if (!rd.reported)
     {
         const ImVec2 hp = ImGui::GetCursorScreenPos();
-        const float  hw = std::max(16.0f, ImGui::GetContentRegionAvail().x);
+        const float  hw = std::max(ui::px(16.0f), ImGui::GetContentRegionAvail().x);
         ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
         fit_text(text_box::table_cell, "selection.building.recipe.head", heading.c_str(), hw);
         ImGui::PopStyleColor();
@@ -3191,7 +3192,7 @@ void draw_building_recipe_rows(const world& w, const recipe_registry& reg, const
         ImGui::PopStyleVar();
         return;
     }
-    constexpr float k_recipe_gap = 3.0f; // the table pads no inner edge, so a column holds its own gap
+    const float k_recipe_gap = ui::px(3.0f); // the table pads no inner edge, so a column holds its own gap
     ImGui::TableSetupColumn("##pip",   ImGuiTableColumnFlags_WidthFixed, construction_grid::makes + k_recipe_gap);
     ImGui::TableSetupColumn("##good",  ImGuiTableColumnFlags_WidthStretch, 1.0f);
     ImGui::TableSetupColumn("##fig",   ImGuiTableColumnFlags_WidthFixed, std::ceil(fig_w) + k_recipe_gap);
@@ -3203,7 +3204,7 @@ void draw_building_recipe_rows(const world& w, const recipe_registry& reg, const
     if (rd.reported)
     {
         const ImVec2 hp = ImGui::GetCursorScreenPos();
-        const float  hw = std::max(16.0f, ImGui::GetContentRegionAvail().x);
+        const float  hw = std::max(ui::px(16.0f), ImGui::GetContentRegionAvail().x);
         ImGui::TextDisabled("%s", heading.c_str());
         head_cells.push_back(construction_cell(
             "heading", hp, hw,
@@ -3244,7 +3245,7 @@ void draw_building_recipe_rows(const world& w, const recipe_registry& reg, const
         ImGui::Dummy({construction_grid::makes, line_h});
 
         ImGui::TableSetColumnIndex(1);
-        const float name_w = std::max(16.0f, ImGui::GetContentRegionAvail().x);
+        const float name_w = std::max(ui::px(16.0f), ImGui::GetContentRegionAvail().x);
         fit_text(text_box::table_cell, "selection.building.recipe.good", good.c_str(), name_w);
         cells.push_back(construction_cell(
             "good", pp, construction_grid::makes + construction_grid::pad * 2.0f + name_w,
@@ -3390,7 +3391,7 @@ void draw_expanded_building_card(world& w, const recipe_registry& reg,
         const float cnt_w = cnt[0] ? ImGui::CalcTextSize(cnt).x : 0.0f;
         ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(palette::selection));
         fit_text(text_box::table_cell, "selection.building.title", name.c_str(),
-                 std::max(24.0f, ImGui::GetContentRegionAvail().x - cnt_w));
+                 std::max(ui::px(24.0f), ImGui::GetContentRegionAvail().x - cnt_w));
         ImGui::PopStyleColor();
         if (cnt[0])
         {
@@ -3476,7 +3477,7 @@ void draw_expanded_building_card(world& w, const recipe_registry& reg,
             std::vector<grid_explainer> cells;
 
             ImGui::TableSetColumnIndex(1);
-            const float label_w = std::max(16.0f, ImGui::GetContentRegionAvail().x);
+            const float label_w = std::max(ui::px(16.0f), ImGui::GetContentRegionAvail().x);
             // BL-1371: through the shared wrapping draw like every other name
             // column, so the budget is stated in one place even where the label
             // is a literal that always fits.
@@ -3492,8 +3493,8 @@ void draw_expanded_building_card(world& w, const recipe_registry& reg,
             ImGui::TableSetColumnIndex(2);
             {
                 const ImVec2 bp = ImGui::GetCursorScreenPos();
-                construction_grid_bar(dl, {bp.x, bp.y + 3.0f},
-                                      {bp.x + construction_grid::bar, bp.y + line_h - 3.0f},
+                construction_grid_bar(dl, {bp.x, bp.y + ui::px(3.0f)},
+                                      {bp.x + construction_grid::bar, bp.y + line_h - ui::px(3.0f)},
                                       frac, palette::selection);
                 ImGui::Dummy({construction_grid::bar, line_h});
                 char buf[200];
@@ -3574,7 +3575,7 @@ void draw_expanded_building_card(world& w, const recipe_registry& reg,
         std::string       market;
         const std::string method = building_method_line(w, reg, report, bid, b, &market);
         fit_text(text_box::table_cell, "selection.building.method", method.c_str(),
-                 std::max(24.0f, ImGui::GetContentRegionAvail().x));
+                 std::max(ui::px(24.0f), ImGui::GetContentRegionAvail().x));
         if (!market.empty() && ImGui::IsItemHovered())
             ImGui::SetTooltip("%s\nFor the %s market.", method.c_str(), market.c_str());
         ui.tile_card.method = method;
@@ -3868,7 +3869,7 @@ void draw_province_card(const world& w, const recipe_registry& reg, const econom
     ImGui::SameLine();
     const float bar_x   = ImGui::GetCursorPosX();
     const float right_x = ImGui::GetWindowContentRegionMax().x;
-    const float bar_w   = std::max(24.0f, right_x - bar_x - pop_w - style.ItemSpacing.x);
+    const float bar_w   = std::max(ui::px(24.0f), right_x - bar_x - pop_w - style.ItemSpacing.x);
     (void)row_x;
 
     // Capacity: standing buildings against the province building ceiling. -1 is
@@ -4132,7 +4133,7 @@ void draw_tile_selection(world& w, const recipe_registry& reg, const economy_rep
     const float spacing  = style.ItemSpacing.x;
     const float left_w   = avail * 0.25f;
     const float right_w  = avail * 0.25f;
-    const float centre_w = std::max(160.0f, avail - left_w - right_w - 3.0f * spacing);
+    const float centre_w = std::max(ui::px(160.0f), avail - left_w - right_w - 3.0f * spacing);
     const float prov_w   = std::floor(centre_w * 0.5f);
     const float tile_w   = centre_w - prov_w;
 
@@ -4299,7 +4300,7 @@ void draw_tile_selection(world& w, const recipe_registry& reg, const economy_rep
         {
             const ImVec2 pmin = ImGui::GetCursorScreenPos();
             ImGui::GetWindowDrawList()->AddRect(
-                {pmin.x - 2.0f, pmin.y - 2.0f}, {pmin.x + bsz.x + 2.0f, pmin.y + bsz.y + 2.0f},
+                {pmin.x - ui::px(2.0f), pmin.y - ui::px(2.0f)}, {pmin.x + bsz.x + ui::px(2.0f), pmin.y + bsz.y + ui::px(2.0f)},
                 palette::selection, 4.0f, 0, 2.0f);
         }
         {
@@ -4509,7 +4510,7 @@ bool draw_front_selection(const world& w, ui_state& ui)
     const float avail   = ImGui::GetContentRegionAvail().x;
     const float total_h = ImGui::GetContentRegionAvail().y;
     const float right_w = avail * 0.25f;
-    const float left_w  = std::max(80.0f, avail - right_w - style.ItemSpacing.x);
+    const float left_w  = std::max(ui::px(80.0f), avail - right_w - style.ItemSpacing.x);
 
     // ── Left: the assigned units, one row each ──
     const std::vector<entity_id> units = front_units(w, nation, view.f.key);
@@ -5504,7 +5505,7 @@ void draw_construction_ledger_body(world& w, const recipe_registry& reg, ui_stat
         ImGui::TableSetColumnIndex(0);
         const ImVec2 gp = ImGui::GetCursorScreenPos();
         {
-            constexpr float gr = construction_grid::glyph * 0.5f;
+            const float gr = construction_grid::glyph * 0.5f;
             // BL-429: an extraction row carries its target in c.target; a
             // processing row's c.target is the placeholder iron_ore the candidate
             // was built with, so the glyph is computed from the row's own recipe
@@ -5520,7 +5521,7 @@ void draw_construction_ledger_body(world& w, const recipe_registry& reg, ui_stat
 
         // ── Column 1: the name, elided to its column ──
         ImGui::TableSetColumnIndex(1);
-        const float name_w = std::max(16.0f, ImGui::GetContentRegionAvail().x);
+        const float name_w = std::max(ui::px(16.0f), ImGui::GetContentRegionAvail().x);
         ImGui::PushStyleColor(ImGuiCol_Text, palette::selection);
         // BL-1371: the name WRAPS into the row's second line rather than eliding.
         // This column is the whole reason the row grew: at the fold-out's
@@ -5653,8 +5654,8 @@ void draw_construction_ledger_body(world& w, const recipe_registry& reg, ui_stat
         {
             const ImVec2 bp = ImGui::GetCursorScreenPos();
             if (c.group == 0)
-                construction_grid_bar(cdl, {bp.x, bp.y + 3.0f},
-                                      {bp.x + construction_grid::bar, bp.y + line_h - 3.0f},
+                construction_grid_bar(cdl, {bp.x, bp.y + ui::px(3.0f)},
+                                      {bp.x + construction_grid::bar, bp.y + line_h - ui::px(3.0f)},
                                       ceiling > 0.0f ? std::fabs(c.profit.net()) / ceiling : 0.0f,
                                       value_colour(static_cast<double>(c.profit.net())));
             ImGui::Dummy({construction_grid::bar, line_h});
@@ -5712,7 +5713,7 @@ void draw_construction_ledger_body(world& w, const recipe_registry& reg, ui_stat
         // shifts; the reason is the card's.
         ImGui::TableSetColumnIndex(7);
         const ImVec2 act_p = ImGui::GetCursorScreenPos();
-        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, {4.0f, 0.0f});
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ui::px(4.0f, 0.0f));
         ImGui::BeginDisabled(!c.pr.ok() || !affordable);
         if (ImGui::Button("Build"))
         {
@@ -5762,7 +5763,7 @@ void draw_construction_ledger_body(world& w, const recipe_registry& reg, ui_stat
             construction_controls::grid_row pub;
             pub.name  = c.name;
             pub.hover = construction_cells_text(cells);
-            pub.x     = gp.x + 24.0f;
+            pub.x     = gp.x + ui::px(24.0f);
             pub.y     = gp.y + line_h * 0.5f;
             pub.h           = row_h;
             pub.name_lines  = name_lines;
@@ -5820,7 +5821,7 @@ void draw_construction_ledger_body(world& w, const recipe_registry& reg, ui_stat
         {
             const ImVec2 fmn = ImGui::GetItemRectMin();
             const ImVec2 fmx = ImGui::GetItemRectMax();
-            ui.construction_ui.road_fold_x = fmn.x + 40.0f;
+            ui.construction_ui.road_fold_x = fmn.x + ui::px(40.0f);
             ui.construction_ui.road_fold_y = (fmn.y + fmx.y) * 0.5f;
         }
         // Closing the fold hides the press that shows the armed state, and that press is
@@ -5874,7 +5875,7 @@ void draw_construction_ledger_body(world& w, const recipe_registry& reg, ui_stat
 
             // Column 1: the name.
             ImGui::TableSetColumnIndex(1);
-            const float name_w = std::max(16.0f, ImGui::GetContentRegionAvail().x);
+            const float name_w = std::max(ui::px(16.0f), ImGui::GetContentRegionAvail().x);
             ImGui::PushStyleColor(ImGuiCol_Text, palette::selection);
             construction_grid_text("build.road.name", rt.name, name_w, /*disabled=*/false);
             ImGui::PopStyleColor();
@@ -5976,7 +5977,7 @@ void draw_construction_ledger_body(world& w, const recipe_registry& reg, ui_stat
             const ImVec2 press_p = ImGui::GetCursorScreenPos();
             // "Stop", not "Cancel": the grid's press column is 44 px, and "Cancel" took all
             // of it before the frame's padding, so its last letter was cut.
-            ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, {4.0f, 0.0f});
+            ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ui::px(4.0f, 0.0f));
             const bool road_pressed = ImGui::Button(armed ? "Stop" : "Build");
             ImGui::PopStyleVar();
             if (road_pressed)
@@ -6144,8 +6145,8 @@ void draw_construction_ledger_body(world& w, const recipe_registry& reg, ui_stat
                 const auto idx = static_cast<std::uint16_t>(row - table.data());
                 ImGui::PushID(static_cast<int>(idx));
                 ImGui::TextUnformatted(row->name);
-                ImGui::SameLine(bar_w - style.WindowPadding.x - 70.0f);
-                if (ImGui::Button("Hire", {60.0f, 0.0f}))
+                ImGui::SameLine(bar_w - style.WindowPadding.x - ui::px(70.0f));
+                if (ImGui::Button("Hire", {ui::px(60.0f), 0.0f}))
                 {
                     ui.construction.pending_hire_tile      = tile_id;
                     ui.construction.pending_hire_unit_type = idx;

@@ -1,4 +1,5 @@
 #include "generation_charts.hpp"
+#include "ui_scale.hpp" // BL-1495: px
 
 #include "charts.hpp"
 #include "presentation.hpp"
@@ -364,7 +365,7 @@ void draw_stage_charts(const generation_chart_source& src, chain_stage s, bool h
         const ImVec2 p  = ImGui::GetCursorScreenPos();
         const float  cw = ImGui::GetContentRegionAvail().x;
         const float  extra = (m.legend_rows > 0)
-                             ? static_cast<float>(m.legend_rows) * 20.0f + 6.0f : 0.0f;
+                             ? static_cast<float>(m.legend_rows) * 20.0f + ui::px(6.0f) : 0.0f;
         ImGui::Dummy({cw, h + extra});
         body(cdl, p, ImVec2{p.x + cw, p.y + h});
         ImGui::EndChild();

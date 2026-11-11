@@ -1,4 +1,5 @@
 #include "strategy_readout.hpp"
+#include "ui_scale.hpp" // BL-1495: px
 
 #include "charts.hpp"         // draw_stacked_band / draw_value_bar
 #include "foldout_column.hpp" // the shell-column host this ledger draws into
@@ -138,7 +139,7 @@ void draw_bucket_legend(const std::array<std::uint32_t, 3>* counts)
     for (int b = 0; b < bucket_count; ++b)
     {
         const ImVec2 p = ImGui::GetCursorScreenPos();
-        dl->AddRectFilled({p.x, p.y + 3.0f}, {p.x + 9.0f, p.y + 12.0f}, bucket_colour(b), 2.0f);
+        dl->AddRectFilled({p.x, p.y + ui::px(3.0f)}, {p.x + ui::px(9.0f), p.y + ui::px(12.0f)}, bucket_colour(b), 2.0f);
         ImGui::Dummy({11.0f, ImGui::GetTextLineHeight()});
         ImGui::SameLine();
         ImGui::PushStyleColor(ImGuiCol_Text, palette::text_secondary);
@@ -164,10 +165,10 @@ void draw_count_row(const char* label, std::uint32_t count, std::uint32_t ceilin
     ImGui::TextWrapped("%s", label);
 
     const ImVec2 p  = ImGui::GetCursorScreenPos();
-    const float  bw = std::max(40.0f, ImGui::GetContentRegionAvail().x - 4.0f);
+    const float  bw = std::max(ui::px(40.0f), ImGui::GetContentRegionAvail().x - ui::px(4.0f));
     const float  bh = ImGui::GetTextLineHeight(); // the printed count sits inside the bar
     ImDrawList*  dl = ImGui::GetWindowDrawList();
-    ImGui::Dummy({bw, bh + 2.0f});
+    ImGui::Dummy({bw, bh + ui::px(2.0f)});
     charts::draw_value_bar(dl, {p.x, p.y}, {p.x + bw, p.y + bh},
                            static_cast<float>(count),
                            static_cast<float>(std::max<std::uint32_t>(ceiling, 1u)),
@@ -384,7 +385,7 @@ void draw_strategy_readout(const world& w, const strategy_readout_state& s,
             ImGui::Text("- %u decisions", p.window_total);
             ImGui::PopStyleColor();
 
-            draw_bucket_share_bar(ImGui::GetContentRegionAvail().x - 4.0f, p.buckets);
+            draw_bucket_share_bar(ImGui::GetContentRegionAvail().x - ui::px(4.0f), p.buckets);
 
             ImGui::PushStyleColor(ImGuiCol_Text, palette::text_secondary);
             ImGui::Text("%u / %u / %u", p.buckets[0], p.buckets[1], p.buckets[2]);
@@ -419,7 +420,7 @@ void draw_strategy_readout(const world& w, const strategy_readout_state& s,
         ImGui::TextUnformatted("Bucket split by quarter");
         {
             const ImVec2 bp = ImGui::GetCursorScreenPos();
-            const float  bw = std::max(60.0f, ImGui::GetContentRegionAvail().x - 4.0f);
+            const float  bw = std::max(ui::px(60.0f), ImGui::GetContentRegionAvail().x - ui::px(4.0f));
             const float  bh = 56.0f;
             ImGui::Dummy({bw, bh});
 

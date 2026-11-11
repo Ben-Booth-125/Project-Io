@@ -1,4 +1,5 @@
 #include "selection_card.hpp"
+#include "ui_scale.hpp" // BL-1495: px, px_const
 
 #include "selection.hpp"        // selection_kind_of — the open/kind gate
 #include "selection_panel.hpp"  // draw_selection_content — the card body
@@ -7,8 +8,8 @@ namespace ui {
 
 namespace {
 
-constexpr float kPad      = 10.0f;
-constexpr float kRounding = 6.0f;
+constexpr px_const kPad      {10.0f};
+constexpr px_const kRounding {6.0f};
 
 } // namespace
 

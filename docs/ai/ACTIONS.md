@@ -3364,12 +3364,12 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 
 | Arg | Type | Meaning |
 |---|---|---|
-| `step` | `enum: 1.0x | 1.25x | 1.5x` | Global UI scale step (stored as index 0-2; a corrupt config clamps back into this range). |
+| `step` | `enum: 12 px | 16 px | 20 px | 24 px` | Global UI scale step, named by its font size; 12 px is the default and the smallest. Stored as ui_scale_px in options.cfg; a value off the list lands on the nearest step. |
 
 **Valid when:**
 - Options window open.
 
-**Expected output.** UI scale applies live and persists to options.cfg immediately. These steps grow the font on top of the UI draw scale (LAYOUT.md § UI scale), which is one constant and has no control.
+**Expected output.** UI scale applies live and persists to options.cfg immediately. Every chrome element - text, padding, spacing, panel widths, the icon rail - scales with the font by one factor (font px / 16); the canvas ground does not. The window's minimum size scales with it (960x540 at 12 px). LAYOUT.md § UI scale.
 
 **Reason to select.** To make the interface legible on dense or high-DPI displays.
 

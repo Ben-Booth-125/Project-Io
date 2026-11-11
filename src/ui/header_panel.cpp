@@ -1,4 +1,5 @@
 #include "header_panel.hpp"
+#include "ui_scale.hpp" // BL-1495: px, px_const
 
 #include "corporation_dashboard.hpp" // BL-1415: nation_operating_net
 #include "format.hpp"
@@ -100,11 +101,11 @@ bool ledger_burn(const world& w, float& movement)
 
 // Squeezed (Ben, 2026-11-02) to a 52 px floor, so the runway's value keeps its place
 // at the 1280 floor: there the strip is 521 px and the money run 388 of it.
-constexpr float k_recruit_glyph_r  = 6.0f; ///< glyph half-extent
-constexpr float k_recruit_text_gap = 3.0f; ///< glyph to its numbers
-constexpr float k_recruit_gap      = 6.0f; ///< between two readouts
-constexpr float k_recruit_lead     = 4.0f; ///< the least room left of the three
-constexpr float k_recruit_bar_h    = 3.0f;
+constexpr px_const k_recruit_glyph_r  {6.0f}; ///< glyph half-extent
+constexpr px_const k_recruit_text_gap {3.0f}; ///< glyph to its numbers
+constexpr px_const k_recruit_gap      {6.0f}; ///< between two readouts
+constexpr px_const k_recruit_lead     {4.0f}; ///< the least room left of the three
+constexpr px_const k_recruit_bar_h    {3.0f};
 
 const char* const k_recruit_theatre_names[3] = {"Land", "Air", "Sea"};
 
@@ -188,8 +189,8 @@ void draw_recruit_readouts(const recruit_readout (&r)[3], int fit, float right, 
 
     ImDrawList* dl   = ImGui::GetWindowDrawList();
     const float line = ImGui::GetTextLineHeight();
-    const float gy   = cy - 2.0f;                                   // glyph and numbers
-    const float by   = gy + k_recruit_glyph_r + 2.0f;               // the bar beneath
+    const float gy   = cy - ui::px(2.0f);                                   // glyph and numbers
+    const float by   = gy + k_recruit_glyph_r + ui::px(2.0f);               // the bar beneath
     const float top  = gy - k_recruit_glyph_r - 1.0f;
     const float h    = by + k_recruit_bar_h + 1.0f - top;
     float x = right - recruit_strip_width(r, fit);

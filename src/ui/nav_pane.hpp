@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ui_state.hpp"
+#include "ui_scale.hpp" // BL-1495: px, px_const
 
 namespace ui {
 
@@ -22,7 +23,7 @@ void draw_nav_pane(ui_state& state, float top_offset = 0.0f);
 /// Width of the navigation pane in pixels. Exposed so the caller can lay out
 /// other panels clear of the pane. Narrow, since the pane is an icon rail rather
 /// than a worded menu (the profile aligns to its own width, not this one).
-inline constexpr float nav_pane_width = 56.0f;
+inline constexpr px_const nav_pane_width {56.0f};
 
 /// Close every fold-out ledger/panel so at most one column occupant is shown.
 /// The Selection element shares the fold-out column and is mutually exclusive with

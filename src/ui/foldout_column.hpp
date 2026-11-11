@@ -1,4 +1,5 @@
 #pragma once
+#include "ui_scale.hpp" // BL-1495: px, px_const
 
 namespace ui {
 
@@ -44,7 +45,7 @@ float minimap_height(float disp_x, float disp_y);
 /// Margin (px) between the minimap box and the screen edges. The bottom strip is
 /// flush to the bottom, so this is the amount the strip's top edge must sit BELOW
 /// the minimap's to make the two align.
-inline constexpr float chrome_margin = 8.0f;
+inline constexpr px_const chrome_margin {8.0f};
 
 /// Height (px) of the bottom strip — the Selection band and the comms dock, which
 /// share it by design (BL-213/BL-227).

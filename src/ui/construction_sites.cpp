@@ -1,4 +1,5 @@
 #include "construction_sites.hpp"
+#include "ui_scale.hpp" // BL-1495: px, px_const
 
 #include "construction_panel.hpp" // grid_explainer / construction_column_card - the shared per-column hover
 #include "format.hpp"             // fmt::abbreviate / signed_delta
@@ -721,14 +722,14 @@ void draw_site_grid(const world& w, const recipe_registry& reg, ui_state& ui)
     const float pad   = 4.0f;
     const float gap   = 3.0f;
     const float glyph = std::ceil(lh * 1.5f);
-    const float avail = std::max(120.0f, ImGui::GetContentRegionAvail().x - st.ScrollbarSize);
+    const float avail = std::max(ui::px(120.0f), ImGui::GetContentRegionAvail().x - st.ScrollbarSize);
 
     // THE COLUMN COUNT IS MEASURED: the most columns of at least the minimum width at
     // which every name wraps whole inside its cell (a word wider than the room would
     // elide). The cell is then as tall as the tallest wrapped name needs, so no name
     // is cut at any supported width.
     constexpr int   k_max_cols   = 4;
-    constexpr float k_min_cell_w = 124.0f;
+    const float k_min_cell_w = ui::px(124.0f);
     const auto cell_width = [&](int n) {
         return (avail - gap * static_cast<float>(n - 1)) / static_cast<float>(n);
     };
@@ -757,13 +758,13 @@ void draw_site_grid(const world& w, const recipe_registry& reg, ui_state& ui)
     float name_h = glyph;
     for (const site_cell& c : sf.cells)
         name_h = std::max(name_h, ImGui::CalcTextSize(c.option.name.c_str(), nullptr, false, name_room).y);
-    const float cell_h = std::ceil(name_h + lh) + pad * 2.0f + 2.0f;
+    const float cell_h = std::ceil(name_h + lh) + pad * 2.0f + ui::px(2.0f);
 
     // Height: what is left once the table has the room it needs. The tab is the finder's
     // alone (Ben, 2026-11-09). A part row shows that it scrolls.
     const int   rows = (static_cast<int>(sf.cells.size()) + cols - 1) / cols;
     const float row_step = cell_h + gap;
-    constexpr float k_table_reserve = 260.0f;  // the site ledger's caption and table
+    const float k_table_reserve = ui::px(260.0f);  // the site ledger's caption and table
     const float reserve = 30.0f + (sf.armed ? k_table_reserve : 0.0f);
     const float room_rows = (ImGui::GetContentRegionAvail().y - reserve) / row_step;
     const float want_rows = std::max(room_rows, 1.5f);
@@ -849,12 +850,12 @@ void draw_site_grid(const world& w, const recipe_registry& reg, ui_state& ui)
         // The press: a real button over the cell's right half, so it takes the press
         // and the hover before the cell under it.
         const bool can_build = !c.pending && c.sites > 0 && c.build_tile != null_entity;
-        const ImVec2 b_mn{half_x + st.ItemInnerSpacing.x * 0.5f, fig_y - 2.0f};
-        const ImVec2 b_mx{mx.x - pad, mx.y - 2.0f};
+        const ImVec2 b_mn{half_x + st.ItemInnerSpacing.x * 0.5f, fig_y - ui::px(2.0f)};
+        const ImVec2 b_mx{mx.x - pad, mx.y - ui::px(2.0f)};
         ImGui::SetCursorScreenPos(b_mn);
         ImGui::PushID(idx);
         ImGui::BeginDisabled(!can_build);
-        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, {1.0f, 0.0f});
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ui::px(1.0f, 0.0f));
         ImGui::SetWindowFontScale(0.85f); // the label reads at the line's size
         const bool build_pressed = ImGui::Button("Construct##cell_build", {b_mx.x - b_mn.x, b_mx.y - b_mn.y});
         ImGui::SetWindowFontScale(1.0f);
@@ -974,7 +975,7 @@ void draw_site_grid(const world& w, const recipe_registry& reg, ui_state& ui)
     }
     // Reserve the grid's own extent so the child's scroll range is right.
     ImGui::SetCursorScreenPos({origin.x, origin.y + static_cast<float>(rows) * row_step});
-    ImGui::Dummy({1.0f, 0.0f});
+    ImGui::Dummy(ui::px(1.0f, 0.0f));
 
     // A choice made elsewhere (the Military ledger's door) may sit off the visible part.
     static std::string framed;
@@ -1346,7 +1347,7 @@ void draw_site_finder(world& w, const recipe_registry& reg, ui_state& ui)
         const float clear_w = ImGui::CalcTextSize("Clear").x + ImGui::GetStyle().FramePadding.x * 2.0f;
         const float start_x = ImGui::GetCursorPosX();
         const float room    = ImGui::GetContentRegionAvail().x;
-        ImGui::PushTextWrapPos(start_x + room - clear_w - 6.0f);
+        ImGui::PushTextWrapPos(start_x + room - clear_w - ui::px(6.0f));
         ImGui::TextUnformatted(text.c_str());
         ImGui::PopTextWrapPos();
         grid_explainer e;
@@ -1425,7 +1426,7 @@ void draw_site_finder(world& w, const recipe_registry& reg, ui_state& ui)
     // default, every tie broken by tile id (sort_site_rows).
     const float line_h  = ImGui::GetTextLineHeightWithSpacing();
     const int   shown   = std::min<int>(static_cast<int>(sf.rows.size()), 9);
-    const float table_h = line_h * static_cast<float>(shown + 1) + 6.0f;
+    const float table_h = line_h * static_cast<float>(shown + 1) + ui::px(6.0f);
     const ImGuiTableFlags tf = ImGuiTableFlags_Sortable | ImGuiTableFlags_RowBg
                              | ImGuiTableFlags_ScrollY | ImGuiTableFlags_BordersInnerV
                              | ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_NoSavedSettings;
@@ -1442,7 +1443,7 @@ void draw_site_finder(world& w, const recipe_registry& reg, ui_state& ui)
     // worst-case sample, because at the fold-out's narrowest every pixel a fixed
     // column does not need is a pixel the two named columns' headers do.
     float fig_net = 0.0f, fig_cost = 0.0f, fig_yield = 0.0f;
-    constexpr float k_runway_mark_w = 8.0f; // the amber mark beside a warned row's figure
+    const float k_runway_mark_w = ui::px(8.0f); // the amber mark beside a warned row's figure
     for (const site_row& r : sf.rows)
     {
         if (r.priced)
@@ -1476,7 +1477,7 @@ void draw_site_finder(world& w, const recipe_registry& reg, ui_state& ui)
     // headers need, so neither elides while the other has room to spare.
     const float need_place  = header_need("Place", 0);
     const float need_market = header_need("Market", 3);
-    ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, {2.0f, 1.0f});
+    ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, ui::px(2.0f, 1.0f));
     if (!ImGui::BeginTable("##site_ledger", 6, tf, {0.0f, table_h}))
     {
         ImGui::PopStyleVar();
@@ -1544,8 +1545,8 @@ void draw_site_finder(world& w, const recipe_registry& reg, ui_state& ui)
                 const ImVec2 p = ImGui::GetCursorScreenPos();
                 grid_explainer e;
                 e.key  = key;
-                e.mn   = {p.x - 2.0f, p.y - 1.0f};
-                e.mx   = {p.x + wpx + 2.0f, p.y + line_h - 1.0f};
+                e.mn   = {p.x - ui::px(2.0f), p.y - 1.0f};
+                e.mx   = {p.x + wpx + ui::px(2.0f), p.y + line_h - 1.0f};
                 e.text = std::move(text);
                 e.ink  = ink;
                 cells.push_back(std::move(e));
@@ -1558,7 +1559,7 @@ void draw_site_finder(world& w, const recipe_registry& reg, ui_state& ui)
                                     : r.place_near   ? "near " + r.place
                                                      : r.place;
             const ImVec2 rp = ImGui::GetCursorScreenPos();
-            const float  pw = std::max(16.0f, ImGui::GetContentRegionAvail().x);
+            const float  pw = std::max(ui::px(16.0f), ImGui::GetContentRegionAvail().x);
             cell("place", pw,
                  (r.place.empty() ? std::string("No named place is near this tile. ")
                   : r.place_near  ? "No centre's province holds this tile; " + r.place
@@ -1581,7 +1582,7 @@ void draw_site_finder(world& w, const recipe_registry& reg, ui_state& ui)
             }
             ImGui::SameLine(0.0f, 0.0f);
             ImGui::TextUnformatted(fitted(place.c_str(), pw).c_str());
-            sf.drawn.push_back({r.tile, rp.x + 12.0f, rp.y + ImGui::GetTextLineHeight() * 0.5f, std::string()});
+            sf.drawn.push_back({r.tile, rp.x + ui::px(12.0f), rp.y + ImGui::GetTextLineHeight() * 0.5f, std::string()});
 
             // Net / qtr — the door's estimate, cover applied.
             ImGui::TableSetColumnIndex(1);
@@ -1648,7 +1649,7 @@ void draw_site_finder(world& w, const recipe_registry& reg, ui_state& ui)
             // Market — which market the tile clears in.
             ImGui::TableSetColumnIndex(3);
             {
-                const float mw = std::max(16.0f, ImGui::GetContentRegionAvail().x);
+                const float mw = std::max(ui::px(16.0f), ImGui::GetContentRegionAvail().x);
                 cell("market", mw, r.market == null_entity
                                        ? std::string("No market supplies this tile.")
                                        : "Sells and buys at " + r.market_name + "'s market.");

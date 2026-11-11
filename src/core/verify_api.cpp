@@ -49,6 +49,7 @@
 #include "world/recruits.hpp"      // BL-1463: recruit_pools() / grant_recruits()
 #include "world/unit_designs.hpp"  // set_kit_research_waived_for_harness — waive_kit_research()
 #include "ui/fonts.hpp"
+#include "ui/ui_scale.hpp"
 #include "ui/frame_stats.hpp"
 #include "ui/market_ledger.hpp"
 #include "ui/nation_history.hpp" // BL-1295: the seat card's history read
@@ -3905,10 +3906,11 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         }
         return out;
     });
-    // BL-1495: draw this run at a UI scale. No argument: the shipped constant, so a
-    // check never restates the number. Verify otherwise runs at 1, the tightest layout.
-    v.set_function("ui_draw_scale", [this](sol::optional<float> s) {
-        m_ui_draw_scale = s.value_or(shipped_ui_draw_scale());
+    // BL-1495: draw this run at an Options UI scale step (0..3 = 12/16/20/24 px). No
+    // argument: the default step, so a check never restates the number. Verify runs at
+    // the default otherwise, as the player first sees it. Each script starts there.
+    v.set_function("ui_scale_step", [this](sol::optional<int> step) {
+        m_settings.ui_scale_step = step.value_or(0);
         apply_ui_scale();
     });
 
@@ -9077,7 +9079,8 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         ImGui::StyleColorsDark();
         ImGui_ImplSDL3_InitForSDLRenderer(m_window, m_renderer);
         ImGui_ImplSDLRenderer3_Init(m_renderer);
-        ui::load_ui_font();
+        m_settings.ui_scale_step = 0; // BL-1495: every script starts at the default scale
+        apply_ui_scale();
         ui::set_overflow_recording(true);
 
         // Restore via copy-construct + move-assign, NOT plain copy-assign.

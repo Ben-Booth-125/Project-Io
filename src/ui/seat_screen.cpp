@@ -30,6 +30,7 @@
 /// a draw cache for one body and are rebuilt if the body changes.
 
 #include "core/app.hpp"
+#include "ui_scale.hpp" // BL-1495: px
 
 #include <imgui.h>
 #include <imgui_internal.h> // BringWindowToDisplayFront -- the history link's ledger over the screen
@@ -522,12 +523,12 @@ void app::draw_seat_screen()
     ImGui::TextUnformatted("or take no nation: open the world with nobody seated and watch every "
                            "nation play itself.");
     ImGui::PopStyleColor();
-    ImGui::Dummy({1.0f, 6.0f});
+    ImGui::Dummy(ui::px(1.0f, 6.0f));
 
     const float pad     = ImGui::GetStyle().ItemSpacing.x;
     const float avail   = ImGui::GetContentRegionAvail().x;
-    const float list_w  = std::max(340.0f, avail * 0.30f);
-    const float right_w = std::max(200.0f, avail - list_w - pad);
+    const float list_w  = std::max(ui::px(340.0f), avail * 0.30f);
+    const float right_w = std::max(ui::px(200.0f), avail - list_w - pad);
     const float body_h  = ImGui::GetContentRegionAvail().y;
 
     // The nation the map and the card show: the open briefing's, else the hovered row.
@@ -542,7 +543,7 @@ void app::draw_seat_screen()
     if (ImGui::BeginTable("##seat_rows", 3,
                           ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingStretchProp))
     {
-        ImGui::TableSetupColumn("#", ImGuiTableColumnFlags_WidthFixed, 22.0f);
+        ImGui::TableSetupColumn("#", ImGuiTableColumnFlags_WidthFixed, ui::px(22.0f));
         ImGui::TableSetupColumn("Nation", ImGuiTableColumnFlags_WidthStretch, 2.6f);
         ImGui::TableSetupColumn("Treasury", ImGuiTableColumnFlags_WidthStretch, 1.2f);
         ImGui::TableHeadersRow();
@@ -574,9 +575,9 @@ void app::draw_seat_screen()
             ImGui::TableSetColumnIndex(1);
             const ImVec2 sw = ImGui::GetCursorScreenPos();
             const float  lh = ImGui::GetTextLineHeight();
-            ImGui::GetWindowDrawList()->AddRectFilled({sw.x, sw.y + 2.0f}, {sw.x + lh - 4.0f, sw.y + lh - 2.0f},
+            ImGui::GetWindowDrawList()->AddRectFilled({sw.x, sw.y + ui::px(2.0f)}, {sw.x + lh - ui::px(4.0f), sw.y + lh - ui::px(2.0f)},
                                                       ui::palette::nation_colour(m.nation));
-            ImGui::Dummy({lh - 2.0f, lh});
+            ImGui::Dummy({lh - ui::px(2.0f), lh});
             ImGui::SameLine();
             if (marked) ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(150, 150, 158, 255));
             ImGui::TextUnformatted(nit->second.name.c_str());
@@ -718,7 +719,7 @@ void app::draw_seat_screen()
 
     // The map takes the top of the pane, capped so the card keeps the rest.
     const float map_wmax = ImGui::GetContentRegionAvail().x;
-    const float map_hmax = std::max(80.0f, ImGui::GetContentRegionAvail().y * 0.40f);
+    const float map_hmax = std::max(ui::px(80.0f), ImGui::GetContentRegionAvail().y * 0.40f);
     ImDrawList* dl = ImGui::GetWindowDrawList();
     if (m_seat_ui.gw > 0 && m_seat_ui.gh > 0)
     {
@@ -765,7 +766,7 @@ void app::draw_seat_screen()
             {
                 ImVec2 p;
                 if (at(mit->second.centre_tile, p))
-                    ui::icons::market(dl, p, std::max(4.0f, cell * 2.2f), ui::palette::settlement);
+                    ui::icons::market(dl, p, std::max(ui::px(4.0f), cell * 2.2f), ui::palette::settlement);
             }
         if (nat)
         {
@@ -773,7 +774,7 @@ void app::draw_seat_screen()
             // within a few tiles of its HQ, and a glyph drawn last hid them.
             ImVec2 hp;
             if (at(hq_tile, hp))
-                ui::icons::hq(dl, hp, std::max(5.0f, cell * 2.0f), ui::palette::hover);
+                ui::icons::hq(dl, hp, std::max(ui::px(5.0f), cell * 2.0f), ui::palette::hover);
             for (const entity_id bid : nat->state_assets)
             {
                 const auto bit = m_world.buildings.find(bid);
@@ -789,7 +790,7 @@ void app::draw_seat_screen()
         dl->AddRect(tl, {tl.x + map_w, tl.y + map_h}, IM_COL32(52, 60, 76, 255));
     }
 
-    ImGui::Dummy({1.0f, 4.0f});
+    ImGui::Dummy(ui::px(1.0f, 4.0f));
     if (!nat)
     {
         ImGui::EndChild();
