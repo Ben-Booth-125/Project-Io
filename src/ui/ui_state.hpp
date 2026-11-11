@@ -634,6 +634,28 @@ struct wing_ui_state
 
 /// BL-1534: the ship card and the canvas's right-click order (ship_card.hpp). VIEW state plus
 /// the queued orders.
+/// BL-1431 (MILITARY.md § Missiles): the missile section a launcher's or an air defence
+/// unit's card draws (missile_panel.hpp).
+struct missile_ui_state
+{
+    /// Orders queued for app::render, sent through the seam in order.
+    std::vector<corp_command> pending;
+    std::string               last_message; ///< The seam's answer (app writes it).
+    /// The target index picked per (launcher, kind).
+    std::map<std::pair<entity_id, int>, int> target_pick;
+    /// The target list per (launcher, kind), recomputed when the day moves, every
+    /// `k_missile_target_refresh_frames` frames, or once the section's orders are sent
+    /// (app clears it): `missile_targets` walks every unit and building, so not per frame.
+    struct target_cache
+    {
+        int day   = -1;
+        int frame = -1;
+        std::vector<std::pair<uint32_t, entity_id>> targets; ///< (province, building or null)
+    };
+    std::map<std::pair<entity_id, int>, target_cache> targets;
+};
+inline constexpr int k_missile_target_refresh_frames = 30;
+
 struct ship_ui_state
 {
     /// The mission a warship with no zone is set to work next, as a wing's.
@@ -1303,6 +1325,7 @@ struct ui_state
     unit_designer_state   designer; ///< The full-canvas unit designer (military.md § The designer).
     wing_ui_state         wing;         ///< BL-1450: the wing card and the canvas right-click assignment.
     ship_ui_state         ship;         ///< BL-1534: the ship card and the canvas right-click order.
+    missile_ui_state      missile;      ///< BL-1431: the missile section of a launcher's or an air defence unit's card.
     std::vector<convoy_loss> convoy_losses; ///< BL-1534: cargo lost or taken lately, newest last.
     int                      convoy_loss_rows = 0; ///< BL-1534: "Lost" rows the Convoys ledger drew this frame.
 

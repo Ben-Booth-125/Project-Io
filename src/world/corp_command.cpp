@@ -36,6 +36,8 @@
 #include <cassert> // BL-388: build-seam recipe-forwarding assertion
 #include <cmath>
 #include <cstddef> // BL-628: std::ptrdiff_t in the dissolution walk's vector erases
+#include "missiles.hpp" // BL-1431: the missile verbs
+
 #include <iterator> // BL-628: std::next, over the erase-while-walking sets
 #include <limits>  // BL-628: the HQ recompute's nearest-centroid search
 #include <set>     // BL-628: the stance tables the dissolution walk drops from
@@ -351,6 +353,9 @@ bool nation_self_shared_verb(corp_verb v)
         case corp_verb::refit_ship:         // BL-1527: a nation's own ship
         case corp_verb::embark_unit:        // BL-1531: a nation's own unit and ship
         case corp_verb::land_units:         // BL-1531: a nation's own ship
+        case corp_verb::stock_missiles:     // BL-1431: a nation's own magazine
+        case corp_verb::stock_interceptors: // BL-1431: a nation's own air defence unit
+        case corp_verb::fire_missile:       // BL-1431: a nation's own launcher
         case corp_verb::place_road:
         case corp_verb::set_trade:
         case corp_verb::clear_trade:
@@ -739,6 +744,16 @@ hire_goods_reading reading_of(const world& w, entity_id nation, const std::array
 }
 
 } // namespace
+
+float kit_goods_price_bound(const world& w, entity_id nation, const std::array<float, resource_count>& goods)
+{
+    return hire_goods_price_bound(w, nation, goods);
+}
+
+bool kit_goods_on_shelves(const world& w, entity_id nation, const std::array<float, resource_count>& goods)
+{
+    return hire_goods_affordable(w, nation, nullptr, goods);
+}
 
 hire_goods_reading read_land_hire_goods(const world& w, entity_id nation, uint16_t row_index)
 {
@@ -1347,6 +1362,51 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
             if (r != corp_command_result::applied)
                 return r;
             set_ship_landing(w, reg, w.ships.at(cmd.subject), cmd.tile);
+            return corp_command_result::applied;
+        }
+
+        // --- BL-1431: missiles (MILITARY.md § Missiles) ---------------------
+        // Every check before anything moves: the read-only legs (missiles.cpp), then
+        // the goods on the shelves and their price bound against the purse room, as
+        // a hire's kit. A refusal mutates nothing.
+        case corp_verb::stock_missiles:
+        {
+            const corp_command_result r = stock_missiles_check(w, reg, cmd.corp, cmd.order, cmd.unit_type);
+            if (r != corp_command_result::applied)
+                return r;
+            const missile_kind k = static_cast<missile_kind>(cmd.order);
+            const std::array<float, resource_count> goods = missile_goods(reg, k, cmd.unit_type);
+            if (!hire_goods_affordable(w, cmd.corp, nullptr, goods)
+                || purse_room_of(w, cmd.corp) < hire_goods_price_bound(w, cmd.corp, goods))
+                return corp_command_result::rejected_funds;
+            debit_kit_goods(w, cmd.corp, goods);
+            w.missile_magazines[cmd.corp][static_cast<std::size_t>(k)] += static_cast<int32_t>(cmd.unit_type);
+            return corp_command_result::applied;
+        }
+
+        case corp_verb::stock_interceptors:
+        {
+            const corp_command_result r = stock_interceptors_check(w, reg, cmd.corp, cmd.subject, cmd.unit_type);
+            if (r != corp_command_result::applied)
+                return r;
+            const std::array<float, resource_count> goods =
+                missile_goods(reg, missile_kind::short_range, cmd.unit_type, true);
+            if (!hire_goods_affordable(w, cmd.corp, nullptr, goods)
+                || purse_room_of(w, cmd.corp) < hire_goods_price_bound(w, cmd.corp, goods))
+                return corp_command_result::rejected_funds;
+            debit_kit_goods(w, cmd.corp, goods);
+            w.interceptor_stocks[cmd.subject] += static_cast<int32_t>(cmd.unit_type);
+            return corp_command_result::applied;
+        }
+
+        case corp_verb::fire_missile:
+        {
+            missile_strike_plan plan;
+            const corp_command_result r = fire_missile_check(w, reg, cmd.corp, cmd.subject, cmd.order, cmd.unit_type,
+                                                             cmd.province, cmd.counterparty, &plan);
+            if (r != corp_command_result::applied)
+                return r;
+            apply_missile_strike(w, reg, cmd.corp, plan);
             return corp_command_result::applied;
         }
 

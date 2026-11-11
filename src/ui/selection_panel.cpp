@@ -2,6 +2,7 @@
 
 #include "core/battle_dispatch_text.hpp" // battle_phase_word — SHARED with BL-468's dispatches
 #include "construction_sites.hpp"
+#include "missile_panel.hpp" // BL-1431: the unit card's missile section
 #include "world/resource_names.hpp"
 #include "world/battle_system.hpp"      // active_battle, quote_withdrawal, read_battle_phase (BL-469)
 
@@ -1598,6 +1599,7 @@ void draw_unit_selection_body(const world& w, const recipe_registry& reg, ui_sta
                             owner_name != nullptr ? owner_name : "\xe2\x80\x94");
 
         draw_stat_grid("unit_card", unit_stat_bands(w, reg, sel), ImGui::GetContentRegionAvail().x);
+        draw_missile_section(w, reg, ui, sel); // BL-1431: artillery launches; air defence intercepts
 
         // What the grid does not hold: an older design, a refit in progress, the front.
         if (is_player_side(w, u.owner))

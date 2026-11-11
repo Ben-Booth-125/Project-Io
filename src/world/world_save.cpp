@@ -12,6 +12,7 @@
 #include "sea_combat.hpp"   // BL-1430: ship_roster_table, the ship section's bound
 #include "carried_supplies.hpp" // BL-1452: k_starvation_days — the stocks section's range check
 #include "war.hpp"         // BL-1459: the war section
+#include "missile_params.hpp" // BL-1431: the missile section's caps
 #include "hex_neighbors.hpp" // BL-1502: a front key across the line
 #include "unit_roster.hpp" // BL-1437: unit_roster_table — the obsolete flips' range check // BL-1407: fold_legacy_firms -- a pre-v56 stream's corporations
 
@@ -1066,6 +1067,52 @@ std::vector<std::pair<entity_id, entity_id>> saved_sightings(const world& w)
         const auto sit = w.ships.find(k.second);
         if (w.nations.count(k.first) != 0 && sit != w.ships.end() && w.nations.count(sit->second.owner) != 0)
             v.push_back(k);
+    }
+    return v;
+}
+
+/// BL-1431: the magazines the stream carries: a live nation's, not all zero, each count in
+/// range. Ascending, as the map is. No live path leaves an entry this drops: `stock_missiles`
+/// proves a live nation and the 64 cap, a strike erases an all-zero magazine, and
+/// `eliminate_nation` erases an ended nation's. The filter stays as a guard.
+std::vector<entity_id> saved_missile_magazines(const world& w)
+{
+    std::vector<entity_id> v;
+    for (const auto& [nid, mag] : w.missile_magazines)
+    {
+        const auto nit = w.nations.find(nid);
+        if (nit == w.nations.end() || nit->second.ended)
+            continue;
+        bool any = false, ok = true;
+        for (const int32_t c : mag)
+        {
+            any = any || c > 0;
+            ok  = ok && c >= 0 && c <= k_missile_magazine_cap;
+        }
+        if (any && ok)
+            v.push_back(nid);
+    }
+    return v;
+}
+
+/// BL-1431: the interceptor stocks the stream carries: a nation's air defence unit's, in range.
+///
+/// NO LIVE PATH LEAVES AN ENTRY THIS FILTER DROPS, so a save never silently changes
+/// state_hash (BL-1431 review). A stock is only ever written by `stock_interceptors`, whose
+/// check proves an owned, manned air defence unit and a count within 1..24; a strike erases
+/// it at zero. Every site that erases a unit calls `forget_air_unit` (which erases the stock)
+/// or is `disband_orphaned_units`, which erases it too; embarking goes through `forget_air_unit`.
+/// A refit keeps the land class (`refit_check`), and an owner that stops being a nation
+/// orphans the unit, which the same disband removes. The filter stays as a guard.
+std::vector<entity_id> saved_interceptor_stocks(const world& w)
+{
+    std::vector<entity_id> v;
+    for (const auto& [uid, c] : w.interceptor_stocks)
+    {
+        const auto uit = w.units.find(uid);
+        if (uit != w.units.end() && w.nations.count(uit->second.owner) != 0
+            && unit_land_class(uit->second) == land_class::air_defence && c >= 1 && c <= k_interceptor_cap)
+            v.push_back(uid);
     }
     return v;
 }
@@ -2290,6 +2337,39 @@ void write_world_snapshot_at(const world& w, std::ostream& out, uint32_t version
         for (const entity_id nid : ids)
             w_id(out, nid);
     }
+
+    // world_save_version 89 (BL-1431, MILITARY.md § Missiles): THE MISSILES, the last
+    // section, after the ended nations. The magazines, then the interceptor stocks,
+    // each ascending id, only the entries the reader accepts (`saved_missile_*`).
+    if (world_stream_has_missiles(version))
+    {
+        const auto mags = saved_missile_magazines(w);
+        w_u32(out, static_cast<uint32_t>(mags.size()));
+        for (const entity_id nid : mags)
+        {
+            w_id(out, nid);
+            for (const int32_t c : w.missile_magazines.at(nid))
+                w_i32(out, c);
+        }
+        const auto ints = saved_interceptor_stocks(w);
+        w_u32(out, static_cast<uint32_t>(ints.size()));
+        for (const entity_id uid : ints)
+        {
+            w_id(out, uid);
+            w_i32(out, w.interceptor_stocks.at(uid));
+        }
+    }
+}
+
+void write_world_snapshot_pre_missiles(const world& w, std::ostream& out)
+{
+    // VERIFICATION ONLY (BL-1431): the v88 stream shape - no missile section.
+    write_world_snapshot_at(w, out, k_world_save_version_pre_missiles);
+}
+
+std::size_t world_save_missile_section_bytes(const world& w)
+{
+    return 4 + 16 * saved_missile_magazines(w).size() + 4 + 8 * saved_interceptor_stocks(w).size();
 }
 
 void write_world_snapshot_pre_growth_carry(const world& w, std::ostream& out)
@@ -2380,7 +2460,9 @@ std::size_t world_save_ship_hulls_bytes(const world& w)
     std::ostringstream wide(std::ios::binary), narrow(std::ios::binary);
     write_world_snapshot(w, wide);
     write_world_snapshot_pre_stacked(w, narrow);
-    return wide.str().size() - narrow.str().size() - world_save_ships_section_bytes(w);
+    // BL-1431: and v89's missile section, which v83 lacks too.
+    return wide.str().size() - narrow.str().size() - world_save_ships_section_bytes(w)
+         - world_save_missile_section_bytes(w);
 }
 
 void write_world_snapshot_pre_ships(const world& w, std::ostream& out)
@@ -2815,7 +2897,8 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
             && version != k_world_save_version_pre_growth_carry // v80: every growth carry 0, no naval
             && version != k_world_save_version_ship_kit         // BL-1527: v81, the naval branch's (no books)
             && version != k_world_save_version_pre_ended        // BL-1562: v82, no nation ended
-            && version != k_world_save_version_ended))          // the naval merge: v83, 55 wide, no naval
+            && version != k_world_save_version_ended            // the naval merge: v83, 55 wide, no naval
+            && version != k_world_save_version_pre_missiles))   // BL-1431: v88, nothing stocked
         return false; // mismatched version -- refuse rather than misread
 
     // BL-1422: a stream before the kit goods carries every per-resource array 49 wide;
@@ -4073,7 +4156,7 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
             uint8_t kind = 0;
             if (!r_id(in, e.observer) || !r_id(in, e.subject) || !r_u8(in, kind)
                 || !r_f32(in, e.magnitude)
-                || kind >= sentiment_factor_count || !std::isfinite(e.magnitude)
+                || kind >= world_stream_sentiment_kinds(version) || !std::isfinite(e.magnitude)
                 || e.observer == e.subject
                 || s.nations.count(e.observer) == 0 || s.nations.count(e.subject) == 0)
                 return false; // only nations are queued (sentiment_emitters.cpp)
@@ -4450,7 +4533,8 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
     // already read (`read_sentiment_provenance`); refused whole otherwise. A v76 (and
     // older) stream ends before it: no row names a contributor or a seeded war.
     if (version >= k_world_save_version_contributors
-        && !read_sentiment_provenance(s.sentiment, in, s.sentiment.contributions, s.sentiment.seeds))
+        && !read_sentiment_provenance(s.sentiment, in, s.sentiment.contributions, s.sentiment.seeds,
+                                      world_stream_sentiment_kinds(version)))
         return false;
 
     // v78 (BL-1502): the occupation layer. Untrusted: tiles strictly ascending, each with
@@ -4959,6 +5043,56 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
                 || !enc.ship_design_kit.empty())
                 return false;
             nit->second.ended = true;
+        }
+    }
+
+    // v89 (BL-1431), after the ended nations: the missiles. Untrusted: magazines of live
+    // nations of the stream, ascending, each count in [0, 64] and not all zero; then
+    // interceptor stocks of the stream's air defence units owned by a nation, ascending,
+    // each in [1, 24]. Refused whole otherwise. A v88 stream ends before it: nothing stocked.
+    if (world_stream_has_missiles(version))
+    {
+        uint32_t count = 0;
+        if (!r_u32(in, count) || count > s.nations.size())
+            return false;
+        entity_id prev = null_entity;
+        for (uint32_t k = 0; k < count; ++k)
+        {
+            entity_id nid = null_entity;
+            if (!r_id(in, nid) || nid == null_entity || (k > 0 && nid <= prev))
+                return false;
+            prev = nid;
+            const auto nit = s.nations.find(nid);
+            if (nit == s.nations.end() || nit->second.ended)
+                return false;
+            std::array<int32_t, 3> mag{};
+            bool any = false;
+            for (int32_t& c : mag)
+            {
+                if (!r_i32(in, c) || c < 0 || c > k_missile_magazine_cap)
+                    return false;
+                any = any || c > 0;
+            }
+            if (!any)
+                return false;
+            s.missile_magazines.emplace(nid, mag);
+        }
+        if (!r_u32(in, count) || count > s.units.size())
+            return false;
+        prev = null_entity;
+        for (uint32_t k = 0; k < count; ++k)
+        {
+            entity_id uid = null_entity;
+            int32_t c = 0;
+            if (!r_id(in, uid) || uid == null_entity || (k > 0 && uid <= prev) || !r_i32(in, c)
+                || c < 1 || c > k_interceptor_cap)
+                return false;
+            prev = uid;
+            const auto uit = s.units.find(uid);
+            if (uit == s.units.end() || s.nations.count(uit->second.owner) == 0
+                || unit_land_class(uit->second) != land_class::air_defence)
+                return false;
+            s.interceptor_stocks.emplace(uid, c);
         }
     }
 

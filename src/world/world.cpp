@@ -773,6 +773,24 @@ uint64_t world::state_hash(int tick) const
             fnv1a_i32(h, bank.second);
         }
     }
+    if (!missile_magazines.empty()) // BL-1431: only when non-empty, as the air records
+    {
+        fnv1a_u32(h, 0x4D534C4Du); // "MSLM"
+        for (const auto& [nid, mag] : missile_magazines) // std::map: ascending
+        {
+            fnv1a_u32(h, nid);
+            for (const int32_t c : mag) fnv1a_i32(h, c);
+        }
+    }
+    if (!interceptor_stocks.empty()) // BL-1431
+    {
+        fnv1a_u32(h, 0x4D494E54u); // "MINT"
+        for (const auto& [uid, c] : interceptor_stocks) // std::map: ascending
+        {
+            fnv1a_u32(h, uid);
+            fnv1a_i32(h, c);
+        }
+    }
     {
         std::vector<entity_id> designed;
         for (const auto& [nid, nc] : nations)

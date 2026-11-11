@@ -29,6 +29,7 @@
 #include "ui/unit_designer.hpp"   // the full-canvas unit designer
 #include "ui/wing_card.hpp"       // BL-1450: reset_wing_ui beside reset_unit_designer
 #include "ui/ship_card.hpp"       // BL-1534: reset_ship_ui, ship_order_answer
+#include "ui/missile_panel.hpp"   // BL-1431: missile_order_answer
 #include "world/sea_combat.hpp"   // BL-1534: ship_crew, for the hire's refusal
 #include "ui/market_ledger.hpp"
 #include "ui/chat_panel.hpp"
@@ -3800,6 +3801,17 @@ void app::render()
             m_ui.ship.last_message = ui::ship_order_answer(cmd.verb, said, player_command(cmd));
         }
         m_ui.ship.pending.clear();
+    }
+    // BL-1431: the missile section's presses (stock, intercept, fire), in the order pressed.
+    if (!m_ui.missile.pending.empty())
+    {
+        for (corp_command cmd : m_ui.missile.pending)
+        {
+            cmd.tick = static_cast<int>(m_sim_loop.day_tick());
+            m_ui.missile.last_message = ui::missile_order_answer(cmd.verb, player_command(cmd));
+        }
+        m_ui.missile.pending.clear();
+        m_ui.missile.targets.clear(); // the strike moved the world: re-read the targets
     }
 
     // The Military ledger's air Raise: `hire_wing` at the chosen airbase's tile.

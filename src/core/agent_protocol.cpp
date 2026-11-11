@@ -187,6 +187,9 @@ bool wire_nation_verb(corp_verb v)
         case corp_verb::refit_ship:         // BL-1527: the actor's own ship
         case corp_verb::embark_unit:        // BL-1531: the actor's own unit; the ship rides `order=`
         case corp_verb::land_units:         // BL-1531: the actor's own ship
+        case corp_verb::stock_missiles:     // BL-1431: the actor's own magazine; kind rides `order=`, count `unit_type=`
+        case corp_verb::stock_interceptors: // BL-1431: the actor's own air defence unit
+        case corp_verb::fire_missile:       // BL-1431: the actor's own launcher; the seam checks every leg
         case corp_verb::declare_war:        // BL-1459: the actor's own war; goals ride `provinces=`
         case corp_verb::answer_war:         // BL-1459
         case corp_verb::offer_peace:        // BL-1428: terms ride `order=` + `provinces=`

@@ -1,6 +1,7 @@
 #include "ship_card.hpp"
 
 #include "icons.hpp"
+#include "missile_panel.hpp" // BL-1431: the card's missile section
 #include "player_side.hpp" // is_player_side
 #include "presentation.hpp"
 #include "stat_grid.hpp"
@@ -458,6 +459,7 @@ bool draw_ship_selection(const world& w, const recipe_registry& reg, ui_state& u
     ImGui::PushTextWrapPos(0.0f);
     draw_stat_grid("ship_card", ship_stat_bands(w, reg, id), ImGui::GetContentRegionAvail().x);
     ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "%s", ship_status_text(w, reg, id).c_str());
+    draw_missile_section(w, reg, ui, id); // BL-1431: a destroyer, capital ship or submarine launches
     ImGui::PopTextWrapPos();
     ImGui::EndChild();
     ImGui::SameLine();

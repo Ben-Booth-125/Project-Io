@@ -13,6 +13,7 @@
 #include "nation_generation.hpp" // BL-1540: unit_tile_cover_permille, the claim's own read
 #include "air_combat.hpp"      // BL-1451: a rival flies air wings
 #include "sea_combat.hpp"      // BL-1533: a rival sails its fleet
+#include "missiles.hpp"        // BL-1431: a rival fires missiles
 #include "unit_designs.hpp"    // BL-1533: the ship kit a rival designs with
 #include "campaign_settle.hpp" // BL-1452: k_campaign_settle_ticks - the settle assigns no fronts
 #include "stance.hpp"          // is_hostile (BL-1451)
@@ -3874,6 +3875,13 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
         }
         if (actor.is_nation)
             score_nation_sea(w, reg, corp, tick);
+
+        // BL-1431 (AI_OPPONENT.md § 11, "Rival nations fire missiles", Ben 2026-11-10): its
+        // own magazine, air defence stocks and at most one strike at a sighted target of a
+        // nation it is already hostile to. Live play only, as the fronts; past the player
+        // guard above, and score_nation_missiles refuses the player's nation itself as well.
+        if (actor.is_nation && tick >= k_campaign_settle_ticks)
+            score_nation_missiles(w, reg, corp, tick);
 
         if (actor.is_nation && tick >= k_campaign_settle_ticks)
             score_nation_defence(w, reg, corp, tick); // BL-1504: before the front's assign

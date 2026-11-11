@@ -1328,6 +1328,24 @@
    ],
    "status": "drafted"
   },
+  "missile_section": {
+   "surface": "Selection band - the Missiles section of the player's own launcher card (artillery unit, destroyer, capital ship, submarine, multirole or bomber wing) and air defence unit card",
+   "answers": "How many missiles of each kind can this launcher draw on, what can it strike now, and how do I fire? For air defence: how many interceptors does it hold, and how do I add more?",
+   "because": "MILITARY.md § Missiles (Ben, 2026-11-10): missiles are fired by launchers at a province or building, and interceptors are stocked at air defence; the verbs had no player surface. It sits on the launcher's own card because firing is one launcher's act, as a refit is one ship's. The target list is the seam's own legal set (missile_targets), so a player never learns range, hostility or sight by being refused. The warhead's Fire tooltip names its Alarm cost, because a cost the player cannot see is a gotcha. Default widget sizes only.",
+   "backlog_item": [
+    "BL-1431"
+   ],
+   "files": [
+    "src/ui/missile_panel.cpp",
+    "src/ui/missile_panel.hpp",
+    "src/ui/ship_card.cpp",
+    "src/ui/wing_card.cpp",
+    "src/ui/selection_panel.cpp",
+    "src/ui/ui_state.hpp",
+    "src/core/app.cpp"
+   ],
+   "status": "drafted"
+  },
   "ship_marker": {
    "surface": "Planetary canvas - Ship marker, closed-port mark, taken-cargo mark",
    "answers": "Where are the ships I can see, whose and of what class? Which ports are shut? Where did a cargo just go?",

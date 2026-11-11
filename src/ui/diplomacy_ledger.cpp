@@ -1,4 +1,5 @@
 #include "diplomacy_ledger.hpp"
+#include "conduct_words.hpp"  // conduct_words — the factor kinds, read aloud
 
 #include "foldout_column.hpp"
 #include "format.hpp"       // fmt::credits / fmt::percent
@@ -289,36 +290,6 @@ std::string war_context(const world& w, entity_id a, entity_id b)
             return line;
         }
     return {};
-}
-
-/// BL-1470: the player's words for a factor kind — RELATIONS.md § The factors,
-/// read aloud. Indexed by the kind, so a new kind is one more entry.
-const char* conduct_words(sentiment_factor_kind k)
-{
-    static constexpr const char* words[sentiment_factor_count] = {
-        "contracts delivered",       // contract_completed
-        "contracts cancelled",       // contract_cancelled
-        "trade",                     // trade_conducted
-        "a firm taken",              // equity_taken
-        "a declaration of war",      // hostility_declared
-        "a friendship accepted",     // friendship_accepted
-        "levies charged",            // levy_charged
-        "an embargo",                // embargo_imposed
-        "lobbying against them",     // lobbied_against
-        "force used",                // force_used
-        "a contract failed",         // contract_failed
-        "an old grudge",             // historical_grudge
-        "a war declared on others",  // war_declared
-        "a peace concluded",         // peace_concluded
-        "provinces ceded",           // province_ceded
-        "visible technology",        // technology_visible
-        "large facilities",          // facility_visible
-        "force on the border",       // border_force
-        "trade severed",             // trade_severed
-        "unrest",                    // unrest_visible
-    };
-    const std::size_t i = static_cast<std::size_t>(k);
-    return i < sentiment_factor_count ? words[i] : "conduct";
 }
 
 /// BL-1470: the seeded war's cause, in grudge_event_line's words (`grudge_kind`).

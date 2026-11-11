@@ -232,6 +232,9 @@ const char* play_log::verb_name(corp_verb v)
         case corp_verb::refit_ship:           return "refit_ship";         // BL-1527
         case corp_verb::embark_unit:          return "embark_unit";        // BL-1531
         case corp_verb::land_units:           return "land_units";         // BL-1531
+        case corp_verb::stock_missiles:       return "stock_missiles";     // BL-1431
+        case corp_verb::stock_interceptors:   return "stock_interceptors"; // BL-1431
+        case corp_verb::fire_missile:         return "fire_missile";       // BL-1431
         case corp_verb::set_air_design:       return "set_air_design";     // BL-1449
         case corp_verb::declare_war:          return "declare_war";        // BL-1459
         case corp_verb::answer_war:           return "answer_war";         // BL-1459

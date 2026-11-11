@@ -1513,6 +1513,12 @@ economy = {
             trade_severed       = { alarm = 2.0 },
             -- Unrest has no store, so nothing emits this.
             unrest_visible      = { alarm = 0.0 },
+            -- BL-1431 (MILITARY.md § Missiles): a tactical nuclear warhead fired,
+            -- every other nation toward the firer, per warhead; the struck nation
+            -- counts it twice (missile_params.hpp). SEVERE: +30 Alarm per observer
+            -- is above the most one declaration of war can raise in any one row
+            -- (war_declared 3 x 4.5 for eight goals x 2 on a border = 27).
+            nuclear_used        = { trust = -15.0, alarm = 30.0 },
         },
     },
 

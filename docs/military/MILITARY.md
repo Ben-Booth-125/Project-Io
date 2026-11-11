@@ -841,6 +841,96 @@ the defender's economy.
 warhead is a munition with a severe Alarm cost (`../politics/RELATIONS.md` § 6). A strategic
 arsenal is held, seen and deterring, and no verb fires it.
 
+**The first cut (calibrated 2026-11-10, BL-1431 (missiles and satellites)).** The numbers
+below are a first cut; the design around them is settled.
+
+**Three kinds, assembled from kit goods into a magazine.** A missile is not a market good of
+its own. A nation **stocks** missiles: it buys the kind's goods off its own shelves, at posted
+prices, as a hire buys its kit (§ What a force costs), and the missiles join its **magazine**.
+A magazine holds up to 64 of each kind. Firing takes missiles out of it. Strategic weapons
+have no column in the magazine.
+
+| Kind | Goods per missile | At base prices | Range | Interceptor stops | Lands on |
+|---|---|---|---|---|---|
+| Short range | 1 guided weapons, 1 ordnance | about 396 | 12 tiles | 700‰ | one unit: 60‰ of its men, 120‰ readiness; or a building: 150‰ condition |
+| Long range | 3 guided weapons, 2 electronics, 4 refined fuel | about 867 | 45 tiles | 250‰ | one unit: 80‰ of its men, 120‰ readiness; or a building: 300‰ condition |
+| Tactical nuclear | 4 guided weapons, 6 electronics, 6 machinery, 4 alloys | about 1,918 | 12 tiles | 500‰ | every hostile unit in the province: 600‰ of its men, all its readiness; every hostile building there: 700‰ condition |
+
+A tactical warhead may be stocked only by a nation holding **Uranium Enrichment**
+(`../economy/tech/DIGITISATION_TREE.md`). The other kinds need no research: the 1960
+standard already fields them.
+
+**Launchers, by class.** A launcher fires from where it stands, and only a raised one fires.
+A land unit or ship cannot fire while refitting, mustering or aboard. A wing fires from its
+airbase, and its class's range adds to the missile's, since it flies out before it releases.
+A silo building is not part of this cut.
+
+| Launcher | Carries |
+|---|---|
+| Artillery | Short range, tactical nuclear |
+| Destroyer | Short range |
+| Capital ship | Short range, long range |
+| Submarine | Long range, tactical nuclear |
+| Multirole wing | Short range |
+| Bomber wing | Long range, tactical nuclear |
+
+**A strike names a province or a building in it.** Range is the straight-line tile distance
+from the launcher to the province's nearest tile, or to the building's tile. A strike is legal
+when four things hold:
+
+- **Hostility.** The target belongs to a nation the firer has declared hostile. That is a
+  building's owner; for a province, its holder, or the owner of a unit standing in it.
+- **Range.** The target is within the launcher's reach.
+- **Stock.** The magazine holds the salvo, up to eight missiles at once.
+- **Sight.** The firer must see the province. It sees a province it holds or owns ground in.
+  It sees one within 4 tiles of any of its raised units or ships. It sees one any of its flying
+  wings is assigned to. It also sees one where its air revealed a hostile unit, or its ships
+  sighted a ship.
+
+A province strike lands on one hostile unit there, a unit in battle first, as tactical bombing
+does (§ Air). It needs one to land on: a province with no hostile unit in it is refused,
+however hostile its holder, and a warhead's needs a hostile unit or building there. A unit a
+strike grinds to no men is disbanded as one a battle kills is. A building strike lands on the building's condition. Only buildings whose
+condition matters may be named (§ Air, strategic bombing), and a damaged one repairs as a
+bombed one does. A tactical warhead strikes the whole province whatever was named. A missile
+strike is one blow, so it takes no day scale.
+
+**Interception is arithmetic, not a draw.** An **interceptor** is a missile of its own,
+2 guided weapons and 3 electronics, about 606 at base prices. That is more than a short-range
+missile, so a defence that stops a cheap strike pays more than the strike did. An interceptor
+is stocked at an **air defence unit**, up to 24 to a unit; a unit that boards a ship, or is
+disbanded, loses its stock. A strike draws on every air defence unit standing in the target
+province whose nation is hostile to the firer, either way, in ascending unit id. A unit in the
+surf off a landing draws none, as it launches none. Doctrine spends **two interceptors on
+each incoming missile**. Each one lets through (1000 − its kind's stop) per-mille of the missile,
+so two let through that figure squared over 1000. A missile no interceptor met lands whole.
+The strike's damage scales with the missiles that land, counted in thousandths. Against eight
+interceptors, four short-range missiles land about 0.36 of a missile between them, while four
+long-range missiles land about 2.25.
+
+**The tactical warhead's Alarm.** Firing a tactical warhead queues the `nuclear_used`
+conduct, whether or not it is intercepted. Every other nation feels it toward the firer:
+**+30 Alarm and −15 Trust a warhead**, and the struck nation counts it twice. A declaration
+of war raises at most 27 Alarm in any one row (`war_declared` 3 × 4.5 for eight goals × 2 on a
+border). So one warhead outweighs the worst declaration in every observer's row, and in the
+sum. Men a strike kills also emit `force_used`, as a battle's losses do.
+
+**Rivals strike under the grant** (`../ai/AI_OPPONENT.md` § 11, "Rival nations fire missiles").
+A rival acts only while mobilised, and only through the verbs the player presses. In one
+evaluation it may do three things:
+
+- **Stock missiles.** It buys toward 4 short-range, 2 long-range and 1 tactical warhead, the
+  last only with the node held.
+- **Stock interceptors.** It buys toward 6 at one of its air defence units.
+- **Fire once.** It fires at the best sighted target of a nation it has already declared
+  hostile.
+
+Each buy must cost no more than a quarter of its uncommitted treasury. A strike is scored as
+its value less its cost. The value is 20 a man killed plus each building's build cost times
+the condition it loses. The cost is the missiles' goods at posted prices times 1.25. For a
+tactical warhead the cost also counts **100 a point of the Alarm** it would raise across every
+observer. So a warhead is held unless the stack it would hit is very large.
+
 ### Space
 
 Pre-space military in orbit is **intelligence satellites** and **missiles**. A reconnaissance

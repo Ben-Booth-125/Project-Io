@@ -272,11 +272,19 @@ enum class sentiment_factor_kind : uint8_t
     /// The subject's domestic unrest. Unrest has no store in the campaign, so
     /// nothing emits this and its weight is authored zero.
     unrest_visible = 19,
+
+    // --- BL-1431 (MILITARY.md § Missiles; RELATIONS.md § 6) -----------------
+    /// The subject fired a TACTICAL NUCLEAR warhead. Emitted by `apply_missile_strike`
+    /// (missiles.cpp) from every other nation toward the firer, the struck nation's
+    /// row counted twice, intercepted or not. Magnitude: warheads fired. Authored
+    /// severe: one warhead's Alarm per observer is above the largest a declaration of
+    /// war can raise in any one row.
+    nuclear_used = 20,
 };
 
 /// Number of rows in `sentiment_factor_kind`. Grows when a value is appended;
 /// it is the array bound the fold indexes with, so the two cannot drift apart.
-inline constexpr std::size_t sentiment_factor_count = 20;
+inline constexpr std::size_t sentiment_factor_count = 21;
 
 /// The AUTHORING NAME of each kind, INDEXED BY the kind — the key
 /// `scripts/economy.lua`'s `sentiment.factors` table uses for that row.
@@ -307,7 +315,19 @@ inline constexpr const char* sentiment_factor_names[sentiment_factor_count] = {
     "border_force",
     "trade_severed",
     "unrest_visible",
+    "nuclear_used",
 };
+
+/// BL-1431 review: the table is sized by the count, so a missing name would be a silent
+/// nullptr; refuse to compile one instead.
+constexpr bool sentiment_factor_names_all_set()
+{
+    for (const char* s : sentiment_factor_names)
+        if (s == nullptr || s[0] == '\0')
+            return false;
+    return true;
+}
+static_assert(sentiment_factor_names_all_set(), "every sentiment_factor_kind needs a name");
 
 /// The AUTHORED weight of one kind of conduct: how far a single occurrence moves
 /// each dimension. Both default to zero, which is what makes an unauthored
@@ -698,4 +718,5 @@ void write_sentiment_provenance(const sentiment_table& t, std::ostream& out);
 bool read_sentiment_provenance(const sentiment_table& t, std::istream& in,
                                std::map<std::pair<entity_id, entity_id>,
                                         std::vector<sentiment_contribution>>& contributions,
-                               std::map<std::pair<entity_id, entity_id>, sentiment_seed_record>& seeds);
+                               std::map<std::pair<entity_id, entity_id>, sentiment_seed_record>& seeds,
+                               std::size_t kinds = sentiment_factor_count);
