@@ -329,10 +329,11 @@ int main()
                                + std::to_string(men1) + ")");
         // A building strike lowers condition.
         const entity_id fac = add_building(f, f.b, 34, 4, building_type::processing_facility);
-        check(run(f, reg, fire_cmd(f.a, s.art, 0, 1, f.strip(8), fac)) == corp_command_result::applied
-                  && f.w.buildings.at(fac).condition_permille < 1000,
-              "M2c a strike on a hostile factory lowers its condition ("
-                  + std::to_string(f.w.buildings.at(fac).condition_permille) + ")");
+        const corp_command_result rb = run(f, reg, fire_cmd(f.a, s.art, 0, 1, f.strip(8), fac));
+        const int32_t cond = f.w.buildings.at(fac).condition_permille;
+        check(rb == corp_command_result::applied && cond == 850,
+              "M2c a strike on a hostile factory lowers its condition 1000 -> " + std::to_string(cond)
+                  + " (150 a short-range missile landed)");
     }
 
     // =====================================================================
