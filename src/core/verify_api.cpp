@@ -3910,7 +3910,8 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     // argument: the default step, so a check never restates the number. Verify runs at
     // the default otherwise, as the player first sees it. Each script starts there.
     v.set_function("ui_scale_step", [this](sol::optional<int> step) {
-        m_settings.ui_scale_step = step.value_or(0);
+        static constexpr float k_step_px[] = {12.0f, 16.0f, 20.0f, 24.0f};
+        m_ui_scale_override_px = k_step_px[std::clamp(step.value_or(0), 0, 3)];
         apply_ui_scale();
     });
 
@@ -9079,7 +9080,10 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         ImGui::StyleColorsDark();
         ImGui_ImplSDL3_InitForSDLRenderer(m_window, m_renderer);
         ImGui_ImplSDLRenderer3_Init(m_renderer);
-        m_settings.ui_scale_step = 0; // BL-1495: every script starts at the default scale
+        // BL-1495: every script starts at 12 px, the smallest fit, so a check holds
+        // whatever the capture window's height; ui_scale_step(n) moves it.
+        m_ui_scale_override_px = 12.0f;
+        m_ui_font_px = 0.0f; // fresh context: rebuild the atlas
         apply_ui_scale();
         ui::set_overflow_recording(true);
 

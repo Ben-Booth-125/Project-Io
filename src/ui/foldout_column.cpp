@@ -28,7 +28,9 @@ float shell_column_width(float disp_x)
     // is 384).
     // BL-1495: the rule is authored at a scale of 1, so read the display in authored
     // pixels and scale the answer back: at 0.75 the column is the 1.0 column, shrunk.
-    const float s = ui_scale();
+    // The panel scale, not the font's, so the column keeps its share of the window
+    // below the 12 px font floor (Ben, 2026-11-11).
+    const float s = panel_scale();
     float w = 0.20f * (disp_x / s);
     if (w < 380.0f) w = 380.0f;
     if (w > 460.0f) w = 460.0f;
@@ -41,7 +43,8 @@ float shell_column_width(float disp_x)
 float minimap_width(float disp_x, float disp_y)
 {
     // BL-1495: authored at a scale of 1; the display read in authored px, the answer scaled.
-    const float s = ui_scale();
+    // The panel scale, so the Selection band (minimap + margin) keeps its share too.
+    const float s = panel_scale();
     const float by_display = 0.28f * ((disp_x < disp_y) ? disp_x : disp_y) / s;
     // `+ 27` (BL-1314): ~20 px more bottom strip at the same 4:3 aspect.
     return (((by_display > 336.0f) ? by_display : 336.0f) + 27.0f) * s;

@@ -215,9 +215,9 @@ app::app()
     // BL-215 display contract: the smallest supported display is 1280x720 at UI
     // scale 1.0x (DEVELOPMENT_PRACTICES.md § Display environment). Below it the
     // shell fails soft (zero-width Selection band, header early-out), so the OS
-    // is told not to go there. apply_ui_scale re-applies this scaled by the
-    // active UI-scale step.
-    SDL_SetWindowMinimumSize(m_window, 1280, 720);
+    // is told not to go there. The UI fits the window (apply_ui_scale), so the floor
+    // is the layout at its smallest font: 960x540 at 12 px.
+    SDL_SetWindowMinimumSize(m_window, 960, 540);
 
     // Dev-machine preference (2026-07-06): Ben runs a two-monitor setup and wants
     // the game on the secondary display, keeping the primary free. Pick the first
@@ -273,8 +273,8 @@ app::app()
     // Load the UI font with oversampling so on-canvas labels stay crisp at the
     // fractional positions moving bodies produce. The renderer backend uploads
     // the atlas on the first NewFrame.
-    // BL-1495: the default UI scale step - the font, ImGui's style and ui::px at one
-    // factor. run() re-applies it once options.cfg is read; --verify keeps the default.
+    // BL-1495: the font, ImGui's style and ui::px at one factor, fitted to the window
+    // height. run() re-applies it once options.cfg has sized the window.
     apply_ui_scale();
 
     // The unit designer's class art (assets/units/, military.md § The designer).
@@ -288,38 +288,40 @@ app::app()
 }
 
 namespace {
-/// BL-1495 steps (LAYOUT.md § UI scale; Ben, 2026-11-10): the font px of each Options
-/// step. Step 0, 12 px, is the default and the smallest; chrome scales with it
-/// (ui::ui_scale() = px / 16), so 12 px is 0.75x of the size the chrome was drawn at.
-constexpr std::array<float, 4> k_ui_scale_px = {12.0f, 16.0f, 20.0f, 24.0f};
-constexpr int k_ui_scale_default_step = 0;
+/// BL-1495 (LAYOUT.md § UI scale; Ben, 2026-11-11): the UI fits the window. The font
+/// is 16 px at 1080 lines and moves with the window height, held to 12..24 px;
+/// chrome scales with it (ui::ui_scale() = px / 16). Whole px, so text stays crisp.
+constexpr float k_ui_fit_px_at_1080 = 16.0f;
+constexpr float k_ui_fit_min_px     = 12.0f;
+constexpr float k_ui_fit_max_px     = 24.0f;
 
-/// Map a font px read from options.cfg onto the nearest step.
-int ui_scale_step_for_px(float font_px)
+float ui_fit_px(int window_h)
 {
-    int best = k_ui_scale_default_step;
-    for (int i = 0; i < static_cast<int>(k_ui_scale_px.size()); ++i)
-        if (std::abs(k_ui_scale_px[static_cast<std::size_t>(i)] - font_px)
-            < std::abs(k_ui_scale_px[static_cast<std::size_t>(best)] - font_px))
-            best = i;
-    return best;
+    const float px = std::round(k_ui_fit_px_at_1080 * static_cast<float>(window_h) / 1080.0f);
+    return std::clamp(px, k_ui_fit_min_px, k_ui_fit_max_px);
 }
 } // namespace
 
 void app::apply_ui_scale()
 {
-    const int step = std::clamp(m_settings.ui_scale_step, 0, static_cast<int>(k_ui_scale_px.size()) - 1);
-    const float font_px = k_ui_scale_px[static_cast<std::size_t>(step)];
+    float font_px = m_ui_scale_override_px;
+    if (font_px <= 0.0f)
+    {
+        int w = 0, h = 0;
+        SDL_GetWindowSize(m_window, &w, &h);
+        font_px = ui_fit_px(h);
+        // The menu column and Selection band keep their 1080 share down to 720 lines
+        // (Ben, 2026-11-11); every resize, whether or not the font px moves.
+        ui::set_panel_scale(std::clamp(static_cast<float>(h) / 1080.0f, 2.0f / 3.0f, 1.5f));
+    }
+    else
+        ui::set_panel_scale(font_px / ui::k_ui_base_font_px); // verify: panels follow the fixed px
+    // A resize fires every few pixels; the atlas rebuilds only when the px moves.
+    if (font_px == m_ui_font_px)
+        return;
+    m_ui_font_px = font_px;
     ui::apply_ui_scale(font_px); // font, style.ScaleAllSizes and ui::px, one factor
     ImGui_ImplSDLRenderer3_DestroyFontsTexture();
-
-    // The display floor scales with the factor (BL-215): the layout is authored at
-    // 1280x720 for 1.0x, and every element moves with the factor, so the floor does
-    // too - 960x540 at the 12 px default, 1920x1080 at 24 px.
-    const float s = ui::ui_scale();
-    SDL_SetWindowMinimumSize(m_window,
-                             static_cast<int>(1280.0f * s),
-                             static_cast<int>(720.0f * s));
 }
 
 app::~app()
@@ -2307,6 +2309,8 @@ void app::process_events(bool& running)
         }
         else if (event.type == SDL_EVENT_KEY_DOWN)
             handle_key_down(event.key);
+        else if (event.type == SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED)
+            m_ui_scale_apply_pending = true; // BL-1495: the UI fits the new height
         else if (event.type == SDL_EVENT_WINDOW_RESIZED && !m_settings.fullscreen)
         {
             // Remember a free drag-resize so it persists across launches. Only
@@ -2782,6 +2786,11 @@ void app::render()
         exit_to_menu();
     }
     sync_escape_menu_pause();
+    if (m_ui_scale_apply_pending)
+    {
+        m_ui_scale_apply_pending = false;
+        apply_ui_scale(); // BL-1495: never inside a frame - the atlas is locked there
+    }
 
     ImGui_ImplSDLRenderer3_NewFrame();
     ImGui_ImplSDL3_NewFrame();
@@ -4225,23 +4234,6 @@ void app::render()
                 save_settings();
             }
 
-            ImGui::SeparatorText("Accessibility");
-            // BL-1495: the step's font px; chrome scales with it.
-            static const char* ui_scale_labels[] = {"12 px", "16 px", "20 px", "24 px"};
-            if (ImGui::BeginCombo("UI Scale", ui_scale_labels[m_settings.ui_scale_step]))
-            {
-                for (int i = 0; i < IM_ARRAYSIZE(ui_scale_labels); ++i)
-                {
-                    if (ImGui::Selectable(ui_scale_labels[i], i == m_settings.ui_scale_step))
-                    {
-                        m_settings.ui_scale_step = i;
-                        apply_ui_scale();
-                        save_settings();
-                    }
-                }
-                ImGui::EndCombo();
-            }
-
             // BL-1537 (RENDERING.md § Art direction and palette): the land lift's
             // trial levels. A change re-bakes the land; the sea keeps its colour.
             ImGui::SeparatorText("Map");
@@ -4315,13 +4307,8 @@ void app::load_settings()
     if (!in)
         return; // no file yet — keep defaults
 
-    // BL-1495: the scale persists as its font px (ui_scale_px), which means the same
-    // physical size whatever the step list becomes. An older file carries only
-    // ui_scale_step, an index into {16, 20, 24} px drawn at 0.875: its 0 was the
-    // untouched default and takes the new default; 1 and 2 were chosen, and keep
-    // their font px (20, 24).
-    float ui_px = 0.0f;
-    int legacy_step = -1;
+    // BL-1495: the UI scale is not a setting - it fits the window - so an older
+    // file's ui_scale_px / ui_scale_step keys are read past and dropped on save.
     std::string line;
     while (std::getline(in, line))
     {
@@ -4332,30 +4319,20 @@ void app::load_settings()
         const std::string val = line.substr(eq + 1);
         try
         {
-            if      (key == "ui_scale_px") { ui_px = std::stof(val); }
-            else if (key == "window_w")   m_settings.window_w   = std::stoi(val);
+            if      (key == "window_w")   m_settings.window_w   = std::stoi(val);
             else if (key == "window_h")   m_settings.window_h   = std::stoi(val);
             else if (key == "fullscreen") m_settings.fullscreen = (std::stoi(val) != 0);
             else if (key == "vsync")      m_settings.vsync      = (std::stoi(val) != 0);
-            else if (key == "ui_scale_step") legacy_step = std::stoi(val);
             else if (key == "land_lift")  m_settings.land_lift  = std::stoi(val);
         }
         catch (const std::exception&) { /* skip malformed value */ }
     }
 
-    // Clamp to the supported display floor (BL-215: 1280x720 @ 1.0x, scaled by the
-    // UI scale, so 960x540 at the 12 px step, the smallest) so a corrupt or stale
-    // file can't open the shell below the size it is authored against.
-    // apply_ui_scale holds the live window to the active step's floor.
+    // Clamp to the supported display floor (BL-215: the layout at its smallest font,
+    // 960x540 at 12 px) so a corrupt or stale file can't open the shell below the
+    // size it is authored against.
     m_settings.window_w = std::max(960, m_settings.window_w);
     m_settings.window_h = std::max(540, m_settings.window_h);
-    if (ui_px > 0.0f)
-        m_settings.ui_scale_step = ui_scale_step_for_px(ui_px);
-    else if (legacy_step == 1 || legacy_step == 2)
-        m_settings.ui_scale_step = ui_scale_step_for_px(legacy_step == 1 ? 20.0f : 24.0f);
-    else
-        m_settings.ui_scale_step = k_ui_scale_default_step;
-    m_settings.ui_scale_step = std::clamp(m_settings.ui_scale_step, 0, static_cast<int>(k_ui_scale_px.size()) - 1);
     m_settings.land_lift = std::clamp(m_settings.land_lift, 0, ui::ground::k_land_lift_levels - 1);
 }
 
@@ -4371,10 +4348,6 @@ void app::save_settings() const
         << "window_h="   << m_settings.window_h        << '\n'
         << "fullscreen=" << (m_settings.fullscreen ? 1 : 0) << '\n'
         << "vsync="      << (m_settings.vsync ? 1 : 0)      << '\n'
-        << "ui_scale_px="
-        << static_cast<int>(k_ui_scale_px[static_cast<std::size_t>(
-               std::clamp(m_settings.ui_scale_step, 0, static_cast<int>(k_ui_scale_px.size()) - 1))])
-        << '\n'
         << "land_lift="  << m_settings.land_lift           << '\n';
 }
 

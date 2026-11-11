@@ -24,7 +24,7 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 > **Generated file.** Produced by `node tools/session/render_actions.js`.
 > Edit the JSON, then re-run; hand edits here are overwritten.
 
-*249 entries — 63 gameplay · 41 canvas · 15 lens · 88 ledger · 42 chrome.*
+*248 entries — 63 gameplay · 41 canvas · 15 lens · 88 ledger · 41 chrome.*
 
 ---
 
@@ -3469,21 +3469,6 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 **Expected output.** The planetary map's land re-bakes at the chosen lightness over the next moments (the view first); water - sea, lakes and rivers - keeps its colour. Persists to options.cfg immediately. Sim, view and selection untouched.
 
 **Reason to select.** To make the map's land read lighter or darker on this display.
-
-### `chrome.options_set_ui_scale` — Options window, Accessibility section, UI Scale combo
-
-**Press.** Open the combo and click a step.
-
-| Arg | Type | Meaning |
-|---|---|---|
-| `step` | `enum: 12 px | 16 px | 20 px | 24 px` | Global UI scale step, named by its font size; 12 px is the default and the smallest. Stored as ui_scale_px in options.cfg; a value off the list lands on the nearest step. |
-
-**Valid when:**
-- Options window open.
-
-**Expected output.** UI scale applies live and persists to options.cfg immediately. Every chrome element - text, padding, spacing, panel widths, the icon rail - scales with the font by one factor (font px / 16); the canvas ground does not. The window's minimum size scales with it (960x540 at 12 px). LAYOUT.md § UI scale.
-
-**Reason to select.** To make the interface legible on dense or high-DPI displays.
 
 ### `chrome.options_vsync` — Options window, Display section
 

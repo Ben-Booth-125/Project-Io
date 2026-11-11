@@ -490,10 +490,6 @@
    "Options window, Map section, Ground lightness combo"
   ],
   [
-   "chrome.options_set_ui_scale",
-   "Options window, Accessibility section, UI Scale combo"
-  ],
-  [
    "chrome.options_vsync",
    "Options window, Display section"
   ],

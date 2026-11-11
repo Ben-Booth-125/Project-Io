@@ -184,17 +184,21 @@ offers to spectate or return to the menu.
 
 ---
 
-## UI scale (Ben, 2026-11-05; Ben, 2026-11-10)
+## UI scale (Ben, 2026-11-05; Ben, 2026-11-10; Ben, 2026-11-11)
 
 The UI is smaller than the size its chrome was authored at, so **each element is smaller** and text
 stops clipping (Ben, 2026-11-05).
 
-**The default UI is a 12 px font** (Ben, 2026-11-10): 0.75x of the 16 px the chrome was authored
-against. It is the default and the smallest step of the Options window's **UI Scale** setting; the
-larger steps are 16, 20 and 24 px. The setting persists as its font px (`ui_scale_px` in
-`options.cfg`), so a stored choice keeps its physical size if the step list changes. A file from
-before the 12 px step carries a step index instead: its untouched default takes the 12 px default,
-and its chosen steps keep their font px.
+**The UI fits the window; it is not a setting** (Ben, 2026-11-11). The font is 16 px at a window
+1080 lines tall and moves with the window's height, rounded to a whole pixel and held between 12 and
+24 px: about 12 px at 720 lines, 21 px at 1440, 24 px at 1620 and above. A resize refits it. There is
+no UI Scale control, and `options.cfg` stores none. The smallest fit, 12 px, is 0.75x of the 16 px
+the chrome was authored against (Ben, 2026-11-10), and sets the window floor: 960x540.
+
+**The menu column and the Selection band keep their share of the window down to 720 lines** (Ben,
+2026-11-11). They are sized by the window height over 1080, not by the font, so below about 810
+lines, where the font has stopped at 12 px, they still shrink with the window: the column is about
+253 px and the band about 187 px at 720 lines. Below 720 lines they hold.
 
 **Everything in the chrome scales with the text, by one factor** (Ben, 2026-11-10): the font px over
 16. Padding, spacing and item sizes scale with it (ImGui's style, rebuilt from a fresh base and
@@ -208,9 +212,8 @@ answer, so at 0.75x the shell is the 1.0x shell drawn smaller.
 **Canvas ground does not scale** (the main session's reading of Ben's 2026-11-10 ruling, open as NR-1216). The map bake, tile sizes and zoom are the
 canvases' own (`RENDERING.md`); a smaller UI gives the canvas more of the window, not smaller tiles.
 
-The window's minimum size scales with the factor (BL-215): 1280 x 720 at 1.0x, so 960 x 540 at the
-12 px default and 1920 x 1080 at 24 px. A 1280 x 720 window is a comfortable default at 12 px. The
-headless harness runs at the default step, as the player first sees it.
+The window's minimum size is 960 x 540 (BL-215), the layout at its smallest font. The headless
+harness runs at a fixed 12 px with the panels at the same factor, whatever its window's height.
 
 ---
 

@@ -548,7 +548,6 @@ private:
         int  window_h   = 1080;
         bool fullscreen = false;  ///< Borderless-desktop fullscreen.
         bool vsync      = true;
-        int  ui_scale_step = 0;   ///< BL-1495 UI scale step: 0..3 = 12 / 16 / 20 / 24 px font; 0 is the default.
         int  land_lift = ui::ground::k_land_lift_default; ///< BL-1537 ground lightness: 0 = off, 1-3.
     };
 
@@ -558,9 +557,12 @@ private:
     void save_settings() const;
     /// Apply m_settings to the live SDL window + renderer (size, fullscreen, vsync).
     void apply_display_settings();
-    /// Apply m_settings.ui_scale_step (BL-1495; LAYOUT.md § UI scale): the font px, ImGui's
-    /// style.ScaleAllSizes and ui::px at one factor, and the window floor scaled by it.
+    /// Fit the UI to the window height (BL-1495; LAYOUT.md § UI scale): the font px, ImGui's
+    /// style.ScaleAllSizes and ui::px at one factor. Never inside a frame (the atlas is
+    /// locked there); a no-op when the px is unchanged.
     void apply_ui_scale();
+    float m_ui_font_px = 0.0f;           ///< BL-1495: the px last applied; 0 = none yet.
+    float m_ui_scale_override_px = 0.0f; ///< BL-1495: verify-only fixed px; 0 = fit the window.
 
     /// How many rounds the New World wizard walks (BL-167, extended to five by
     /// BL-816 and to SIX by BL-860). Declared here rather than beside the wizard
@@ -673,6 +675,7 @@ private:
     bool       m_quit_requested = false;  ///< Set by the menu's Quit button; breaks the run() loop.
     // --- The escape menu (BL-1519; MENU.md § Application / system menu) ---
     bool       m_exit_to_menu_requested = false; ///< Pressed inside a frame; acted on at the next frame's head.
+    bool       m_ui_scale_apply_pending = false; ///< BL-1495: a resize; the UI refits at the next frame's head.
     /// The Load list on the main menu (Ben, 2026-11-09; STARTUP.md § Main menu).
     bool                      m_load_list_open  = false;
     std::vector<save_listing> m_save_list;      ///< Newest first; re-read while the menu stands.

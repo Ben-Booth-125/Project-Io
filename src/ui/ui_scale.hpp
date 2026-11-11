@@ -17,10 +17,19 @@ inline constexpr float k_ui_base_font_px = 16.0f;
 
 namespace detail {
 inline float g_ui_scale = 1.0f;
+inline float g_panel_scale = 1.0f;
 } // namespace detail
 
 /// The active factor: font px / 16.
 inline float ui_scale() { return detail::g_ui_scale; }
+
+/// **The panel scale** (Ben, 2026-11-11; LAYOUT.md § UI scale): the factor the shell's
+/// big panels - the menu column and the Selection band - are sized by. It is the window
+/// height over 1080, held to [2/3, 1.5], so those panels keep their 1080 share of the
+/// window down to 720 lines, where the font has already stopped at 12 px. Above
+/// ~810 lines it equals ui_scale() within a rounding step.
+inline float panel_scale() { return detail::g_panel_scale; }
+inline void  set_panel_scale(float s) { detail::g_panel_scale = s; }
 
 /// A chrome pixel length at the active scale.
 inline float  px(float v) { return v * detail::g_ui_scale; }
