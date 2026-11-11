@@ -787,6 +787,27 @@
    ],
    "resolution": "Ben, 2026-11-10: keep the merged MILITARY.md domain-row wording for coastal water and open ocean.",
    "resolved": "2026-11-10"
+  },
+  {
+   "id": "NR-1215",
+   "title": "Missiles: a magazine assembled from kit goods, or a market good of its own?",
+   "raised": "2026-11-11",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "BL-1431 (missiles and satellites) lane",
+   "what": "MILITARY.md § Missiles says a missile is a good fired by a launcher and consumed. The lane built it instead as a per-nation magazine (up to 64 of each kind), stocked by buying kit goods off the nation's own shelves at posted prices. That avoids widening the resource arrays, an envelope bump and moved digests, but a missile is then never traded, priced or shipped. It also took two first-cut calls: tactical warheads need the Uranium Enrichment node, and the rival scorer prices nuclear Alarm at 100 credits a point.",
+   "why_it_matters": "A market good makes missiles a trade lever (embargo, scarcity, sale to a rival). A magazine keeps them a pure force cost. The doc now says both and must say one.",
+   "options": [
+    "Keep the magazine; reword the settled line",
+    "Make missiles market goods (resource arrays widen; envelope bump; digests move)"
+   ],
+   "recommendation": "Keep the magazine for v0.3.0: the force cost is what the design leans on, and goods trade can follow. Uranium Enrichment and the Alarm price are in-band first cuts.",
+   "files": [
+    "docs/military/MILITARY.md",
+    "src/world/missiles.cpp",
+    "src/world/missile_params.hpp"
+   ],
+   "resolution": null
   }
  ]
 }

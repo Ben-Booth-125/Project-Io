@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*52 entries — 41 open, 11 resolved.*
+*53 entries — 42 open, 11 resolved.*
 
 ---
 
@@ -413,6 +413,20 @@ Two calls. Income is the mean of the last four returns of income plus taxes less
 *decision taken on your behalf · raised 2026-11-09 · from MINOR_PLANT_FLOOR (BL-1616), GARRISON_INCOME (BL-1617)*
 
 Three calls. The plant floor visits every nation, because majors are not known until after the walk; the kit then replaces a major's floor firm. Garrisons are paid at the 0.50 force ceiling, not the threat-scaled share, so a minor is not stripped by its first reading. The opening chest cut now reserves only the 20-man token's pay. Measured on four seeds: 22 of 112 minors still open plantless, and 15 of the 23 broke rivals at tick 40 are among those. World digests moved and wait on the re-bless.
+
+### NR-1215 — Missiles: a magazine assembled from kit goods, or a market good of its own?
+*decision taken on your behalf · raised 2026-11-11 · from BL-1431 (missiles and satellites) lane*
+
+MILITARY.md § Missiles says a missile is a good fired by a launcher and consumed. The lane built it instead as a per-nation magazine (up to 64 of each kind), stocked by buying kit goods off the nation's own shelves at posted prices. That avoids widening the resource arrays, an envelope bump and moved digests, but a missile is then never traded, priced or shipped. It also took two first-cut calls: tactical warheads need the Uranium Enrichment node, and the rival scorer prices nuclear Alarm at 100 credits a point.
+
+**Why it matters.** A market good makes missiles a trade lever (embargo, scarcity, sale to a rival). A magazine keeps them a pure force cost. The doc now says both and must say one.
+
+- Keep the magazine; reword the settled line
+- Make missiles market goods (resource arrays widen; envelope bump; digests move)
+
+> **Recommendation:** Keep the magazine for v0.3.0: the force cost is what the design leans on, and goods trade can follow. Uranium Enrichment and the Alarm price are in-band first cuts.
+
+*Files: `docs/military/MILITARY.md`, `src/world/missiles.cpp`, `src/world/missile_params.hpp`*
 
 ---
 
