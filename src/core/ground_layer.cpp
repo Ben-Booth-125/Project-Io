@@ -632,11 +632,40 @@ void ground_layer::refresh_source(body_state& b, const world& w)
     // sea lanes, "The Logistics lens takes the routes off the ground").
     if (m_hide_routes)
         gb::strip_painted_routes(src);
+    src.land_lift = static_cast<std::uint8_t>(m_land_lift);
     set_source(b, std::make_shared<const gb::bake_source>(std::move(src)));
+}
+
+int ground_layer::initial_land_lift()
+{
+    if (const char* v = SDL_getenv("IO_GROUND_LAND_LIFT"); v && *v)
+        return std::clamp(std::atoi(v), 0, gb::k_land_lift_levels - 1);
+    return gb::k_land_lift_default;
+}
+
+void ground_layer::set_land_lift(int level)
+{
+    level = std::clamp(level, 0, gb::k_land_lift_levels - 1);
+    if (level == m_land_lift)
+        return;
+    m_land_lift = level;
+    // Re-take every held snapshot at the new level (set_source re-stamps it): the
+    // whole-body digest moves, so each body's sweep finds the windows with land.
+    for (auto& [id, bp] : m_bodies)
+        if (bp && bp->src)
+            set_source(*bp, bp->src);
 }
 
 void ground_layer::set_source(body_state& b, std::shared_ptr<const gb::bake_source> src)
 {
+    // BL-1537: every source carries the layer's land-lift level - a source handed
+    // in from a round worker or a bench is re-stamped here, once.
+    if (src && src->land_lift != static_cast<std::uint8_t>(m_land_lift))
+    {
+        auto c = std::make_shared<gb::bake_source>(*src);
+        c->land_lift = static_cast<std::uint8_t>(m_land_lift);
+        src = std::move(c);
+    }
     b.src = std::move(src);
     ++b.src_epoch;
     b.src_age = 0;

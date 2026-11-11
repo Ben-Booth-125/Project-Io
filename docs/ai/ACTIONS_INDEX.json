@@ -486,6 +486,10 @@
    "Options window, Display section, Resolution combo"
   ],
   [
+   "chrome.options_set_ground_lightness",
+   "Options window, Map section, Ground lightness combo"
+  ],
+  [
    "chrome.options_set_ui_scale",
    "Options window, Accessibility section, UI Scale combo"
   ],

@@ -2933,6 +2933,162 @@ void towns_row(const bake_source& src0, const bake_params& p)
                     sum_off / towns.size(), sum_on / towns.size(), (sum_on - sum_off) / towns.size());
 }
 
+// ---------------------------------------------------------------------------
+// BL-1537 (the land lift), RENDERING.md § Art direction and palette.
+//   P35 Each level of the land lift, baked over the same master windows
+//       across the home body: the land's luminance percentiles reported per
+//       level (p10/p50/p90/p99, and p50 against off), the land p99 held under
+//       235 (the top does not clip), and the water untouched - every pixel
+//       the bake weighs as water (the sea, a lake, a river's water) byte-for-
+//       byte the colour it bakes with the lift off, its percentiles equal,
+//       and the land weight itself independent of the level. Independently of
+//       that weight: a window over open sea bakes byte-identical at every
+//       level. `--lift` runs it alone and writes lift_<level>.png.
+// ---------------------------------------------------------------------------
+void lift_row(const bake_source& src0, const bake_params& p0, bool previews)
+{
+    bake_params p = p0;
+    p.supersample = 1; // the app's master (ground_layer k_master_ss)
+    const geometry gm = make_master_geometry(src0.gw, src0.gh);
+    const auto land  = static_cast<std::uint8_t>(bake_source::tile_class::land);
+    const auto water = static_cast<std::uint8_t>(bake_source::tile_class::water);
+    constexpr int W = 512, H = 512;
+
+    // The windows: a fixed lattice over the temperate band (5 rows x 8
+    // columns), kept where the window's centre tile is land or water, so the
+    // sample is the ground a player looks at, sea and shore included.
+    struct win { int x0, y0; };
+    std::vector<win> wins;
+    for (int rj = 0; rj < 5; ++rj)
+        for (int ci = 0; ci < 8; ++ci)
+        {
+            const int r = src0.gh / 5 + (src0.gh * 3 / 5) * rj / 4;
+            const int c = src0.gw * ci / 8 + (rj & 1) * src0.gw / 16;
+            const int i = r * src0.gw + c;
+            if (src0.cls[i] != land && src0.cls[i] != water)
+                continue;
+            const double cx = 1.7320508075688772 * (c + ((r & 1) ? 0.5 : 0.0));
+            const int x0 = (static_cast<int>(cx * gm.s) - W / 2) / 16 * 16;
+            const int y0 = std::clamp((static_cast<int>((1.5 * r - gm.y_min) * gm.s) - H / 2) / 16 * 16, 0, gm.H - H);
+            wins.push_back({ x0, y0 });
+        }
+    // An open-sea window: a water tile whose every tile within 7 is water.
+    int sea = -1;
+    for (int r = src0.gh / 5; r < src0.gh * 4 / 5 && sea < 0; ++r)
+        for (int c = 0; c < src0.gw && sea < 0; ++c)
+        {
+            bool all = true;
+            for (int dr = -7; dr <= 7 && all; ++dr)
+                for (int dc = -7; dc <= 7 && all; ++dc)
+                {
+                    const int rr = r + dr;
+                    if (rr < 0 || rr >= src0.gh) { all = false; break; }
+                    const int cc = ((c + dc) % src0.gw + src0.gw) % src0.gw;
+                    all = src0.cls[static_cast<std::size_t>(rr) * src0.gw + cc] == water;
+                }
+            if (all)
+                sea = r * src0.gw + c;
+        }
+
+    // A river window: the first temperate land tile a river leaves, so the
+    // sample holds a river's water (the land weight's other source).
+    for (int i = 0; i < static_cast<int>(src0.cls.size()); ++i)
+    {
+        const int r = i / src0.gw, c = i % src0.gw;
+        if (r <= src0.gh / 5 || r >= src0.gh * 4 / 5 || src0.cls[i] != land || !src0.river_out[i] || !src0.river_in[i])
+            continue;
+        const double cx = 1.7320508075688772 * (c + ((r & 1) ? 0.5 : 0.0));
+        const int x0 = (static_cast<int>(cx * gm.s) - W / 2) / 16 * 16;
+        const int y0 = std::clamp((static_cast<int>((1.5 * r - gm.y_min) * gm.s) - H / 2) / 16 * 16, 0, gm.H - H);
+        wins.push_back({ x0, y0 });
+        std::printf("P35: river window at tile [%d,%d]\n", c, r);
+        break;
+    }
+
+    const std::size_t n = static_cast<std::size_t>(W) * H;
+    std::vector<std::vector<std::uint32_t>> off_px(wins.size());
+    std::vector<std::vector<std::uint8_t>>  off_lw(wins.size());
+    std::vector<std::uint32_t> px(n), sea_off(256u * 256u), sea_px(256u * 256u);
+    std::vector<std::uint8_t>  lw(n);
+    const auto lum = [](std::uint32_t c) {
+        return 0.2126 * ui::palette::col_r(c) + 0.7152 * ui::palette::col_g(c) + 0.0722 * ui::palette::col_b(c);
+    };
+    double land_p50_off = 0.0;
+    std::vector<double> water_off;
+    std::printf("P35: %zu master windows %dx%d over the home body; open sea %s\n", wins.size(), W, H,
+                sea >= 0 ? "found" : "none");
+    for (int level = 0; level < k_land_lift_levels; ++level)
+    {
+        bake_source src = src0;
+        src.land_lift = static_cast<std::uint8_t>(level);
+        std::vector<double> lland, lwater;
+        long water_moved = 0, weight_moved = 0, partial = 0;
+        for (std::size_t k = 0; k < wins.size(); ++k)
+        {
+            bake_region(src, gm, p, wins[k].x0, wins[k].y0, W, H, px.data(), lw.data());
+            if (level == 0)
+            {
+                off_px[k] = px;
+                off_lw[k] = lw;
+            }
+            for (std::size_t i = 0; i < n; ++i)
+            {
+                weight_moved += lw[i] != off_lw[k][i];
+                if (ui::palette::col_a(px[i]) != 255)
+                    continue;
+                if (lw[i] == 255)
+                    lland.push_back(lum(px[i]));
+                else if (lw[i] == 0)
+                {
+                    lwater.push_back(lum(px[i]));
+                    water_moved += px[i] != off_px[k][i];
+                }
+                else
+                    ++partial;
+            }
+            if (previews && k == wins.size() / 2)
+            {
+                char path[64];
+                std::snprintf(path, sizeof path, "lift_%d.png", level);
+                write_png_rgba(path, W, H, reinterpret_cast<const unsigned char*>(px.data()), W * 4);
+            }
+        }
+        std::sort(lland.begin(), lland.end());
+        std::sort(lwater.begin(), lwater.end());
+        const auto q = [](const std::vector<double>& v, double f) {
+            return v.empty() ? 0.0 : v[static_cast<std::size_t>(f * (v.size() - 1))];
+        };
+        if (level == 0)
+        {
+            land_p50_off = q(lland, 0.5);
+            water_off = lwater;
+        }
+        std::printf("P35: level %d (gamma %.3f)  land  %8zu px  lum p10 %5.1f p50 %5.1f p90 %5.1f p99 %5.1f"
+                    "  (p50 %+.1f%% vs off)\n",
+                    level, land_lift_gamma(level), lland.size(), q(lland, 0.10), q(lland, 0.50), q(lland, 0.90),
+                    q(lland, 0.99), land_p50_off > 0.0 ? 100.0 * (q(lland, 0.5) / land_p50_off - 1.0) : 0.0);
+        std::printf("P35: level %d                water %8zu px  lum p10 %5.1f p50 %5.1f p90 %5.1f p99 %5.1f"
+                    "  (%ld shore/bank px partly land)\n",
+                    level, lwater.size(), q(lwater, 0.10), q(lwater, 0.50), q(lwater, 0.90), q(lwater, 0.99), partial);
+        check(q(lland, 0.99) < 235.0, "P35", "the land's p99 stays under 235 (the top does not clip)");
+        check(weight_moved == 0, "P35", "the land weight does not move with the level");
+        check(partial > 0, "P35", "a river's edge is weighed part water (the river's water is held)");
+        check(water_moved == 0 && lwater == water_off, "P35", "every water pixel bakes as it does with the lift off");
+        if (level > 0)
+            check(q(lland, 0.5) > land_p50_off, "P35", "the level lifts the land's median");
+        if (sea >= 0)
+        {
+            const int r = sea / src0.gw, c = sea % src0.gw;
+            const double cx = 1.7320508075688772 * (c + ((r & 1) ? 0.5 : 0.0));
+            const int x0 = (static_cast<int>(cx * gm.s) - 128) / 16 * 16;
+            const int y0 = std::clamp((static_cast<int>((1.5 * r - gm.y_min) * gm.s) - 128) / 16 * 16, 0, gm.H - 256);
+            bake_region(src, gm, p, x0, y0, 256, 256, (level == 0 ? sea_off : sea_px).data());
+            if (level > 0)
+                check(sea_off == sea_px, "P35", "an open-sea window bakes byte-identical to the lift off");
+        }
+    }
+}
+
 int main(int argc, char** argv)
 {
     generation_report report;
@@ -3116,6 +3272,14 @@ int main(int argc, char** argv)
         }
         look_row(src, q, argc > 2 ? argv[2] : "");
         return 0;
+    }
+
+    // --lift: the BL-1537 row (P35) alone, with previews.
+    if (argc > 1 && std::strcmp(argv[1], "--lift") == 0)
+    {
+        lift_row(src, p, /*previews=*/true);
+        std::printf("%s (%d failures)\n", g_failures ? "FAIL" : "PASS", g_failures);
+        return g_failures ? 1 : 0;
     }
 
     // --border: the BL-1251 rows (P26, P27) alone, with previews.
@@ -4598,6 +4762,8 @@ int main(int argc, char** argv)
     roadsets_row(src, p, /*previews=*/false); // BL-1291
     // P31 - cast shadows (BL-1256).
     shadow_row(src, p);
+    // P35 - the land lift (BL-1537).
+    lift_row(src, p, /*previews=*/false);
 
     std::printf("\n%s (%d failure%s)\n", g_failures ? "FAILED" : "ALL PASS",
                 g_failures, g_failures == 1 ? "" : "s");

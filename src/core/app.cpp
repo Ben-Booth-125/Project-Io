@@ -425,6 +425,7 @@ int app::run(autostart_mode autostart)
     // never touches settings, keeping golden captures at the fixed default size.
     load_settings();
     apply_display_settings();
+    m_ground.set_land_lift(m_settings.land_lift); // BL-1537: interactive only, like the rest
     m_ui_draw_scale = k_ui_draw_scale; // BL-1495: interactive only, like the settings above
     apply_ui_scale();
 
@@ -4260,6 +4261,25 @@ void app::render()
                 ImGui::EndCombo();
             }
 
+            // BL-1537 (RENDERING.md § Art direction and palette): the land lift's
+            // trial levels. A change re-bakes the land; the sea keeps its colour.
+            ImGui::SeparatorText("Map");
+            static const char* land_lift_labels[] = {"Off", "+15%", "+30%", "+45%"};
+            static_assert(IM_ARRAYSIZE(land_lift_labels) == ui::ground::k_land_lift_levels);
+            if (ImGui::BeginCombo("Ground lightness", land_lift_labels[m_settings.land_lift]))
+            {
+                for (int i = 0; i < IM_ARRAYSIZE(land_lift_labels); ++i)
+                {
+                    if (ImGui::Selectable(land_lift_labels[i], i == m_settings.land_lift))
+                    {
+                        m_settings.land_lift = i;
+                        m_ground.set_land_lift(i);
+                        save_settings();
+                    }
+                }
+                ImGui::EndCombo();
+            }
+
             // Live window size (also reflects a free drag-resize of the frame).
             int win_w = 0, win_h = 0;
             SDL_GetWindowSize(m_window, &win_w, &win_h);
@@ -4329,6 +4349,7 @@ void app::load_settings()
             else if (key == "fullscreen") m_settings.fullscreen = (std::stoi(val) != 0);
             else if (key == "vsync")      m_settings.vsync      = (std::stoi(val) != 0);
             else if (key == "ui_scale_step") m_settings.ui_scale_step = std::stoi(val);
+            else if (key == "land_lift")  m_settings.land_lift  = std::stoi(val);
         }
         catch (const std::exception&) { /* skip malformed value */ }
     }
@@ -4339,6 +4360,7 @@ void app::load_settings()
     m_settings.window_w = std::max(1280, m_settings.window_w);
     m_settings.window_h = std::max(720, m_settings.window_h);
     m_settings.ui_scale_step = std::clamp(m_settings.ui_scale_step, 0, 2);
+    m_settings.land_lift = std::clamp(m_settings.land_lift, 0, ui::ground::k_land_lift_levels - 1);
 }
 
 void app::save_settings() const
@@ -4353,7 +4375,8 @@ void app::save_settings() const
         << "window_h="   << m_settings.window_h        << '\n'
         << "fullscreen=" << (m_settings.fullscreen ? 1 : 0) << '\n'
         << "vsync="      << (m_settings.vsync ? 1 : 0)      << '\n'
-        << "ui_scale_step=" << m_settings.ui_scale_step     << '\n';
+        << "ui_scale_step=" << m_settings.ui_scale_step     << '\n'
+        << "land_lift="  << m_settings.land_lift           << '\n';
 }
 
 void app::apply_display_settings()

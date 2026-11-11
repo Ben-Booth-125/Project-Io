@@ -9,7 +9,7 @@ space**, with the backlog item that demanded it. The pair is required. Enforceme
 authorship, not machinery — there is deliberately no audit check against this file
 (BL-260, Ben 2026-08-01: *"the docs are the audit"*).
 
-**84 surfaces** — 4 settled, 80 awaiting Ben's wording.
+**85 surfaces** — 4 settled, 81 awaiting Ben's wording.
 
 ---
 
@@ -345,6 +345,14 @@ THE SEAM'S ANSWER IS SHOWN, because set_trade validates what the form cannot (bo
 **Because:** Every ledger and panel needs exactly one discoverable door, and the rail is where that door is. A surface with no slot is drawn every frame and reachable by nobody; a slot with no surface teaches a system the game does not have. That is why the inert Acquisitions slot left the rail rather than standing blank once its ledger retired (Ben, 2026-10-24: "we can retire rail slot 5, and move everything up"): twelve slots, every later one moved up one.
 
 *Demanded by BL-022, BL-027, BL-028 · `src/ui/nav_pane.cpp` · id `nav_pane`*
+
+### Options window - Map section, Ground lightness combo (Off, +15%, +30%, +45%)
+
+**Answers:** How light should the map's land read on this display?
+
+**Because:** Ben, 2026-11-10 (RENDERING.md § Art direction and palette, 'The land lift'): the lighter tileset is a grade pass on land only with three trial levels, chosen live rather than tuned blind, and the choice must survive a restart. One combo in the window that already holds the display settings; it re-bakes the land and leaves water as it is, so the player sees the effect on the map behind the window.
+
+*Demanded by BL-1537 · `src/core/app.cpp`, `src/core/ground_layer.cpp`, `src/ui/ground_bake.cpp` · id `options_ground_lightness`*
 
 ### Placement lens (Planetary canvas, while the Site Finder view's site finder has a building chosen) - a mode of the build flow, not an overlay_mode
 

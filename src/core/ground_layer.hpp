@@ -173,6 +173,15 @@ public:
     /// The C-F dials; shipped values are ground_bake.hpp's defaults.
     ui::ground::bake_params params;
 
+    /// THE LAND LIFT (BL-1537, RENDERING.md § Art direction and palette): the
+    /// player's setting, 0 = off, 1..k_land_lift_levels-1. Every source this layer
+    /// takes carries it, so a change moves the hash of every window holding land
+    /// and the sweep re-bakes exactly those (the sea and the lock fill stand).
+    /// Starts at ui::ground::k_land_lift_default, or IO_GROUND_LAND_LIFT (0-3) when
+    /// set - the lever a capture of each level is taken with.
+    void set_land_lift(int level);
+    int  land_lift() const { return m_land_lift; }
+
     /// BL-1247 (the ground benchmark, `--bench-ground`): false holds back the
     /// speculative background bakes of other bodies, so the bench can time a
     /// true first visit. True in play.
@@ -609,6 +618,8 @@ private:
     /// The Logistics lens is up: sources are taken with their routes unpainted
     /// (ui::ground::strip_painted_routes; ground_request::hide_routes).
     bool          m_hide_routes = false;
+    int           m_land_lift = initial_land_lift(); ///< BL-1537; see set_land_lift.
+    static int    initial_land_lift();
     /// The coarsest drawn level (0 = the master, 96 px a hex; 2 = 24 px) at which the
     /// Logistics lens's unpainted ground is re-baked under the view. Coarser than this a
     /// painted road is under a pixel, so a dirty chunk keeps its pixels until the view
