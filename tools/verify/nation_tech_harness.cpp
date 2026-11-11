@@ -64,7 +64,7 @@
 //
 // Usage: nation_tech_harness [--seeds N | --seed-list a,b,...] [--quarters Q] [--once]
 //                            [--base X] [--lin Y] [--sqrt Z] [--unit U]
-//                            [--growth G] [--econ E] [--age Y] [--age-only]
+//                            [--growth G] [--econ E] [--age Y] [--age-only] [--r0-only]
 //   --seeds 0   fixture rows (R1-R3, T1, T2) plus T2-live's one generated world — the ctest invocation.
 //   --fixture-only  with --seeds 0: the fixture rows ALONE, skipping T2-live and R5-live
 //               (their generated seed-28 settle and leg search run for over half an hour).
@@ -2005,6 +2005,10 @@ void rows_r0(const std::vector<std::uint32_t>& seeds, int quarters, bool twice, 
             const bool done = r.quarters_to_maj > 0;
             if (done) ++s_done;
             const double q = done ? r.quarters_to_maj : quarters + 1;
+            // BL-1561: one line per nation, so seed shards run in parallel can be
+            // pooled (tools/verify/nation_tech_pool.js) into the PACING percentiles.
+            std::printf("  NATQ seed %u nation %llu q %.0f held %d\n", s,
+                        static_cast<unsigned long long>(r.nation), q, r.held_end);
             qs.push_back(q);
             q_src.push_back(q);
             rp_src.push_back(r.rp_live / quarters);
@@ -2541,6 +2545,7 @@ int main(int argc, char** argv)
     int  seed_count = 16;
     int  age_years  = 0;     // BL-1324: --age Y runs R4 over Y years (80 = the age)
     bool age_only   = false; // --age-only: skip the fixture rows and R0
+    bool r0_only    = false; // --r0-only (BL-1561): skip the fixture and live rows, run R0 alone
     int  quarters   = 32; // 16 x the RP-unit scale (200 / 100)
     bool twice      = true;
     dial_override ov;
@@ -2566,6 +2571,7 @@ int main(int argc, char** argv)
         else if (!std::strcmp(argv[i], "--econ") && more)   { ov.set_econ = true; ov.econ = static_cast<float>(std::atof(argv[++i])); }
         else if (!std::strcmp(argv[i], "--age") && more)    age_years = std::atoi(argv[++i]);
         else if (!std::strcmp(argv[i], "--age-only"))       age_only = true;
+        else if (!std::strcmp(argv[i], "--r0-only"))        r0_only = true;
         else if (!std::strcmp(argv[i], "--ai") && more)     ai_years = std::atoi(argv[++i]);
         else if (!std::strcmp(argv[i], "--relief") && more)  { ad.set_relief = true;  ad.relief  = static_cast<float>(std::atof(argv[++i])); }
         else if (!std::strcmp(argv[i], "--unlock") && more)  { ad.set_unlock = true;  ad.unlock  = static_cast<float>(std::atof(argv[++i])); }
@@ -2616,7 +2622,7 @@ int main(int argc, char** argv)
     }
 
     std::printf("nation_tech_harness (BL-1273): %d nodes in the Digitisation tree\n", io::dg::node_count);
-    if (!age_only)
+    if (!age_only && !r0_only)
     {
     rows_r1();
     rows_r2();
