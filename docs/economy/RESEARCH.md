@@ -146,6 +146,8 @@ whose branch carries a placeholder needs only the branch's real rim major until 
 nation, researching without pause, completes the whole tree inside the age, and the median nation
 reaches its first ring-2 major in about five years.
 
+**Research costs three times the 2026-10-10 price (Ben, 2026-11-11: *"the game's pacing is far too fast"*).** The RP unit is tripled in the same change that makes the tick a month; RP accrual keeps its per-year value. The age's length and the first-major interval are re-measured against the new price, and the figures in this section are the measured ones.
+
 **A node costs its tier's base × its ring × the RP unit.** The unit is a dial, set so that a nation
 spending a typical research share reaches a power surge — a major — at steady intervals through the
 age. That pacing is the property the price is tuned to and the sweep measures (Ben, 2026-10-10:

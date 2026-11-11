@@ -863,16 +863,25 @@ standard already fields them.
 **Launchers, by class.** A launcher fires from where it stands, and only a raised one fires.
 A land unit or ship cannot fire while refitting, mustering or aboard. A wing fires from its
 airbase, and its class's range adds to the missile's, since it flies out before it releases.
-A silo building is not part of this cut.
+**A missile silo is a building (Ben, 2026-11-11).** A nation builds a **silo** on its own ground; it is the long-range launcher. A silo fires long-range and tactical nuclear missiles from the nation's magazine, at **90 tiles** — twice a ship or bomber's long-range reach — and only while it stands undamaged past half condition. A silo is a building a strike may name, so a rival's silos are the first targets of a war.
 
 | Launcher | Carries |
 |---|---|
-| Artillery | Short range, tactical nuclear |
+| Silo | Long range (90 tiles), tactical nuclear |
 | Destroyer | Short range |
 | Capital ship | Short range, long range |
 | Submarine | Long range, tactical nuclear |
 | Multirole wing | Short range |
 | Bomber wing | Long range, tactical nuclear |
+
+**Artillery fires shells, not missiles (Ben, 2026-11-11).** Artillery leaves the launcher table; its
+reach becomes its own. Artillery has a **range** in tiles and strikes hostile units within it from
+where it stands, without entering their province. Three kit items deepen it, each a node of the age
+tree: **self-propelled guns** (the battery marches as fast as the force it supports), **counter-battery
+radar** (it finds and answers hostile artillery in range first) and **precision shells** (more of
+each strike lands). **The front keeps artillery at its range:** a front's automation places its
+assigned artillery as far behind the line as its range allows while still reaching across it, and
+moves it back when the line moves (§ Fronts).
 
 **A strike names a province or a building in it.** Range is the straight-line tile distance
 from the launcher to the province's nearest tile, or to the building's tile. A strike is legal

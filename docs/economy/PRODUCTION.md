@@ -1333,6 +1333,31 @@ arcs are `food_rations` and `refined_copper`; everything else is banded.
 
 ---
 
+## One building per product (Ben, 2026-11-11)
+
+**Every processing product has its own building.** A Steel Mill makes steel, a Refined Copper works
+makes refined copper; a building's type names what it makes, and its marker on the map says so. A
+**method** is a way the one building makes its one product, never a way to make a different one, so
+switching a method can never change what a building produces. Arms Works splits the same way: one
+building per kit good. *Why:* a building that could switch to another product hid what was built
+where, and the method control had no clear place on the building's own card.
+
+**Methods are upgrades or variants, per pair.** Where one method needs a good the other does not and
+is the deeper route to the same product, it is an **upgrade**: paid in place, one way, and the
+building keeps its tile and stack. Where two methods differ only in which raws they draw, they are
+**variants**: switchable both ways at the switch cost. Each method pair is tagged one or the other in
+the recipe data.
+
+**A tile may hold several products; a stack holds one method.** Buildings of one type on one tile are
+a stack, and every building in a stack runs the same method, so a switch or upgrade applies to the
+whole stack. Different products may still share a tile under the non-extraction cap.
+
+**The method is changed on the building's own card.** The Selection element shows the stack's method
+and, where one exists, its upgrade or variant, with the cost — the one exception to the card
+presenting and never operating.
+
+A save from before the split is refused with a clear message, not migrated.
+
 ## Alternate production methods
 
 **Ruling (Ben, 2026-08-15): alternates with real trade-offs, not tier upgrades** (BL-430,

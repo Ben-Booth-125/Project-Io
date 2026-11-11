@@ -153,6 +153,104 @@
    "title": "Tech pacing below its band",
    "design": "Measured 2026-11-09, 16 seeds, 577 nations: majors' completed nodes median 15, p10 6, against targets 16-24 and at least 8. The before-sprint tree read 15 and 5, so this is not a sprint 63 regression. A calibration for a later sprint, after Ben's opening playtest. Carried at the sprint 63 close (2026-11-10): a later calibration, after the opening playtest.",
    "author": "main session (Ben, 2026-11-09)"
+  },
+  {
+   "glyph": "○",
+   "sprint": null,
+   "version_goal": "v0.3.0",
+   "written": "2026-11-11",
+   "parked": false,
+   "blocked_on": null,
+   "requires": [],
+   "status": "proposed",
+   "author": "main session (Ben, 2026-11-11)",
+   "id": "BL-1640",
+   "short_name": "SITE_FINDER_PARALLEL",
+   "title": "Site finder searches in parallel, shows the sorted list once",
+   "priority": "A",
+   "difficulty": 2,
+   "category": "UI",
+   "authority_doc": "docs/ui/ledgers/construction.md",
+   "files": [
+    "src/ui/construction_sites.cpp"
+   ],
+   "design": "Ben, 2026-11-11: score every option of a pass at once on worker threads, then sort once and show the whole list; no unsorted list while it runs. Results identical to the sequential path; verify keeps a synchronous path. Lane running."
+  },
+  {
+   "glyph": "○",
+   "sprint": null,
+   "version_goal": "v0.3.0",
+   "written": "2026-11-11",
+   "parked": false,
+   "blocked_on": null,
+   "requires": [],
+   "status": "proposed",
+   "author": "main session (Ben, 2026-11-11)",
+   "id": "BL-1641",
+   "short_name": "ONE_BUILDING_PER_PRODUCT",
+   "title": "One building per product; methods are upgrades or variants",
+   "priority": "A",
+   "difficulty": 4,
+   "category": "Economy",
+   "authority_doc": "docs/economy/PRODUCTION.md",
+   "files": [
+    "scripts/recipes.lua",
+    "src/world/recipe_registry.hpp",
+    "src/world/economy_system.cpp",
+    "src/world/corp_ai.cpp",
+    "src/ui/selection_panel.cpp",
+    "src/world/world_save.cpp"
+   ],
+   "design": "PRODUCTION.md § One building per product (Ben, 2026-11-11). Split every multi-product group (Metal Foundry, Electronics, Advanced Fabrication, Welfare Goods, Food Processing, Arms Works) into one building per product; tag each same-output method pair upgrade or variant; one method per stack; the method control on the Selection card; old saves refused. Research effects scoped to group names must be re-targeted."
+  },
+  {
+   "glyph": "○",
+   "sprint": null,
+   "version_goal": "v0.3.0",
+   "written": "2026-11-11",
+   "parked": false,
+   "blocked_on": null,
+   "requires": [],
+   "status": "proposed",
+   "author": "main session (Ben, 2026-11-11)",
+   "id": "BL-1642",
+   "short_name": "MONTHLY_TICK",
+   "title": "The tick is a month; research costs triple",
+   "priority": "A",
+   "difficulty": 4,
+   "category": "Economy",
+   "authority_doc": "docs/tech/TECH_FOUNDATIONS.md",
+   "files": [
+    "src/core/sim_loop.hpp",
+    "scripts/economy.lua",
+    "src/world/nation_tech.hpp"
+   ],
+   "design": "TECH_FOUNDATIONS.md § Simulation tick architecture, GLOSSARY.md § Month, RESEARCH.md (Ben, 2026-11-11). econ_tick_days 90 -> 30; every per-tick flow a third, every tick-counted duration tripled; seconds_per_day_1x 2 -> 6; Quarter -> Month in every player string; RP unit x3. Supersedes BL-1561's (tech pacing) dial. Re-measure with nation_tech_harness and the opening gates."
+  },
+  {
+   "glyph": "○",
+   "sprint": null,
+   "version_goal": "v0.3.0",
+   "written": "2026-11-11",
+   "parked": false,
+   "blocked_on": null,
+   "requires": [],
+   "status": "proposed",
+   "author": "main session (Ben, 2026-11-11)",
+   "id": "BL-1643",
+   "short_name": "MISSILE_SILOS",
+   "title": "Missile silos; artillery gets range, kit and front placement",
+   "priority": "A",
+   "difficulty": 4,
+   "category": "Military",
+   "authority_doc": "docs/military/MILITARY.md",
+   "files": [
+    "src/world/missiles.cpp",
+    "src/world/missile_params.hpp",
+    "src/world/fronts.cpp",
+    "scripts/economy.lua"
+   ],
+   "design": "MILITARY.md § Missiles and § Artillery fires shells (Ben, 2026-11-11). A silo building fires long range and tactical nuclear at 90 tiles; launchers are silos, ships and bombers; artillery leaves the launcher table, gains a range and three kit items (self-propelled guns, counter-battery radar, precision shells); front automation holds artillery at max range behind the line. Rivals' missile grant (AI_OPPONENT.md § 11) extends to silos as launchers - raise if it reads as a new subject."
   }
  ]
 }
