@@ -159,7 +159,10 @@ a tile keep the shared header (§ Layout & chrome).
    and **the card itself never scrolls** — only the resource table does, inside its own rows
    (Ben, 2026-10-13, round 2). Top to bottom:
    - **The header row** — the title, then the **capacity bar, narrowed** to share the row, then
-     the **population count right-aligned** at the row's end.
+     the **population count right-aligned** at the row's end. Where the card is too narrow for the
+     bar to read beside them (a larger UI Scale step at its floor), the title and the population
+     keep the row and the bar takes a row of its own beneath, full width: the three never draw
+     over one another.
    - **Capacity** — the province's building count against its **province building ceiling**
      (`../economy/PRODUCTION.md` § The province building ceiling), drawn as a **bar**. Hovering
      the bar opens a tooltip naming **where the capacity is granted** — the ceiling's four
@@ -174,8 +177,12 @@ a tile keep the shared header (§ Layout & chrome).
      across member tiles — a deposit is a stock, so several tiles each holding a little iron *is*
      one province holding that much). Richest deposit first. Each row names its resource by
      **glyph, not text**: the extraction-site glyph keyed to that resource, in its colour, with
-     the name on hover (Ben, 2026-11-04) — at the 1280×720 floor the card is about 135 px, and a
-     name column left the longest names 4 px. Agricultural Produce's hover name is **Farm**
+     the name on hover (Ben, 2026-11-04) — at the 1280×720 floor the card was about 135 px, and a
+     name column left the longest names 4 px. The glyph stays at the 12 px default UI
+     (`LAYOUT.md` § UI scale; re-read 2026-11-11): the card is about 180 px at 1280×720 and the
+     glyph, Built, Max and Resource columns take about 145 of it, while a name column would need
+     about 80 px for the longest name (Rare Earth Ore) where the glyph takes about 20, so names
+     would still clip the Resource column at the right edge. Agricultural Produce's hover name is **Farm**
      (Ben, 2026-10-14) — the name of what is built on it. This one table replaces the former
      separate Buildings and Deposits sections: they were two readings of the same rows.
      It takes the rest of the card's height and **scrolls inside itself**.

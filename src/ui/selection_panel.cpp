@@ -3865,50 +3865,75 @@ void draw_province_card(const world& w, const recipe_registry& reg, const econom
     char pop[32];
     std::snprintf(pop, sizeof pop, "%d k", pt.total);
     const float pop_w   = ImGui::CalcTextSize(pop).x;
-    const float row_x   = ImGui::GetCursorPosX();     // after the title, on its line
+    const float row_x   = ImGui::GetCursorPosX();     // the line start, under the title
     ImGui::SameLine();
     const float bar_x   = ImGui::GetCursorPosX();
     const float right_x = ImGui::GetWindowContentRegionMax().x;
-    const float bar_w   = std::max(ui::px(24.0f), right_x - bar_x - pop_w - style.ItemSpacing.x);
-    (void)row_x;
+    // BL-1490: the bar shares the title's row only while it has room to read; a card
+    // narrower than that (a larger UI Scale step at its floor) puts the population
+    // on the title's row and the bar on a row of its own, so the title, the bar and
+    // the figure never draw over one another.
+    const float bar_room   = right_x - bar_x - pop_w - style.ItemSpacing.x;
+    const bool  bar_on_row = bar_room >= ui::px(48.0f);
+
+    const auto draw_pop = [&] {
+        ImGui::TextUnformatted(pop);
+        const ImVec2 mn = ImGui::GetItemRectMin();
+        const ImVec2 mx = ImGui::GetItemRectMax();
+        ui.tile_card.population_x = (mn.x + mx.x) * 0.5f;
+        ui.tile_card.population_y = (mn.y + mx.y) * 0.5f;
+        if (ImGui::IsItemHovered())
+            draw_population_tooltip(pt);
+    };
 
     // Capacity: standing buildings against the province building ceiling. -1 is
     // UNKNOWN by the BL-513 contract and is said, never drawn as room.
     ui.tile_card.province_standing = pb.standing;
     ui.tile_card.province_ceiling  = pb.ceiling;
-    if (pb.ceiling >= 0)
+    const auto draw_capacity = [&](float bar_w) {
+        if (pb.ceiling >= 0)
+        {
+            const bool  full = pb.standing >= pb.ceiling;
+            const float frac = pb.ceiling > 0
+                                   ? std::clamp(static_cast<float>(pb.standing) / static_cast<float>(pb.ceiling), 0.0f, 1.0f)
+                                   : 1.0f;
+            char ov[48];
+            std::snprintf(ov, sizeof ov, full ? "%d/%d full" : "%d/%d", pb.standing, pb.ceiling);
+            ImGui::PushStyleColor(ImGuiCol_PlotHistogram,
+                                  ImGui::ColorConvertU32ToFloat4(full ? palette::negative : palette::positive));
+            ImGui::ProgressBar(frac, {bar_w, ImGui::GetTextLineHeight()}, ov);
+            ImGui::PopStyleColor();
+            const ImVec2 mn = ImGui::GetItemRectMin();
+            const ImVec2 mx = ImGui::GetItemRectMax();
+            ui.tile_card.capacity_x = (mn.x + mx.x) * 0.5f;
+            ui.tile_card.capacity_y = (mn.y + mx.y) * 0.5f;
+            if (ImGui::IsItemHovered())
+                draw_capacity_tooltip(w, tile_id);
+        }
+        else
+        {
+            fit_text(text_box::table_cell, "selection.province.capacity", "capacity unknown", bar_w, true);
+        }
+    };
+
+    if (bar_on_row)
     {
-        const bool  full = pb.standing >= pb.ceiling;
-        const float frac = pb.ceiling > 0
-                               ? std::clamp(static_cast<float>(pb.standing) / static_cast<float>(pb.ceiling), 0.0f, 1.0f)
-                               : 1.0f;
-        char ov[48];
-        std::snprintf(ov, sizeof ov, full ? "%d/%d full" : "%d/%d", pb.standing, pb.ceiling);
-        ImGui::PushStyleColor(ImGuiCol_PlotHistogram,
-                              ImGui::ColorConvertU32ToFloat4(full ? palette::negative : palette::positive));
-        ImGui::ProgressBar(frac, {bar_w, ImGui::GetTextLineHeight()}, ov);
-        ImGui::PopStyleColor();
-        const ImVec2 mn = ImGui::GetItemRectMin();
-        const ImVec2 mx = ImGui::GetItemRectMax();
-        ui.tile_card.capacity_x = (mn.x + mx.x) * 0.5f;
-        ui.tile_card.capacity_y = (mn.y + mx.y) * 0.5f;
-        if (ImGui::IsItemHovered())
-            draw_capacity_tooltip(w, tile_id);
+        draw_capacity(bar_room);
+        ImGui::SameLine(right_x - pop_w);
+        draw_pop();
     }
     else
     {
-        fit_text(text_box::table_cell, "selection.province.capacity", "capacity unknown", bar_w, true);
+        // The figure right-aligned on the title's row when it clears the title,
+        // else under it; the bar takes the full width below.
+        if (right_x - pop_w >= bar_x)
+            ImGui::SameLine(right_x - pop_w);
+        else
+            ImGui::NewLine();
+        draw_pop();
+        ImGui::SetCursorPosX(row_x);
+        draw_capacity(std::max(ui::px(24.0f), right_x - row_x));
     }
-    ImGui::SameLine(right_x - pop_w);
-    ImGui::TextUnformatted(pop);
-    {
-        const ImVec2 mn = ImGui::GetItemRectMin();
-        const ImVec2 mx = ImGui::GetItemRectMax();
-        ui.tile_card.population_x = (mn.x + mx.x) * 0.5f;
-        ui.tile_card.population_y = (mn.y + mx.y) * 0.5f;
-    }
-    if (ImGui::IsItemHovered())
-        draw_population_tooltip(pt);
     ImGui::Separator();
 
     // ── The resource table: Built / Max / Resource, richest deposit first, ──
