@@ -285,16 +285,17 @@ is not the standard this project holds a generated world to.
 | Column | Water tile |
 |---|---|
 | Left — hex neighbourhood | Unchanged. The ring reads a shoreline usefully; it is where the coast/ocean boundary is legible at all |
-| Centre — facts | **Owner** and **domain** are the headline pair — the nation holding it, or *unowned* stated **positively** for open ocean rather than left blank. Then the province, and habitability |
-| Right — actions | **Construct** is live only for a **port**, on **owned** coastal water; everything else is disabled, as on ground that refuses the type |
+| Centre — facts | **Owner** and **domain** are the headline pair — the nation holding it, or *unowned* stated **positively** for open ocean rather than left blank. Then the province, habitability, and any deposit the water carries (shelf oil), each with its richness band |
+| Right — actions | **Construct** is live only for a **port**, and for an **Oil Platform** on owned shelf oil once the nation holds Offshore Drilling and owns a port within 6 water tiles (`../economy/PRODUCTION.md`); everything else is disabled, as on ground that refuses the type |
 
 **Unowned must READ as a fact, not as missing data.** An empty owner row and an owner row saying
 "unowned" are the same pixels' worth of effort and opposite in meaning: the first looks like the
 panel failed, the second is the design. Open ocean is unowned *structurally* — it is the assertion,
 not the absence of one.
 
-**What is deliberately not here.** The centre column does not gain a deposit, workforce or
-resource page for water — those read the ground, and there is none. And selecting water does not
+**What is deliberately not here.** The centre column does not gain a workforce or resource page
+for water — water has no settlement. A deposit is the one exception: shelf sea can carry oil, and
+the column lists it, because the tile is where a player decides whether to drill it. And selecting water does not
 substitute for a territory lens: the panel answers *who holds this tile*, one tile at a time,
 where a lens would answer *who holds this region* at a glance. The lens stays unbuilt and
 unpromised.

@@ -3700,10 +3700,31 @@ void draw_water_facts_column(const world& w, entity_id sel, const tile_component
     ImGui::SameLine();
     ImGui::Text("%.2f", static_cast<double>(tile.habitability));
 
+    // ── Deposits — shelf sea can carry oil (BL-1522, offshore drilling) ──
+    bool any_deposit = false;
+    for (std::size_t r = 0; r < tile.resource_deposit.size(); ++r)
+    {
+        const float dep = tile.resource_deposit[r];
+        if (dep <= 0.0f)
+            continue;
+        any_deposit = true;
+        const char* band = dep < 0.25f ? "trace" : dep < 0.75f ? "moderate" : "rich";
+        ImGui::TextDisabled("%s deposit", presentation_of(static_cast<resource_type>(r)).name);
+        ImGui::SameLine();
+        ImGui::Text("%.2f", static_cast<double>(dep));
+        ImGui::SameLine();
+        ImGui::TextDisabled("(%s)", band);
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("An Oil Platform can work this shelf once your nation holds\n"
+                              "Offshore Drilling, with one of your ports within 6 water tiles.");
+    }
+
     ImGui::Dummy({1.0f, style.ItemSpacing.y});
     ImGui::PushTextWrapPos(0.0f);
-    ImGui::TextDisabled("No deposits, workforce or buildings are read here: those "
-                        "questions are about ground, and there is none.");
+    ImGui::TextDisabled(any_deposit
+                            ? "No workforce is read here: water has no settlement."
+                            : "No deposits or workforce are read here: this water carries "
+                              "no deposit, and has no settlement.");
     ImGui::PopTextWrapPos();
 
     ImGui::EndChild();
