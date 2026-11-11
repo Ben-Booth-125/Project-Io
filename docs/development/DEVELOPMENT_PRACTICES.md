@@ -768,16 +768,17 @@ The runtime display and the verification harness do **not** render at the same s
 must be **resolution-robust** — sized from content and fixed anchors, never pinned to a
 resolution-scaled value.
 
-**The smallest supported display is 1280×720 at UI scale 1.0x** (BL-215). It is enforced, not
-merely stated: `SDL_SetWindowMinimumSize(1280·s, 720·s)` on window creation and from
-`app::apply_ui_scale()`, where `s` is the active UI-scale factor (1.0/1.25/1.5).
+**The smallest supported display is 1280×720 at a UI scale of 1.0x** (BL-215), and it moves with
+the scale. It is enforced, not merely stated: `SDL_SetWindowMinimumSize(1280·s, 720·s)` from
+`app::apply_ui_scale()`, where `s` is the active UI-scale factor, the font px over 16
+(`docs/ui/LAYOUT.md` § UI scale). At the 12 px default `s` is 0.75 and the floor is 960×540; at
+24 px it is 1920×1080.
 
-The floor scales with UI scale because BL-063 grows the font without scaling the px chrome — at
-1.5x the same layout honestly needs 1920×1080. The persisted-settings floor clamps to 1280×720;
-the automated overflow check (`scripts/verify/text_overflow_floor.lua`) runs at 1280×720 @ 1.0x.
-The harness draws at a UI draw scale of 1, the tightest layout, while the interactive path draws at
-the shipped constant (`docs/ui/LAYOUT.md` § UI scale); `scripts/verify/ui_scale_down.lua` runs the same
-walk at that constant.
+The floor scales with the factor because every chrome element does: the layout is authored at 1.0x
+and draws at `s` of that size. The persisted-settings floor clamps to 960×540, the floor at the
+smallest step. The harness runs at the default step, as the player first sees it; the automated
+overflow check (`scripts/verify/text_overflow_floor.lua`) runs at 1280×720 there, and
+`scripts/verify/ui_scale_down.lua` compares the default step with the 16 px step.
 
 - The window opens at **1280×720** (`window_w`/`window_h` in `src/core/app.cpp`,
   `SDL_WINDOW_RESIZABLE`) and persists its size to **`options.cfg`** in the run directory

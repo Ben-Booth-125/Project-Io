@@ -1,6 +1,7 @@
 #pragma once
 
 #include "world/world.hpp"
+#include "ui_scale.hpp" // BL-1495: px, px_const
 
 namespace ui {
 
@@ -21,10 +22,10 @@ void draw_profile_panel(const world& w);
 /// header starts at that same column edge — so this no longer describes the profile's
 /// width. Superseded for layout; kept until the Tile Ledger migrates off the floating
 /// spawn.
-inline constexpr float profile_panel_width = 200.0f;
+inline constexpr px_const profile_panel_width {200.0f};
 
 /// Height of the profile panel in pixels. Exposed so the navigation pane can
 /// start below it.
-inline constexpr float profile_panel_height = 92.0f;
+inline constexpr px_const profile_panel_height {92.0f};
 
 } // namespace ui

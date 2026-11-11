@@ -1,4 +1,5 @@
 #include "body_surface_canvas.hpp"
+#include "ui_scale.hpp" // BL-1495: px, px_const
 #include "diplomacy_ledger.hpp" // open_declaration — the right-click declare-and-attack
 #include "text_fit.hpp"
 
@@ -767,7 +768,7 @@ void draw_lens_wedges(ImDrawList* dl, ImVec2 c, float r, const ImU32* cols, int 
 /// which the former popup button docked in) — a real scrollable ImGui::BeginCombo,
 /// hosted in a small borderless window since the legend itself paints on the
 /// background draw list rather than a live ImGui window.
-constexpr float kLensComboH = 22.0f;
+constexpr px_const kLensComboH {22.0f};
 
 void draw_lens_resource_combo(ui_state& state, ImVec2 pos, float w)
 {
@@ -1056,7 +1057,7 @@ void draw_resource_key(const world& w, ui_state& state)
     ImGui::InputTextWithHint("##lens_resource_search", "Search resources",
                              state.lens_resource_filter, sizeof state.lens_resource_filter);
     ImGui::Dummy({bw, 2.0f});
-    ImGui::BeginChild("##rows", {bw, std::max(0.0f, list_h - kLensComboH - 4.0f)}, false,
+    ImGui::BeginChild("##rows", {bw, std::max(0.0f, list_h - kLensComboH - ui::px(4.0f))}, false,
                       ImGuiWindowFlags_NoBackground);
     const bool full = static_cast<int>(state.lens_resources.size()) >= ui_state::k_lens_resource_cap;
     if (rows.empty())

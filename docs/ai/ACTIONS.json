@@ -2120,14 +2120,14 @@
    "args": [
     {
      "name": "step",
-     "type": "enum: 1.0x | 1.25x | 1.5x",
-     "meaning": "Global UI scale step (stored as index 0-2; a corrupt config clamps back into this range)."
+     "type": "enum: 12 px | 16 px | 20 px | 24 px",
+     "meaning": "Global UI scale step, named by its font size; 12 px is the default and the smallest. Stored as ui_scale_px in options.cfg; a value off the list lands on the nearest step."
     }
    ],
    "preconditions": [
     "Options window open."
    ],
-   "expected_output": "UI scale applies live and persists to options.cfg immediately. These steps grow the font on top of the UI draw scale (LAYOUT.md § UI scale), which is one constant and has no control.",
+   "expected_output": "UI scale applies live and persists to options.cfg immediately. Every chrome element - text, padding, spacing, panel widths, the icon rail - scales with the font by one factor (font px / 16); the canvas ground does not. The window's minimum size scales with it (960x540 at 12 px). LAYOUT.md § UI scale.",
    "reason_to_select": "To make the interface legible on dense or high-DPI displays."
   },
   {

@@ -1,4 +1,5 @@
 #include "unit_designer.hpp"
+#include "ui_scale.hpp" // BL-1495: px
 
 #include "detail_level.hpp"
 #include "icons.hpp"
@@ -789,8 +790,8 @@ void draw_unit_designer(const world& w, const recipe_registry& reg, ui_state& s)
         // content corner (its padding is 36 x 28), one frame-height square.
         const ImVec2 wp = ImGui::GetWindowPos();
         const float  fh = ImGui::GetFrameHeight();
-        d.back_x = wp.x + 36.0f + fh * 0.5f;
-        d.back_y = wp.y + 28.0f + fh * 0.5f;
+        d.back_x = wp.x + ui::px(36.0f) + fh * 0.5f;
+        d.back_y = wp.y + ui::px(28.0f) + fh * 0.5f;
     }
     d.drawn_cls = key;
     d.drawn_air = is_air(surface);
@@ -812,15 +813,15 @@ void draw_unit_designer(const world& w, const recipe_registry& reg, ui_state& s)
     // The grid's height, or two summary lines and the Save / Revert row, whichever is taller.
     const float  grid_h = stat_grid_height(t.bands(reg, design, live_d));
     const float  summary_h = std::max(grid_h, 2.0f * ImGui::GetTextLineHeightWithSpacing()
-                                                 + ImGui::GetFrameHeightWithSpacing()) + 14.0f;
-    const float  main_h    = std::max(120.0f, avail.y - summary_h);
+                                                 + ImGui::GetFrameHeightWithSpacing()) + ui::px(14.0f);
+    const float  main_h    = std::max(ui::px(120.0f), avail.y - summary_h);
     const float  box_w     = std::clamp(avail.x * 0.24f, 180.0f, 300.0f);
-    const float  box_h     = 3.0f * line + 2.0f * pad + 4.0f;
+    const float  box_h     = 3.0f * line + 2.0f * pad + ui::px(4.0f);
     const float  gap       = 28.0f;
 
     const float img_x0 = o.x + box_w + gap;
     const float img_x1 = o.x + avail.x - box_w - gap;
-    const float img_w_room = std::max(40.0f, img_x1 - img_x0);
+    const float img_w_room = std::max(ui::px(40.0f), img_x1 - img_x0);
     const float aw = t.image_w(), ah = t.image_h();
     const float scale = std::min(img_w_room / aw, main_h / ah);
     const float iw = aw * scale, ih = ah * scale;
@@ -853,14 +854,14 @@ void draw_unit_designer(const world& w, const recipe_registry& reg, ui_state& s)
         for (slot_pos* p : col)
         {
             p->top = std::max(next, std::clamp(p->anchor.y - box_h * 0.5f, o.y, o.y + main_h - box_h));
-            next   = p->top + box_h + 10.0f;
+            next   = p->top + box_h + ui::px(10.0f);
         }
         float over = (col.empty() ? 0.0f : col.back()->top + box_h) - (o.y + main_h);
         for (auto it = col.rbegin(); it != col.rend() && over > 0.0f; ++it)
         {
             (*it)->top -= over;
             if (it + 1 != col.rend())
-                over = ((*(it + 1))->top + box_h + 10.0f) - (*it)->top;
+                over = ((*(it + 1))->top + box_h + ui::px(10.0f)) - (*it)->top;
             else
                 over = 0.0f;
         }
@@ -928,9 +929,9 @@ void draw_unit_designer(const world& w, const recipe_registry& reg, ui_state& s)
         }
         else
             clipped_text(dl, {b0.x + pad, ty}, tw, palette::text_secondary, t.slot_name(sl));
-        ty += line + 2.0f;
+        ty += line + ui::px(2.0f);
         clipped_text(dl, {b0.x + pad, ty}, tw, palette::selection, has_fi ? t.item_name(fitted) : "\xe2\x80\x94");
-        ty += line + 2.0f;
+        ty += line + ui::px(2.0f);
         clipped_text(dl, {b0.x + pad, ty}, tw, palette::text_secondary,
                      has_fi && !t.item_is_base(fitted) ? t.item_delta(fitted) : std::string("Base kit"));
 
@@ -965,11 +966,11 @@ void draw_unit_designer(const world& w, const recipe_registry& reg, ui_state& s)
         // choice); `live_it` is the live design's, which a pick can return to.
         const uint16_t fitted  = t.item_at(sl, design.fit[static_cast<std::size_t>(sl)]);
         const uint16_t live_it = t.live(sl);
-        const float row_h3 = 3.0f * line + 8.0f; // a locked row takes a fourth line: the node that opens it
-        const float list_w = std::min(440.0f, std::max(240.0f, img_x1 - img_x0 + gap));
+        const float row_h3 = 3.0f * line + ui::px(8.0f); // a locked row takes a fourth line: the node that opens it
+        const float list_w = std::min(ui::px(440.0f), std::max(ui::px(240.0f), img_x1 - img_x0 + gap));
         const float want_h = ImGui::GetFrameHeightWithSpacing() + static_cast<float>(items.size()) * (row_h3 + line + 4.0f) + 16.0f;
         const float list_h = std::min(want_h, main_h);
-        const float lx     = open_box_right ? open_box_x - 12.0f - list_w : open_box_x + 12.0f;
+        const float lx     = open_box_right ? open_box_x - ui::px(12.0f) - list_w : open_box_x + ui::px(12.0f);
         const float ly     = std::clamp(open_box_top, o.y, o.y + main_h - list_h);
 
         ImGui::SetCursorScreenPos({lx, ly});
@@ -1027,18 +1028,18 @@ void draw_unit_designer(const world& w, const recipe_registry& reg, ui_state& s)
             }
 
             // Line 1: name, then the badge — Fitted, LOCKED or Saved — at the right.
-            const float tx = r0.x + 6.0f;
+            const float tx = r0.x + ui::px(6.0f);
             const bool  is_live = id == live_it && !is_fit; // the saved item, when the draft moved off it
             const char* badge = is_fit ? "Fitted" : locked ? "LOCKED" : is_live ? "Saved" : nullptr;
-            const float badge_w = badge ? ImGui::CalcTextSize(badge).x + 10.0f : 0.0f;
+            const float badge_w = badge ? ImGui::CalcTextSize(badge).x + ui::px(10.0f) : 0.0f;
             if (badge)
             {
-                const ImVec2 bp = {r0.x + rw - badge_w, r0.y + 3.0f};
+                const ImVec2 bp = {r0.x + rw - badge_w, r0.y + ui::px(3.0f)};
                 const ImU32  bc = is_fit ? palette::positive : is_live ? palette::text_secondary : palette::negative;
-                cdl->AddRect({bp.x - 2.0f, bp.y - 1.0f}, {bp.x + badge_w - 6.0f, bp.y + line + 1.0f}, bc, 3.0f);
-                cdl->AddText({bp.x + 2.0f, bp.y}, bc, badge);
+                cdl->AddRect({bp.x - ui::px(2.0f), bp.y - 1.0f}, {bp.x + badge_w - ui::px(6.0f), bp.y + line + 1.0f}, bc, 3.0f);
+                cdl->AddText({bp.x + ui::px(2.0f), bp.y}, bc, badge);
             }
-            clipped_text(cdl, {tx, r0.y + 3.0f}, rw - badge_w - 14.0f,
+            clipped_text(cdl, {tx, r0.y + ui::px(3.0f)}, rw - badge_w - ui::px(14.0f),
                          locked ? palette::text_secondary : palette::selection, t.item_name(id));
             // Line 2: what it changes against the fitted item.
             clipped_text(cdl, {tx, r0.y + 3.0f + line}, rw - 12.0f, palette::text_secondary,
@@ -1047,7 +1048,7 @@ void draw_unit_designer(const world& w, const recipe_registry& reg, ui_state& s)
             clipped_text(cdl, {tx, r0.y + 3.0f + 2.0f * line}, rw - 12.0f, palette::text_secondary,
                          t.item_goods(id) + " per " + t.per());
             if (locked)
-                clipped_text(cdl, {tx, r0.y + 3.0f + 3.0f * line}, rw - 12.0f, palette::negative,
+                clipped_text(cdl, {tx, r0.y + ui::px(3.0f) + 3.0f * line}, rw - ui::px(12.0f), palette::negative,
                              "Needs research " + node_text(t.research_node(id)));
 
             unit_designer_state::drawn_item di;
@@ -1066,7 +1067,7 @@ void draw_unit_designer(const world& w, const recipe_registry& reg, ui_state& s)
     }
 
     // ── Summary: the design's stats and kit goods, previewing a hovered pick ──
-    ImGui::SetCursorScreenPos({o.x, o.y + main_h + 6.0f});
+    ImGui::SetCursorScreenPos({o.x, o.y + main_h + ui::px(6.0f)});
     ImGui::Separator();
     {
         unit_design next = design;
@@ -1082,7 +1083,7 @@ void draw_unit_designer(const world& w, const recipe_registry& reg, ui_state& s)
         draw_stat_grid(is_air(surface) ? "air_designer" : is_sea(surface) ? "ship_designer" : "unit_designer",
                        t.bands(reg, next, live_d), grid_w);
         ImGui::SetCursorScreenPos(strip);
-        const float text_w = std::max(120.0f, avail.x - grid_w - 16.0f);
+        const float text_w = std::max(ui::px(120.0f), avail.x - grid_w - ui::px(16.0f));
         ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + text_w);
         const std::string goods_now = t.design_goods(design);
         if (has_preview)
@@ -1142,8 +1143,8 @@ void draw_unit_designer(const world& w, const recipe_registry& reg, ui_state& s)
     int answer = 0; // 1 save, 2 discard, 3 keep editing
     if (d.confirm_close)
     {
-        const float pw = std::min(460.0f, avail.x - 40.0f);
-        const float ph = 2.0f * ImGui::GetTextLineHeightWithSpacing() + ImGui::GetFrameHeightWithSpacing() + 24.0f;
+        const float pw = std::min(ui::px(460.0f), avail.x - ui::px(40.0f));
+        const float ph = 2.0f * ImGui::GetTextLineHeightWithSpacing() + ImGui::GetFrameHeightWithSpacing() + ui::px(24.0f);
         ImGui::SetCursorScreenPos({o.x + (avail.x - pw) * 0.5f, o.y + (main_h - ph) * 0.5f});
         ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32(20, 22, 28, 252));
         ImGui::PushStyleColor(ImGuiCol_Border, ImGui::ColorConvertU32ToFloat4(palette::pinned));

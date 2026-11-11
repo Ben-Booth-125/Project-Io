@@ -5,6 +5,8 @@
 #include "profile_panel.hpp" // profile_panel_height
 #include "selection_card.hpp" // selection_band_height (the comms dock shares it)
 
+#include "ui_scale.hpp"     // px: the column scales with the UI (BL-1495)
+
 #include <imgui.h>
 
 #include <string>
@@ -24,9 +26,13 @@ float shell_column_width(float disp_x)
     // the whole common range: 380 @1280..1900, 384 @1920, ~410 @2048 (BL-216 — the
     // "~410 @1920" this comment used to claim was arithmetically wrong; 0.20*1920
     // is 384).
-    float w = 0.20f * disp_x;
+    // BL-1495: the rule is authored at a scale of 1, so read the display in authored
+    // pixels and scale the answer back: at 0.75 the column is the 1.0 column, shrunk.
+    const float s = ui_scale();
+    float w = 0.20f * (disp_x / s);
     if (w < 380.0f) w = 380.0f;
     if (w > 460.0f) w = 460.0f;
+    w *= s;
     // Round to a whole pixel so the column edge (and everything anchored to it) lands
     // on a pixel boundary rather than blurring across two.
     return static_cast<float>(static_cast<int>(w + 0.5f));
@@ -34,9 +40,11 @@ float shell_column_width(float disp_x)
 
 float minimap_width(float disp_x, float disp_y)
 {
-    const float by_display = 0.28f * ((disp_x < disp_y) ? disp_x : disp_y);
+    // BL-1495: authored at a scale of 1; the display read in authored px, the answer scaled.
+    const float s = ui_scale();
+    const float by_display = 0.28f * ((disp_x < disp_y) ? disp_x : disp_y) / s;
     // `+ 27` (BL-1314): ~20 px more bottom strip at the same 4:3 aspect.
-    return ((by_display > 336.0f) ? by_display : 336.0f) + 27.0f;
+    return (((by_display > 336.0f) ? by_display : 336.0f) + 27.0f) * s;
 }
 
 float minimap_height(float disp_x, float disp_y)

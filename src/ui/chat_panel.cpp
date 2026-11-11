@@ -1,4 +1,5 @@
 #include "chat_panel.hpp"
+#include "ui_scale.hpp" // BL-1495: px
 
 #include "presentation.hpp"
 #include "text_fit.hpp"
@@ -101,7 +102,7 @@ void draw_chat_panel(const world& w, chat_state& chat, int day,
         chat.active_channel = 0;
     const float plus_w = ImGui::GetFrameHeight();
     ImGui::SetNextItemWidth(
-        std::max(60.0f, ImGui::GetContentRegionAvail().x - plus_w - ImGui::GetStyle().ItemSpacing.x));
+        std::max(ui::px(60.0f), ImGui::GetContentRegionAvail().x - plus_w - ImGui::GetStyle().ItemSpacing.x));
     if (ImGui::BeginCombo("##chat_channel", chat.channels[chat.active_channel].name.c_str()))
     {
         for (int c = 0; c < static_cast<int>(chat.channels.size()); ++c)
@@ -135,11 +136,11 @@ void draw_chat_panel(const world& w, chat_state& chat, int day,
     if (ImGui::BeginPopup("new_group"))
     {
         ImGui::TextDisabled("NEW GROUP");
-        ImGui::SetNextItemWidth(160.0f);
+        ImGui::SetNextItemWidth(ui::px(160.0f));
         ImGui::InputTextWithHint("##group_name", "group name", chat.group_name,
                                  sizeof(chat.group_name));
         ImGui::Separator();
-        if (ImGui::BeginChild("##grp_members", {0.0f, 160.0f}))
+        if (ImGui::BeginChild("##grp_members", {0.0f, ui::px(160.0f)}))
         {
             for (auto& [id, in] : chat.group_draft)
             {
@@ -223,7 +224,7 @@ void draw_chat_panel(const world& w, chat_state& chat, int day,
                 ImGui::SameLine(0.0f, gap);
             ImGui::TextWrapped("%s", m.text.c_str());
         }
-        if (ImGui::GetScrollY() >= ImGui::GetScrollMaxY() - 4.0f)
+        if (ImGui::GetScrollY() >= ImGui::GetScrollMaxY() - ui::px(4.0f))
             ImGui::SetScrollHereY(1.0f);
     }
     ImGui::EndChild();

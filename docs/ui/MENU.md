@@ -248,10 +248,11 @@ and from the session menu above.
   window first**, because a maximised window takes no size and the pick would otherwise change
   nothing on screen (Ben, 2026-11-09); VSync and Fullscreen leave a maximised window alone.
 - **Persistence** — settings are stored in a flat `options.cfg` (key=value: `window_w`, `window_h`,
-  `fullscreen`, `vsync`) in the working directory, loaded at interactive startup only (never in the
+  `fullscreen`, `vsync`, `ui_scale_px`) in the working directory, loaded at interactive startup only (never in the
   `--verify` path, so golden captures stay at the fixed default). Preset/toggle changes save
   immediately; a free drag-resize of the window frame is remembered and flushed on clean exit.
-- **UI Scale** grows the font in steps; the size every element draws at is `LAYOUT.md` § UI scale.
+- **UI Scale** picks the font in steps (12, 16, 20 or 24 px; 12 is the default), and every chrome
+  element scales with it (`LAYOUT.md` § UI scale).
 - **Follow-ons** — this surface is the natural home for later non-display options (monitor
   selection) and sits beside the session menu and Save/Load.
 

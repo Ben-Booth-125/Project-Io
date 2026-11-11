@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*53 entries — 42 open, 11 resolved.*
+*54 entries — 43 open, 11 resolved.*
 
 ---
 
@@ -427,6 +427,21 @@ MILITARY.md § Missiles says a missile is a good fired by a launcher and consume
 > **Recommendation:** Keep the magazine for v0.3.0: the force cost is what the design leans on, and goods trade can follow. Uranium Enrichment and the Alarm price are in-band first cuts.
 
 *Files: `docs/military/MILITARY.md`, `src/world/missiles.cpp`, `src/world/missile_params.hpp`*
+
+### NR-1216 — UI scale: should the canvases shrink with the UI, or keep their size?
+*decision taken on your behalf · raised 2026-11-11 · from BL-1495 (UI scale down) lane*
+
+The 2026-11-05 mechanism drew the whole frame at 0.875, canvases and hit-testing included. Your 2026-11-10 ruling says the default is a 12 px font and everything in the chrome scales with it. The main session's brief added "canvas ground does not scale", which you did not say, and the lane removed the 0.875 frame scale on that line. So the map now draws at 1.0: about 14% larger on screen than before, while the chrome is 0.75 of its authored size and the canvas gains the room the chrome gave up.
+
+**Why it matters.** Tile, unit and marker sizes on the map read about 14% larger than at your last playtest. That is a look call only you can make.
+
+- Keep the canvas at 1.0 (the map gains room and keeps tile size)
+- Scale the canvas with the UI factor too (the map shrinks with the chrome)
+- Restore a separate canvas factor (e.g. 0.875) on its own dial
+
+> **Recommendation:** Keep the canvas at 1.0: the map has its own zoom, so a smaller tile is a zoom-out away. Decide at the live look.
+
+*Files: `docs/ui/LAYOUT.md`, `src/ui/ui_scale.cpp`, `src/core/app.cpp`*
 
 ---
 

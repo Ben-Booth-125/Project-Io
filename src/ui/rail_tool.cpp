@@ -1,4 +1,5 @@
 #include "rail_tool.hpp"
+#include "ui_scale.hpp" // BL-1495: px
 
 #include "construction_panel.hpp" // the SHARED grid: columns, row metric, per-column cards
 #include "format.hpp"             // fmt::abbreviate - the cost column's own figure
@@ -181,7 +182,7 @@ void draw_rail_rows(const world& w, const recipe_registry& reg, ui_state& ui, en
 
         // Column 1: the name.
         ImGui::TableSetColumnIndex(1);
-        const float name_w = std::max(16.0f, ImGui::GetContentRegionAvail().x);
+        const float name_w = std::max(ui::px(16.0f), ImGui::GetContentRegionAvail().x);
         // BL-1371: the same wrapping draw as every other name column, so these
         // rows keep being the SAME grid rather than two rows that resemble it.
         ImGui::PushStyleColor(ImGuiCol_Text, palette::selection);
@@ -274,7 +275,7 @@ void draw_rail_rows(const world& w, const recipe_registry& reg, ui_state& ui, en
         // a refusal rather than replaced by a wrapped sentence.
         ImGui::TableSetColumnIndex(7);
         const ImVec2 ap = ImGui::GetCursorScreenPos();
-        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, {4.0f, 0.0f});
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ui::px(4.0f, 0.0f));
         ImGui::BeginDisabled(refusal != nullptr);
         if (ImGui::Button("Build"))
             pressed = true;
@@ -312,7 +313,7 @@ void draw_rail_rows(const world& w, const recipe_registry& reg, ui_state& ui, en
         construction_controls::grid_row pub;
         pub.name  = name;
         pub.hover = construction_cells_text(cells);
-        pub.x     = gp.x + 24.0f;
+        pub.x     = gp.x + ui::px(24.0f);
         pub.y     = gp.y + line_h * 0.5f;
         pub.h           = row_h;
         pub.name_lines  = name_lines;

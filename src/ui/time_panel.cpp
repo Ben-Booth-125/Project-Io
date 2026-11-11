@@ -2,6 +2,7 @@
 /// The time panel and the escape menu (BL-361, BL-1519).
 
 #include "ui/time_panel.hpp"
+#include "ui_scale.hpp" // BL-1495: px
 
 #include "core/sim_loop.hpp"
 #include "core/save_names.hpp"   // the named-save rule the escape menu's form asks
@@ -87,7 +88,7 @@ void draw_time_panel(ui_state& state, sim_loop& sim, int& prev_speed, const ImVe
     // BL-178: the 10 px bar was easy to miss and carried no label. Tall enough to
     // seat a centred overlay ("58 d to Q2"), which is what actually makes the
     // next-resolution distance read.
-    const float time_prog_h    = ImGui::GetTextLineHeight() + 4.0f;
+    const float time_prog_h    = ImGui::GetTextLineHeight() + ui::px(4.0f);
     const float time_spacing   = ImGui::GetStyle().ItemSpacing.y;
     // BL-178: one always-visible line under the speed row naming the ACTIVE
     // tier's real rate. A tooltip cannot be seen without hovering (the same
@@ -115,7 +116,7 @@ void draw_time_panel(ui_state& state, sim_loop& sim, int& prev_speed, const ImVe
     // is still why the row is one frame tall; the panel simply stops ending early
     // when its content happens to be shorter than its neighbours.
     const float time_h         = std::max(time_content_h + ImGui::GetStyle().WindowPadding.y * 2.0f,
-                                          ui::profile_panel_height);
+                                          float(ui::profile_panel_height));
     // Publish it: the right chrome column below this panel needs to know where
     // its ceiling is, and this is the only place the number exists (BL-533).
     state.time_panel_h = time_h;
@@ -328,13 +329,13 @@ escape_menu_press draw_escape_menu(ui_state& st, bool options_open, const char* 
     if (ImGui::IsWindowAppearing())
         ImGui::BringWindowToDisplayFront(ImGui::GetCurrentWindow());
 
-    const ImVec2 btn{std::min(280.0f, area.x - 32.0f), 40.0f};
+    const ImVec2 btn{std::min(ui::px(280.0f), area.x - ui::px(32.0f)), ui::px(40.0f)};
     const float  line = ImGui::GetTextLineHeightWithSpacing();
     const float  gap  = 6.0f;
     // Title, last-saved line, then four presses or the warning; the hint beneath.
     const float  body_h = line * 3.0f + (btn.y + gap) * 4.0f
                         + (st.spectating ? ImGui::GetFrameHeightWithSpacing() : 0.0f);
-    ImGui::SetCursorPosY(std::max(8.0f, (area.y - body_h) * 0.5f));
+    ImGui::SetCursorPosY(std::max(ui::px(8.0f), (area.y - body_h) * 0.5f));
 
     const auto centred_text = [&](const char* text, ImU32 col) {
         ImGui::SetCursorPosX((area.x - ImGui::CalcTextSize(text).x) * 0.5f);
@@ -357,7 +358,7 @@ escape_menu_press draw_escape_menu(ui_state& st, bool options_open, const char* 
 
     centred_text("Paused", ImGui::GetColorU32(ImGuiCol_Text));
     centred_text(last_saved, palette::text_secondary);
-    ImGui::Dummy({0.0f, 6.0f});
+    ImGui::Dummy(ui::px(0.0f, 6.0f));
 
     if (st.save_form_open)
     {

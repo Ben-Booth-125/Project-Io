@@ -1,6 +1,7 @@
 #pragma once
 
 #include "imgui.h"
+#include "ui_scale.hpp" // BL-1495: px, px_const
 
 #include <cstddef>
 #include <cstdint>
@@ -25,7 +26,7 @@ namespace ui::charts {
 
 /// Width of the tick-label gutter. Callers indent chart headers by this so the
 /// title sits above the plot origin rather than above the labels.
-inline constexpr float gutter = 40.0f;
+inline constexpr px_const gutter {40.0f};
 
 /// Round @p v up to a 'nice' axis ceiling (1 / 2 / 5 x a power of ten): 45->50,
 /// 18->20, 130->200. Gives the bar a legible top gridline instead of a ragged max.

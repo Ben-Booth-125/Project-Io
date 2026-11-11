@@ -18,6 +18,10 @@ holds the full doc map; this file holds only what every `ui/*` session needs.
   index). A stale entry misleads the AI player like a stale golden misleads a visual check.
 - **Glyphs** live in `src/ui/icons.{hpp,cpp}` under the `(dl, centre, r, colour)` contract,
   catalogued in `docs/ui/ICONS.md`; identity colours live in `presentation.hpp`, not there.
+- **Chrome px scale with the UI** (`docs/ui/LAYOUT.md` § UI scale). A hard-coded chrome length
+  is written at its 16 px-authored value through `ui::px(...)`, or declared `px_const`
+  (`ui_scale.hpp`); prefer font- or style-derived sizes where they exist. Canvas ground
+  geometry (tiles, zoom, the bake) never goes through it.
 - On-screen wording uses `docs/GLOSSARY.md` terms exactly.
 - UI reads world state; it never mutates the simulation except through command verbs.
 

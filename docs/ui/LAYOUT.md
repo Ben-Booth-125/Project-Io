@@ -184,17 +184,33 @@ offers to spectate or return to the menu.
 
 ---
 
-## UI scale (Ben, 2026-11-05)
+## UI scale (Ben, 2026-11-05; Ben, 2026-11-10)
 
-The whole UI draws smaller than the pixels it is laid out in, so **each element is smaller** and
-text stops clipping: text, hard-coded chrome, the canvases and hit-testing all move together, by one
-constant (`k_ui_draw_scale`, `src/core/app.cpp`). A window lays out at its size divided by that
-constant, so the 1280 x 720 floor gains room as well as shrinking. Glyphs are rasterised at the size
-they land on screen, so the text stays sharp. The Options window's UI Scale steps grow the font on
-top of this; they do not move it.
+The UI is smaller than the size its chrome was authored at, so **each element is smaller** and text
+stops clipping (Ben, 2026-11-05).
 
-A layout checked at a draw scale of 1 is therefore the tightest case: the headless harness runs
-there unless a script asks otherwise, and whatever fits at 1 fits below it.
+**The default UI is a 12 px font** (Ben, 2026-11-10): 0.75x of the 16 px the chrome was authored
+against. It is the default and the smallest step of the Options window's **UI Scale** setting; the
+larger steps are 16, 20 and 24 px. The setting persists as its font px (`ui_scale_px` in
+`options.cfg`), so a stored choice keeps its physical size if the step list changes. A file from
+before the 12 px step carries a step index instead: its untouched default takes the 12 px default,
+and its chosen steps keep their font px.
+
+**Everything in the chrome scales with the text, by one factor** (Ben, 2026-11-10): the font px over
+16. Padding, spacing and item sizes scale with it (ImGui's style, rebuilt from a fresh base and
+scaled on every change), and so does every hard-coded pixel in the chrome: panel and column widths,
+the icon rail, heights, offsets, gaps and glyph sizes. One factor is the source of truth
+(`ui::ui_scale()`, `src/ui/ui_scale.hpp`); a chrome length is written at its authored 16 px value and
+read through `ui::px` or a `ui::px_const`. A layout rule written against the display (a column that is
+a share of the window, between two px bounds) reads the display in authored pixels and scales its
+answer, so at 0.75x the shell is the 1.0x shell drawn smaller.
+
+**Canvas ground does not scale** (the main session's reading of Ben's 2026-11-10 ruling, open as NR-1216). The map bake, tile sizes and zoom are the
+canvases' own (`RENDERING.md`); a smaller UI gives the canvas more of the window, not smaller tiles.
+
+The window's minimum size scales with the factor (BL-215): 1280 x 720 at 1.0x, so 960 x 540 at the
+12 px default and 1920 x 1080 at 24 px. A 1280 x 720 window is a comfortable default at 12 px. The
+headless harness runs at the default step, as the player first sees it.
 
 ---
 

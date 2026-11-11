@@ -808,6 +808,28 @@
     "src/world/missile_params.hpp"
    ],
    "resolution": null
+  },
+  {
+   "id": "NR-1216",
+   "title": "UI scale: should the canvases shrink with the UI, or keep their size?",
+   "raised": "2026-11-11",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "BL-1495 (UI scale down) lane",
+   "what": "The 2026-11-05 mechanism drew the whole frame at 0.875, canvases and hit-testing included. Your 2026-11-10 ruling says the default is a 12 px font and everything in the chrome scales with it. The main session's brief added \"canvas ground does not scale\", which you did not say, and the lane removed the 0.875 frame scale on that line. So the map now draws at 1.0: about 14% larger on screen than before, while the chrome is 0.75 of its authored size and the canvas gains the room the chrome gave up.",
+   "why_it_matters": "Tile, unit and marker sizes on the map read about 14% larger than at your last playtest. That is a look call only you can make.",
+   "options": [
+    "Keep the canvas at 1.0 (the map gains room and keeps tile size)",
+    "Scale the canvas with the UI factor too (the map shrinks with the chrome)",
+    "Restore a separate canvas factor (e.g. 0.875) on its own dial"
+   ],
+   "recommendation": "Keep the canvas at 1.0: the map has its own zoom, so a smaller tile is a zoom-out away. Decide at the live look.",
+   "files": [
+    "docs/ui/LAYOUT.md",
+    "src/ui/ui_scale.cpp",
+    "src/core/app.cpp"
+   ],
+   "resolution": null
   }
  ]
 }

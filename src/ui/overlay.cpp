@@ -1,4 +1,5 @@
 #include "overlay.hpp"
+#include "ui_scale.hpp" // BL-1495: px
 
 #include "icons.hpp"
 #include "presentation.hpp"
@@ -15,7 +16,7 @@ namespace {
 void draw_lens_icon(ImDrawList* dl, overlay_mode m, ImVec2 rect_min, ImVec2 rect_max, ImU32 colour)
 {
     const ImVec2 centre = (rect_min + rect_max) * 0.5f;
-    const float  r      = std::min(rect_max.x - rect_min.x, rect_max.y - rect_min.y) * 0.5f - 2.0f;
+    const float  r      = std::min(rect_max.x - rect_min.x, rect_max.y - rect_min.y) * 0.5f - ui::px(2.0f);
     switch (m)
     {
         case overlay_mode::supply:      icons::supply     (dl, centre, r, colour); break;
@@ -135,7 +136,7 @@ void draw_overlay_controls(ui_state& ui, float x, float top_y, float w)
         break; // planetary — the full sub-body set above
     }
 
-    const float bar_h = ImGui::GetFrameHeight() + 6.0f;
+    const float bar_h = ImGui::GetFrameHeight() + ui::px(6.0f);
     ImGui::SetNextWindowPos({x, top_y}, ImGuiCond_Always);
     ImGui::SetNextWindowSize({w, bar_h}, ImGuiCond_Always);
     ImGui::SetNextWindowBgAlpha(0.0f); // transparent — sits over the minimap's own bar fill
@@ -148,7 +149,7 @@ void draw_overlay_controls(ui_state& ui, float x, float top_y, float w)
         ImGuiWindowFlags_NoNav               |
         ImGuiWindowFlags_NoBringToFrontOnFocus |
         ImGuiWindowFlags_NoSavedSettings;
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, {2.0f, 2.0f});
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ui::px(2.0f, 2.0f));
     ImGui::Begin("##overlay_controls", nullptr, flags);
 
     ImDrawList*  dl        = ImGui::GetWindowDrawList();
@@ -156,8 +157,8 @@ void draw_overlay_controls(ui_state& ui, float x, float top_y, float w)
     const float  spacing   = ImGui::GetStyle().ItemSpacing.x;
     // Left-aligned row from a small pad, leaving room at the right for the
     // resource-selector popup button when a resource-keyed lens is active.
-    float       cursor_x = x + 6.0f;
-    const float cursor_y = top_y + 3.0f;
+    float       cursor_x = x + ui::px(6.0f);
+    const float cursor_y = top_y + ui::px(3.0f);
 
     int idx = 0;
     for (std::size_t mi = 0; mi < modes_count; ++mi)

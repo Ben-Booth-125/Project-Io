@@ -1,4 +1,5 @@
 #include "detail_level.hpp"
+#include "ui_scale.hpp" // BL-1495: px
 
 #include "foldout_column.hpp" // canvas_rect — what a takeover takes (BL-265)
 #include "presentation.hpp"   // palette::selection / text_secondary
@@ -240,7 +241,7 @@ bool fold_overlay_begin(ui_state& ui, detail_surface s, int key, const char* tit
     // zero-inset content sat jammed into the top-left corner of a 1280 px screen.
     // A mode switch has to look like one.
     ImGui::PushStyleColor(ImGuiCol_WindowBg, IM_COL32(14, 15, 19, 255));
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, {36.0f, 28.0f});
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ui::px(36.0f, 28.0f));
     ImGui::Begin("##fold_overlay", nullptr, flags);
     ImGui::PopStyleVar();   // WindowPadding is consumed by Begin
     ImGui::PopStyleColor();

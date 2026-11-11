@@ -1,4 +1,5 @@
 #include "corporation_dashboard.hpp"
+#include "ui_scale.hpp" // BL-1495: px
 
 #include "charts.hpp"
 #include "detail_level.hpp"   // the fold idiom (BL-214)
@@ -41,7 +42,7 @@ void balance_body(const corp_rollups& r)
     const ImVec2 p  = ImGui::GetCursorScreenPos();
     const float  cw = ImGui::GetContentRegionAvail().x;
     // Two bars at text height and a half: Standing takes the column's room beneath.
-    const float chart_h = ImGui::GetTextLineHeight() * 3.0f + 8.0f;
+    const float chart_h = ImGui::GetTextLineHeight() * 3.0f + ui::px(8.0f);
     charts::draw_stacked_bars(ImGui::GetWindowDrawList(), p, {p.x + cw, p.y + chart_h},
                               c.earnings, c.earning_count, c.expenses, c.expense_count,
                               "Earnings", "Expenses");

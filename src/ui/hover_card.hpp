@@ -1,6 +1,7 @@
 #pragma once
 
 #include <functional>
+#include "ui_scale.hpp" // BL-1495: px, px_const
 #include <imgui.h>
 
 namespace ui {
@@ -47,7 +48,7 @@ inline constexpr float kHoverThresholdEpsilon = kVerifyFrameSeconds * 0.5f;
 /// gap, so the cursor that froze it starts outside the rect; this pad spans
 /// that gap and leaves a forgiving margin for the trip up into the card.
 /// Only applies once the card is stuck — see kHoverStickDelaySec.
-inline constexpr float kHoverCardExitPadPx = 26.0f;
+inline constexpr px_const kHoverCardExitPadPx {26.0f};
 
 /// Render the floating hover card at `anchor` and report the rect it occupied.
 ///

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "world/building_profit.hpp" // building_profit — the per-building figure the roster sums
+#include "ui_scale.hpp" // BL-1495: px, px_const
 #include "world/economy_system.hpp" // economy_report
 #include "world/recipe_registry.hpp"
 #include "world/world.hpp"
@@ -209,16 +210,16 @@ std::string building_group_name(const world& w, const recipe_registry& reg, cons
 /// the quantities, which are the half a player can act on, were never on the line
 /// at all. The hover names them in full.
 namespace construction_grid {
-inline constexpr float glyph = 15.0f; ///< The building glyph.
-inline constexpr float cost  = 34.0f; ///< Credits, abbreviated ("940", "1.2k").
-inline constexpr float makes = 14.0f; ///< The resource pip for what it makes.
-inline constexpr float stack = 28.0f; ///< "2/4".
-inline constexpr float state = 12.0f; ///< The state mark.
-inline constexpr float bar   = 38.0f; ///< The profit / progress bar.
-inline constexpr float act   = 44.0f; ///< The Build press.
-inline constexpr float eta   = 32.0f; ///< Days left (the queue) - sized so its
+inline constexpr px_const glyph {15.0f}; ///< The building glyph.
+inline constexpr px_const cost  {34.0f}; ///< Credits, abbreviated ("940", "1.2k").
+inline constexpr px_const makes {14.0f}; ///< The resource pip for what it makes.
+inline constexpr px_const stack {28.0f}; ///< "2/4".
+inline constexpr px_const state {12.0f}; ///< The state mark.
+inline constexpr px_const bar   {38.0f}; ///< The profit / progress bar.
+inline constexpr px_const act   {44.0f}; ///< The Build press.
+inline constexpr px_const eta   {32.0f}; ///< Days left (the queue) - sized so its
                                       ///< "Days" header is not itself elided.
-inline constexpr float pad   = 2.0f;  ///< Horizontal cell padding, per side.
+inline constexpr px_const pad   {2.0f};  ///< Horizontal cell padding, per side.
 /// HOW MANY TEXT LINES A ROW RESERVES (BL-1371) — two, since Ben's live click of
 /// the one-line grid: *"we are going to have to use two row spaces for each
 /// building, this is so that text can wrap to the second row."* A column whose

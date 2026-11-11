@@ -1,4 +1,5 @@
 #include "stat_grid.hpp"
+#include "ui_scale.hpp" // BL-1495: px, px_const
 
 #include "player_side.hpp" // is_player_side
 #include "presentation.hpp"
@@ -209,15 +210,15 @@ bool band_has_range(const stat_band& b)
 }
 
 constexpr float k_small   = 0.80f; // a range's type, against the value's
-constexpr float k_bar_h   = 3.0f;
-constexpr float k_row_gap = 3.0f;
-constexpr float k_pad     = 4.0f;
+constexpr px_const k_bar_h   {3.0f};
+constexpr px_const k_row_gap {3.0f};
+constexpr px_const k_pad     {4.0f};
 
 float row_h(const stat_band& b)
 {
     const float line = ImGui::GetTextLineHeight();
     float h = line + 2.0f * k_pad;
-    if (band_has_bar(b))   h += k_bar_h + 2.0f;
+    if (band_has_bar(b))   h += k_bar_h + ui::px(2.0f);
     if (band_has_range(b)) h += line * k_small;
     return h;
 }
@@ -250,8 +251,8 @@ void draw_stat_grid(const char* id, const stat_bands& bands, float width)
     float label_w = 0.0f;
     for (const stat_band& b : bands)
         label_w = std::max(label_w, ImGui::CalcTextSize(b.name).x);
-    label_w += 8.0f;
-    const float cell_w = std::max(30.0f, (width - label_w - 2.0f * gap) / 3.0f);
+    label_w += ui::px(8.0f);
+    const float cell_w = std::max(ui::px(30.0f), (width - label_w - 2.0f * gap) / 3.0f);
 
     ImGui::PushID(id);
     float y = o.y;
@@ -285,13 +286,13 @@ void draw_stat_grid(const char* id, const stat_bands& bands, float width)
 
             // The value right-aligned; a delta right of it, in its direction's colour.
             float right = p1.x - k_pad;
-            const float icon_right = p0.x + k_pad + 2.0f * gr + 2.0f; // the value stops at the glyph
+            const float icon_right = p0.x + k_pad + 2.0f * gr + ui::px(2.0f); // the value stops at the glyph
             if (!c.delta.empty())
             {
                 const float dw = ImGui::CalcTextSize(c.delta.c_str()).x;
                 dl->AddText({right - dw, p0.y + k_pad}, c.delta_good ? palette::positive : palette::negative,
                             c.delta.c_str());
-                right -= dw + 4.0f;
+                right -= dw + ui::px(4.0f);
             }
             const float vw = ImGui::CalcTextSize(c.value.c_str()).x;
             dl->AddText({std::max(right - vw, icon_right), p0.y + k_pad}, ink, c.value.c_str());
@@ -307,7 +308,7 @@ void draw_stat_grid(const char* id, const stat_bands& bands, float width)
                 ty += k_bar_h + 1.0f;
             }
             else if (band_has_bar(b))
-                ty += k_bar_h + 2.0f;
+                ty += k_bar_h + ui::px(2.0f);
             if (!c.range.empty())
             {
                 const float  sz = fs * k_small;

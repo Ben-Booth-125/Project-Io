@@ -1,4 +1,5 @@
 #include "entity_summary.hpp"
+#include "ui_scale.hpp" // BL-1495: px
 
 #include "presentation.hpp"
 
@@ -214,10 +215,10 @@ void draw_market_summary(const world& w, entity_id id)
         ImGuiTableFlags_BordersOuter | ImGuiTableFlags_BordersInnerV |
         ImGuiTableFlags_RowBg        | ImGuiTableFlags_SizingFixedFit))
     {
-        ImGui::TableSetupColumn("Resource", ImGuiTableColumnFlags_WidthFixed, 100.0f);
-        ImGui::TableSetupColumn("Supply",   ImGuiTableColumnFlags_WidthFixed,  70.0f);
-        ImGui::TableSetupColumn("Demand",   ImGuiTableColumnFlags_WidthFixed,  70.0f);
-        ImGui::TableSetupColumn("Price",    ImGuiTableColumnFlags_WidthFixed,  60.0f);
+        ImGui::TableSetupColumn("Resource", ImGuiTableColumnFlags_WidthFixed, ui::px(100.0f));
+        ImGui::TableSetupColumn("Supply",   ImGuiTableColumnFlags_WidthFixed,  ui::px(70.0f));
+        ImGui::TableSetupColumn("Demand",   ImGuiTableColumnFlags_WidthFixed,  ui::px(70.0f));
+        ImGui::TableSetupColumn("Price",    ImGuiTableColumnFlags_WidthFixed,  ui::px(60.0f));
         ImGui::TableHeadersRow();
 
         for (std::size_t r = 0; r < resource_count; ++r)

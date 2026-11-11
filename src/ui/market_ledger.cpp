@@ -1,4 +1,5 @@
 #include "market_ledger.hpp"
+#include "ui_scale.hpp" // BL-1495: px
 
 #include "foldout_column.hpp" // shell fold-out column host (BL-122)
 #include "format.hpp"         // fmt::abbreviate — the Revenue column's width budget
@@ -312,7 +313,7 @@ std::string short_corp_name(const std::string& full)
 /// count authored against one.
 float table_height(int rows)
 {
-    return ImGui::GetTextLineHeightWithSpacing() * static_cast<float>(rows + 1) + 6.0f;
+    return ImGui::GetTextLineHeightWithSpacing() * static_cast<float>(rows + 1) + ui::px(6.0f);
 }
 
 /// One side of an exchange, as a label.
@@ -1636,16 +1637,16 @@ void draw_item_glyph_sheet()
     {
         const resource_type res = static_cast<resource_type>(i);
         const float x = cell_w * static_cast<float>(n % cols) + 8.0f;
-        const float y = cell_h * static_cast<float>(n / cols) + 4.0f;
+        const float y = cell_h * static_cast<float>(n / cols) + ui::px(4.0f);
         ++n;
 
         float gx = x;
         for (const float r : sizes)
         {
-            icons::item(dl, {gx + r, y + 18.0f}, r, res);
-            gx += r * 2.0f + 8.0f;
+            icons::item(dl, {gx + r, y + ui::px(18.0f)}, r, res);
+            gx += r * 2.0f + ui::px(8.0f);
         }
-        dl->AddText({x, y + 38.0f}, palette::readable_on_chrome(presentation_of(res).colour),
+        dl->AddText({x, y + ui::px(38.0f)}, palette::readable_on_chrome(presentation_of(res).colour),
                     presentation_of(res).name);
 
         // A fingerprint of the SHAPE alone, drawn off to one side at a fixed size
@@ -2251,7 +2252,7 @@ void draw_market_ledger(world& w, const recipe_registry& reg, ui_state& s,
     ImGui::Separator();
     // What the section took beyond the one chip row it replaced (a chip was
     // font + 4 px high); the Goods rows are sized against the view as it was.
-    const float legacy_extra_h = top_h - (ImGui::GetFontSize() + 4.0f);
+    const float legacy_extra_h = top_h - (ImGui::GetFontSize() + ui::px(4.0f));
 
     // --- View tabs -----------------------------------------------------------
     // GOODS (the reworked Prices view, BL-686) and TRADES. Convoys has LEFT for

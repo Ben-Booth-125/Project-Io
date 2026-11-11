@@ -1,4 +1,5 @@
 #include "construction_panel.hpp"
+#include "ui_scale.hpp" // BL-1495: px
 
 #include <algorithm>
 #include <array>   // the per-tick need row the sim's mirror builds (BL-1342)
@@ -475,7 +476,7 @@ std::string draw_construction_site_card_body(const construction_site_reading& rd
     ImDrawList* dl      = ImGui::GetWindowDrawList();
     const float  lh     = ImGui::GetTextLineHeight();
     const ImU32  warn   = palette::site_no_logistics;
-    const float  bang_w = ImGui::CalcTextSize("!").x + 3.0f;
+    const float  bang_w = ImGui::CalcTextSize("!").x + ui::px(3.0f);
     bool any_short      = false;
     for (const construction_material& m : rd.materials)
     {
@@ -695,9 +696,9 @@ void draw_queue_section(const world& w, const recipe_registry& reg, ui_state& ui
     // four-digit days, and at the grid's 32 px "1750" ran into the Cost column and
     // the header read "Da...". The column is the wider of the grid's budget, its
     // header and a four-digit count.
-    const float days_w = std::ceil(std::max({construction_grid::eta,
+    const float days_w = std::ceil(std::max({float(construction_grid::eta),
                                              ImGui::CalcTextSize("Days").x,
-                                             ImGui::CalcTextSize("8888").x})) + 2.0f;
+                                             ImGui::CalcTextSize("8888").x})) + ui::px(2.0f);
     ImGui::TableSetupColumn("Days",  ImGuiTableColumnFlags_WidthFixed, days_w);
     ImGui::TableSetupColumn("Cost",  ImGuiTableColumnFlags_WidthFixed, construction_grid::cost);
     ImGui::TableSetupColumn("##state", ImGuiTableColumnFlags_WidthFixed, construction_grid::state);
@@ -721,7 +722,7 @@ void draw_queue_section(const world& w, const recipe_registry& reg, ui_state& ui
         std::vector<grid_explainer> cells;
 
         ImGui::TableSetColumnIndex(1);
-        const float name_w = std::max(16.0f, ImGui::GetContentRegionAvail().x);
+        const float name_w = std::max(ui::px(16.0f), ImGui::GetContentRegionAvail().x);
         ImGui::PushID(static_cast<int>(row.id));
         // Pressing a row SELECTS the building — the same navigation the group
         // member rows below offer, and it decides nothing for the player.
@@ -758,8 +759,8 @@ void draw_queue_section(const world& w, const recipe_registry& reg, ui_state& ui
                                                   : IM_COL32(0, 180, 95, 255);
         {
             const ImVec2 bp = ImGui::GetCursorScreenPos();
-            construction_grid_bar(dl, {bp.x, bp.y + 3.0f},
-                                  {bp.x + construction_grid::bar, bp.y + line_h - 3.0f},
+            construction_grid_bar(dl, {bp.x, bp.y + ui::px(3.0f)},
+                                  {bp.x + construction_grid::bar, bp.y + line_h - ui::px(3.0f)},
                                   row.progress, band);
             ImGui::Dummy({construction_grid::bar, line_h});
             char buf[200];
@@ -849,7 +850,7 @@ void draw_queue_section(const world& w, const recipe_registry& reg, ui_state& ui
         construction_controls::grid_row pub;
         pub.name  = row.name;
         pub.hover = construction_cells_text(cells);
-        pub.x     = gp.x + 24.0f;
+        pub.x     = gp.x + ui::px(24.0f);
         pub.y     = gp.y + line_h * 0.5f;
         pub.h           = row_h;
         pub.name_lines  = name_lines;
@@ -985,7 +986,7 @@ void draw_buildings_view(world& w, const recipe_registry& reg,
     // never be squeezed out by a fixed sibling.
     const float avail  = ImGui::GetContentRegionAvail().x;
     const float net_w  = ImGui::CalcTextSize("-000.0k").x + ImGui::GetStyle().ItemSpacing.x;
-    const float name_w = std::max(40.0f, avail - net_w);
+    const float name_w = std::max(ui::px(40.0f), avail - net_w);
 
     bool published_group = false;
     for (const building_group& g : groups)
@@ -1034,10 +1035,10 @@ void draw_buildings_view(world& w, const recipe_registry& reg,
                 const bool pressed = draw_group_member_row(
                     w, id, p.has_data ? p.net() : 0.0f, p.has_data,
                     ui.selected_entity == id,
-                    std::max(40.0f, name_w - ImGui::GetStyle().IndentSpacing));
+                    std::max(ui::px(40.0f), name_w - ImGui::GetStyle().IndentSpacing));
                 if (!published_member)
                 {
-                    ui.construction_ui.member_x = mp.x + 20.0f;
+                    ui.construction_ui.member_x = mp.x + ui::px(20.0f);
                     ui.construction_ui.member_y = mp.y + ImGui::GetTextLineHeight() * 0.5f;
                     ui.construction_ui.member   = id;
                     published_member = true;

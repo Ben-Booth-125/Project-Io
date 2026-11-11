@@ -1,4 +1,5 @@
 #include "charts.hpp"
+#include "ui_scale.hpp" // BL-1495: px, px_const
 
 #include "format.hpp" // abbreviate (axis + readout labels)
 #include "text_fit.hpp"
@@ -23,7 +24,7 @@ float legend_width(const bar* bars, std::size_t count, const char* fmt)
         std::snprintf(buf, sizeof buf, "%s %s", bars[i].label, val);
         widest = std::max(widest, ui::fit_width(buf));
     }
-    return (widest > 0.0f) ? 16.0f + widest + 8.0f : 0.0f;
+    return (widest > 0.0f) ? 16.0f + widest + ui::px(8.0f) : 0.0f;
 }
 
 namespace {
@@ -60,7 +61,7 @@ int legend_flow_rows(const bar* bars, std::size_t count, const char* fmt, float 
             continue;
         char buf[80];
         legend_entry(buf, sizeof buf, bars[i], fmt);
-        const float w = 16.0f + ImGui::CalcTextSize(buf).x + 18.0f;
+        const float w = 16.0f + ImGui::CalcTextSize(buf).x + ui::px(18.0f);
         if (rows == 0 || x + w > flow_w)
         {
             ++rows;
@@ -82,7 +83,7 @@ chart_metrics measure_chart(float box_w, const char* title,
 
     // The title is indented by the tick gutter, so it wraps against the rest of
     // the box width. More than two lines is elided at draw time, not counted.
-    const float title_w = std::max(40.0f, box_w - gutter - 8.0f);
+    const float title_w = std::max(ui::px(40.0f), box_w - gutter - ui::px(8.0f));
     const float line_h  = ImGui::GetTextLineHeight();
     const float wrapped = ImGui::CalcTextSize(title, nullptr, false, title_w).y;
     m.title_lines = (wrapped > line_h * 1.5f) ? 2 : 1;
@@ -94,7 +95,7 @@ chart_metrics measure_chart(float box_w, const char* title,
     if (lw > 0.0f && (box_w - gutter - lw) < 120.0f)
     {
         m.place       = legend_place::below;
-        m.legend_rows = legend_flow_rows(bars, count, fmt, std::max(60.0f, box_w - gutter));
+        m.legend_rows = legend_flow_rows(bars, count, fmt, std::max(ui::px(60.0f), box_w - gutter));
     }
     return m;
 }
@@ -129,15 +130,15 @@ float tight_ceil(float v)
 
 void dotted_hline(ImDrawList* dl, float x0, float x1, float y, ImU32 col)
 {
-    for (float x = x0; x < x1; x += 6.0f)
-        dl->AddLine({x, y}, {std::min(x + 3.0f, x1), y}, col, 1.0f);
+    for (float x = x0; x < x1; x += ui::px(6.0f))
+        dl->AddLine({x, y}, {std::min(x + ui::px(3.0f), x1), y}, col, 1.0f);
 }
 
 float chart_row_height(float chart_h)
 {
     const ImGuiStyle& style = ImGui::GetStyle();
     const float frame_h = ImGui::GetFrameHeight();
-    return frame_h + chart_h + style.ItemSpacing.y + style.WindowPadding.y * 2.0f + 4.0f;
+    return frame_h + chart_h + style.ItemSpacing.y + style.WindowPadding.y * 2.0f + ui::px(4.0f);
 }
 
 float chart_row_height(const chart_metrics& m)
@@ -146,7 +147,7 @@ float chart_row_height(const chart_metrics& m)
     float h = chart_row_height(m.chart_h);
     h += static_cast<float>(m.title_lines - 1) * line_h;
     if (m.legend_rows > 0)
-        h += static_cast<float>(m.legend_rows) * 20.0f + 6.0f;
+        h += static_cast<float>(m.legend_rows) * 20.0f + ui::px(6.0f);
     return h;
 }
 
@@ -221,7 +222,7 @@ void draw_stacked_columns(ImDrawList* dl, ImVec2 mn, ImVec2 mx,
     const bool  captioned = (left_caption != nullptr) || (right_caption != nullptr);
     // The caption strip is carved out of the plot, never added to it: the host
     // budgeted this rectangle and the chart must stay inside it.
-    const float cap_h  = captioned ? ImGui::GetTextLineHeight() + 2.0f : 0.0f;
+    const float cap_h  = captioned ? ImGui::GetTextLineHeight() + ui::px(2.0f) : 0.0f;
     const float base_y = mx.y - cap_h;
     const float box_w  = mx.x - mn.x;
     const float box_h  = base_y - mn.y;
@@ -264,12 +265,12 @@ void draw_stacked_bars(ImDrawList* dl, ImVec2 mn, ImVec2 mx,
     const float peak    = std::max(column_total(top, top_count), column_total(bottom, bottom_count));
     const float ceiling = tight_ceil(peak > 0.0f ? peak : 1.0f);
     const float gutter_w = std::max(ImGui::CalcTextSize(top_caption).x,
-                                    ImGui::CalcTextSize(bottom_caption).x) + 8.0f;
+                                    ImGui::CalcTextSize(bottom_caption).x) + ui::px(8.0f);
     // Room for the longer total at the right end: the axis never runs under it.
     char total_top[24], total_bot[24];
     std::snprintf(total_top, sizeof total_top, "%.0f", static_cast<double>(column_total(top, top_count)));
     std::snprintf(total_bot, sizeof total_bot, "%.0f", static_cast<double>(column_total(bottom, bottom_count)));
-    const float total_w = std::max(ImGui::CalcTextSize(total_top).x, ImGui::CalcTextSize(total_bot).x) + 8.0f;
+    const float total_w = std::max(ImGui::CalcTextSize(total_top).x, ImGui::CalcTextSize(total_bot).x) + ui::px(8.0f);
     const float x0    = mn.x + gutter_w;
     const float plot  = mx.x - total_w - x0;
     const float gap   = 6.0f;
@@ -322,7 +323,7 @@ void draw_bars(ImDrawList* dl, ImVec2 mn, ImVec2 mx,
     // 40 px overran left of the box on 5-digit ceilings (BL-215). Labels format
     // through fmt::abbreviate so the gutter stays narrow on large ceilings.
     const std::string top_label = tick_label(ceiling);
-    const float g = std::max(gutter, ui::fit_width(top_label.c_str()) + 6.0f);
+    const float g = std::max(float(gutter), ui::fit_width(top_label.c_str()) + ui::px(6.0f));
 
     const float plot_x0 = mn.x + g;
     const float y0 = mn.y, y1 = mx.y;
@@ -341,7 +342,7 @@ void draw_bars(ImDrawList* dl, ImVec2 mn, ImVec2 mx,
         const float       th = ImGui::GetTextLineHeight();
         const float       ly = std::max(mn.y, ty - th * 0.5f);
         ui::add_fit_text(dl, ui::text_box::chart_plot, "charts.bars.tick",
-                         {plot_x0 - 6.0f, ly}, g - 6.0f, label_col, s.c_str(),
+                         {plot_x0 - ui::px(6.0f), ly}, g - ui::px(6.0f), label_col, s.c_str(),
                          ui::text_align::right);
     };
     tick(0.0f);
@@ -359,19 +360,19 @@ void draw_bars(ImDrawList* dl, ImVec2 mn, ImVec2 mx,
     // against the left edge. A caller whose width is fixed by a mockup passes an
     // explicit bar_cap — the tile-selection graphs pass 34.0f, which is what keeps
     // them pixel-identical to the version this was extracted from.
-    constexpr float gap      = 10.0f;
+    const float gap      = ui::px(10.0f);
     const float cap  = (bar_cap > 0.0f) ? bar_cap : 96.0f;
     // The 12 px covers the fixed offsets between band and legend text (6 px bar
     // inset + trailing 4 px + final gap slack), so a full-band bar row still
     // leaves the measured legend its whole reserve.
-    const float band = std::max(60.0f, (mx.x - plot_x0) - reserve
+    const float band = std::max(ui::px(60.0f), (mx.x - plot_x0) - reserve
                                        - (reserve > 0.0f ? 12.0f : 0.0f));
     const float bar_w = std::min(cap,
-        std::max(6.0f, (band - gap * static_cast<float>(count - 1)) / static_cast<float>(count)));
+        std::max(ui::px(6.0f), (band - gap * static_cast<float>(count - 1)) / static_cast<float>(count)));
 
     for (std::size_t i = 0; i < count; ++i)
     {
-        const float bx = plot_x0 + 6.0f + static_cast<float>(i) * (bar_w + gap);
+        const float bx = plot_x0 + ui::px(6.0f) + static_cast<float>(i) * (bar_w + gap);
         const ImVec2 a{bx, y_of(bars[i].value)};
         const ImVec2 b{bx + bar_w, y1};
         if (bars[i].hollow)
@@ -385,33 +386,33 @@ void draw_bars(ImDrawList* dl, ImVec2 mn, ImVec2 mx,
 
     const auto swatch = [&](float sx, float sy, const bar& b) {
         if (b.hollow)
-            dl->AddRect({sx, sy + 2.0f}, {sx + 10.0f, sy + 12.0f}, b.colour, 0.0f, 0, 1.5f);
+            dl->AddRect({sx, sy + ui::px(2.0f)}, {sx + ui::px(10.0f), sy + ui::px(12.0f)}, b.colour, 0.0f, 0, 1.5f);
         else
-            dl->AddRectFilled({sx, sy + 2.0f}, {sx + 10.0f, sy + 12.0f}, b.colour);
+            dl->AddRectFilled({sx, sy + ui::px(2.0f)}, {sx + ui::px(10.0f), sy + ui::px(12.0f)}, b.colour);
     };
 
     if (place == legend_place::below)
     {
         // Entries flow left-to-right under the plot, wrapping by the same
         // measurement legend_flow_rows counted the reserve from.
-        const float flow_w = std::max(60.0f, mx.x - plot_x0);
+        const float flow_w = std::max(ui::px(60.0f), mx.x - plot_x0);
         float lx = plot_x0;
-        float ly = y1 + 4.0f;
+        float ly = y1 + ui::px(4.0f);
         for (std::size_t i = 0; i < count; ++i)
         {
             if (bars[i].label[0] == '\0')
                 continue;
             char buf[80];
             legend_entry(buf, sizeof buf, bars[i], fmt);
-            const float w = 16.0f + ImGui::CalcTextSize(buf).x + 18.0f;
+            const float w = 16.0f + ImGui::CalcTextSize(buf).x + ui::px(18.0f);
             if (lx > plot_x0 && lx + w > plot_x0 + flow_w)
             {
                 lx  = plot_x0;
-                ly += 20.0f;
+                ly += ui::px(20.0f);
             }
             swatch(lx, ly, bars[i]);
             ui::add_fit_text(dl, ui::text_box::chart_plot, "charts.bars.legend_below",
-                             {lx + 16.0f, ly}, flow_w - 16.0f,
+                             {lx + ui::px(16.0f), ly}, flow_w - ui::px(16.0f),
                              IM_COL32(210, 210, 210, 255), buf);
             lx += w;
         }
@@ -419,8 +420,8 @@ void draw_bars(ImDrawList* dl, ImVec2 mn, ImVec2 mx,
     }
 
     // Legend to the right of the columns: swatch + label + value, one row each.
-    const float lx = plot_x0 + 6.0f + static_cast<float>(count) * (bar_w + gap) + 4.0f;
-    float ly = y0 + 2.0f;
+    const float lx = plot_x0 + ui::px(6.0f) + static_cast<float>(count) * (bar_w + gap) + ui::px(4.0f);
+    float ly = y0 + ui::px(2.0f);
     for (std::size_t i = 0; i < count; ++i)
     {
         if (bars[i].label[0] == '\0')
@@ -429,9 +430,9 @@ void draw_bars(ImDrawList* dl, ImVec2 mn, ImVec2 mx,
         char buf[80];
         legend_entry(buf, sizeof buf, bars[i], fmt);
         ui::add_fit_text(dl, ui::text_box::chart_plot, "charts.bars.legend",
-                         {lx + 16.0f, ly}, mx.x - (lx + 16.0f),
+                         {lx + ui::px(16.0f), ly}, mx.x - (lx + ui::px(16.0f)),
                          IM_COL32(210, 210, 210, 255), buf);
-        ly += 20.0f;
+        ly += ui::px(20.0f);
     }
 }
 
@@ -446,7 +447,7 @@ void draw_value_bar(ImDrawList* dl, ImVec2 mn, ImVec2 mx,
 
     // Reserve the figure's measured width (never under 52 px) so it can be neither
     // truncated nor collided with by the bar.
-    const float plot_w = (mx.x - mn.x) - std::max(52.0f, ts.x) - 6.0f;
+    const float plot_w = (mx.x - mn.x) - std::max(ui::px(52.0f), ts.x) - ui::px(6.0f);
     const float frac   = (ceiling > 0.0f)
                          ? std::clamp(std::fabs(value) / ceiling, 0.0f, 1.0f) : 0.0f;
     // A 2 px stub at the origin when the value (or the ceiling) is zero, so zero reads
@@ -530,11 +531,11 @@ void threshold_line(ImDrawList* dl, ImVec2 mn, ImVec2 mx,
         // the legend's. The caller passes the RESOLVED reserve its draw_bars
         // used, so caption and band cannot disagree by construction (BL-215).
         // Degrade ladder: in-band → below the line at plot_x0 → elide-with-record.
-        const float band_x1 = std::max(plot_x0 + 60.0f,
+        const float band_x1 = std::max(plot_x0 + ui::px(60.0f),
                                        mx.x - std::max(0.0f, legend_reserve));
-        if (ts.x + 2.0f <= band_x1 - plot_x0)
+        if (ts.x + ui::px(2.0f) <= band_x1 - plot_x0)
         {
-            dl->AddText({band_x1 - ts.x - 2.0f, ty - ts.y - 1.0f}, colour, caption); // fit-exempt: measured to fit the band two lines up
+            dl->AddText({band_x1 - ts.x - ui::px(2.0f), ty - ts.y - 1.0f}, colour, caption); // fit-exempt: measured to fit the band two lines up
         }
         else if (ts.x <= mx.x - plot_x0)
         {

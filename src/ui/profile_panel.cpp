@@ -1,4 +1,5 @@
 #include "profile_panel.hpp"
+#include "ui_scale.hpp" // BL-1495: px, px_const
 #include "foldout_column.hpp"
 
 #include "presentation.hpp"
@@ -49,7 +50,7 @@ void draw_profile_panel(const world& w)
             nation_name = nat_it->second.name.c_str();
     }
 
-    constexpr float rule_w = 4.0f;
+    const float rule_w = ui::px(4.0f);
     const ImVec2    p0     = ImGui::GetCursorScreenPos();
     const float     line_h = ImGui::GetTextLineHeight();
     ImGui::GetWindowDrawList()->AddRectFilled(p0, {p0.x + rule_w, p0.y + line_h}, nation_col, 1.0f);

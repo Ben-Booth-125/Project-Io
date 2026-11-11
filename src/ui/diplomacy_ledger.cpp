@@ -1,5 +1,6 @@
 #include "diplomacy_ledger.hpp"
 #include "conduct_words.hpp"  // conduct_words — the factor kinds, read aloud
+#include "ui_scale.hpp" // BL-1495: px
 
 #include "foldout_column.hpp"
 #include "format.hpp"       // fmt::credits / fmt::percent
@@ -355,9 +356,9 @@ ImVec2 sentiment_bar(const char* label, float v, bool has_trend, float delta, bo
     // starts (the expanded block is indented), so the bar never runs into it.
     const float lx = ImGui::GetCursorPosX();
     ImGui::TextDisabled("%s", label);
-    ImGui::SameLine(lx + ImGui::CalcTextSize("Access").x + 10.0f);
+    ImGui::SameLine(lx + ImGui::CalcTextSize("Access").x + ui::px(10.0f));
     const float  h  = ImGui::GetTextLineHeight() * 0.62f;
-    const float  bw = std::max(60.0f, ImGui::GetContentRegionAvail().x - 74.0f);
+    const float  bw = std::max(ui::px(60.0f), ImGui::GetContentRegionAvail().x - ui::px(74.0f));
     const ImVec2 p0 = ImGui::GetCursorScreenPos();
     const float  y0 = p0.y + (ImGui::GetTextLineHeight() - h) * 0.5f;
     ImDrawList*  dl = ImGui::GetWindowDrawList();
@@ -393,7 +394,7 @@ ImVec2 sentiment_bar(const char* label, float v, bool has_trend, float delta, bo
         const ImU32  ac = better ? palette::positive : palette::negative;
         if (up) dl->AddTriangleFilled({c.x - r, c.y + r * 0.7f}, {c.x + r, c.y + r * 0.7f}, {c.x, c.y - r}, ac);
         else    dl->AddTriangleFilled({c.x - r, c.y - r * 0.7f}, {c.x + r, c.y - r * 0.7f}, {c.x, c.y + r}, ac);
-        ImGui::Dummy({r * 2.0f + 2.0f, th});
+        ImGui::Dummy({r * 2.0f + ui::px(2.0f), th});
     }
     if (hovered)
     {
@@ -803,7 +804,7 @@ void draw_expanded(const world& w, const recipe_registry& reg, const std::vector
     diplomacy_ledger_state& d = s.diplomacy;
     const sentiment_params& sp = reg.sentiment();
     const entity_id them = r.id;
-    ImGui::Indent(8.0f);
+    ImGui::Indent(ui::px(8.0f));
 
     // Your sentiment toward them.
     ImGui::TextDisabled("You toward them");
@@ -940,7 +941,7 @@ void draw_expanded(const world& w, const recipe_registry& reg, const std::vector
 
     if (d.declare_target == them && !d.declare_answer)
         draw_declaration(w, reg, s, me);
-    ImGui::Unindent(8.0f);
+    ImGui::Unindent(ui::px(8.0f));
 }
 
 void draw_nations(const world& w, const recipe_registry& reg, const std::vector<corp_standing>& standings,
@@ -1026,7 +1027,7 @@ void draw_nations(const world& w, const recipe_registry& reg, const std::vector<
             d.combo_items.push_back({r.id,
                                      (ImGui::GetItemRectMin().x + ImGui::GetItemRectMax().x) * 0.5f,
                                      (ImGui::GetItemRectMin().y + ImGui::GetItemRectMax().y) * 0.5f});
-            ImGui::GetWindowDrawList()->AddRectFilled({sw.x, sw.y + 2.0f}, {sw.x + 6.0f, sw.y + th - 2.0f},
+            ImGui::GetWindowDrawList()->AddRectFilled({sw.x, sw.y + ui::px(2.0f)}, {sw.x + ui::px(6.0f), sw.y + th - ui::px(2.0f)},
                                                       palette::nation_colour(r.id));
             ImGui::PopID();
         }
@@ -1039,7 +1040,7 @@ void draw_nations(const world& w, const recipe_registry& reg, const std::vector<
         const nation_row& r = cur;
         const ImVec2 sw = ImGui::GetCursorScreenPos();
         const float  th = ImGui::GetTextLineHeight();
-        ImGui::GetWindowDrawList()->AddRectFilled({sw.x, sw.y + 2.0f}, {sw.x + 4.0f, sw.y + th - 2.0f},
+        ImGui::GetWindowDrawList()->AddRectFilled({sw.x, sw.y + ui::px(2.0f)}, {sw.x + ui::px(4.0f), sw.y + th - ui::px(2.0f)},
                                                   palette::nation_colour(r.id));
         ImGui::Dummy({6.0f, th});
         ImGui::SameLine();
@@ -1084,7 +1085,7 @@ void draw_nations(const world& w, const recipe_registry& reg, const std::vector<
 void score_bar(int score)
 {
     const float  h  = ImGui::GetTextLineHeight() * 0.62f;
-    const float  bw = std::max(60.0f, ImGui::GetContentRegionAvail().x - 50.0f);
+    const float  bw = std::max(ui::px(60.0f), ImGui::GetContentRegionAvail().x - ui::px(50.0f));
     const ImVec2 p0 = ImGui::GetCursorScreenPos();
     const float  y0 = p0.y + (ImGui::GetTextLineHeight() - h) * 0.5f;
     const float  cx = p0.x + bw * 0.5f;
