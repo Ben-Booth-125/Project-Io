@@ -420,7 +420,9 @@ constexpr modifier_subject k_read_subjects[] = {
 
 /// Mechanic keys with a reader. `space_dispatch` (Rocketry, Ben 2026-10-10):
 /// read by price_convoy_leg's inter-body branch through `nation_mechanic`.
-constexpr std::string_view k_read_mechanics[] = { "space_dispatch" };
+/// `offshore_drilling` (Offshore Drilling, BL-1522, Ben 2026-11-10): read by
+/// placement_rules::can_place_in_world - an Oil Platform may stand on shelf sea.
+constexpr std::string_view k_read_mechanics[] = { "space_dispatch", "offshore_drilling" };
 
 /// Named extraction sites a scope may name (`extraction_site_name`).
 constexpr std::string_view k_sites[] = { "farm", "fishing_wharf", "well" };
@@ -435,7 +437,7 @@ constexpr std::string_view k_unread_systems[] = {
     "construction cost by nation", "convoy cargo capacity", "deed history", "espionage",
     "fertiliser recipe", "holding losses by nation", "household demand by nation",
     "launch draw by nation", "microchip recipe", "muster time",
-    "national stock and demand ledger", "offshore placement", "plastics recipe", "politics",
+    "national stock and demand ledger", "plastics recipe", "politics", // "offshore placement" is read (BL-1522)
     "port handling by nation", "province building ceiling by type", "roads", "sea control", "sentiment", "ship muster time", "ship strength",
     "survey reach", "tariffs", "tax yield", "trade partners by nation", "trade points",
     "trade settlement timing", "travel time by nation", "unit movement", "unit strength",

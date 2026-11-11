@@ -290,7 +290,7 @@ inline constexpr std::array<effect, effect_count> effects = {{
     /*   1 */ {1, effect_kind::modifier, "extraction_rate", "all", effect_op::multiply, 1.01f, "", "", ""},
     /*   2 */ {2, effect_kind::unread, "", "", effect_op::multiply, 1.0f, "", "deposits in your provinces reveal 1 province further", "survey reach"},
     /*   3 */ {3, effect_kind::modifier, "extraction_rate", "resource:petroleum", effect_op::multiply, 1.05f, "", "", ""},
-    /*   4 */ {4, effect_kind::unread, "", "", effect_op::multiply, 1.0f, "", "Oil Platforms may be placed on shelf sea", "offshore placement"},
+    /*   4 */ {4, effect_kind::mechanic, "", "", effect_op::multiply, 1.0f, "offshore_drilling", "Oil Platforms may be placed on shelf sea", ""},
     /*   5 */ {4, effect_kind::modifier, "extraction_rate", "resource:petroleum", effect_op::multiply, 1.25f, "", "", ""},
     /*   6 */ {5, effect_kind::modifier, "extraction_rate", "all", effect_op::multiply, 1.01f, "", "", ""},
     /*   7 */ {6, effect_kind::modifier, "extraction_rate", "all", effect_op::multiply, 1.01f, "", "", ""},

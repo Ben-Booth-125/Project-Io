@@ -2336,11 +2336,14 @@ void generate_life_deposits_over(
     std::vector<std::uint8_t>      dens(total, 0u);
     std::vector<terrain_landform>  land(total, terrain_landform::plains);
     std::vector<bool>              is_ocean(total, false);
+    std::vector<bool>              shelf(total, false);      // BL-1522: coast water
+    std::vector<float>             shelf_oil(static_cast<std::size_t>(total), 0.0f);
     for (int idx = 0; idx < total; ++idx)
     {
         const tile_component& t = w.tiles.at(tile_ids[static_cast<std::size_t>(idx)]);
         const bool water = is_water(t.substrate);
         is_ocean[idx] = water;
+        shelf[idx]    = is_coastal_water(t.substrate);
         sub[idx]      = water ? terrain_substrate::ocean : t.substrate;
         cov[idx]      = t.cover;
         dens[idx]     = t.cover_density;
@@ -2447,7 +2450,27 @@ void generate_life_deposits_over(
 
         for (int idx = 0; idx < total; ++idx)
         {
-            if (is_ocean[idx]) continue; // no deposit pass runs on water
+            if (is_ocean[idx])
+            {
+                // BL-1522 (Ben, 2026-11-10; TILES.md § Shelf petroleum): SHELF SEA carries
+                // petroleum - the one deposit water holds. The shelf is the same marine
+                // basin the land oil term reads, continued under the sea: a coast tile
+                // bears where a land neighbour sat low (the marine cut), read from the
+                // oil epoch's frame like any land tile. Open ocean and lakes carry nothing.
+                if (!shelf[static_cast<std::size_t>(idx)]) continue;
+                std::pair<int, int> nb[6];
+                int nc = 0;
+                hex_neighbours(idx % gw, idx / gw, gw, gh, nb, nc);
+                bool basin = false;
+                for (int k = 0; k < nc && !basin; ++k)
+                {
+                    const std::size_t j = static_cast<std::size_t>(nb[k].first + nb[k].second * gw);
+                    basin = !is_ocean[j] && height[j] <= marine_cut;
+                }
+                const std::size_t i = static_cast<std::size_t>(idx);
+                shelf_oil[i] = oil_belt_of(oil_frame, i, basin) * oil_thermal;
+                continue; // no other deposit pass runs on water
+            }
             const std::size_t i = static_cast<std::size_t>(idx);
             const float h = height[i];
             sites[i].coal_belt = coal_belt_of(coal_frame, i, h <= swamp_cut) * coal_thermal;
@@ -2585,6 +2608,22 @@ void generate_life_deposits_over(
                 const std::size_t ri = static_cast<std::size_t>(res);
                 if (deposits[ri] > 0.0f)
                     deposits[ri] *= field[static_cast<std::size_t>(idx)];
+            }
+
+            // BL-1522: SHELF PETROLEUM (TILES.md § Shelf petroleum). The land row's range
+            // and rarity, times the shelf's belt; the two body scalars as every deposit
+            // takes them. Not the ore field, which is a land field. ITS OWN STREAM, salted
+            // apart from the life stream, so no land tile's draw moves.
+            if (shelf_oil[static_cast<std::size_t>(idx)] > 0.0f)
+            {
+                constexpr std::size_t rp = static_cast<std::size_t>(resource_type::petroleum);
+                std::mt19937 sea_rng(seed_deposit ^ (static_cast<uint32_t>(idx) * 2246822519u) ^ 0x5EA0F11Eu);
+                const float raw = roll(sea_rng, 0.0f, 120.0f) * rarity[rp]
+                                * shelf_oil[static_cast<std::size_t>(idx)];
+                life_placed[rp] += static_cast<double>(raw);
+                float v = raw * deposit_scalar;
+                if (pl) v *= pl->endowment[rp];
+                deposits[rp] = v > 0.0f ? v : 0.0f;
             }
 
             // C -> D: endemic trade goods (BL-191) — the PLACEMENT of the draws

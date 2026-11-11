@@ -247,9 +247,17 @@ int auto_road_side(const world& w, entity_id tile, std::uint8_t tier, entity_id 
 
 placement_result can_place(const tile_component& tc, building_type type, resource_type target)
 {
-    // No building ever sits on water.
+    // No building ever sits on water - save one. BL-1522 (Ben, 2026-11-10; TILES.md
+    // § Water kinds): an Oil Platform stands on SHELF sea (coast water) carrying
+    // petroleum. Open ocean and lakes take nothing, a rig included.
     if (is_water_tile(tc.substrate))
+    {
+        if (is_offshore_rig(tc.substrate, type, target))
+            return tc.resource_deposit[static_cast<std::size_t>(resource_type::petroleum)] > 0.0f
+                ? placement_reason::ok
+                : placement_reason::no_deposit;
         return placement_reason::ocean;
+    }
 
     switch (type)
     {
@@ -519,6 +527,14 @@ placement_result can_place_in_world(const world& w, entity_id tile_id,
     if (!structure_unlocked(w, corp, type))
         return placement_reason::tech_locked;
 
+    // BL-1522 (Ben, 2026-11-10; TILES.md § Water kinds): a rig on shelf sea needs
+    // Offshore Drilling (DG-PR-EX-A) held by the builder's nation. Skipped with no
+    // builder named, like the gate above.
+    const bool rig = is_offshore_rig(tc_it->second.substrate, type, target);
+    if (rig && corp != null_entity
+        && !nation_mechanic(w, owner_home_nation(w, corp), k_offshore_mechanic))
+        return placement_reason::tech_locked;
+
     // BL-1399 OWN GROUND (Ben, 2026-10-23; NATIONS.md § Own ground): a nation builds
     // only on its own tiles - never another nation's, never ground no nation owns. Asked
     // of the builder's nation, for every building kind. Skipped when no builder is named
@@ -606,7 +622,9 @@ placement_result can_place_in_world(const world& w, entity_id tile_id,
     // has no anchor of any kind yet. Existence ends the exemption (see
     // body_has_supply_anchor): the second hub must chain within reach of the
     // first, which is the discipline the rule exists to create.
-    if (max_reach >= 0.0f && !::is_supply_anchor(w, tile_id))
+    // BL-1522: a rig is supplied by its port, not by the land reach field (below,
+    // and logistic_points.hpp `rig_supply_port_tile`); the road rule is land's too.
+    if (!rig && max_reach >= 0.0f && !::is_supply_anchor(w, tile_id))
     {
         const bool placing_anchor = type == building_type::port
                                  || type == building_type::inland_logistics_hub;
@@ -636,7 +654,7 @@ placement_result can_place_in_world(const world& w, entity_id tile_id,
     // same rule at their own end rather than exempted here: the road passes lay a crossing
     // to every site generation stamps (`lay_site_roads`, road_generation.hpp), so the 1960
     // world holds no building this would have refused.
-    if (!tile_has_road(tc_it->second))
+    if (!rig && !tile_has_road(tc_it->second)) // BL-1522: a rig stands on water, fed by its port
         return placement_reason::needs_road;
 
     // ONE SITE PER TILE (Ben, 2026-10-26: "To slow the pace of the game down, we need
@@ -691,7 +709,9 @@ placement_result can_place_in_world(const world& w, entity_id tile_id,
     // A -1 ceiling means the partition has not been built (or the tile is
     // unpartitioned) and is UNKNOWN, never "no room" — the rule is skipped
     // rather than guessed at, the same contract tile_reach_cost uses.
-    if (const uint32_t province_id = w.provinces.province_of(tile_id); province_id != 0)
+    // BL-1522: a sea province sustains no LAND building (measure_province_sustain), and
+    // a rig is bounded by its deposit's stack above, not by the land it is not on.
+    if (const uint32_t province_id = rig ? 0u : w.provinces.province_of(tile_id); province_id != 0)
     {
         const int ceiling = ::province_building_ceiling(w, province_id);
         if (ceiling >= 0 && ::province_buildings_standing(w, province_id) >= ceiling)

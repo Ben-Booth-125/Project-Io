@@ -1233,15 +1233,48 @@ ranked_site_map rank_extraction_sites(const world& w, const recipe_registry& reg
     entity_id             memo_body = null_entity;
     const body_component* memo_bc   = nullptr;
 
+    // BL-1522: the port sets the rig candidates read, once per nation for this ranking.
+    lp_reach_memo rig_memo;
+    std::map<entity_id, bool> rig_held; // nation -> holds Offshore Drilling
+
     for (const auto& [tid, tc] : w.tiles)
     {
-        if (placement_rules::is_water_tile(tc.substrate))
+        // Water takes no candidate - save a rig on shelf sea (BL-1522, below).
+        if (placement_rules::is_water_tile(tc.substrate) && !is_coastal_water(tc.substrate))
             continue;
         // BL-1401 (own ground): a tile no nation holds is no actor's to build on.
         const auto tn = w.tile_to_nation.find(tid);
         if (tn == w.tile_to_nation.end() || tn->second == null_entity)
             continue;
         const entity_id tile_nation = tn->second;
+        if (is_coastal_water(tc.substrate))
+        {
+            // BL-1522 (offshore drilling; Ben 2026-11-10): an Oil Platform on the nation's
+            // OWN shelf, offered only once the nation holds Offshore Drilling and a port of
+            // its OWN lies within reach to supply it (rig_supply_port_tile). Reads its own
+            // tech, ground and ports - nothing of another nation's. Survey as for land.
+            const float rich = tc.resource_deposit[static_cast<std::size_t>(resource_type::petroleum)];
+            if (!(rich > 0.0f))
+                continue;
+            auto [hit, fresh] = rig_held.try_emplace(tile_nation, false);
+            if (fresh)
+                hit->second = nation_mechanic(w, tile_nation, placement_rules::k_offshore_mechanic);
+            if (!hit->second)
+                continue;
+            const auto bit = w.bodies.find(tc.body);
+            if (bit == w.bodies.end()
+                || !survey_tile_visible(bit->second.survey, bit->second.grid_width,
+                                        bit->second.grid_height, tc.grid_x, tc.grid_y))
+                continue;
+            // const_cast: the walk only builds the body's derived raster index.
+            if (rig_supply_port_tile(const_cast<world&>(w), tile_nation, tid, nullptr, &rig_memo)
+                == null_entity)
+                continue;
+            sites.push_back({tid,
+                             rich * demand_weight[static_cast<std::size_t>(resource_type::petroleum)],
+                             resource_type::petroleum, tile_nation});
+            continue;
+        }
         if (tc.body != memo_body)
         {
             const auto bit = w.bodies.find(tc.body);
@@ -3953,6 +3986,18 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
             const auto tn = w.tile_to_nation.find(tile);
             if (!lp_may_source || tn == w.tile_to_nation.end())
                 return out;
+            // BL-1522: a rig on shelf sea is supplied at its own port, so the chain it
+            // needs is the chain to THAT port tile; no port in reach, unreachable.
+            if (const auto rt = w.tiles.find(tile);
+                rt != w.tiles.end() && is_coastal_water(rt->second.substrate))
+            {
+                tile = rig_supply_port_tile(w, tn->second, tile, nullptr, &lp_memo);
+                if (tile == null_entity)
+                {
+                    out.reachable = false;
+                    return out;
+                }
+            }
             if (tn->second == lp_player_nation)
             {
                 out.legacy = true;
@@ -6223,7 +6268,16 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                     {
                         if (lp_coverage_at(w, lp_memo, c.cmd.tile) >= 1.0f)
                             break;
-                        const lp_chain_plan plan = chain_for(c.cmd.tile);
+                        // BL-1522: a rig's chain runs to its port (source_capex priced it so).
+                        entity_id chain_target = c.cmd.tile;
+                        if (const auto rt = w.tiles.find(chain_target);
+                            rt != w.tiles.end() && is_coastal_water(rt->second.substrate))
+                            chain_target = (tn != w.tile_to_nation.end())
+                                ? rig_supply_port_tile(w, tn->second, chain_target, nullptr, &lp_memo)
+                                : null_entity;
+                        if (chain_target == null_entity)
+                            break;
+                        const lp_chain_plan plan = chain_for(chain_target);
                         if (!plan.reachable || plan.tiles.empty() || !lay_hub(plan.tiles.front()))
                             break;
                     }

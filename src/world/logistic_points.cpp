@@ -640,7 +640,12 @@ lp_tick resolve_logistic_points(world& w, const std::vector<lp_supply_claim>& su
             // nation's, so its pool serves its own buildings as one queue - the
             // state / champion / other split has no subject. Every claim is `state`.
             row.cls = lp_class::state;
-            const lp_route route = lp_route_to(w, memo, row.nation, tit->second.body, b.tile);
+            // BL-1522: a rig on shelf sea is routed at its port (null: none in reach,
+            // unsupplied); every other building at its own tile.
+            const entity_id at = lp_request_tile(w, row.nation, b.tile, b.type, b.target_resource, &memo);
+            const lp_route route = at == null_entity
+                ? lp_route{}
+                : lp_route_to(w, memo, row.nation, tit->second.body, at);
             row.coverage = route.cover;
             qkeys.push_back({route.full, route.norm});
             lp_nation_row& r = rows[row.nation];
@@ -1143,6 +1148,74 @@ entity_id unit_supply_draw_tile(world& w, entity_id nation, entity_id unit_tile,
     return unit_supply_draw_tile(w, memo, nation, unit_tile, max_steps, steps_out);
 }
 
+entity_id rig_supply_port_tile(world& w, entity_id nation, entity_id rig_tile, int* steps_out,
+                               lp_reach_memo* memo)
+{
+    // BL-1522 (Ben, 2026-11-10; LOGISTICS.md § Logistic Points, "A rig is supplied through
+    // its own port"). Ports are the only gateway: a rig's request is paid at the nearest
+    // standing port of its own nation within `lp_rig_port_reach` water tiles, and routed
+    // there exactly as that port tile's own request would be.
+    if (steps_out != nullptr)
+        *steps_out = -1;
+    const auto here = w.tiles.find(rig_tile);
+    if (nation == null_entity || here == w.tiles.end() || !is_coastal_water(here->second.substrate))
+        return null_entity;
+    // The nation's standing ports, by tile. An existence set: the walk below decides.
+    // Read once per memo where one is handed in (the lens asks of every shelf tile).
+    std::set<entity_id> local;
+    std::set<entity_id>* slot = &local;
+    bool read = false;
+    if (memo != nullptr)
+    {
+        const auto [it, fresh] = memo->rig_ports.try_emplace(nation);
+        slot = &it->second;
+        read = !fresh;
+    }
+    if (!read)
+        for (const auto& [bid, b] : w.buildings)
+        {
+            (void)bid;
+            if (b.type != building_type::port || b.ticks_remaining > 0 || b.decommissioned
+                || w.closed_ports.count(b.tile) != 0)
+                continue;
+            const auto hn = w.tile_to_nation.find(b.tile);
+            if (hn != w.tile_to_nation.end() && hn->second == nation)
+                slot->insert(b.tile);
+        }
+    const std::set<entity_id>& ports = *slot;
+    if (ports.empty())
+        return null_entity;
+    // The any-water walk from the rig (six sides, a landing on the shore ending it),
+    // bounded at the reach; every step 1, so a distance is a whole count of tiles.
+    const std::unordered_map<entity_id, float> dist =
+        lp_sea_walk(w, here->second.body, {rig_tile}, static_cast<float>(lp_rig_port_reach));
+    entity_id best = null_entity;
+    float     best_d = 0.0f;
+    for (const entity_id p : ports) // ascending tile id: the first at the least distance wins
+    {
+        const auto it = dist.find(p);
+        if (it == dist.end())
+            continue;
+        if (best == null_entity || it->second < best_d)
+        {
+            best   = p;
+            best_d = it->second;
+        }
+    }
+    if (best != null_entity && steps_out != nullptr)
+        *steps_out = static_cast<int>(std::lround(best_d));
+    return best;
+}
+
+entity_id lp_request_tile(world& w, entity_id nation, entity_id tile, building_type type,
+                          resource_type target, lp_reach_memo* memo)
+{
+    const auto tit = w.tiles.find(tile);
+    if (tit != w.tiles.end() && placement_rules::is_offshore_rig(tit->second.substrate, type, target))
+        return rig_supply_port_tile(w, nation, tile, nullptr, memo);
+    return tile;
+}
+
 namespace {
 
 /// Steps from @p target over @p nation's own dry ground (4-neighbour, columns wrap) -
@@ -1295,7 +1368,17 @@ float lp_coverage_at(world& w, lp_reach_memo& memo, entity_id tile, lp_coverage_
     const auto nit = w.tile_to_nation.find(tile);
     if (tit == w.tiles.end() || nit == w.tile_to_nation.end())
         return 0.0f;
-    const lp_route r = lp_route_to(w, memo, nit->second, tit->second.body, tile);
+    // BL-1522: the only building that stands on shelf sea is a rig, and a rig is
+    // routed at its own nation's port within reach - so that is the cover a building
+    // standing here would get. No port in reach: 0, unreached.
+    entity_id at = tile;
+    if (is_coastal_water(tit->second.substrate))
+    {
+        at = rig_supply_port_tile(w, nit->second, tile, nullptr, &memo);
+        if (at == null_entity)
+            return 0.0f;
+    }
+    const lp_route r = lp_route_to(w, memo, nit->second, tit->second.body, at);
     if (why != nullptr)
         *why = { r.reached, r.network, r.distance, r.used, r.blocked };
     return r.cover;

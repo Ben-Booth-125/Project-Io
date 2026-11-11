@@ -1050,6 +1050,24 @@ intended, legible cost of keeping an army in the field.
 
 **A lane lands no points on a hostile port (Ben, 2026-11-05; `../military/MILITARY.md` § Sea, landings).** A nation's lane lands no points on a port held by a nation hostile to it, declared either way, so an army that has landed must take a port, and a port it occupies serves it as its own.
 
+**A rig is supplied through its own port (Ben, 2026-11-10).** An offshore Oil Platform stands on
+shelf sea (`TILES.md` § Water kinds), where no road runs and no lane lands. **Ports are its only
+gateway.** Its request is **paid at a port**: the nearest standing port on its own nation's ground
+within **6 water tiles** of the rig, by the any-water walk (six sides, a landing on the shore ending
+it), ties to the lowest tile id. It is then routed there as that port tile's own request would be,
+so the rig gets the port tile's routed cover and waits in the queue at the port's distance. A port
+that is still building, decommissioned or closed is no gateway; nor is another nation's port, a
+friend's included. A rig with no own port in reach is **unsupplied**: its cover is 0 and it
+produces nothing. It is still **placeable**, as a land building on a road no source covers is; the
+Build door and the site reads show it uncovered (`lp_coverage_at`). Its output reaches market
+through that same shore: a rig clears in its own tile's market, the catchment of the coast it lies
+off (`PRODUCTION.md` § Extraction buildings).
+
+*Why six (in-band, 2026-11-10).* Six is the Track's full-strength reach on land, the shortest reach
+any source carries in full. A rig is a short service run from its port, not a voyage: fifty, a
+port's lane reach, would let one port feed a whole sea's shelf, and the port would stop being a
+decision. At six, a rig is a reason to build a port where the oil is.
+
 **A unit draws off the road, up to 8 tiles from it (Ben, 2026-10-29).** A unit need not stand on
 the network to be supplied. Its request is **paid at the closest road** of its nation's network —
 the nearest tile within **8 tiles** of the unit that the network reaches, by steps over crossable

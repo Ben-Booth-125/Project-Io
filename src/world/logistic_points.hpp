@@ -391,7 +391,9 @@ struct lp_reach_memo
     /// touches the anchor or the tile of a source already in the set, closed outward
     /// until nothing more joins.
     std::map<std::tuple<entity_id, entity_id, entity_id>, std::set<entity_id>> connected;
-    void clear() { sources.clear(); fields.clear(); connected.clear(); }
+    /// BL-1522: nation -> its standing port tiles (`rig_supply_port_tile`), read once per memo.
+    std::map<entity_id, std::set<entity_id>> rig_ports;
+    void clear() { sources.clear(); fields.clear(); connected.clear(); rig_ports.clear(); }
 };
 
 /// How a tile's request is routed (BL-1356; LOGISTICS.md § How a tile's points get
@@ -443,6 +445,29 @@ inline constexpr int lp_offroad_draw_steps = 8;
 entity_id unit_supply_draw_tile(world& w, lp_reach_memo& memo, entity_id nation,
                                 entity_id unit_tile, int max_steps = lp_offroad_draw_steps,
                                 int* steps_out = nullptr);
+/// BL-1522 (offshore drilling; LOGISTICS.md § Logistic Points, "A rig is supplied
+/// through its own port", Ben 2026-11-10): how far, in water tiles, an Oil Platform on
+/// shelf sea may lie from a standing port of its own nation and still be supplied.
+/// Six: the Track's full-strength reach on land, a port's short service run.
+inline constexpr int lp_rig_port_reach = 6;
+
+/// WHERE A RIG'S REQUEST IS PAID (BL-1522). For a building standing on shelf sea
+/// (`placement_rules::is_offshore_rig`) the request is routed at a PORT, never at the
+/// water tile it stands on: the tile of the nearest standing port (complete, not
+/// decommissioned, not closed) on @p nation's own ground within `lp_rig_port_reach`
+/// water steps of @p rig_tile - the any-water walk (`lp_sea_walk`, six sides, a landing
+/// ending the walk) - ties to the lowest tile id. null_entity when none is in reach:
+/// the rig is unsupplied and its cover is 0. Pure and order-independent.
+/// @param steps_out Optional; receives the water steps to the port, -1 with none.
+entity_id rig_supply_port_tile(world& w, entity_id nation, entity_id rig_tile,
+                               int* steps_out = nullptr, lp_reach_memo* memo = nullptr);
+
+/// The tile a building's Logistic Point request is ROUTED at: its own tile, or for a
+/// rig on shelf sea its port (`rig_supply_port_tile`; null when it has none). The one
+/// substitution the resolver and `lp_coverage_at` both make, so they cannot disagree.
+entity_id lp_request_tile(world& w, entity_id nation, entity_id tile, building_type type,
+                          resource_type target, lp_reach_memo* memo = nullptr);
+
 /// The same, on a memo of its own (a caller with no resolve in hand, e.g. placement).
 entity_id unit_supply_draw_tile(world& w, entity_id nation, entity_id unit_tile,
                                 int max_steps = lp_offroad_draw_steps, int* steps_out = nullptr);

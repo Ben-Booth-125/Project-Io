@@ -229,7 +229,8 @@ bool can_place_population_centre(const tile_component& tc);
 /// The load-bearing validity check: may a building of `type` targeting
 /// `target` be placed on tile `tc`?
 ///
-/// - Never on ocean (any building type).
+/// - Never on water (any building type) — save one: an Oil Platform on SHELF sea
+///   (`is_offshore_rig`, BL-1522), valid where the shelf tile carries petroleum.
 /// - extraction_site: only on a non-zero deposit of `target`, and `target` must
 ///   be a prototype-extractable resource. **Exception (Fishing Wharf, BL-168):**
 ///   an `agricultural_produce` target with no deposit still passes this tile-only
@@ -319,8 +320,27 @@ inline constexpr float depositless_rate_scalar(resource_type target)
                                                          : k_well_rate_scalar;
 }
 
+/// BL-1522 (offshore drilling; TILES.md § Water kinds, PRODUCTION.md § Extraction
+/// buildings, Ben 2026-11-10): an **Oil Platform on shelf sea** — an extraction site
+/// targeting petroleum on a `coast` substrate tile (the shoreline ring of the sea,
+/// `is_coastal_water`). The ONE building that stands on water; open ocean and lakes
+/// take nothing. Pure in its arguments; no persistent field carries it.
+constexpr bool is_offshore_rig(terrain_substrate sub, building_type type, resource_type target)
+{
+    return type == building_type::extraction_site && target == resource_type::petroleum
+        && is_coastal_water(sub);
+}
+
+/// The research mechanic that permits a rig (DG-PR-EX-A, Offshore Drilling):
+/// `nation_mechanic(w, nation, k_offshore_mechanic)`.
+inline constexpr const char* k_offshore_mechanic = "offshore_drilling";
+
 /// Full placement check including world-level constraints (BL-043):
 ///  1. Tile-level can_place (ocean / deposit / terrain).
+///  1b. Offshore rig (BL-1522): the builder's nation must hold Offshore Drilling
+///     (`tech_locked`); the road, reach-field and province-ceiling rules are land's
+///     and are not asked of it - its supply is its port (logistic_points.hpp,
+///     `rig_supply_port_tile`), and its bound is its deposit's stack.
 ///  2. Port: tile must be coastal (is_coastal).
 ///  3. Fishing Wharf (BL-168): an extraction_site targeting agricultural_produce
 ///     with no deposit on the tile must also be coastal (is_coastal).

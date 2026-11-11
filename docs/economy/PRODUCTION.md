@@ -58,6 +58,9 @@ richest tile on the body is a decision rather than a lookup.
 The generated world obeys the same rule: the road pass lays a crossing to every site it stamps
 (`../economy/LOGISTICS.md` § 4, Generation roads every building site).
 
+**The rule is land's (Ben, 2026-11-10).** The offshore Oil Platform stands on shelf sea, where no
+road runs; its port is its road (§ Extraction buildings; `LOGISTICS.md` § Logistic Points).
+
 ### One site under construction per tile (Ben, 2026-10-26)
 
 **A tile holds at most one building under construction at a time.** Ben's reason: *"To slow the
@@ -204,7 +207,7 @@ Each building type targets a specific class of resource. Placement is valid only
 | Building | Target resources | Valid terrain | Era |
 |----------|-----------------|---------------|-----|
 | Mine | Iron ore, coal, silica, copper ore, rare earth ore, peat | Barren, rocky, volcanic substrates; scrub-on-sedimentary for peat | 0 |
-| Oil Platform | Petroleum | Barren (geological deposit) | 0 |
+| Oil Platform | Petroleum | Barren (geological deposit); **shelf sea** (coast water), with Offshore Drilling | 0 |
 | Quarry | Stone, sand, clay | All non-water compositions | 0 |
 | Lumber Camp | Timber | Forest or marsh cover | 0 |
 | Farm | Agricultural produce | Grass, marsh or forest cover on sedimentary substrate | 0 |
@@ -216,7 +219,7 @@ Each building type targets a specific class of resource. Placement is valid only
 **Fishing Wharf** (BL-168, fishing wharf). The extraction_site's target resource is again
 `agricultural_produce`, but the placement gate is coastal adjacency rather than a deposit: valid on
 any land tile with a sea neighbour, deposit-agnostic. The Wharf stands on the shore, never in the
-water — a coastal water tile is not a Wharf site, and no building sits on water. A tile can satisfy Farm's deposit rule, the
+water — a coastal water tile is not a Wharf site; the only building on water is the offshore Oil Platform (below). A tile can satisfy Farm's deposit rule, the
 Fishing Wharf's coastal rule, both, or neither — they are two independent ways the same generic
 extraction_site can reach agricultural_produce, not two building types (`placement_rules.cpp`
 `can_place` / `can_place_in_world`, mirroring the Port coastal check via `is_coastal`).
@@ -239,6 +242,17 @@ fishing: there is no taper and no exhaustion, and the site yields its target alo
 basket). A tile carrying any deposit of the target is the deposit route instead — a Farm, an Ice
 Extractor — even once that reserve is spent. The tick, the workforce solver, the Build door's profit
 estimate and the input-reach reading all price the site by this one formula.
+
+**The offshore Oil Platform (Ben, 2026-11-10).** An Oil Platform may also stand on **shelf sea** —
+a `coast` water tile — where the tile carries petroleum (`TILES.md` § Water kinds, § Shelf
+petroleum). It is the same generic extraction site pointed at petroleum, and the one building that
+stands on water: never open ocean, never a lake. It needs **Offshore Drilling** (DG-PR-EX-A) held by
+the builder's nation, and stands only on that nation's own water. Its yield, depletion, staffing
+and market are the land site's: it draws its workforce and clears in its own tile's market, which
+is the catchment of the shore it lies off. It needs no road, because it is supplied through its
+own nation's port (`LOGISTICS.md` § Logistic Points, "A rig is supplied through its own port"). A
+rig with no own port in reach places, and produces nothing until a port is built in reach — the
+same as a land site on a road no source covers.
 
 The Mine covers all terrestrial hard-mineral deposits and adjusts its output to whatever the tile holds: the same building type on one volcanic tile yields rare earth ore and on another yields copper ore. The distinction between deposit types is in the tile data, not the building type. Off-world metallic deposits (iron-nickel ore, platinum group metals) are harvested by the Surface Extractor, the Era 1 airless-body counterpart to the Mine; both feed the same smelting chain, so the distinction is one of era and deployment environment, not of downstream product.
 
@@ -776,8 +790,8 @@ power supply is induced by price the way every other good's is.
 ### Wind (Ben, 2026-11-05)
 
 **A wind turbine is a power building that burns no fuel.** It stands on land and feeds the grid as a
-plant does, and it pays its way by its site, not its fuel bill. Water still takes no building
-(`TILES.md`); offshore turbines and drilling arrive with the naval system. It is a Power Generation
+plant does, and it pays its way by its site, not its fuel bill. Water takes no turbine
+(`TILES.md`: the offshore Oil Platform is the one building on water). It is a Power Generation
 recipe with no input and a smaller output than either fuel route, so it earns between them at base
 prices. A nation opens it by researching Wind Power, in the Energy branch (`tech/DIGITISATION_TREE.md`).
 Generation founds none: no nation holds a node before play, and a recipe research opens is out of what
