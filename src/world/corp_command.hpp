@@ -247,6 +247,13 @@ enum class corp_verb : uint8_t
     // grant's item (AI_OPPONENT.md § 11).
     embark_unit,          ///< BL-1531: land unit `subject`, on or beside the actor's own open port, boards transport `order` (a ship id) lying at that port's mouth, up to its capacity.
     land_units,           ///< BL-1531: transport `subject` sails for the sea beside coast tile `tile` and lands everyone aboard; a null `tile` recalls it home.
+    // --- BL-1431: missiles (MILITARY.md § Missiles; Ben, 2026-11-10) ---
+    // Appended AFTER land_units, same append-only rule. Any nation on its OWN
+    // magazine, launchers and air defence; rivals issue all three under the grant in
+    // AI_OPPONENT.md § 11 ("Rival nations fire missiles"). missiles.hpp owns the checks.
+    stock_missiles,       ///< BL-1431: buy `unit_type` (1..16) missiles of kind `order` (0 short range, 1 long range, 2 tactical nuclear) into the actor's magazine, their goods off its shelves. rejected_invalid (another kind - a strategic weapon is never stocked - or count) / rejected_tech_locked (a tactical warhead without Uranium Enrichment) / rejected_state (magazine full, 64 a kind) / rejected_funds — see `stock_missiles_check`.
+    stock_interceptors,   ///< BL-1431: buy `unit_type` (1..16) interceptors into the stock of the actor's air defence unit `subject` (24 at most), their goods off its shelves. rejected_invalid / rejected_not_owner / rejected_state / rejected_funds — see `stock_interceptors_check`.
+    fire_missile,         ///< BL-1431: launcher `subject` (the actor's own land unit, ship or wing) fires `unit_type` (1..8) missiles of kind `order` from the magazine at province `province`, or at building `counterparty` in it. Kind 3, a strategic weapon, is refused always. rejected_invalid / rejected_not_owner / rejected_state (not ready, target not of a nation the actor has declared hostile, not sighted) / rejected_placement (out of range) / rejected_funds (the magazine is short) — see `fire_missile_check`.
 };
 
 /// One past the highest verb — the wire parser's range gate (BL-396: run_serve
@@ -256,7 +263,7 @@ enum class corp_verb : uint8_t
 /// appending a verb means moving this with it — and only this, since existing
 /// values never renumber.
 inline constexpr uint8_t corp_verb_count =
-    static_cast<uint8_t>(corp_verb::land_units) + 1;
+    static_cast<uint8_t>(corp_verb::fire_missile) + 1;
 
 /// `unqueue_research`'s "the last entry" sentinel for `corp_command::order`
 /// (the MCP boundary's -1). UINT32_MAX, never a node index.
@@ -537,6 +544,13 @@ corp_command_result march_check(world& w, entity_id actor, entity_id unit, entit
                                 entity_id assume_hostile = null_entity,
                                 std::vector<entity_id>* out_path = nullptr,
                                 const military_capability_params* mil = nullptr);
+
+/// BL-1431: an upper bound on what buying @p goods off @p nation's shelves costs, each
+/// good at the highest posted price among its markets (the hire's price gate).
+float kit_goods_price_bound(const world& w, entity_id nation, const std::array<float, resource_count>& goods);
+
+/// BL-1431: can @p nation's shelves supply @p goods (quantity only)?
+bool kit_goods_on_shelves(const world& w, entity_id nation, const std::array<float, resource_count>& goods);
 
 /// Apply one command through the player-grade seams. Deterministic; a rejected
 /// command mutates nothing. `out_building` (optional) receives the entity id a

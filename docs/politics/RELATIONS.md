@@ -171,6 +171,7 @@ read neutral. A factor's direction on each dimension is fixed below; its size is
 | `force_used` | a battle between the pair; magnitude is the strength the observer lost | the side that lost strength → the other | | − | + |
 | `peace_concluded` | a peace, any terms | each party → the other | | + | − |
 | `province_ceded` | a peace that cedes; magnitude is the provinces ceded | loser → winner | − | − | + |
+| `nuclear_used` | `fire_missile` with a tactical warhead; magnitude is the warheads fired, doubled for the struck nation (`../military/MILITARY.md` § Missiles) | every other nation → firer | | − | + |
 
 **Alarm's capability factors** are § 6's, emitted the same way — one call site each, and every one
 but severed trade emitted every tick from the subject's standing state:
@@ -447,6 +448,10 @@ ties the subject severed, its military posture, and its domestic unrest. Where e
   on any tile of the observer's own ground; seen by that observer.
 - **Severed trade** — cargo the subject's convoys land in the observer's markets, fold by fold,
   through the persistence window (§ Who emits each factor).
+- **A tactical nuclear warhead fired** — the `nuclear_used` conduct, every other nation toward
+  the firer, per warhead and whether or not it was intercepted, the struck nation counting it
+  twice; severe, above anything a declaration of war raises in one row
+  (`../military/MILITARY.md` § Missiles).
 - **Unrest** — nowhere yet: it has no store, so it moves nothing. Technology effects that read
 *"Alarm toward you"* write to this dimension (`../economy/tech/DIGITISATION_TREE.md`). **What
 relieves it** — decay toward neutral like every sentiment dimension, live trade between the pair, and

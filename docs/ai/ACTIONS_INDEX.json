@@ -968,6 +968,30 @@
   [
    "ledger.selection_ship_recall",
    "Selection band, a transport's card with a landing ordered: Recall."
+  ],
+  [
+   "gameplay.stock_missiles",
+   "A launcher's card, Buy beside a missile kind (ledger.selection_missile_buy). Also a corp_verb (corp_verb::stock_missiles, 61) on the command seam."
+  ],
+  [
+   "gameplay.stock_interceptors",
+   "An air defence unit's card, Stock 4 beside its interceptors (ledger.selection_missile_intercept). Also a corp_verb (corp_verb::stock_interceptors, 62) on the command seam."
+  ],
+  [
+   "gameplay.fire_missile",
+   "A launcher's card, a target and Fire beside a missile kind (ledger.selection_missile_fire). Also a corp_verb (corp_verb::fire_missile, 63) on the command seam."
+  ],
+  [
+   "ledger.selection_missile_buy",
+   "The Missiles section of the player's own launcher card (artillery unit, destroyer, capital ship, submarine, multirole or bomber wing): one row per kind it carries with the magazine count and Buy."
+  ],
+  [
+   "ledger.selection_missile_fire",
+   "The Missiles section of the player's own launcher card: a target list (forces or a building in a province) and Fire, per kind it carries. The list is every target the seam would accept but for the stock."
+  ],
+  [
+   "ledger.selection_missile_intercept",
+   "The Missiles section of the player's own air defence unit card: its interceptor count and Stock 4."
   ]
  ]
 }

@@ -756,7 +756,28 @@ inline constexpr uint32_t k_world_save_version_pre_recruits = 71;
 /// accepts v80 (55 wide, none of the three), v81 (naval only), v82 (55 wide, carry), v83 (55
 /// wide, carry, ended) and v88; each section a stream lacks reads as empty. The section
 /// predicates below (`world_stream_has_*`) are the one place that says which stream holds what.
-inline constexpr uint32_t world_save_version = 88;
+///
+/// **89 (BL-1431, MILITARY.md § Missiles) — MISSILES.** Appended last, after v83's ended
+/// nations: after a u32 count, each nation's MAGAZINE, nation strictly ascending, three i32
+/// counts (short range, long range, tactical nuclear) each in [0, 64], not all zero, of a
+/// live (not ended) nation of the stream; then after a u32 count, each air defence unit's
+/// INTERCEPTORS, unit strictly ascending, an i32 in [1, 24], of a unit of the stream whose
+/// owner is a nation and whose class is air defence. Refused whole otherwise. v88 is a
+/// STRICT PREFIX of v89 and is read too (`k_world_save_version_pre_missiles`), as a world
+/// with no magazine and no interceptor.
+inline constexpr uint32_t world_save_version = 89;
+
+/// BL-1431: the first version carrying the missile section.
+inline constexpr uint32_t k_world_save_version_missiles = 89;
+
+/// BL-1431: v88, a strict prefix of v89.
+inline constexpr uint32_t k_world_save_version_pre_missiles = 88;
+
+/// Does a world stream of @p version carry the v89 missile section? v89 on.
+inline constexpr bool world_stream_has_missiles(uint32_t version)
+{
+    return version >= k_world_save_version_missiles;
+}
 
 /// The naval merge: the first version stacking every section, 56 wide.
 inline constexpr uint32_t k_world_save_version_stacked = 88;
@@ -1178,6 +1199,13 @@ void write_world_snapshot_pre_ended(const world& w, std::ostream& out);
 
 /// BL-1562: the bytes v83's ended-nations section takes for @p w: the count and 4 a nation.
 std::size_t world_save_ended_section_bytes(const world& w);
+
+/// VERIFICATION ONLY (BL-1431): the v88 stream shape - no missile section.
+void write_world_snapshot_pre_missiles(const world& w, std::ostream& out);
+
+/// BL-1431: the bytes v89's missile section takes for @p w: two counts, 16 a magazine,
+/// 8 an interceptor stock.
+std::size_t world_save_missile_section_bytes(const world& w);
 /// VERIFICATION ONLY (BL-1430): the v79 stream shape - no ship section.
 void write_world_snapshot_pre_ships(const world& w, std::ostream& out);
 

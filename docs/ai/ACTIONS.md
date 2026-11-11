@@ -24,7 +24,7 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 > **Generated file.** Produced by `node tools/session/render_actions.js`.
 > Edit the JSON, then re-run; hand edits here are overwritten.
 
-*242 entries — 60 gameplay · 41 canvas · 15 lens · 85 ledger · 41 chrome.*
+*248 entries — 63 gameplay · 41 canvas · 15 lens · 88 ledger · 41 chrome.*
 
 ---
 
@@ -1158,6 +1158,68 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 **Expected output.** The transport sails to the water beside the tile and lands its units over the authored days. On hostile ground those days run only while its side holds that sea province. A hostile stack on the tile opens the ordinary campaign battle, fought from the surf.
 
 **Reason to select.** Put an army ashore where the road does not go, once the water is won.
+
+### `gameplay.stock_missiles` — A launcher's card, Buy beside a missile kind (ledger.selection_missile_buy). Also a corp_verb (corp_verb::stock_missiles, 61) on the command seam.
+
+**Press.** Over the seam: COMMAND corp=<nation> nation=<nation> verb=61 order=<kind> unit_type=<count>.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `order` | `uint32 (missile kind)` | 0 short range, 1 long range, 2 tactical nuclear. 3, a strategic weapon, is never stocked. |
+| `unit_type` | `uint16` | How many, 1..16. |
+
+**Valid when:**
+- The actor is a nation that has not ended; the kind is 0..2 and the count 1..16 (rejected_invalid).
+- A tactical warhead needs Uranium Enrichment held (rejected_tech_locked).
+- The magazine has room: 64 of a kind (rejected_state).
+- The actor's shelves hold the goods and its purse room covers their price bound (rejected_funds). A refusal mutates nothing.
+
+**Expected output.** The kind's goods are bought off the actor's shelves at posted prices and the missiles join its magazine.
+
+**Reason to select.** Arm the launchers before a strike is wanted.
+
+### `gameplay.stock_interceptors` — An air defence unit's card, Stock 4 beside its interceptors (ledger.selection_missile_intercept). Also a corp_verb (corp_verb::stock_interceptors, 62) on the command seam.
+
+**Press.** Over the seam: COMMAND corp=<nation> nation=<nation> verb=62 subject=<unit id> unit_type=<count>.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `subject` | `entity_id (unit)` | The actor's air defence unit. |
+| `unit_type` | `uint16` | How many, 1..16. |
+
+**Valid when:**
+- The unit exists (rejected_invalid), is the actor's (rejected_not_owner), is air defence with men (rejected_invalid); the count is 1..16 (rejected_invalid).
+- The stock has room: 24 a unit (rejected_state).
+- The actor's shelves hold the goods and its purse room covers them (rejected_funds). A refusal mutates nothing.
+
+**Expected output.** Interceptors (2 guided weapons and 3 electronics each) are bought off the shelves into the unit's stock. A missile strike on its province draws two for each incoming missile.
+
+**Reason to select.** Thin a short-range strike on a province you hold; it costs more than what it stops.
+
+### `gameplay.fire_missile` — A launcher's card, a target and Fire beside a missile kind (ledger.selection_missile_fire). Also a corp_verb (corp_verb::fire_missile, 63) on the command seam.
+
+**Press.** Over the seam: COMMAND corp=<nation> nation=<nation> verb=63 subject=<launcher id> order=<kind> unit_type=<salvo> province=<province id> counterparty=<building id or 0>.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `subject` | `entity_id (unit, ship or wing)` | The actor's launcher: artillery; destroyer, capital ship or submarine; multirole or bomber wing. |
+| `order` | `uint32 (missile kind)` | 0 short range, 1 long range, 2 tactical nuclear. 3, a strategic weapon, is always refused. |
+| `unit_type` | `uint16` | Salvo, 1..8. |
+| `province` | `uint32 (province id)` | The province struck. |
+| `counterparty` | `entity_id (building), or null` | A building in the province to strike; null strikes its hostile units. |
+
+**Valid when:**
+- The launcher exists (rejected_invalid) and is the actor's (rejected_not_owner).
+- The kind is 0..2 and one the launcher carries; the salvo is 1..8; the province exists; a named building stands completed in it and its condition matters (rejected_invalid).
+- The launcher is raised and not refitting, mustering or aboard; a wing has its own standing airbase (rejected_state).
+- The target belongs to a nation the actor has declared hostile: the building's owner, or the province's holder or a unit standing in it (rejected_state).
+- It lies within reach: the kind's range, plus a wing's own range (rejected_placement).
+- The actor sees the province: its ground, a unit or ship of its within 4 tiles, a wing of its flying there, or a hostile unit or ship it revealed there (rejected_state).
+- The magazine holds the salvo (rejected_funds). A refusal mutates nothing.
+
+**Expected output.** The salvo leaves the magazine. Hostile air defence in the province spends two interceptors on each missile; what lands kills men and readiness of one hostile unit (in battle first) or lowers the building's condition. A tactical warhead hits every hostile unit and building in the province and raises every nation's Alarm toward the firer by 30 a warhead, the struck nation's by 60.
+
+**Reason to select.** Strike a sighted enemy stack or a factory beyond the front without risking a unit.
 
 ---
 
@@ -3160,6 +3222,39 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 **Expected output.** Issues gameplay.land_units with a null tile: the landing is off and it sails home, its units still aboard.
 
 **Reason to select.** Call off a landing the water has turned against.
+
+### `ledger.selection_missile_buy` — The Missiles section of the player's own launcher card (artillery unit, destroyer, capital ship, submarine, multirole or bomber wing): one row per kind it carries with the magazine count and Buy.
+
+**Press.** Click Buy (Buy 4; Buy 1 for tactical warheads).
+
+**Valid when:**
+- The card is the player's own launcher.
+
+**Expected output.** Issues gameplay.stock_missiles at the frame's end; the answer shows under the section.
+
+**Reason to select.** Fill the magazine from the card that will fire it.
+
+### `ledger.selection_missile_fire` — The Missiles section of the player's own launcher card: a target list (forces or a building in a province) and Fire, per kind it carries. The list is every target the seam would accept but for the stock.
+
+**Press.** Pick a target in the list, then click Fire.
+
+**Valid when:**
+- The card is the player's own launcher with a sighted hostile target in reach; Fire is dimmed with an empty magazine.
+
+**Expected output.** Issues gameplay.fire_missile with a salvo of one at the frame's end; the answer shows under the section.
+
+**Reason to select.** Strike what the launcher can reach now.
+
+### `ledger.selection_missile_intercept` — The Missiles section of the player's own air defence unit card: its interceptor count and Stock 4.
+
+**Press.** Click Stock 4.
+
+**Valid when:**
+- The card is the player's own air defence unit with room in its stock.
+
+**Expected output.** Issues gameplay.stock_interceptors at the frame's end.
+
+**Reason to select.** Harden a province against missile strikes.
 
 ---
 

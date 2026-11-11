@@ -185,7 +185,8 @@ std::size_t tail_after_refusals(const world& w)
     return world_save_contributors_section_bytes(w) + world_save_occupation_section_bytes(w)
          + world_save_defend_section_bytes(w) + world_save_research_books_section_bytes(w)
          + world_save_ships_section_bytes(w) // the naval merge: v88 stacks the naval sections here
-         + world_save_growth_carry_section_bytes(w) + world_save_ended_section_bytes(w);
+         + world_save_growth_carry_section_bytes(w) + world_save_ended_section_bytes(w)
+         + world_save_missile_section_bytes(w); // BL-1431: v89 appends the missiles last
 }
 
 /// BL-1562: whether @p nation may order a PUSH on its front toward @p neighbour through
@@ -1165,6 +1166,7 @@ int main()
             check(read_world_snapshot(old, in) && !old.nations.at(f.B).ended
                       && to_bytes(w).size() == v80.size() + world_save_ended_section_bytes(w)
                                                  + world_save_ship_hulls_bytes(w) + world_save_ships_section_bytes(w) // the naval merge (v88)
+                                                 + world_save_missile_section_bytes(w) // BL-1431 (v89)
                       && cleared.state_hash(0) == old.state_hash(0),
                   "E12 a v82 stream (before the flag) loads with every nation not ended, and is the v88 stream less the section, the ship-hulls column and the naval sections");
         }

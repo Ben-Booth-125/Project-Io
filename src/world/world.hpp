@@ -450,12 +450,24 @@ struct world
     /// one man, so the remainder carries. Pruned when the unit goes. Saved (v65).
     std::map<entity_id, std::pair<int32_t, int32_t>> air_hit_bank;
 
+    /// BL-1431 (MILITARY.md § Missiles): each nation's MAGAZINE, the missiles it has
+    /// stocked and not fired, by kind (`missile_kind`, the first three columns). Keyed by
+    /// nation, ORDERED; a nation with none is absent. Saved (v89), hashed when non-empty.
+    std::map<entity_id, std::array<int32_t, 3>> missile_magazines;
+
+    /// BL-1431: the interceptors stocked at each air defence unit, keyed by unit id,
+    /// ORDERED; a unit with none is absent. Pruned with the unit (`forget_air_unit`):
+    /// a unit that boards a ship leaves its stock behind. Saved (v89), hashed when
+    /// non-empty.
+    std::map<entity_id, int32_t> interceptor_stocks;
+
     /// BL-1449 fix round: forget unit @p uid in the air records (the reveal set and
     /// the hit bank). Every path that erases a unit calls it, so neither ever names
     /// a unit the world no longer holds (the v65 reader refuses such a stream).
     void forget_air_unit(entity_id uid)
     {
         air_hit_bank.erase(uid);
+        interceptor_stocks.erase(uid); // BL-1431: its interceptors go with it
         for (auto it = air_revealed.begin(); it != air_revealed.end();)
             it = (it->second == uid) ? air_revealed.erase(it) : std::next(it);
     }

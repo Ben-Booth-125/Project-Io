@@ -1088,6 +1088,7 @@ void eliminate_nation(world& w, const sentiment_params& p, entity_id ended, enti
     for (auto it = w.sea_sightings.begin(); it != w.sea_sightings.end();)
         it = (it->first == ended || w.ships.count(it->second) == 0) ? w.sea_sightings.erase(it) : std::next(it);
     w.nations.at(ended).ship_design_kit.clear();
+    w.missile_magazines.erase(ended); // BL-1431: its magazine ends with it (its units' interceptors went with them)
     w.musters.erase(std::remove_if(w.musters.begin(), w.musters.end(),
                                    [&](const muster_order& m) { return m.owner == ended; }),
                     w.musters.end());

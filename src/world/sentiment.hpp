@@ -272,11 +272,19 @@ enum class sentiment_factor_kind : uint8_t
     /// The subject's domestic unrest. Unrest has no store in the campaign, so
     /// nothing emits this and its weight is authored zero.
     unrest_visible = 19,
+
+    // --- BL-1431 (MILITARY.md § Missiles; RELATIONS.md § 6) -----------------
+    /// The subject fired a TACTICAL NUCLEAR warhead. Emitted by `apply_missile_strike`
+    /// (missiles.cpp) from every other nation toward the firer, the struck nation's
+    /// row counted twice, intercepted or not. Magnitude: warheads fired. Authored
+    /// severe: one warhead's Alarm per observer is above the largest a declaration of
+    /// war can raise in any one row.
+    nuclear_used = 20,
 };
 
 /// Number of rows in `sentiment_factor_kind`. Grows when a value is appended;
 /// it is the array bound the fold indexes with, so the two cannot drift apart.
-inline constexpr std::size_t sentiment_factor_count = 20;
+inline constexpr std::size_t sentiment_factor_count = 21;
 
 /// The AUTHORING NAME of each kind, INDEXED BY the kind — the key
 /// `scripts/economy.lua`'s `sentiment.factors` table uses for that row.
@@ -307,6 +315,7 @@ inline constexpr const char* sentiment_factor_names[sentiment_factor_count] = {
     "border_force",
     "trade_severed",
     "unrest_visible",
+    "nuclear_used",
 };
 
 /// The AUTHORED weight of one kind of conduct: how far a single occurrence moves

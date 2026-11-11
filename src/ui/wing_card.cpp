@@ -1,6 +1,7 @@
 #include "wing_card.hpp"
 
 #include "icons.hpp"
+#include "missile_panel.hpp" // BL-1431: the card's missile section
 #include "player_side.hpp" // is_player_side
 #include "presentation.hpp"
 #include "stat_grid.hpp" // BL-1454: the wing's stat grid
@@ -276,6 +277,7 @@ bool draw_wing_selection(const world& w, const recipe_registry& reg, ui_state& s
         if (wg.muster_days > 0)
             ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::unit_readiness),
                                "Mustering: %d days before it flies", wg.muster_days);
+        draw_missile_section(w, reg, s, id); // BL-1431: a multirole or bomber wing launches
     }
     ImGui::PopTextWrapPos();
     ImGui::EndChild();
