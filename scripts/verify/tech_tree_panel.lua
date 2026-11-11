@@ -1,7 +1,8 @@
 -- Verify the research panel (BL-1276): the Digitisation tree drawn as three
--- trees in a ring, its hover card, and the shift-click queue (Ben, 2026-10-10:
--- no Plan mode; SHIFT + left click queues, a plain click/hover inspects, and a
--- shift-click on a queued node takes it off with the entries that need it).
+-- trees in a ring, its hover card, and the queue (Ben, 2026-10-10: no Plan mode;
+-- SHIFT + left click adds to the queue, and a shift-click on a queued node takes it
+-- off with the entries that need it. Ben, 2026-11-11: a plain click makes the node
+-- the research target, the old queue behind it; hover alone inspects).
 --
 -- Captures (screenshots/):
 --   tech_tree_inspect      the ring: 211 nodes in ten branches, four cost rings, AND links in
@@ -11,7 +12,7 @@
 --   tech_tree_hover_major  the shared hover card on a major (Offshore Drilling).
 --   tech_tree_hover_quest  the card on a quest (Strategic Reserve): deed, keys.
 --   tech_tree_hover_naval  the card on a Naval major (Reactor Propulsion): the kit it opens.
---   tech_tree_queue        one shift-click on Seismic Survey queued it with its
+--   tech_tree_queue        one plain click on Seismic Survey queued it with its
 --                          two requirements ahead of it: 3 entries with arrivals.
 --   tech_tree_unqueue      a shift-click on queued Field Practice II took it off
 --                          with Seismic Survey, which needs it (the toggle).
@@ -53,18 +54,14 @@ x, y = node("DG-ST-NV-A")
 verify.hover(x, y, 40)
 verify.capture("tech_tree_hover_naval")
 
--- A plain click only inspects: nothing is queued.
+-- A plain click makes the node the research target, its requirements ahead of it
+-- (Ben, 2026-11-11). Shift-click adds to the queue (tested below, far plan).
 verify.expect(count(verify.tech_tree_queue()) == 0, "queue starts empty")
 x, y = node("DG-PR-EX-A1")
 verify.click(x, y)
 verify.frames(2)
-verify.expect(count(verify.tech_tree_queue()) == 0, "a plain click queues nothing")
-
--- Shift-click queues the node with its requirements ahead of it.
-verify.shift_click(x, y)
-verify.frames(2)
 local q = verify.tech_tree_queue()
-verify.expect(count(q) == 3, "one shift-click queued 3 nodes (" .. count(q) .. ")")
+verify.expect(count(q) == 3, "one plain click queued 3 nodes (" .. count(q) .. ")")
 verify.expect(q[1] == "DG-PR-EX-T1" and q[2] == "DG-PR-EX-T2" and q[3] == "DG-PR-EX-A1",
               "requirements queued ahead of the node, head first")
 away()
@@ -104,6 +101,7 @@ verify.frames(2)
 q = verify.tech_tree_queue()
 verify.expect(count(q) == 15, "the far press queued its 10-node route (" .. count(q) .. " total)")
 verify.expect(q[count(q)] == "DG-ST-AC-M", "the far node is last, its route ahead of it")
+verify.expect(q[1] == "DG-PR-EX-T1", "a shift-click adds to the queue and keeps the target")
 verify.expect(has(q, "DG-ST-AC-C") and has(q, "DG-ST-AC-C1") and has(q, "DG-ST-AC-C2"),
               "both AND groups' routes are queued")
 verify.expect(has(q, "DG-ST-AC-Ba") ~= has(q, "DG-ST-AC-Bb"),
@@ -117,3 +115,14 @@ end
 verify.expect(finite, "every entry has a finite arrival quarter (last: " .. tostring(arr[count(arr)]) .. ")")
 away()
 verify.capture("tech_tree_far_plan")
+
+-- A plain click on a queued node makes it the target: its route moves to the front
+-- and the rest of the queue follows, nothing lost (Ben, 2026-11-11).
+x, y = node("DG-ST-AC-M")
+verify.click(x, y)
+verify.frames(2)
+q = verify.tech_tree_queue()
+local function at(id) for i = 1, count(q) do if q[i] == id then return i end end return nil end
+verify.expect(count(q) == 15, "retargeting kept every entry (" .. count(q) .. ")")
+verify.expect(at("DG-ST-AC-M") ~= nil and at("DG-PR-EX-T1") ~= nil and at("DG-ST-AC-M") < at("DG-PR-EX-T1"),
+              "the clicked node's route now runs ahead of the old target")

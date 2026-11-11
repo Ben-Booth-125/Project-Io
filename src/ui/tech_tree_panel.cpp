@@ -726,6 +726,54 @@ void press_node(const world& w, ui_state& s, entity_id nation, int i)
                                       : ".");
 }
 
+/// A plain click on node @p i: it becomes the research target (Ben, 2026-11-11). The
+/// queue is emptied, the node is queued with its unheld requirements ahead of it, and
+/// the old entries are queued again behind it in their order - one an exclusion now
+/// refuses, or one already queued as a requirement, is refused by the seam and dropped.
+/// The pool stays. Shift-click (press_node) only adds to the queue.
+void target_node(const world& w, ui_state& s, entity_id nation, int i)
+{
+    std::vector<std::uint16_t> plan;
+    const auto sit = w.nation_tech.find(nation);
+    const std::vector<std::uint16_t> old = sit != w.nation_tech.end() ? sit->second.queue
+                                                                      : std::vector<std::uint16_t>{};
+    if (!old.empty() && old.front() == static_cast<std::uint16_t>(i))
+    {
+        s.research_message = std::string("Already researching ") + node_at(i).name + ".";
+        return;
+    }
+    // Refusals read against the queue as it will be: empty, so only held, pick-one
+    // and unknown-node reasons remain.
+    const bool queued_now = std::find(old.begin(), old.end(), static_cast<std::uint16_t>(i)) != old.end();
+    if (!queued_now)
+    {
+        const std::string why = refusal_reason(w, nation, i, &plan);
+        if (!why.empty())
+        {
+            s.research_message = why;
+            return;
+        }
+    }
+    corp_command cmd;
+    cmd.corp = w.player_entity;
+    if (!old.empty())
+    {
+        cmd.verb = corp_verb::clear_research;
+        s.pending_research_commands.push_back(cmd);
+    }
+    cmd.verb  = corp_verb::queue_research;
+    cmd.order = static_cast<std::uint32_t>(i);
+    s.pending_research_commands.push_back(cmd);
+    for (const std::uint16_t e : old)
+    {
+        if (e == static_cast<std::uint16_t>(i))
+            continue;
+        cmd.order = e;
+        s.pending_research_commands.push_back(cmd);
+    }
+    s.research_message = std::string("Researching ") + node_at(i).name + " next.";
+}
+
 /// The column's two projections — RP a quarter and each queue entry's arrival
 /// — recomputed only when what they read changes: the day, the nation, its
 /// treasury, pool, held set or queue (cold review of BL-1276: they ran every
@@ -879,8 +927,8 @@ void draw_tech_tree_menu(const world& w, const research_params& p, ui_state& s)
         ImGui::PopStyleColor();
         ImGui::Separator();
 
-        ImGui::TextWrapped("Shift-click a node to queue it; shift-click a queued node to "
-                           "take it off. Hover reads it.");
+        ImGui::TextWrapped("Click a node to research it next; shift-click to add it to the "
+                           "queue, or to take a queued node off. Hover reads it.");
         ImGui::Spacing();
 
         // --- the queue
@@ -1199,8 +1247,9 @@ void draw_tech_tree_panel(const world& w, const research_params& p, ui_state& s)
     // --- the mode line and the legend, in the canvas corners
     {
         const char* line = can_plan
-                               ? "Hover a node to read it. Shift-click a node to queue it, with its "
-                                 "requirements ahead of it; shift-click a queued node to take it off."
+                               ? "Hover a node to read it. Click a node to research it next, with its "
+                                 "requirements ahead of it; shift-click to add it to the queue, or to "
+                                 "take a queued node off."
                                : "Hover a node to read it. No corporation is seated, so there is no "
                                  "nation to plan for.";
         dl->AddText({canvas.x + 12.0f, canvas.y + 10.0f}, palette::text_secondary, line); // fit-exempt: canvas caption
@@ -1211,10 +1260,16 @@ void draw_tech_tree_panel(const world& w, const research_params& p, ui_state& s)
         legend(dl, {canvas.x + 12.0f, canvas.y + canvas.h - 10.0f * lh - 12.0f}, k);
     }
 
-    // --- the press: SHIFT + left click queues (or toggles a queued node off)
-    // through the seam (Ben, 2026-10-10). A plain click only inspects.
-    if (can_plan && shift && hovered >= 0 && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
-        press_node(w, s, v.nation, hovered);
+    // --- the press, through the seam. SHIFT + left click adds to the queue (or
+    // toggles a queued node off) (Ben, 2026-10-10); a plain left click makes the node
+    // the research target, the rest of the queue behind it (Ben, 2026-11-11).
+    if (can_plan && hovered >= 0 && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+    {
+        if (shift)
+            press_node(w, s, v.nation, hovered);
+        else
+            target_node(w, s, v.nation, hovered);
+    }
 
     // --- publish node positions for the verify API
     s.tech_tree_node_screen.resize(static_cast<std::size_t>(dg::node_count) * 2);
