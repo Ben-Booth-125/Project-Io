@@ -195,9 +195,9 @@
    "advantage": "Oil Platforms may be placed on shelf sea; Oil Platforms +25% extraction rate",
    "effects": [
     {
-     "kind": "unread",
-     "what": "Oil Platforms may be placed on shelf sea",
-     "waits_on": "offshore placement"
+     "kind": "mechanic",
+     "key": "offshore_drilling",
+     "what": "Oil Platforms may be placed on shelf sea"
     },
     {
      "kind": "modifier",

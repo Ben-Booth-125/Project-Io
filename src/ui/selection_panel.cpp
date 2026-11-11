@@ -34,6 +34,7 @@
 #include "world/market_clearing.hpp"
 #include "world/construction.hpp"    // demolish path (the building element's Demolish)
 #include "world/logistics.hpp"       // invalidate_logistics_caches (idle/resume flips the anchor set)
+#include "world/logistic_points.hpp" // BL-1522: rig_supply_port_tile - a rig's own port in reach
 #include "world/placement_rules.hpp" // buildable-type validity + stack capacity
 #include "world/province.hpp"        // BL-534: province membership + BL-513 building ceiling
 #include "world/settlement.hpp"      // BL-785: region_domain_of - the three-domain word for a water tile
@@ -4242,9 +4243,14 @@ void draw_tile_selection(world& w, const recipe_registry& reg, const economy_rep
                 refusals.push_back(r.reason);
             return r.ok();
         };
+        // BL-1522: shelf sea also takes the Oil Platform, and its refusal (not researched,
+        // no oil) is the rules' own, kept for the disabled press to name.
+        const bool shelf = water && is_coastal_water(tile.substrate);
         if (water)
         {
             any_placeable = probe(building_type::port, resource_type::iron_ore);
+            if (!any_placeable && shelf)
+                any_placeable = probe(building_type::extraction_site, resource_type::petroleum);
         }
         else
         for (const resource_type er : placement_rules::k_extractable)
@@ -4309,14 +4315,23 @@ void draw_tile_selection(world& w, const recipe_registry& reg, const economy_rep
             ui.construction_ui.construct_x = any_placeable ? cp.x + bsz.x * 0.5f : -1.0f;
             ui.construction_ui.construct_y = any_placeable ? cp.y + bsz.y * 0.5f : -1.0f;
         }
+        // BL-1522: on owned shelf sea a disabled press names the Oil Platform's own refusal
+        // (the last probe's - the rig's), as a land tile names its first type's.
+        std::string shelf_why;
+        if (!any_placeable && shelf && w.tile_to_nation.count(sel) != 0 && !refusals.empty())
+            shelf_why = std::string("Only a port or an Oil Platform stands on shelf sea. "
+                                    "Oil Platform: ")
+                      + placement_rules::placement_reason_text(refusals.back());
         if (tile_icon_button("##act_construct", bsz, any_placeable,
                              any_placeable
                                  ? (water
-                                        ? "Construct a port - the one thing that stands on water"
+                                        ? (shelf ? "Construct a port or an Oil Platform - the shelf's two buildings"
+                                                 : "Construct a port - the one thing that stands on water")
                                         : (primed ? "Construct buildings - nothing under way"
                                                   : "Construct buildings"))
                              : water
-                                 ? (w.tile_to_nation.count(sel) != 0
+                                 ? (!shelf_why.empty() ? shelf_why.c_str()
+                                    : w.tile_to_nation.count(sel) != 0
                                         ? "Only a port stands on water, and not on this water"
                                         : "Unowned water: a port needs a shore its owner holds")
                                  : (construct_why.empty() ? "Nothing can be built on this tile"
@@ -5192,6 +5207,21 @@ void draw_construction_ledger_body(world& w, const recipe_registry& reg, ui_stat
         resource_type   good       = resource_type::iron_ore;
     };
     std::vector<candidate> cands;
+    // BL-1522: on shelf sea the one extraction row is the Oil Platform, offered whether or
+    // not the tile bears oil, so the door shows the rules' own refusal (no oil, not
+    // researched) as it shows a land row's.
+    const bool shelf_tile = is_coastal_water(tile.substrate);
+    if (shelf_tile)
+        cands.push_back({building_type::extraction_site, resource_type::petroleum, "Oil Platform"});
+    // Whether the rig would be SUPPLIED: its own nation's port in reach (the resolver's rule).
+    bool shelf_no_port = false;
+    if (shelf_tile)
+    {
+        const auto own = w.tile_to_nation.find(tile_id);
+        shelf_no_port = own == w.tile_to_nation.end()
+                     || rig_supply_port_tile(w, own->second, tile_id) == null_entity;
+    }
+    if (!shelf_tile)
     for (const resource_type er : placement_rules::k_extractable)
         if (tile.resource_deposit[static_cast<std::size_t>(er)] > 0.0f)
             cands.push_back({building_type::extraction_site, er,
@@ -5668,6 +5698,17 @@ void draw_construction_ledger_body(world& w, const recipe_registry& reg, ui_stat
             if (c.group == 0 && !c.starved)
                 bar_text = shelf_runway_text(
                     shelf_runway_for(w, reg, tile_id, c.type, c.recipe, lp_cover));
+            // BL-1522: a rig is supplied only through its own nation's port in reach
+            // (LOGISTICS.md, "A rig is supplied through its own port"). Without one it
+            // places, and stands idle: said here, as the no-LP case the cover implies.
+            if (shelf_no_port && c.type == building_type::extraction_site && c.pr.ok())
+            {
+                char pbuf[160];
+                std::snprintf(pbuf, sizeof pbuf,
+                              "No own port within %d water tiles supplies it: it would stand "
+                              "idle until one is built.", lp_rig_port_reach);
+                bar_text = pbuf;
+            }
             // THIS ROW QUOTES ONE RECIPE of a group, its best net here, and the site ledger
             // reads whichever recipe was chosen there. Saying which keeps the two honest.
             if (!bar_text.empty())

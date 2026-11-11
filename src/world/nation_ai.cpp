@@ -928,7 +928,10 @@ int unlock_class(const io::dg::effect& ef)
     {
         case effect_kind::unlock_recipe:    return 1;
         case effect_kind::unlock_structure: return 2;
-        case effect_kind::mechanic:         return std::string_view(ef.target) == "space_dispatch" ? 3 : 0;
+        // BL-1522: offshore drilling became a read mechanic; it still opens a placement (2),
+        // as it did while it was an unread row waiting on "offshore placement".
+        case effect_kind::mechanic:         return std::string_view(ef.target) == "space_dispatch" ? 3
+                                                 : std::string_view(ef.target) == "offshore_drilling" ? 2 : 0;
         case effect_kind::unread:
         {
             static constexpr std::string_view k_recipes[]   = { "fertiliser recipe", "plastics recipe", "microchip recipe" };

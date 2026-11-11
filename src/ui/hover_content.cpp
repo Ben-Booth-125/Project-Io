@@ -147,7 +147,11 @@ void hover_structure_ground(const ui_state& ui)
         ImGui::Spacing();
         // BL-1356: a hub can stand beside this tile and still give nothing, because
         // it has no chain back to the capital. Say that, not "nothing reaches".
-        ImGui::TextDisabled(ui.lp_hover_blocked ? "Not tied to the capital" : "No source reaches here");
+        // BL-1522: a shelf tile is supplied only through its own port within reach.
+        if (ui.lp_hover_no_port)
+            ImGui::TextDisabled("No own port within %d water tiles", lp_rig_port_reach);
+        else
+            ImGui::TextDisabled(ui.lp_hover_blocked ? "Not tied to the capital" : "No source reaches here");
         return;
     }
     const auto i = static_cast<std::size_t>(n);

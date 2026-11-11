@@ -2346,6 +2346,7 @@ struct ui_state
     float     lp_hover_distance = 0.0f;
     int       lp_hover_used     = 0;     ///< BL-1356: sources the cover was topped up from
     bool      lp_hover_blocked  = false; ///< BL-1356: a source reaches here but has no chain to the capital
+    bool      lp_hover_no_port  = false; ///< BL-1522: a shelf tile with no own port in reach (lp_coverage_why::no_port)
     float     lp_hover_supplied  = 0.0f;  ///< the tile's SUPPLIED figure (lp_supplied's cell)
     float     lp_hover_requested = 0.0f;  ///< the tile's REQUESTED figure (lp_requested's cell)
     bool      lp_hover_road      = false; ///< the pair is a link's routed flow, not the tile's own

@@ -54,7 +54,7 @@ and the terrain colour the lenses tint.
 | Regolith | Loose surface material on airless bodies | Very low | Regolith, stone |
 | Icy | Ice-dominated ground; frozen subsurface | Low | Water ice (only — see deposit tables) |
 | Ocean | Open water, out of sight of land | — (no buildings) | None |
-| Coast | Shallow sea with land alongside — the shoreline ring | — (no buildings) | None |
+| Coast | Shallow sea with land alongside — the shoreline ring; the **shelf sea** | — (one building: the Oil Platform) | Petroleum (see § Shelf petroleum) |
 | Lake | Inland water with no path to the sea | — (no buildings) | None |
 
 **Sedimentary is the substrate the biotic covers grow on.** Grassland, forest, wetland and tundra
@@ -105,8 +105,22 @@ counts all go through it. Two consumers genuinely care *which* water:
 - **`is_coastal`** (ports, the Fishing Wharf, coastal-only extraction) means the **sea**
   specifically. A lakeshore is not a coast.
 
-Water carries no deposits, no buildings, no cover and no population on any of the three kinds —
-the distinction is about connectivity and locality, not about resources.
+Water carries no cover and no population on any of the three kinds. It carries **no deposit and no
+building either, with one exception: shelf sea** (below).
+
+**Shelf sea takes one building, the Oil Platform (Ben, 2026-11-10).** A `coast` tile is the
+shelf — the shallow sea along a shore — and it is the one water an extraction site may stand on:
+an Oil Platform working the tile's petroleum. Open ocean takes nothing, and neither does a lake.
+No other building and no other target stands on the shelf. The rig is placed through the same
+build verb as any building, by the player or a rival, and only on its own nation's water —
+coastal water belongs to whoever owns the shore (`../generation/PROVINCES.md` § Who owns water),
+so water no nation owns takes no rig. A nation places one once it has researched **Offshore
+Drilling** (`tech/DIGITISATION_TREE.md`, DG-PR-EX-A). How a rig is supplied is `LOGISTICS.md`
+§ Logistic Points, "A rig is supplied through its own port"; what it produces is `PRODUCTION.md`
+§ Extraction buildings. The road, reach-field and province-ceiling rules are land's, and a rig is
+not asked them: a sea province sustains no land building, and a rig is bounded by its deposit's
+stack. **Generation places no building on water**, a rig included: the opening's charters and kit
+stand on land, and a rig is only ever a build through the verb.
 
 ### Terrain cover
 
@@ -177,7 +191,7 @@ how much what grows on it gets in the way:
 | Sedimentary | 6 | Habitable; the settlement-favoured ground (POPULATION.md) |
 | Barren, Rocky, Regolith, Metallic | 4 | Industrial-friendly, low habitability ceiling |
 | Volcanic, Icy | 2 | Hostile; already carry the lowest habitability ceiling |
-| Ocean, Coast, Lake | 0 (pinned, exempt) | No buildings at all, on any water kind — `can_place` refuses them |
+| Ocean, Coast, Lake | 0 (pinned, exempt) | No non-extraction building on any water kind — `can_place` refuses them. The shelf's one building, the Oil Platform, is an extraction site and stacks by its deposit |
 
 | Cover | Modifier | Rationale |
 |---|---|---|
@@ -305,7 +319,26 @@ Reading the tables (`generate_deposits`, `src/world/tile_generation.cpp`):
   (± a small seeded jitter).
 - **Clay** is cross-cutting: any **valley** landform rolls clay 8–20, not just marsh. It is listed
   only in the marsh table below.
-- **Water** tiles (ocean, coast, lake) carry nothing.
+- **Water** tiles carry nothing, save **shelf petroleum** on coast tiles (below). Ocean and lake
+  tiles carry nothing at all.
+
+**Shelf petroleum (Ben, 2026-11-10).** Shelf sea carries petroleum: generation lays it on `coast`
+tiles, and on no other water. It is a **basin**: an oil field on the shore running out under the
+shelf, and the shelf bears nowhere else (calibrated 2026-11-11, BL-1522 (offshore drilling)).
+
+- **A field** is land oil in the top 9% of the body's bearing land (the 0.91 quantile), where the
+  ore fields gathered it. A trace is not a field: low coastal ground almost always bears some,
+  and "next to any oil" would put oil under most of the shelf.
+- **The edge** is a shelf tile next to field land. **The patch** is shelf tiles one shelf step
+  from an edge tile; it reaches no further.
+- **Richness follows the field.** An edge tile takes the richest field land beside it; a patch
+  tile takes the richest edge beside it, at half. Each is drawn 0.4–0.8 of that, times the shelf
+  tile's own palaeo belt (tropical and subtropical 1.0, temperate 0.8, subpolar 0.45, polar none).
+  The land value already carries the body's scalars, so none is applied again.
+
+The target is a sparse shelf: roughly 15–25% of shelf tiles bear oil, worth about 10–20% of the
+land's oil, pooled over the curated seeds. The draw has its own stream, read after the land is
+laid, so no land tile's deposit moves.
 
 **Barren:**
 | Deposit | Relative weight | Landform modifier |

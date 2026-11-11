@@ -1236,9 +1236,15 @@ float site_lp_cover(world& w, entity_id tile, bool* blocked)
     const auto nit = w.tile_to_nation.find(tile);
     if (tit != w.tiles.end() && nit != w.tile_to_nation.end() && nit->second != null_entity)
     {
-        const lp_route r = lp_route_to(w, cc.memo, nit->second, tit->second.body, tile);
-        cover = r.cover;
-        blk   = r.blocked;
+        // BL-1522: a shelf tile's one building is a rig, routed at its own port in reach -
+        // the resolver's rule (lp_site_request_tile). No port in reach: cover 0, no-LP row.
+        const entity_id at = lp_site_request_tile(w, nit->second, tile, &cc.memo);
+        if (at != null_entity)
+        {
+            const lp_route r = lp_route_to(w, cc.memo, nit->second, tit->second.body, at);
+            cover = r.cover;
+            blk   = r.blocked;
+        }
     }
     cc.at.emplace(tile, std::make_pair(cover, blk));
     if (blocked != nullptr)
