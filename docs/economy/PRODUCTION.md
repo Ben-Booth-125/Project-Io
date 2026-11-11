@@ -248,8 +248,8 @@ a `coast` water tile — where the tile carries petroleum (`TILES.md` § Water k
 petroleum). It is the same generic extraction site pointed at petroleum, and the one building that
 stands on water: never open ocean, never a lake. It needs **Offshore Drilling** (DG-PR-EX-A) held by
 the builder's nation, and stands only on that nation's own water. Its yield, depletion, staffing
-and market are the land site's: it draws its workforce and clears in its own tile's market, which
-is the catchment of the shore it lies off. It needs no road, because it is supplied through its
+and market are the land site's: it draws its workforce and clears in the market of the coast it
+lies off, its own tile's market, never through the port. It needs no road, because it is supplied through its
 own nation's port (`LOGISTICS.md` § Logistic Points, "A rig is supplied through its own port"). A
 rig with no own port in reach places, and produces nothing until a port is built in reach — the
 same as a land site on a road no source covers.

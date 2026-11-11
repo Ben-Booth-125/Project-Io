@@ -1675,10 +1675,20 @@ std::unordered_map<entity_id, lp_flow> lp_route_flow(world& w, lp_reach_memo& me
         const auto bit = w.buildings.find(br.building);
         if (bit == w.buildings.end())
             continue;
-        const entity_id home = bit->second.tile;
-        const auto tit = w.tiles.find(home);
+        const auto tit = w.tiles.find(bit->second.tile);
         if (tit == w.tiles.end() || tit->second.body != body)
             continue;
+        // BL-1522: a rig on shelf sea is routed at its supplying port tile, the resolver's
+        // and lp_coverage_at's one rule (lp_request_tile), so the lens agrees with cover. A
+        // rig with no own port in reach lays its request on its own tile, unreached.
+        const entity_id routed = lp_request_tile(w, nation, bit->second.tile, bit->second.type,
+                                                 bit->second.target_resource, &memo);
+        if (routed == null_entity)
+        {
+            flow[bit->second.tile].requested += br.need;
+            continue;
+        }
+        const entity_id home = routed;
         bool blocked = false;
         const std::vector<route_cand> cands = route_cands(w, memo, nation, body, home, blocked);
         float cover = 0.0f;

@@ -1818,9 +1818,10 @@
    "args": [],
    "preconditions": [
     "A tile is selected",
-    "Something is actually placeable on the tile (otherwise the button disables with 'Nothing can be built on this tile')"
+    "Something is actually placeable on the tile (otherwise the button disables with 'Nothing can be built on this tile')",
+    "On water: a port, or on SHELF sea (coast water) the nation owns an Oil Platform (BL-1522 (offshore drilling)), is placeable. On owned shelf sea a disabled button names the Oil Platform's own refusal - not researched (Offshore Drilling) or no oil on the tile"
    ],
-   "expected_output": "Opens the Construction ledger on its CONSTRUCTION view - the collapsible queue above the build bar for THIS tile: every building type placeable here, each row carrying its cost in credits AND in materials, what the building gives (output resource, or its effect in one phrase), an expected-profit bar, how many of that type already stand on the tile and how many more fit, and reason-coded validity. The same view the nav rail's slot 3 opens, so the two doors cannot show two different build bars. Opening it is non-mutating; the Build presses inside it belong to the construction action family. The button carries an accent ring ('primed') when the player has nothing under construction anywhere.",
+   "expected_output": "Opens the Construction ledger on its CONSTRUCTION view - the collapsible queue above the build bar for THIS tile: every building type placeable here, each row carrying its cost in credits AND in materials, what the building gives (output resource, or its effect in one phrase), an expected-profit bar, how many of that type already stand on the tile and how many more fit, and reason-coded validity. The same view the nav rail's slot 3 opens, so the two doors cannot show two different build bars. Opening it is non-mutating; the Build presses inside it belong to the construction action family. The button carries an accent ring ('primed') when the player has nothing under construction anywhere. On a shelf tile the view's one extraction row is the Oil Platform, listed whether or not the tile bears oil so a refusal reads as a land row's; a placeable rig with no own port within 6 water tiles carries the warning that it would stand idle until one is built.",
    "reason_to_select": "The front door to building on a specific tile - answers 'what could I put here and what would it earn?' before committing."
   },
   {

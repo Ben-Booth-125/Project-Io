@@ -2453,22 +2453,13 @@ void generate_life_deposits_over(
             if (is_ocean[idx])
             {
                 // BL-1522 (Ben, 2026-11-10; TILES.md § Shelf petroleum): SHELF SEA carries
-                // petroleum - the one deposit water holds. The shelf is the same marine
-                // basin the land oil term reads, continued under the sea: a coast tile
-                // bears where a land neighbour sat low (the marine cut), read from the
-                // oil epoch's frame like any land tile. Open ocean and lakes carry nothing.
+                // petroleum - the one deposit water holds. Here only the shelf tile's own
+                // palaeo belt, read from the oil epoch's frame like any land tile; WHERE it
+                // bears is decided after the tile loop, off the oil fields on land beside
+                // it (the shelf pass below). Open ocean and lakes carry nothing.
                 if (!shelf[static_cast<std::size_t>(idx)]) continue;
-                std::pair<int, int> nb[6];
-                int nc = 0;
-                hex_neighbours(idx % gw, idx / gw, gw, gh, nb, nc);
-                bool basin = false;
-                for (int k = 0; k < nc && !basin; ++k)
-                {
-                    const std::size_t j = static_cast<std::size_t>(nb[k].first + nb[k].second * gw);
-                    basin = !is_ocean[j] && height[j] <= marine_cut;
-                }
                 const std::size_t i = static_cast<std::size_t>(idx);
-                shelf_oil[i] = oil_belt_of(oil_frame, i, basin) * oil_thermal;
+                shelf_oil[i] = oil_belt_of(oil_frame, i, true) * oil_thermal;
                 continue; // no other deposit pass runs on water
             }
             const std::size_t i = static_cast<std::size_t>(idx);
@@ -2610,22 +2601,6 @@ void generate_life_deposits_over(
                     deposits[ri] *= field[static_cast<std::size_t>(idx)];
             }
 
-            // BL-1522: SHELF PETROLEUM (TILES.md § Shelf petroleum). The land row's range
-            // and rarity, times the shelf's belt; the two body scalars as every deposit
-            // takes them. Not the ore field, which is a land field. ITS OWN STREAM, salted
-            // apart from the life stream, so no land tile's draw moves.
-            if (shelf_oil[static_cast<std::size_t>(idx)] > 0.0f)
-            {
-                constexpr std::size_t rp = static_cast<std::size_t>(resource_type::petroleum);
-                std::mt19937 sea_rng(seed_deposit ^ (static_cast<uint32_t>(idx) * 2246822519u) ^ 0x5EA0F11Eu);
-                const float raw = roll(sea_rng, 0.0f, 120.0f) * rarity[rp]
-                                * shelf_oil[static_cast<std::size_t>(idx)];
-                life_placed[rp] += static_cast<double>(raw);
-                float v = raw * deposit_scalar;
-                if (pl) v *= pl->endowment[rp];
-                deposits[rp] = v > 0.0f ? v : 0.0f;
-            }
-
             // C -> D: endemic trade goods (BL-191) — the PLACEMENT of the draws
             // the Body half made on `tile_rng`. Unlike the endowment above this
             // ADDS a deposit rather than scaling one, because an endemic good
@@ -2655,6 +2630,108 @@ void generate_life_deposits_over(
             tile_component& t = w.tiles.at(tile_ids[static_cast<std::size_t>(idx)]);
             t.resource_deposit   = deposits;
             t.resource_remaining = remaining;
+        }
+    }
+
+    // BL-1522: SHELF PETROLEUM (TILES.md § Shelf petroleum; calibrated 2026-11-11). An oil
+    // FIELD on the shore runs out under the shelf, and nowhere else does the shelf bear.
+    //   * A field is land oil in the top `k_shelf_field_quantile` of this body's bearing land
+    //     - where the ore fields gathered it. Not any trace of oil: low coastal ground almost
+    //     always bears some (the marine cut is the lowest 40% of land), and "touches land with
+    //     oil" alone read as 84% of the shelf.
+    //   * The field's EDGE: a shelf tile touching such land. Its PATCH: shelf tiles within
+    //     `k_shelf_patch_steps` shelf steps of an edge tile.
+    //   * Richness follows the field it extends: the richest field land an edge tile touches
+    //     (a patch tile takes the richest edge beside it), times a draw in [0.4, 0.8], times the
+    //     shelf tile's own palaeo belt (a polar shelf bears nothing), the patch at half. The
+    //     land value already carries the body's scalars, so none is applied again.
+    // Read after the tile loop, off the land's final deposits. ITS OWN STREAM per tile, so no
+    // land tile's draw moves. Raster order throughout: deterministic.
+    {
+        constexpr float k_shelf_field_quantile = 0.91f;
+        constexpr int   k_shelf_patch_steps    = 1;
+        constexpr float k_shelf_patch_scale    = 0.5f;
+        constexpr std::size_t rp = static_cast<std::size_t>(resource_type::petroleum);
+        const auto oil_at = [&](int idx) {
+            return w.tiles.at(tile_ids[static_cast<std::size_t>(idx)]).resource_deposit[rp];
+        };
+        float field_cut = 0.0f;
+        {
+            std::vector<float> bearing;
+            for (int idx = 0; idx < total; ++idx)
+                if (!is_ocean[idx] && oil_at(idx) > 0.0f)
+                    bearing.push_back(oil_at(idx));
+            if (!bearing.empty())
+            {
+                std::sort(bearing.begin(), bearing.end());
+                field_cut = bearing[static_cast<std::size_t>(k_shelf_field_quantile
+                                                             * static_cast<float>(bearing.size() - 1))];
+            }
+        }
+        // step: 0 on an edge tile, s on the patch's ring s, -1 elsewhere. source: the field
+        // richness the tile extends.
+        std::vector<int>   step(static_cast<std::size_t>(total), -1);
+        std::vector<float> source(static_cast<std::size_t>(total), 0.0f);
+        std::vector<int>   frontier;
+        std::pair<int, int> nb[6];
+        int nc = 0;
+        for (int idx = 0; idx < total; ++idx)
+        {
+            if (!shelf[static_cast<std::size_t>(idx)]) continue;
+            hex_neighbours(idx % gw, idx / gw, gw, gh, nb, nc);
+            float best = 0.0f;
+            for (int k = 0; k < nc; ++k)
+            {
+                const int j = nb[k].first + nb[k].second * gw;
+                if (!is_ocean[j] && oil_at(j) > 0.0f && oil_at(j) >= field_cut && oil_at(j) > best)
+                    best = oil_at(j);
+            }
+            if (best > 0.0f)
+            {
+                step[static_cast<std::size_t>(idx)]   = 0;
+                source[static_cast<std::size_t>(idx)] = best;
+                frontier.push_back(idx);
+            }
+        }
+        for (int s = 1; s <= k_shelf_patch_steps; ++s)
+        {
+            std::vector<int> next;
+            for (const int idx : frontier) // ascending: raster order within each ring
+            {
+                hex_neighbours(idx % gw, idx / gw, gw, gh, nb, nc);
+                for (int k = 0; k < nc; ++k)
+                {
+                    const int j = nb[k].first + nb[k].second * gw;
+                    const std::size_t sj = static_cast<std::size_t>(j);
+                    if (!shelf[sj] || (step[sj] >= 0 && step[sj] < s))
+                        continue;
+                    if (step[sj] < 0)
+                    {
+                        step[sj] = s;
+                        next.push_back(j);
+                    }
+                    // The richest edge beside it - a max, so the walk order cannot matter.
+                    source[sj] = std::max(source[sj], source[static_cast<std::size_t>(idx)]);
+                }
+            }
+            std::sort(next.begin(), next.end());
+            frontier = std::move(next);
+        }
+        const float scalars = deposit_scalar * (pl ? pl->endowment[rp] : 1.0f);
+        for (int idx = 0; idx < total; ++idx)
+        {
+            const std::size_t i = static_cast<std::size_t>(idx);
+            if (step[i] < 0 || !(shelf_oil[i] > 0.0f) || !(source[i] > 0.0f)) continue;
+            std::mt19937 sea_rng(seed_deposit ^ (static_cast<uint32_t>(idx) * 2246822519u) ^ 0x5EA0F11Eu);
+            float v = source[i] * roll(sea_rng, 0.4f, 0.8f) * shelf_oil[i];
+            if (step[i] > 0) v *= k_shelf_patch_scale;
+            if (!(v > 0.0f) || !std::isfinite(v)) continue;
+            // The life phase's ledger is kept before the body scalars, as every row's is.
+            if (scalars > 0.0f)
+                life_placed[rp] += static_cast<double>(v / scalars);
+            tile_component& t = w.tiles.at(tile_ids[i]);
+            t.resource_deposit[rp]   = v;
+            t.resource_remaining[rp] = v * deposit_reserve_factor;
         }
     }
 

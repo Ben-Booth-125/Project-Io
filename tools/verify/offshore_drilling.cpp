@@ -278,6 +278,27 @@ void fixture()
               "L5 lp_coverage_at (what the site reads) agrees with the resolver on both rigs");
     }
     {
+        // L6: the Logistics lens's flow routes a rig at its port, the resolver's rule: the
+        // supplied rig's request is drawn from the port tile (never its own water tile),
+        // and the unsupplied rig's lies on its own tile with nothing granted.
+        lp_reach_memo memo;
+        const auto flow = lp_route_flow(w, memo, t, a, body);
+        const auto at_port = flow.find(g_tile[2][1]);
+        const auto at_near = flow.find(near_rig);
+        const auto at_far  = flow.find(far_rig);
+        std::printf("    L6 flow: port requested %.3f granted %.3f; near rig tile %s; far rig requested %.3f granted %.3f\n",
+                    at_port != flow.end() ? at_port->second.requested : -1.0f,
+                    at_port != flow.end() ? at_port->second.granted : -1.0f,
+                    at_near != flow.end() ? "has flow" : "no flow",
+                    at_far != flow.end() ? at_far->second.requested : -1.0f,
+                    at_far != flow.end() ? at_far->second.granted : -1.0f);
+        check(at_port != flow.end() && at_port->second.requested > 0.0f && at_port->second.granted > 0.0f
+                  && at_near == flow.end(),
+              "L6 the lens flow routes the supplied rig at its port tile, not its own water tile");
+        check(at_far != flow.end() && at_far->second.requested > 0.0f && at_far->second.granted == 0.0f,
+              "L6b the unsupplied rig's request lies on its own tile, ungranted");
+    }
+    {
         // A decommissioned port is no gateway.
         w.buildings.at(port_a).decommissioned = true;
         check(rig_supply_port_tile(w, a, near_rig) == null_entity,
@@ -322,6 +343,7 @@ void census(const std::vector<unsigned>& seeds)
 {
     std::printf("\nC1 shelf petroleum on the curated seeds (home body, no prehistory)\n");
     long all_shelf = 0, all_oil = 0, all_owned = 0;
+    double all_sum = 0.0, all_land_sum = 0.0;
     int  bad = 0, seeds_with_oil = 0;
     for (const unsigned seed : seeds)
     {
@@ -362,13 +384,23 @@ void census(const std::vector<unsigned>& seeds)
                     "land_oil=%d land_oil_sum=%.0f ocean_or_lake_deposits=%d shelf_non_oil=%d\n",
                     seed, shelf, shelf_oil, sum, owned_oil, land_oil, land_sum, wet_other, shelf_other);
         all_shelf += shelf; all_oil += shelf_oil; all_owned += owned_oil;
+        all_sum += sum; all_land_sum += land_sum;
         if (shelf_oil > 0) ++seeds_with_oil;
         if (wet_other != 0 || shelf_other != 0) ++bad;
     }
-    std::printf("C total shelf=%ld shelf_oil=%ld owned=%ld seeds_with_shelf_oil=%d/%zu\n",
-                all_shelf, all_oil, all_owned, seeds_with_oil, seeds.size());
+    const double tile_share = all_shelf > 0 ? static_cast<double>(all_oil) / static_cast<double>(all_shelf) : 0.0;
+    const double sum_share  = all_land_sum > 0.0 ? all_sum / all_land_sum : 0.0;
+    std::printf("C total shelf=%ld shelf_oil=%ld (%.1f%% of shelf) owned=%ld shelf_oil_sum=%.0f "
+                "land_oil_sum=%.0f (shelf = %.1f%% of land) seeds_with_shelf_oil=%d/%zu\n",
+                all_shelf, all_oil, 100.0 * tile_share, all_owned, all_sum, all_land_sum,
+                100.0 * sum_share, seeds_with_oil, seeds.size());
     check(bad == 0, "C1 no ocean or lake tile carries a deposit; a shelf tile carries petroleum only");
     check(all_oil > 0, "C1b shelf petroleum exists on the curated seeds");
+    // The calibration band (2026-11-11, BL-1522): basin-like, not a blanket. Gated only on
+    // the full curated set, where the band was set; a subset reports.
+    if (seeds.size() >= 16)
+        check(tile_share >= 0.15 && tile_share <= 0.25 && sum_share >= 0.10 && sum_share <= 0.20,
+              "C1c pooled: 15-25% of shelf tiles bear oil, worth 10-20% of the land's oil");
 }
 
 } // namespace

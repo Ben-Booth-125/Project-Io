@@ -1059,9 +1059,10 @@ so the rig gets the port tile's routed cover and waits in the queue at the port'
 that is still building, decommissioned or closed is no gateway; nor is another nation's port, a
 friend's included. A rig with no own port in reach is **unsupplied**: its cover is 0 and it
 produces nothing. It is still **placeable**, as a land building on a road no source covers is; the
-Build door and the site reads show it uncovered (`lp_coverage_at`). Its output reaches market
-through that same shore: a rig clears in its own tile's market, the catchment of the coast it lies
-off (`PRODUCTION.md` § Extraction buildings).
+Build door and the site reads show it uncovered (`lp_coverage_at`). The port is its gateway for
+**supply only**. A rig's output does not pass through the port: it clears in the market of the
+coast it lies off, its own tile's market (`PRODUCTION.md` § Extraction buildings). The Logistics
+lens draws a rig's flow at its supplying port, the tile cover is routed at.
 
 *Why six (in-band, 2026-11-10).* Six is the Track's full-strength reach on land, the shortest reach
 any source carries in full. A rig is a short service run from its port, not a voyage: fifty, a

@@ -322,14 +322,22 @@ Reading the tables (`generate_deposits`, `src/world/tile_generation.cpp`):
   tiles carry nothing at all.
 
 **Shelf petroleum (Ben, 2026-11-10).** Shelf sea carries petroleum: generation lays it on `coast`
-tiles, and on no other water. It is the land oil's own mechanism continued under the sea.
-Petroleum is a marine legacy, laid where the ground sat in a shallow, productive sea at the oil
-epoch. So a shelf tile bears where a **land neighbour sat low** — the marine cut the land row reads,
-the lowest 40% of land — and its palaeo latitude was productive: the land row's belt, tropical and
-subtropical 1.0, temperate 0.8, subpolar 0.45, polar none. The magnitude is the land row's, 0–120
-times the body's petroleum rarity and the belt, then the body's deposit scalar and endowment. The
-ore field that gathers land oil into regions is a land field and is not applied. The draw has its
-own stream, so no land tile's deposit moves.
+tiles, and on no other water. It is a **basin**: an oil field on the shore running out under the
+shelf, and the shelf bears nowhere else (calibrated 2026-11-11, BL-1522 (offshore drilling)).
+
+- **A field** is land oil in the top 9% of the body's bearing land (the 0.91 quantile), where the
+  ore fields gathered it. A trace is not a field: low coastal ground almost always bears some,
+  and "next to any oil" would put oil under most of the shelf.
+- **The edge** is a shelf tile next to field land. **The patch** is shelf tiles one shelf step
+  from an edge tile; it reaches no further.
+- **Richness follows the field.** An edge tile takes the richest field land beside it; a patch
+  tile takes the richest edge beside it, at half. Each is drawn 0.4–0.8 of that, times the shelf
+  tile's own palaeo belt (tropical and subtropical 1.0, temperate 0.8, subpolar 0.45, polar none).
+  The land value already carries the body's scalars, so none is applied again.
+
+The target is a sparse shelf: roughly 15–25% of shelf tiles bear oil, worth about 10–20% of the
+land's oil, pooled over the curated seeds. The draw has its own stream, read after the land is
+laid, so no land tile's deposit moves.
 
 **Barren:**
 | Deposit | Relative weight | Landform modifier |
