@@ -468,6 +468,13 @@ entity_id rig_supply_port_tile(world& w, entity_id nation, entity_id rig_tile,
 entity_id lp_request_tile(world& w, entity_id nation, entity_id tile, building_type type,
                           resource_type target, lp_reach_memo* memo = nullptr);
 
+/// The tile a building STANDING on @p tile would be routed at, for a tile-level read
+/// (cover, points reaching, the site reads): `lp_request_tile` asked of the one
+/// building shelf sea takes, the Oil Platform (extraction_site -> petroleum). Land, and
+/// any other water, is its own tile; a shelf tile is its port, null with none in reach.
+entity_id lp_site_request_tile(world& w, entity_id nation, entity_id tile,
+                               lp_reach_memo* memo = nullptr);
+
 /// The same, on a memo of its own (a caller with no resolve in hand, e.g. placement).
 entity_id unit_supply_draw_tile(world& w, entity_id nation, entity_id unit_tile,
                                 int max_steps = lp_offroad_draw_steps, int* steps_out = nullptr);
@@ -514,6 +521,7 @@ struct lp_coverage_why
     float      distance = 0.0f;
     int        used     = 0;     ///< sources the cover was topped up from (lp_route::used)
     bool       blocked  = false; ///< a source reached here but has no chain to the capital (lp_route::blocked)
+    bool       no_port  = false; ///< BL-1522: a shelf tile with no own port within lp_rig_port_reach
 };
 
 /// The coverage a building standing on @p tile would get from the running

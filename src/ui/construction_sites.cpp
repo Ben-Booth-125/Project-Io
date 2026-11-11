@@ -1237,10 +1237,8 @@ float site_lp_cover(world& w, entity_id tile, bool* blocked)
     if (tit != w.tiles.end() && nit != w.tile_to_nation.end() && nit->second != null_entity)
     {
         // BL-1522: a shelf tile's one building is a rig, routed at its own port in reach -
-        // the resolver's rule (lp_request_tile). No port in reach: cover 0, a no-LP row.
-        entity_id at = tile;
-        if (is_coastal_water(tit->second.substrate))
-            at = rig_supply_port_tile(w, nit->second, tile, nullptr, &cc.memo);
+        // the resolver's rule (lp_site_request_tile). No port in reach: cover 0, no-LP row.
+        const entity_id at = lp_site_request_tile(w, nit->second, tile, &cc.memo);
         if (at != null_entity)
         {
             const lp_route r = lp_route_to(w, cc.memo, nit->second, tit->second.body, at);

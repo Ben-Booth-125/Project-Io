@@ -194,7 +194,8 @@ construction_result construct_for(world& w, const recipe_registry& reg,
             return construction_result::wrong_air;
 
     // Tile-level validity check (ocean / deposit / terrain).
-    if (!placement_rules::can_place(tile_it->second, type, target))
+    // BL-1522: the build door's tile check, which alone admits a rig on shelf sea.
+    if (!placement_rules::can_place_site(tile_it->second, type, target))
         return construction_result::invalid_tile;
 
     // BL-1255 (LOGISTICS.md § 4c; PRODUCTION.md § Infrastructure buildings): a

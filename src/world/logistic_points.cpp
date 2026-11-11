@@ -1216,6 +1216,12 @@ entity_id lp_request_tile(world& w, entity_id nation, entity_id tile, building_t
     return tile;
 }
 
+entity_id lp_site_request_tile(world& w, entity_id nation, entity_id tile, lp_reach_memo* memo)
+{
+    return lp_request_tile(w, nation, tile, building_type::extraction_site,
+                           resource_type::petroleum, memo);
+}
+
 namespace {
 
 /// Steps from @p target over @p nation's own dry ground (4-neighbour, columns wrap) -
@@ -1369,14 +1375,15 @@ float lp_coverage_at(world& w, lp_reach_memo& memo, entity_id tile, lp_coverage_
     if (tit == w.tiles.end() || nit == w.tile_to_nation.end())
         return 0.0f;
     // BL-1522: the only building that stands on shelf sea is a rig, and a rig is
-    // routed at its own nation's port within reach - so that is the cover a building
-    // standing here would get. No port in reach: 0, unreached.
-    entity_id at = tile;
-    if (is_coastal_water(tit->second.substrate))
+    // routed at its own nation's port within reach (lp_site_request_tile, the
+    // resolver's rule) - so that is the cover a building standing here would get. No
+    // port in reach: 0, unreached, and the why says so.
+    const entity_id at = lp_site_request_tile(w, nit->second, tile, &memo);
+    if (at == null_entity)
     {
-        at = rig_supply_port_tile(w, nit->second, tile, nullptr, &memo);
-        if (at == null_entity)
-            return 0.0f;
+        if (why != nullptr)
+            why->no_port = true;
+        return 0.0f;
     }
     const lp_route r = lp_route_to(w, memo, nit->second, tit->second.body, at);
     if (why != nullptr)
@@ -1396,13 +1403,18 @@ float lp_points_reaching(world& w, lp_reach_memo& memo, const lp_tick& t, entity
     const entity_id nation = nit->second;
     const entity_id body   = tit->second.body;
     const entity_id centre = chain_anchor(w, nation, body);
+    // BL-1522: a shelf tile reads the points reaching its supplying port, the tile its
+    // rig is routed at (lp_site_request_tile) - none with no own port in reach.
+    const entity_id at = lp_site_request_tile(w, nation, tile, &memo);
+    if (at == null_entity)
+        return 0.0f;
     float sum = 0.0f;
     int   n   = 0;
     // Ascending building id (memo_sources' order), so the float sum is replay-exact.
     for (const lp_source_ref& s : memo_sources(w, memo, nation, body))
     {
         const auto& f   = memo_field(w, memo, s, body);
-        const auto  dit = f.find(tile);
+        const auto  dit = f.find(at);
         if (dit == f.end())
             continue;
         const float r = lp_reach(s.network, dit->second);

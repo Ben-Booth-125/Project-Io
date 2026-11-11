@@ -119,7 +119,8 @@ Drilling** (`tech/DIGITISATION_TREE.md`, DG-PR-EX-A). How a rig is supplied is `
 § Logistic Points, "A rig is supplied through its own port"; what it produces is `PRODUCTION.md`
 § Extraction buildings. The road, reach-field and province-ceiling rules are land's, and a rig is
 not asked them: a sea province sustains no land building, and a rig is bounded by its deposit's
-stack.
+stack. **Generation places no building on water**, a rig included: the opening's charters and kit
+stand on land, and a rig is only ever a build through the verb.
 
 ### Terrain cover
 

@@ -3987,16 +3987,13 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
             if (!lp_may_source || tn == w.tile_to_nation.end())
                 return out;
             // BL-1522: a rig on shelf sea is supplied at its own port, so the chain it
-            // needs is the chain to THAT port tile; no port in reach, unreachable.
-            if (const auto rt = w.tiles.find(tile);
-                rt != w.tiles.end() && is_coastal_water(rt->second.substrate))
+            // needs is the chain to THAT port tile (lp_site_request_tile, the resolver's
+            // rule); no port in reach, unreachable.
+            tile = lp_site_request_tile(w, tn->second, tile, &lp_memo);
+            if (tile == null_entity)
             {
-                tile = rig_supply_port_tile(w, tn->second, tile, nullptr, &lp_memo);
-                if (tile == null_entity)
-                {
-                    out.reachable = false;
-                    return out;
-                }
+                out.reachable = false;
+                return out;
             }
             if (tn->second == lp_player_nation)
             {
@@ -6227,9 +6224,17 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                 };
                 const auto tn = w.tile_to_nation.find(c.cmd.tile);
                 const bool legacy = tn != w.tile_to_nation.end() && tn->second == lp_player_nation;
+                // BL-1522: a rig is supplied only through its own port, so a hub laid on
+                // or beside its water tile would feed nothing: the legacy grant lays none
+                // for a rig (the port is what supplies it).
+                const bool rig_build = [&] {
+                    const auto rt = w.tiles.find(c.cmd.tile);
+                    return rt != w.tiles.end()
+                        && placement_rules::is_offshore_rig(rt->second.substrate, c.cmd.type, c.cmd.target);
+                }();
                 if (legacy)
                 {
-                    if (lp_coverage_at(w, lp_memo, c.cmd.tile) < 1.0f)
+                    if (!rig_build && lp_coverage_at(w, lp_memo, c.cmd.tile) < 1.0f)
                     {
                         std::vector<entity_id> spots = {c.cmd.tile};
                         const auto tt = w.tiles.find(c.cmd.tile);
@@ -6268,13 +6273,11 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                     {
                         if (lp_coverage_at(w, lp_memo, c.cmd.tile) >= 1.0f)
                             break;
-                        // BL-1522: a rig's chain runs to its port (source_capex priced it so).
-                        entity_id chain_target = c.cmd.tile;
-                        if (const auto rt = w.tiles.find(chain_target);
-                            rt != w.tiles.end() && is_coastal_water(rt->second.substrate))
-                            chain_target = (tn != w.tile_to_nation.end())
-                                ? rig_supply_port_tile(w, tn->second, chain_target, nullptr, &lp_memo)
-                                : null_entity;
+                        // BL-1522: a rig's chain runs to its port (source_capex priced it so),
+                        // the resolver's rule (lp_request_tile).
+                        const entity_id chain_target = (tn != w.tile_to_nation.end())
+                            ? lp_request_tile(w, tn->second, c.cmd.tile, c.cmd.type, c.cmd.target, &lp_memo)
+                            : (rig_build ? null_entity : c.cmd.tile);
                         if (chain_target == null_entity)
                             break;
                         const lp_chain_plan plan = chain_for(chain_target);

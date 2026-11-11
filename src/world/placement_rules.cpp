@@ -247,17 +247,11 @@ int auto_road_side(const world& w, entity_id tile, std::uint8_t tier, entity_id 
 
 placement_result can_place(const tile_component& tc, building_type type, resource_type target)
 {
-    // No building ever sits on water - save one. BL-1522 (Ben, 2026-11-10; TILES.md
-    // § Water kinds): an Oil Platform stands on SHELF sea (coast water) carrying
-    // petroleum. Open ocean and lakes take nothing, a rig included.
+    // No building ever sits on water. The one exception, BL-1522's Oil Platform on
+    // shelf sea, is admitted by can_place_site alone (the build door), so every
+    // generation placer that asks this check keeps off the water.
     if (is_water_tile(tc.substrate))
-    {
-        if (is_offshore_rig(tc.substrate, type, target))
-            return tc.resource_deposit[static_cast<std::size_t>(resource_type::petroleum)] > 0.0f
-                ? placement_reason::ok
-                : placement_reason::no_deposit;
         return placement_reason::ocean;
-    }
 
     switch (type)
     {
@@ -508,6 +502,18 @@ bool centre_within_radius(const world& w, const tile_component& tc, int radius)
 
 } // namespace
 
+placement_result can_place_site(const tile_component& tc, building_type type, resource_type target)
+{
+    // BL-1522 (Ben, 2026-11-10; TILES.md § Water kinds): an Oil Platform stands on SHELF
+    // sea (coast water) carrying petroleum. Open ocean and lakes take nothing, a rig
+    // included; every other case is the bare check's.
+    if (is_offshore_rig(tc.substrate, type, target))
+        return tc.resource_deposit[static_cast<std::size_t>(resource_type::petroleum)] > 0.0f
+            ? placement_reason::ok
+            : placement_reason::no_deposit;
+    return can_place(tc, type, target);
+}
+
 placement_result can_place_in_world(const world& w, entity_id tile_id,
                                     building_type type, resource_type target,
                                     float max_reach, entity_id corp,
@@ -517,7 +523,7 @@ placement_result can_place_in_world(const world& w, entity_id tile_id,
     if (tc_it == w.tiles.end())
         return placement_reason::no_tile;
     // Tile-level terrain/deposit check first — propagate its specific reason.
-    if (const placement_result tile_ok = can_place(tc_it->second, type, target); !tile_ok)
+    if (const placement_result tile_ok = can_place_site(tc_it->second, type, target); !tile_ok)
         return tile_ok;
 
     // BL-344 tech gate. Ahead of the world-level terrain checks on purpose: a

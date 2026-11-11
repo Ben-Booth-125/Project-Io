@@ -170,7 +170,7 @@ canvas_pass_meter& pass_meter()
 bool suitability_placeable(const world& w, entity_id id, const tile_component& tile,
                            building_type bt, resource_type target)
 {
-    if (!placement_rules::can_place(tile, bt, target))
+    if (!placement_rules::can_place_site(tile, bt, target)) // BL-1522: the door's check, rig included
         return false;
     if (bt != building_type::extraction_site
         || tile.resource_deposit[static_cast<std::size_t>(target)] > 0.0f)
@@ -2110,6 +2110,7 @@ void update_body_throughput(world& w, ui_state& state, const recipe_registry& re
     state.lp_player_known    = false;
     state.lp_hover_tile      = null_entity;
     state.lp_hover_reached   = false;
+    state.lp_hover_no_port   = false;
     state.lp_hover_reaching  = 0.0f;
     state.lp_hover_sources   = 0;
     state.lp_hover_consumed  = 0.0f;
@@ -2420,6 +2421,7 @@ void update_body_throughput(world& w, ui_state& state, const recipe_registry& re
                 state.lp_hover_distance = why.distance;
                 state.lp_hover_used     = why.used;
                 state.lp_hover_blocked  = why.blocked;
+                state.lp_hover_no_port  = why.no_port;
                 state.lp_hover_tile     = state.hovered_structure;
                 // The card's stacked pair is the tile's own two numbers, read back.
                 if (const auto ht = w.tiles.find(state.hovered_structure);

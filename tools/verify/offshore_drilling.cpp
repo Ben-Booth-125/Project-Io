@@ -173,7 +173,7 @@ void fixture()
     using placement_rules::can_place_in_world;
     using placement_rules::placement_reason;
     const auto tile_reason = [&](entity_id t, building_type ty, resource_type r) {
-        return can_place(w.tiles.at(t), ty, r).reason;
+        return placement_rules::can_place_site(w.tiles.at(t), ty, r).reason; // the build door's
     };
     const entity_id near_rig = g_tile[3][2];
     const entity_id far_rig  = g_tile[3][10];
@@ -197,6 +197,11 @@ void fixture()
           "G4 the rig is the ONE building on water: any other type or target on the shelf is refused");
     check(tile_reason(land_oil, ex, oil) == placement_reason::ok,
           "G4b the land Oil Platform is unchanged");
+    // G0 (cold review, fix 1): the BARE check - what every generation placer asks - keeps
+    // refusing water, a rig included; only the build door's can_place_site admits one.
+    check(can_place(w.tiles.at(near_rig), ex, oil).reason == placement_reason::ocean
+              && can_place(w.tiles.at(land_oil), ex, oil).ok(),
+          "G0 bare can_place (generation's check) refuses a rig on the shelf; land oil unchanged");
 
     // G5-G7: the world-level rule, asked as nation A.
     check(can_place_in_world(w, near_rig, ex, oil, 24.0f, a).reason == placement_reason::tech_locked,
