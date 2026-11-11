@@ -318,6 +318,17 @@ inline constexpr const char* sentiment_factor_names[sentiment_factor_count] = {
     "nuclear_used",
 };
 
+/// BL-1431 review: the table is sized by the count, so a missing name would be a silent
+/// nullptr; refuse to compile one instead.
+constexpr bool sentiment_factor_names_all_set()
+{
+    for (const char* s : sentiment_factor_names)
+        if (s == nullptr || s[0] == '\0')
+            return false;
+    return true;
+}
+static_assert(sentiment_factor_names_all_set(), "every sentiment_factor_kind needs a name");
+
 /// The AUTHORED weight of one kind of conduct: how far a single occurrence moves
 /// each dimension. Both default to zero, which is what makes an unauthored
 /// factor inert rather than guessed — a factor that has not been given a number
@@ -707,4 +718,5 @@ void write_sentiment_provenance(const sentiment_table& t, std::ostream& out);
 bool read_sentiment_provenance(const sentiment_table& t, std::istream& in,
                                std::map<std::pair<entity_id, entity_id>,
                                         std::vector<sentiment_contribution>>& contributions,
-                               std::map<std::pair<entity_id, entity_id>, sentiment_seed_record>& seeds);
+                               std::map<std::pair<entity_id, entity_id>, sentiment_seed_record>& seeds,
+                               std::size_t kinds = sentiment_factor_count);

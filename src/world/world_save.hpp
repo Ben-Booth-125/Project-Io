@@ -779,6 +779,13 @@ inline constexpr bool world_stream_has_missiles(uint32_t version)
     return version >= k_world_save_version_missiles;
 }
 
+/// BL-1431: how many sentiment factor kinds a stream of @p version can name. v89 added
+/// `nuclear_used` (kind 20); an older stream naming it was not written by any build.
+inline constexpr std::size_t world_stream_sentiment_kinds(uint32_t version)
+{
+    return world_stream_has_missiles(version) ? sentiment_factor_count : 20;
+}
+
 /// The naval merge: the first version stacking every section, 56 wide.
 inline constexpr uint32_t k_world_save_version_stacked = 88;
 

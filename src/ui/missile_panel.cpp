@@ -155,7 +155,24 @@ bool draw_missile_section(const world& w, const recipe_registry& reg, ui_state& 
         if (ImGui::IsItemHovered())
             ImGui::SetTooltip("Buy into the magazine; the goods come off your shelves at their prices.");
 
-        const std::vector<missile_target> targets = missile_targets(w, reg, owner, e, k);
+        // BL-1431 review: cached per (launcher, kind); refreshed as the day moves, every
+        // k_missile_target_refresh_frames frames, or when app sends the section's orders.
+        std::vector<missile_target> targets;
+        {
+            missile_ui_state::target_cache& tc = m.targets[{e, ki}];
+            const int frame = ImGui::GetFrameCount();
+            if (tc.day != w.current_day_tick || tc.frame < 0 || frame - tc.frame >= k_missile_target_refresh_frames
+                || frame < tc.frame)
+            {
+                tc.targets.clear();
+                for (const missile_target& t : missile_targets(w, reg, owner, e, k))
+                    tc.targets.push_back({t.province, t.building});
+                tc.day   = w.current_day_tick;
+                tc.frame = frame;
+            }
+            for (const auto& [p, b] : tc.targets)
+                targets.push_back({p, b});
+        }
         if (targets.empty())
             ImGui::TextDisabled("No sighted hostile target in reach (%d tiles).", P.kind[static_cast<std::size_t>(ki)].range);
         else

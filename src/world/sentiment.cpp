@@ -427,8 +427,10 @@ void write_sentiment_provenance(const sentiment_table& t, std::ostream& out)
 bool read_sentiment_provenance(const sentiment_table& t, std::istream& in,
                                std::map<std::pair<entity_id, entity_id>,
                                         std::vector<sentiment_contribution>>& contributions,
-                               std::map<std::pair<entity_id, entity_id>, sentiment_seed_record>& seeds)
+                               std::map<std::pair<entity_id, entity_id>, sentiment_seed_record>& seeds,
+                               std::size_t kinds)
 {
+    kinds = std::min(kinds, sentiment_factor_count); // BL-1431: the stream's version bounds the kinds
     contributions.clear();
     seeds.clear();
 
@@ -443,7 +445,7 @@ bool read_sentiment_provenance(const sentiment_table& t, std::istream& in,
             return false;
         // Strictly ascending, a row the table holds, 1..count-of-kinds shares.
         if ((!contributions.empty() && !(contributions.rbegin()->first < key))
-            || t.pairs.count(key) == 0 || n == 0 || n > sentiment_factor_count)
+            || t.pairs.count(key) == 0 || n == 0 || n > kinds)
             return false;
         std::vector<sentiment_contribution> shares;
         shares.reserve(n);
@@ -454,7 +456,7 @@ bool read_sentiment_provenance(const sentiment_table& t, std::istream& in,
             in.read(reinterpret_cast<char*>(&k), 1);
             if (!in || !read_f32(in, c.access) || !read_f32(in, c.trust) || !read_f32(in, c.alarm))
                 return false;
-            if (k >= sentiment_factor_count
+            if (k >= kinds
                 || (!shares.empty() && !(static_cast<uint8_t>(shares.back().kind) < k))
                 || !std::isfinite(c.access) || !std::isfinite(c.trust) || !std::isfinite(c.alarm))
                 return false;

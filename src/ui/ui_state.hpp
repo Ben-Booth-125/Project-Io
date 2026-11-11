@@ -643,7 +643,18 @@ struct missile_ui_state
     std::string               last_message; ///< The seam's answer (app writes it).
     /// The target index picked per (launcher, kind).
     std::map<std::pair<entity_id, int>, int> target_pick;
+    /// The target list per (launcher, kind), recomputed when the day moves, every
+    /// `k_missile_target_refresh_frames` frames, or once the section's orders are sent
+    /// (app clears it): `missile_targets` walks every unit and building, so not per frame.
+    struct target_cache
+    {
+        int day   = -1;
+        int frame = -1;
+        std::vector<std::pair<uint32_t, entity_id>> targets; ///< (province, building or null)
+    };
+    std::map<std::pair<entity_id, int>, target_cache> targets;
 };
+inline constexpr int k_missile_target_refresh_frames = 30;
 
 struct ship_ui_state
 {

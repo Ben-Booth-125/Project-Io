@@ -888,7 +888,9 @@ when four things hold:
   sighted a ship.
 
 A province strike lands on one hostile unit there, a unit in battle first, as tactical bombing
-does (§ Air). A building strike lands on the building's condition. Only buildings whose
+does (§ Air). It needs one to land on: a province with no hostile unit in it is refused,
+however hostile its holder, and a warhead's needs a hostile unit or building there. A unit a
+strike grinds to no men is disbanded as one a battle kills is. A building strike lands on the building's condition. Only buildings whose
 condition matters may be named (§ Air, strategic bombing), and a damaged one repairs as a
 bombed one does. A tactical warhead strikes the whole province whatever was named. A missile
 strike is one blow, so it takes no day scale.
@@ -896,9 +898,10 @@ strike is one blow, so it takes no day scale.
 **Interception is arithmetic, not a draw.** An **interceptor** is a missile of its own,
 2 guided weapons and 3 electronics, about 606 at base prices. That is more than a short-range
 missile, so a defence that stops a cheap strike pays more than the strike did. An interceptor
-is stocked at an **air defence unit**, up to 24 to a unit; a unit that boards a ship leaves its
-stock behind. A strike draws on every air defence unit in the target province whose nation is
-hostile to the firer, either way, in ascending unit id. Doctrine spends **two interceptors on
+is stocked at an **air defence unit**, up to 24 to a unit; a unit that boards a ship, or is
+disbanded, loses its stock. A strike draws on every air defence unit standing in the target
+province whose nation is hostile to the firer, either way, in ascending unit id. A unit in the
+surf off a landing draws none, as it launches none. Doctrine spends **two interceptors on
 each incoming missile**. Each one lets through (1000 − its kind's stop) per-mille of the missile,
 so two let through that figure squared over 1000. A missile no interceptor met lands whole.
 The strike's damage scales with the missiles that land, counted in thousandths. Against eight

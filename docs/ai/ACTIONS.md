@@ -1212,12 +1212,12 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 - The launcher exists (rejected_invalid) and is the actor's (rejected_not_owner).
 - The kind is 0..2 and one the launcher carries; the salvo is 1..8; the province exists; a named building stands completed in it and its condition matters (rejected_invalid).
 - The launcher is raised and not refitting, mustering or aboard; a wing has its own standing airbase (rejected_state).
-- The target belongs to a nation the actor has declared hostile: the building's owner, or the province's holder or a unit standing in it (rejected_state).
+- The target belongs to a nation the actor has declared hostile: the building's owner, or the province's holder or a unit standing in it; a province strike needs a hostile unit standing there, a tactical warhead's a hostile unit or building (rejected_state).
 - It lies within reach: the kind's range, plus a wing's own range (rejected_placement).
 - The actor sees the province: its ground, a unit or ship of its within 4 tiles, a wing of its flying there, or a hostile unit or ship it revealed there (rejected_state).
 - The magazine holds the salvo (rejected_funds). A refusal mutates nothing.
 
-**Expected output.** The salvo leaves the magazine. Hostile air defence in the province spends two interceptors on each missile; what lands kills men and readiness of one hostile unit (in battle first) or lowers the building's condition. A tactical warhead hits every hostile unit and building in the province and raises every nation's Alarm toward the firer by 30 a warhead, the struck nation's by 60.
+**Expected output.** The salvo leaves the magazine. Hostile air defence standing in the province (not aboard or in the surf) spends two interceptors on each missile; what lands kills men and readiness of one hostile unit (in battle first) or lowers the building's condition. A tactical warhead hits every hostile unit and building in the province and raises every nation's Alarm toward the firer by 30 a warhead, the struck nation's by 60.
 
 **Reason to select.** Strike a sighted enemy stack or a factory beyond the front without risking a unit.
 

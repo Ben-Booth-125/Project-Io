@@ -200,9 +200,8 @@ bool missile_province_sighted(const world& w, const recipe_registry& reg, entity
         if (const auto it = w.tile_to_nation.find(t); it != w.tile_to_nation.end() && it->second == nation)
             return true;
     const int sight = mp(reg).sight_tiles;
-    for (const entity_id uid : sorted_unit_ids(w))
+    for (const auto& [uid, u] : w.units) // an any-test: its answer cannot depend on order
     {
-        const unit_component& u = w.units.at(uid);
         if (u.owner != nation || u.count <= 0 || u.position == null_entity)
             continue;
         const int d = air_province_distance(w, u.position, province_id);
@@ -304,10 +303,62 @@ corp_command_result stock_interceptors_check(const world& w, const recipe_regist
 // The strike
 // ---------------------------------------------------------------------------
 
-corp_command_result fire_missile_check(const world& w, const recipe_registry& reg, entity_id nation,
+namespace {
+
+/// What every strike check on @p nation's side reads off the world, gathered ONCE per pass
+/// (BL-1431 review): hostile units and hostile buildings by province, ascending id, and a
+/// memo of which provinces it has sighted. A check over many launchers, kinds and targets
+/// shares one scan, so the cost is one walk of units and buildings, not one per candidate.
+/// Every list is ascending, so a check through a scan answers exactly as one without.
+struct missile_scan
+{
+    entity_id nation = null_entity;
+    std::map<uint32_t, std::vector<entity_id>> hostile_units;     ///< province -> ascending ids
+    std::map<uint32_t, std::vector<entity_id>> hostile_buildings; ///< province -> ascending ids
+    std::map<uint32_t, bool> sighted;                             ///< memo of missile_province_sighted
+};
+
+missile_scan scan_for(const world& w, entity_id nation)
+{
+    missile_scan sc;
+    sc.nation = nation;
+    for (const entity_id uid : sorted_unit_ids(w))
+    {
+        const unit_component& u = w.units.at(uid);
+        if (u.count > 0 && u.owner != nation && is_hostile(w, nation, u.owner))
+            sc.hostile_units[w.provinces.province_of(u.position)].push_back(uid);
+    }
+    std::vector<entity_id> bids;
+    for (const auto& kv : w.buildings)
+        if (hostile_target_owner(w, nation, kv.first) != null_entity)
+            bids.push_back(kv.first);
+    std::sort(bids.begin(), bids.end());
+    for (const entity_id bid : bids)
+        sc.hostile_buildings[w.provinces.province_of(w.buildings.at(bid).tile)].push_back(bid);
+    return sc;
+}
+
+const std::vector<entity_id>& in_province(const std::map<uint32_t, std::vector<entity_id>>& m, uint32_t p)
+{
+    static const std::vector<entity_id> none;
+    const auto it = m.find(p);
+    return it == m.end() ? none : it->second;
+}
+
+bool scan_sighted(const world& w, const recipe_registry& reg, missile_scan& sc, uint32_t p)
+{
+    const auto it = sc.sighted.find(p);
+    if (it != sc.sighted.end())
+        return it->second;
+    const bool s = missile_province_sighted(w, reg, sc.nation, p);
+    sc.sighted.emplace(p, s);
+    return s;
+}
+
+corp_command_result fire_check_scanned(const world& w, const recipe_registry& reg, entity_id nation,
                                        entity_id launcher, uint32_t kind, uint32_t salvo,
                                        uint32_t province_id, entity_id building,
-                                       missile_strike_plan* plan_out)
+                                       missile_strike_plan* plan_out, missile_scan& sc)
 {
     const missile_launcher_type lt = missile_launcher_of(w, launcher);
     if (lt == missile_launcher_type::none)
@@ -315,7 +366,7 @@ corp_command_result fire_missile_check(const world& w, const recipe_registry& re
     const entity_id owner = lt == missile_launcher_type::land_unit ? w.units.at(launcher).owner
                           : lt == missile_launcher_type::ship      ? w.ships.at(launcher).owner
                                                                    : w.wings.at(launcher).owner;
-    if (owner != nation || !is_live_nation(w, nation))
+    if (owner != nation || !is_live_nation(w, nation) || sc.nation != nation)
         return corp_command_result::rejected_not_owner;
     // NO VERB FIRES A STRATEGIC WEAPON (MILITARY.md § Missiles): kind 3 and anything
     // past it is refused here, before any other leg is read.
@@ -334,18 +385,12 @@ corp_command_result fire_missile_check(const world& w, const recipe_registry& re
     const province* prov = w.provinces.find(province_id);
     if (prov == nullptr)
         return corp_command_result::rejected_invalid;
+    const missile_kind_stats& ks = P.kind[col(k)];
 
     // The target, and whose it is.
     entity_id struck = null_entity;
-    const std::vector<entity_id> uids = sorted_unit_ids(w);
-    std::vector<entity_id> hostile_units; // in the province, ascending
-    for (const entity_id uid : uids)
-    {
-        const unit_component& u = w.units.at(uid);
-        if (u.count > 0 && u.owner != nation && w.provinces.province_of(u.position) == province_id
-            && is_hostile(w, nation, u.owner))
-            hostile_units.push_back(uid);
-    }
+    const std::vector<entity_id>& hostile_units = in_province(sc.hostile_units, province_id);
+    const std::vector<entity_id>& hostile_bids  = in_province(sc.hostile_buildings, province_id);
     if (building != null_entity)
     {
         const auto bit = w.buildings.find(building);
@@ -358,20 +403,25 @@ corp_command_result fire_missile_check(const world& w, const recipe_registry& re
     }
     else
     {
+        // A province strike needs something to strike (BL-1431 review): a conventional one a
+        // hostile unit standing there, an area one a hostile unit or a hostile building. A
+        // hostile holder over empty ground is not a target; the salvo is not wasted silently.
+        if (hostile_units.empty() && (!ks.area || hostile_bids.empty()))
+            return corp_command_result::rejected_state;
         const entity_id holder = province_holder_for(w, province_id);
         if (holder != null_entity && holder != nation && is_hostile(w, nation, holder))
             struck = holder;
         else if (!hostile_units.empty())
             struck = w.units.at(hostile_units.front()).owner;
         else
-            return corp_command_result::rejected_state;
+            struck = hostile_target_owner(w, nation, hostile_bids.front());
     }
 
     const int dist = building != null_entity ? air_tile_distance(w, from, w.buildings.at(building).tile)
                                              : air_province_distance(w, from, province_id);
     if (dist < 0 || dist > reach)
         return corp_command_result::rejected_placement;
-    if (!missile_province_sighted(w, reg, nation, province_id))
+    if (!scan_sighted(w, reg, sc, province_id))
         return corp_command_result::rejected_state;
     if (missile_stock(w, nation, k) < static_cast<int32_t>(salvo))
         return corp_command_result::rejected_funds;
@@ -379,27 +429,31 @@ corp_command_result fire_missile_check(const world& w, const recipe_registry& re
         return corp_command_result::applied;
 
     // --- The plan --------------------------------------------------------------
-    const missile_kind_stats& ks = P.kind[col(k)];
     missile_strike_plan plan;
     plan.kind   = k;
     plan.salvo  = static_cast<int>(salvo);
     plan.struck = struck;
 
     // Interceptors: every air defence unit in the province hostile to the firer, either
-    // way, ascending id, until the salvo's doctrine is met.
+    // way, ascending id (the stock map's order), until the salvo's doctrine is met. Only a
+    // unit standing on the ground draws: one aboard a ship is out of `world::units`, and one
+    // in the surf (`landing_ship`) fires nothing, as neither may launch (BL-1431 review).
     int need = static_cast<int>(salvo) * std::max(1, P.interceptors_per_missile);
-    for (const entity_id uid : uids)
+    for (const auto& [uid, have] : w.interceptor_stocks)
     {
         if (need <= 0)
             break;
-        const auto sit = w.interceptor_stocks.find(uid);
-        if (sit == w.interceptor_stocks.end() || sit->second <= 0)
+        if (have <= 0)
             continue;
-        const unit_component& u = w.units.at(uid);
-        if (u.count <= 0 || w.provinces.province_of(u.position) != province_id || u.owner == nation
+        const auto uit = w.units.find(uid);
+        if (uit == w.units.end())
+            continue;
+        const unit_component& u = uit->second;
+        if (u.count <= 0 || u.landing_ship != null_entity || u.position == null_entity
+            || w.provinces.province_of(u.position) != province_id || u.owner == nation
             || !(is_hostile(w, nation, u.owner) || is_hostile(w, u.owner, nation)))
             continue;
-        const int take = std::min(need, static_cast<int>(sit->second));
+        const int take = std::min(need, static_cast<int>(have));
         plan.interceptor_draws.push_back({uid, take});
         plan.interceptors += take;
         need -= take;
@@ -433,13 +487,7 @@ corp_command_result fire_missile_check(const world& w, const recipe_registry& re
     {
         for (const entity_id uid : hostile_units)
             unit_hit(uid);
-        std::vector<entity_id> bids;
-        for (const auto& kv : w.buildings)
-            if (w.provinces.province_of(kv.second.tile) == province_id
-                && hostile_target_owner(w, nation, kv.first) != null_entity)
-                bids.push_back(kv.first);
-        std::sort(bids.begin(), bids.end());
-        for (const entity_id bid : bids)
+        for (const entity_id bid : hostile_bids)
             building_hit(bid);
     }
     else if (building != null_entity)
@@ -461,39 +509,64 @@ corp_command_result fire_missile_check(const world& w, const recipe_registry& re
     return corp_command_result::applied;
 }
 
+/// Whether a launcher at @p from with @p reach could touch target (@p p, @p bid) at all: the
+/// check's own range leg, tested before the full check is built.
+bool in_reach(const world& w, entity_id from, int reach, uint32_t p, entity_id bid)
+{
+    const int dist = bid != null_entity ? air_tile_distance(w, from, w.buildings.at(bid).tile)
+                                        : air_province_distance(w, from, p);
+    return dist >= 0 && dist <= reach;
+}
+
+/// The (province, building or null) candidates a scan offers, in the published order:
+/// provinces with a hostile unit ascending, then hostile buildings by ascending id.
+std::vector<std::pair<uint32_t, entity_id>> scan_candidates(const missile_scan& sc)
+{
+    std::vector<std::pair<uint32_t, entity_id>> out;
+    for (const auto& [p, ids] : sc.hostile_units)
+        if (p != 0 && !ids.empty())
+            out.push_back({p, null_entity});
+    std::vector<std::pair<entity_id, uint32_t>> bids;
+    for (const auto& [p, ids] : sc.hostile_buildings)
+        if (p != 0)
+            for (const entity_id b : ids)
+                bids.push_back({b, p});
+    std::sort(bids.begin(), bids.end());
+    for (const auto& [b, p] : bids)
+        out.push_back({p, b});
+    return out;
+}
+
+} // namespace
+
+corp_command_result fire_missile_check(const world& w, const recipe_registry& reg, entity_id nation,
+                                       entity_id launcher, uint32_t kind, uint32_t salvo,
+                                       uint32_t province_id, entity_id building,
+                                       missile_strike_plan* plan_out)
+{
+    missile_scan sc = scan_for(w, nation);
+    return fire_check_scanned(w, reg, nation, launcher, kind, salvo, province_id, building, plan_out, sc);
+}
+
 std::vector<missile_target> missile_targets(const world& w, const recipe_registry& reg, entity_id nation,
                                             entity_id launcher, missile_kind k)
 {
     std::vector<missile_target> out;
     int reach = -1;
-    if (!fireable(static_cast<uint32_t>(k)) || !missile_launcher_carries(w, launcher, k)
-        || missile_launch_tile(w, reg, launcher, k, &reach) == null_entity)
+    if (!fireable(static_cast<uint32_t>(k)) || !missile_launcher_carries(w, launcher, k))
         return out;
-    const auto passes = [&](uint32_t p, entity_id b) {
-        const corp_command_result r = fire_missile_check(w, reg, nation, launcher, static_cast<uint32_t>(k), 1, p, b);
-        return r == corp_command_result::applied || r == corp_command_result::rejected_funds;
-    };
-    std::set<uint32_t> provs;
-    for (const entity_id uid : sorted_unit_ids(w))
+    const entity_id from = missile_launch_tile(w, reg, launcher, k, &reach);
+    if (from == null_entity)
+        return out;
+    missile_scan sc = scan_for(w, nation);
+    for (const auto& [p, b] : scan_candidates(sc))
     {
-        const unit_component& u = w.units.at(uid);
-        if (u.count > 0 && u.owner != nation && is_hostile(w, nation, u.owner))
-            provs.insert(w.provinces.province_of(u.position));
-    }
-    provs.erase(0);
-    for (const uint32_t p : provs)
-        if (passes(p, null_entity))
-            out.push_back({p, null_entity});
-    std::vector<entity_id> bids;
-    for (const auto& kv : w.buildings)
-        if (hostile_target_owner(w, nation, kv.first) != null_entity)
-            bids.push_back(kv.first);
-    std::sort(bids.begin(), bids.end());
-    for (const entity_id bid : bids)
-    {
-        const uint32_t p = w.provinces.province_of(w.buildings.at(bid).tile);
-        if (p != 0 && passes(p, bid))
-            out.push_back({p, bid});
+        if (!in_reach(w, from, reach, p, b))
+            continue;
+        const corp_command_result r =
+            fire_check_scanned(w, reg, nation, launcher, static_cast<uint32_t>(k), 1, p, b, nullptr, sc);
+        if (r == corp_command_result::applied || r == corp_command_result::rejected_funds)
+            out.push_back({p, b});
     }
     return out;
 }
@@ -557,10 +630,14 @@ float nuclear_alarm_sum(const world& w, const sentiment_params& sp, entity_id fi
 {
     // The magnitude rule is apply_missile_strike's.
     const float per = sp.factors[static_cast<std::size_t>(sentiment_factor_kind::nuclear_used)].alarm;
-    float sum = 0.0f;
+    std::vector<entity_id> others;
     for (const auto& [nid, nc] : w.nations)
         if (nid != firer && !nc.ended)
-            sum += per * static_cast<float>(salvo) * (nid == struck ? struck_mag : 1.0f);
+            others.push_back(nid);
+    std::sort(others.begin(), others.end()); // a float sum: fix its order (BL-1431 review)
+    float sum = 0.0f;
+    for (const entity_id nid : others)
+        sum += per * static_cast<float>(salvo) * (nid == struck ? struck_mag : 1.0f);
     return sum;
 }
 
@@ -637,41 +714,13 @@ void score_nation_missiles(world& w, const recipe_registry& reg, entity_id natio
         return;
 
     // Targets: provinces with a unit of a nation it has declared hostile, and the hostile
-    // buildings whose condition matters, ascending; each kept only when SIGHTED.
-    std::set<uint32_t> unit_provinces;
-    for (const entity_id uid : sorted_unit_ids(w))
-    {
-        const unit_component& u = w.units.at(uid);
-        if (u.count > 0 && u.owner != nation && is_hostile(w, nation, u.owner))
-            unit_provinces.insert(w.provinces.province_of(u.position));
-    }
-    unit_provinces.erase(0);
+    // buildings whose condition matters, ascending; each kept only when SIGHTED. One scan
+    // serves every check below (BL-1431 review): the world does not move inside this pass.
+    missile_scan sc = scan_for(w, nation);
     std::vector<std::pair<uint32_t, entity_id>> targets; // (province, building or null)
-    std::map<uint32_t, bool> seen;
-    const auto sighted = [&](uint32_t p) {
-        const auto it = seen.find(p);
-        if (it != seen.end())
-            return it->second;
-        const bool s = missile_province_sighted(w, reg, nation, p);
-        seen.emplace(p, s);
-        return s;
-    };
-    for (const uint32_t p : unit_provinces)
-        if (sighted(p))
-            targets.push_back({p, null_entity});
-    {
-        std::vector<entity_id> bids;
-        for (const auto& kv : w.buildings)
-            if (hostile_target_owner(w, nation, kv.first) != null_entity)
-                bids.push_back(kv.first);
-        std::sort(bids.begin(), bids.end());
-        for (const entity_id bid : bids)
-        {
-            const uint32_t p = w.provinces.province_of(w.buildings.at(bid).tile);
-            if (p != 0 && sighted(p))
-                targets.push_back({p, bid});
-        }
-    }
+    for (const auto& t : scan_candidates(sc))
+        if (scan_sighted(w, reg, sc, t.first))
+            targets.push_back(t);
     if (targets.empty())
         return;
 
@@ -700,14 +749,17 @@ void score_nation_missiles(world& w, const recipe_registry& reg, entity_id natio
             if (stock <= 0 || !missile_launcher_carries(w, lid, k))
                 continue;
             int reach = -1;
-            if (missile_launch_tile(w, reg, lid, k, &reach) == null_entity)
+            const entity_id from = missile_launch_tile(w, reg, lid, k, &reach);
+            if (from == null_entity)
                 continue;
             const int salvo = k == missile_kind::tactical_nuclear ? 1 : std::min<int32_t>(stock, 2);
             for (const auto& [p, bid] : targets)
             {
+                if (!in_reach(w, from, reach, p, bid)) // the check's own range leg, first
+                    continue;
                 missile_strike_plan plan;
-                if (fire_missile_check(w, reg, nation, lid, static_cast<uint32_t>(ki), static_cast<uint32_t>(salvo),
-                                       p, bid, &plan) != corp_command_result::applied)
+                if (fire_check_scanned(w, reg, nation, lid, static_cast<uint32_t>(ki), static_cast<uint32_t>(salvo),
+                                       p, bid, &plan, sc) != corp_command_result::applied)
                     continue;
                 double value = static_cast<double>(plan.men) * man_value;
                 for (const auto& [b, loss] : plan.building_hits)

@@ -3811,6 +3811,7 @@ void app::render()
             m_ui.missile.last_message = ui::missile_order_answer(cmd.verb, player_command(cmd));
         }
         m_ui.missile.pending.clear();
+        m_ui.missile.targets.clear(); // the strike moved the world: re-read the targets
     }
 
     // The Military ledger's air Raise: `hire_wing` at the chosen airbase's tile.

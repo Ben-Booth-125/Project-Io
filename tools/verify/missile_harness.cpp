@@ -10,7 +10,9 @@
 //
 // The process exits non-zero if any assertion FAILs.
 
+#include "ui/conduct_words.hpp" // header-only, ImGui-free: the factor kinds' words
 #include "world/components.hpp"
+#include "world/economy_system.hpp" // disband_orphaned_units
 #include "world/corp_command.hpp"
 #include "world/missiles.hpp"
 #include "world/nation_tech.hpp"
@@ -622,6 +624,102 @@ int main()
             std::memcpy(&zero[mag_at + 4 * static_cast<std::size_t>(i)], &z, 4);
         world refused_z;
         check(!from_bytes(zero, refused_z), "M9e an all-zero magazine is refused");
+    }
+
+    // =====================================================================
+    std::printf("\nM10 - review fixes: words, version-bound kinds, empty-province strikes, ground-only interceptors\n");
+    {
+        // 1: every kind has its words; nuclear_used reads as itself, never the fallback.
+        bool words = true;
+        for (std::size_t i = 0; i < sentiment_factor_count; ++i)
+        {
+            const char* s = ui::conduct_words(static_cast<sentiment_factor_kind>(i));
+            words = words && s != nullptr && s[0] != '\0' && std::strcmp(s, "conduct") != 0;
+        }
+        const char* nw = ui::conduct_words(sentiment_factor_kind::nuclear_used);
+        check(words && nw != nullptr && std::strcmp(nw, "a nuclear weapon used") == 0,
+              "M10a every sentiment kind has its words; nuclear_used reads \"a nuclear weapon used\"");
+
+        // 3: a v88 stream naming kind 20 (nuclear_used) is refused; v89 carries it.
+        fixture f; build(f);
+        const scene s = stage(f, reg);
+        hold_node(f.w, f.a, missile_nuclear_node());
+        f.w.missile_magazines[f.a][2] = 1;
+        check(run(f, reg, fire_cmd(f.a, s.art, 2, 1, f.strip(8))) == corp_command_result::applied
+                  && !f.w.sentiment_pending.empty(),
+              "M10b setup: a warhead fired leaves nuclear_used conduct pending");
+        {
+            std::ostringstream o(std::ios::binary);
+            write_world_snapshot_pre_missiles(f.w, o);
+            world old, now;
+            check(!from_bytes(o.str(), old) && from_bytes(to_bytes(f.w), now),
+                  "M10c a v88 stream with nuclear_used conduct pending is REFUSED; the v89 stream loads");
+        }
+        fold_pending_sentiment(f.w, reg);
+        {
+            bool named = false;
+            for (const auto& [key, shares] : f.w.sentiment.contributions)
+                for (const sentiment_contribution& c : shares)
+                    named = named || c.kind == sentiment_factor_kind::nuclear_used;
+            std::ostringstream o(std::ios::binary);
+            write_world_snapshot_pre_missiles(f.w, o);
+            world old, now;
+            check(named && !from_bytes(o.str(), old) && from_bytes(to_bytes(f.w), now),
+                  "M10d a v88 stream whose provenance names nuclear_used is REFUSED; the v89 stream loads");
+        }
+    }
+    {
+        // 6a: a province strike with nothing hostile standing in it is refused.
+        fixture f; build(f);
+        const scene s = stage(f, reg);
+        (void)s;
+        add_unit(f, f.a, 35, 5, land_class::infantry, 10); // A's eyes on strip 9 (columns 36-39)
+        hold_node(f.w, f.a, missile_nuclear_node());
+        f.w.missile_magazines[f.a] = {2, 0, 1};
+        refused(f, [&] { return run(f, reg, fire_cmd(f.a, s.art, 0, 1, f.strip(9))); },
+                corp_command_result::rejected_state,
+                "M10e a conventional strike on a hostile-held province with no hostile unit in it is refused");
+        refused(f, [&] { return run(f, reg, fire_cmd(f.a, s.art, 2, 1, f.strip(9))); },
+                corp_command_result::rejected_state,
+                "M10f an area strike on a province with no hostile unit or building is refused");
+        add_building(f, f.b, 37, 5, building_type::processing_facility);
+        check(fire_missile_check(f.w, reg, f.a, s.art, 2, 1, f.strip(9), null_entity) == corp_command_result::applied
+                  && fire_missile_check(f.w, reg, f.a, s.art, 0, 1, f.strip(9), null_entity)
+                         == corp_command_result::rejected_state,
+              "M10g a hostile building there makes it an area target, still not a conventional one");
+    }
+    {
+        // 6c: interceptors draw only from air defence standing on the ground.
+        fixture f; build(f);
+        const scene s = stage(f, reg);
+        f.w.missile_magazines[f.a][0] = 2;
+        f.w.interceptor_stocks[s.b_ad] = 8;
+        f.w.units.at(s.b_ad).landing_ship = f.w.create_entity(); // in the surf
+        missile_strike_plan surf;
+        fire_missile_check(f.w, reg, f.a, s.art, 0, 2, f.strip(8), null_entity, &surf);
+        check(surf.interceptors == 0 && surf.landed_milli == 2000,
+              "M10h an air defence unit in the surf draws no interceptor");
+        // Aboard: out of world::units, its id still keyed (no live path does this; the check must not trip).
+        f.w.units.at(s.b_ad).landing_ship = null_entity;
+        f.w.units.erase(s.b_ad);
+        missile_strike_plan aboard;
+        fire_missile_check(f.w, reg, f.a, s.art, 0, 2, f.strip(8), null_entity, &aboard);
+        check(aboard.interceptors == 0 && aboard.landed_milli == 2000,
+              "M10i an air defence unit aboard (out of world::units) draws no interceptor");
+    }
+    {
+        // 5 and 6b: a strike that kills a unit outright leaves it to the one disband path, which
+        // takes its interceptor stock with it, so a save never drops what the world holds.
+        fixture f; build(f);
+        const scene s = stage(f, reg);
+        f.w.interceptor_stocks[s.b_ad] = 4;
+        f.w.units.at(s.b_ad).count = 0; // ground to nothing, as a strike or battle can leave it
+        disband_orphaned_units(f.w);
+        check(f.w.units.count(s.b_ad) == 0 && f.w.interceptor_stocks.count(s.b_ad) == 0,
+              "M10j a zero-man unit is disbanded and its interceptor stock goes with it");
+        world back;
+        check(from_bytes(to_bytes(f.w), back) && back.state_hash(0) == f.w.state_hash(0),
+              "M10k so the save carries every stock the world holds (hash equal across save and load)");
     }
 
     std::printf("\nRESULT: %d failures / %d checks\n", failures, checks);

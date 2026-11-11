@@ -4226,7 +4226,10 @@ int disband_orphaned_units(world& w)
     if (gone.empty())
         return 0;
     for (const entity_id id : gone)
+    {
         w.units.erase(id);
+        w.interceptor_stocks.erase(id); // BL-1431: no stock outlives its battery (the save drops none)
+    }
     // A live battle may still list a removed unit; the rounds already skip a unit that
     // is gone (`build_combatants`), and its id is stripped here so no record names a
     // unit the world no longer holds. `gone` is ascending, so a binary search answers.

@@ -1072,7 +1072,9 @@ std::vector<std::pair<entity_id, entity_id>> saved_sightings(const world& w)
 }
 
 /// BL-1431: the magazines the stream carries: a live nation's, not all zero, each count in
-/// range. Ascending, as the map is.
+/// range. Ascending, as the map is. No live path leaves an entry this drops: `stock_missiles`
+/// proves a live nation and the 64 cap, a strike erases an all-zero magazine, and
+/// `eliminate_nation` erases an ended nation's. The filter stays as a guard.
 std::vector<entity_id> saved_missile_magazines(const world& w)
 {
     std::vector<entity_id> v;
@@ -1094,6 +1096,14 @@ std::vector<entity_id> saved_missile_magazines(const world& w)
 }
 
 /// BL-1431: the interceptor stocks the stream carries: a nation's air defence unit's, in range.
+///
+/// NO LIVE PATH LEAVES AN ENTRY THIS FILTER DROPS, so a save never silently changes
+/// state_hash (BL-1431 review). A stock is only ever written by `stock_interceptors`, whose
+/// check proves an owned, manned air defence unit and a count within 1..24; a strike erases
+/// it at zero. Every site that erases a unit calls `forget_air_unit` (which erases the stock)
+/// or is `disband_orphaned_units`, which erases it too; embarking goes through `forget_air_unit`.
+/// A refit keeps the land class (`refit_check`), and an owner that stops being a nation
+/// orphans the unit, which the same disband removes. The filter stays as a guard.
 std::vector<entity_id> saved_interceptor_stocks(const world& w)
 {
     std::vector<entity_id> v;
@@ -4146,7 +4156,7 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
             uint8_t kind = 0;
             if (!r_id(in, e.observer) || !r_id(in, e.subject) || !r_u8(in, kind)
                 || !r_f32(in, e.magnitude)
-                || kind >= sentiment_factor_count || !std::isfinite(e.magnitude)
+                || kind >= world_stream_sentiment_kinds(version) || !std::isfinite(e.magnitude)
                 || e.observer == e.subject
                 || s.nations.count(e.observer) == 0 || s.nations.count(e.subject) == 0)
                 return false; // only nations are queued (sentiment_emitters.cpp)
@@ -4523,7 +4533,8 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
     // already read (`read_sentiment_provenance`); refused whole otherwise. A v76 (and
     // older) stream ends before it: no row names a contributor or a seeded war.
     if (version >= k_world_save_version_contributors
-        && !read_sentiment_provenance(s.sentiment, in, s.sentiment.contributions, s.sentiment.seeds))
+        && !read_sentiment_provenance(s.sentiment, in, s.sentiment.contributions, s.sentiment.seeds,
+                                      world_stream_sentiment_kinds(version)))
         return false;
 
     // v78 (BL-1502): the occupation layer. Untrusted: tiles strictly ascending, each with
