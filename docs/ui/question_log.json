@@ -1295,6 +1295,18 @@
    ],
    "status": "drafted"
   },
+  "options_ground_lightness": {
+   "surface": "Options window - Map section, Ground lightness combo (Off, +15%, +30%, +45%)",
+   "answers": "How light should the map's land read on this display?",
+   "because": "Ben, 2026-11-10 (RENDERING.md § Art direction and palette, 'The land lift'): the lighter tileset is a grade pass on land only with three trial levels, chosen live rather than tuned blind, and the choice must survive a restart. One combo in the window that already holds the display settings; it re-bakes the land and leaves water as it is, so the player sees the effect on the map behind the window.",
+   "backlog_item": "BL-1537",
+   "files": [
+    "src/core/app.cpp",
+    "src/core/ground_layer.cpp",
+    "src/ui/ground_bake.cpp"
+   ],
+   "status": "drafted"
+  },
   "escape_menu": {
    "surface": "Escape menu: the full-window pause screen behind the gear and Esc, with the Save name form, Options, Exit to Menu and Exit Game; and the Load list on the main menu",
    "answers": "How do I stop, keep what I have, and leave?",

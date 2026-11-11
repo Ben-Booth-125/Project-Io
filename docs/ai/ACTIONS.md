@@ -24,7 +24,7 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 > **Generated file.** Produced by `node tools/session/render_actions.js`.
 > Edit the JSON, then re-run; hand edits here are overwritten.
 
-*242 entries — 60 gameplay · 41 canvas · 15 lens · 85 ledger · 41 chrome.*
+*243 entries — 60 gameplay · 41 canvas · 15 lens · 85 ledger · 42 chrome.*
 
 ---
 
@@ -3211,7 +3211,7 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 - App is in game.
 - Not while an ImGui widget owns the keyboard.
 
-**Expected output.** Toggles the Options window: a Display section (Resolution preset combo, Fullscreen, VSync), an Accessibility section (UI Scale), a live window-size readout, and Close. Every change applies live to the SDL window and persists to options.cfg immediately.
+**Expected output.** Toggles the Options window: a Display section (Resolution preset combo, Fullscreen, VSync), an Accessibility section (UI Scale), a Map section (Ground lightness), a live window-size readout, and Close. Every change applies live to the SDL window and persists to options.cfg immediately.
 
 **Reason to select.** To adjust display and UI-scale settings mid-session.
 
@@ -3357,6 +3357,21 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 **Expected output.** The SDL window resizes immediately, un-maximising it first if it was maximised, and the choice persists to options.cfg at once.
 
 **Reason to select.** To fit the window to the display or to a capture-friendly size.
+
+### `chrome.options_set_ground_lightness` — Options window, Map section, Ground lightness combo
+
+**Press.** Open the combo and click a level.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `level` | `enum: Off | +15% | +30% | +45%` | The land lift (RENDERING.md § Art direction and palette): how far the baked map's land is lightened, by roughly that share of its median luminance. Stored as index 0-3 (default 2, +30%); a corrupt config clamps back into this range. |
+
+**Valid when:**
+- Options window open.
+
+**Expected output.** The planetary map's land re-bakes at the chosen lightness over the next moments (the view first); water - sea, lakes and rivers - keeps its colour. Persists to options.cfg immediately. Sim, view and selection untouched.
+
+**Reason to select.** To make the map's land read lighter or darker on this display.
 
 ### `chrome.options_set_ui_scale` — Options window, Accessibility section, UI Scale combo
 

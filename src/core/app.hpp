@@ -549,6 +549,7 @@ private:
         bool fullscreen = false;  ///< Borderless-desktop fullscreen.
         bool vsync      = true;
         int  ui_scale_step = 0;   ///< BL-063 discrete UI scale: 0=1.0, 1=1.25, 2=1.5.
+        int  land_lift = ui::ground::k_land_lift_default; ///< BL-1537 ground lightness: 0 = off, 1-3.
     };
 
     /// Read options.cfg into m_settings; a missing/partial file leaves defaults.

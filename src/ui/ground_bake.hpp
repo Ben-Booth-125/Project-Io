@@ -337,6 +337,11 @@ struct bake_source
     /// pass paints no surface. Folded into route_hash, so flipping it re-bakes
     /// exactly the windows a route reaches.
     bool routes_unpainted = false;
+    /// THE LAND LIFT's level (BL-1537; 0 = off, 1..k_land_lift_levels-1): a view
+    /// setting the snapshot carries, as routes_unpainted is, so it reaches the bake
+    /// through the source and moves terrain_hash on every window that holds land -
+    /// changing it re-bakes the land and leaves the open sea and the lock fill be.
+    std::uint8_t land_lift = 0;
 };
 
 /// The border sets (BL-1251; RENDERING.md § Tiles hold their own ground) —
@@ -416,8 +421,19 @@ int tree_patch_boxes(const bake_source& src, const geometry& g, const bake_param
 /// ABGR u32, row-major). Pixels outside the grid's vertical extent bake
 /// transparent (the canvas background shows through). Pure and deterministic:
 /// same source + params + window -> byte-identical output.
+/// @p land_out (optional, pw*ph) receives each pixel's LAND WEIGHT, 0-255: the
+/// share of it that is land ground the land lift applies to (0 = water, a river's
+/// water, the lock fill or no ground). A reading for ground_bake_check.
 void bake_region(const bake_source& src, const geometry& g, const bake_params& p,
-                 int px0, int py0, int pw, int ph, std::uint32_t* out);
+                 int px0, int py0, int pw, int ph, std::uint32_t* out,
+                 std::uint8_t* land_out = nullptr);
+
+/// THE LAND LIFT (BL-1537, RENDERING.md § Art direction and palette, "The land
+/// lift"): a dial of k_land_lift_levels steps, 0 = off. The level's gamma on
+/// land luminance (y' = 255 (y/255)^gamma, applied as a ratio so hue holds).
+inline constexpr int k_land_lift_levels  = 4;
+inline constexpr int k_land_lift_default = 2; ///< The middle trial level, until Ben picks.
+float land_lift_gamma(int level);
 
 /// BL-1311 (the process under 6 GB; RENDERING.md § Resident set): a chunk of
 /// ground held in RAM. A fully opaque chunk (every alpha 255) is held

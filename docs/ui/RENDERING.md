@@ -89,6 +89,7 @@ untouched by construction):
 | **Installations** | buildings (type, active recipe, stack membership), settlements (scale, razed) | Structure stamps — § Installations below |
 | **Cast shadows** | `height`, the relief fields, the landform forms | The low NW sun's shadow over everything the ground carries, behind ridges and hills (§ Art direction and palette) |
 | **Near-future grade** | — (a colour pass) | Desaturation, an S-curve on luminance, a split tone (cool shadows, warm lights), haze — **a separable final pass**, tunable without re-authoring any brush |
+| **Land lift** | the land weight (water and a river's water carry none) | The player's lightness level on land only — a hue-keeping gamma on luminance, the last pass (§ Art direction and palette, "The land lift") |
 
 **Brush placement is hashed from tile grid coordinates**, never screen position — the
 established rule (wrap copies of one tile must agree; no crawl under pan).
@@ -764,6 +765,21 @@ Judged against `docs/ui/design/renders/map/`. What it asks of the bake, procedur
 
 - **A lighter tileset (Ben, 2026-11-05).** The palette across the tileset lifts lighter. The
   figures below are the base it lifts from; how far it lifts is read against the live map.
+- **The land lift (Ben, 2026-11-10).** The lighter tileset is a **grade pass**, not new base
+  colours: a separable final pass over the finished bake, after the near-future grade and the
+  sharpening, so a level can be tried without re-authoring any palette entry. **Only land lifts.**
+  Water — sea, ocean, lakes, and a river's water — keeps its colour exactly; a shore or bank
+  pixel lifts by the share of it that is land. The shadow and relief shading on land lift with
+  the land. The pass is a **gamma curve on luminance** (y' = 255 · (y / 255)^γ), applied as a
+  ratio of the pixel's own channels so hue and saturation hold, never a flat add that greys the
+  colour; the curve leaves the top of the range where it is, and a ratio that would clip a
+  channel is held to the largest that does not, so highlights never clip and the land's p99 stays
+  under ~235. It is a **player setting with three trial levels and off** — about +15%, +30% and
+  +45% on the median land luminance — chosen live by Ben; changing it re-bakes the land, and
+  ground holding no land (open sea, the survey lock fill) is not re-baked. The default is the
+  **middle level (+30%)** until Ben picks. The percentiles each level gives are
+  `ground_bake_check` P35's reading (`--lift`), which also holds the water byte-identical to the
+  lift off.
 - **Palette and value.** Base hues take **it1's colour** — warm olive and khaki, rich green
   forest, white peaks, blue-green sea — not C-F's grey (the grade's desaturation eases to
   match); from it3 the value structure stays:

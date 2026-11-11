@@ -3371,7 +3371,7 @@ inline double river_hw(float flow)
 /// shallow at the edge to deep in the channel.
 void bake_rivers(const bake_source& src, const geometry& g, const bake_params& p,
                  int pw, int ph, std::uint32_t* out, const std::uint8_t* tag,
-                 const std::uint8_t* cover, const feature_px* fpx)
+                 const std::uint8_t* cover, const feature_px* fpx, std::uint8_t* wet)
 {
     const double period = g.gw * kSqrt3;
     int mea_n = 1;
@@ -3573,6 +3573,9 @@ void bake_rivers(const bake_source& src, const geometry& g, const bake_params& p
             r_ += (wr - r_) * a;
             g_ += (wg - g_) * a;
             b_ += (wb - b_) * a;
+            // BL-1537: the river's water is water - the land lift leaves it be.
+            if (wet)
+                wet[i] = std::max(wet[i], static_cast<std::uint8_t>(std::min(1.0f, a) * 255.0f + 0.5f));
         }
         blend_px(dst, r_, g_, b_);
     }
@@ -3956,12 +3959,12 @@ void bake_cast_shadows(const bake_source& src, const geometry& g, const bake_par
 /// biome brushes, before installations and the grade.
 void bake_terrain_features(const bake_source& src, const geometry& g, const bake_params& p,
                            int pw, int ph, std::uint32_t* out, const std::uint8_t* tag,
-                           const std::uint8_t* cover, const feature_px* fpx)
+                           const std::uint8_t* cover, const feature_px* fpx, std::uint8_t* wet)
 {
     if (p.landform_strength > 0.0f)
         bake_landforms(src, g, p, pw, ph, out, tag, cover, fpx);
     if (p.river_strength > 0.0f)
-        bake_rivers(src, g, p, pw, ph, out, tag, cover, fpx);
+        bake_rivers(src, g, p, pw, ph, out, tag, cover, fpx, wet);
 }
 
 /// One bake of a window at geometry @p g — which, under supersampling, is the
@@ -3970,7 +3973,7 @@ void bake_terrain_features(const bake_source& src, const geometry& g, const bake
 /// (optional, pw*ph) receives the terrain tag of each output pixel.
 void bake_region_at(const bake_source& src, const geometry& g, const bake_params& p,
                     int px0, int py0, int pw, int ph, std::uint32_t* out,
-                    std::uint8_t* tag_out)
+                    std::uint8_t* tag_out, std::uint8_t* land_out)
 {
     const double ns = nominal_s(g);
     // APRON (BL-736): the post passes below read neighbours (ink 1 px,
@@ -3987,6 +3990,16 @@ void bake_region_at(const bake_source& src, const geometry& g, const bake_params
         const pass_timer pt{ bp_window };
         bake_window(src, g, p, px0 - A, py0 - A, apw, aph,
                     abuf.data(), atag.data(), acov.data(), afpx.data());
+    }
+    // BL-1537: the land lift's water mask - a water tile's ground, then (the
+    // river pass) a river's water. Read only when the caller asks for the land
+    // weight; the bake itself is unchanged by it.
+    std::vector<std::uint8_t> awet;
+    if (land_out)
+    {
+        awet.assign(an, 0u);
+        for (std::size_t i = 0; i < an; ++i)
+            awet[i] = acov[i] == 100 ? 255u : 0u;
     }
 
     // Cover-boundary ink BEFORE the stamps: a tree may straddle an inked
@@ -4015,7 +4028,8 @@ void bake_region_at(const bake_source& src, const geometry& g, const bake_params
     // Landform relief and carved rivers (BL-1242).
     {
         const pass_timer pt{ bp_features };
-        bake_terrain_features(src, g, p, apw, aph, abuf.data(), atag.data(), acov.data(), afpx.data());
+        bake_terrain_features(src, g, p, apw, aph, abuf.data(), atag.data(), acov.data(), afpx.data(),
+                              land_out ? awet.data() : nullptr);
     }
     // Roads and sea lanes (BL-1253, route_paint.hpp), then the installations
     // (BL-1241): the route pass runs INSIDE the installation pass, between its
@@ -4141,18 +4155,85 @@ void bake_region_at(const bake_source& src, const geometry& g, const bake_params
             std::memcpy(tag_out + static_cast<std::size_t>(y) * pw,
                         atag.data() + static_cast<std::size_t>(y + A) * apw + A,
                         static_cast<std::size_t>(pw));
+        if (land_out)
+            for (int x = 0; x < pw; ++x)
+            {
+                const std::size_t i = static_cast<std::size_t>(y + A) * apw + A + x;
+                land_out[static_cast<std::size_t>(y) * pw + x] =
+                    atag[i] && acov[i] != 0 ? static_cast<std::uint8_t>(255u - awet[i]) : 0u;
+            }
+    }
+}
+
+/// THE LAND LIFT (BL-1537, RENDERING.md § Art direction and palette): the last
+/// pass on the finished window. Land luminance rises on a gamma curve, applied
+/// as a ratio of the pixel's own channels, so hue and saturation hold and the
+/// top of the range (y -> 255) does not move; a ratio that would clip a
+/// channel is held to the largest that does not, so a hue never bends at the
+/// top either. Weighted by the land weight, so water - the sea, lakes, a
+/// river's water - keeps its colour exactly and a shore pixel lifts by its
+/// land share.
+void apply_land_lift(std::uint32_t* px, const std::uint8_t* land, std::size_t n, int level)
+{
+    const float gamma = land_lift_gamma(level);
+    if (gamma >= 1.0f)
+        return;
+    // ratio[k] = (y'/y) at luminance k: (k/255)^(gamma - 1), tabulated once.
+    float ratio[257];
+    for (int k = 0; k <= 256; ++k)
+        ratio[k] = std::pow(std::clamp(std::max(k, 1) / 255.0f, 0.0f, 1.0f), gamma - 1.0f);
+    for (std::size_t i = 0; i < n; ++i)
+    {
+        const int w = land[i];
+        if (w == 0)
+            continue;
+        const std::uint32_t c = px[i];
+        const float r = static_cast<float>(palette::col_r(c));
+        const float g = static_cast<float>(palette::col_g(c));
+        const float b = static_cast<float>(palette::col_b(c));
+        const float y = 0.2126f * r + 0.7152f * g + 0.0722f * b;
+        const float fk = std::clamp(y, 0.0f, 255.99f);
+        const int   k0 = static_cast<int>(fk);
+        float sc = ratio[k0] + (ratio[k0 + 1] - ratio[k0]) * (fk - k0);
+        const float mx = std::max({ r, g, b });
+        if (mx * sc > 255.0f)
+            sc = std::max(1.0f, 255.0f / std::max(mx, 1.0f));
+        sc = 1.0f + (sc - 1.0f) * (w / 255.0f);
+        px[i] = palette::col32(std::clamp(static_cast<int>(r * sc + 0.5f), 0, 255),
+                               std::clamp(static_cast<int>(g * sc + 0.5f), 0, 255),
+                               std::clamp(static_cast<int>(b * sc + 0.5f), 0, 255), palette::col_a(c));
     }
 }
 
 } // namespace
 
-void bake_region(const bake_source& src, const geometry& g, const bake_params& p,
-                 int px0, int py0, int pw, int ph, std::uint32_t* out)
+float land_lift_gamma(int level)
 {
+    // +15%, +30%, +45% on the home body's median land luminance (the shipped
+    // look's p50); the gamma that lifts that median by the share, measured by
+    // ground_bake_check --lift (RENDERING.md § Art direction and palette).
+    // The off median is 59.3 over P35's windows; these give +15/+30/+45% there.
+    static constexpr float k_gamma[k_land_lift_levels] = { 1.0f, 0.904f, 0.820f, 0.745f };
+    return k_gamma[std::clamp(level, 0, k_land_lift_levels - 1)];
+}
+
+void bake_region(const bake_source& src, const geometry& g, const bake_params& p,
+                 int px0, int py0, int pw, int ph, std::uint32_t* out, std::uint8_t* land_out)
+{
+    const std::size_t npx = static_cast<std::size_t>(pw) * ph;
+    if (land_out)
+        std::memset(land_out, 0, npx);
     if (src.gw <= 0 || src.gh <= 0)
     {
         std::memset(out, 0, static_cast<std::size_t>(pw) * ph * 4u);
         return;
+    }
+    const bool lift = src.land_lift > 0 && land_lift_gamma(src.land_lift) < 1.0f;
+    std::vector<std::uint8_t> own_land;
+    if (lift && !land_out)
+    {
+        own_land.assign(npx, 0u);
+        land_out = own_land.data();
     }
     // THE LOCK FAST PATH (BL-1246): a window every tile in reach of which is
     // survey-masked bakes as the flat lock fill and nothing else — the mask
@@ -4188,7 +4269,7 @@ void bake_region(const bake_source& src, const geometry& g, const bake_params& p
             if (all_masked)
             {
                 std::fill(out, out + static_cast<std::size_t>(pw) * ph, k_lock_colour);
-                return;
+                return; // the lock fill: no land weight, no lift
             }
         }
     }
@@ -4196,7 +4277,9 @@ void bake_region(const bake_source& src, const geometry& g, const bake_params& p
     const int ss = std::max(1, p.supersample);
     if (ss == 1)
     {
-        bake_region_at(src, g, p, px0, py0, pw, ph, out, nullptr);
+        bake_region_at(src, g, p, px0, py0, pw, ph, out, nullptr, land_out);
+        if (lift)
+            apply_land_lift(out, land_out, npx, src.land_lift);
         return;
     }
 
@@ -4217,8 +4300,9 @@ void bake_region(const bake_source& src, const geometry& g, const bake_params& p
     const int  hw = mw * ss,    hh = mh * ss;
     std::vector<std::uint32_t> hi(static_cast<std::size_t>(hw) * hh);
     std::vector<std::uint8_t>  htag(static_cast<std::size_t>(hw) * hh, 0u);
+    std::vector<std::uint8_t>  hland(land_out ? static_cast<std::size_t>(hw) * hh : 0u, 0u);
     bake_region_at(src, gs, p, (px0 - M) * ss, (py0 - M) * ss, hw, hh,
-                   hi.data(), htag.data());
+                   hi.data(), htag.data(), land_out ? hland.data() : nullptr);
 
     // Box downsample, alpha-weighted so the transparent margin never darkens
     // a grid edge. A nominal pixel is TAGGED only when every sub-sample is
@@ -4227,11 +4311,12 @@ void bake_region(const bake_source& src, const geometry& g, const bake_params& p
     // the lock colour byte-exact).
     std::vector<std::uint32_t> lo(static_cast<std::size_t>(mw) * mh);
     std::vector<std::uint8_t>  ltag(static_cast<std::size_t>(mw) * mh);
+    std::vector<std::uint8_t>  lland(land_out ? static_cast<std::size_t>(mw) * mh : 0u, 0u);
     const int n = ss * ss;
     for (int y = 0; y < mh; ++y)
         for (int x = 0; x < mw; ++x)
         {
-            int sr = 0, sg = 0, sb = 0, sa = 0;
+            int sr = 0, sg = 0, sb = 0, sa = 0, sl = 0;
             std::uint8_t all = 1;
             for (int dy = 0; dy < ss; ++dy)
             {
@@ -4246,10 +4331,14 @@ void bake_region(const bake_source& src, const geometry& g, const bake_params& p
                     sb += palette::col_b(c) * a;
                     sa += a;
                     all &= htag[i];
+                    if (land_out)
+                        sl += hland[i];
                 }
             }
             const std::size_t o = static_cast<std::size_t>(y) * mw + x;
             ltag[o] = all;
+            if (land_out)
+                lland[o] = static_cast<std::uint8_t>((sl + n / 2) / n);
             lo[o] = sa == 0 ? 0u
                   : palette::col32((sr + sa / 2) / sa, (sg + sa / 2) / sa,
                                    (sb + sa / 2) / sa, (sa + n / 2) / n);
@@ -4259,9 +4348,17 @@ void bake_region(const bake_source& src, const geometry& g, const bake_params& p
         unsharp(lo.data(), ltag.data(), mw, mh, p.unsharp_amount_ss);
 
     for (int y = 0; y < ph; ++y)
+    {
         std::memcpy(out + static_cast<std::size_t>(y) * pw,
                     lo.data() + static_cast<std::size_t>(y + M) * mw + M,
                     static_cast<std::size_t>(pw) * 4u);
+        if (land_out)
+            std::memcpy(land_out + static_cast<std::size_t>(y) * pw,
+                        lland.data() + static_cast<std::size_t>(y + M) * mw + M,
+                        static_cast<std::size_t>(pw));
+    }
+    if (lift) // last, after the unsharp: the lift is the final pass
+        apply_land_lift(out, land_out, npx, src.land_lift);
 }
 
 geometry make_master_geometry(int gw, int gh)
@@ -4361,6 +4458,9 @@ std::uint64_t terrain_hash(const bake_source& src, const geometry& g,
             const int cw = ((c % src.gw) + src.gw) % src.gw;
             const std::size_t i = static_cast<std::size_t>(r) * src.gw + cw;
             mix(src.cls[i]);
+            // BL-1537: the land lift moves every window holding land, and only those.
+            if (src.land_lift && src.cls[i] == static_cast<std::uint8_t>(bake_source::tile_class::land))
+                mix(0x4C1F700ull + src.land_lift);
             mix(src.colour[i]);
             mix(src.cover[i]);   // the feature stamps read these two, so a
             mix(src.density[i]); // cover change must move the hash
