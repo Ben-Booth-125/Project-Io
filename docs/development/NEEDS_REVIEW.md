@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*77 entries — 33 open, 44 resolved.*
+*78 entries — 34 open, 44 resolved.*
 
 ---
 
@@ -386,6 +386,20 @@ Briefed to make auto trade size off the silenced want, the lane found that alrea
 > **Recommendation:** Keep until NR-1203 is ruled.
 
 *Files: `src/world/trade.cpp`*
+
+### NR-1215 — Generated body mass: bands and four calls taken; the inner planet's air now varies by seed
+*decision taken on your behalf · raised 2026-11-10 · from BL-1638 lane report*
+
+Bands (PLANETOLOGY.md): planet R 0.30-0.50 R_E, moon 0.20-0.34, asteroid 0.010-0.075, core fragment 0.015-0.045; density from core mass fraction and mantle density for every kind. Seed 0: Cinder 0.059 M_E, Selene 0.0050, Pallas 0.0000054; seed 46: Cinder 0.113. Climbs on seed 20260911: home 12.16, Cinder 2.10, moon 1.89, Pallas 0.29 (all read 8.0 before). Calls: (1) bands live in a C++ table beside the chain's other ranges (no data/params file exists; Lua would split the wizard preview from the build); (2) one density rule for every kind, the planet included (its band reaches 0.12 M_E, where self-compression is a few percent); (3) logistics keeps its scale by reading 1.0 for a non-home body on a world with a home body, not by a saved field; (4) Selene's parent mass stays the authored 1.0 for tidal heating, not the homeworld's corridor mass (outside the brief). Moved: Cinder's atmosphere class now follows its rolled mass (seed 46 none to thin; seed 20260911 thin to none); world_determinism's printed digests move; the homeworld's tiles are byte-identical on three seeds. Low-orbit slots stay 8 on every non-home body (all under 0.25 M_E).
+
+**Why it matters.** Call (4) leaves a moon's tidal heating keyed to a fixed parent mass while the homeworld's mass varies 0.66-1.48.
+
+- Accept
+- Feed Selene the homeworld's rolled mass as its parent
+
+> **Recommendation:** Accept, and file (4) as a small follow-up.
+
+*Files: `src/world/planetology.cpp`, `docs/generation/PLANETOLOGY.md`, `src/world/logistics.cpp`*
 
 ---
 

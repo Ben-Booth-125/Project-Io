@@ -2384,8 +2384,8 @@
    "design": "SPACE_ASSETS.md § Boost. Replaces the whole-lot shelf buy and the quarterly standing launch-lot bid. Done when a spectated run shows rival launches without pooling markets, and the same goods per launch as before."
   },
   {
-   "status": "designed",
-   "glyph": "○",
+   "status": "complete",
+   "glyph": "●",
    "version_goal": "v0.5.0",
    "written": "2026-11-10",
    "parked": false,
