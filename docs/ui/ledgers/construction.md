@@ -114,18 +114,21 @@ whatever thread priced which option. While the first pass, or a pass for a new p
 option set, runs, **the grid shows no cells**: a **search line** in its place reads *"Searching... N
 of M buildings"* with a bar, and the whole grid appears, in its order, when the last option is done.
 No part-grid stands meanwhile, because cells that fill and re-sort as they go read as an answer before
-they are one. A re-pass (the treasury or the frame stamp moved) leaves the last complete grid standing
-until the fresh set swaps in whole, so a running game's grid does not flicker. Under `--verify` the
-pass runs on one thread and completes in the frame it starts, so no capture rests on the clock.
-**The grid and the table read one Net.** While the grid priced at the current prices stands, the
-table's row for a tile shows the grid's own quote as its Net, so a cell and its row never disagree.
-When a pass completes, and whenever ownership, the wars or the market set move, the Build door's quotes are dropped and priced again, so a pressed tile and a
-row's full-cover figure (which a row short of full Logistic Point cover still asks for) read the
-same moment as the grid. A pass restarts on what its figures read, and on a treasury move only when
-the move crosses the cost of a site it has judged: an affordable site now dearer than the treasury,
-or a too-costly one now within it. A move that crosses nothing changes no verdict, so the grid
-and the table always agree on what the treasury can pay for, paused or running. A pass that
-fails stops; the last complete grid stands again only on its own body and province.
+they are one. A re-pass (the prices, the ground or the roads moved) leaves the last complete grid
+standing until the fresh set swaps in whole, so a running game's grid does not flicker. Under
+`--verify` the pass runs on one thread and completes in the frame it starts, so no capture rests on
+the clock. **The treasury is not part of a pass.** A pass judges each tile by its air and the
+placement rules and keeps the site's cost; which sites the treasury can pay for is drawn against
+the treasury as it stands, by the Build door's own rule (a site dearer than the treasury is too
+costly), every time the grid is drawn after the treasury moves. So spending never restarts a pass,
+the grid and the table read the same treasury in the same frame, and in debt every site is too
+costly. **The grid and the table read one Net.** While the grid stands at the moment it was
+published - the same prices, ground, roads, wars and markets - the table's row for a tile shows the
+grid's own quote as its Net, so a cell and its row never disagree. Publishing a grid, and any move
+of the ownership, the wars or the market set, drops the Build door's quotes, so a pressed tile and a
+row's full-cover figure (which a row short of full Logistic Point cover still asks the door for)
+are priced again from then on. A pass that fails stops; the last complete grid stands again only on
+its own body, province and buildings.
 
 **The province scope** (Ben, 2026-11-08). **A selected tile restricts the finder to its province's own
 ground**: the grid's figures and counts, the table's rows and the placement lens. A province is not a

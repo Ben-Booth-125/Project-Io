@@ -106,6 +106,19 @@ door_stamp make_door_stamp(const world& w)
              grid_published() };
 }
 
+/// The moment one evaluation reads at: `evaluate` takes it once and every quote and
+/// runway it asks for reads it here, rather than walking the wars again per call.
+std::optional<door_stamp>& door_hint()
+{
+    static std::optional<door_stamp> h;
+    return h;
+}
+
+door_stamp door_now(const world& w)
+{
+    return door_hint() ? *door_hint() : make_door_stamp(w);
+}
+
 struct quote_cache
 {
     door_stamp                        stamp;
@@ -160,9 +173,11 @@ std::uint64_t& quote_epoch()
     return e;
 }
 
-/// One tile's quote, as the grid priced it: what the table's row shows of it.
+/// One tile's verdict and quote, as the grid priced it, for one option.
 struct tile_figure
 {
+    bool          site     = false; ///< The air and the placement rules take it here (the treasury aside).
+    float         capex    = 0.0f;  ///< What it would cost here: the treasury is judged against it when drawn.
     float         net      = 0.0f;
     float         revenue  = 0.0f;  ///< For the Yield column, at the price it was valued at.
     float         price_share = 1.0f;
@@ -172,21 +187,27 @@ struct tile_figure
     resource_type short_of = resource_type::iron_ore;
 };
 
-/// A grid pass's quotes: per option, per tile in scope, each slot written by the one
-/// worker that holds its option, sized before any worker forks. THE ROW READS THESE
-/// (Ben's one Net): while a grid priced at the current stamp stands, the table's row for
-/// one of its tiles shows the cell's own figure, so the two cannot disagree and a tile
-/// is quoted once a pass.
+/// A grid pass's answer: per option, per tile in scope, each slot written by the one
+/// worker that holds its option, sized before any worker forks. THE TREASURY IS NOT IN
+/// IT: a site's capex is kept, and the affordable / too-costly split is drawn against the
+/// live treasury (`derive_cells`), by the same boundary as the door's gate. And THE ROW
+/// READS IT (Ben's one Net): while the door's moment is the one it was published at, the
+/// table's row for one of its tiles shows the cell's own quote.
 struct grid_figures
 {
     bool                     valid = false;
-    lp_stamp                 stamp;
+    door_stamp               door;            ///< The door's moment it was published at.
     std::uint64_t            epoch = 0;
     entity_id                body  = null_entity;
+    std::uint32_t            scope = 0;
+    bool                     scope_empty = false;
     std::vector<site_option> opts;
+    std::vector<entity_id>   tiles;           ///< Own ground in scope, in grid order.
     std::unordered_map<entity_id, std::uint32_t> tile_ix;
     std::vector<float>       cover;           ///< Per tile, the cover it was quoted at.
-    std::vector<std::vector<tile_figure>> at; ///< Per option (empty: it earns nothing).
+    std::vector<std::vector<tile_figure>> at; ///< Per option, per tile.
+    std::vector<std::map<int, int>> refusals; ///< Per option: placement reason -> tiles.
+    std::vector<int>         air_refused;     ///< Per option: tiles whose air cannot run it.
 };
 
 grid_figures& shown_figures()
@@ -195,13 +216,13 @@ grid_figures& shown_figures()
     return f;
 }
 
-/// The shown grid's quote for @p tile under this option at @p cover, or null when no
-/// grid priced at the world's current stamp holds it.
-const tile_figure* grid_figure(const world& w, entity_id body, building_type type, resource_type target,
+/// The shown grid's quote for @p tile under this option at @p cover, or null when the
+/// door's moment @p now is not the one the grid was published at.
+const tile_figure* grid_figure(const door_stamp& now, entity_id body, building_type type, resource_type target,
                                std::uint16_t recipe, entity_id tile, float cover)
 {
     const grid_figures& f = shown_figures();
-    if (!f.valid || f.body != body || f.epoch != quote_epoch() || !(f.stamp == make_lp_stamp(w)))
+    if (!f.valid || f.body != body || f.epoch != quote_epoch() || !(f.door == now))
         return nullptr;
     const auto tit = f.tile_ix.find(tile);
     if (tit == f.tile_ix.end() || f.cover[tit->second] != cover)
@@ -211,14 +232,14 @@ const tile_figure* grid_figure(const world& w, entity_id body, building_type typ
         const site_option& o = f.opts[i];
         if (o.type != type || o.target != target || o.recipe != recipe)
             continue;
-        if (f.at[i].empty() || !f.at[i][tit->second].quoted)
+        if (!f.at[i][tit->second].quoted)
             return nullptr;
         return &f.at[i][tit->second];
     }
     return nullptr;
 }
 
-/// Rows whose displayed figure (whole credits) another row shares — the tie the
+// Rows whose displayed figure (whole credits) another row shares — the tie the
 /// player would see. Deterministic: counted off a sorted copy.
 int count_ties(std::vector<std::pair<long long, long long>> keys)
 {
@@ -391,6 +412,11 @@ void evaluate(world& w, const recipe_registry& reg, ui_state& ui)
 
     std::map<entity_id, std::string> market_names; // one name lookup per market
 
+    // ONE MOMENT FOR THE WHOLE TABLE: every row's quote, runway and grid figure read it.
+    const door_stamp now = make_door_stamp(w);
+    door_hint() = now;
+    struct hint_reset { ~hint_reset() { door_hint().reset(); } } const reset_hint;
+
     const place_index places(w, ui.active_body, sf.gw);
     for (std::size_t idx = 0; idx < grid.size() && idx < sf.cls.size(); ++idx)
     {
@@ -434,7 +460,7 @@ void evaluate(world& w, const recipe_registry& reg, ui_state& ui)
         // The shown grid's quote where it has one, so the cell and the row read one Net;
         // the door's own quote otherwise.
         float revenue = 0.0f, price_share = 1.0f;
-        if (const tile_figure* gf = grid_figure(w, ui.active_body, c.type, c.target, c.recipe, tid, r.cover))
+        if (const tile_figure* gf = grid_figure(now, ui.active_body, c.type, c.target, c.recipe, tid, r.cover))
         {
             r.priced    = gf->priced;
             r.profit    = gf->net;
@@ -532,7 +558,7 @@ void evaluate(world& w, const recipe_registry& reg, ui_state& ui)
     sf.eval_ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
 }
 
-// --- THE BUILDING GRID (Ben, 2026-11-08) -------------------------------------------
+/// --- THE BUILDING GRID (Ben, 2026-11-08) -------------------------------------------
 // Every option scored over every tile in scope is far more work than the one chosen
 // building the table scores. A pass therefore SCORES ITS OPTIONS IN PARALLEL (Ben,
 // 2026-11-11: "check all different options in parallel, rather than sequentially, then
@@ -546,33 +572,41 @@ void evaluate(world& w, const recipe_registry& reg, ui_state& ui)
 // inside the join nothing writes: every lazily-built cache the scoring reads is WARMED on
 // the main thread first. When the pass starts (`warm_step`, spread over frames under the
 // same budget): each tile's Logistic Point cover, the market raster and the body's
-// indexes, and the quote context with the reach set of every (market, input) a quote can
-// ask for. And on EVERY frame before the fork (`rewarm_shared`), the indexes that rebuild
-// themselves on the entity cursor or the catchment generation - the markets and centres
-// per body, and each body's catchment raster - because a muster or a hire between two
-// frames moves the cursor without moving the pass's key. What would stale the warmed
-// state itself (ownership, roads, wars, the market set) is in the key, and restarts the
-// pass. An option's figures live in its own cell and its own per-tile slots, which one
-// worker holds at a time. THE ROW'S NET IS THE CELL'S QUOTE: the pass prices through its
-// own context, and when it completes the table reads each row's Net from the pass's slots
-// (`grid_figure`) while the stamp they were priced at holds. Publishing also drops the
-// door's cache (`door_stamp`), so a pressed tile and a row's full-cover figure - which a
-// row under full cover still asks the door for - are priced again from that moment, not
-// from an older context. A tripwire checks
-// after each join that no warmed memo grew and no stamp moved, and logs it once if one did.
+// indexes, and the pass's quote context with the reach set of every (market, input) a
+// quote can ask for. And on EVERY frame before the fork (`rewarm_shared`), the indexes
+// that rebuild themselves on the entity cursor or the catchment generation - the markets
+// and centres per body, and each body's catchment raster - because a muster or a hire
+// between two frames moves the cursor without moving the pass's key. What would stale the
+// warmed state itself (ownership, roads, wars, the market set) is in the key, and
+// restarts the pass. An option's figures live in its own per-tile slots, which one worker
+// holds at a time. A tripwire checks after each join that no warmed memo grew and no
+// stamp moved, and logs it once if one did.
+//
+// THE TREASURY IS NOT IN THE PASS. A pass judges each tile by the air and the placement
+// rules alone and keeps its capex; the affordable / too-costly split is drawn against the
+// LIVE treasury (`derive_cells`), by the door's own boundary (treasury < capex), whenever
+// the grid is published or the treasury moves. So a treasury move never restarts a pass,
+// and the grid and the table read one treasury in the same frame - in debt, every site
+// is too costly.
+//
+// THE ROW'S NET IS THE CELL'S QUOTE. When a pass completes, the table reads each row's
+// Net from the pass's slots (`grid_figure`) while the door's moment (`door_stamp`) is the
+// one the grid was published at. Publishing moves that moment, which drops the door's
+// cache, so a pressed tile and a row's full-cover figure (a row short of full cover still
+// asks the door for it) are priced again from then on.
 //
 // WHY IT IS THE SEQUENTIAL ANSWER. An option's tiles are always scored in tile order, and
 // options never share state, so which thread scored an option, and across how many frames,
-// cannot change its cell. The cells are merged by option index and ordered once, when
-// every option is done (`order_cells`); nothing is shown in completion order.
+// cannot change its slots. Cells are derived from the slots in option and tile order and
+// ordered once (`order_cells`); nothing is shown in completion order.
 //
 // WHAT SHOWS MEANWHILE. A pass for a new scope, body or option set shows no cells, only
 // how far the search has got, and the whole ordered grid appears when it ends: a cell list
 // that filled and re-sorted as it went read as an answer before it was one. A re-pass for
-// the same view (the treasury or the frame stamp moved) leaves the last complete grid
-// standing until the fresh one swaps in whole, so a running game's grid does not flicker.
-// Under --verify a pass is scored on the main thread alone and completes in the frame it
-// starts, because a wall-clock budget would make a capture depend on the clock.
+// the same view (the frame stamp moved) leaves the last complete grid standing until the
+// fresh one swaps in whole, so a running game's grid does not flicker. Under --verify a
+// pass is scored on the main thread alone and completes in the frame it starts, because a
+// wall-clock budget would make a capture depend on the clock.
 
 constexpr double   k_grid_frame_budget_ms = 3.0;
 constexpr unsigned k_grid_max_workers     = 15; ///< Beside the main thread.
@@ -589,8 +623,7 @@ struct grid_key
     // tile's market), the wars the lanes detour round, and the market set the reach memo
     // was warmed for. NOT the territory generation: an occupation anywhere moves it at day
     // grain, so in a war a pass keyed on it would never finish, and the scoring reads the
-    // lanes only through the warmed haul memo. NOT the treasury either, which moves daily
-    // while a site draws its materials (below: a restart only when it crosses a capex).
+    // lanes only through the warmed haul memo. NOT the treasury: see above.
     std::uint64_t catchment = 0;
     std::uint64_t wars      = 0;
     std::size_t   markets   = 0;
@@ -618,35 +651,29 @@ struct grid_pass
     grid_key                key;
     bool                    have_key = false;
     bool                    running  = false;
-    std::vector<site_cell>  work;
-    std::vector<std::map<int, int>> refusals;    ///< Per option: reason -> tiles, for the commonest.
-    std::vector<int>        air_refused;
+    std::vector<site_option> opts;               ///< The options this pass scores.
     std::vector<std::size_t> next_tile;          ///< Per option: the tile it resumes at.
     std::vector<char>       done;                ///< Per option: every tile scored.
     std::size_t             finished = 0;
     std::vector<entity_id>  tiles;               ///< Own ground in scope, in grid order.
     std::vector<float>      cover;               ///< Per tile: its Logistic Point cover, read when warming.
     entity_id               actor   = null_entity;
-    float                   balance = 0.0f;
     float                   reach   = 0.0f;
-    std::vector<float>      max_ok_capex;        ///< Per option: the dearest site it judged affordable (-1: none).
     std::optional<site_quote_context> cx;        ///< The pass's own, warmed before any worker forks.
-    grid_figures            figures;             ///< Per option, per tile: the quote, filled by its worker.
-    std::optional<place_index> places;           ///< Built once per pass, not per frame.
-    entity_id               shown_body  = null_entity; ///< The view the shown grid belongs to.
-    std::uint32_t           shown_scope = 0;
-    entity_id               kept_body  = null_entity; ///< The view the kept grid belongs to.
-    std::uint32_t           kept_scope = 0;
+    grid_figures            figures;             ///< Per option, per tile: filled by its worker.
+    int                     grid_w = 0;          ///< The body's grid width, for the place names.
+    std::optional<place_index> shown_places;     ///< The shown grid's, for its cells' place names.
+    bool                    hide_shown    = false; ///< A new view is searching: the shown grid is not drawn.
+    float                   derived_balance = 0.0f; ///< The treasury the drawn cells were split at.
+    bool                    derived = false;
     bool                    failed        = false; ///< The pass for this key threw and stopped.
     bool                    failed_logged = false; ///< This key's failure is already in the log.
     // THE WARM-UP, resumable so it keeps to the frame budget: 0 covers and markets per
-    // tile, 1 the quote context, 2 the reach set per (market, good taken), 3 done.
+    // tile, 1 the quote context and the slots, 2 the reach set per (market, good taken), 3 done.
     int                     warm_phase = 0;
     std::size_t             warm_i     = 0;
     std::vector<entity_id>  warm_markets;
     std::array<bool, resource_count> taken{};
-    std::vector<site_cell>  kept_cells;          ///< The last complete grid, while a new view searches.
-    std::vector<int>        kept_order;
     double                  spent_ms = 0.0;
     double                  warm_ms  = 0.0;      ///< Of which, the warm-up.
     double                  warm_frame_max_ms = 0.0; ///< The longest single warm-up frame.
@@ -665,12 +692,12 @@ bool same_option(const site_option& a, const site_option& b)
     return a.type == b.type && a.target == b.target && a.recipe == b.recipe;
 }
 
-bool same_options(const std::vector<site_cell>& cells, const std::vector<site_option>& opts)
+bool same_options(const std::vector<site_option>& a, const std::vector<site_option>& b)
 {
-    if (cells.size() != opts.size())
+    if (a.size() != b.size())
         return false;
-    for (std::size_t i = 0; i < opts.size(); ++i)
-        if (!same_option(cells[i].option, opts[i]))
+    for (std::size_t i = 0; i < a.size(); ++i)
+        if (!same_option(a[i], b[i]))
             return false;
     return true;
 }
@@ -699,42 +726,101 @@ void order_cells(site_finder_state& sf)
     });
 }
 
-void finish_cell(grid_pass& p, std::size_t i, bool scope_empty)
+/// The cells, from the shown grid's slots, split against @p balance by the door's own
+/// boundary (balance < capex is too costly): in option order, each option's tiles in
+/// tile order, so a cell is the one a pass judging at this treasury would have built.
+void derive_cells(const world& w, const grid_figures& f, const place_index& places, float balance,
+                  site_finder_state& sf)
 {
-    site_cell& c = p.work[i];
-    if (c.sites > 0)
-        return;
-    if (c.unaffordable > 0)
+    sf.cells.assign(f.opts.size(), site_cell{});
+    for (std::size_t i = 0; i < f.opts.size(); ++i)
     {
-        char buf[160];
-        std::snprintf(buf, sizeof buf, "%d %s would take it, but the cheapest costs %s cr, more than the treasury holds.",
-                      c.unaffordable, c.unaffordable == 1 ? "tile" : "tiles",
-                      fmt::abbreviate(static_cast<double>(c.cheapest_unaffordable)).c_str());
-        c.refusal = buf;
-        return;
-    }
-    if (scope_empty)
-    {
-        c.refusal = "None of this province is your ground.";
-        return;
-    }
-    // The commonest refusal; a tie goes to the lower reason, so the sentence is one answer.
-    int best_n = p.air_refused[i], best_reason = -1;
-    for (const auto& [reason, n] : p.refusals[i])
-        if (n > best_n)
+        site_cell& cell = sf.cells[i];
+        cell.option = f.opts[i];
+        const bool earns = option_earns(cell.option);
+        entity_id best_tile = null_entity;
+        for (std::size_t ti = 0; ti < f.tiles.size(); ++ti)
         {
-            best_n      = n;
-            best_reason = reason;
+            const tile_figure& fig = f.at[i][ti];
+            if (!fig.site)
+                continue;
+            const entity_id tid = f.tiles[ti];
+            if (balance < fig.capex)
+            {
+                if (cell.unaffordable == 0 || fig.capex < cell.cheapest_unaffordable)
+                    cell.cheapest_unaffordable = fig.capex;
+                ++cell.unaffordable;
+                continue;
+            }
+            ++cell.sites;
+            const float cover = f.cover[ti];
+            if (!(cover > 0.0f))
+                ++cell.no_lp;
+            const bool priced = earns && fig.priced;
+            const long net    = priced ? std::lround(fig.net) : 0;
+            if (priced && (!cell.has_figure || fig.net > cell.best_net))
+            {
+                cell.has_figure   = true;
+                cell.best_net     = fig.net;
+                cell.best_cover   = cover;
+                cell.best_starved = fig.starved;
+                best_tile         = tid;
+            }
+            // The Construct press's site: highest Net, then cover, then lowest id.
+            const bool better =
+                cell.build_tile == null_entity
+                || (priced != cell.build_priced ? priced
+                    : net != cell.build_net     ? net > cell.build_net
+                    : cover != cell.build_cover ? cover > cell.build_cover
+                                                : tid < cell.build_tile);
+            if (better)
+            {
+                cell.build_tile   = tid;
+                cell.build_priced = priced;
+                cell.build_net    = net;
+                cell.build_cover  = cover;
+            }
         }
-    if (best_n == 0)
-        c.refusal = "You hold no ground on this body to build it on.";
-    else if (best_reason < 0)
-        c.refusal = "The air here cannot run this recipe.";
-    else
-        c.refusal = placement_rules::placement_reason_text(static_cast<placement_rules::placement_reason>(best_reason));
+        if (best_tile != null_entity)
+        {
+            const tile_component& tc = w.tiles.at(best_tile);
+            cell.best_place = places.name(best_tile, tc.grid_x, tc.grid_y, cell.best_near);
+        }
+        if (cell.sites > 0)
+            continue;
+        if (cell.unaffordable > 0)
+        {
+            char buf[160];
+            std::snprintf(buf, sizeof buf, "%d %s would take it, but the cheapest costs %s cr, more than the treasury holds.",
+                          cell.unaffordable, cell.unaffordable == 1 ? "tile" : "tiles",
+                          fmt::abbreviate(static_cast<double>(cell.cheapest_unaffordable)).c_str());
+            cell.refusal = buf;
+            continue;
+        }
+        if (f.scope_empty)
+        {
+            cell.refusal = "None of this province is your ground.";
+            continue;
+        }
+        // The commonest refusal; a tie goes to the lower reason, so the sentence is one answer.
+        int best_n = f.air_refused[i], best_reason = -1;
+        for (const auto& [reason, n] : f.refusals[i])
+            if (n > best_n)
+            {
+                best_n      = n;
+                best_reason = reason;
+            }
+        if (best_n == 0)
+            cell.refusal = "You hold no ground on this body to build it on.";
+        else if (best_reason < 0)
+            cell.refusal = "The air here cannot run this recipe.";
+        else
+            cell.refusal = placement_rules::placement_reason_text(static_cast<placement_rules::placement_reason>(best_reason));
+    }
+    order_cells(sf);
 }
 
-//// Build, on the main thread, every lazily-built thing a worker would otherwise build
+/// Build, on the main thread, every lazily-built thing a worker would otherwise build
 /// under the join: the body's tile raster and centre index, each tile's market (the
 /// catchment raster) and Logistic Point cover, and the quote context with the reach set
 /// of every market in scope for every good an offered recipe takes. Resumable: it stops
@@ -769,31 +855,27 @@ bool warm_step(world& w, const recipe_registry& reg, grid_pass& p, entity_id bod
     if (p.warm_phase == 1)
     {
         // The pass's own context (the door's cache is never reset under the table), and
-        // its per-tile figures sized for every option that earns: a worker only writes
-        // its own option's slots.
+        // its per-tile slots for every option: a worker only writes its own option's.
         p.cx.emplace(make_site_quote_context(w, reg, quote_report()));
         grid_figures& f = p.figures;
-        f.valid = false;
-        f.stamp = p.key.stamp;
+        f = grid_figures{};
         f.epoch = p.key.epoch;
         f.body  = p.key.body;
-        f.opts.clear();
-        f.at.assign(p.work.size(), {});
-        for (std::size_t i = 0; i < p.work.size(); ++i)
-        {
-            f.opts.push_back(p.work[i].option);
-            if (option_earns(p.work[i].option))
-                f.at[i].assign(p.tiles.size(), tile_figure{});
-        }
+        f.scope = p.key.scope;
+        f.scope_empty = p.key.scope != 0 && p.tiles.empty();
+        f.opts  = p.opts;
+        f.tiles = p.tiles;
         f.cover = p.cover;
-        f.tile_ix.clear();
+        f.at.assign(p.opts.size(), std::vector<tile_figure>(p.tiles.size()));
+        f.refusals.assign(p.opts.size(), {});
+        f.air_refused.assign(p.opts.size(), 0);
         f.tile_ix.reserve(p.tiles.size());
         for (std::size_t t = 0; t < p.tiles.size(); ++t)
             f.tile_ix.emplace(p.tiles[t], static_cast<std::uint32_t>(t));
         p.taken.fill(false);
-        for (const site_cell& c : p.work)
-            if (c.option.type == building_type::processing_facility)
-                if (const recipe* rc = reg.get_recipe(c.option.recipe); rc != nullptr)
+        for (const site_option& o : p.opts)
+            if (o.type == building_type::processing_facility)
+                if (const recipe* rc = reg.get_recipe(o.recipe); rc != nullptr)
                     for (std::size_t r = 0; r < resource_count; ++r)
                         p.taken[r] = p.taken[r] || rc->inputs[r] > 0.0f;
         p.warm_phase = 2;
@@ -860,52 +942,39 @@ std::vector<std::uint64_t> grid_watch(const world& w, const grid_pass& p, entity
 }
 
 /// Score option @p i's tiles from where it stopped, in tile order, until they are all
-/// scored (true) or @p deadline passes (false; null: no deadline). Touches only the
-/// option's own cell and tallies; reads the world, the warmed context and the pass's
-/// per-tile covers.
+/// scored (true) or @p deadline passes (false; null: no deadline). Writes only the
+/// option's own slots and tallies; reads the world, the warmed context and the pass's
+/// per-tile covers. The treasury is not asked: every site is kept with its capex.
 bool score_option(world& w, const recipe_registry& reg, grid_pass& p, site_quote_context& cx, std::size_t i,
                   const std::chrono::steady_clock::time_point* deadline)
 {
-    site_cell& cell = p.work[i];
-    const site_option& o = cell.option;
+    const site_option& o = p.opts[i];
     const recipe* rc = (o.type == building_type::processing_facility) ? reg.get_recipe(o.recipe) : nullptr;
     const placement_gate gate = reg.placement_gate_for(o.type, o.recipe);
     const bool earns = option_earns(o);
+    grid_figures& f = p.figures;
     std::size_t& t = p.next_tile[i];
+    constexpr float k_any_treasury = std::numeric_limits<float>::infinity();
 
     while (t < p.tiles.size())
     {
         const std::size_t ti  = t++;
         const entity_id   tid = p.tiles[ti];
-        const site_gate_result sg = gate_site(w, reg, o, rc, gate, tid, p.reach, p.actor, p.balance);
+        const site_gate_result sg = gate_site(w, reg, o, rc, gate, tid, p.reach, p.actor, k_any_treasury);
         if (sg.verdict == site_verdict::air)
-            ++p.air_refused[i];
+            ++f.air_refused[i];
         else if (sg.verdict == site_verdict::refused)
-            ++p.refusals[i][static_cast<int>(sg.why)];
-        else if (sg.verdict == site_verdict::unaffordable)
-        {
-            if (cell.unaffordable == 0 || sg.capex < cell.cheapest_unaffordable)
-                cell.cheapest_unaffordable = sg.capex;
-            ++cell.unaffordable;
-        }
+            ++f.refusals[i][static_cast<int>(sg.why)];
         else
         {
-            ++cell.sites;
-            if (sg.capex > p.max_ok_capex[i]) // this option's own slot: what a treasury move must stay above
-                p.max_ok_capex[i] = sg.capex;
-            // THE ROW'S OWN FIGURE: the same cover and the same quote the table asks for.
-            const float cover = p.cover[ti];
-            if (!(cover > 0.0f))
-                ++cell.no_lp;
-            bool priced = false;
-            long net    = 0;
+            // This option's own slot for this tile, sized before the fork.
+            tile_figure& fig = f.at[i][ti];
+            fig.site  = true;
+            fig.capex = sg.capex;
             if (earns)
             {
-                const site_quote sq = quote_site(w, reg, cx, tid, o.type, o.target, o.recipe, cover);
-                priced = sq.profit.has_data;
-                net    = priced ? std::lround(sq.profit.net()) : 0;
-                // This option's own slot for this tile, sized before the fork: the row's figure.
-                tile_figure& fig = p.figures.at[i][ti];
+                // THE ROW'S OWN FIGURE: the same cover and the same quote the table asks for.
+                const site_quote sq = quote_site(w, reg, cx, tid, o.type, o.target, o.recipe, p.cover[ti]);
                 fig.net         = sq.profit.net();
                 fig.revenue     = sq.profit.revenue;
                 fig.price_share = sq.price_share;
@@ -913,29 +982,6 @@ bool score_option(world& w, const recipe_registry& reg, grid_pass& p, site_quote
                 fig.priced      = sq.profit.has_data;
                 fig.starved     = sq.starved;
                 fig.short_of    = sq.short_of;
-                if (sq.profit.has_data && (!cell.has_figure || sq.profit.net() > cell.best_net))
-                {
-                    const tile_component& tc = w.tiles.at(tid);
-                    cell.has_figure   = true;
-                    cell.best_net     = sq.profit.net();
-                    cell.best_cover   = cover;
-                    cell.best_starved = sq.starved;
-                    cell.best_place   = p.places->name(tid, tc.grid_x, tc.grid_y, cell.best_near);
-                }
-            }
-            // The Construct press's site: highest Net, then cover, then lowest id.
-            const bool better =
-                cell.build_tile == null_entity
-                || (priced != cell.build_priced ? priced
-                    : net != cell.build_net     ? net > cell.build_net
-                    : cover != cell.build_cover ? cover > cell.build_cover
-                                                : tid < cell.build_tile);
-            if (better)
-            {
-                cell.build_tile   = tid;
-                cell.build_priced = priced;
-                cell.build_net    = net;
-                cell.build_cover  = cover;
             }
         }
         // A look at the clock every tile: a tile's quote costs far more than the look,
@@ -946,7 +992,8 @@ bool score_option(world& w, const recipe_registry& reg, grid_pass& p, site_quote
     return t >= p.tiles.size();
 }
 
-/// Advance the grid's pass by one frame, starting a new pass when its key moves.
+/// Advance the grid's pass by one frame, starting a new pass when its key moves, and
+/// split the shown grid against the live treasury.
 void step_site_grid(world& w, const recipe_registry& reg, ui_state& ui, const std::vector<site_option>& opts)
 {
     site_finder_state& sf = ui.site_finder;
@@ -962,52 +1009,24 @@ void step_site_grid(world& w, const recipe_registry& reg, ui_state& ui, const st
     key.markets   = w.markets.size();
     key.folded    = w.folded_markets.size();
 
-    // THE TREASURY restarts a pass only when the move CROSSES a capex the grid has judged:
-    // an affordable site's above the new treasury, or a too-costly site's within it. It moves
-    // daily while a site draws its materials, and a pass restarted on every move would never
-    // finish while time ran; a move that crosses nothing changes no verdict, so the pass
-    // takes the new treasury for the tiles it has still to score and its grid stays the one
-    // a fresh pass would build. The grid and the table (which re-evaluates on any move)
-    // therefore always agree on what the treasury can pay for, paused or running.
-    bool balance_moved = false;
-    if (p.have_key && balance != p.balance)
+    const grid_figures& shown = shown_figures();
+    const bool options_moved = !same_options(p.have_key ? p.opts : std::vector<site_option>{}, opts);
+    if (!p.have_key || !(key == p.key) || options_moved)
     {
-        const std::vector<site_cell>& judged = (p.running || p.failed) ? p.work : sf.cells;
-        for (std::size_t i = 0; i < judged.size() && !balance_moved; ++i)
-        {
-            const site_cell& c = judged[i];
-            if (c.unaffordable > 0 && c.cheapest_unaffordable <= balance)
-                balance_moved = true;
-            if (i < p.max_ok_capex.size() && p.max_ok_capex[i] > balance)
-                balance_moved = true;
-        }
-        if (!balance_moved)
-            p.balance = balance;
-    }
-    const bool options_moved = !same_options((p.running || p.failed) ? p.work : sf.cells, opts);
-    if (!p.have_key || !(key == p.key) || options_moved || balance_moved)
-    {
+        const bool new_view = !p.have_key || p.key.body != key.body || p.key.scope != key.scope || options_moved;
         p.failed        = false;
         p.failed_logged = false;
-        const bool new_view = !p.have_key || p.key.body != key.body || p.key.scope != key.scope
-                           || !same_options(sf.cells, opts);
         p.key      = key;
         p.have_key = true;
         p.running  = true;
         p.actor    = actor;
-        p.balance  = balance;
         p.reach    = ui.max_logistics_reach;
         p.spent_ms = 0.0;
         p.warm_ms  = 0.0;
         p.warm_frame_max_ms = 0.0;
         p.frames   = 0;
         p.started  = std::chrono::steady_clock::now();
-        p.work.assign(opts.size(), site_cell{});
-        for (std::size_t i = 0; i < opts.size(); ++i)
-            p.work[i].option = opts[i];
-        p.refusals.assign(opts.size(), {});
-        p.air_refused.assign(opts.size(), 0);
-        p.max_ok_capex.assign(opts.size(), -1.0f);
+        p.opts     = opts;
         p.next_tile.assign(opts.size(), 0);
         p.done.assign(opts.size(), 0);
         p.finished     = 0;
@@ -1034,26 +1053,30 @@ void step_site_grid(world& w, const recipe_registry& reg, ui_state& ui, const st
             }
         }
         sf.scope_foreign = sf.scope_province != 0 && p.tiles.empty();
-        p.places.emplace(w, ui.active_body, grid_w);
-
-        if (new_view)
-        {
-            // Nothing stands for a grid not yet priced: the search line says how far it is.
-            // The last complete grid is kept aside, to stand again if the pass fails.
-            if (!sf.cells.empty())
-            {
-                p.kept_cells = std::move(sf.cells);
-                p.kept_order = std::move(sf.cell_order);
-                p.kept_body  = p.shown_body;
-                p.kept_scope = p.shown_scope;
-            }
-            sf.cells.clear();
-            sf.cell_order.clear();
-        }
+        p.grid_w = grid_w;
+        // Nothing stands for a grid not yet priced on a new view: the search line says
+        // how far it is. A re-pass for the same view leaves the last grid standing.
+        p.hide_shown = new_view;
     }
+
+    // THE SHOWN GRID, split at today's treasury whenever it or the grid moved.
+    const bool show = shown.valid && !p.hide_shown && p.shown_places.has_value();
+    if (!show)
+    {
+        sf.cells.clear();
+        sf.cell_order.clear();
+        p.derived = false;
+    }
+    else if (!p.derived || balance != p.derived_balance)
+    {
+        derive_cells(w, shown, *p.shown_places, balance, sf);
+        p.derived         = true;
+        p.derived_balance = balance;
+    }
+
     sf.searching     = p.running;
     sf.search_done   = static_cast<int>(p.finished);
-    sf.search_total  = static_cast<int>(p.work.size());
+    sf.search_total  = static_cast<int>(p.opts.size());
     if (!p.running)
         return;
 
@@ -1080,7 +1103,7 @@ void step_site_grid(world& w, const recipe_registry& reg, ui_state& ui, const st
 
     // This frame's options: every one not yet done, in option order.
     std::vector<std::size_t> todo;
-    for (std::size_t i = 0; i < p.work.size(); ++i)
+    for (std::size_t i = 0; i < p.opts.size(); ++i)
         if (!p.done[i])
             todo.push_back(i);
 
@@ -1156,10 +1179,10 @@ void step_site_grid(world& w, const recipe_registry& reg, ui_state& ui, const st
 
     if (failed)
     {
-        // A pass that threw is stopped, not resumed: a tile it was on was never scored. The
-        // last complete grid stands; the pass restarts when its key next moves.
-        // Logged once for this key: a world that throws every pass does not flood the log.
-        // Its options stay in p.work, so the stopped pass is not restarted every frame.
+        // A pass that threw is stopped, not resumed: a tile it was on was never scored. It
+        // is logged once for its key, and is not restarted until the key or the options
+        // move. The last complete grid stands again only if it is this view's: its own
+        // body, scope and options.
         if (!p.failed_logged)
         {
             p.failed_logged = true;
@@ -1168,17 +1191,9 @@ void step_site_grid(world& w, const recipe_registry& reg, ui_state& ui, const st
         p.running    = false;
         p.failed     = true;
         sf.searching = false;
-        // Another view's grid never stands for this one: the kept grid comes back only on
-        // its own body and scope, for the same buildings.
-        if (sf.cells.empty() && !p.kept_cells.empty() && p.kept_body == p.key.body && p.kept_scope == p.key.scope
-            && same_options(p.kept_cells, opts))
-        {
-            sf.cells      = std::move(p.kept_cells);
-            sf.cell_order = std::move(p.kept_order);
-        }
-        p.kept_cells.clear();
-        p.kept_order.clear();
         p.cx.reset();
+        if (shown.valid && shown.body == p.key.body && shown.scope == p.key.scope && same_options(shown.opts, p.opts))
+            p.hide_shown = false;
         return;
     }
 
@@ -1186,37 +1201,32 @@ void step_site_grid(world& w, const recipe_registry& reg, ui_state& ui, const st
     for (const char d : p.done)
         p.finished += d ? 1 : 0;
     sf.search_done = static_cast<int>(p.finished);
-    if (p.finished < p.work.size())
+    if (p.finished < p.opts.size())
         return;
 
-    // Every option is scored: settle each cell in option order, then show the whole grid.
-    const bool scope_empty = sf.scope_province != 0 && p.tiles.empty();
-    for (std::size_t i = 0; i < p.work.size(); ++i)
-        finish_cell(p, i, scope_empty);
+    // Every option is scored: publish the pass, and the cells split at today's treasury.
     p.running    = false;
     sf.searching = false;
-    sf.cells     = std::move(p.work);
-    p.work.clear();
-    p.kept_cells.clear();
-    p.kept_order.clear();
-    p.shown_body  = p.key.body;
-    p.shown_scope = p.key.scope;
     p.cx.reset();
-    // The pass's quotes become the shown grid's, and the table re-reads its rows from
-    // them: a row's Net is the cell's quote.
+    ++grid_published(); // the door's moment moves: its quotes and the table's rows are priced again
     p.figures.valid = true;
+    p.figures.door  = make_door_stamp(w);
     shown_figures() = std::move(p.figures);
     p.figures       = grid_figures{};
-    ++grid_published(); // the door's quotes and the table's rows are priced again, together
+    p.shown_places.reset();
+    p.shown_places.emplace(w, p.key.body, p.grid_w);
+    p.hide_shown    = false;
     last_key()      = eval_key{};
-    order_cells(sf);
-    sf.grid_ms           = p.spent_ms;
-    sf.grid_frames       = p.frames;
+    derive_cells(w, shown_figures(), *p.shown_places, balance, sf);
+    p.derived         = true;
+    p.derived_balance = balance;
+    sf.grid_ms            = p.spent_ms;
+    sf.grid_frames        = p.frames;
     sf.grid_warm_frame_ms = p.warm_frame_max_ms;
     sf.grid_wall_ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - p.started).count();
 }
 
-/// THE SEARCH LINE: a grid still being priced shows how far the search has got, never
+// THE SEARCH LINE: a grid still being priced shows how far the search has got, never
 /// a part of the grid, which would read as an answer before it is one.
 void draw_site_search(const site_finder_state& sf)
 {
@@ -1637,7 +1647,7 @@ shelf_runway shelf_runway_for(const world& w, const recipe_registry& reg, entity
 
     // Cached with the quote, on its stamp, so the door and the finder stay stale together.
     quote_cache& qc = quotes();
-    const door_stamp now = make_door_stamp(w);
+    const door_stamp now = door_now(w);
     if (!(now == qc.stamp))
     {
         qc.stamp = now;
@@ -1737,7 +1747,7 @@ site_quote quote_for_tile(world& w, const recipe_registry& reg, entity_id tile, 
 {
     const economy_report* report = quote_report();
     quote_cache& qc = quotes();
-    const door_stamp now = make_door_stamp(w);
+    const door_stamp now = door_now(w);
     if (!(now == qc.stamp) || !qc.cx.has_value())
     {
         if (!(now == qc.stamp))
