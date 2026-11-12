@@ -5221,7 +5221,16 @@ military_day_result run_military_day(world& w, const recipe_registry& reg, int d
     // take to no men goes today as a battle-killed one does. Live days only, as starvation:
     // the settle's wars keep no battery firing.
     if (carried_supplies_live(w, day_tick))
+    {
         out.artillery = run_artillery_day(w, reg, fought);
+        // The shells' losses count as a battle's toward the war (MILITARY.md § Artillery
+        // fires shells): the same battle inputs and exhaustion path the battles feed.
+        std::vector<war_losses> shelled;
+        shelled.reserve(out.artillery.losses.size());
+        for (const artillery_loss& l : out.artillery.losses) // battery id order
+            shelled.push_back({ l.firer, l.struck, 0, l.men });
+        note_war_losses(w, shelled);
+    }
     // THE CARRIED SUPPLIES' DAY (BL-1452; MILITARY.md § Carried supplies): after the
     // rounds that read the stocks, drain and refill them at the unit's road share, and
     // starve a unit with no food - before the disband, so a unit starvation takes to

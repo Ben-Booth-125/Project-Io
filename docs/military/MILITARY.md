@@ -555,7 +555,7 @@ span is ever left without a name. A span runs
 farthest from that end. A span that closes on itself, ringing an enclave, runs on round the other
 side. Tiles off that line sit beside their nearest line tile. Every tie goes to the lower tile id.
 
-**Artillery stands behind the line (Ben, 2026-11-11).** A front's artillery — a battery reaching 2 tiles or more — takes no line slot and is not pushed. The rest are the **line**, and the slots below are spaced among the line alone. The front's *m* batteries each take an anchor, the middle tile of stretch *j* of *m*. From its anchor a battery stands on the deepest tile of its own nation's ground, no more than its range less one step back, from which it still reaches some neighbour tile across the span. Depth is hex steps to the nearest span tile; ties go to the fewest steps from the anchor, then the lower tile id. When the line moves, the anchor moves with it, and so does the battery (§ Artillery fires shells).
+**Artillery stands behind the line (Ben, 2026-11-11).** A front's artillery — a battery reaching 2 tiles or more — takes no line slot and is not pushed. The rest are the **line**, and the slots below are spaced among the line alone. The front's *m* batteries each take an anchor, the middle tile of stretch *j* of *m*. From its anchor a battery stands on the deepest tile of its own nation's ground, no more than its range less one step back, from which it still reaches some neighbour tile across the span. Depth is hex steps to the nearest span tile; ties go to the fewest steps from the anchor, then the lower tile id. A tile where a hostile stack stands is never chosen, so the march there is never an attack. When the line moves, the anchor moves with it, and so does the battery (§ Artillery fires shells).
 
 **Slots.** A front with *n* units on its line cuts its span into *n* equal stretches. Unit *i*, in
 ascending unit id, takes the middle tile of stretch *i*. A unit is on its slot once it stands on
@@ -895,10 +895,12 @@ moves it back when the line moves (§ Fronts).
 **Artillery's first cut (calibrated 2026-11-12, BL-1643 (missile silos)).** The numbers are a first
 cut; the design around them is settled. A battery reaches **2 tiles** on its base gun. The longer
 guns add to it: the long barrel and the rocket launcher +1, guided rockets +2, and the radar-laid
-howitzer +1, so no gun reaches past a raised unit's 4-tile sight. Each live day, a battery that is
+howitzer +1. A battery's range never passes a raised unit's 4-tile sight, so none fires blind. Each live day, a battery that is
 standing — on the ground, under no march order, not refitting and not in a battle — strikes one
 hostile unit in range. It picks a unit in battle first, then the nearest, ties to the lower id; with
-counter-battery radar it picks hostile artillery before either. A strike is half a battle day's
+counter-battery radar it picks hostile artillery before either. Every battery aims, and sizes its
+strike, on the day as it began; then every strike lands. So two batteries shelling each other trade
+a full day's fire each, whichever was raised first. A strike is half a battle day's
 fire from the battery (its soft or hard attack by the target's hardness, times its men, rounds and
 readiness), of which **600‰ lands**, or **900‰** with precision shells. What lands takes men and
 readiness as tactical bombing's does (§ Air), and its losses count as a battle's toward the war. A

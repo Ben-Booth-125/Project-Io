@@ -16,11 +16,19 @@
 //   A8  THE SCORER'S READ: front_hold_slot gives a battery its battery tile, as the step does.
 //   A9  SELF-PROPELLED PACE: an SP battery on a front marches at the force's pace.
 //   A10 THE WAKE TEST: a day with a target in range is a military day.
+//   A11 A DUEL IS EVEN: two identical hostile batteries in range of each other take equal
+//       losses, whatever their ids (each aims against the day's start, then both land).
+//   A12 THE WAR SEES THE SHELLS: a battery's kills count as battle losses toward the war -
+//       its battle inputs and the struck side's exhaustion - through run_military_day.
+//   A13 NO MARCH INTO A HOSTILE STACK: the battery tile is never one a hostile unit holds.
+//   A14 RANGE NEVER PASSES SIGHT: a gun past sight_tiles is clamped to it.
 //
 // Run: node tools/verify/build_harness.js artillery_harness --run
 // ---------------------------------------------------------------------------
 
 #include "world/artillery.hpp"
+#include "world/campaign_settle.hpp"
+#include "world/war.hpp"
 #include "world/components.hpp"
 #include "world/corp_command.hpp"
 #include "world/economy_system.hpp"
@@ -417,6 +425,115 @@ int main()
         check(!artillery_fire_pending(f.w, reg), "A10a with no hostility nothing is pending");
         f.w.corp_hostile_pairs.insert({f.A, f.B});
         check(artillery_fire_pending(f.w, reg), "A10b with a hostile unit in range a strike is pending");
+    }
+
+    // =====================================================================
+    std::printf("\nA11 - two identical hostile batteries in range of each other take equal losses\n");
+    {
+        fixture f; build(f);
+        const entity_id a = add_unit(f, f.A, 5, 3, land_class::artillery);
+        const entity_id b = add_unit(f, f.B, 5, 5, land_class::artillery);
+        f.w.corp_hostile_pairs.insert({f.A, f.B});
+        f.w.corp_hostile_pairs.insert({f.B, f.A});
+        for (int d = 0; d < 20; ++d)
+            run_artillery_day(f.w, reg, none);
+        const unit_component& ua = f.w.units.at(a);
+        const unit_component& ub = f.w.units.at(b);
+        std::printf("      after 20 days: lower id %d men / %d readiness, higher id %d men / %d readiness\n",
+                    ua.count, ua.readiness_permille, ub.count, ub.readiness_permille);
+        check(ua.count < 500 && ua.count == ub.count && ua.readiness_permille == ub.readiness_permille,
+              "A11a both lose men, and exactly as many as each other");
+    }
+
+    // =====================================================================
+    std::printf("\nA12 - a battery's kills count toward the war as a battle's do\n");
+    {
+        const int live = military_quarter_day_base(k_campaign_settle_ticks);
+        fixture f; build(f);
+        add_unit(f, f.A, 5, 3, land_class::artillery);
+        add_unit(f, f.B, 5, 5, land_class::infantry);
+        add_unit(f, f.B, 15, 8, land_class::infantry); // B's standing elsewhere, out of range
+        f.w.corp_hostile_pairs.insert({f.A, f.B});
+        war_record wr;
+        wr.declarer = f.A; wr.defender = f.B;
+        f.w.wars[{ f.A, f.B }] = wr;
+        int killed = 0;
+        for (int d = 1; d <= 20; ++d)
+            killed += run_military_day(f.w, reg, live + d).artillery.men_killed;
+        const war_record& after = f.w.wars.at({ f.A, f.B });
+        std::printf("      20 live days: %d men killed; war defender_men_lost %lld, defender exhaustion %.3f\n",
+                    killed, static_cast<long long>(after.defender_men_lost), after.defender_exhaustion);
+        check(killed > 0 && after.defender_men_lost == killed && after.declarer_men_lost == 0
+                  && after.defender_exhaustion > 0.0f && after.declarer_exhaustion == 0.0f,
+              "A12a the defender's battle inputs carry every man the shells killed, and its exhaustion rose");
+        // The settle's days fire nothing, so they feed nothing.
+        fixture g; build(g);
+        add_unit(g, g.A, 5, 3, land_class::artillery);
+        add_unit(g, g.B, 5, 5, land_class::infantry);
+        g.w.corp_hostile_pairs.insert({g.A, g.B});
+        war_record wg;
+        wg.declarer = g.A; wg.defender = g.B;
+        g.w.wars[{ g.A, g.B }] = wg;
+        for (int d = 1; d <= 5; ++d)
+            (void)run_military_day(g.w, reg, live - 10 + d);
+        check(g.w.wars.at({ g.A, g.B }).defender_men_lost == 0,
+              "A12b a settle day bombards nothing and feeds the war nothing");
+    }
+
+    // =====================================================================
+    std::printf("\nA13 - the battery's tile is never one a hostile stack holds\n");
+    {
+        // The same front twice: the first finds the battery's tile; the second puts a hostile
+        // stack of B's on it (on A's ground, as a raid would) and asks again.
+        entity_id first = null_entity, second = null_entity;
+        bool second_ok = false;
+        for (int run = 0; run < 2; ++run)
+        {
+            fixture f; build(f);
+            const entity_id i1 = add_unit(f, f.A, 2, 1, land_class::infantry);
+            const entity_id bat = add_unit(f, f.A, 14, 0, land_class::artillery);
+            fit(f.w.units.at(bat), "art.gun.long_barrel"); // range 3: two rows behind the line
+            f.w.corp_hostile_pairs.insert({f.A, f.B});
+            reanchor_fronts(f.w);
+            const std::vector<front> fs = current_fronts(f.w, f.A);
+            const front* fr = front_toward(fs, f.B);
+            if (fr == nullptr)
+                break;
+            std::vector<entity_id> members = { i1, bat };
+            std::sort(members.begin(), members.end());
+            const std::size_t m = members[0] == bat ? 0 : 1;
+            if (run == 1)
+                add_unit(f, f.B, f.w.tiles.at(first).grid_x, f.w.tiles.at(first).grid_y, land_class::infantry, 50);
+            const entity_id t = front_hold_slot(f.w, reg, *fr, members, m);
+            (run == 0 ? first : second) = t;
+            if (run == 1 && t != null_entity)
+            {
+                int reach = 1 << 30;
+                for (int x = 0; x < W; ++x)
+                    reach = std::min(reach, hex(f.w, t, f.at(x, 5)));
+                second_ok = reach <= 3 && depth(f.w, *fr, t) == 2;
+                const tile_component& a = f.w.tiles.at(first);
+                const tile_component& b = f.w.tiles.at(t);
+                std::printf("      free: (%d,%d); with a hostile stack there: (%d,%d)\n", a.grid_x, a.grid_y,
+                            b.grid_x, b.grid_y);
+            }
+        }
+        check(first != null_entity && second != null_entity && second != first && second_ok,
+              "A13a with a hostile stack on its tile, the battery takes another as deep that still reaches across");
+    }
+
+    // =====================================================================
+    std::printf("\nA14 - a battery's range never passes sight\n");
+    {
+        recipe_registry far = make_registry();
+        military_capability_params mp = far.military();
+        mp.artillery.base_range = 9; // past the 4-tile sight
+        far.set_military(mp);
+        fixture f; build(f);
+        const entity_id a = add_unit(f, f.A, 5, 3, land_class::artillery);
+        const int sight = far.military().missile.sight_tiles;
+        check(artillery_range_tiles(far, f.w.units.at(a)) == sight,
+              "A14a a base range of 9 reaches only the sight's " + std::to_string(sight) + " tiles");
     }
 
     std::printf("\nRESULT: %d failures / %d checks\n", failures, checks);

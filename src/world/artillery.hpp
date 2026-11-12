@@ -29,11 +29,13 @@
 
 #include <cstdint>
 #include <set>
+#include <vector>
 
 struct world;
 class recipe_registry;
 
-/// The range of @p u in tiles: the class's base plus its recorded kit's guns. 0 for any
+/// The range of @p u in tiles: the class's base plus its recorded kit's guns, never past a
+/// unit's sight (`missile_params::sight_tiles`), so a battery never fires blind. 0 for any
 /// unit that is not artillery.
 int artillery_range_tiles(const recipe_registry& reg, const unit_component& u);
 
@@ -52,17 +54,28 @@ bool artillery_ready(const recipe_registry& reg, const unit_component& u, entity
 entity_id artillery_target(const world& w, const recipe_registry& reg, entity_id uid,
                            const std::set<entity_id>& fighting);
 
+/// One strike's men killed, by whose battery on whose unit: the war's input (`note_war_losses`).
+struct artillery_loss
+{
+    entity_id firer  = null_entity; ///< The battery's nation.
+    entity_id struck = null_entity; ///< The struck unit's nation.
+    int       men    = 0;           ///< Men the strike killed (> 0).
+};
+
 /// What one day of artillery fire did.
 struct artillery_day_tick
 {
     int strikes    = 0; ///< Batteries that fired at a target.
     int men_killed = 0; ///< Men the strikes killed, summed.
+    std::vector<artillery_loss> losses; ///< Each killing strike, in battery id order.
 };
 
-/// THE DAY'S BOMBARDMENT. Every ready battery, ascending id, strikes its target; a unit the
-/// strikes take to no men is left for the day's disband (`disband_orphaned_units`). Men
-/// killed emit `force_used` as a battle's do. @p fighting is the set of units in live
-/// battles at the start of the step.
+/// THE DAY'S BOMBARDMENT. Every ready battery, ascending id, picks its target and its hits
+/// against the START of the day; then every strike lands. So two batteries shelling each
+/// other trade fire on equal terms whatever their ids. A unit the strikes take to no men is
+/// left for the day's disband (`disband_orphaned_units`). Men killed emit `force_used` as a
+/// battle's do, and are returned in `losses` for the war's battle inputs. @p fighting is the
+/// set of units in live battles at the start of the step.
 artillery_day_tick run_artillery_day(world& w, const recipe_registry& reg, const std::set<entity_id>& fighting);
 
 /// Is any battery able to strike today? The daily pass's wake test.

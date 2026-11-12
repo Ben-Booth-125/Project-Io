@@ -40,7 +40,9 @@ int artillery_range_tiles(const recipe_registry& reg, const unit_component& u)
     const land_class c = unit_land_class(u);
     if (c != land_class::artillery)
         return 0;
-    return std::max(0, reg.military().artillery.base_range + artillery_kit_range(c, u.kit));
+    // Never past sight: a battery fires only at what its side's units can see.
+    const int range = reg.military().artillery.base_range + artillery_kit_range(c, u.kit);
+    return std::clamp(range, 0, std::max(0, reg.military().missile.sight_tiles));
 }
 
 uint8_t artillery_traits(const unit_component& u)
@@ -100,6 +102,12 @@ artillery_day_tick run_artillery_day(world& w, const recipe_registry& reg, const
     artillery_day_tick out;
     const artillery_params& ap = reg.military().artillery;
     const campaign_battle_params land{}; // the land round's hit conversion, as tactical bombing's
+
+    // 1. AIM: every ready battery, ascending id, picks its target and its hits against the
+    //    world as it stands at the day's start. Nothing lands yet, so no battery's id decides
+    //    a duel: two batteries in range of each other each fire their full day.
+    struct strike { entity_id battery; entity_id target; entity_id firer; int64_t hits; };
+    std::vector<strike> strikes;
     for (const entity_id uid : sorted_unit_ids(w))
     {
         const auto bit = w.units.find(uid);
@@ -109,7 +117,7 @@ artillery_day_tick run_artillery_day(world& w, const recipe_registry& reg, const
         if (target == null_entity)
             continue;
         const unit_component& b = bit->second;
-        unit_component& t = w.units.at(target);
+        const unit_component& t = w.units.at(target);
 
         // The battery's day of fire, on the land round's scale: per man, soft and hard
         // against the target's hardness, rounds a day, the round's day scale - then the
@@ -124,15 +132,20 @@ artillery_day_tick run_artillery_day(world& w, const recipe_registry& reg, const
         hits = hits * std::clamp(ap.strike_share_permille, 0, 1000) / 1000;
         hits = hits * std::clamp(landed, 0, 1000) / 1000;
         hits = hits * std::clamp<int64_t>(b.readiness_permille, 0, 1000) / 1000;
-        if (hits <= 0)
-            continue;
-        ++out.strikes;
+        if (hits > 0)
+            strikes.push_back({ uid, target, b.owner, hits });
+    }
 
-        // Into men and readiness through the bank tactical bombing keeps (air_combat.cpp).
-        std::pair<int32_t, int32_t>& bank = w.air_hit_bank[target];
-        const int64_t hp_part = hits * land.hp_share_permille / 1000;
+    // 2. LAND: each strike in battery id order, into men and readiness through the bank
+    //    tactical bombing keeps (air_combat.cpp).
+    for (const strike& st : strikes)
+    {
+        unit_component& t = w.units.at(st.target);
+        ++out.strikes;
+        std::pair<int32_t, int32_t>& bank = w.air_hit_bank[st.target];
+        const int64_t hp_part = st.hits * land.hp_share_permille / 1000;
         int64_t hp_bank = bank.first + hp_part;
-        int64_t rd_bank = bank.second + (hits - hp_part);
+        int64_t rd_bank = bank.second + (st.hits - hp_part);
         const int64_t men = std::min<int64_t>(hp_bank / std::max(1, land.hp_cost), t.count);
         hp_bank -= men * std::max(1, land.hp_cost);
         const int before = t.count;
@@ -148,7 +161,10 @@ artillery_day_tick run_artillery_day(world& w, const recipe_registry& reg, const
         bank.first  = static_cast<int32_t>(std::clamp<int64_t>(hp_bank, 0, 1 << 30));
         bank.second = static_cast<int32_t>(std::clamp<int64_t>(rd_bank, 0, 1 << 30));
         if (men > 0)
-            note_battle_losses(w, b.owner, t.owner, 0, static_cast<int>(men)); // force_used
+        {
+            note_battle_losses(w, st.firer, t.owner, 0, static_cast<int>(men)); // force_used
+            out.losses.push_back({ st.firer, t.owner, static_cast<int>(men) });
+        }
     }
     return out;
 }

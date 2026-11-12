@@ -189,6 +189,12 @@ entity_id front_hold_slot(world& w, const recipe_registry& reg, const unit_compo
 entity_id front_hold_slot(world& w, const recipe_registry& reg, const front& f,
                           const std::vector<entity_id>& members, std::size_t m);
 
+/// BL-1643: `front_hold_slot` for every member at once, index for index: the line/battery
+/// split, the tiles across the span and the hostile-held tiles are read once, so a scorer
+/// that prices a whole member list pays for them once, not once a member.
+std::vector<entity_id> front_hold_slots(world& w, const recipe_registry& reg, const front& f,
+                                        const std::vector<entity_id>& members);
+
 /// BL-1441 (front edge cases): may @p unit reach front @p f? The test a front's
 /// own hold step would meet for a lone unit: of the span tiles nearest the span's
 /// middle (ties to the lower index), the first the unit's class may enter; reachable
