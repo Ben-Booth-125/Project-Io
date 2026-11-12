@@ -532,7 +532,7 @@
      "DG-PR-EX-A"
     ]
    ],
-   "deed": "your own stock of crude oil and iron ore covers 4 quarters of your demand",
+   "deed": "your own stock of crude oil and iron ore covers 12 months of your demand",
    "deed_effect": {
     "kind": "unread",
     "waits_on": "national stock and demand ledger"
@@ -1047,7 +1047,7 @@
      "DG-PR-PC-B"
     ]
    ],
-   "deed": "your microchip output covers your own electronics demand for 4 quarters",
+   "deed": "your microchip output covers your own electronics demand for 12 months",
    "deed_effect": {
     "kind": "unread",
     "waits_on": "microchip recipe"
@@ -1474,7 +1474,7 @@
      "DG-PR-EN-C"
     ]
    ],
-   "deed": "a propellant plant fully staffed for 8 quarters",
+   "deed": "a propellant plant fully staffed for 24 months",
    "deed_effect": {
     "kind": "unread",
     "waits_on": "deed history"
@@ -1548,11 +1548,11 @@
      "DG-NE-SO-T2"
     ]
    ],
-   "advantage": "rivals’ prices and stocks seen 1 quarter fresher",
+   "advantage": "rivals’ prices and stocks seen 3 months fresher",
    "effects": [
     {
      "kind": "unread",
-     "what": "rivals’ prices and stocks seen 1 quarter fresher",
+     "what": "rivals’ prices and stocks seen 3 months fresher",
      "waits_on": "activity fog"
     }
    ],
@@ -2319,7 +2319,7 @@
      "DG-NE-MK-A"
     ]
    ],
-   "deed": "trade with the markets of 3 other nations in one quarter",
+   "deed": "trade with the markets of 3 other nations in three months",
    "deed_effect": {
     "kind": "unread",
     "waits_on": "trade partners by nation"
@@ -2742,7 +2742,7 @@
      "DG-NE-FR-B"
     ]
    ],
-   "deed": "10 convoy routes served every quarter for 4 quarters",
+   "deed": "10 convoy routes served every month for 12 months",
    "deed_effect": {
     "kind": "unread",
     "waits_on": "deed history"
@@ -3409,11 +3409,11 @@
      "DG-ST-OR-T4"
     ]
    ],
-   "advantage": "unrest forecast 2 quarters ahead",
+   "advantage": "unrest forecast 6 months ahead",
    "effects": [
     {
      "kind": "unread",
-     "what": "unrest forecast 2 quarters ahead",
+     "what": "unrest forecast 6 months ahead",
      "waits_on": "unrest"
     }
    ],
@@ -3589,7 +3589,7 @@
      "DG-ST-OR-Bb"
     ]
    ],
-   "deed": "unrest below the floor in every province for 8 quarters",
+   "deed": "unrest below the floor in every province for 24 months",
    "deed_effect": {
     "kind": "unread",
     "waits_on": "unrest"
@@ -4039,7 +4039,7 @@
      "DG-ST-AC-Ab"
     ]
    ],
-   "deed": "no nation’s Alarm toward you rises for 8 quarters",
+   "deed": "no nation’s Alarm toward you rises for 24 months",
    "deed_effect": {
     "kind": "unread",
     "waits_on": "Alarm"

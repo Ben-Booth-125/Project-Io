@@ -226,7 +226,7 @@ a tile keep the shared header (§ Layout & chrome).
      what it makes, and owner — `placement_rules::stack_members`; a rival's stacks group by
      type and owner only, since splitting them by recipe would itself reveal the recipes). Each
      button carries the **type glyph** (`icons::building`, with the stack's count when above
-     one), the **building name**, and its **net profit per quarter** (`estimate_building_profit`,
+     one), the **building name**, and its **net profit per month** (`estimate_building_profit`,
      the figure the Profitability page charts), coloured by sign. A **rival's** button shows
      glyph and name, with profit reading *private* (DISCOVERY.md, the competitor-visibility
      rule). A stack still under construction shows its ETA in place of profit.
@@ -406,32 +406,32 @@ The preview and the province card do not move; two columns change.
      rate and ETA while it is still building — never a bare "Operating.".
    - **The profit row** — **left**, a short **net-over-time line chart** ("Net, 6 mo.", the
      honest placeholder series anchored to the live estimate, since no per-building profit
-     history is tracked — NR-249); **right**, the **net profit per quarter** as one figure,
-     coloured by sign, with **expenses per quarter** below it as one figure. Hovering expenses
+     history is tracked — NR-249); **right**, the **net profit per month** as one figure,
+     coloured by sign, with **expenses per month** below it as one figure. Hovering expenses
      splits it into `input_cost` / `maintenance` / `wages` (NR-248). The column chart of
      revenue against stacked expenses and the Inputs bar chart are retired: one number says
      what the column pair said, in a fraction of the height.
    - **The recipe (Ben, 2026-11-05)** — the recipe the building runs, as rows: its **inputs and
      outputs**, each input flagged when it is short. Owner only, under the recipe-disclosure rule
-     above. The figures are **per quarter**. The economy report names **one** input, the one that
+     above. The figures are **per month**. The economy report names **one** input, the one that
      held the run, so that flag is a report and every other per-good figure is a mirror of the
-     recipe at the building's staffing, and the surface says so: the column reads *Est./qtr*, an
+     recipe at the building's staffing, and the surface says so: the column reads *Est./mo*, an
      input short by the shelf carries an amber mark whose hover says *by estimate*, and the
      reported one a red mark whose hover cites the report. An output's figure is the report's
      total split by the recipe. An extraction site has no recipe and shows one output row per good it yields: every deposit on its tile with reserve left, its share by richness, as the sim shares it. The report gives the site's one total, so where a basket has more than one good the shares are labelled an estimate; a site with one good reads as reported.
-     **No quarter read is not zero.** Until a building has a report row, as after a load, the
-     heading says *no quarter yet* and an output reads a dash. Where the sim would run no batch (mothballed, standing idle, a retired recipe, no market, no staff, unsupplied, no labour reached it) an input reads a dash and no shortage, and its hover says why. Power comes off the grid, so its row
+     **No month read is not zero.** Until a building has a report row, as after a load, the
+     heading says *no month yet* and an output reads a dash. Where the sim would run no batch (mothballed, standing idle, a retired recipe, no market, no staff, unsupplied, no labour reached it) an input reads a dash and no shortage, and its hover says why. Power comes off the grid, so its row
      shows no shelf figure and no estimated flag.
    - **The workforce row** — the building's workforce target as a **read-only bar** with the
-     percentage of full employment to its right (0–100 %, the internal target ÷ 2). The game sets it, one 25 % step a quarter toward the
+     percentage of full employment to its right (0–100 %, the internal target ÷ 2). The game sets it, one 25 % step a month toward the
      most profitable level (`../economy/PRODUCTION.md` § Workforce target and the auto-solver);
      the slider and the Auto control are retired (Ben, 2026-10-13).
 
-   **Every card shows its method and status line, always** — before the first quarter, and for
+   **Every card shows its method and status line, always** — before the first month, and for
    a building with no recipe. A building with no recipe names what it does instead (a Port: the
    trade points it makes; a hub: the haul it discounts). The profit and workforce rows are drawn
    for the player's own completed building; **a fresh campaign opens with them filled**, from the
-   settle's quarters (`STARTUP.md` § Handoff, Ben 2026-10-13: *"the first few ticks in
+   settle's months (`STARTUP.md` § Handoff, Ben 2026-10-13: *"the first few ticks in
    generation … pass their data to the live game"*). A building with no output still has costs:
    its profit row reads its net (negative) and expenses. A building still under construction
    shows the header, method and status. A **rival's** card
@@ -484,7 +484,7 @@ A selected **Unit** (`selection_kind::unit`) takes the **same 3-column band shap
 building/tile elements (`draw_unit_selection_body`, `src/ui/selection_panel.cpp`) — the
 card's shape is built ahead of units carrying much in the live economy (Ben's direction).
 
-1. **Left quarter — the class's portrait**: the designer's authored image of the land class the
+1. **Left month — the class's portrait**: the designer's authored image of the land class the
    unit fights as (`assets/units/<class>.png`, `unit_art.hpp`), scaled with its aspect kept; the
    humanoid placeholder glyph (`glyph_soldier`) where a class has no image.
 2. **Centre half — the unit's type and owner over its stat grid** (`ledgers/military.md` § The
@@ -492,7 +492,7 @@ card's shape is built ahead of units carrying much in the live economy (Ben's di
    (`unit_roster_display_name`; on the player's own unit, the designer's door), the land class it
    fights as and the owner; then the four bands of numbers; then a line each for what the grid
    does not hold — an older design, a refit in progress, the front it holds, a supply shortfall.
-3. **Right quarter — a 2×3 action grid**: **Defend province** (Ben, 2026-11-09: a toggle, lit
+3. **Right month — a 2×3 action grid**: **Defend province** (Ben, 2026-11-09: a toggle, lit
    while the unit defends the province it stands in; `../military/MILITARY.md` § Defend province),
    **March**, **Halt**, **Disband**, **Refit** and **Assign to front** (§ The front element),
    matching the tile/building cards' pattern. Going to a unit is the unit group's and stack's
@@ -873,7 +873,7 @@ See [DISCOVERY.md](DISCOVERY.md) for the model authority (the geographic fog thi
 - **`scanning`** — `Surveying <k>/<N> — ETA <days> d` under a dispatched probe. A body the player
   maps from orbit instead (DISCOVERY.md § Mapping, then prospecting) reads the two steps:
   `Mapped <k>/<N> from orbit`, `Prospected <p>/<N> on the ground`, then what prospects it — the
-  player's landed Landers and active rovers there, a region a quarter each — or that prospecting
+  player's landed Landers and active rovers there, a region a month each — or that prospecting
   waits for mapping, or that nothing on the ground is prospecting yet.
 - **`surveyed`** — the hero action switches to **"Go to surface"**, which descends via
   `focus_on_entity` — surveying is done, the move now is to look.
@@ -925,7 +925,7 @@ the screen, rather than floating with the cursor."* The band is:
 
 - **Fixed, not click-anchored.** Always the same rect — left edge at the **comms dock's right
   edge** (the dock takes three quarters of the fold-out column's width; the band takes the
-  quarter it gives back), right edge at the right chrome column, bottom-anchored at
+  month it gives back), right edge at the right chrome column, bottom-anchored at
   `selection_band_height` tall (`app.cpp`'s band block; the frame is
   `src/ui/selection_card.{hpp,cpp}`) — regardless of where the selecting click landed. The
   player's eye never has to re-find it.

@@ -74,20 +74,22 @@ class recipe_registry;
 /// two rates are UNMEASURED placeholders (one and half a cost unit a quarter).
 struct research_params
 {
-    /// RP every nation gets each quarter, at no treasury cost.
-    float base_rp_per_nation = 120.0f;
+    /// RP every nation gets each tick (a month), at no treasury cost. A third of the
+    /// quarter tick's 120 (BL-1642: the tick is a month, per-year RP unchanged).
+    float base_rp_per_nation = 40.0f;
     /// RP per credit the academic-research budget line spends (the linear term).
     float rp_per_research_credit = 0.0f;
     /// RP per sqrt(credit) the line spends (the concave term).
-    float rp_per_research_credit_sqrt = 10.0f; // BL-1305: re-fit 20 -> 10 (scripts/economy.lua)
+    float rp_per_research_credit_sqrt = 5.7735027f; // BL-1642: 10 / sqrt(3) a month (BL-1305 re-fit 20 -> 10 a quarter)
     /// RP per quarter per STAFFED University (completed, standing, workforce
     /// assigned > 0) in the nation's territory (RESEARCH.md § Research points).
-    float rp_per_university = 100.0f;
+    float rp_per_university = 100.0f / 3.0f; // a month (a quarter 100, BL-1642)
     /// RP per quarter per STAFFED research institute whose owner corp's home
     /// nation is this nation (NR-1023: the institute's corp `science` folds in).
-    float rp_per_institute = 50.0f;
+    float rp_per_institute = 50.0f / 3.0f; // a month (a quarter 50, BL-1642)
     /// The RP unit: a node costs `cost_units x rp_per_cost_unit` x the price index.
-    float rp_per_cost_unit = 200.0f;
+    /// 600: three times the 2026-10-10 price (Ben, 2026-11-11; was 200).
+    float rp_per_cost_unit = 600.0f;
 
     /// BL-1324 (rising tech prices; RESEARCH.md § Cost, Ben 2026-10-15): the
     /// price index's growth a year through the age, compounded quarterly as a
@@ -123,7 +125,7 @@ struct research_params
     /// nation to do each space deed earns (space_firsts.hpp). ERAS.md fixes no
     /// size; 400 RP is two cost units at the age's opening price, a bit over three
     /// quarters of the base accrual (economy.research.space_first_grant_rp).
-    float space_first_grant_rp = 400.0f;
+    float space_first_grant_rp = 1200.0f; // two cost units: x3 with the RP unit (BL-1642; was 400)
 };
 
 /// The price index (ppm: 1'000'000 = the age's opening price) after
@@ -157,7 +159,7 @@ std::int64_t research_price_ppm(const world& w, const research_params& p = {});
 /// milli-credits (integer and saturating, so the unordered corporation walk
 /// cannot reorder or overflow the sum). Negative incomes count as zero. Not
 /// the latest return: the research pass runs in the tick that filed it, and
-/// FINANCE.md § The quarterly return holds that no branch reads a return
+/// FINANCE.md § The monthly return holds that no branch reads a return
 /// during the tick that writes it.
 std::int64_t nation_economy_milli(const world& w, entity_id nation);
 
@@ -530,7 +532,7 @@ std::int64_t estimate_rp_per_quarter_milli(const world& w, entity_id nation,
 /// every `es_queue` entry - so the result has `queue.size() + es_queue.size()` rows.
 std::vector<int> project_queue_arrivals(const world& w, entity_id nation,
                                         const research_params& p = {},
-                                        int horizon_quarters = 480);
+                                        int horizon_quarters = 1440); // ticks: 120 years of months (BL-1642; was 480 quarters)
 
 /// Drop the LAST entry of @p nation's queue - the Early Space tail's last when it
 /// has one (BL-1613: one logical queue). False (nothing touched) when both are empty. The pool is untouched: it is the head's progress.

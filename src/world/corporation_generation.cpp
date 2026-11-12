@@ -3221,7 +3221,7 @@ float seat_clean_slate(world& w, entity_id nation)
     // sites are cancelled in ascending building id. Each refunds exactly what any
     // cancelled site does (Ben, 2026-10-26, NR-1075): its credits in full, through
     // the demolition door, which books them on the nation's next quarterly return
-    // (refund_unbooked / refund_opening; FINANCE.md § The quarterly return). The
+    // (refund_unbooked / refund_opening; FINANCE.md § The monthly return). The
     // materials already drawn stay spent — the seat keeps no exception.
     const auto nit = w.nations.find(nation);
     if (nit == w.nations.end())

@@ -385,7 +385,7 @@ nation_figures figures_of(const world& w, const recipe_registry& reg, const econ
         const building_profit p = estimate_building_profit(w, reg, rep, bid);
         if (!p.has_data) continue;
         f.gdp_read = true;
-        f.gdp_year += static_cast<double>(p.revenue) * 4.0; // one economy tick is one quarter (budget_system.hpp)
+        f.gdp_year += static_cast<double>(p.revenue) * static_cast<double>(k_econ_ticks_per_year); // one economy tick is one month (BL-1642)
     }
     return f;
 }
@@ -932,11 +932,11 @@ void app::draw_seat_screen()
             if (fig.gdp_read)
             {
                 const double per_head = fig.population > 0.0 ? fig.gdp_year / (fig.population * 1000.0) : 0.0;
-                ImGui::Text("GDP %.0f cr a year (%.2f cr a head): its ground's last quarter of output, "
+                ImGui::Text("GDP %.0f cr a year (%.2f cr a head): its ground's last month of output, "
                             "at its markets' prices.", fig.gdp_year, per_head);
             }
             else
-                ImGui::TextUnformatted("GDP: no quarter has cleared on this world yet.");
+                ImGui::TextUnformatted("GDP: no month has cleared on this world yet.");
 
             // (3) treasury and budget weights
             card_heading("Treasury and budget");

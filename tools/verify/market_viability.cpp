@@ -1413,7 +1413,7 @@ void run_seed(std::uint32_t seed, int ticks, seed_reading& r)
     exchange_tap tap;
     tap.clear_lap  = clear_lap_index();
     tap.last_total = w.exchanges.total;
-    constexpr int k_econ_tick_days = 90; // sim_loop::econ_tick_days (harness_params.hpp)
+    constexpr int k_econ_tick_days = ::k_econ_tick_days; // BL-1642: 30, a month; // sim_loop::econ_tick_days (harness_params.hpp)
     std::uint32_t max_convoy_id = 0;
     for (const convoy_component& c : w.convoys) max_convoy_id = std::max(max_convoy_id, c.id);
     // L (BL-1223): its own convoy-id watermark, so the W row's is untouched.

@@ -151,7 +151,7 @@ The rung draws the anchor's part of the orbital graph
 | In transit | A short dashed segment along the link the asset travels, with a marker at its share of the way. |
 | Fleets | One mark per nation per node: a pointed hull in the owner's colour carrying the lead unit's hull mark, the fleet's size as a badge. On a ring's upper side, or above a diamond. In transit, on its segment at its share of the way. |
 | Debris | A small cluster of shards beside a node whose debris level is above the floor, larger for more; the level is on the node's hover card. |
-| Solar storm | A bolt at the upper right of a satellite the quarter's storm darkens, or a station whose modules it stops (`../EVENTS.md` § Solar storms). |
+| Solar storm | A bolt at the upper right of a satellite the month's storm darkens, or a station whose modules it stops (`../EVENTS.md` § Solar storms). |
 
 **Hover** a node: its name, its free slots, and the thrust cost and days from the player's home
 surface. **Hover** a satellite or station: its owner, class or role, and state. **Press** a satellite

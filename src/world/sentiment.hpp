@@ -358,13 +358,13 @@ struct sentiment_params
     ///
     /// Authored as a rate rather than a half-life on purpose. A half-life is the
     /// legible way to THINK about it — rate = 1 - 2^(-1 / half_life_ticks), so a
-    /// 180-tick half-life is ~0.00384 (a tick is a quarter) — but converting it
+    /// 180-tick half-life is ~0.00384 (a tick is a month, BL-1642) — but converting it
     /// would put a `std::pow` in the engine, and pow is not guaranteed
     /// identically rounded across libms. The value that crosses the save seam
     /// and the tick is the RATE. The authored value (scripts/economy.lua,
-    /// NR-568) is a NINE-tick half-life: 1 - 2^(-1/9) = 0.074125, for Access and
-    /// Alarm. Trust's is EIGHTEEN ticks, 1 - 2^(-1/18) = 0.037776 (Ben, 2026-11-03,
-    /// NR-1129).
+    /// NR-568) is a nine-quarter half-life, TWENTY-SEVEN monthly ticks since BL-1642:
+    /// 1 - 2^(-1/27) = 0.025345, for Access and Alarm. Trust's is eighteen quarters,
+    /// FIFTY-FOUR ticks, 1 - 2^(-1/54) = 0.012754 (Ben, 2026-11-03, NR-1129).
     ///
     /// Zero = this dimension does not decay AND IS NOT TOUCHED AT ALL (not even
     /// by the epsilon snap). Values above 1 are clamped to 1 (full decay in one
@@ -462,7 +462,7 @@ struct sentiment_trade_streak
 };
 
 /// The window, in folds (ticks), on both sides of a severing.
-inline constexpr uint8_t sentiment_trade_window = 2;
+inline constexpr uint8_t sentiment_trade_window = 6; ///< BL-1642: six monthly folds, the two quarters.
 
 inline bool operator==(const sentiment_trade_streak& a, const sentiment_trade_streak& b)
 {

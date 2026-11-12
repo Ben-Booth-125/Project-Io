@@ -28,7 +28,7 @@ The second, independent fog (BL-089, commercial-sphere visibility): a body-level
 **Retired** with **Corporation** (Ben, 2026-10-23). It said whether a firm's books were open and whether it could be bought; no firm remains to have books or be bought.
 
 **Monthly return**
-The filed record a **nation** writes at the end of every economy tick (a month; renamed from the quarterly return with the tick, Ben, 2026-11-11): the money-loop flows, its closing treasury, its holding count and its book value (Ben, 2026-10-23, re-subjected from the retired corporation). A **retain** over the nation's own budget, not a second computation, so it can never disagree with the loop. Rolling **120 months** (ten years) per nation, world state, serialised. See `docs/economy/FINANCE.md` § The quarterly return.
+The filed record a **nation** writes at the end of every economy tick (a month; renamed from the quarterly return with the tick, Ben, 2026-11-11): the money-loop flows, its closing treasury, its holding count and its book value (Ben, 2026-10-23, re-subjected from the retired corporation). A **retain** over the nation's own budget, not a second computation, so it can never disagree with the loop. Rolling **120 months** (ten years) per nation, world state, serialised. See `docs/economy/FINANCE.md` § The monthly return.
 
 **Buyout**
 **Retired** (Ben, 2026-10-23). It was acquiring a firm whole; with no firms, nothing is bought. Ground and what stands on it change hands only by **conquest** (`docs/politics/NATIONS.md` § Own ground).

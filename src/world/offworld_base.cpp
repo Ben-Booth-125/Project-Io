@@ -411,9 +411,22 @@ void run_offworld_base_quarter(world& w, const offworld_base_params& p, offworld
         }
         ++r.unfed;
         base.unfed_quarters = std::min(base.unfed_quarters + 1, k_offworld_unfed_max);
-        const int lost = std::min(pc.population,
-                                  std::max(1, static_cast<int>(std::ceil(static_cast<double>(pc.population)
-                                                                         * std::clamp(p.shrink_share, 0.0f, 1.0f)))));
+        // BL-1642 (the tick is a month): the loss is CARRIED. Each unfed month adds the
+        // month's share of the people, s = 1 - 0.75^(1/3), to the base's carry in
+        // milli-heads - at least a third of a head, the quarter tick's one-head floor
+        // spread over its three months - and whole heads leave as the carry reaches
+        // them. Feeding does not clear the carry, so a base fed one month in three
+        // still loses at the calendar rate; no pattern dodges it.
+        const double  s_month = std::clamp(static_cast<double>(p.shrink_share), 0.0, 1.0);
+        const int64_t add     = std::max<int64_t>(k_offworld_loss_floor_milli,
+                                    std::llround(static_cast<double>(pc.population) * s_month * 1000.0));
+        const int64_t carried = static_cast<int64_t>(std::clamp(base.loss_carry_milli, 0,
+                                                                k_offworld_loss_carry_max - 1)) + add;
+        base.loss_carry_milli = static_cast<int32_t>(carried % k_offworld_loss_carry_max);
+        const int64_t heads   = carried / k_offworld_loss_carry_max;
+        if (heads <= 0)
+            continue;
+        const int lost = static_cast<int>(std::min<int64_t>(pc.population, heads));
         pc.population -= lost;
         r.heads_lost += lost;
         if (pc.population <= 0)

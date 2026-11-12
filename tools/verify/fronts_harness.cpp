@@ -65,6 +65,14 @@
 
 namespace {
 
+// BL-1642 (the tick is a month): a rival scores its fronts every QUARTER (Ben,
+// 2026-11-09) - on the quarter's last month (is_quarter_tick). The rows' live tick is
+// therefore the first quarter tick past the settle, not the settle tick itself.
+constexpr int k_live_front_tick = k_campaign_settle_ticks
+    + ((k_econ_ticks_per_quarter - 1 - k_campaign_settle_ticks % k_econ_ticks_per_quarter)
+       + k_econ_ticks_per_quarter) % k_econ_ticks_per_quarter;
+static_assert(k_live_front_tick >= k_campaign_settle_ticks, "a live tick");
+
 int failures = 0, checks = 0;
 
 void check(bool ok, const std::string& what)
@@ -720,8 +728,8 @@ int main()
         world twin = w;
         corp_ai_params p; p.cadence_k = 1;
         economy_report r1, r2;
-        run_corp_strategic_step(w, reg, r1, k_campaign_settle_ticks, p);
-        run_corp_strategic_step(twin, reg, r2, k_campaign_settle_ticks, p);
+        run_corp_strategic_step(w, reg, r1, k_live_front_tick, p);
+        run_corp_strategic_step(twin, reg, r2, k_live_front_tick, p);
         check(w.units.at(stranded).front == null_entity && w.units.at(home).front != null_entity
                   && w.state_hash(2) == twin.state_hash(2),
               "F9f the rival assigns its home unit, never the stranded one (no refused march to re-issue); twins agree");
@@ -1051,8 +1059,8 @@ int main()
         corp_ai_params p; p.cadence_k = 1;
         {
             economy_report ra, rb;
-            run_corp_strategic_step(wa, reg, ra, k_campaign_settle_ticks, p); // a live tick: the settle scores no fronts (BL-1452)
-            run_corp_strategic_step(wb, reg, rb, k_campaign_settle_ticks, p); // a live tick: the settle scores no fronts (BL-1452)
+            run_corp_strategic_step(wa, reg, ra, k_live_front_tick, p); // a live tick: the settle scores no fronts (BL-1452)
+            run_corp_strategic_step(wb, reg, rb, k_live_front_tick, p); // a live tick: the settle scores no fronts (BL-1452)
         }
         std::size_t assigned = 0;
         bool own_only = true, never_player = true, capital_home = true;
@@ -1141,8 +1149,8 @@ int main()
         world twin = f.w;
         corp_ai_params p; p.cadence_k = 1;
         economy_report r1, r2;
-        run_corp_strategic_step(f.w, reg, r1, k_campaign_settle_ticks, p); // a live tick: the settle scores no fronts (BL-1452)
-        run_corp_strategic_step(twin, reg, r2, k_campaign_settle_ticks, p); // a live tick: the settle scores no fronts (BL-1452)
+        run_corp_strategic_step(f.w, reg, r1, k_live_front_tick, p); // a live tick: the settle scores no fronts (BL-1452)
+        run_corp_strategic_step(twin, reg, r2, k_live_front_tick, p); // a live tick: the settle scores no fronts (BL-1452)
         const entity_id key = f.at(0, 2);
         bool all_a = true;
         for (const entity_id u : us) all_a = all_a && f.w.units.at(u).front == key;
@@ -1622,8 +1630,8 @@ int main()
         world twin = f.w;
         corp_ai_params p; p.cadence_k = 1;
         economy_report r1, r2;
-        run_corp_strategic_step(f.w, reg, r1, k_campaign_settle_ticks, p);
-        run_corp_strategic_step(twin, reg, r2, k_campaign_settle_ticks, p);
+        run_corp_strategic_step(f.w, reg, r1, k_live_front_tick, p);
+        run_corp_strategic_step(twin, reg, r2, k_live_front_tick, p);
         check(f.w.units.at(ru).defend_province == f.w.provinces.province_of(f.at(4, 1))
                   && f.w.units.at(pu).defend_province == no_province && f.w.units.at(ru).front == null_entity
                   && f.w.state_hash(2) == twin.state_hash(2),
@@ -1718,7 +1726,7 @@ int main()
         const auto score_once = [&](world& w) {
             corp_ai_params p; p.cadence_k = 1;
             economy_report r;
-            run_corp_strategic_step(w, reg, r, k_campaign_settle_ticks, p);
+            run_corp_strategic_step(w, reg, r, k_live_front_tick, p);
         };
         const auto cover_at = [](world& w, entity_id nation, entity_id t) {
             unit_draw_memo memo;
@@ -1940,6 +1948,10 @@ int main()
                 war.declarer = f.B; war.defender = f.A;
                 war.defender_goals = { gp.id };
                 war.answered = true; // or the war scorer writes its own
+                // BL-1642: scored on the quarter tick past the settle; the war keeps the age
+                // it had when the row scored on the settle tick, so the peace scorer reads
+                // the same war.
+                war.opened_tick = k_live_front_tick - k_campaign_settle_ticks;
                 f.w.wars[{ f.B, f.A }] = war;
                 const std::vector<front> fs = current_fronts(f.w, f.A);
                 const front* on = nullptr;
@@ -2228,7 +2240,7 @@ int main()
         const auto score_with = [&](world& w, const recipe_registry& rr) {
             corp_ai_params p; p.cadence_k = 1;
             economy_report r;
-            run_corp_strategic_step(w, rr, r, k_campaign_settle_ticks, p);
+            run_corp_strategic_step(w, rr, r, k_live_front_tick, p);
         };
         const auto add_gun = [&](wide& f, entity_id tile) {
             const entity_id u = add_wide_unit(f, f.A, tile, 40);
@@ -2408,7 +2420,9 @@ int main()
             int not_due = -1, due = -1;
             {
                 wide probe; entity_id h = null_entity, a = null_entity; clock_world(probe, h, a);
-                for (int t = k_campaign_settle_ticks; t < k_campaign_settle_ticks + 2000 && (not_due < 0 || due < 0); ++t)
+                // Quarter ticks only (BL-1642): fronts score on a quarter's last month.
+                for (int t = k_live_front_tick; t < k_live_front_tick + 6000 && (not_due < 0 || due < 0);
+                     t += k_econ_ticks_per_quarter)
                     (corp_strategic_eval_due(probe.w, probe.B, t, p) ? due : not_due) = t;
             }
             check(not_due >= 0 && due >= 0, "F13clock0 the fixture finds a due and a not-due quarter");
@@ -2425,6 +2439,13 @@ int main()
             run_corp_strategic_step(dd.w, reg, r2, due, p);
             check(dd.w.units.at(dh).defend_province != no_province,
                   "F13clock3 the same world on a due quarter does post it: the row can see the pass");
+            // F13clock4 (BL-1642): "every quarter" on the monthly tick - a month that is not
+            // a quarter's last scores no fronts, so the idle unit stays unassigned.
+            wide nq; entity_id qh = null_entity, qa = null_entity; clock_world(nq, qh, qa);
+            economy_report r3;
+            run_corp_strategic_step(nq.w, reg, r3, not_due - 1, p);
+            check(!is_quarter_tick(not_due - 1) && nq.w.units.at(qa).front == null_entity,
+                  "F13clock4 a month that is not a quarter's last scores no fronts: the idle unit waits");
         }
         // (jj, jj2) A unit that cannot stand fed, already on a no-reason front: the joiner's test.
         // A slot costlier than standing takes it off; one no costlier leaves it there.

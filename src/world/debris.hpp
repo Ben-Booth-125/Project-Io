@@ -77,10 +77,10 @@ struct space_debris_params
     float satellite_mass         = 4.0f;   ///< A lost satellite's mass.
     float station_core_mass      = 20.0f;  ///< A lost station core's mass (outside a battle).
     float station_module_mass    = 6.0f;   ///< A lost station module's (or truss's) mass.
-    float wear_per_debris        = 0.004f; ///< Wear a quarter per unit of level (1 = lost).
+    float wear_per_debris        = 0.004f / 3.0f; ///< Wear a tick (a month; a quarter 0.004, BL-1642) per unit of level (1 = lost).
     float unit_damage_per_debris = 0.002f; ///< Hull points a day per unit of level.
-    float tug_clear_per_quarter  = 6.0f;   ///< Level one idle Tug removes a quarter.
-    float low_orbit_drag         = 0.08f;  ///< Fraction of a low-orbit level drag clears a quarter.
+    float tug_clear_per_quarter  = 2.0f;   ///< Level one idle Tug removes a tick (a month; a quarter 6.0, BL-1642; name kept).
+    float low_orbit_drag         = 0.0274113f; ///< Fraction of a low-orbit level drag clears a tick: 1 - 0.92^(1/3), the quarter's 0.08 a month (BL-1642).
 };
 
 /// Below this a level is erased (and the save reader refuses one at or below it).

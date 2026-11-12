@@ -866,7 +866,7 @@ inline void run_app_live_window(world& w, const recipe_registry& reg, int first_
 {
     using harness_timing_detail::clk;
     using harness_timing_detail::ms_between;
-    constexpr int k_econ_tick_days = 90;   // sim_loop::econ_tick_days (sim_loop.hpp:28)
+    constexpr int k_econ_tick_days = ::k_econ_tick_days; // BL-1642: 30, a month;   // sim_loop::econ_tick_days (sim_loop.hpp:28)
     for (int k = 1; k <= ticks; ++k)
     {
         const int day = k * k_econ_tick_days;

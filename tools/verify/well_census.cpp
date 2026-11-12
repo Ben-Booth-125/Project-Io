@@ -292,7 +292,7 @@ int main(int argc, char** argv)
         }
     }
     std::printf("well_census — BL-1198; settle %d ticks, seat, then %d play ticks\n", k_campaign_settle_ticks, ticks);
-    constexpr int k_econ_tick_days = 90;        // sim_loop::econ_tick_days
+    constexpr int k_econ_tick_days = ::k_econ_tick_days; // BL-1642: 30, a month;        // sim_loop::econ_tick_days
     constexpr int k_win_lo = 26, k_win_hi = 50; // market_viability's G2 window
     for (const std::uint32_t seed : seeds)
     {

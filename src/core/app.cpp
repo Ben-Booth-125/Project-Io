@@ -208,6 +208,10 @@ static const std::array<key_binding, 24> s_bindings = {{
 static_assert(sizeof(app) < 512u * 1024u,
               "app is approaching the main thread's stack budget");
 
+// BL-1642 (monthly tick): the app clock and the world-side calendar mirror must agree.
+static_assert(sim_loop::econ_tick_days == k_econ_tick_days,
+              "sim_loop::econ_tick_days and k_econ_tick_days (components.hpp) must match");
+
 app::app()
 {
     if (!SDL_Init(SDL_INIT_VIDEO))
@@ -1748,7 +1752,7 @@ void app::finish_seat(bool picked)
         if (c.nation == m_seat_result.seated)
             std::printf("[start_new_game] seat card: landscape %.4f (%d of %d holdings on "
                         "scored ground)  treasury %.0f cr  trailing net %.0f cr over %d "
-                        "quarter(s)  [information, not the gate]\n",
+                        "month(s)  [information, not the gate]\n",
                         c.landscape, c.holdings_scored, c.holdings,
                         static_cast<double>(c.balance), static_cast<double>(c.trailing_net),
                         c.quarters_read);
@@ -1843,7 +1847,7 @@ void app::adopt_settle_readings(settle_readings&& r)
             }
         }
     std::printf("[begin] settle readings handed to play: %s; %zu building rows, %zu corp budgets, "
-                "%zu standings, %zu quarter(s) of price series on %zu markets\n",
+                "%zu standings, %zu month(s) of price series on %zu markets\n",
                 r.filled ? "filled" : "EMPTY (no settle ran)",
                 m_last_econ_report.buildings.size(), m_last_econ_report.budgets.size(),
                 m_last_corp_standings.size(), r.market_ticks.size(), m_market_history.size());
@@ -3158,10 +3162,11 @@ void app::render()
     ui::draw_unit_designer(m_world, m_registry, m_ui);
     {
         // Budget ledger (BL-171): profit chart reads the income/expenditure series;
-        // the rank table's change column reads the ranking from ~4 econ ticks back.
+        // the rank table's change column reads the ranking from a year (12 monthly ticks) back.
         const ui::player_plot_history bhist{m_balance_history, m_income_history, m_expenditure_history};
         static const std::unordered_map<entity_id, int> k_no_prior;
-        const auto& prior_rank = (m_building_rank_hist.size() >= 5)
+        const auto& prior_rank = (m_building_rank_hist.size()
+                                  >= static_cast<std::size_t>(k_econ_ticks_per_year + 1))
                                      ? m_building_rank_hist.front() : k_no_prior;
         ui::draw_balance_ledger(m_world, m_registry, m_last_econ_report, bhist,
                                 prior_rank, m_ui, m_ui.show_balance_ledger);

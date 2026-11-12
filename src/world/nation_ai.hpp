@@ -106,7 +106,7 @@ struct nation_ai_params
     /// (rather than on the raw id, or on a hash) is what makes admitting a
     /// nation shift nobody else's slot when the new id sorts last, which is the
     /// case a world that grows a nation actually produces. Verified by R2.
-    int cadence_k = 4;
+    int cadence_k = 12; // months: a year, the quarter tick's 4 (BL-1642)
 
     // --- Term 1: niche fit --------------------------------------------------
     /// A neighbour is counted as LACKING resource r by how far its own output
@@ -254,7 +254,7 @@ struct nation_ai_params
     /// quarters. A share, not a credit floor, because treasuries differ by orders
     /// of magnitude between worlds and nations. A reserve rule, not a forecast.
     float space_reserve_share           = 0.5f;
-    int   space_reserve_upkeep_quarters = 8;
+    int   space_reserve_upkeep_quarters = 24; // counted in ticks: 24 months, the 8 quarters (BL-1642; name kept)
     /// The station the scorer fills, one launch at a time, in this order: the
     /// next entry whose kind the station holds fewer of than the list has up to
     /// that entry, whose key is held, whose crew the pool covers and which the

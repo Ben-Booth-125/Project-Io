@@ -147,9 +147,9 @@ void draw_time_panel(ui_state& state, sim_loop& sim, int& prev_speed, const ImVe
         // 1/3-vs-2/3 split applies to the row underneath, where both sides
         // ARE sized elements (a progress bar, a button row) that actually
         // respect a width argument.
-        ImGui::Text("%s %s %s [Q%d]", std::to_string(date.year).c_str(),
+        ImGui::Text("%s %s %s", std::to_string(date.year).c_str(),
                     ui::fmt::month_abbrev(date.month),
-                    ui::fmt::ordinal_day(date.day).c_str(), date.quarter);
+                    ui::fmt::ordinal_day(date.day).c_str());
 
         const ImVec2 row_start = ImGui::GetCursorPos();
 
@@ -157,15 +157,16 @@ void draw_time_panel(ui_state& state, sim_loop& sim, int& prev_speed, const ImVe
         // text-height, carries a centred overlay naming the distance to the
         // next resolution ("how close am I to the economy resolving").
         ImGui::BeginGroup();
-        const float quarter_frac = ui::fmt::quarter_progress(day);
+        // BL-1642: the economy resolves every month, so the bar is the month's.
+        const float quarter_frac = ui::fmt::month_progress(day);
         char         prog_label[32];
         const int    days_left = static_cast<int>(
             std::lround((1.0f - quarter_frac) * static_cast<float>(sim_loop::econ_tick_days)));
-        std::snprintf(prog_label, sizeof(prog_label), "%d d to Q%d",
-                      days_left, (date.quarter % 4) + 1);
+        std::snprintf(prog_label, sizeof(prog_label), "%d d to %s",
+                      days_left, ui::fmt::month_abbrev(date.month % 12 + 1));
         ImGui::ProgressBar(quarter_frac, {prog_w, time_prog_h}, prog_label);
         ImGui::SetItemTooltip(
-            "Quarter progress. The economy resolves on the quarter boundary:\n"
+            "Month progress. The economy resolves on the month boundary:\n"
             "prices clear, production banks, and the budget settles.");
         ImGui::EndGroup();
 
@@ -247,7 +248,7 @@ void draw_time_panel(ui_state& state, sim_loop& sim, int& prev_speed, const ImVe
                 if (speeds[i] == 0)
                     ImGui::SetItemTooltip("%s (Space)", sim.paused() ? "Resume" : "Pause");
                 else
-                    ImGui::SetItemTooltip("Speed %s — %s\n%s per quarter (%d)",
+                    ImGui::SetItemTooltip("Speed %s — %s\n%s per month (%d)",
                                           labels[i],
                                           speed_rate_label(speeds[i]),
                                           speed_quarter_label(speeds[i]),
@@ -289,7 +290,7 @@ void draw_time_panel(ui_state& state, sim_loop& sim, int& prev_speed, const ImVe
             if (sim.paused())
                 std::snprintf(rate, sizeof(rate), "Paused");
             else
-                std::snprintf(rate, sizeof(rate), "%s  ·  %s per quarter",
+                std::snprintf(rate, sizeof(rate), "%s  ·  %s per month",
                               speed_rate_label(sim.speed()),
                               speed_quarter_label(sim.speed()));
 

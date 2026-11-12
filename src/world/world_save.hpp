@@ -460,7 +460,7 @@ inline constexpr uint32_t world_save_magic =
 /// two tiers (`migrate_legacy_roads`). On load the mirror invariant is checked over the
 /// whole field and the stream is refused whole if two halves of a crossing disagree.
 ///
-/// Bumped to 54 by BL-1337 (return net crosses zero; FINANCE.md § The quarterly return):
+/// Bumped to 54 by BL-1337 (return net crosses zero; FINANCE.md § The monthly return):
 /// `quarterly_return::net` is a double, the exact balance delta. The record keeps its f32
 /// slot (the double rounded to float), and a TRAILING SECTION after the returns' taxes
 /// carries the exact figure for every corporation whose history holds any net the f32
@@ -713,7 +713,7 @@ inline constexpr uint32_t k_world_save_version_pre_recruits = 71;
 /// names a unit of the stream, a province of the stream and a tile of it. Refused whole
 /// otherwise. v78 is a STRICT PREFIX of v79 and is read too, as no unit defending.
 ///
-/// **80 (BL-1539, FINANCE.md § The quarterly return) — THE RESEARCH BOOKS.** Appended last:
+/// **80 (BL-1539, FINANCE.md § The monthly return) — THE RESEARCH BOOKS.** Appended last:
 /// after a u32 count, every nation with an unbooked debit or a return that booked research,
 /// ascending id, as (id, f64 research_unbooked, f64 upkeep_unbooked, u32 n = its return
 /// count, n x f32 research in filed order). All finite and never negative. v79 is a STRICT
@@ -794,11 +794,29 @@ inline constexpr uint32_t k_world_save_version_pre_recruits = 71;
 /// stream below `k_world_save_version_one_product`, saying why. `read_save_game` and
 /// `read_world_snapshot` still read v93 and every older stream they read, for the
 /// verification producers; a bare world snapshot is not a save the game opens.
-inline constexpr uint32_t world_save_version = 94;
-
+///
 /// BL-1641: the first world stream of one building per product. A game save whose
 /// world is older is refused at the game's load (`save_game_refusal_reason`).
 inline constexpr uint32_t k_world_save_version_one_product = 94;
+
+/// **95 (BL-1642, the tick is a month; Ben, 2026-11-11) - THE MONTHLY TICK.** No section
+/// is added or moved; one record grows: each off-world base record (v90's section) carries
+/// an i32 loss carry after unfed_quarters (16 bytes, not 12;
+/// `world_stream_has_offworld_loss_carry`), so a base's shrink is carried between unfed
+/// months. Otherwise v95's layout IS v94's (and v93's). What moved is MEANING - every count the stream holds
+/// in econ ticks (the filed returns' window, cooldowns, lead times, unpaid and unfed
+/// counts, truce and offer ticks, arrival ticks, the econ tick itself) counts months
+/// where v94's and older counted quarters, and every per-tick figure is a month's. So a game save
+/// (`read_save_game`, src/core) refuses any world stream below v95 whole, with no
+/// migration (an old campaign's clock cannot be re-read at the new grain). This reader
+/// still DECODES v94, v93 and the legacy streams, because the layout harness rows
+/// (save_roundtrip) exercise the section readers through them; it is the game's door
+/// that refuses them.
+inline constexpr uint32_t world_save_version = 95;
+
+/// BL-1642: the first stream whose econ ticks are months. Every game save below it is
+/// refused (`read_save_game`).
+inline constexpr uint32_t k_world_save_version_monthly = 95;
 
 /// The space-mechanics merge: the first version stacking the naval/missile line and the
 /// space line.
@@ -1148,6 +1166,9 @@ inline constexpr bool world_stream_has_space_convoys(uint32_t v) { return world_
 inline constexpr bool world_stream_has_debris(uint32_t v) { return world_stream_has_space_section(v, k_world_save_version_debris); }
 inline constexpr bool world_stream_has_space_bombard(uint32_t v) { return world_stream_has_space_section(v, k_world_save_version_space_bombard); }
 inline constexpr bool world_stream_has_offworld_bases(uint32_t v) { return world_stream_has_space_section(v, k_world_save_version_offworld_bases); }
+/// BL-1642: from v95 each off-world base record carries its loss carry (i32
+/// loss_carry_milli in [0, 1000)) after unfed_quarters - 16 bytes, not 12.
+inline constexpr bool world_stream_has_offworld_loss_carry(uint32_t v) { return v >= k_world_save_version_monthly && !world_stream_is_space_line(v); }
 inline constexpr bool world_stream_has_space_firsts(uint32_t v) { return world_stream_has_space_section(v, k_world_save_version_space_firsts); }
 inline constexpr bool world_stream_has_transit_origin(uint32_t v) { return world_stream_has_space_section(v, k_world_save_version_transit_origin); }
 
@@ -1446,8 +1467,10 @@ std::size_t world_save_prospecting_section_bytes(const world& w);
 /// record. The LAST section of a v87 stream.
 std::size_t world_save_space_convoy_section_bytes(const world& w);
 /// BL-1601: the byte length of the v88 off-world base section `w` writes - 4 + 12 per
-/// base, 4 + 8 per colonist entry of a live unit. The LAST section of a v88 stream.
+/// base (16 from v95, BL-1642: the loss carry), 4 + 8 per colonist entry of a live unit.
+/// The one-argument form measures today's stream; the other a stream of `version`.
 std::size_t world_save_offworld_base_section_bytes(const world& w);
+std::size_t world_save_offworld_base_section_bytes(const world& w, uint32_t version);
 /// BL-1606: VERIFICATION ONLY - the v90 stream shape (no space-firsts section).
 void write_world_snapshot_pre_space_firsts(const world& w, std::ostream& out);
 /// BL-1606: the byte length of the v91 space-firsts section `w` writes - 4 + 9 per

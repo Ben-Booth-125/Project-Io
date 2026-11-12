@@ -523,7 +523,7 @@ void run_seed(std::uint32_t seed, seed_out& out)
             for (std::size_t g = 0; g < resource_count; ++g)
                 if (rc->inputs[g] > 0.0f && !reg.grid_goods().grid(g)) tracked.insert({plant_mkt[bid], g});
     p.tracked = &tracked;
-    constexpr int k_econ_tick_days = 90;
+    constexpr int k_econ_tick_days = ::k_econ_tick_days; // BL-1642: 30, a month;
     for (int k = 1; k <= T; ++k)
     {
         const int day = k * k_econ_tick_days;

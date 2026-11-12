@@ -493,7 +493,7 @@ void play_log::snapshot(const world& w, const economy_report& report, std::uint6
         double last_net    = 0.0;
     };
     // BL-1407: no corporation exists; the nation's OWN last filed return is the
-    // figure (FINANCE.md § The quarterly return), and the firm counts read 0.
+    // figure (FINANCE.md § The monthly return), and the firm counts read 0.
     std::map<entity_id, corp_agg> corps;
     for (const auto& [nid, nc] : w.nations)
     {

@@ -319,7 +319,7 @@ void run_space_effects(world& w, const space_effects_params& p, const station_pa
         for (const sat_map& s : sats)
             if (coverage(s.owner).count(s.node) != 0)
                 rep.survey_regions += survey_map_regions(w, s.owner, space_served_body(s.node),
-                                                         p.survey_regions_per_quarter);
+                                                         quarter_count_this_tick(p.survey_regions_per_quarter, econ_tick));
     }
 
     // ---- Observatories (5). -------------------------------------------------
@@ -328,7 +328,7 @@ void run_space_effects(world& w, const space_effects_params& p, const station_pa
             if (w.space_assets.at(aid).module == static_cast<uint8_t>(station_module_kind::observatory))
                 for (const entity_id body : covered_bodies(coverage(sw.owner)))
                     rep.observatory_regions += survey_map_regions(w, sw.owner, body,
-                                                                  p.observatory_regions_per_quarter);
+                                                                  quarter_count_this_tick(p.observatory_regions_per_quarter, econ_tick));
 
     // ---- Prospecting (6). ---------------------------------------------------
     // BL-1600 (DISCOVERY.md § Mapping, then prospecting): each ACTIVE rover, then
@@ -353,7 +353,7 @@ void run_space_effects(world& w, const space_effects_params& p, const station_pa
                 ground.push_back({u.owner, u.node.body});
         }
         for (const prospector& g : ground)
-            for (int k = 0; k < p.prospect_regions_per_quarter; ++k)
+            for (int k = 0; k < quarter_count_this_tick(p.prospect_regions_per_quarter, econ_tick); ++k)
             {
                 const survey_prospect_result pr = survey_prospect_region(w, g.owner, g.body);
                 if (pr == survey_prospect_result::prospected)

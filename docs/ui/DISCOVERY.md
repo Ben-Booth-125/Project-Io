@@ -85,12 +85,12 @@ not prospected draws its terrain with its deposits hidden. The home world begins
 - **Knowledge is the nation's own.** Mapping and prospecting are recorded per nation and per body:
   what one nation's satellite maps, or its Lander prospects, reveals nothing to another. The home
   world is surveyed for every nation; the star is never surveyed.
-- **Rates.** A Survey satellite maps **four regions a quarter**; a working Observatory maps **two
-  regions a quarter** on each body in its owner's coverage; a rover or a landed Lander prospects
-  **one region a quarter**. Mapping comes first in the quarter, so a region mapped this quarter can
+- **Rates.** A Survey satellite maps **four regions every three months**; a working Observatory maps **two
+  regions a month** on each body in its owner's coverage; a rover or a landed Lander prospects
+  **one region a month**. Mapping comes first in the month, so a region mapped this month can
   be prospected in it.
 - **Prospecting never runs ahead of mapping.** A prospector on ground with no mapped region left to
-  prospect does nothing that quarter. Prospecting needs no comms coverage: § Signal delay
+  prospect does nothing that month. Prospecting needs no comms coverage: § Signal delay
   (`../economy/SPACE_ASSETS.md`) gates only what orbital assets send home.
 - **Nearest the landing first.** The landing stands at the body's first region, the one mapping
   reaches first; the next region prospected is the unprospected mapped one nearest it, in region
@@ -124,8 +124,8 @@ branch point is `is_player_owned(world, building)` (with `owner_corp_of` behind 
   means their output is down, or demand is up elsewhere — not a fact read off a panel.
 
 - **The ownership-class disclosure regime is retired** (Ben, 2026-10-23; `../GLOSSARY.md`
-  § Ownership class). It said whether a firm published a quarterly return; the return is now the
-  nation's (`../GLOSSARY.md` § Quarterly return). Whatever of it is published is published exact,
+  § Ownership class). It said whether a firm published a monthly return; the return is now the
+  nation's (`../GLOSSARY.md` § Monthly return). Whatever of it is published is published exact,
   never banded — a **disclosure regime, not a hole in the fog**. `docs/economy/FINANCE.md`
   § Disclosure owns what a nation publishes.
 
@@ -315,7 +315,7 @@ brightest edge meeting there. Presentation only — no `world/*` change.
   **head** and a dimming **tail**. `ui_state.convoy_beams` stores each convoy's tile path (from
   `intra_body_path`'s exposed sequence) + progress + speed; the canvas interpolates the head along
   the path by the fraction through the current econ tick (`fmod(sim_now_days, 90)/90`), so it
-  **glides smoothly** between quarterly steps, and trails a tail one econ tick's travel behind
+  **glides smoothly** between monthly steps, and trails a tail one econ tick's travel behind
   (intensity ramping `1 → 0` head → tail). This is the "things are moving" layer; the corridors +
   pockets are the "where I operate" layer.
 - **Another nation's convoy (SELECTION.md § The convoy element):** its marker draws only on a tile

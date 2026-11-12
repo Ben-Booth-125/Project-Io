@@ -208,7 +208,7 @@ void apply_budget(world& w,
     // take a treasury below zero. Ascending nation id, each nation's buildings
     // in stored order: a fixed float order.
     //
-    // BL-1407 — THE NATION FILES THE QUARTERLY RETURN (FINANCE.md § The quarterly
+    // BL-1407 — THE NATION FILES THE QUARTERLY RETURN (FINANCE.md § The monthly
     // return): every nation, ascending id, one row a tick, a RETAIN of the flows
     // this pass just applied. Its opening is taken before a single flow lands (and
     // before an unbooked refund, which the row books as `refunds`), and its `net`

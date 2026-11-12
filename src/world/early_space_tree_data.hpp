@@ -124,7 +124,7 @@ inline constexpr std::array<node, node_count> nodes = {{
     /*  50 */ {"ES-ST-SF-C2", "Heavy Truss", tier::minor, 3, 6, 1, {{{45}, {-1}}}, -1, false, false, false, false, false, "ST-SF", "", "", "station grids may be upgraded to 9 x 7", 50, 51, ""},
     /*  51 */ {"ES-ST-SF-C", "Cruisers", tier::major, 4, 24, 2, {{{49}, {50}}}, -1, false, false, false, false, false, "ST-SF", "", "", "opens the Cruiser hull: the capital ship, built at a Shipyard only", 51, 52, ""},
     /*  52 */ {"ES-ST-SF-M", "Space Superiority", tier::travel, 4, 4, 2, {{{48}, {51}}}, -1, false, false, false, true, false, "ST-SF", "", "", "+3% strength for every space unit", 52, 53, ""},
-    /*  53 */ {"ES-ST-SF-Q", "Orbit Held", tier::quest, 2, 6, 1, {{{38}, {-1}}}, -1, true, false, false, false, false, "ST-SF", "", "an armed fleet of yours holds your home world\342\200\231s low orbit for 4 quarters", "space unit upkeep -5%", 53, 54, "deed history"},
+    /*  53 */ {"ES-ST-SF-Q", "Orbit Held", tier::quest, 2, 6, 1, {{{38}, {-1}}}, -1, true, false, false, false, false, "ST-SF", "", "an armed fleet of yours holds your home world\342\200\231s low orbit for 12 months", "space unit upkeep -5%", 53, 54, "deed history"},
 }};
 
 inline constexpr std::array<effect, effect_count> effects = {{

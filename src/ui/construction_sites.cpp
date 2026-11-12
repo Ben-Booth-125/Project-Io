@@ -43,7 +43,7 @@ namespace {
 /// The rebuild key the Logistic Point memo and the site evaluation hold against —
 /// the body_frame_stamp pattern (body_surface_canvas.cpp): what a cover can move on
 /// is an ECONOMY tick (a source idles or completes, prices and ground move; the
-/// quarter counter, not the day tick - keying on the day rebuilt a whole-body pass every
+/// month counter, not the day tick - keying on the day rebuilt a whole-body pass every
 /// game day while time ran), a building placed or
 /// demolished, or a road laid (the logistics generation).
 struct lp_stamp
@@ -76,7 +76,7 @@ cover_cache& covers()
 
 /// The quotes asked for since the stamp last moved: an economy tick, a building placed
 /// or demolished, a road. A mothball or recipe switch while paused is read at the next
-/// quarter, as prices are; the door and the finder stay stale together, so they agree.
+/// month, as prices are; the door and the finder stay stale together, so they agree.
 std::uint64_t wars_digest(const world& w); // the grid key's, below
 
 /// Bumped each time a grid pass publishes its quotes (`shown_figures`).
@@ -1510,11 +1510,11 @@ void draw_site_grid(const world& w, const recipe_registry& reg, ui_state& ui)
                                                                : c.best_place;
                 if (c.best_starved)
                     std::snprintf(buf, sizeof buf,
-                                  "The best site, %s, would likely stand idle: its Est. net %+d cr / qtr is upkeep alone.",
+                                  "The best site, %s, would likely stand idle: its Est. net %+d cr / mo is upkeep alone.",
                                   where.c_str(), static_cast<int>(std::lround(c.best_net)));
                 else
                     std::snprintf(buf, sizeof buf,
-                                  "Est. net %+d cr / qtr at the best site, %s, at %d%% Logistic Point cover.",
+                                  "Est. net %+d cr / mo at the best site, %s, at %d%% Logistic Point cover.",
                                   static_cast<int>(std::lround(c.best_net)), where.c_str(),
                                   static_cast<int>(std::lround(c.best_cover * 100.0f)));
                 card("net", {mn.x, fig_y - 1.0f}, {mid, mx.y}, buf, value_colour(static_cast<double>(c.best_net)));
@@ -1761,21 +1761,21 @@ std::string shelf_runway_text(const shelf_runway& s)
     const std::string good = resource_name(s.good);
     char lead[120];
     if (s.quarters < 1.0f)
-        std::snprintf(lead, sizeof lead, "Under a quarter of %s left on this market's shelf", good.c_str());
+        std::snprintf(lead, sizeof lead, "Under a month of %s left on this market's shelf", good.c_str());
     else if (s.quarters < 2.0f)
-        std::snprintf(lead, sizeof lead, "Only about 1 quarter of %s left on this market's shelf", good.c_str());
+        std::snprintf(lead, sizeof lead, "Only about 1 month of %s left on this market's shelf", good.c_str());
     else
-        std::snprintf(lead, sizeof lead, "Only about %.0f quarters of %s left on this market's shelf",
+        std::snprintf(lead, sizeof lead, "Only about %.0f months of %s left on this market's shelf",
                       std::floor(s.quarters), good.c_str());
     char tail[160];
     if (s.drain > 0.0f)
-        std::snprintf(tail, sizeof tail, ": it would use %.1f a quarter, and the shelf is already falling %.1f.",
+        std::snprintf(tail, sizeof tail, ": it would use %.1f a month, and the shelf is already falling %.1f.",
                       static_cast<double>(s.plant_use), static_cast<double>(s.drain));
     else if (s.drain_known)
-        std::snprintf(tail, sizeof tail, " at the %.1f a quarter it would use.", static_cast<double>(s.plant_use));
+        std::snprintf(tail, sizeof tail, " at the %.1f a month it would use.", static_cast<double>(s.plant_use));
     else // An unread trail is not a flat shelf, so the sentence does not read as one.
         std::snprintf(tail, sizeof tail,
-                      " at the %.1f a quarter it would use. That is its own use alone: this shelf has no "
+                      " at the %.1f a month it would use. That is its own use alone: this shelf has no "
                       "trail read yet, so a fall would not show.", static_cast<double>(s.plant_use));
     std::string out = std::string(lead) + tail;
     if (s.others > 0)
@@ -2140,7 +2140,7 @@ void draw_site_finder(world& w, const recipe_registry& reg, ui_state& ui)
             e.key  = "net_header";
             e.mn   = ImGui::GetItemRectMin();
             e.mx   = ImGui::GetItemRectMax();
-            e.text = "Est. net / qtr at today's local prices, at 50% staffing, no labour shortage and "
+            e.text = "Est. net / mo at today's local prices, at 50% staffing, no labour shortage and "
                      "each tile's Logistic Point cover.";
             construction_column_card("Net", {std::move(e)});
         }
@@ -2223,7 +2223,7 @@ void draw_site_finder(world& w, const recipe_registry& reg, ui_state& ui)
                                   static_cast<int>(std::lround(r.earn3)), r.build_days);
                 else
                     std::snprintf(buf, sizeof buf,
-                                  "Est. %+d cr over 3 years: %d days to build, then %d days at %+d cr / qtr, "
+                                  "Est. %+d cr over 3 years: %d days to build, then %d days at %+d cr / mo, "
                                   "less its cost of %d cr.",
                                   static_cast<int>(std::lround(r.earn3)), r.build_days,
                                   k_site_horizon_days - r.build_days, static_cast<int>(std::lround(r.profit)),
@@ -2237,7 +2237,7 @@ void draw_site_finder(world& w, const recipe_registry& reg, ui_state& ui)
                     ImGui::TextDisabled("-");
             }
 
-            // Net / qtr — the door's estimate, cover applied. Its card text is
+            // Net / mo — the door's estimate, cover applied. Its card text is
             // published even where the column has stepped out at a narrow width.
             const bool net_drawn = ImGui::TableSetColumnIndex(2) && net_on;
             {
@@ -2247,12 +2247,12 @@ void draw_site_finder(world& w, const recipe_registry& reg, ui_state& ui)
                 else if (r.starved)
                     std::snprintf(buf, sizeof buf,
                                   "It would likely stand idle: this market cannot get it %s at a price it "
-                                  "will pay. Est. net %+d cr / qtr is its upkeep alone.",
+                                  "will pay. Est. net %+d cr / mo is its upkeep alone.",
                                   resource_name(r.short_of),
                                   static_cast<int>(std::lround(r.profit)));
                 else if (r.cover < 1.0f)
                     std::snprintf(buf, sizeof buf,
-                                  "Est. net %+d cr / qtr: it would run at %d%% while its Logistic "
+                                  "Est. net %+d cr / mo: it would run at %d%% while its Logistic "
                                   "Point cover is %d%%. Fully served it would make %+d.",
                                   static_cast<int>(std::lround(r.profit)),
                                   static_cast<int>(std::lround(r.cover * 100.0f)),
@@ -2260,7 +2260,7 @@ void draw_site_finder(world& w, const recipe_registry& reg, ui_state& ui)
                                   static_cast<int>(std::lround(r.profit_full_cover)));
                 else
                     std::snprintf(buf, sizeof buf,
-                                  "Est. net %+d cr / qtr once its output is selling here, fully served.",
+                                  "Est. net %+d cr / mo once its output is selling here, fully served.",
                                   static_cast<int>(std::lround(r.profit)));
                 const ImU32 ink = r.priced ? value_colour(static_cast<double>(r.profit)) : 0u;
                 const std::string net_text = r.runway_warn ? r.runway_text + " " + buf : std::string(buf);
@@ -2346,17 +2346,17 @@ void draw_site_finder(world& w, const recipe_registry& reg, ui_state& ui)
                     ImGui::Text("%d%%", static_cast<int>(std::lround(r.cover * 100.0f)));
             }
 
-            // Yield — units of what it makes per qtr (extraction: the deposit's figure).
+            // Yield — units of what it makes per month (extraction: the deposit's figure).
             ImGui::TableSetColumnIndex(6);
             {
                 char buf[240];
                 if (r.has_yield && r.depositless)
                     std::snprintf(buf, sizeof buf,
-                                  "About %.1f units / qtr. No deposit: it draws on the river or the "
+                                  "About %.1f units / mo. No deposit: it draws on the river or the "
                                   "sea, which never runs out.", static_cast<double>(r.yield));
                 else if (r.has_yield)
                     std::snprintf(buf, sizeof buf,
-                                  "About %.1f units / qtr from a deposit of richness %.2f, %.0f units "
+                                  "About %.1f units / mo from a deposit of richness %.2f, %.0f units "
                                   "left in the ground.", static_cast<double>(r.yield),
                                   static_cast<double>(r.deposit), static_cast<double>(r.remaining));
                 else

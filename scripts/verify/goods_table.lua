@@ -30,8 +30,10 @@ verify.show_panel("market", false)
 verify.frames(1)
 
 -- Enough ticks that the price series have more than the 8-quarter window in them,
--- so "the graph plots at most 8" is a real constraint and not vacuously true.
-verify.econ_step(16)
+-- so "the graph plots at most 24" is a real constraint and not vacuously true.
+-- BL-1642: a tick is a month, so the window is 24 monthly samples.
+local k_window = 24
+verify.econ_step(30)
 verify.show_panel("market", true)
 verify.panel_view("market", 0) -- Goods
 verify.frames(2)
@@ -70,9 +72,9 @@ for _, r in ipairs(rows) do
         if err > 1e-4 then bad_vs = bad_vs + 1 end
     end
     -- 3. THE GRAPH WINDOW IS 8 QUARTERS. Ben's number once the arithmetic was put
-    --    to him: record_histories samples once per econ tick and a tick is a
-    --    quarter, so "six months" would have been two points.
-    if r.samples > 8 then bad_samples = bad_samples + 1 end
+    --    to him (2026-08-29: 8 quarters, not six months). record_histories samples
+    --    once per econ tick and a tick is a month (BL-1642): 24 samples.
+    if r.samples > k_window then bad_samples = bad_samples + 1 end
 end
 
 verify.expect(bad_price == 0,
@@ -81,14 +83,14 @@ verify.expect(bad_vs == 0,
     "vs-base column is price/base_price (" .. bad_vs .. " wrong, worst err " ..
     string.format("%.6f", worst_vs) .. ")")
 verify.expect(bad_samples == 0,
-    "no row's graph plots more than 8 quarters (" .. bad_samples .. " over)")
+    "no row's graph plots more than 8 quarters, 24 months (" .. bad_samples .. " over)")
 
--- The window must actually BE 8 after 16 ticks, not merely "at most 8" — an
+-- The window must actually BE 24 after 30 ticks, not merely "at most 24" — an
 -- always-empty graph would satisfy the bound above and show nothing.
 local full = 0
-for _, r in ipairs(rows) do if r.samples == 8 then full = full + 1 end end
+for _, r in ipairs(rows) do if r.samples == k_window then full = full + 1 end end
 verify.expect(full > 0,
-    "after 16 ticks at least one row plots a full 8-quarter window (" .. full .. " do)")
+    "after 30 monthly ticks at least one row plots a full 8-quarter window (" .. full .. " do)")
 
 -- 4. THE SCROLL REQUEST REACHES THE REAL SCROLLER (NR-719, the half that was
 --    silent). The Goods list is in a child scroller; before this fix the request
@@ -180,7 +182,7 @@ for _, h in ipairs(verify.goods_headers()) do
     end
 end
 
-for _, c in ipairs({ {"Shelf", "shelf"}, {"Price", "price"}, {"v.Base", "vs_base"}, {"8 qtr", "change"} }) do
+for _, c in ipairs({ {"Shelf", "shelf"}, {"Price", "price"}, {"v.Base", "vs_base"}, {"2 yr", "change"} }) do
     press_heading(c[1])
     verify.expect(verify.goods_sort().desc, c[1] .. ": the first press sorts high to low")
     local bad = in_order(c[2], true)

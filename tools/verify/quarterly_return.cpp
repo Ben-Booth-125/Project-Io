@@ -211,7 +211,7 @@ fixture build_fixture(const recipe_registry& reg)
     const auto make_corp = [&](const char* name, float capital,
                                std::vector<entity_id> assets) {
         // BL-1407: the owner is a NATION — the corporation retired, and the
-        // nation files the return (FINANCE.md § The quarterly return). Nothing in
+        // nation files the return (FINANCE.md § The monthly return). Nothing in
         // this harness's tick runs an AI, so neither nation is commanded.
         const entity_id c = w.create_entity();
         nation_component cc;

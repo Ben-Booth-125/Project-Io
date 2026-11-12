@@ -91,7 +91,7 @@ zoom and frame, the tech tree and persona bench, the balance series from filed r
 1960 close and plays back while the worker builds this tail behind it, captioned by the step under
 way — "Searching the landscape", "Proving the field" — never a blank wait (`../ui/STARTUP.md`
 § The wait, then the lapse). The settle keeps its meaning from
-`../economy/ERAS.md`: twelve quarterly ticks with no calendar meaning, and the clock rebased at
+`../economy/ERAS.md`: thirty-six monthly ticks with no calendar meaning, and the clock rebased at
 Begin. The serve path adopts the searched and settled world; the verify path opens on the
 unsearched seed-candidate world, so a golden reads generation alone.
 
@@ -692,7 +692,7 @@ per tile. We want to find, given a planet with markets and national borders — 
 all the resources in said market, so that each part makes some profit?"*
 
 **That is not a simulation question.** A tick answers *who traded what, at which price, this
-quarter*. Saturation — every resource has a supplier and a buyer, every chain reaches a terminal
+month*. Saturation — every resource has a supplier and a buyer, every chain reaches a terminal
 sink, every participant clears its costs — is a **static property of a candidate roster against a
 fixed world**. Roads, borders, markets, deposits and population are all settled by the end of
 phase 4, and none of them moves during phase 6, so there is nothing to step.

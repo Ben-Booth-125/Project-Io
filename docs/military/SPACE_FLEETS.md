@@ -47,7 +47,7 @@ ordering it.
 
 **Refuelling restores the budget**, by buying propellant at the unit's node:
 
-- **docked** at a station with a Dock and a Fuel depot, from the depot's stock — stocked each quarter
+- **docked** at a station with a Dock and a Fuel depot, from the depot's stock — stocked each month
   off the market of the owner's off-world base on the station's body, else off the home shelf
   (`../economy/ERAS.md` § The propellant loop);
 - **in a body's low orbit** where its owner holds a Launchpad on that body, off that body's shelf.

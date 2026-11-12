@@ -1553,7 +1553,7 @@ is diagnostics, not spectacle.
 
 Ben, 2026-08-14, asked for a way to **watch the AI play in real time** and discover what
 strategies emerge — explicitly as a way to describe and explain the project's aims, not as
-a feature. Most of what that needs exists: the clock runs to 16× (a quarter every ~11 real
+a feature. Most of what that needs exists: the clock runs to 16× (a month every ~11 real
 seconds), rivals act through `corp_command`, and every decision records `winning_score` /
 `runner_up` / `reason`. What it adds is a **window** (the decision feed, BL-407, and the Strategy
 readout, BL-411), and one rule.
@@ -1837,7 +1837,7 @@ boilerplate: pure, seeded, deterministic, replayable, legal verbs only, never a 
   beyond this one dial stays prohibited. See `solve_workforce_target` in economy_system.cpp.
 
   **Amended 2026-10-13 (Ben): the dial is no longer opt-out.** The player's workforce is set
-  by the game alone — one 25 % step a quarter (shown; 50 internal) toward the solver's best target, up to full employment — shown as 100 %, the internal 200
+  by the game alone — one 25 % step a quarter (every third month; shown; 50 internal) toward the solver's best target, up to full employment — shown as 100 %, the internal 200
   (`../economy/PRODUCTION.md` § Workforce target and the auto-solver). The slider, the Auto
   control and the player's `set_workforce` / `set_workforce_auto` verbs are retired. The grant
   is the same single dial under the same constraints — pure, seeded, deterministic, never a

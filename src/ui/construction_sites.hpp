@@ -69,9 +69,9 @@ site_quote quote_for_tile(world& w, const recipe_registry& reg, entity_id tile, 
 /// Under this many quarters of a recipe input on the market's shelf, the door and the
 /// finder warn (Ben, 2026-11-05; the default he reads live; construction.md § The site
 /// ledger).
-inline constexpr float k_shelf_runway_warn_quarters = 4.0f;
+inline constexpr float k_shelf_runway_warn_quarters = 12.0f; // months: a year, the 4 quarters (BL-1642)
 /// How many quarters of the shelf's own trail the net drain averages over.
-inline constexpr int k_shelf_trail_quarters = 4;
+inline constexpr int k_shelf_trail_quarters = 12; // months: a year (BL-1642; was 4 quarters)
 
 /// THE reading behind both warnings: a recipe input the plant would run through soon.
 /// For each input, quarters = shelf / (the plant's use + the market's net drain, where

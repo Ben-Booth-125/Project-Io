@@ -423,7 +423,7 @@ void recipe_registry::load_from_lua(lua_state& lua)
         mp.neutral_gate_permille = migr->get_or("neutral_gate_permille", mp.neutral_gate_permille);
         mp.wage_weight           = migr->get_or("wage_weight",           mp.wage_weight);
         mp.qualified_selectivity = migr->get_or("qualified_selectivity", mp.qualified_selectivity);
-        if (mp.rate_permille < 0 || mp.rate_permille > 1000)
+        if (!std::isfinite(mp.rate_permille) || mp.rate_permille < 0.0f || mp.rate_permille > 1000.0f)
             throw std::runtime_error("economy.migration.rate_permille must be in [0, 1000]");
         if (mp.neutral_gate_permille < 0 || mp.neutral_gate_permille > 1000)
             throw std::runtime_error("economy.migration.neutral_gate_permille must be in [0, 1000]");

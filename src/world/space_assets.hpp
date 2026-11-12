@@ -137,7 +137,7 @@ enum class space_asset_state : uint8_t
 {
     in_transit = 0, ///< Launched; arrives at `arrival_tick`.
     active     = 1, ///< In place, upkeep paid.
-    decaying   = 2, ///< In place, upkeep unpaid for `unpaid_quarters` (>= 1) quarters.
+    decaying   = 2, ///< In place, upkeep unpaid for `unpaid_quarters` (>= 1) econ ticks (months, BL-1642).
     lost       = 3, ///< Gone. Kept as a record; never steps again.
 };
 
@@ -160,11 +160,11 @@ struct space_asset
     space_asset_class cls   = space_asset_class::satellite;
     space_destination dest{};
     space_asset_state state = space_asset_state::in_transit;
-    int32_t           launch_tick  = 0;    ///< Econ tick (quarter) of launch.
+    int32_t           launch_tick  = 0;    ///< Econ tick (month) of launch.
     int32_t           arrival_tick = 0;    ///< Econ tick it becomes active; >= launch_tick.
-    float             upkeep       = 0.0f; ///< Credits per quarter, fixed at launch.
-    int32_t           unpaid_quarters = 0; ///< Consecutive unpaid quarters; 0 when paid.
-    float             launch_cost  = 0.0f; ///< Credits the launch debited (the quote), for the quarter's report.
+    float             upkeep       = 0.0f; ///< Credits per econ tick (a month), fixed at launch.
+    int32_t           unpaid_quarters = 0; ///< Consecutive unpaid econ ticks (months); 0 when paid.
+    float             launch_cost  = 0.0f; ///< Credits the launch debited (the quote), for the tick's report.
 
     // ---- BL-1583 / BL-1585: the station fields (stations.hpp). SERIALISED in
     // the v81 station section, only for an asset where any differs from these
@@ -206,7 +206,8 @@ inline bool space_asset_has_transit_origin(const space_asset& a)
 /// The hard ceiling on `space_asset_params::quarters_to_loss`. The step clamps
 /// the dial into [1, this]; the save reader, which cannot see the registry,
 /// validates an asset's unpaid count against it.
-inline constexpr int32_t k_space_quarters_to_loss_ceiling = 64;
+/// Counted in econ ticks (months): 192, the 64 quarters (BL-1642; the name is kept).
+inline constexpr int32_t k_space_quarters_to_loss_ceiling = 192;
 
 //// The dials. Defaults are the BL-1327 first cut, re-cut for the graph and the
 /// goods by BL-1581/1582 (in-band; see that report). Credits are the
@@ -218,8 +219,10 @@ struct space_asset_params
     /// BL-1583: the station core (index 4) is priced above a module — it opens the grid.
     std::array<float, space_asset_class_count> launch_cost{10000.0f, 20000.0f, 60000.0f, 40000.0f, 50000.0f};
 
-    /// Per class: quarterly upkeep, fixed onto the asset at launch.
-    std::array<float, space_asset_class_count> upkeep{500.0f, 1000.0f, 3000.0f, 2000.0f, 2500.0f};
+    /// Per class: upkeep a tick (a month), fixed onto the asset at launch. A third of
+    /// the quarter tick's {500, 1000, 3000, 2000, 2500} (BL-1642).
+    std::array<float, space_asset_class_count> upkeep{500.0f / 3.0f, 1000.0f / 3.0f, 1000.0f,
+                                                      2000.0f / 3.0f, 2500.0f / 3.0f};
 
     /// BL-1581: credits per Δv unit of the path (the thrust cost's own price,
     /// beside the propellant it burns). Home low orbit climbs ~10 Δv.
@@ -237,23 +240,27 @@ struct space_asset_params
     /// The path's quarters are its days over this, ROUNDED DOWN, then held to
     /// the reach floor below — so a home orbit is still reached the quarter it
     /// launches, and nothing arrives sooner than before the graph.
-    float days_per_quarter = 90.0f;
+    /// BL-1642: the tick is a month, so this is 30 days per TICK (the "quarters" in
+    /// these names count econ ticks, now months).
+    float days_per_quarter = 30.0f;
 
-    /// Per reach tier: the travel-time FLOOR in quarters (further = slower).
-    std::array<int32_t, space_reach_count> travel_quarters{0, 1, 1, 2, 3};
+    /// Per reach tier: the travel-time FLOOR in ticks (further = slower). Months:
+    /// three times the quarter tick's {0, 1, 1, 2, 3} (BL-1642).
+    std::array<int32_t, space_reach_count> travel_quarters{0, 3, 3, 6, 9};
 
-    /// Far tiers only: extra FLOOR quarters per AU of heliocentric separation
+    /// Far tiers only: extra FLOOR ticks per AU of heliocentric separation
     /// between the home body's system position and the target's, floored.
-    float far_quarters_per_au = 1.0f;
+    /// 3 months, the quarter (BL-1642).
+    float far_quarters_per_au = 3.0f;
 
     /// Consecutive unpaid quarters at which a decaying asset is LOST. The first
     /// unpaid quarter makes it decaying; a paid quarter restores it to active.
     /// Clamped into [1, k_space_quarters_to_loss_ceiling] where it is read.
-    int32_t quarters_to_loss = 4;
+    int32_t quarters_to_loss = 12; // months: a year, the 4 quarters (BL-1642)
 
     /// Far tiers only: the AU-derived extra quarters are clamped to this before
     /// the integer cast, so no separation can overflow a tick.
-    int32_t max_extra_quarters = 400;
+    int32_t max_extra_quarters = 1200; // months (BL-1642; was 400 quarters)
 
     /// BL-1582: the fair-price ceiling (`price_band_params::reservation_mult`,
     /// BL-1172: it governs every goods draw). NOT a space dial: the command seam

@@ -45,13 +45,13 @@
 // entirely and priced a spent tile as though it were untouched, which put the
 // tallest bar on the one candidate guaranteed to earn nothing. Two copies of a
 // depletion curve is exactly how that divergence happens, so there is one.
-constexpr float deposit_taper_ticks = 8.0f;  ///< Output tapers over the last ~8 ticks of nominal yield.
+constexpr float deposit_taper_ticks = 24.0f; ///< Output tapers over the last ~24 ticks (two years) of nominal yield (was 8 quarters).
 constexpr float deposit_min_taper   = 0.05f; ///< Below 5% of nominal the reserve reads as exhausted.
 
 /// The idle-a-loser reflex's window: consecutive loss ticks before a building idles.
 /// One constant, read by the reflex and by the opening kit's input stock (BL-1487),
 /// which shelves each kit processor's draw for this many ticks.
-inline constexpr int k_loss_streak_to_idle = 8;
+inline constexpr int k_loss_streak_to_idle = 24; ///< Two years of months (was 8 quarters, BL-1642).
 
 struct building_report
 {

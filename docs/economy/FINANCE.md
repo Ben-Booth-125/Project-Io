@@ -1,7 +1,7 @@
 # Finance — the nation's money loop
 
 > **Settles:** what moves a nation's treasury through its buildings each tick, and in which order ·
-> which costs recur, in credits and in goods · what a quarterly return reports · what becomes of a
+> which costs recur, in credits and in goods · what a monthly return reports · what becomes of a
 > building its treasury cannot pay for.
 > **Not here:** what a good sells for and how that clears (MARKETS) · what a building yields for
 > its cost (PRODUCTION) · the treasury's other flows — tariff, tax tier, the national budget
@@ -20,7 +20,7 @@ Code home: `src/world/budget_system.{hpp,cpp}`, breakdown struct in
 
 ## The money loop
 
-Once per economy tick (one quarter), `apply_budget` applies to every nation:
+Once per economy tick (one month), `apply_budget` applies to every nation:
 
 ```
 treasury += income − expenditure − maintenance − wages − upkeep + taxes
@@ -179,7 +179,7 @@ into prices itself out of a full shelf: its own want is demand against zero supp
 resolves from 1.5× toward the 10× cap (5.75× in one tick), the draw is then over the ceiling and
 does not bid, and the price eases back under it over three ticks. Measured on a unit and on a
 processor beside a full shelf (`unit_upkeep` U13, `fair_price_ceiling` M5): each is fed **one tick
-in four** — 3 of 12 — never more than three ticks running without. The processor runs at a quarter
+in four** — 3 of 12 — never more than three ticks running without. The processor runs at a month
 of its capacity. The unit's supply factor nets −50 per four-tick cycle and walks down to a floor
 cycle of 100, 50, 0, 0: an army fed only from such a shelf ends near zero strength. A market that
 is also being listed into at a rate near its demand does not pulse this way, since its listings
@@ -271,30 +271,30 @@ numbers are settled.
 
 ## Debt interest
 
-**Retired (Ben, 2026-10-23).** It compounded a firm's negative balance each quarter. A nation does not
+**Retired (Ben, 2026-10-23).** It compounded a firm's negative balance each month. A nation does not
 borrow: a building its treasury cannot pay for idles instead (§ The money loop). The brief
 negative a shortfall leaves is carried, not charged. The opening working capital that buffered a firm against the
 spiral retires with it; a nation's opening money is generation's credit to its treasury
 (`NATIONS.md` § 2).
 
-## The quarterly return
+## The monthly return
 
-One economy tick is one quarter, so the ledger's cadence is the money loop's own. At the end of
-`apply_budget` every nation writes a **quarterly return** (Ben, 2026-10-23, re-subjected from the
+One economy tick is one month, so the ledger's cadence is the money loop's own. At the end of
+`apply_budget` every nation writes a **monthly return** (Ben, 2026-10-23, re-subjected from the
 retired corporation) — the flows it just paid and took, any refund booked since its last return,
 its net and closing treasury, and two stock figures. It is a *retain*, not a second computation:
 every flow already exists in the budget breakdown, and `net()` is by construction the delta applied
 to the treasury, so a return can never disagree with the loop that produced it.
 
-Design: BL-626 (quarterly return record). Ben, 2026-08-26: *"a table ledger that tracks
-profitability, updated each quarter with company balance sheets."*
+Design: BL-626 (monthly return record). Ben, 2026-08-26: *"a table ledger that tracks
+profitability, updated each month with company balance sheets."*
 
 | Field | Source |
 |---|---|
 | `income` / `expenditure` | the budget breakdown — the market cash flows from `clear_markets` |
 | `maintenance` / `wages` | the budget breakdown — summed `compute_building_opex` |
-| `upkeep` | the standing costs: the garrison's pay and each space asset's quarterly upkeep since the last return, booked on the next one (Ben, 2026-11-07). A debit paid in the nation step after the return is written, booked as `research` is |
-| `taxes` | the tier's share of the quarter's wages, returned to the treasury (`NATIONS.md` § Taxes and Discontent) |
+| `upkeep` | the standing costs: the garrison's pay and each space asset's monthly upkeep since the last return, booked on the next one (Ben, 2026-11-07). A debit paid in the nation step after the return is written, booked as `research` is |
+| `taxes` | the tier's share of the month's wages, returned to the treasury (`NATIONS.md` § Taxes and Discontent) |
 | `research` | Credits the nation's research line spent since its last return, booked on the next one. A debit: research is paid in the nation step, after the return is written (Ben, 2026-11-05: research counts inside net) |
 | `refunds` | Credits refunded to the nation since its last return, booked on the next one — a cancelled construction. A credit: `net` = the flows **+ refunds**, and the return's opening is taken from before the refund so it still telescopes |
 | `net` | The difference of two consecutive treasuries across the money loop, research included — see below. Construction, hiring, retooling and the other movers listed below debit the treasury outside it, so a nation at +100 net can still lose treasury. The header's NET reads after research. The opening's construction price is the one figure set against net before research (`PRODUCTION.md` § What construction costs at the opening) |
@@ -312,13 +312,13 @@ row a balance sheet rather than an income statement alone.
   two consecutive treasuries telescopes *exactly*. The retain property below is the whole point of
   the record, and it is worth more than naming a tidier source. The difference is held at **double**
   precision: a single-precision difference can need more significand than a single has, and a
-  rounded `net` would neither state the quarter nor replay onto the treasury the loop wrote.
+  rounded `net` would neither state the month nor replay onto the treasury the loop wrote.
 - **`book_value` is historical cost, and deliberately NOT what the build press charges.** The press
   charges `build_cost` **plus** a materials term valued at the *current market price*. Folding that
   in would make the balance sheet mark-to-market — the same building's book value moving every
-  quarter with commodity prices. A book value that moves on its own is not a book value.
+  month with commodity prices. A book value that moves on its own is not a book value.
 
-**Retention is a rolling 40 quarters** (ten years; Ben, 2026-08-26), oldest dropped first, per
+**Retention is a rolling 120 months** (ten years; Ben, 2026-08-26), oldest dropped first, per
 nation. Bounded by construction, and that is the point: the record is world state and crosses
 the serialisation seam, so it must not grow with campaign length. Ten years carries a trailing
 profit read through a full boom-bust while keeping the whole world's history small.
@@ -335,7 +335,7 @@ writes it, so the record is a pure downstream observation of the loop and cannot
 
 ### What a return does not carry — the movers outside the money loop
 
-The money loop is not the only thing that moves a treasury in a quarter. A return records
+The money loop is not the only thing that moves a treasury in a month. A return records
 `apply_budget`, and books the three figures above that land elsewhere: its `net` is the treasury's
 movement **across that call**, plus the refund, less the research, garrison pay and space upkeep paid
 since the last return. Every other debit or credit lands elsewhere in the tick and appears in **no** return:
@@ -347,7 +347,7 @@ since the last return. Every other debit or credit lands elsewhere in the tick a
 - **Hiring** — a unit's hire cost and the kit it buys off the shelves — and a unit's
   **movement credits**, priced per Logistic Point drawn.
 - **Survey dispatch** — debited upfront.
-- **A launch** — a space asset's launch cost, once, at the launch (`SPACE_ASSETS.md`). Its quarterly
+- **A launch** — a space asset's launch cost, once, at the launch (`SPACE_ASSETS.md`). Its monthly
   upkeep is booked; the launch is a purchase, as construction is.
 - **Trade** — the haul a trade pays at dispatch (its purchase at the source shelf is billed at the
   clear and *is* in `expenditure`), and the **import tariff** a nation's goods pay on entering a
@@ -357,7 +357,7 @@ since the last return. Every other debit or credit lands elsewhere in the tick a
   the three it books, as above (Ben, 2026-11-05: research counts inside net; Ben, 2026-11-07: space
   upkeep too).
 
-So a return explains the money loop's movement exactly and the **quarter's** only partly. That is
+So a return explains the money loop's movement exactly and the **month's** only partly. That is
 right for reading the profitability of a nation's industry.
 
 The return carries **no residue field**. An `other` line — the whole-tick delta less the money-loop
@@ -389,7 +389,7 @@ every store keyed by an erased firm. No verb erases an actor now.
 
 ## Firm exit — insolvency has a consequence
 
-**Retired (Ben, 2026-10-23).** It wound up a firm whose filed quarters all closed below a balance
+**Retired (Ben, 2026-10-23).** It wound up a firm whose filed months all closed below a balance
 floor. A nation is never wound up: a building it cannot pay for idles (§ The money loop), and
 an idle producer leaving the shelf is what clears a glut.
 
@@ -401,7 +401,7 @@ an idle producer leaving the shelf is what clears a glut.
   while the net is negative — a growing treasury has no runway to run out. See `docs/ui/HEADER.md`.
 - **Per-building profitability** — unit economics per building via
   `building_profit.hpp`, surfaced in selection / construction / hover.
-- **Profitability ledger** — the filed returns, one row per nation, refreshed each quarter. Its
+- **Profitability ledger** — the filed returns, one row per nation, refreshed each month. Its
   buyout press retires with the buyout. Design: BL-627 (profitability ledger); its
   `question_log.json` pair is Ben's wording and is owed before it is built.
 

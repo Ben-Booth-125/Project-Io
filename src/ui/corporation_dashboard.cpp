@@ -33,7 +33,7 @@ void balance_body(const corp_rollups& r)
     if (!r.budget_measured)
     {
         ImGui::TextWrapped("No budget breakdown has been recorded yet - "
-                           "advance time by one economy quarter.");
+                           "advance time by one economy month.");
         return;
     }
 
@@ -51,7 +51,7 @@ void balance_body(const corp_rollups& r)
     ImGui::SetCursorScreenPos(p);
     ImGui::Dummy({cw, chart_h});
 
-    ImGui::Text("Net this quarter: %+.1f", static_cast<double>(r.net()));
+    ImGui::Text("Net this month: %+.1f", static_cast<double>(r.net()));
 
     // BL-1215: the refund is named on its own line rather than folded into the
     // net above. It is cash credited back (the seat's cancelled construction,
@@ -188,7 +188,7 @@ void standing_body(const world& w, const recipe_registry& reg, const economy_rep
     ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Standing");
     ImGui::Separator();
     row("GDP", "%.0f", "What your buildings' goods sell for in a year.", gdp);
-    row("Market share", "%.1f%%", "Your share of what the markets cleared last quarter.", share);
+    row("Market share", "%.1f%%", "Your share of what the markets cleared last month.", share);
     row("Reach", "%.0f", "Bodies with at least one of the nation's buildings.", reach);
     row("Total force", "%.0f", "Units in the field. A rival's are the ones on ground you have surveyed.", force);
 }
@@ -243,13 +243,13 @@ balance_columns build_balance_columns(const corp_budget& b, float refunds, float
         {b.levies,      IM_COL32(210, 175, 90, 255),  "Levies",      nullptr},
         // The garrison's pay and the space assets' upkeep, one booked figure (Ben, 2026-11-07).
         {b.upkeep,      IM_COL32(200, 130, 110, 255), "Upkeep",
-         "Your garrison's pay and your space assets' upkeep this quarter"},
+         "Your garrison's pay and your space assets' upkeep this month"},
         // BL-1335: the home nation's tax on the quarter's operating profit.
         {b.taxes,       IM_COL32(185, 150, 120, 255), "Taxes",
-         "Your home nation's tax tier: its share of this quarter's operating profit"},
+         "Your home nation's tax tier: its share of this month's operating profit"},
         // BL-1539: the research line, inside the net (Ben, 2026-11-05).
         {research,      IM_COL32(110, 170, 205, 255), "Research",
-         "What your research line spent this quarter"},
+         "What your research line spent this month"},
     };
     for (const charts::stack_segment& s : all)
         if (s.value > 0.0f)
@@ -345,10 +345,10 @@ void draw_corporation_dashboard(const world& w, const recipe_registry& reg,
     const char* purse = r.nation ? "treasury" : "balance";
     char verdict[128];
     if (r.budget_measured)
-        std::snprintf(verdict, sizeof verdict, "%+.1f/qtr, %s %.0f",
+        std::snprintf(verdict, sizeof verdict, "%+.1f/mo, %s %.0f",
                       static_cast<double>(r.net()), purse, static_cast<double>(r.balance));
     else
-        std::snprintf(verdict, sizeof verdict, "%s %.0f (no quarter measured yet)",
+        std::snprintf(verdict, sizeof verdict, "%s %.0f (no month measured yet)",
                       purse, static_cast<double>(r.balance));
     const ImU32 verdict_col =
         (r.budget_measured && r.net() < 0.0f) ? palette::negative : palette::positive;

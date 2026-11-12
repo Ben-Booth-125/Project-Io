@@ -85,8 +85,18 @@ class recipe_registry;
 struct offworld_base
 {
     int32_t founded_tick   = 0; ///< The econ tick it was founded at.
-    int32_t unfed_quarters = 0; ///< Consecutive quarters its life support went unbought.
+    int32_t unfed_quarters = 0; ///< Consecutive econ ticks (months since BL-1642) its life support went unbought.
+    /// BL-1642: the shrink CARRIED between unfed months, in milli-heads, [0, 1000). Each
+    /// unfed month adds its share of the people (at least a third of a head, the quarter
+    /// tick's one-head floor spread over its three months); a whole head leaves when the
+    /// carry reaches 1000. Feeding does not clear it, so no pattern of fed and unfed
+    /// months dodges the calendar rate. SERIALISED from world v95.
+    int32_t loss_carry_milli = 0;
 };
+
+/// BL-1642: the carry's bound (exclusive), and the least a month adds to it.
+inline constexpr int32_t k_offworld_loss_carry_max   = 1000;
+inline constexpr int32_t k_offworld_loss_floor_milli = 334; // a third of a head: 3 months >= 1 head
 
 /// The dials. First cut, in-band; not a Lua key yet.
 struct offworld_base_params
@@ -94,9 +104,9 @@ struct offworld_base_params
     int32_t       min_colonists = 2;                      ///< Thousands of heads a founding needs.
     resource_type kit_res       = resource_type::machinery; ///< The base kit's good.
     float         kit_qty       = 20.0f;                  ///< Of it, aboard the landed Landers.
-    float         water_per_k   = 1.0f;                   ///< Water per thousand a quarter at habitability 0.
-    float         food_per_k    = 1.0f;                   ///< Food rations per thousand a quarter at habitability 0.
-    float         shrink_share  = 0.25f;                  ///< Of its people a base loses an unfed quarter.
+    float         water_per_k   = 1.0f / 3.0f;            ///< Water per thousand a tick (a month; a quarter 1.0, BL-1642) at habitability 0.
+    float         food_per_k    = 1.0f / 3.0f;            ///< Food rations per thousand a tick (a month; a quarter 1.0) at habitability 0.
+    float         shrink_share  = 0.0914397f;             ///< Of its people a base loses an unfed tick: 1 - 0.75^(1/3), the quarter's 0.25 a month (BL-1642).
     float         reservation_mult = 0.0f;                ///< The fair-price ceiling (0 = buy what the shelf holds).
 };
 

@@ -33,8 +33,8 @@ namespace ui {
 
 namespace {
 
-constexpr std::size_t k_trend_samples = 5; ///< Now and four ticks back (diplomacy.md, open question 1).
-constexpr std::size_t k_trade_window  = 4; ///< Ticks of landings the exposure reads.
+constexpr std::size_t k_trend_samples = 13; ///< Now and twelve monthly ticks back - the four quarters of diplomacy.md, open question 1 (BL-1642).
+constexpr std::size_t k_trade_window  = 12; ///< Ticks (months) of landings the exposure reads - a year, the four quarters (BL-1642).
 
 ImVec4 col4(ImU32 c) { return ImGui::ColorConvertU32ToFloat4(c); }
 
@@ -160,7 +160,7 @@ void refresh_gdp(const world& w, const recipe_registry& reg, const economy_repor
         const building_profit p = estimate_building_profit(w, reg, rep, bid);
         if (!p.has_data)
             continue;
-        d.gdp_year[n->second] += static_cast<double>(p.revenue) * 4.0; // a tick is a quarter
+        d.gdp_year[n->second] += static_cast<double>(p.revenue) * static_cast<double>(k_econ_ticks_per_year); // a tick is a month (BL-1642)
     }
 }
 
@@ -866,7 +866,7 @@ void draw_expanded(const world& w, const recipe_registry& reg, const std::vector
         ImGui::Text("  Exports to them %s", exp_all > 0.0 ? fmt::percent(exp_them / exp_all).c_str() : "-");
     }
     if (ImGui::IsItemHovered())
-        ImGui::SetTooltip("Shares of the cargo landed between nations over the last %d ticks this "
+        ImGui::SetTooltip("Shares of the cargo landed between nations over the last %d months this "
                           "session has watched. A war cuts it: hostile cargo is intercepted.",
                           static_cast<int>(k_trade_window));
 
@@ -1151,7 +1151,7 @@ void draw_peace(const world& w, ui_state& s, const war_record& war, entity_id me
         const int left = rit == w.peace_refusals.end() ? 0
                        : rit->second + k_war_offer_cooldown_ticks - w.current_econ_tick;
         cooling = "Your last offer was refused: you may offer again in " + std::to_string(left)
-                + (left == 1 ? " quarter." : " quarters.");
+                + (left == 1 ? " month." : " months.");
     }
     if (d.peace_with != other)
     {

@@ -233,6 +233,6 @@ staleness detector — a non-empty list means the UI grew and the spine did not.
 - `turbulence_lean` (5 captures, 1 expects) — Verification for BL-839 — the historical turbulence lean, in the wizard.
 - `ui_scale_down` (8 captures, 0 expects) — BL-1495 (UI scale down): the default 12 px UI, side by side with the 16 px step.
 - `unit_counter` (8 captures, 0 expects) — Verify the land unit counter, the unit card and the unit group (BL-1425 R1-R3,
-- `units_survive_quarters` (0 captures, 0 expects) — Do units survive the quarters in the --verify world?
+- ` 0 ` (0 captures, 0 expects) — Do units survive the months in the --verify world?
 - `wharf_on_shore` (5 captures, 0 expects) — BL-1218 (wharf placed on shore): the construction ledger offers a Fishing
 

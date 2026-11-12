@@ -71,25 +71,25 @@ struct space_effects_params
     float navigation_logistics_factor = 0.9f;
 
     /// Survey satellite: regions mapped per quarter while its node is covered.
-    int survey_regions_per_quarter = 4;
+    int survey_regions_per_quarter = 4; // per QUARTER: spread over its three monthly ticks (quarter_count_this_tick, BL-1642)
 
     /// Research module: RP per quarter while its station's node is covered
     /// (half a research institute's 50 — RESEARCH.md § Research points).
-    float research_rp_per_module = 50.0f;
+    float research_rp_per_module = 50.0f / 3.0f; // per tick, a month: a third of the quarter's 50 (BL-1642)
 
     /// Life support: food_rations per crew aboard per quarter.
-    float rations_per_crew = 1.0f;
+    float rations_per_crew = 1.0f / 3.0f; // per tick, a month (a quarter 1.0, BL-1642)
 
     /// Microgravity factory: silicon bought, electronics sold, per quarter.
-    float factory_input_lot  = 20.0f;
-    float factory_output_lot = 10.0f;
+    float factory_input_lot  = 20.0f / 3.0f; // per tick, a month (a quarter 20, BL-1642)
+    float factory_output_lot = 10.0f / 3.0f; // (a quarter 10)
 
     /// Observatory: regions mapped per quarter on each body in coverage.
-    int observatory_regions_per_quarter = 2;
+    int observatory_regions_per_quarter = 2; // per QUARTER, spread (BL-1642)
 
     /// Rover / landed Lander: regions prospected per quarter (BL-1600; "one at a
     /// time", DISCOVERY.md § Mapping, then prospecting).
-    int prospect_regions_per_quarter = 1;
+    int prospect_regions_per_quarter = 1; // per QUARTER, spread (BL-1642)
 };
 
 /// What one quarterly effects step did — reported, never stored.

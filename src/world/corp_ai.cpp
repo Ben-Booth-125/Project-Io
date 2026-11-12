@@ -2752,7 +2752,7 @@ namespace {
 
 constexpr float k_force_base_share = 0.20f;  ///< Of income, with no neighbour stronger. First cut.
 constexpr float k_force_threat_span = 3.0f;  ///< Threat over 1 that reaches the ceiling. First cut.
-constexpr int   k_force_income_returns = 4;  ///< Returns averaged: a year.
+constexpr int   k_force_income_returns = 12; ///< Returns averaged: a year of months (BL-1642; was 4 quarters).
 
 float land_row_price(const recipe_registry& reg, uint16_t type)
 {
@@ -3476,7 +3476,7 @@ constexpr float k_war_ai_min_motive   = 0.025f;
 
 /// Peace: a war younger than this is neither offered nor accepted (a declaration
 /// is not withdrawn the quarter it is made).
-constexpr int   k_war_ai_min_peace_ticks    = 4;
+constexpr int   k_war_ai_min_peace_ticks    = 12; // months: a year, the 4 quarters (BL-1642)
 constexpr float k_war_ai_peace_w_exhaustion = 0.8f; ///< x own exhaustion / 100
 constexpr float k_war_ai_peace_w_losing     = 0.6f; ///< x max(0, -score) / 100
 constexpr float k_war_ai_peace_w_duration   = 0.4f; ///< x min(1, ticks at war / truce length)
@@ -3763,7 +3763,7 @@ void score_nation_war(world& w, const recipe_registry& reg, entity_id nation, in
         if (dur < k_war_ai_min_peace_ticks)
             continue;
         if (peace_offer_cooling(w, nation, other))
-            continue; // its last offer was refused under four ticks ago (NR-1120)
+            continue; // its last offer was refused under a year ago (NR-1120; twelve monthly ticks)
         std::vector<uint32_t> provs;
         uint32_t order = 0; // white
         if (mine >= k_war_ai_demand_score)
@@ -4113,7 +4113,8 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
             // "A rival's march may weigh supply"): that one pass, on the live-only gate it
             // has below. Everything else in the evaluation keeps the staggered clock, and a
             // due actor still scores its fronts after its war, embargo and defence passes.
-            if (actor.is_nation && tick >= k_campaign_settle_ticks)
+            // BL-1642: "every quarter" holds on the monthly tick - one month in three.
+            if (actor.is_nation && tick >= k_campaign_settle_ticks && is_quarter_tick(tick))
                 score_nation_fronts(w, reg, corp, tick);
             continue;
         }
@@ -4123,7 +4124,7 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
         // a nation's own units onto its own fronts, and each front's order. Past the
         // player guard above, so never the player's nation in a seated session.
         // NO UNIT IS ASSIGNED TO A FRONT BY DEFAULT (Ben, 2026-10-29; MILITARY.md
-        // § Nation garrisons): the pre-game settle (econ ticks 0..11, under spectate,
+        // § Nation garrisons): the pre-game settle (econ ticks 0..35, three years of months, under spectate,
         // when every nation - the player's too - is evaluated) runs no front scoring at
         // all, so every garrison opens on its post. This NARROWS the BL-1427 grant to
         // live play; it widens nothing. Keyed on the econ tick, the same settle/live
@@ -4168,7 +4169,7 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
         if (actor.is_nation && tick >= k_campaign_settle_ticks)
             score_nation_defence(w, reg, corp, tick); // BL-1504: before the front's assign
 
-        if (actor.is_nation && tick >= k_campaign_settle_ticks)
+        if (actor.is_nation && tick >= k_campaign_settle_ticks && is_quarter_tick(tick)) // BL-1642: a quarter
             score_nation_fronts(w, reg, corp, tick);
 
         // BL-1451 (AI_OPPONENT.md § 11, "Rival nations fly air wings", Ben 2026-10-28):
@@ -5341,10 +5342,11 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
 
             // Idle: sustained loss where stopping (wages saved, the fixed share
             // of maintenance still owed) beats running. Rides the BL-079
-            // loss_streak; the 4-tick gate keeps "no idling without a sustained
-            // streak" true while letting the strategic tier act ahead of the
-            // 8-tick reflex.
-            if (bp.has_data && bp.net() < 0.0f && b.loss_streak >= 4)
+            // loss_streak; the one-year gate (12 months, the quarter tick's 4)
+            // keeps "no idling without a sustained streak" true while letting the
+            // strategic tier act ahead of the two-year reflex (k_loss_streak_to_idle).
+            // BL-1642: counted in calendar time - left at 4 it idled after 4 months.
+            if (bp.has_data && bp.net() < 0.0f && b.loss_streak >= k_econ_ticks_per_year)
             {
                 // net idle − net running. Same correction as the resume side
                 // above, in the opposite direction: subtracting the RUNNING

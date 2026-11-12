@@ -307,7 +307,7 @@ void draw_strategy_readout(const world& w, const strategy_readout_state& s,
     {
         ImGui::TextWrapped("No strategic decisions observed yet. The readout "
                            "aggregates the same stream the AI decision feed "
-                           "lists, one sample per quarter.");
+                           "lists, one sample per month.");
         foldout_end();
         return;
     }
@@ -347,7 +347,7 @@ void draw_strategy_readout(const world& w, const strategy_readout_state& s,
     ImGui::Separator();
     ImGui::PushStyleColor(ImGuiCol_Text, palette::text_secondary);
     ImGui::TextWrapped("%llu decisions observed; the window holds the last %zu "
-                       "quarters (%zu decisions).",
+                       "months (%zu decisions).",
                        static_cast<unsigned long long>(s.observed),
                        strategy_window_samples, s.window.size());
     if (s.missed > 0)
@@ -417,7 +417,7 @@ void draw_strategy_readout(const world& w, const strategy_readout_state& s,
         // Bucket split, quarter by quarter — the stacked band. The transition
         // is the artifact worth seeing: the quarter a corp falls out of
         // nice-to-have and never recovers is the quarter it lost.
-        ImGui::TextUnformatted("Bucket split by quarter");
+        ImGui::TextUnformatted("Bucket split by month");
         {
             const ImVec2 bp = ImGui::GetCursorScreenPos();
             const float  bw = std::max(ui::px(60.0f), ImGui::GetContentRegionAvail().x - ui::px(4.0f));
@@ -438,7 +438,7 @@ void draw_strategy_readout(const world& w, const strategy_readout_state& s,
                                       layers, bucket_count);
         }
         ImGui::PushStyleColor(ImGuiCol_Text, palette::text_secondary);
-        ImGui::TextWrapped("oldest quarter on the left; a gap is a quarter "
+        ImGui::TextWrapped("oldest month on the left; a gap is a month "
                            "with no decisions");
         ImGui::PopStyleColor();
         draw_bucket_legend(&p.buckets);

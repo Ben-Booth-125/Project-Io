@@ -78,8 +78,12 @@ inline bool solar_storm_at(uint32_t seed, int tick, const solar_storm_params& p 
 {
     if (tick < 1 || p.cycle_quarters < 1 || p.storm_per_mille <= 0)
         return false;
-    const int cycle  = (tick - 1) / p.cycle_quarters;
-    const int within = (tick - 1) % p.cycle_quarters;
+    // BL-1642 (the tick is a month): the storm calendar stays in QUARTERS - a storm
+    // strikes for the three monthly ticks of its quarter, so its length and the
+    // three-year cycle hold in calendar time and each seed draws the storms it did.
+    const int q      = (tick - 1) / k_econ_ticks_per_quarter; // the tick's quarter, from 0
+    const int cycle  = q / p.cycle_quarters;
+    const int within = q % p.cycle_quarters;
     const uint64_t h = solar_storm_detail::mix(
         solar_storm_detail::mix(static_cast<uint64_t>(seed) ^ solar_storm_detail::k_salt)
         + static_cast<uint64_t>(cycle));

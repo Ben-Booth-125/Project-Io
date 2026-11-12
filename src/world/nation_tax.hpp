@@ -41,10 +41,15 @@ struct tax_params
     /// (BL-1403). Each finite in [0, 1].
     std::array<float, k_tax_tier_count> rate = {0.0f, 0.05f, 0.10f, 0.15f, 0.20f};
 
-    /// Discontent added per quarter at each tier I..V (negative = ebbs). Each
-    /// finite in [-1, 1]. Binary fractions so the quarterly sum is exact: tier IV
-    /// reaches the 0.5 threshold in exactly 8 quarters, tier V in 4.
-    std::array<float, k_tax_tier_count> pressure = {-0.125f, -0.0625f, 0.0f, 0.0625f, 0.125f};
+    /// Discontent added per econ tick (a month, BL-1642) at each tier I..V (negative
+    /// = ebbs). Each finite in [-1, 1]: a third of the quarter tick's binary
+    /// {-0.125, -0.0625, 0, 0.0625, 0.125}. A third is not a binary fraction, so the
+    /// float sum is not exact; the crossing is PINNED instead (tax_discontent_harness):
+    /// from 0, tier IV first stands over the 0.5 bite threshold in month 24
+    /// (0.50000006) and tier V in month 13 (0.5417; month 12 reads just under 0.5).
+    /// Under the quarter tick IV sat exactly on 0.5 at quarter 8 and bit from quarter 9.
+    std::array<float, k_tax_tier_count> pressure = {-0.041666667f, -0.020833333f, 0.0f,
+                                                    0.020833333f, 0.041666667f}; // the authored literals
 
     /// Discontent above which output is cut. In [0, 1].
     float bite_threshold = 0.5f;

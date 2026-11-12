@@ -526,24 +526,24 @@ int main()
         if (have)
         {
             building_component& site = wd.buildings.at(bids[0]);
-            site.ticks_remaining = 2; site.days_remaining = 150; site.build_rate_permille = 600;
-            site.build_paid_days = 40; site.build_day_milli = 321; site.construction_progress = 0.0f;
+            site.ticks_remaining = 5; site.days_remaining = 150; /* BL-1642: 30-day ticks */ site.build_rate_permille = 600;
+            site.build_paid_days = 20; site.build_day_milli = 321; site.construction_progress = 0.0f;
             site.build_credit_paid = 1234.5f; site.build_arrears_milli = 12345; // Ben, 2026-10-25
             building_component& done = wd.buildings.at(bids[1]);
             done.ticks_remaining = 0; done.days_remaining = 0; done.completion_day = 12;
             done.output_share_permille = 500;
             done.build_arrears_milli = 700; // completed owing materials: still owed
-            wd.construction_quarter_day = 37;
+            wd.construction_quarter_day = 17;
         }
         const std::string b57 = to_bytes(wd);
         world back;
-        bool ok = have && from_bytes(b57, back) && back.construction_quarter_day == 37;
+        bool ok = have && from_bytes(b57, back) && back.construction_quarter_day == 17;
         if (ok)
         {
             const building_component& s2 = back.buildings.at(bids[0]);
             const building_component& d2 = back.buildings.at(bids[1]);
-            ok = s2.ticks_remaining == 2 && s2.days_remaining == 150 && s2.build_rate_permille == 600
-              && s2.build_paid_days == 40 && s2.build_day_milli == 321
+            ok = s2.ticks_remaining == 5 && s2.days_remaining == 150 && s2.build_rate_permille == 600
+              && s2.build_paid_days == 20 && s2.build_day_milli == 321
               && d2.completion_day == 12 && d2.output_share_permille == 500
               && s2.build_credit_paid == 1234.5f && s2.build_arrears_milli == 12345 && d2.build_arrears_milli == 700
               && back.state_hash(7) == wd.state_hash(7) && to_bytes(back) == b57;
@@ -556,7 +556,7 @@ int main()
         if (have)
         {
             building_component& site = w56.buildings.at(bids[0]);
-            site.days_remaining = 0; site.build_rate_permille = 0; site.build_paid_days = 0;
+            site.ticks_remaining = 2; /* BL-1642: two monthly ticks */ site.days_remaining = 0; site.build_rate_permille = 0; site.build_paid_days = 0;
             site.build_day_milli = 0; site.construction_progress = 0.25f; // a quarter of a quarter done
             site.build_credit_paid = 0.0f; site.build_arrears_milli = 0;
             building_component& done = w56.buildings.at(bids[1]);
@@ -576,15 +576,15 @@ int main()
         if (ok56)
         {
             const building_component& s3 = old.buildings.at(bids[0]);
-            ok56 = s3.ticks_remaining == 2 && s3.days_remaining == 105
+            ok56 = s3.ticks_remaining == 2 && s3.days_remaining == 35
                 && old.construction_quarter_day == 0;
             for (const auto& [bid, b] : old.buildings)
                 ok56 = ok56 && (b.ticks_remaining > 0
-                                    ? (b.days_remaining + 89) / 90 == b.ticks_remaining
+                                    ? (b.days_remaining + 29) / 30 == b.ticks_remaining
                                     : b.days_remaining == 0);
         }
-        check(ok56, "P23 a v56 stream reads, each site's days derived from its ticks (2 qtrs less "
-                    "a quarter of one = 158 days, x2/3 for the v80 build days = 105), the cursor 0");
+        check(ok56, "P23 a v56 stream reads, each site's days derived from its ticks (2 months less "
+                    "a quarter of one = 53 days, x2/3 for the v80 build days = 35; BL-1642 30-day ticks), the cursor 0");
         std::size_t rows = 0; // the buildings the v57 section carries
         for (const auto& [bid, b] : wd.buildings)
             rows += canonical_construction_days(b).any() ? 1 : 0;
@@ -616,7 +616,7 @@ int main()
         }
         world sentinel;
         check(have && !from_bytes(bad, sentinel) && sentinel.buildings.empty(),
-              "P23 a cursor past day 90 is REFUSED, destination untouched");
+              "P23 a cursor past day 30 is REFUSED, destination untouched");
     }
 
     // -----------------------------------------------------------------------
@@ -2172,7 +2172,7 @@ int main()
             if (have_two)
             {
                 building_component& whole = sites.buildings.at(ids[0]);
-                whole.ticks_remaining = 2;
+                whole.ticks_remaining = 6; // BL-1642: 180 days span six 30-day ticks
                 whole.days_remaining = 180;
                 whole.build_arrears_milli = 3000;
                 building_component& last_day = sites.buildings.at(ids[1]);
@@ -2185,7 +2185,7 @@ int main()
             const bool read_old = have_two && from_bytes(o.str(), old_sites);
             const bool read_new = have_two && from_bytes(to_bytes(sites), new_sites);
             check(read_old && old_sites.buildings.at(ids[0]).days_remaining == 120
-                      && old_sites.buildings.at(ids[0]).ticks_remaining == 2
+                      && old_sites.buildings.at(ids[0]).ticks_remaining == 4
                       && old_sites.buildings.at(ids[0]).build_arrears_milli == 2000
                       && old_sites.buildings.at(ids[1]).days_remaining == 1
                       && old_sites.buildings.at(ids[1]).ticks_remaining == 1,
@@ -2318,7 +2318,8 @@ int main()
         // and v88 is read as its strict prefix; every PG size below adds that section.
         // The space merge: today is v93 (every space section after the missiles); v89 is read
         // as its prefix less the space sections.
-        static_assert(world_save_version == k_world_save_version_one_product && k_world_save_version_one_product == 94
+        static_assert(world_save_version == k_world_save_version_monthly && k_world_save_version_monthly == 95
+                          && k_world_save_version_one_product == 94
                           && k_world_save_version_space_merge == 93 && k_world_save_version_stacked == 88
                           && k_world_save_version_ship_kit == 81 && k_world_save_version_ended == 83
                           && k_world_save_version_missiles == 89,
@@ -2413,13 +2414,13 @@ int main()
 
         // The space merge gave v84..v87 and v90..v92 the space line's layouts, so no version
         // in 81..93 is unclaimed any more; a stream stamped past today is refused.
-        for (const uint32_t v : {95u, 96u})
+        for (const uint32_t v : {96u, 97u}) // BL-1642: v95 is today (the monthly tick)
         {
             std::string other = b88;
             std::memcpy(&other[4], &v, sizeof v);
             world sentinel;
             check(!from_bytes(other, sentinel) && sentinel.tiles.empty(),
-                  "PG a stream stamped past today (v95, v96) is REFUSED");
+                  "PG a stream stamped past today (v96, v97) is REFUSED");
         }
     }
 
@@ -2430,8 +2431,9 @@ int main()
     // collide with this line's numbers and read as this line's.
     // -----------------------------------------------------------------------
     {
-        // BL-1641: v94 (one building per product) adds no section, so today's stream is v93's layout.
-        static_assert(world_save_version == 94 && k_world_save_version_space_merge == 93
+        // BL-1641: v94 (one building per product) adds no section, nor does v95 (BL-1642, the
+        // monthly tick), so today's stream is v93's layout.
+        static_assert(world_save_version == 95 && k_world_save_version_space_merge == 93
                           && k_world_save_version_pre_space_merge == 89,
                       "PH pins v93 as the space merge over main's v89");
         static_assert(world_stream_is_space_line(84) && world_stream_is_space_line(87)

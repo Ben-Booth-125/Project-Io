@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
 #include <array>
 #include <fstream>
 #include <utility>
@@ -1414,6 +1415,18 @@ bool save_world_predates_product_split(std::istream& in)
     return read && magic == world_save_magic && version < k_world_save_version_one_product;
 }
 
+/// BL-1642: does the world stream at @p in's position predate the monthly tick (world
+/// v95)? Its econ ticks count quarters. Puts the position back, as above.
+bool save_world_predates_monthly_tick(std::istream& in)
+{
+    const std::streampos at = in.tellg();
+    uint32_t magic = 0, version = 0;
+    const bool read = r_u32(in, magic) && r_u32(in, version);
+    in.clear();
+    in.seekg(at);
+    return read && magic == world_save_magic && version < k_world_save_version_monthly;
+}
+
 } // namespace
 
 std::string save_game_refusal_reason(const std::string& path)
@@ -1425,6 +1438,9 @@ std::string save_game_refusal_reason(const std::string& path)
     if (save_world_predates_product_split(in))
         return "this save is from before one building per product (every processing building "
                "now makes one product) and cannot be opened; start a new game";
+    if (save_world_predates_monthly_tick(in))
+        return "this save is from before the monthly tick (a turn is now a month, not a "
+               "quarter) and cannot be opened; start a new game";
     return {};
 }
 
@@ -1456,6 +1472,26 @@ bool read_save_game(const std::string& path, world& w, save_envelope& env,
     // report a failed load without having already lost the live campaign.
     world         scratch_world;
     save_envelope scratch_env;
+
+    // BL-1642 (the tick is a month; Ben, 2026-11-11): a save whose world stream predates
+    // the monthly tick counts its econ ticks in QUARTERS, so it is refused whole, never
+    // migrated. The world reader still decodes v93 and older (its layout harness rows
+    // need it); this door is where an old CAMPAIGN is turned away.
+    {
+        const std::streampos at = in.tellg();
+        uint32_t world_magic = 0, world_version = 0;
+        if (!r_u32(in, world_magic) || !r_u32(in, world_version))
+            return false;
+        if (world_version < k_world_save_version_monthly)
+        {
+            std::fprintf(stderr, "[save] %s: saved under the quarter tick (world v%u); a save from "
+                                 "before the monthly tick (v%u) cannot be loaded\n",
+                         path.c_str(), static_cast<unsigned>(world_version),
+                         static_cast<unsigned>(k_world_save_version_monthly));
+            return false;
+        }
+        in.seekg(at);
+    }
 
     if (!read_world_snapshot(scratch_world, in, mil, base_price))
         return false;

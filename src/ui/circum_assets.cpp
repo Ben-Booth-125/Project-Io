@@ -154,9 +154,9 @@ float space_transit_share(int depart_tick, int arrival_tick, int econ_tick, floa
 
 float circum_quarter_fraction(const world& w)
 {
-    // The live day tick runs 90 days a quarter (the econ cadence); a harness world
-    // whose day tick stands still reads the quarter's start.
-    constexpr int k_days = 90;
+    // The live day tick runs k_econ_tick_days a tick (a month since BL-1642, the econ
+    // cadence); a harness world whose day tick stands still reads the tick's start.
+    constexpr int k_days = k_econ_tick_days;
     const int d = ((w.current_day_tick % k_days) + k_days) % k_days;
     return static_cast<float>(d) / static_cast<float>(k_days);
 }
@@ -345,9 +345,9 @@ void draw_space_asset_summary(const world& w, entity_id id)
                 ImGui::Text("Left from: %s", node_name_or(w, a->transit_from).c_str());
             ImGui::Text("Bound for: %s", node.c_str());
             if (q == 0)
-                ImGui::TextUnformatted("State: in transit, arrives this quarter");
+                ImGui::TextUnformatted("State: in transit, arrives this month");
             else
-                ImGui::Text("State: in transit, arrives in %d quarter%s", q, q == 1 ? "" : "s");
+                ImGui::Text("State: in transit, arrives in %d month%s", q, q == 1 ? "" : "s");
             break;
         }
         case space_asset_state::active:
@@ -356,7 +356,7 @@ void draw_space_asset_summary(const world& w, entity_id id)
             break;
         case space_asset_state::decaying:
             ImGui::Text("Node: %s", node.c_str());
-            ImGui::Text("State: decaying, upkeep unpaid %d quarter%s", a->unpaid_quarters,
+            ImGui::Text("State: decaying, upkeep unpaid %d month%s", a->unpaid_quarters,
                         a->unpaid_quarters == 1 ? "" : "s");
             break;
         case space_asset_state::lost:
@@ -366,8 +366,8 @@ void draw_space_asset_summary(const world& w, entity_id id)
     // BL-1609: the quarter's solar storm (EVENTS.md § Solar storms).
     if (space_asset_storm_struck(w, *a))
         ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::space_storm), "%s",
-                           st != nullptr ? "Solar storm: every module stopped this quarter"
-                                         : "Solar storm: dark this quarter");
+                           st != nullptr ? "Solar storm: every module stopped this month"
+                                         : "Solar storm: dark this month");
 }
 
 void draw_circum_asset_card(const world& w, entity_id id, ImVec2 mouse)

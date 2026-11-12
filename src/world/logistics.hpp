@@ -499,11 +499,12 @@ inline constexpr float caravan_km_per_day = 25.0f;
 inline constexpr float coastal_km_per_day = 130.0f;
 
 /// Days in one econ tick. MIRRORS `sim_loop::econ_tick_days` (core/sim_loop.hpp,
-/// 30 × 3 = 90) and is restated here rather than included because `world/*` must
+/// 30 x 1 = 30, a month since Ben's 2026-11-11 ruling) through components.hpp's
+/// k_econ_tick_days, restated rather than included because `world/*` must
 /// not depend on `core/*` — the headless harnesses link the world layer alone.
-/// If the tick length ever changes, these two must change together; the
+/// If the tick length ever changes, these must change together; the
 /// stepped-clock harness asserts they agree.
-inline constexpr int econ_tick_days_world = 90;
+inline constexpr int econ_tick_days_world = k_econ_tick_days;
 
 /// Econ ticks a convoy needs to traverse @p path on @p body, minimum 1.
 ///

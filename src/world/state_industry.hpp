@@ -247,7 +247,7 @@ std::vector<entity_id> state_gate_would_idle(const world& w, const recipe_regist
 /// before the player's first tick (`k_campaign_settle_ticks`, campaign_settle.hpp
 /// -- read from there, never a second literal) plus a year, four quarterly
 /// ticks of the state bill. Twelve plus four: sixteen ticks.
-inline constexpr int k_state_founding_year_ticks     = 4;
+inline constexpr int k_state_founding_year_ticks     = k_econ_ticks_per_year; // a year: 12 monthly ticks (BL-1642; was 4 quarters)
 inline constexpr int k_state_founding_reserve_ticks  = k_campaign_settle_ticks + k_state_founding_year_ticks;
 
 struct state_reserve_report

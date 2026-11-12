@@ -83,7 +83,7 @@ a nation owns tiles and never buildings.
   stock, so one fed only by trade waits out the haul.
 - **The player's controls** over a building are the building verbs — build, recipe, sell — paid from
   the treasury. **Workforce is not one of them**: the game steps every building's workforce one 25 %
-  step a quarter toward the most profitable level, a raise taken only when the treasury funds it (Ben,
+  step a month toward the most profitable level, a raise taken only when the treasury funds it (Ben,
   2026-10-14; `../economy/PRODUCTION.md` § Workforce target and the auto-solver).
 - **The player's economy grows only by the player's builds** (Ben, 2026-10-23). Every building it
   opens with keeps running; nothing builds on its ground for it. A rival nation's builds are its
@@ -156,7 +156,7 @@ taken as ground at home is.
 
 **A base must be kept alive.** Its population needs the habitability its body gives
 (`../CLIMATE.md`) and, where that falls short, life-support goods bought off its own market each
-quarter — water, food and oxygen. A base that cannot buy them shrinks.
+month — water, food and oxygen. A base that cannot buy them shrinks.
 
 ### Elimination — a nation with no ground ends (Ben, 2026-11-09)
 
@@ -219,7 +219,7 @@ credit it and one pass debits it.
 | Flow | Direction | Where |
 |---|---|---|
 | **Import tariff** | in | the clearing tick, `market_clearing.cpp` — paid by the foreign nation whose goods enter |
-| **Tax** | in | each quarter, the tier's share of the wages the nation pays (§ Taxes and Discontent) |
+| **Tax** | in | each month, the tier's share of the wages the nation pays (§ Taxes and Discontent) |
 | **The national budget** | out | `run_national_budget`, `nation_budget.cpp`, called from `run_nation_step` |
 
 The tariff is a **transfer, not a mint**: the importing nation is debited exactly what the market
@@ -302,14 +302,14 @@ space programme's goods buyer, bidding through its staffed pad (`../economy/SPAC
 
 **A nation taxes the wages it pays, at a tier, I to V** (Ben, 2026-10-23: *"Taxes are taken from
 wages, which are also paid for by the nation"*, re-subjecting the 2026-10-16 tax on home firms'
-profit, which had no firm left to tax). Each quarter the tier's share of every wage its buildings
-paid that quarter comes back into the treasury, in the same float and tick. A higher tier therefore
+profit, which had no firm left to tax). Each month the tier's share of every wage its buildings
+paid that month comes back into the treasury, in the same float and tick. A higher tier therefore
 lowers the nation's net wage bill. The tier rates are dials in `scripts/economy.lua`. The player sets
 its nation's tier on the Budget ledger's Taxes control; a rival nation's scorer sets its own, under
 the 2026-08-18 grant ("a nation setting a tariff or tax rate").
 
 **High taxes breed Discontent, and Discontent costs output.** Every nation carries a Discontent
-reading between 0 and 1. A tier above the middle raises it each quarter; the middle tier holds it;
+reading between 0 and 1. A tier above the middle raises it each month; the middle tier holds it;
 a tier below lowers it. At tier IV it takes **two years** of high taxes before Discontent starts to
 bite; tier V bites sooner. Once it bites, every building on the nation's ground loses output in
 proportion, up to **15%** at full Discontent. Cutting taxes lets it ebb at the same pace.
@@ -435,13 +435,13 @@ economic premise already assumes nations that act.
 ## What a nation does each tick — the nation step
 
 `run_nation_step` (`src/world/nation_step.{hpp,cpp}`) is where a nation acts. It runs **after
-`apply_budget`** — the treasury holds this quarter's sales, tax and tariff only then; running it inside
-`run_economy_step` would spend last quarter's revenue. Four moves, in order, and each is
+`apply_budget`** — the treasury holds this month's sales, tax and tariff only then; running it inside
+`run_economy_step` would spend last month's revenue. Four moves, in order, and each is
 somebody else's machinery:
 
 1. **Score.** `score_national_budgets` returns a weight vector for exactly the nations **due** on
    this economy tick under the staggered cadence (§ What a nation wants). Each returned slot
-   overwrites one entry of `w.nation_budgets`; the rest keep last quarter's weights.
+   overwrites one entry of `w.nation_budgets`; the rest keep last month's weights.
 2. **Gather.** This tick's claims are the nation's own: its survey targets, its upkeep bill and its
    `space_programme` purchase claims, derived here (§ A budget). The claimant is always the nation
    itself, its payee a market or its own dispatch.
@@ -460,7 +460,7 @@ somebody else's machinery:
 every other move in the step: the academic-research line pays what the queue still
 owes, and the pool flows down the queue (`docs/economy/RESEARCH.md` § Research points).
 
-The cadence key is `world::current_econ_tick` — the quarter counter, never the day tick.
+The cadence key is `world::current_econ_tick` — the month counter, never the day tick.
 
 **Until the budget verbs exist, the scorer stands in for the player (Ben, 2026-10-16, NR-1048).**
 The player's nation has no way yet to set its own weights, so move 1 scores it like a rival and
@@ -511,7 +511,7 @@ Three rules keep the budget honest, each a requirement row in `nation_budget_har
    flagged `rationed`. Unearmarked claims keep rule 3's partial fill.
 
 A paid claim is read on its `budget_line_result`, and an earmark also lives on `report.earmarks`.
-The quarterly return books the academic-research line, garrison pay and space upkeep (Ben, 2026-11-05:
+The monthly return books the academic-research line, garrison pay and space upkeep (Ben, 2026-11-05:
 research counts inside net; Ben, 2026-11-07: space upkeep too); the other lines debit the treasury outside it (`../economy/FINANCE.md` § What a
 return does not carry).
 
@@ -574,7 +574,7 @@ The anchor fixes **one ratio between two quantities a player already understands
 other price is argued against it.
 
 Both halves live in `scripts/economy.lua` § `unit_upkeep`, charged per head per tick. An economy
-tick is one quarter, so the annual factor of 4 appears on both sides and cancels — *"for that
+tick is one month, so the annual factor of 12 appears on both sides and cancels — *"for that
 year"* needs no calendar arithmetic anywhere:
 
     Σ ( goods_per_head[r] × base_price[r] )  ≈  2 × credits_per_head

@@ -265,7 +265,7 @@ void draw_rail_rows(const world& w, const recipe_registry& reg, ui_state& ui, en
             ImGui::Dummy({construction_grid::bar, line_h});
             char buf[240];
             std::snprintf(buf, sizeof buf,
-                          "No corporate revenue: the nation owns it. Upkeep %.2f cr / qtr, paid "
+                          "No corporate revenue: the nation owns it. Upkeep %.2f cr / mo, paid "
                           "from the treasury.",
                           static_cast<double>(upkeep));
             cells.push_back(construction_cell("bar", bp, construction_grid::bar, buf));

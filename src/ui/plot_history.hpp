@@ -19,7 +19,7 @@ inline constexpr ImVec4 plot_col_green  = {0.000f, 0.620f, 0.451f, 1.0f}; // #00
 
 /// Maximum retained samples across all plot series (coordinates the retention
 /// window for the v0.0.9 data-creep audit — one place to tighten or widen).
-inline constexpr std::size_t plot_history_cap = 64;
+inline constexpr std::size_t plot_history_cap = 192; ///< Econ ticks: 16 years of months, the 64 quarters it held before BL-1642.
 
 /// Push v onto series, capping at plot_history_cap by dropping the oldest entry.
 inline void push_capped(std::vector<float>& series, float v)

@@ -70,13 +70,13 @@ verify.place_mode("extraction", "iron_ore")
 -- the BL-095 reason the old fixed tile was chosen). The top site-finder row's market
 -- could not, so a fixed 40 steps captured a site still under construction - the
 -- element's SITE shape, not its producing one. So: place on each accepting row in
--- drawn order, step up to 8 quarters, and keep the first site that completes. A
+-- drawn order, step up to 24 months (8 quarters, BL-1642), and keep the first site that completes. A
 -- stalled site is left standing; the capture is refused rather than taken of the
 -- wrong shape.
 local placed, built = nil, nil
 local refusals = "" -- in row order (the verify state opens no `table` library)
 local stalled = ""
-local k_tries, k_quarters = 6, 8
+local k_tries, k_quarters = 6, 24 -- months (BL-1642)
 local tries = 0
 
 local function find_at(row)
@@ -132,7 +132,7 @@ for i = 1, sites.n_rows do
 end
 if not placed then
     error("building_element.lua: no Iron Mine site completed within " .. k_quarters ..
-          " quarters; stalled: " .. stalled .. "; refused: " .. refusals)
+          " months; stalled: " .. stalled .. "; refused: " .. refusals)
 end
 print(string.format("building_element: the site at (%d,%d) is complete (stalled first: %s)",
                     placed.x, placed.y, stalled == "" and "none" or stalled))

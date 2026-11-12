@@ -28,8 +28,8 @@ Three views behind a `nav_button` strip (`construction.panel_view`), inside `fol
 
 | View | Answers (one question) | Content |
 |---|---|---|
-| **Buildings** *(default)* | "What do I own, and how much is each kind of it making me?" | One row per building **type** the player owns at least one of — the type's display name, its **count**, and the **summed per-quarter net** of its members, sign-coloured. The list takes the **whole height of the tab**, less exactly what the levers below it need, scrolling only past that (Ben, 2026-10-26). **Expanding a row** lists that type's own buildings, one line each carrying the tile and that building's own net, visibly summing to the header's total; **pressing one selects it**, and its **levers** draw below the roster. One group open at a time (an accordion). |
-| **Construction** | "What's in flight, what is it costing, and what could I put on this tile?" | A **collapsible** queue header carrying **N cr / qtr** (`estimated_quarterly_construction_cost` — `compute_building_opex` maintenance + wages summed over every player building with `ticks_remaining > 0`, the same formula the budget loop uses), then, when expanded, one row per in-progress build with a progress cell colour-coded dim (<25 %) / mid (25–75 %) / high (>75 %). Below it the **tile build bar** (`draw_construction_ledger_body`, `selection_panel.cpp`): manual construction on the selected tile, with no caption of its own and no treasury figure, the header carrying the treasury and each column's hover its explanation (Ben, 2026-11-09). |
+| **Buildings** *(default)* | "What do I own, and how much is each kind of it making me?" | One row per building **type** the player owns at least one of — the type's display name, its **count**, and the **summed per-month net** of its members, sign-coloured. The list takes the **whole height of the tab**, less exactly what the levers below it need, scrolling only past that (Ben, 2026-10-26). **Expanding a row** lists that type's own buildings, one line each carrying the tile and that building's own net, visibly summing to the header's total; **pressing one selects it**, and its **levers** draw below the roster. One group open at a time (an accordion). |
+| **Construction** | "What's in flight, what is it costing, and what could I put on this tile?" | A **collapsible** queue header carrying **N cr / mo** (`estimated_quarterly_construction_cost`, a month's figure under its kept name — `compute_building_opex` maintenance + wages summed over every player building with `ticks_remaining > 0`, the same formula the budget loop uses), then, when expanded, one row per in-progress build with a progress cell colour-coded dim (<25 %) / mid (25–75 %) / high (>75 %). Below it the **tile build bar** (`draw_construction_ledger_body`, `selection_panel.cpp`): manual construction on the selected tile, with no caption of its own and no treasury figure, the header carrying the treasury and each column's hover its explanation (Ben, 2026-11-09). |
 | **Site Finder** | "What would earn most on my ground, and where would it go?" | The **site finder** — a grid of buildings with their estimated returns and, with a building chosen, the **site ledger** (§ The site ledger, `construction_sites.cpp`). It has its own tab so it does not hide manual construction (Ben, 2026-11-09). |
 
 **Why Buildings is the default.** The queue is empty most of the time and the player always owns
@@ -78,7 +78,7 @@ recipes count as Infrastructure, as they do in the door (`../SELECTION.md` § Th
 ledger).
 
 **A cell** draws the building's glyph, its name whole (the column count is the most at which every name
-wraps inside its cell, and the cell is as tall as the tallest name needs), the **best estimated Net / qtr** among the tiles the table would list for it, and
+wraps inside its cell, and the cell is as tall as the tallest name needs), the **best estimated Net / mo** among the tiles the table would list for it, and
 **how many such sites exist** (Ben, 2026-11-08). The figure is the table's own: every cell asks the
 table's gates and the table's quote (`quote_site`, which `quote_for_tile` caches) at each tile's own Logistic Point cover, so a cell's count is its
 table's row count and its figure is that table's top Net.
@@ -148,11 +148,11 @@ here". A province holding none of the player's ground says so, and every cell re
 
 **The shelf runway warning (Ben, 2026-11-05).** A site can look profitable today and starve soon, so
 the Build door row's hover and the site ledger's row warn when a building's recipe input has only a few
-quarters left on that market's shelf, naming the good and the quarters. One reading serves both
-(`shelf_runway_for`, `construction_sites.cpp`): for each input, the **shelf** over the **quarterly
+months left on that market's shelf, naming the good and the months. One reading serves both
+(`shelf_runway_for`, `construction_sites.cpp`): for each input, the **shelf** over the **monthly
 use this building would add**, at the staffing and Logistic Point cover the quote judges it at, plus the
 **market's net drain where the shelf is already falling**. The warning fires under
-`k_shelf_runway_warn_quarters`, **4 quarters**. It covers recipe inputs only: construction materials
+`k_shelf_runway_warn_quarters`, **12 months** (a year; the name is kept). It covers recipe inputs only: construction materials
 already have the state mark's stall reading. In the ledger the row's Net figure also carries an amber
 mark, and the sentence opens that column's hover; in the door it opens the bar column's hover. A row
 already reading *would likely stand idle* carries no second warning, and a tile with no Logistic Point
@@ -164,8 +164,8 @@ against the plant's own use.
 
 **The net drain's source.** No market flow field nets to the shelf: `demand` is what was bid, not what
 was drawn. So the drain is measured on the shelf itself: the economy tick samples `inventory` into the
-market history's `shelf` series, and the drain is the fall over the last four quarters at most, per
-quarter. The series is a view record and is not saved, so a loaded game, or a campaign's first quarter,
+market history's `shelf` series, and the drain is the fall over the last four months at most, per
+month. The series is a view record and is not saved, so a loaded game, or a campaign's first month,
 has no trail. An unread trail is unknown, not flat: the reading is the plant's own use alone, and the sentence says it knows only that. A hover whose own use leaves the shelf past the threshold stays silent, since the warning fires on what is known and an unread fall is not known. Power
 comes off the grid, so one market's shelf is not its reading and it takes no warning.
 
@@ -180,11 +180,11 @@ Seven columns, **every one sortable** by its header, and **every header legible 
 |---|---|
 | **Place** | The row's identity: the named **population centre whose province holds the tile**, or, where no centre's province covers it, the nearest named centre on the body, read **"near X"**. There is no grid-position column (Ben, 2026-10-26): an x,y is an address only the map can read, and a place name is one the player already knows. A province has no name of its own (`../../GLOSSARY.md` § Province) but it is its centre's ground, so the centre names it; where a province holds two centres, the lower id names it, so the name is one answer. The row's press: it **selects the tile and frames it** on the map; a press on the tile places the building. The press is the whole row. Sorted by name, ties by tile id. |
 | **3 yr** | **The ranking figure** (Ben, 2026-11-12: *"Instead of scoring by profit, we should score by projected earnings in 3 years. This helps by incorporating build cost and time into the estimate."*): the **projected earnings over three years** of placing the building here — the **Net a day** (the Net a tick over the days in a tick) times the days of the three years it stands built (three years less the days it takes to build here, `construction_build_days`, never below zero), less its **Cost** (the column's own figure: the credits and the build's goods at their posted prices, what the door charges). It is reckoned in **calendar days**, three years of the game's calendar (twelve 30-day months), never in economy ticks, so it reads the same whatever an economy tick's length. A build longer than three years scores **minus its cost**. Sign-coloured; the hover gives the days to build, the days it runs, the Net and the cost. **The default sort, descending**, an unpriced row last, every tie by tile id. |
-| **Net** | Est. net / qtr — `quote_site`, the door's own figure with the same assumptions (§ What the quote asks; 50 % staffing, no labour shortage), **with the tile's Logistic Point cover applied** (below). Sign-coloured. Sorts descending; it is no longer the ranking, which is **3 yr**. **Net keeps its own column where the table has room** (Ben, 2026-11-12): where seven columns would elide a header, Net steps out first and the 3 yr cell's hover still gives it. |
+| **Net** | Est. net / mo — `quote_site`, the door's own figure with the same assumptions (§ What the quote asks; 50 % staffing, no labour shortage), **with the tile's Logistic Point cover applied** (below). Sign-coloured. Sorts descending; it is no longer the ranking, which is **3 yr**. **Net keeps its own column where the table has room** (Ben, 2026-11-12): where seven columns would elide a header, Net steps out first and the 3 yr cell's hover still gives it. |
 | **Cost** | `construction_capex` — the flat cost times the site multiplier, paid once at placement, plus the materials at the local market's posted price, bought in arrears as each tick draws them (Ben, 2026-10-26: costs depend on market prices; PRODUCTION.md § Construction is measured in days). The hover splits the two halves and names the multiplier. |
 | **Market** | The market the tile clears in, by its city's name (`market_city_name`). |
 | **LP** | The tile's Logistic Point cover, 0–100 % (`lp_route_to(...).cover`). **Zero is the no-logistics flag** (`icons::no_logistics`, a struck truck, in amber), drawn in place of the figure — the flag is the zero, and the width a "0%" beside it took was the width the headers needed (Ben, 2026-10-26): no source both reaches the tile and is tied to the capital, so a building there would stand and not run. The hover says which — no source reaches it, or one does and has no chain to the capital. |
-| **Yield** | Extraction: units of the good per quarter, the estimate's own revenue at the price it valued it at; the hover gives the deposit's richness and what is left in the ground, or names a Well or Wharf as depositless. Empty for a building whose output does not turn on the ground. |
+| **Yield** | Extraction: units of the good per month, the estimate's own revenue at the price it valued it at; the hover gives the deposit's richness and what is left in the ground, or names a Well or Wharf as depositless. Empty for a building whose output does not turn on the ground. |
 
 **Every tie is broken by tile id, ascending**, in every column and either direction, so the order is
 total and reproducible; an unpriced row (no market resolves) sorts last on Net. The rows are one
@@ -225,7 +225,7 @@ finder open, which rests the whole reward for searching on these figures).
 
 The question is the door's, the finder's and the Method lever's. The lever asks it of a plant already
 running (Ben, 2026-11-09): the plant's real staffing, supply factor and condition, against a market
-with what it listed and bid last quarter taken out, so its own goods and bids are not counted twice.
+with what it listed and bid last month taken out, so its own goods and bids are not counted twice.
 The rival scorer keeps its own glut forecast.
 
 **3. Lens.** Choosing a building arms the **placement lens** (`../LENSES.md` § The placement lens):
@@ -250,7 +250,7 @@ sentence — the gate's refusal, the recipe's air, the treasury, or the province
 tile is a marked tile: it builds, and the flag says it will not run.
 
 **The return over the tile** (Ben, 2026-11-09): *"We can also render the expected return over each tile in
-green."* Each site carries its table Net / qtr over the tile, in the table's abbreviation, in green on
+green."* Each site carries its table Net / mo over the tile, in the table's abbreviation, in green on
 a dark backing, upper-centre on the hex; it stays upright on the tilted rungs. A figure draws only where
 it fits the hex (roughly 22 px radius and up for a four-character figure), so zoomed out the wash
 alone reads. A negative figure is **green text with its sign**, not sign-coloured: green says "the
@@ -293,7 +293,7 @@ grid carries a fourth button that opens this view **aimed** at the selected buil
 group expanded, the building selected — which is how a map selection reaches its levers in one
 press.
 
-**Construction is durative and material-gated.** A building under construction advances each economy tick by a rate in [0,1] set by how much of its per-tick material need (`resource_build_cost[r] / build_duration_ticks`) the local market (`market_for_tile`) can actually give it; below `1 / max_stretch` the build is **paused**. **What "can give it" means is the whole defect this surface once had (Ben, 2026-10-16 playtest):** the sim draws the market's **persistent `inventory`**, adds the `capacity_per_build_tick` row, and counts a good priced above `reservation_mult × base` as absent (`shelf_admits`). The panel's own mirror read `supply` — the per-tick flow, reset every tick — carried no capacity row and ignored the price ceiling, so it reported "ETA ~2 qtrs" while the sim held the same build at the `1 / max_stretch` floor for twenty. **One shared read now serves both**, and the mirror matching `run_construction`'s `site_rate` is the contract its declaration cites. A stall also **names the good** that holds it, in the status line, the stack reading, the queue row and the build door. Construction is measured in **days** (PRODUCTION.md § Construction is measured in days, Ben 2026-10-24): the site carries the days of work it has left, a quarter's supply rate sets how many of them it makes over the quarter, and it completes on a day. Every construction readout — the queue's **Days** column, the status line, the stack button and the site card — counts days left at the current rate, never quarters or ticks. **Payment timing (Ben, 2026-10-25):** the whole flat build cost is paid when the site is placed, and its materials are drawn in arrears at each economy tick (PRODUCTION.md § Construction is measured in days). **Progress is days, not credits (Ben, 2026-10-26).** Every progress reading — the queue's Done bar, the site card's bar and the map's progress circle — is the days of work built over the days the whole build takes (`construction_progress_fraction`). A credit fraction opened at the flat cost's share the day a site was placed and re-priced with every price move, so it never said how much of the work was done.
+**Construction is durative and material-gated.** A building under construction advances each economy tick by a rate in [0,1] set by how much of its per-tick material need (`resource_build_cost[r] / build_duration_ticks`) the local market (`market_for_tile`) can actually give it; below `1 / max_stretch` the build is **paused**. **What "can give it" means is the whole defect this surface once had (Ben, 2026-10-16 playtest):** the sim draws the market's **persistent `inventory`**, adds the `capacity_per_build_tick` row, and counts a good priced above `reservation_mult × base` as absent (`shelf_admits`). The panel's own mirror read `supply` — the per-tick flow, reset every tick — carried no capacity row and ignored the price ceiling, so it reported "ETA ~2 qtrs" while the sim held the same build at the `1 / max_stretch` floor for twenty. **One shared read now serves both**, and the mirror matching `run_construction`'s `site_rate` is the contract its declaration cites. A stall also **names the good** that holds it, in the status line, the stack reading, the queue row and the build door. Construction is measured in **days** (PRODUCTION.md § Construction is measured in days, Ben 2026-10-24): the site carries the days of work it has left, a month's supply rate sets how many of them it makes over the month, and it completes on a day. Every construction readout — the queue's **Days** column, the status line, the stack button and the site card — counts days left at the current rate, never months or ticks. **Payment timing (Ben, 2026-10-25):** the whole flat build cost is paid when the site is placed, and its materials are drawn in arrears at each economy tick (PRODUCTION.md § Construction is measured in days). **Progress is days, not credits (Ben, 2026-10-26).** Every progress reading — the queue's Done bar, the site card's bar and the map's progress circle — is the days of work built over the days the whole build takes (`construction_progress_fraction`). A credit fraction opened at the flat cost's share the day a site was placed and re-priced with every price move, so it never said how much of the work was done.
 
 ### The progress circle and the site card (Ben, 2026-10-26)
 
@@ -304,7 +304,7 @@ needed to build."*
 **The circle.** On the Planetary canvas, over each of the player's own sites under construction, a
 ring fills clockwise from twelve o'clock with the **days built over the days the build takes**
 (`construction_build_days` at the tile's live site multiplier, less `construction_days_left`). Its
-ink is the quarter's rate — green on schedule, amber stretched, red paused
+ink is the month's rate — green on schedule, amber stretched, red paused
 (`construction_status_colour`) — so a stalled site reads without a hover. It draws under any lens,
 because it is the site's own mark rather than a lens, wherever a tile is drawn at 5 px or more.
 Rivals' sites carry none: what a rival's build still needs is its own affair.
@@ -318,11 +318,11 @@ the ledger cannot tell one site two stories:
 - **Still to draw:** every material the site has yet to take off the shelf, each with the site
   market's **posted price now** — what the draw pays for it, in arrears at the tick (Ben,
   2026-10-26: costs depend on market prices; the flat credits were paid once at placement). The
-  amount is `run_construction`'s own row (`resource_build_cost_for` over the duration in quarters)
+  amount is `run_construction`'s own row (`resource_build_cost_for` over the duration in months)
   for the days left **plus** the days built and not
   yet drawn (`build_arrears_milli`);
 - an **"!"** beside any good the market is short of, by **the construction draw's own test**: the
-  shelf holds less than this quarter's draw needs (`construction_read::short_of`, set where
+  shelf holds less than this month's draw needs (`construction_read::short_of`, set where
   `site_rate`'s coverage of that good is below 1). No second shortage test exists.
 
 The entity glance card does not open over the ring; the site card owns that moment. The other queue
@@ -430,7 +430,7 @@ band is independent of the column and stays where it is.
   which group is expanded and which row is highlighted. Confirm, or say what a multi-building
   selection would be.
 - ~~**Queue table shape.**~~ **Answered in build (2026-10-17, superseding the previous day's
-  four):** six columns — glyph, building (selects it), done (a bar), quarters left, cost left, and
+  four):** six columns — glyph, building (selects it), done (a bar), months left, cost left, and
   the state mark — the shape the grid ruling gives every construction row, so the queue, the build
   list, the tile card's stacks and the expanded site card all read in the same places. The build
   list and the rail rows take **eight** (glyph, name, cost, output pip, stack, state, bar, press);

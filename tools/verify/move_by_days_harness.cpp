@@ -570,15 +570,15 @@ int main()
         (void)run_economy_step(a, reg);
         (void)run_economy_step(b, reg);
         const int col_first = col_of(a, a.units.at(ua).position);
-        const int base = a.current_econ_tick * 90;
-        for (int d = 1; d <= 90; ++d) (void)advance_quarter_to(a, reg, d, base);
+        const int base = military_quarter_day_base(a.current_econ_tick);
+        for (int d = 1; d <= k_econ_tick_days; ++d) (void)advance_quarter_to(a, reg, d, base);
         const int col_mid = col_of(a, a.units.at(ua).position);
         (void)run_economy_step(a, reg);
         (void)run_economy_step(b, reg);
         std::printf("      after the first step: col %d; after the walked quarter: col %d; both stepped again\n",
                     col_first, col_mid);
-        check(col_first == 30 && col_mid == 40,
-              "D9a the first step's quarter moved foot infantry thirty tiles, and the walked quarter the last ten");
+        check(col_first == 10 && col_mid == 20,
+              "D9a the first step's month moved foot infantry ten tiles, and the walked month ten more (BL-1642)");
         check(a.state_hash(2) == b.state_hash(2), "D9b the day-by-day world and the caught-up world hash alike");
     }
 
@@ -699,10 +699,10 @@ int main()
     // -----------------------------------------------------------------------
     std::printf("\nD14 - one day-stamp base: the app's day loop and the headless catch-up seed a battle alike\n");
     {
-        // The first LIVE quarter: the settle stepped econ ticks 0..11, so the step that
-        // closes this quarter runs under k_campaign_settle_ticks (12). An infantry march
-        // from column 0 meets the defender at column 12 on day 33 and fights it out
-        // inside the quarter.
+        // The first LIVE month: the settle stepped econ ticks 0..35, so the step that
+        // closes this month runs under k_campaign_settle_ticks (36). An infantry march
+        // from column 0 meets the defender at column 4 on day 11 and fights it out
+        // inside the month (BL-1642: the tick is 30 days; the old gap 12 met on day 33).
         const int closing = k_campaign_settle_ticks;
         const auto stream = [](const std::vector<battle_dispatch>& v) {
             std::vector<uint64_t> s;
@@ -714,26 +714,26 @@ int main()
         // (`military_quarter_day_base` of the counter its next step runs under), then
         // the step runs - its own catch-up finds no day left.
         duel a;
-        build_duel(a, 12, 400, 300, modern(land_class::infantry));
+        build_duel(a, 4, 400, 300, modern(land_class::infantry));
         std::vector<battle_dispatch> app_days;
-        for (int d = 1; d <= 90; ++d)
+        for (int d = 1; d <= k_econ_tick_days; ++d)
             (void)advance_quarter_to(a.w, reg, d, military_quarter_day_base(closing), &app_days);
         a.w.current_econ_tick = closing;
         const economy_report ra = run_economy_step(a.w, reg);
 
         // HEADLESS: the step's own catch-up walks the same 90 days.
         duel b;
-        build_duel(b, 12, 400, 300, modern(land_class::infantry));
+        build_duel(b, 4, 400, 300, modern(land_class::infantry));
         b.w.current_econ_tick = closing;
         const economy_report rb = run_economy_step(b.w, reg);
 
         // The old app derivation, the calendar quarter (live quarter 0 -> base 0), as a
         // control: it must seed differently, or this case could not see the stamp.
         duel c;
-        build_duel(c, 12, 400, 300, modern(land_class::infantry));
+        build_duel(c, 4, 400, 300, modern(land_class::infantry));
         std::vector<battle_dispatch> old_days;
-        for (int d = 1; d <= 90; ++d)
-            (void)advance_quarter_to(c.w, reg, d, 0 * 90, &old_days);
+        for (int d = 1; d <= k_econ_tick_days; ++d)
+            (void)advance_quarter_to(c.w, reg, d, 0, &old_days);
         c.w.current_econ_tick = closing;
         (void)run_economy_step(c.w, reg);
 
@@ -750,7 +750,7 @@ int main()
               "D14b ...and the two worlds end the quarter hash- and byte-identical");
         check(!sc.empty() && sc != sb,
               "D14c control: the retired calendar base (live quarter x 90) seeds a different stream");
-        check(military_quarter_day_base(closing) >= military_quarter_day_base(k_campaign_settle_ticks - 1) + 90,
+        check(military_quarter_day_base(closing) >= military_quarter_day_base(k_campaign_settle_ticks - 1) + k_econ_tick_days,
               "D14d live stamps start past the settle's last quarter: no reuse of its range");
     }
 

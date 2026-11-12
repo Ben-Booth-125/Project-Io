@@ -3,9 +3,9 @@
 > **Two surfaces shared the word "Corporation"; one survives, re-subjected to the nation.**
 >
 > - **Slot 1** is the ledger `src/ui/corporation_dashboard.cpp` draws. It asks **"How well am
->   I doing?"** and holds **the Balance card and a Standing section**. Balance is a verdict line ("±X/qtr, treasury Y") over
->   horizontal bars — the quarter's earnings against its expenses stacked by flow — with the
->   quarter's net beneath it. It is about the **player's own nation's** money, not the rival
+>   I doing?"** and holds **the Balance card and a Standing section**. Balance is a verdict line ("±X/mo, treasury Y") over
+>   horizontal bars — the month's earnings against its expenses stacked by flow — with the
+>   month's net beneath it. It is about the **player's own nation's** money, not the rival
 >   field (re-subjected, Ben, 2026-10-23: the corporation is retired and a building's money is
 >   its nation's treasury's — `docs/politics/NATIONS.md` § What a nation owns). Owned by
 >   `BL-248` (corporation dashboard roll-ups) and `BL-691` (corp: how am I doing). See § Slot 1.
@@ -28,14 +28,14 @@ this surface can answer is how well the player's nation is doing, and the honest
 is **money** (Ben, 2026-08-29).
 
 **The card is Balance**, and it is a **sub-header inside the ledger**, not a competing surface
-name (Ben, 2026-08-29). It shows its content **at rest**: a verdict line (`±X/qtr, treasury Y`)
+name (Ben, 2026-08-29). It shows its content **at rest**: a verdict line (`±X/mo, treasury Y`)
 carrying the full-canvas control alone — there is nothing to expand in place when the card
-already draws its chart — then the chart, then the quarter's net, and a force line when the
+already draws its chart — then the chart, then the month's net, and a force line when the
 nation fields units.
 
 **The chart is two horizontal bars sharing a left edge (Ben, 2026-11-05).** Earnings on top — what the nation's
 buildings sold, plus the tariff and the tax that return to the treasury (`NATIONS.md` § 2); every
-outflow of the nation's quarterly return stacked on the bar below — **Inputs, Maintenance, Wages,
+outflow of the nation's monthly return stacked on the bar below — **Inputs, Maintenance, Wages,
 Upkeep** — each segment its own shade, naming itself and its figure on hover. **Upkeep** is the
 garrison's pay and the space assets' upkeep (Ben, 2026-11-07). It keeps its own segment rather than
 folding into Wages because a standing cost buried inside Wages is a term nobody can tune against: the

@@ -1145,5 +1145,5 @@ none of it.
 
 **Interaction notes.** Planetary only; no selector of its own (the site finder's grid is the
 selector). A press on a marked tile builds the chosen building there, and each site carries its Net /
-qtr over the tile where the figure fits the hex (Ben, 2026-11-09; `ledgers/construction.md` § The site
+mo over the tile where the figure fits the hex (Ben, 2026-11-09; `ledgers/construction.md` § The site
 ledger). Verified by `scripts/verify/construction_sites.lua`.

@@ -197,7 +197,7 @@ the system that builds, launches or designs the thing reads the key through the 
 | `ES-ST-SF-C2` | Heavy Truss | minor | 3 | station grids may be upgraded to 9 x 7 | Orbital Drill VI |
 | `ES-ST-SF-C` | Cruisers | major | 4 | opens the Cruiser hull: the capital ship, built at a Shipyard only | Orbital Shipyards + Heavy Truss |
 | `ES-ST-SF-M` | Space Superiority | mastery | 4 | +3% strength for every space unit | Orbital Defence Battery + Cruisers |
-| `ES-ST-SF-Q` | Orbit Held | quest | 2 | space unit upkeep -5%. **Deed:** an armed fleet of yours holds your home world’s low orbit for 4 quarters. **Keys next age:** Deep-Space Fleets | Frigates |
+| `ES-ST-SF-Q` | Orbit Held | quest | 2 | space unit upkeep -5%. **Deed:** an armed fleet of yours holds your home world’s low orbit for 12 months. **Keys next age:** Deep-Space Fleets | Frigates |
 
 
 <!-- END GENERATED NODES -->

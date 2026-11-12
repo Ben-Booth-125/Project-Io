@@ -186,7 +186,7 @@ assert_two_line("a queue row", q.row_h, q.line_h)
 -- The authored stall clauses (BL-1342), the exact words this pass must not lose.
 local authored = { "at the market", "priced above the build ceiling",
                    "no market supplies this tile", "market can't supply materials",
-                   "could not fund it this quarter" }
+                   "could not fund it this month" }
 local function names_a_cause(text)
     for _, clause in ipairs(authored) do
         if text:find(clause, 1, true) then return clause end

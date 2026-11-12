@@ -124,16 +124,16 @@ hydrology and deposits, all generated. Effects land on `extraction_rate`, the mo
 
 **Solar storms (Ben, 2026-11-10)** are the environmental family's space event. A storm is scheduled
 from the world seed and the tick, so it is seeded and replayable. It strikes every station and
-satellite outside a planet's shelter — at a Lagrange point, or at an asteroid's nodes — and stops their modules and roles for one quarter. A station Observatory sees a storm a
-quarter ahead, and its owner is told.
+satellite outside a planet's shelter — at a Lagrange point, or at an asteroid's nodes — and stops their modules and roles for one calendar quarter, three monthly ticks. A station Observatory sees a storm a
+calendar quarter ahead, and its owner is told.
 
-- **The schedule.** Time runs in **solar cycles** of twelve quarters. A cycle carries at most one
-  storm; a seeded draw per cycle says whether it does and in which quarter. So storms never bunch,
+- **The schedule.** Time runs in **solar cycles** of twelve calendar quarters. A cycle carries at most one
+  storm; a seeded draw per cycle says whether it does and in which calendar quarter. So storms never bunch,
   and a decade holds about three.
 - **Shelter.** A planet's or a moon's low and high orbit are sheltered. Every Lagrange point and
   every orbit of an asteroid is exposed. Exposure is all or nothing; no module shields a station.
 - **What stops.** A struck satellite is dark: it gives no role effect and no coverage. A struck
-  station's modules all stop. Nothing is worn or lost, upkeep is still paid, and the next quarter
+  station's modules all stop. Nothing is worn or lost, upkeep is still paid, and the next calendar quarter
   works as before.
 - **Nothing is saved.** The storm is derived from the world seed and the tick, so a world with
   nothing in space is untouched.
@@ -156,7 +156,7 @@ the family that generates change **on its own schedule** rather than in response
 ### Rhythm and register
 
 **Seasonal** (Ben, 2026-08-22): one every few years, so a decade has a shape. An economy tick is a
-quarter, so that is single digits per decade, not per year.
+month, so that is single digits per decade, not per year.
 
 > **"Events should usually be boring. Occasional high stress chains."** — Ben, 2026-08-22
 

@@ -660,7 +660,7 @@ buildings.
 
 **The background economy is the landscape phase 6 selected** — not a separate injection pass bolted
 on after generation. The settle that hands play its opening position is phase 6's single
-validation run of the winner — twelve quarterly econ ticks, `k_campaign_settle_ticks` (`src/world/campaign_settle.hpp`), a length
+validation run of the winner — thirty-six monthly econ ticks, `k_campaign_settle_ticks` (`src/world/campaign_settle.hpp`), a length
 measured on the per-tick convoy dispatch count rather than chosen (`../economy/ERAS.md` § The
 opening position; BL-978, warm start retired, owns the work). There is no other pre-game tick
 loop: the prices play opens on are the ones those twelve clearings leave. Generation scores candidate landscapes
@@ -830,7 +830,7 @@ One row per exchange, appended by the clearing tick, ring-capped the way the plo
 
 | Field | Why |
 |---|---|
-| `tick` | The econ tick it cleared on. A tick is a quarter, so this is the date. |
+| `tick` | The econ tick it cleared on. A tick is a month, so this is the date. |
 | `market` | Which board. The surface is per-market. |
 | `resource` | What moved. |
 | `quantity` | How much. |
@@ -980,6 +980,14 @@ target = base_price × √(demand / supply)     — damped elasticity
 price  = prior + 0.5 × (target − prior)       — EMA smoothing
 ```
 
+**The smoothing is per tick, not per calendar span.** With the tick a month (Ben, 2026-11-11) the
+weight stays 0.5, so a price moves halfway to its target each month — faster in calendar time than
+under the quarter tick. Re-deriving it to the quarter's half-life (`1 − 0.5^(1/3)` = 0.2063 a
+month) was measured and refused: the target reads one tick's supply, a month's supply is lumpier
+than a quarter's, and the slower EMA held each dry month's spike over the fair-price ceiling long
+enough to leave processors unbid (market_viability: processors running at handoff 83.6% against
+85.8% at 0.5; input-starved 5.4% against 3.1%).
+
 **The target reads one tick; the EMA is the price's only memory (BL-1618, price falls as supply
 vanishes).** `supply` and `demand` are this tick's figures, never a running average. So a market
 fed in lumps saws: every empty tick pulls the price halfway to the ceiling, and one landing pulls it
@@ -1065,7 +1073,7 @@ The k cap stays: spoilage is what makes k > 0 safe, not a replacement for it.
 
 Target and result are clamped to the band **[0.25×, 10×] of base**. Prices are therefore
 *anchored*: no scarcity can push a good past 10× its authored base, and no glut below a quarter
-of it. Untradeable resources (`base_price ≤ 0`) keep their prior price. A resource pegged at the
+of it (0.25×). Untradeable resources (`base_price ≤ 0`) keep their prior price. A resource pegged at the
 ceiling is a generation-calibration signal (background production absent or under-target — see
 `docs/generation/CORPORATION_GENERATION.md` § Pass 6), not a legitimate "lucrative fillable gap".
 
@@ -1160,7 +1168,7 @@ erases in a year was never a working international market.
 
 **The far trade reading** (BL-1006, far trade reading) is `haulage_measure --far-trade`. It follows
 every convoy from dispatch to its first clear after arrival, on the world the app builds, in two
-windows of four quarterly dispatches — the first year of play, and the year after N years — and
+windows of four monthly dispatches — the first year of play, and the year after N years — and
 reads three things:
 
 - **(a)** volume delivered **and sold** at its destination, where that is not the source market.

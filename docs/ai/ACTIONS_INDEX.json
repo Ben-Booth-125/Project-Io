@@ -47,7 +47,7 @@
   ],
   [
    "gameplay.set_recipe",
-   "The method control on the player's own processing building's Selection card (`draw_card_method_steps`, the card's one lever - Ben, 2026-11-11): beneath the method line, one press per legal step from the stack's method, each labelled with what it is and what it costs the whole stack ('Upgrade to Bessemer Converter - 100 cr for the 2 buildings here, one way'; 'Switch to Peat Kiln - 12 cr'). The same steps are the Method grid in the Construction ledger's Buildings view (`draw_production_method_section`): one row per step, each with its expected profit and a Switch glyph whose hover carries the same label. The profit is the Build door's quote asked for this running plant (`quote_site` with the building): obtainable inputs, the output's settling price, the tile's Logistic Point cover, the plant's real staffing, supply factor and condition, against a market with its own last quarter taken out; a method it could not feed reads upkeep alone. Only the building's own methods are ever offered (one building per product: no method makes another product), only a legal step from the running one, and a recipe research opens (Wind Turbine, by Wind Power) only once the nation holds its node; the active method is always listed on the grid."
+   "The method control on the player's own processing building's Selection card (`draw_card_method_steps`, the card's one lever - Ben, 2026-11-11): beneath the method line, one press per legal step from the stack's method, each labelled with what it is and what it costs the whole stack ('Upgrade to Bessemer Converter - 100 cr for the 2 buildings here, one way'; 'Switch to Peat Kiln - 12 cr'). The same steps are the Method grid in the Construction ledger's Buildings view (`draw_production_method_section`): one row per step, each with its expected profit and a Switch glyph whose hover carries the same label. The profit is the Build door's quote asked for this running plant (`quote_site` with the building): obtainable inputs, the output's settling price, the tile's Logistic Point cover, the plant's real staffing, supply factor and condition, against a market with its own last month taken out; a method it could not feed reads upkeep alone. Only the building's own methods are ever offered (one building per product: no method makes another product), only a legal step from the running one, and a recipe research opens (Wind Turbine, by Wind Power) only once the nation holds its node; the active method is always listed on the grid."
   ],
   [
    "gameplay.set_workforce",
@@ -359,7 +359,7 @@
   ],
   [
    "ledger.market_goods_sort",
-   "Market Ledger, Goods view, the table headings (Good, Shelf, Price, v.Base, 8 qtr)"
+   "Market Ledger, Goods view, the table headings (Good, Shelf, Price, v.Base, 2 yr)"
   ],
   [
    "ledger.nav_budget",
@@ -451,7 +451,7 @@
   ],
   [
    "ledger.selection_tile_building",
-   "Selection band, tile element, the TILE CARD (third column): a grid of building buttons, three across, one per stack on the tile (grouped by type, what it makes and owner; a rival's by type and owner only). Each button carries the type glyph with the stack's count, the building's name, and its net profit per quarter coloured by sign - 'private' on a rival's, and while the stack is still under construction an ETA or a named stall ('ETA 270 days', 'Paused - no Steel', 'ETA 810 days - Steel priced out') over a thin progress strip along the button's bottom edge."
+   "Selection band, tile element, the TILE CARD (third column): a grid of building buttons, three across, one per stack on the tile (grouped by type, what it makes and owner; a rival's by type and owner only). Each button carries the type glyph with the stack's count, the building's name, and its net profit per month coloured by sign - 'private' on a rival's, and while the stack is still under construction an ETA or a named stall ('ETA 270 days', 'Paused - no Steel', 'ETA 810 days - Steel priced out') over a thin progress strip along the button's bottom edge."
   ],
   [
    "ledger.selection_building_back",
@@ -671,7 +671,7 @@
   ],
   [
    "ledger.construction_queue_toggle",
-   "Construction ledger, Construction view, the 'Queue - N cr / qtr' collapsing header"
+   "Construction ledger, Construction view, the 'Queue - N cr / mo' collapsing header"
   ],
   [
    "ledger.construction_buildings_group",

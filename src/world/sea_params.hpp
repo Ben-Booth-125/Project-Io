@@ -75,7 +75,7 @@ struct sea_params
     int resume_hp_permille     = 700;
     int resume_morale_permille = 600;
     /// HP a ship at its home port regains a quarter, ppm of full, fully supplied.
-    int refit_ppm_per_quarter = 200000;
+    int refit_ppm_per_quarter = 66667; // per econ tick, a month (BL-1642: a third of 200000; name kept)
     /// Goods drawn at the home port for a full quarter's refit.
     std::array<float, resource_count> refit_goods{};
     /// Goods one ship draws per economy tick at its home port.
@@ -131,8 +131,8 @@ inline sea_params default_sea_params()
     t.missions = 0;
     t.targets  = 0;
 
-    g(p.refit_goods, rt::steel, 3.0f);
-    g(p.refit_goods, rt::machinery, 1.0f);
-    g(p.ship_upkeep_goods, rt::refined_fuel, 2.0f);
+    g(p.refit_goods, rt::steel, 1.0f);              // a month's full refit (a quarter 3.0, BL-1642)
+    g(p.refit_goods, rt::machinery, 0.333333f);     // (a quarter 1.0); the authored literal
+    g(p.ship_upkeep_goods, rt::refined_fuel, 0.666667f); // the authored literal: a month (a quarter 2.0, BL-1642)
     return p;
 }

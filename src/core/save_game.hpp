@@ -534,14 +534,17 @@ bool write_save_game_at(const std::string& path, const world& w, const save_enve
 /// `kepler_market.base_price`, the table generation prices markets from), threaded to
 /// `read_world_snapshot` so a pre-v74 world's markets get the five kit goods priced.
 ///
-/// ONE BUILDING PER PRODUCT (Ben, 2026-11-11): this reader still reads every older
-/// layout whole (the verification producers exercise it); the GAME refuses a save
-/// whose world predates world v94 before it calls here - see `save_game_refusal_reason`.
+/// ONE BUILDING PER PRODUCT (Ben, 2026-11-11): the GAME refuses a save whose world
+/// predates world v94 before it calls here - see `save_game_refusal_reason`.
+/// THE MONTHLY TICK (BL-1642, Ben 2026-11-11): this reader itself refuses, whole, any
+/// save whose world predates world v95 (its econ ticks count quarters); the world
+/// reader (`read_world_snapshot`) still decodes the older layouts for the harnesses.
 bool read_save_game(const std::string& path, world& w, save_envelope& env,
                     const military_capability_params* mil = nullptr,
                     const std::array<float, resource_count>* base_price = nullptr);
 
-/// Why the game refuses to open @p path, in words a player reads: today, a save whose
+/// Why the game refuses to open @p path, in words a player reads: a save whose world
+/// predates the monthly tick (world v95, BL-1642), or, older still, one whose
 /// world predates one building per product (world v94; Ben, 2026-11-11 - such a save
 /// is refused whole, not migrated: its stacks may mix methods and its buildings may run
 /// another product's recipe). Empty for a file that is not refused for that reason -

@@ -190,12 +190,26 @@ entity_id stage_lander(world& w, entity_id owner, entity_id body)
     return id;
 }
 
-space_effects_report step(world& w, int tick)
+/// One QUARTER of the space-effects pass: BL-1642 made the tick a month, and the
+/// per-quarter region counts are spread over its three months (quarter_count_this_tick),
+/// so quarter @p q runs ticks 3q, 3q+1, 3q+2 and the rows read the quarter's sums.
+space_effects_report step(world& w, int q)
 {
-    w.current_econ_tick = tick;
-    space_effects_report r;
-    run_space_effects(w, space_effects_params{}, station_params{}, 1.5f, tick, &r);
-    return r;
+    space_effects_report sum;
+    for (int m = 0; m < k_econ_ticks_per_quarter; ++m)
+    {
+        const int tick = q * k_econ_ticks_per_quarter + m;
+        w.current_econ_tick = tick;
+        space_effects_report r;
+        run_space_effects(w, space_effects_params{}, station_params{}, 1.5f, tick, &r);
+        sum.survey_regions      += r.survey_regions;
+        sum.observatory_regions += r.observatory_regions;
+        sum.prospected_regions  += r.prospected_regions;
+        sum.prospect_unmapped   += r.prospect_unmapped;
+        sum.stations_fed        += r.stations_fed;
+        sum.stations_starved    += r.stations_starved;
+    }
+    return sum;
 }
 
 int prospected_count(const world& w, entity_id n, entity_id body)

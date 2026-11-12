@@ -1069,7 +1069,7 @@ seed_record run_seed(lua_state& lua, uint32_t seed, int live_ticks, bool travers
     play_tap.last_total = w.exchanges.total;
     t0 = clk::now();
     {
-        constexpr int k_econ_tick_days = 90; // sim_loop::econ_tick_days (harness_params.hpp)
+        constexpr int k_econ_tick_days = ::k_econ_tick_days; // BL-1642: 30, a month; // sim_loop::econ_tick_days (harness_params.hpp)
         settle_tick_hooks hooks;
         hooks.after_lap = tap_after_lap;
         hooks.ctx       = &play_tap;

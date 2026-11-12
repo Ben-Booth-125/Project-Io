@@ -251,17 +251,21 @@ void t2_t4_discontent(const app_start_world& out)
     float pen_at = -1.0f;
     int reach = 0;
     const int v_bite = bite_quarter(5, p, &pen_at, &reach);
-    check(reach == 4 && pen_at == 0.0f && v_bite == 5, "T2",
-          fmt("tier V: threshold in %d quarters (penalty there %.3f), bites in quarter %d", reach, pen_at, v_bite));
+    // BL-1642 (the tick is a month): the monthly pressure is a third of the quarter's
+    // binary step, so the float sum is not exact and the crossing is PINNED
+    // (nation_tax.hpp): V first stands over 0.5 in month 13 (0.5417, biting at once),
+    // IV in month 24 (0.50000006). Under the quarter tick V sat on 0.5 at quarter 4.
+    check(reach == 13 && pen_at > 0.0f && v_bite == 13, "T2",
+          fmt("tier V: threshold in %d months (penalty there %.3f), bites in month %d", reach, pen_at, v_bite));
     const int iv_bite = bite_quarter(4, p, &pen_at, &reach);
-    check(reach == 8 && pen_at == 0.0f && iv_bite == 9, "T2",
-          fmt("tier IV: threshold in %d quarters (two years), bites in quarter %d", reach, iv_bite));
+    check(reach == 24 && iv_bite == 24, "T2",
+          fmt("tier IV: threshold in %d months (two years), bites in month %d", reach, iv_bite));
     {
         float d = 0.0f;
-        for (int q = 0; q < 40; ++q) d = discontent_after_quarter(d, 3, p);
+        for (int q = 0; q < 120; ++q) d = discontent_after_quarter(d, 3, p);
         float d2 = 0.3f;
-        for (int q = 0; q < 40; ++q) d2 = discontent_after_quarter(d2, 3, p);
-        check(d == 0.0f && d2 == 0.3f, "T2", "tier III holds Discontent for 40 quarters (0 stays 0, 0.3 stays 0.3)");
+        for (int q = 0; q < 120; ++q) d2 = discontent_after_quarter(d2, 3, p);
+        check(d == 0.0f && d2 == 0.3f, "T2", "tier III holds Discontent for 120 months (0 stays 0, 0.3 stays 0.3)");
     }
     // Through the pass, on a real nation.
     {
@@ -272,10 +276,12 @@ void t2_t4_discontent(const app_start_world& out)
         w.nations.at(a).tax_tier = 5;
         w.nations.at(b).tax_tier = 4;
         economy_report rep;
-        for (int q = 0; q < 4; ++q) { rep.taxes.clear(); run_nation_taxes(w, p, rep); }
+        // BL-1642: a year is twelve monthly passes; a third is not binary, so to 1e-5.
+        for (int q = 0; q < k_econ_ticks_per_year; ++q) { rep.taxes.clear(); run_nation_taxes(w, p, rep); }
         const float da4 = w.nations.at(a).discontent, db4 = w.nations.at(b).discontent;
-        for (int q = 0; q < 4; ++q) { rep.taxes.clear(); run_nation_taxes(w, p, rep); }
-        check(da4 == 0.5f && db4 == 0.25f && w.nations.at(a).discontent == 1.0f && w.nations.at(b).discontent == 0.5f,
+        for (int q = 0; q < k_econ_ticks_per_year; ++q) { rep.taxes.clear(); run_nation_taxes(w, p, rep); }
+        check(std::fabs(da4 - 0.5f) < 1e-5f && std::fabs(db4 - 0.25f) < 1e-5f && w.nations.at(a).discontent == 1.0f
+                  && std::fabs(w.nations.at(b).discontent - 0.5f) < 1e-5f,
               "T2", fmt("run_nation_taxes: nation %u at V reads %.3f after a year, %.3f after two (clamped); nation %u at IV %.3f then %.3f",
                         a, da4, w.nations.at(a).discontent, b, db4, w.nations.at(b).discontent));
         bool others_zero = true;
@@ -291,7 +297,7 @@ void t2_t4_discontent(const app_start_world& out)
         float e = 0.5f;
         int q2 = 0;
         while (e > 0.0f && q2 < 100) { e = discontent_after_quarter(e, 2, p); ++q2; }
-        check(q1 == 8 && q2 == 8, "T4", fmt("tier I ebbs 1 -> 0 in %d quarters; tier II ebbs 0.5 -> 0 in %d (the same pace as IV/V climb)", q1, q2));
+        check(q1 == 24 && q2 == 24, "T4", fmt("tier I ebbs 1 -> 0 in %d months; tier II ebbs 0.5 -> 0 in %d (the same pace as IV/V climb)", q1, q2));
         check(discontent_after_quarter(0.0f, 1, p) == 0.0f, "T4", "Discontent never goes below 0");
     }
 }
@@ -538,6 +544,7 @@ void t6_save(const app_start_world& out)
             const int q = k_construction_quarter_days;
             b.days_remaining  = std::max(1, static_cast<int>(std::lround(b.days_remaining * 2.0 / 3.0)));
             b.ticks_remaining = (b.days_remaining + q - 1) / q;
+            b.construction_progress = 0.0f; // the reader's rescale zeroes it too
         }
     }
     // ...and the v74/v76 WIDER RESOURCE ARRAYS (the kit goods, then airframes): a v51
@@ -575,6 +582,16 @@ void t6_save(const app_start_world& out)
         u = d;
     }
     base.front_orders.clear();
+    // ...and the v81 NAVAL sections (BL-1527..1533): a pre-naval stream reads no ship,
+    // no closed port, no sighting and every nation on the base kit. BL-1642: the monthly
+    // settle's 36 ticks now build ships by the time this world is cut.
+    base.ships.clear();
+    base.closed_ports.clear();
+    base.sea_sightings.clear();
+    base.ships_found_by_player.clear();
+    for (auto& [nid, nc] : base.nations) { (void)nid; nc.ship_design_kit.clear(); }
+    for (auto& [uid, u] : base.units) { (void)uid; u.landing_ship = null_entity; }
+    for (auto& [cid, pc] : base.population_centres) { (void)cid; pc.growth_carry = 0.0f; } // v82
     // ...and the v72/v73 RECRUITS (Ben, 2026-10-31 / 2026-11-02): a pre-recruits stream
     // reads every nation's land, air and sea pools empty and no centre's heads taken; a
     // stepped world's bases have filled them (BL-1635: the zeroing this row missed).

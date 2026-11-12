@@ -84,7 +84,7 @@ int construction_eta_days(const construction_read& rd, int days_left);
 /// A compact day count — "1 day", "180 days".
 std::string days_label(int days);
 
-/// A compact quarter count — "3 qtrs", "8 qtrs (~2 yr)". The display word is **qtr**,
+/// A compact month count — "3 mo", "24 mo (~2 yr)". The display word is **mo** (BL-1642),
 /// never tick (NR-002, Ben 2026-08-01).
 std::string ticks_label(int ticks);
 
@@ -94,7 +94,7 @@ std::string construction_blocker_phrase(const construction_read& rd);
 
 /// The stall's REASON CLAUSE, in the authored words and nothing else: "no Steel
 /// at the market", "Steel is priced above the build ceiling", "no market
-/// supplies this tile", "its treasury could not fund it this quarter", "market
+/// supplies this tile", "its treasury could not fund it this month", "market
 /// can't supply materials". "" when nothing is stalling the build.
 ///
 /// ONE source for the clause, so the two tenses cannot drift (BL-1365): a site

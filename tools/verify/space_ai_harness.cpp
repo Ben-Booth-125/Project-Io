@@ -982,15 +982,32 @@ int main()
 
     // ---- P9 through the step -----------------------------------------------------------
     {
+        // BL-1642 (the tick is a month): the pick is one a QUARTER, on the quarter's last
+        // month (is_quarter_tick), so the row steps the first such month past the settle.
+        int qt = k_campaign_settle_ticks;
+        while (!is_quarter_tick(qt))
+            ++qt;
         fixture f;
         build(f);
+        const int keep_tick = f.w.current_econ_tick;
+        if (keep_tick < qt)
+            f.w.current_econ_tick = qt;
         economy_report rep;
-        run_nation_step(f.w, reg, rep, k_campaign_settle_ticks);
+        run_nation_step(f.w, reg, rep, qt);
         const space_ai_pick* k = pick_for(rep.space_picks, f.a);
         check(k != nullptr && k->action == space_ai_action::comms_satellite && pick_for(rep.space_picks, f.player) == nullptr
                   && rep.space_assets.launched >= 1,
               "P9", fmt("run_nation_step files the picks (%zu rows) and the launch reaches the asset step (%d launched)",
                         rep.space_picks.size(), rep.space_assets.launched));
+        // P9b: a month that is not the quarter's last files no pick, near or far.
+        fixture g;
+        build(g);
+        if (g.w.current_econ_tick < qt + 1)
+            g.w.current_econ_tick = qt + 1;
+        economy_report rg;
+        run_nation_step(g.w, reg, rg, qt + 1);
+        check(rg.space_picks.empty() && rg.far_space_picks.empty(), "P9b",
+              "a month that is not the quarter's last takes no space pick: one a quarter, as ruled");
     }
 
     // ---- G1..G7 BL-1615 the groundwork: pads and centres --------------------------------

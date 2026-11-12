@@ -13,7 +13,8 @@
 // ---------------------------------------------------------------------------
 
 /// The cap is FIFTEEN QUARTERS of output (MILITARY.md § Recruits): a design constant,
-/// not a tuning knob, so it is not authored.
+/// not a tuning knob, so it is not authored. Counted in quarters of the authored
+/// per-quarter rates below (BL-1642: the tick is a month, the rates stay a quarter's).
 inline constexpr int k_recruit_cap_quarters = 15;
 
 /// The most a pool can ever hold: the save reader's ceiling (2^30, world_save.cpp), and
@@ -30,14 +31,16 @@ struct recruit_params
     /// Land recruits one completed, running `military_base` makes a quarter. 50 is one
     /// hire's men (`hire_batch_manpower`): a base sustains one new unit a quarter, the
     /// muster queue's own cadence.
+    /// BL-1642 (the tick is a month): authored a QUARTER and granted month by month by
+    /// `quarter_count_this_tick` (16, 17, 17), so a quarter makes exactly 50.
     int land_per_base = 50;
     /// Air recruits one completed, running `airbase` makes a quarter. 20 is a fighter
     /// wing's crew (`air_class_stats::crew`): an airbase sustains about one wing a quarter.
-    int air_per_base = 20;
+    int air_per_base = 20; // a quarter; granted 6, 7, 7 over its months
     /// Sea recruits one completed, running `port` makes a quarter (Ben, 2026-11-02: ports
     /// make sea recruits). 20 matches an airbase: an in-band choice made before any ship
     /// spends the pool - nothing spends it yet, so it only sets how fast the pool fills.
-    int sea_per_port = 20;
+    int sea_per_port = 20; // a quarter; granted 6, 7, 7 over its months
     /// Logistic Points one recruit costs when it refills a unit, paid at the unit's
     /// paying road as its supply is (LOGISTICS.md: one point admits one unit of cargo; a
     /// recruit is priced as one unit of it).

@@ -438,11 +438,13 @@ int main()
         const station_budget b13 = evaluate_station_budget(w, stp, st_id, 13);
         check(contains(b13.refitting, research) && !contains(b13.working, research), "S5",
               "in the refit quarter it does not work");
-        quarter(w, sp, stp, 13);
-        quarter(w, sp, stp, 14);
-        const station_budget b14 = evaluate_station_budget(w, stp, st_id, 14);
+        // BL-1642: the refit takes refit_quarters econ ticks - 3 months, the one quarter.
+        const int back = 13 + stp.refit_quarters;
+        for (int t = 13; t <= back; ++t)
+            quarter(w, sp, stp, t);
+        const station_budget b14 = evaluate_station_budget(w, stp, st_id, back);
         check(contains(b14.working, research) && w.space_assets.at(research).refit_done_tick == -1, "S5",
-              "one quarter later it works again and the refit mark is cleared");
+              "one quarter (three months) later it works again and the refit mark is cleared");
         const snap b = take(f);
         check(refit_station_module(w, stp, f.a, st_id, 11, 7).result == station_result::rejected_slot_occupied
                   && refit_station_module(w, stp, f.a, st_id, 6, 0).result == station_result::rejected_slot_empty
@@ -500,9 +502,11 @@ int main()
         g.w.current_econ_tick = 0;
         const station_op m = found_station(g.w, sp, stp, g.a, {g.moon, orbital_node_kind::low_orbit});
         const station_op mp = fit_station_module(g.w, sp, stp, g.a, m.station, 0, station_module_kind::power);
-        for (int q = 0; q < 3; ++q)
+        // BL-1642: the core and module travel their months to the moon; step until both stand.
+        const int up = std::max(g.w.space_assets.at(m.station).arrival_tick, g.w.space_assets.at(mp.asset).arrival_tick) + 1;
+        for (int q = 0; q <= up; ++q)
             quarter(g.w, sp, stp, q);
-        const station_budget bm = evaluate_station_budget(g.w, stp, m.station, 2);
+        const station_budget bm = evaluate_station_budget(g.w, stp, m.station, up);
         check(m.result == station_result::ok && mp.result == station_result::ok && bm.solar_factor == 1.0f
                   && bm.power_supply == stp.core_power_supply + stp.modules[2].power_supply,
               "S7", fmt("a moon station reads its planet's radius: factor %.3f, supply %.2f", bm.solar_factor, bm.power_supply));
@@ -510,7 +514,7 @@ int main()
         // far nodes is BL-1581's; the falloff is read off the node's body alone.
         space_station& st = g.w.stations.at(m.station);
         st.node = {g.far, orbital_node_kind::low_orbit};
-        const station_budget bf = evaluate_station_budget(g.w, stp, m.station, 2);
+        const station_budget bf = evaluate_station_budget(g.w, stp, m.station, up);
         const float want = (stp.core_power_supply + stp.modules[2].power_supply) * 0.25f;
         check(std::fabs(bf.solar_factor - 0.25f) < 1e-6f && std::fabs(bf.power_supply - want) < 1e-4f,
               "S7", fmt("at 2.0 AU: factor (1/2)^2 = %.3f, supply %.2f (vs %.2f at home)", bf.solar_factor,
@@ -552,11 +556,12 @@ int main()
         check(contains(b1.idle_edge, dk.asset) && !contains(b1.working, dk.asset) && contains(b1.working, pw.asset),
               "S8", "the enclosed dock is idle; the power module (not edge-only) still works");
         const station_op rf = refit_station_module(g.w, stp, g.a, s.station, slot_of(1, 2, 1), slot_of(1, 2, 0));
-        quarter(g.w, sp, stp, 2);
-        quarter(g.w, sp, stp, 3);
-        const station_budget b2 = evaluate_station_budget(g.w, stp, s.station, 3);
+        const int back = 2 + stp.refit_quarters; // BL-1642: three months
+        for (int t = 2; t <= back; ++t)
+            quarter(g.w, sp, stp, t);
+        const station_budget b2 = evaluate_station_budget(g.w, stp, s.station, back);
         check(rf.result == station_result::ok && contains(b2.working, dk.asset), "S8",
-              "refitted to the new edge (2,0), it works a quarter later");
+              "refitted to the new edge (2,0), it works a quarter (three months) later");
         check(refit_station_module(g.w, stp, g.a, s.station, slot_of(1, 2, 0), slot_of(1, 2, 1)).result
                   == station_result::rejected_edge_only,
               "S8", "a refit of the dock back into the interior is refused");
@@ -683,30 +688,48 @@ int main()
         add_centre(g.w, g.a, 0.5f, 0);  // running
         add_centre(g.w, g.b, 0.0f, 0);  // unstaffed
         add_centre(g.w, g.b, 0.5f, 2);  // unfinished
-        station_step_report r;
-        run_station_step(g.w, stp, 0, &r);
-        check(g.w.nations.at(g.a).astronauts == stp.astronauts_per_centre && r.astronauts_trained == stp.astronauts_per_centre
+        // BL-1642: training is a QUARTER's count spread over its months (it reads
+        // w.current_econ_tick), so each row runs a quarter - ticks 3q, 3q+1, 3q+2.
+        const auto train_quarter = [&](int q) {
+            int trained = 0;
+            for (int m = 0; m < k_econ_ticks_per_quarter; ++m)
+            {
+                g.w.current_econ_tick = q * k_econ_ticks_per_quarter + m;
+                station_step_report rr;
+                run_station_step(g.w, stp, g.w.current_econ_tick, &rr);
+                trained += rr.astronauts_trained;
+            }
+            return trained;
+        };
+        const int t0 = train_quarter(0);
+        check(g.w.nations.at(g.a).astronauts == stp.astronauts_per_centre && t0 == stp.astronauts_per_centre
                   && g.w.nations.at(g.b).astronauts == 0,
               "S10", fmt("one staffed centre trains %d a quarter; an unstaffed and an unfinished one train none",
                          stp.astronauts_per_centre));
         for (int q = 1; q < 20; ++q)
-            run_station_step(g.w, stp, q);
+            (void)train_quarter(q);
         check(g.w.nations.at(g.a).astronauts == stp.astronaut_cap_per_centre
                   && astronaut_cap(g.w, stp, g.a) == stp.astronaut_cap_per_centre,
               "S10", fmt("the pool stops at its cap (%d)", stp.astronaut_cap_per_centre));
         add_centre(g.w, g.a, 0.5f, 0);
-        run_station_step(g.w, stp, 20);
+        (void)train_quarter(20);
         check(g.w.nations.at(g.a).astronauts == stp.astronaut_cap_per_centre + 2 * stp.astronauts_per_centre,
               "S10", "a second centre raises the cap and both train");
-        // Through the nation step.
+        // Through the nation step: a quarter of monthly nation steps.
         recipe_registry reg;
-        economy_report rep;
-        g.w.current_econ_tick = 21;
         const int before = g.w.nations.at(g.a).astronauts;
-        run_nation_step(g.w, reg, rep, 21);
+        int filed = 0;
+        for (int m = 0; m < k_econ_ticks_per_quarter; ++m)
+        {
+            economy_report rep;
+            const int tick = 21 * k_econ_ticks_per_quarter + m;
+            g.w.current_econ_tick = tick;
+            run_nation_step(g.w, reg, rep, tick);
+            filed += rep.stations.astronauts_trained;
+        }
         check(g.w.nations.at(g.a).astronauts == before + 2 * stp.astronauts_per_centre
-                  && rep.stations.astronauts_trained == 2 * stp.astronauts_per_centre,
-              "S10", "run_nation_step trains them and files the count on economy_report::stations");
+                  && filed == 2 * stp.astronauts_per_centre,
+              "S10", "a quarter of run_nation_step trains them and files the count on economy_report::stations");
     }
 
     // ---- S11 loss ---------------------------------------------------------

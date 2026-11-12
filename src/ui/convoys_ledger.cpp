@@ -187,8 +187,8 @@ void draw_convoys_ledger(const world& w, ui_state& s, bool& open)
             std::snprintf(overlay, sizeof overlay, "%.0f%%  (stalled)",
                           static_cast<double>(c.progress) * 100.0);
         else
-            std::snprintf(overlay, sizeof overlay, "%.0f%%  %d qtr%s",
-                          static_cast<double>(c.progress) * 100.0, eta, eta == 1 ? "" : "s");
+            std::snprintf(overlay, sizeof overlay, "%.0f%%  %d mo",
+                          static_cast<double>(c.progress) * 100.0, eta);
         ImGui::ProgressBar(c.progress, ImVec2{-1.0f, 0.0f}, overlay);
 
         ImGui::TextDisabled("Haul cost paid: %.2f", static_cast<double>(c.cost_paid));

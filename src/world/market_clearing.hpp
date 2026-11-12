@@ -305,6 +305,13 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
 /// clear: next = prior + k_price_smoothing x (target - prior). Exported for
 /// BL-1203's first-clear guard in `dispatch_absorbable` (supply_system.cpp), which
 /// projects the price a cargo will SELL at on its arrival tick.
+/// BL-1642 (the tick is a month): KEPT at 0.5 a tick, not re-derived to the
+/// quarter's calendar half-life (1 - 0.5^(1/3) = 0.2063). The target reads ONE
+/// tick's supply, and a month's supply is lumpier than a quarter's - a convoy that
+/// landed inside every quarter misses whole months - so the slower EMA held each
+/// dry month's ceiling spike for longer and processors sat unbid over the fair-price
+/// ceiling: market_viability quick tier G1 83.6 / G1b 5.4 at 0.2063 against 85.8 /
+/// 3.1 at 0.5 (main under the quarter tick: 87.1 / 2.8). MARKETS.md § Price resolution.
 inline constexpr float k_price_smoothing = 0.5f;
 
 /// The UNSMOOTHED price a market aims at for one good this tick: `base x

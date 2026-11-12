@@ -268,7 +268,7 @@ shape; `nation_tech_harness` holds the store to what the code reads.
 | `DG-PR-EX-C2` | Desalination | minor | 3 | coastal Water extraction sites; Water extraction +10%; station Life support modules may be fitted | Field Practice VI |
 | `DG-PR-EX-C` | Green Revolution | major | 4 | Farms +25% output; Chemical Plants unlock the fertiliser recipe | Hybrid Seed + Desalination |
 | `DG-PR-EX-M` | Resource Base | mastery | 4 | +3% extraction rate at every extraction building | Deep-Shaft Mining + Green Revolution |
-| `DG-PR-EX-Q` | Strategic Reserve | quest | 2 | Mines and Oil Platforms +5% extraction rate. **Deed:** your own stock of crude oil and iron ore covers 4 quarters of your demand. **Keys next age:** Asteroid Prospecting | Offshore Drilling |
+| `DG-PR-EX-Q` | Strategic Reserve | quest | 2 | Mines and Oil Platforms +5% extraction rate. **Deed:** your own stock of crude oil and iron ore covers 12 months of your demand. **Keys next age:** Asteroid Prospecting | Offshore Drilling |
 
 #### Processing (`PR-PC`)
 
@@ -290,7 +290,7 @@ shape; `nation_tech_harness` holds the store to what the code reads.
 | `DG-PR-PC-C2` | Process Automation | minor | 3 | wages in processing buildings -5% | Shop-Floor Practice VI |
 | `DG-PR-PC-C` | Industrial Robotics | major | 4 | every processing building +20% output per batch and wages -10%; station Microgravity factory modules may be fitted | Numerical Control + Process Automation |
 | `DG-PR-PC-M` | Industrial Depth | mastery | 4 | +3% output per batch at every processing building | Semiconductor Foundry + Industrial Robotics |
-| `DG-PR-PC-Q` | Domestic Chips | quest | 4 | Silicon Works +10%, Rare Earth Refineries +10% and Electronics Labs +10% output per batch. **Deed:** your microchip output covers your own electronics demand for 4 quarters. **Keys next age:** Orbital Assembly | Semiconductor Foundry |
+| `DG-PR-PC-Q` | Domestic Chips | quest | 4 | Silicon Works +10%, Rare Earth Refineries +10% and Electronics Labs +10% output per batch. **Deed:** your microchip output covers your own electronics demand for 12 months. **Keys next age:** Orbital Assembly | Semiconductor Foundry |
 | `DG-PR-PC-D1` | Composite Armour | minor | 2 | opens composite armour (armour, the light-armour applique) | Shop-Floor Practice III |
 | `DG-PR-PC-D2` | Ceramic Plates | minor | 2 | opens the ceramic plate carrier (infantry, motorised and mechanised armour) | Shop-Floor Practice III |
 | `DG-PR-PC-D` | Reactive Armour | major | 3 | opens reactive armour (armour) | Composite Armour + Ceramic Plates |
@@ -318,7 +318,7 @@ shape; `nation_tech_harness` holds the store to what the code reads.
 | `DG-PR-EN-C2` | Rocket-Fuel Chemistry | minor | 3 | propellant recipes +5% yield | Fuel Economy VI |
 | `DG-PR-EN-C` | Propellant Synthesis | major | 4 | propellant recipes +20% yield | Cryogenic Storage + Rocket-Fuel Chemistry |
 | `DG-PR-EN-M` | Energy Security | mastery | 4 | -3% fuel draw at every building | Civil Nuclear Power + Propellant Synthesis |
-| `DG-PR-EN-Q` | Propellant at Scale | quest | 4 | propellant output +15%. **Deed:** a propellant plant fully staffed for 8 quarters. **Keys next age:** In-Situ Propellant | Propellant Synthesis |
+| `DG-PR-EN-Q` | Propellant at Scale | quest | 4 | propellant output +15%. **Deed:** a propellant plant fully staffed for 24 months. **Keys next age:** In-Situ Propellant | Propellant Synthesis |
 | `DG-PR-EN-W` | Wind Power | major | 2 | unlocks the Wind Turbine: land power with no fuel | Fuel Economy III + Fuel Economy V |
 
 ### Network — how far and fast the nation moves goods and word
@@ -329,7 +329,7 @@ shape; `nation_tech_harness` holds the store to what the code reads.
 |---|---|---|---|---|---|
 | `DG-NE-SO-T1` | Research Grant I | travel | 1 | +1% national research | — (open) |
 | `DG-NE-SO-T2` | Research Grant II | travel | 1 | +1% national research | Research Grant I |
-| `DG-NE-SO-A1` | Telex Network | minor | 1 | rivals’ prices and stocks seen 1 quarter fresher | Research Grant II |
+| `DG-NE-SO-A1` | Telex Network | minor | 1 | rivals’ prices and stocks seen 3 months fresher | Research Grant II |
 | `DG-NE-SO-A2` | Mass Higher Education | minor | 1 | universities +20% research; the Astronaut Training Centre may be built | Research Grant II |
 | `DG-NE-SO-A` | Mainframe Computing | major | 2 | national research +15% | Telex Network + Mass Higher Education |
 | `DG-NE-SO-T3` | Research Grant III | travel | 2 | +1% national research | Mainframe Computing |
@@ -377,7 +377,7 @@ shape; `nation_tech_harness` holds the store to what the code reads.
 | `DG-NE-MK-C2` | Reserved minor | minor (placeholder) | 3 | reserved for politics: lobbying and market regulation | Trade Desk VI |
 | `DG-NE-MK-C` | [Politics] | major (placeholder) | 4 | placeholder cluster: lobbying and market regulation; effects authored when the politics system exists | Reserved minor + Reserved minor |
 | `DG-NE-MK-M` | Market Depth | mastery | 4 | +3% trade capacity at every Marketplace | Packet Networks |
-| `DG-NE-MK-Q` | Open Markets | quest | 2 | trade points +5%. **Deed:** trade with the markets of 3 other nations in one quarter. **Keys next age:** Off-World Exchange | Electronic Settlement |
+| `DG-NE-MK-Q` | Open Markets | quest | 2 | trade points +5%. **Deed:** trade with the markets of 3 other nations in three months. **Keys next age:** Off-World Exchange | Electronic Settlement |
 
 #### Freight (`NE-FR`)
 
@@ -399,7 +399,7 @@ shape; `nation_tech_harness` holds the store to what the code reads.
 | `DG-NE-FR-C2` | Satellite Navigation | minor | 3 | travel time -5% everywhere; Navigation satellites may be launched | Route Planning VI |
 | `DG-NE-FR-C` | Jet Freight | major | 4 | perishables and electronics travel time -40% | Air Cargo Hubs + Satellite Navigation |
 | `DG-NE-FR-M` | Logistics Backbone | mastery | 4 | -3% logistics cost | Motorway Grid + Jet Freight |
-| `DG-NE-FR-Q` | Ten Lanes | quest | 4 | logistics cost -5%. **Deed:** 10 convoy routes served every quarter for 4 quarters. **Keys next age:** Orbital Port & Depots | Motorway Grid |
+| `DG-NE-FR-Q` | Ten Lanes | quest | 4 | logistics cost -5%. **Deed:** 10 convoy routes served every month for 12 months. **Keys next age:** Orbital Port & Depots | Motorway Grid |
 
 ### State — what the nation can field, hold and keep calm
 
@@ -476,14 +476,14 @@ shape; `nation_tech_harness` holds the store to what the code reads.
 | `DG-ST-OR-T4` | Civil Service IV | travel | 3 | -1% unrest in every province | Civil Service III |
 | `DG-ST-OR-T5` | Civil Service V | travel | 2 | -1% unrest in every province | Welfare State |
 | `DG-ST-OR-T6` | Civil Service VI | travel | 3 | -1% unrest in every province | Civil Service V |
-| `DG-ST-OR-B1` | Opinion Polling | minor | 3 | unrest forecast 2 quarters ahead | Civil Service IV |
+| `DG-ST-OR-B1` | Opinion Polling | minor | 3 | unrest forecast 6 months ahead | Civil Service IV |
 | `DG-ST-OR-Ba` | Mass Television | major (pair) | 4 | tax yield +10%; unrest -15%; assimilation +20% | Opinion Polling |
 | `DG-ST-OR-Bb` | Mass Surveillance | major (pair) | 4 | unrest -30% now, but the unrest floor rises 5 points a year. Destabiliser | Opinion Polling |
 | `DG-ST-OR-C1` | Reserved minor | minor (placeholder) | 3 | reserved for politics: regime, elections, succession | Civil Service VI |
 | `DG-ST-OR-C2` | Reserved minor | minor (placeholder) | 3 | reserved for politics: regime, elections, succession | Civil Service VI |
 | `DG-ST-OR-C` | [Politics] | major (placeholder) | 4 | placeholder cluster: regime, elections, succession; effects authored when the politics system exists | Reserved minor + Reserved minor |
 | `DG-ST-OR-M` | Civic Trust | mastery | 4 | -3% unrest in every province | Mass Television or Mass Surveillance |
-| `DG-ST-OR-Q` | Broad Consensus | quest | 4 | tax yield +5%. **Deed:** unrest below the floor in every province for 8 quarters. **Keys next age:** Settlement Charters | Mass Television or Mass Surveillance |
+| `DG-ST-OR-Q` | Broad Consensus | quest | 4 | tax yield +5%. **Deed:** unrest below the floor in every province for 24 months. **Keys next age:** Settlement Charters | Mass Television or Mass Surveillance |
 
 #### Accord (`ST-AC`)
 
@@ -505,7 +505,7 @@ shape; `nation_tech_harness` holds the store to what the code reads.
 | `DG-ST-AC-C2` | Confidence Measures | minor | 3 | Alarm toward you -5% | Diplomatic Corps VI |
 | `DG-ST-AC-C` | Arms Control Verification | major | 4 | every nation’s Alarm toward you -25%; every nation’s Alarm toward every other decays 10% faster | Inspection Regimes + Confidence Measures |
 | `DG-ST-AC-M` | Diplomatic Standing | mastery | 4 | -3% Alarm toward you | Strategic Deterrent or Survivable Forces + Arms Control Verification |
-| `DG-ST-AC-Q` | Quiet Borders | quest | 2 | Alarm toward you decays 10% faster. **Deed:** no nation’s Alarm toward you rises for 8 quarters. **Keys next age:** Planetary Accords | Free-Trade Accords or Import Substitution |
+| `DG-ST-AC-Q` | Quiet Borders | quest | 2 | Alarm toward you decays 10% faster. **Deed:** no nation’s Alarm toward you rises for 24 months. **Keys next age:** Planetary Accords | Free-Trade Accords or Import Substitution |
 
 ### Joints
 

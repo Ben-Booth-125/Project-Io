@@ -133,7 +133,7 @@ This is a static identity readout in the prototype — no interaction beyond, ev
 A strip across the top of the canvas area, between the identity tile and the time column. Its left edge is the shell column's right edge (`x = W`). It stands the **full identity-tile height** (`profile_panel_height`, ~92 px) and top-aligns at `y = 0`, so the header and the identity tile read as **one level top band**; its content row is vertically centred within that strip. It is the player's persistent financial dashboard, wired to the live economy:
 
 - **Treasury** — the player nation's treasury (a nation never runs into debt, so it has no negative state).
-- **Net, in brackets beside the treasury** — the last economy tick's operating net as a coloured per-quarter figure, `TREASURY 1.2M (+34/qtr)`. Hovering a money figure shows the graph of recent treasury values (Ben, 2026-11-05).
+- **Net, in brackets beside the treasury** — the last economy tick's operating net as a coloured per-month figure, `TREASURY 1.2M (+34/mo)`. Hovering a money figure shows the graph of recent treasury values (Ben, 2026-11-05).
 - **Cargo valuation** — an estimated value of the goods the player owns: its trades' cargo in transit, at each destination market's current price (`HEADER.md`). A single money figure, not a per-resource inventory.
 
 The header answers "can I afford this, and which way is it trending?" without opening a ledger. Detailed, per-body breakdowns stay in their respective ledgers.
@@ -168,7 +168,7 @@ attention, and **each alert clicks through** to the surface that answers it. It 
 It says only what is true now: an alert leaves when its cause does and cannot be dismissed, and the
 strip draws nothing with nothing to say. One press stands for each kind, its count in its words, so
 a dozen idle mines are one alert. It wraps rather than clips. Low runway is the header's own red bar,
-under 8 quarters (`HEADER.md` § Contents).
+under 24 months (`HEADER.md` § Contents).
 
 ## War notice — on the canvas, below the alert strip (Ben, 2026-11-09)
 
@@ -273,15 +273,15 @@ A single panel in the top-right corner, the same width as the minimap so the rig
 
 **Calendar block** (left column, 25%) — the player-facing clock in three rows:
 
-- **Year + quarter** — `1960 Q1` (see `TIME_CONTROLS.md`).
+- **Year + month** — `1960 Q1` (see `TIME_CONTROLS.md`).
 - **Month + day** — `Jan 01`, abbreviated month + zero-padded day.
-- **Quarter progress** — a progress bar through the current in-year quarter, labelled with its percentage.
+- **Month progress** — a progress bar through the current in-year month, labelled with its percentage.
 
 **Speed controls** (right column, 75%) — a raw `Sim` counter with the current multiplier, then the controls:
 
 - A **pause button** — a drawn filled square while running (deliberately not "||", which read as the Roman numeral II beside the tiers), flipping to a play "**>**" while paused — then speed tiers **I–V** in Roman numerals. The active speed is highlighted; each tier names its real rate on hover.
 
-The clock has three layers — sim tick → day → economy tick — paced so that 1× ≈ 6 s/day and 3× ≈ 2 s/day. The economy resolves quarterly. The authoritative calendar/pacing constants live in `src/core/sim_loop.hpp` and are deliberately tentative.
+The clock has three layers — sim tick → day → economy tick — paced so that 1× ≈ 6 s/day and 3× ≈ 2 s/day. The economy resolves monthly. The authoritative calendar/pacing constants live in `src/core/sim_loop.hpp` and are deliberately tentative.
 
 ---
 
@@ -296,7 +296,7 @@ It docks in the **bottom-left tile of the bottom strip** (`comms_dock_rect`,
 `src/ui/foldout_column.{hpp,cpp}`): the fold-out column's x-range, three quarters of the
 column's width, sharing the Selection band's top edge and height so the two read as one
 bar. Comms is ambient chatter, not a decision surface, so it does not hold the prime
-right-edge slot under the time panel; the quarter-width it gives back goes to the
+right-edge slot under the time panel; the month-width it gives back goes to the
 Selection band. The icon rail keeps its full height past the dock — at the 1280×720 floor
 a shortened rail would clip two slots.
 

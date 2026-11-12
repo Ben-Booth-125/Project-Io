@@ -3,10 +3,11 @@
 // ---------------------------------------------------------------------------
 // BL-1463 — recruits (MILITARY.md § Recruits, Ben 2026-10-30)
 // ---------------------------------------------------------------------------
-// SOLDIERS ARE RECRUITS, AND BASES MAKE THEM. Once a quarter every completed, running
+// SOLDIERS ARE RECRUITS, AND BASES MAKE THEM. Each quarter every completed, running
 // `military_base` makes `land_per_base` LAND recruits and every `airbase`
 // `air_per_base` AIR recruits (economy.military.recruits, recruit_params.hpp). There is
-// no other source.
+// no other source. The tick is a month (BL-1642): each month grants its share of the
+// quarter's rate (`quarter_count_this_tick`), so three months make the rate exactly.
 //
 //   * FROM THE PROVINCE'S PEOPLE. Each recruit is one head taken from the population
 //     centres of the base's province, the centre with the most heads first, ties to the
@@ -17,7 +18,7 @@
 //     the base stands (`nation_component::land_recruits` / `air_recruits`).
 //   * THE CAP IS FIFTEEN QUARTERS of the theatre's output: 15 x (its running bases x the
 //     rate) - the NOMINAL output, so the cap does not move with what the provinces gave.
-//     A full pool takes no more; its bases make none that quarter. The cap stops intake
+//     A full pool takes no more; its bases make none that month. The cap stops intake
 //     only: a pool above it (its bases gone) is never cut.
 //   * A HIRE SPENDS ITS MEN (`hire_unit_recruits`, a land unit's `hire_batch_manpower`)
 //     or ITS CREW (`wing_crew`); the seam refuses a hire the pool cannot fill before any

@@ -113,11 +113,11 @@ struct station_params
     int   core_life_support = 2;
 
     /// A refit takes this many quarters before the module works again.
-    int32_t refit_quarters = 1;
+    int32_t refit_quarters = 3; // econ ticks: 3 months, the one quarter (BL-1642; name kept)
 
     /// BL-1585: astronauts one running, staffed training centre adds a quarter,
     /// and the pool cap each running centre contributes.
-    int32_t astronauts_per_centre    = 2;
+    int32_t astronauts_per_centre    = 2; // per QUARTER, spread over its monthly ticks (BL-1642)
     int32_t astronaut_cap_per_centre = 20;
 };
 

@@ -89,11 +89,21 @@ std::string to_bytes(const world& w)
 constexpr uint32_t k_seed = 650u;
 
 /// The first storm quarter T >= 2 whose neighbours carry none.
+// BL-1642 (the tick is a month): a storm strikes for its calendar quarter, three
+// monthly ticks. T is the FIRST tick of an isolated storm - lit at T-1, dark T..T+2,
+// lit again at T+3 (k_storm_after) - so every row reads before, during and after.
+constexpr int k_storm_ticks = k_econ_ticks_per_quarter;
 int find_storm_tick(uint32_t seed)
 {
-    for (int t = 2; t < 2000; ++t)
-        if (solar_storm_at(seed, t) && !solar_storm_at(seed, t - 1) && !solar_storm_at(seed, t + 1))
+    for (int t = 2; t < 6000; ++t)
+    {
+        if (!solar_storm_at(seed, t) || solar_storm_at(seed, t - 1) || solar_storm_at(seed, t + k_storm_ticks))
+            continue;
+        bool whole = true;
+        for (int k = 1; k < k_storm_ticks; ++k) whole = whole && solar_storm_at(seed, t + k);
+        if (whole)
             return t;
+    }
     return -1;
 }
 
@@ -250,19 +260,22 @@ void rows_draw()
           "the draw is pure in (seed, tick), nothing before tick 1, two seeds differ");
 
     const solar_storm_params p{};
+    // BL-1642: ticks are months; a storm quarter is three storm ticks, so the rate is
+    // counted in QUARTERS (storm ticks / 3) over 400 quarters' worth of months.
     int storms = 0, quarters = 0, over = 0;
     for (uint32_t s = 0; s < 200; ++s)
         for (int c = 0; c < 400 / p.cycle_quarters; ++c)
         {
             int in_cycle = 0;
-            for (int q = 0; q < p.cycle_quarters; ++q)
+            for (int q = 0; q < p.cycle_quarters * k_econ_ticks_per_quarter; ++q)
             {
-                const int t = 1 + c * p.cycle_quarters + q;
-                ++quarters;
+                const int t = 1 + c * p.cycle_quarters * k_econ_ticks_per_quarter + q;
+                if (q % k_econ_ticks_per_quarter == 0) ++quarters;
                 if (solar_storm_at(s, t)) { ++storms; ++in_cycle; }
             }
-            if (in_cycle > 1) ++over;
+            if (in_cycle > k_econ_ticks_per_quarter) ++over;
         }
+    storms /= k_econ_ticks_per_quarter;
     const double rate = static_cast<double>(storms) / quarters;
     const double want = p.storm_per_mille / 1000.0 / p.cycle_quarters;
     check(over == 0 && std::fabs(rate - want) < 0.15 * want, "D2",
@@ -305,7 +318,7 @@ void rows_satellites()
         f.w.current_econ_tick = T;
         const bool during = covers_moon(f.w, f.a, f.moon);
         const bool shelter = covers_moon(f.w, f.b, f.moon);
-        f.w.current_econ_tick = T + 1;
+        f.w.current_econ_tick = T + k_storm_ticks;
         const bool post = covers_moon(f.w, f.a, f.moon);
         check(pre && !during && post, "S1", "an L1 Comms satellite covers the moon before, not at T, again after");
         check(shelter, "S1b", "a Comms satellite in the moon's high orbit covers through the storm");
@@ -319,7 +332,7 @@ void rows_satellites()
         f.w.current_econ_tick = T;
         const float during = space_navigation_factor(f.w, f.a, f.moon);
         const float shelter = space_navigation_factor(f.w, f.b, f.moon);
-        f.w.current_econ_tick = T + 1;
+        f.w.current_econ_tick = T + k_storm_ticks;
         const float post = space_navigation_factor(f.w, f.a, f.moon);
         check(pre < 1.0f && during == 1.0f && post == pre, "S2",
               fmt("L2 Navigation factor %.2f -> %.2f at T -> %.2f", pre, during, post));
@@ -335,7 +348,7 @@ void rows_satellites()
         stage_sat(f.w, f.a, {f.rock, orbital_node_kind::low_orbit}, space_satellite_role::survey);
         const auto r_storm = step(f.w, T);
         const int done_storm = f.w.bodies.at(f.rock).survey.regions_done;
-        const auto r_after = step(f.w, T + 1);
+        const auto r_after = step(f.w, T + k_storm_ticks);
         check(r_storm.survey_regions == 0 && done_storm == 0 && r_after.survey_regions > 0, "S3",
               fmt("an asteroid Survey satellite maps %d at T, %d at T+1", r_storm.survey_regions,
                   r_after.survey_regions));
@@ -357,7 +370,8 @@ void rows_stations()
 {
     std::printf("\nM stations\n");
     const int T = g_T;
-    const std::int64_t want = 50 * k_milli_per_rp;
+    const std::int64_t want = static_cast<std::int64_t>(std::llround(
+        space_effects_params{}.research_rp_per_module * static_cast<double>(k_milli_per_rp))); // a month's (BL-1642)
     {
         fixture f; build(f);
         const orbital_node l4{f.moon, orbital_node_kind::l4};
@@ -368,7 +382,7 @@ void rows_stations()
         const bool relay_dark = space_coverage(f.w, f.a).count(l4) == 0;
         const auto r_storm = step(f.w, T);
         const std::int64_t at_storm = pool(f.w, f.a);
-        step(f.w, T + 1);
+        step(f.w, T + k_storm_ticks);
         const std::int64_t after = pool(f.w, f.a);
         check(b.storm_struck && b.working.empty() && b.stormed.size() == 2, "M1",
               fmt("at T the L4 station's %zu modules are stormed, %zu working", b.stormed.size(), b.working.size()));
@@ -411,7 +425,13 @@ void rows_report()
         f.w.current_econ_tick = T;
         solar_storm_report r;
         run_solar_storm_report(f.w, station_params{}, T, &r);
-        const bool one = r.nations.size() == 1 && r.nations[0].nation == f.a;
+        // BL-1642: a storm spans three monthly ticks, so at its first tick T the next
+        // tick is stormy too and Beta's Observatory may warn again; Beta is never struck.
+        // Alpha's row comes first (ascending nation id); Beta's, if present, is a warning.
+        bool one = !r.nations.empty() && r.nations[0].nation == f.a && r.nations.size() <= 2;
+        if (r.nations.size() == 2)
+            one = one && r.nations[1].nation == f.b && r.nations[1].warned && r.nations[1].satellites_dark == 0
+                      && r.nations[1].stations_struck == 0;
         check(r.storm && one && r.nations[0].satellites_dark == 2 && r.nations[0].stations_struck == 1
                   && r.nations[0].modules_stopped == 2 && !r.nations[0].warned, "R1",
               fmt("at T: storm %d, %zu row(s); Alpha %d dark, %d struck, %d stopped", r.storm ? 1 : 0,
@@ -457,7 +477,7 @@ void rows_inert_and_replay()
         stage_sat(f.w, f.a, {f.rock, orbital_node_kind::high_orbit}, space_satellite_role::comms);
         stage_station(f.w, f.a, {f.moon, orbital_node_kind::l4}, 2,
                       {station_module_kind::comms_relay, station_module_kind::research});
-        for (int t = T - 2; t <= T + 2; ++t)
+        for (int t = T - 2; t <= T + k_storm_ticks + 1; ++t) // two lit, the storm's three dark, two lit
         {
             f.w.current_econ_tick = t;
             run_station_step(f.w, station_params{}, t);
@@ -469,9 +489,11 @@ void rows_inert_and_replay()
     check(x.w.state_hash(0) == y.w.state_hash(0) && to_bytes(x.w) == to_bytes(y.w), "P1",
           fmt("two identical programmes through the storm: equal hash %016llx and stream",
               static_cast<unsigned long long>(x.w.state_hash(0))));
-    // Four quarters ran lit, one dark: the pool holds four quarters' RP.
-    check(pool(x.w, x.a) == 4 * 50 * k_milli_per_rp, "P1b",
-          fmt("RP over T-2..T+2 is four quarters' (%lld milli)", static_cast<long long>(pool(x.w, x.a))));
+    // Four months ran lit, the storm's three dark: the pool holds four months' RP.
+    const std::int64_t month_rp = static_cast<std::int64_t>(std::llround(
+        space_effects_params{}.research_rp_per_module * static_cast<double>(k_milli_per_rp)));
+    check(pool(x.w, x.a) == 4 * month_rp, "P1b",
+          fmt("RP over T-2..T+4 is four lit months' (%lld milli)", static_cast<long long>(pool(x.w, x.a))));
 
     const std::string bytes = to_bytes(x.w);
     std::istringstream is(bytes, std::ios::binary);
@@ -483,7 +505,7 @@ void rows_inert_and_replay()
     {
         const entity_id st = x.w.stations.begin()->first;
         storm_kept = evaluate_station_budget(z, station_params{}, st, T).storm_struck
-                  && !evaluate_station_budget(z, station_params{}, st, T + 1).storm_struck;
+                  && !evaluate_station_budget(z, station_params{}, st, T + k_storm_ticks).storm_struck;
     }
     check(same && storm_kept, "V1",
           fmt("the save round-trips byte-identical; the storm still falls on T after load "

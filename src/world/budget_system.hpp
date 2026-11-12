@@ -12,12 +12,12 @@
 #include <vector>
 
 /// Debt interest charged per economy tick on a negative balance (BL-073). An
-/// economy tick is one quarter (k_ticks_per_year = 4), so this is the per-quarter
+/// economy tick is one month since BL-1642 (twelve a year); the per-quarter text below is the old rate
 /// rate: 1.5 %/qtr ≈ 6.1 %/yr compounded. A negative balance compounds once per tick by this
 /// factor; a non-negative balance is never charged. Single source of truth — both
 /// the live budget loop and the econ_bankruptcy harness read this constant, so they
 /// can never drift. Interest is a pure function of balance × rate (deterministic).
-inline constexpr float k_debt_interest_per_quarter = 0.015f;
+inline constexpr float k_debt_interest_per_quarter = 0.005f; // BL-1642: per month, 0.5 %/mo ~ 6.2 %/yr (was 1.5 %/qtr ~ 6.1 %/yr); name kept
 
 /// Per-building operating cost for one tick (BL-074): the maintenance and wage
 /// components apply_budget charges. Extracted as the single source of the formula so

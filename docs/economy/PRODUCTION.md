@@ -528,7 +528,7 @@ Infrastructure buildings affect logistical or economic capacity rather than extr
 | Inland Logistics Hub | Land-mode logistics node (`building_type::inland_logistics_hub`, BL-149): its tile joins the population-centre set that discounts the A\* haul cost of any intra-body convoy routed through it (LOGISTICS.md). The player-placeable counterpart to a city's free-hub discount — extends the cheap land network out to remote sites. Produces nothing (0 workforce); cost in `economy.buildings.inland_logistics_hub`. | 0 |
 | Military Base | Unit muster building (`building_type::military_base`, BL-325). Produces nothing, staffs at zero, and is deliberately **not** a supply anchor — military reach IS the economic reach field. `docs/military/MILITARY.md`. | any |
 | Bunker | Concrete on a tile (`building_type::bunker`). Produces nothing, staffs at zero, one to a tile on any land tile of the builder's own ground; its owner's units defending the tile gain defence and hardness by its condition (`docs/military/MILITARY.md` § Fortifications). Cost in `economy.buildings.bunker`. | any |
-| Research Institute | The "how does tech get done" building (`building_type::research_institute`, BL-332). Passive: it adds research points each quarter to its owner's nation's research pool (`RESEARCH.md` § Research points), and only while staffed; like the University it is staffed at construction (Ben, 2026-10-10). RP are not a resource and never reach a market. | any |
+| Research Institute | The "how does tech get done" building (`building_type::research_institute`, BL-332). Passive: it adds research points each month to its owner's nation's research pool (`RESEARCH.md` § Research points), and only while staffed; like the University it is staffed at construction (Ben, 2026-10-10). RP are not a resource and never reach a market. | any |
 | Schooling | Education building any settlement can host (`building_type::schooling`, BL-615 — stratum placement gates). Passive like the Research Institute; its qualification-raising effect belongs to POPULATION.md § Qualification. Placement is what defines it: it must stand **in** a population centre, of any stratum (POPULATION.md § Strata gate buildings). The Build door and the site finder offer it (Ben, 2026-11-07). | any |
 | University | The Schooling building's City-tier sibling (`building_type::university`, BL-615). Passive; must stand in a centre of stratum **City (4) or above** — "you can't build a university in a town" (Ben, 2026-08-25). The Build door and the site finder offer it (Ben, 2026-11-07). | any |
 | Orbital Port | Receives off-world shipments; required on any non-terrestrial body to accept supply | 1 |
@@ -602,7 +602,7 @@ building, so staffing moves neither; a marketplace's trade points do scale with 
 
 On top of the assigned fraction sits a **workforce target** (`building_component.workforce_target`, 0–200 internally, default 100). **The player reads it as 0–100 % of full employment** (Ben, 2026-10-13: *"100% is just the label for fully employed"*): the shown percentage is the internal target ÷ 2, so a building at the internal maximum reads 100 % and the economy is unchanged by the label — a scalar on both output and the labour portion of wages/maintenance, applied identically in `economy_system` and `budget_system`. The design is BL-181 (workforce auto-solver).
 
-**The game sets the player's workforce, and it moves one step a quarter** (Ben, 2026-10-13: *"let the game auto set the workforce, approaching a more profitable value every quarter"*). Each economy tick (a quarter), `solve_workforce_target` (economy_system.cpp) finds the target that maximises the building's estimated net profit on the grid **0, 25, 50, 75, 100 %** shown (0, 50, 100, 150, 200 internal), and the building's target moves **one 25 % step toward it** — never further in one quarter. A building already at the best target stays. The step is the game's answer to a solver that would otherwise jump: staffing follows the market, it does not snap to it. Because the model is otherwise *linear* in the target (output, wages, and the labour part of maintenance all scale with it), a fixed-price optimum would be degenerate bang-bang (0 % or max) — the **interior optimum comes from the local market price response**: more output raises local supply, which lowers the clearing price (`base · √(demand/supply)`, `docs/economy/MARKETS.md`). The solver reprices each candidate tier against that response — inside the same authored price band the market clears in (`wf_target_price`, MARKETS.md § Where the band lives) — and takes the best net. It is deterministic (reads last tick's market state), **the player's nation only**, and applies only to producing types (extraction / processing).
+**The game sets the player's workforce, and it moves one step a quarter** (Ben, 2026-10-13: *"let the game auto set the workforce, approaching a more profitable value every quarter"*). Every third economy tick (once a quarter; a tick is a month), `solve_workforce_target` (economy_system.cpp) finds the target that maximises the building's estimated net profit on the grid **0, 25, 50, 75, 100 %** shown (0, 50, 100, 150, 200 internal), and the building's target moves **one 25 % step toward it** — never further in one quarter. A building already at the best target stays. The step is the game's answer to a solver that would otherwise jump: staffing follows the market, it does not snap to it. Because the model is otherwise *linear* in the target (output, wages, and the labour part of maintenance all scale with it), a fixed-price optimum would be degenerate bang-bang (0 % or max) — the **interior optimum comes from the local market price response**: more output raises local supply, which lowers the clearing price (`base · √(demand/supply)`, `docs/economy/MARKETS.md`). The solver reprices each candidate tier against that response — inside the same authored price band the market clears in (`wf_target_price`, MARKETS.md § Where the band lives) — and takes the best net. It is deterministic (reads last tick's market state), **the player's nation only**, and applies only to producing types (extraction / processing).
 
 **The player has no workforce control** (Ben, 2026-10-13): the slider, the **Auto** control and the player's `set_workforce` verb are retired, and the building card shows the target read-only. This REVERSES the BL-181 opt-out (a manual tier pinned the value; Auto handed it back). It is still the sole sanctioned auto-action on the player's nation, now without the opt-out — `../ai/AI_OPPONENT.md` § 11 records the change. Rival nations keep their own `set_workforce` verb under their grant (carried over from the corporation, Ben, 2026-10-23), within the same internal 0–200 range.
 
@@ -744,7 +744,7 @@ it on when the good exists.
 
 **Power is not a traded good and not a per-body pool. It is a grid.** Ben's ruling:
 
-> *"Power travels via road infrastructure, although it is different from a convoy, it has a 1 qtr
+> *"Power travels via road infrastructure, although it is different from a convoy, it has a 1 mo
 > travel time or weight. So if there is a connection from a power source to the player's HQ, they
 > will be able to use the power on the next tick. Power can be stockpiled, but not infinitely."*
 
@@ -924,7 +924,7 @@ commit to it) and pays the whole flat `build_cost` then; the materials follow as
 (§ Construction is measured in days). Each economy tick a building under construction:
 
 - draws its materials for the days it built since the last tick — `resource_build_cost` over the
-  build's duration in quarters, per quarter of work — as **real market demand** (competing with
+  build's duration in months, per month of work — as **real market demand** (competing with
   population and other builds, bidding the local price up) and buys them at the shelf's posted
   price (Ben, 2026-10-26: costs depend on market prices);
 - progresses at a **rate set by how much of that per-tick material need the local market can
@@ -953,7 +953,7 @@ chose pay back.
 **Two authored scales set the live price.** A live build pays `build_cost` times
 `credit_cost_mult`, plus materials at the row times `material_cost_mult`
 (`economy.construction`, `scripts/economy.lua`). The authored `build_cost` itself stays the book
-value (FINANCE.md § The quarterly return) and the size of a building for what reads it as a size.
+value (FINANCE.md § The monthly return) and the size of a building for what reads it as a size.
 
 **The curve never prices what a nation's ground opens with (Ben, 2026-11-07).** A founding and every
 site the settle places are on the authored bills, so the kit, the minors' walks and the opening
@@ -975,7 +975,7 @@ sites, not access to the list.
 
 ### Construction is measured in days (Ben, 2026-10-24)
 
-**A build's time is a number of days, so a building can finish between quarters.** Each type's
+**A build's time is a number of days, so a building can finish between months.** Each type's
 duration is authored in days (`build_duration_days`, `scripts/economy.lua`), times the placement's
 site multiplier (§ Construction site time), rounded to a whole day.
 
@@ -984,7 +984,7 @@ so an extraction site takes **120 days** (a ×2/3 scale), and the differences be
 is not the opening's brake; money and materials are (§ What construction costs at the opening).
 
 - **Construction starts on the placement day (Ben, 2026-10-25).** A site begins building the day it
-  is placed. A 120-day build placed on day 10 of a quarter completes on day 130.
+  is placed. A 120-day build placed on day 10 of a month completes on day 130.
 - **Credits are paid up front, once (Ben, 2026-10-25).** The whole flat build cost — `build_cost`
   times the site multiplier, the credit part of the capex — leaves the builder's treasury when the
   site is placed. No economy tick pays construction credits after that. The build door admits a site
@@ -995,25 +995,25 @@ is not the opening's brake; money and materials are (§ What construction costs 
   materials. Each economy tick draws, off the market's shelf, the
   materials for the days built since the last tick, and buys them from the market then, at the
   shelf's posted price — a build's cost depends on market prices (Ben, 2026-10-26). A tick draws
-  at most one quarter's materials plus any shortfall carried from before. Whatever part the shelf
+  at most one month's materials plus any shortfall carried from before. Whatever part the shelf
   cannot cover stays owed and is drawn first at the next tick. A building that completes still owing
   materials pays them at the ticks after.
-- **The rate for the quarter ahead is a claim on the shelf.** At each tick, after the draw, a site's
+- **The rate for the month ahead is a claim on the shelf.** At each tick, after the draw, a site's
   supply rate — full, stretched or paused — is set from the shelf that is left, less the materials
-  still owed by every site there. That rate times the quarter's days is the progress it makes: a
-  paused quarter adds no days, and in its last quarter a site needing fewer than 90 days claims only
+  still owed by every site there. That rate times the month's days is the progress it makes: a
+  paused month adds no days, and in its last month a site needing fewer than 90 days claims only
   them. The rate **claims** its share of the shelf; nothing is drawn until the next tick. Sites claim
   in ascending building id, a short shelf shared pro-rata as every shelf draw is (MARKETS.md § Price
-  resolution). A site placed between ticks builds for the rest of the quarter at the rate the shelf
-  allows less every claim already on it, so a later site reads what earlier ones left. A quarter's
+  resolution). A site placed between ticks builds for the rest of the month at the rate the shelf
+  allows less every claim already on it, so a later site reads what earlier ones left. A month's
   claims on one shelf never exceed what it held when they were made.
 - **A site that owes materials waits for them.** A debt is carried only when the shelf ran short of
-  it, and the quarter ahead reads the shelf less every debt. So a site carrying a debt in a material
+  it, and the month ahead reads the shelf less every debt. So a site carrying a debt in a material
   builds nothing ahead on that material until the debt is paid; it resumes at the tick that pays it.
   The debt comes first because it is work already done.
 - **A cancelled site is refunded its credits in full (Ben, 2026-10-25).** A site demolished or
   cancelled before it completes returns the whole credit cost it paid at placement to the payer — a
-  nation's treasury, booked on its quarterly return as a refund. The materials it drew are not
+  nation's treasury, booked on its monthly return as a refund. The materials it drew are not
   returned: they were spent on the site. Any it still owed are cleared, not drawn. A standing
   building refunds nothing. The seat's clean slate of construction cancels its sites under this same rule,
   with no exception for the materials (Ben, 2026-10-26, NR-1075).
@@ -1023,12 +1023,12 @@ is not the opening's brake; money and materials are (§ What construction costs 
 - **Progress is daily, and a site completes on a day.** Between clearings a site advances day by
   day, as surveys do. Completion fires that day: the building is operational, and a port or
   logistics hub joins the network then.
-- **The first quarter is prorated.** A building finishing mid-quarter produces for the rest of
-  that quarter. At the next economy tick its output, operating costs, wages, inputs, upkeep goods
-  and Logistic Point need are scaled by the share of the quarter it stood complete. From then on
-  it runs whole quarters.
-- **Every path counts the same days.** A path that steps whole quarters with no day loop (the
-  settle, a headless run) catches up the quarter's unadvanced days at the clearing, from one
+- **The first month is prorated.** A building finishing mid-month produces for the rest of
+  that month. At the next economy tick its output, operating costs, wages, inputs, upkeep goods
+  and Logistic Point need are scaled by the share of the month it stood complete. From then on
+  it runs whole months.
+- **Every path counts the same days.** A path that steps whole months with no day loop (the
+  settle, a headless run) catches up the month's unadvanced days at the clearing, from one
   cursor, so it completes each site on the same day the live day loop would. A site placed on
   such a path starts on the cursor's day, as it would in the live loop.
 
@@ -1042,7 +1042,7 @@ nearest supply anchor, up to `1 + site_time_reach_scale` at the reach budget's e
 the tile, floored at `site_time_stack_min`).
 
 **The multiplier stretches materials and cash as well as time.** The draw is the build's materials
-over the *authored* duration per quarter of work, and a hard site simply draws it for more days, so a
+over the *authored* duration per month of work, and a hard site simply draws it for more days, so a
 site at ×1.5 consumes one and a half times the authored basket; its flat cost, paid at placement, is
 the authored `build_cost` times the same multiplier. That is the ruling, not
 an accident of arithmetic: a mountain build hauls more stone and keeps a crew longer.

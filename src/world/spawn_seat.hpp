@@ -70,7 +70,7 @@
 /// is the whole-firm acquisition price's statement of how much history a PRICE
 /// is entitled to read. They answer different questions and must be free to
 /// move apart.
-inline constexpr std::size_t k_spawn_trailing_quarters = 8;
+inline constexpr std::size_t k_spawn_trailing_quarters = 24; ///< Months: two years, the 8 quarters (BL-1642).
 
 /// Tunables for the weighted draw. All three are a FIRST CUT (Ben, 2026-08-26:
 /// "mostly random for now, targeted towards population centres and processing,

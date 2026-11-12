@@ -55,7 +55,7 @@ int run(std::uint32_t seed, int quarters)
 
     std::map<entity_id, std::bitset<io::dg::node_count>> seen;
     const int first = k_app_validation_ticks;
-    constexpr int k_econ_tick_days = 90; // sim_loop::econ_tick_days
+    constexpr int k_econ_tick_days = ::k_econ_tick_days; // BL-1642: 30, a month; // sim_loop::econ_tick_days
     int rows = 0;
     for (int qtr = 1; qtr <= quarters; ++qtr)
     {

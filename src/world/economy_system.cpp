@@ -2248,7 +2248,7 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
     // walk is safe), then applied in ascending nation id so the float writes
     // are ordered. First-cut flat rate, tune-not-restructure (NR-600).
     {
-        constexpr float k_qualification_per_education_building_tick = 0.0005f;
+        constexpr float k_qualification_per_education_building_tick = 0.0005f / 3.0f; // a month's third of the quarter's 0.0005 (BL-1642)
 
         const auto is_education_building = [](const building_component& b) -> bool {
             // Wired at the Sprint 19 wave-1 integration to BL-615's roster
@@ -2734,7 +2734,7 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
     };
 
     // ── Pass 3: BL-181 workforce auto-solve, player corp only; BL-1322 (Ben,
-    //    2026-10-13): STEPPED and without the opt-out — each tick the target
+    //    2026-10-13): STEPPED and without the opt-out — each QUARTER (the quarter tick, BL-1642) the target
     //    moves ONE 25 % step toward the solver's best (stays when equal), and
     //    `workforce_auto` is no longer read for the player (the field stays in
     //    the save and still records a rival's dial pin, `dial_idled`).
@@ -2755,6 +2755,10 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
     if (const auto pn = w.nations.find(player_nation(w));
         pn != w.nations.end() && !pn->second.state_assets.empty())
         auto_solve_sets.emplace_back(pn->first, &pn->second.state_assets);
+    // BL-1642: the ruling's step is ONE a quarter (AI_OPPONENT.md § 11, 2026-10-13); on
+    // the monthly tick the dial moves one month in three, so its rate is the ruling's.
+    if (!is_quarter_tick(w.current_econ_tick))
+        auto_solve_sets.clear();
     for (const auto& [solve_owner, solve_assets] : auto_solve_sets)
     {
         for (const entity_id building_id : *solve_assets)
@@ -3200,7 +3204,7 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
     // The met-supply is read from last tick's cleared market (this step precedes
     // clear_markets in the tick), so it is deterministic and price-consistent.
     // Step sizes/windows are first-cut tuning constants, not commitments.
-    constexpr int k_promotion_window_ticks = 50; ///< sustained ticks above the rung to promote.
+    constexpr int k_promotion_window_ticks = 150; ///< sustained ticks above the rung to promote (50 quarters as months, BL-1642).
     /// BL-624 (razed settlement tier): sustained-met ticks to RE-SETTLE a
     /// razed centre back to scale 1 with a village-rung seed population.
     /// HALF the promotion window, by design ("rebuilding there is cheap" —
@@ -3281,7 +3285,7 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
         }
 
         // POPULATION_GROWTH_RATE (Ben, 2026-11-10; POPULATION.md § Growth,
-        // decline and razing): heads move by a quarter of the signed annual rate
+        // decline and razing): heads move by a twelfth of the signed annual rate
         // EVERY tick, both ways, the fractional thousands carried in
         // `growth_carry` (kept in [0, 1) by the floor). Double arithmetic on one
         // centre's own fields: no cross-centre accumulation, so no order reaches
@@ -3293,7 +3297,8 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
         {
             const double total = static_cast<double>(pcc.growth_carry)
                                + static_cast<double>(pcc.population)
-                                     * static_cast<double>(gr.annual_rate) / 4.0;
+                                     * static_cast<double>(gr.annual_rate)
+                                     / static_cast<double>(k_econ_ticks_per_year);
             const double whole = std::floor(total);
             int   add   = static_cast<int>(whole);
             float carry = static_cast<float>(total - whole);
@@ -3696,7 +3701,18 @@ migration_tick run_population_migration(world& w, const recipe_registry& reg,
     // integer, so the pass is replay-identical by construction.
     migration_tick t;
     const migration_params& mp = reg.migration();
-    if (mp.rate_permille <= 0 || w.population_centres.size() < 2)
+    // BL-1642 (the tick is a month): the rate is authored per month, but heads move
+    // whole and a centre's emigrant pool is floored, so a monthly floor would silence
+    // every centre whose month's share is under one head (the 100-299 k band) and
+    // change the calendar rate. The pass therefore runs once a quarter - on the
+    // first month of each - moving a quarter's worth (three months of the rate) at
+    // once: the old calendar flow exactly, heads conserved, no carried state.
+    if (((w.current_econ_tick % k_econ_ticks_per_quarter) + k_econ_ticks_per_quarter)
+            % k_econ_ticks_per_quarter != 0)
+        return t;
+    const int64_t rate_ppm = std::llround(static_cast<double>(mp.rate_permille)
+                                          * static_cast<double>(k_econ_ticks_per_quarter) * 1000.0);
+    if (rate_ppm <= 0 || w.population_centres.size() < 2)
         return t;
 
     struct centre_row
@@ -3782,7 +3798,7 @@ migration_tick run_population_migration(world& w, const recipe_registry& reg,
             if (donor.attract >= mean)
                 continue;
             // Integer emigrant pool; a centre never empties (cap at pop − 1).
-            int em = donor.pop * mp.rate_permille / 1000;
+            int em = static_cast<int>(static_cast<int64_t>(donor.pop) * rate_ppm / 1000000);
             em = std::min(em, donor.pop - 1);
             if (em <= 0)
                 continue; // small centres shed nobody — the integer floor is deliberate

@@ -532,26 +532,66 @@ void rows_life_support()
     offworld_base_quarter_report r;
     run_offworld_base_quarter(f.w, offworld_base_params{}, &r);
     const float paid = t0 - f.w.nations.at(f.a).treasury;
-    check(r.fed == 1 && r.unfed == 0 && mk.inventory[ri(resource_type::water)] == 6.0f
-              && mk.inventory[ri(resource_type::food_rations)] == 6.0f && paid > 0.0f
+    // BL-1642: a month's lot is a third of the quarter's 4 - 4/3 of each off a shelf of 10.
+    const float month_left = 10.0f - 4.0f / 3.0f;
+    check(r.fed == 1 && r.unfed == 0 && std::fabs(mk.inventory[ri(resource_type::water)] - month_left) < 1e-4f
+              && std::fabs(mk.inventory[ri(resource_type::food_rations)] - month_left) < 1e-4f && paid > 0.0f
               && f.w.population_centres.at(centre).population == 4 && offworld_base_fed(f.w, centre),
-          "L1", fmt("fed: 4 water and 4 rations off the base's shelf (4 thousand at habitability 0), %.1f paid; reads fed", paid));
+          "L1", fmt("fed, a month: 4/3 water and 4/3 rations off the base's shelf (4 thousand at habitability 0), %.1f paid; reads fed", paid));
 
-    mk.inventory[ri(resource_type::water)] = 0.5f; // short: the whole lot or nothing
-    int pops[5] = {0, 0, 0, 0, 0};
-    bool razed = false;
-    for (int q = 0; q < 5; ++q)
+    // BL-1642 (the tick is a month): the loss is CARRIED month to month, so a base of
+    // four thousand loses one a QUARTER - three, two, one, none at months 3, 6, 9 and 12,
+    // the quarter tick's calendar rate - and month 13 (razed) buys nothing.
+    // Short even for one thousand's month (1/3): the whole lot or nothing.
+    mk.inventory[ri(resource_type::water)] = 0.1f;
+    int pops[13] = {};
+    bool razed = false, razed_early = false;
+    for (int q = 0; q < 13; ++q)
     {
         run_offworld_base_quarter(f.w, offworld_base_params{}, &r);
         pops[q] = f.w.population_centres.at(centre).population;
-        if (q == 3)
+        if (q < 11 && f.w.population_centres.at(centre).razed)
+            razed_early = true;
+        if (q == 11)
             razed = f.w.population_centres.at(centre).razed;
     }
-    check(pops[0] == 3 && pops[1] == 2 && pops[2] == 1 && pops[3] == 0 && razed && !offworld_base_fed(f.w, centre)
-              && f.w.offworld_bases.at(centre).unfed_quarters == 4 && mk.inventory[ri(resource_type::water)] == 0.5f
-              && mk.inventory[ri(resource_type::food_rations)] == 6.0f,
-          "L2", fmt("starving: %d %d %d %d — razed at none; nothing bought from a short shelf; a razed base buys nothing (%d)",
-                    pops[0], pops[1], pops[2], pops[3], pops[4]));
+    check(pops[1] == 4 && pops[2] == 3 && pops[5] == 2 && pops[8] == 1 && pops[11] == 0 && razed && !razed_early
+              && !offworld_base_fed(f.w, centre)
+              && f.w.offworld_bases.at(centre).unfed_quarters == 12 && mk.inventory[ri(resource_type::water)] == 0.1f
+              && std::fabs(mk.inventory[ri(resource_type::food_rations)] - month_left) < 1e-4f,
+          "L2", fmt("starving, monthly: %d %d %d %d (months 3/6/9/12) - razed at month 12, the quarter tick's rate; "
+                    "nothing bought from a short shelf; a razed base buys nothing (%d)",
+                    pops[2], pops[5], pops[8], pops[11], pops[12]));
+
+    // L2b (BL-1642): no pattern dodges the carry. Fed one month in three (unfed, unfed,
+    // fed), a base of four still loses: the carry outlives the fed month, so after nine
+    // months - six of them unfed - it has lost two.
+    {
+        fixture h; build(h);
+        ready(h);
+        const entity_id ht = mt(h, 4, 3);
+        const auto ho = found(h, h.a, ht);
+        const entity_id hc = ho.base_centre;
+        market_component& hm = h.w.markets.at(market_for_tile(h.w, ht));
+        hm.base_price[ri(resource_type::water)] = 3.0f;
+        hm.base_price[ri(resource_type::food_rations)] = 5.0f;
+        hm.price[ri(resource_type::water)] = 3.0f;
+        hm.price[ri(resource_type::food_rations)] = 5.0f;
+        int fed_months = 0;
+        for (int q = 0; q < 9; ++q)
+        {
+            const bool feed = (q % 3) == 2;
+            hm.inventory[ri(resource_type::water)]        = feed ? 100.0f : 0.5f;
+            hm.inventory[ri(resource_type::food_rations)] = feed ? 100.0f : 0.5f;
+            offworld_base_quarter_report hr;
+            run_offworld_base_quarter(h.w, offworld_base_params{}, &hr);
+            fed_months += hr.fed;
+        }
+        const int pop = h.w.population_centres.at(hc).population;
+        check(fed_months == 3 && pop == 2, "L2b",
+              fmt("unfed, unfed, fed x3: %d fed months, population %d of 4 (the carry outlives a fed month)",
+                  fed_months, pop));
+    }
 
     fixture g; build(g);
     embark(g, g.a, g.passenger, 3);
@@ -592,7 +632,7 @@ void rows_determinism_and_save()
     const std::size_t sec = world_save_offworld_base_section_bytes(x.w);
     std::ostringstream o87(std::ios::binary);
     write_world_snapshot_pre_offworld_bases(x.w, o87);
-    check(o87.str().size() + world_save_space_tail_bytes_after(k_world_save_version_research_books, x.w) /* the space merge: a v89 stream carries no space section */ == b.size() && sec == 8 + 12 + 8, "S1b", // BL-1606 (v91) follows
+    check(o87.str().size() + world_save_space_tail_bytes_after(k_world_save_version_research_books, x.w) /* the space merge: a v89 stream carries no space section */ == b.size() && sec == 8 + 16 + 8, "S1b", // BL-1642: v95's base record is 16 bytes // BL-1606 (v91) follows
           fmt("v89 (no space section) %zu, section %zu, today %zu", o87.str().size(), sec, b.size()));
     {
         fixture e; build(e);
@@ -604,10 +644,10 @@ void rows_determinism_and_save()
               "S1c", "a base-free world's v89 stream reads, with no base and nobody aboard");
     }
 
-    // Tampers. Section: u32 n, (centre, i32 founded, i32 unfed), u32 n, (unit, i32 count).
+    // Tampers. Section: u32 n, (centre, i32 founded, i32 unfed, i32 carry), u32 n, (unit, i32 count).
     const std::size_t s0 = b.size() - sec - (world_save_space_firsts_section_bytes(x.w) + world_save_transit_origin_section_bytes(x.w)); // BL-1606 (v91) follows
     const std::size_t base0 = s0 + 4;
-    const std::size_t col0 = s0 + 4 + 12 + 4;
+    const std::size_t col0 = s0 + 4 + 16 + 4;
     const auto refused = [&](std::string bad) {
         world wb;
         wb.player_entity = 12345;
@@ -621,6 +661,8 @@ void rows_determinism_and_save()
     { std::string bad = b; put_u32(bad, base0, x.home_centre); expect(refused(bad), "home-centre"); }
     { std::string bad = b; put_u32(bad, base0 + 4, static_cast<uint32_t>(-1)); expect(refused(bad), "founded<0"); }
     { std::string bad = b; put_u32(bad, base0 + 8, static_cast<uint32_t>(-1)); expect(refused(bad), "unfed<0"); }
+    { std::string bad = b; put_u32(bad, base0 + 12, 1000u); expect(refused(bad), "carry>=1000"); }
+    { std::string bad = b; put_u32(bad, base0 + 12, static_cast<uint32_t>(-1)); expect(refused(bad), "carry<0"); }
     { std::string bad = b; put_u32(bad, col0, 0x00FFFFFFu); expect(refused(bad), "ghost-unit"); }
     { std::string bad = b; put_u32(bad, col0, x.carrier); expect(refused(bad), "cargo-bay-unit"); }
     { std::string bad = b; put_u32(bad, col0 + 4, 7); expect(refused(bad), "over-berths"); }

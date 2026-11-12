@@ -8,8 +8,9 @@
 ///   - **sim tick**  smallest step; `sim_ticks_per_day` of them make one day.
 ///                   Fine enough to interpolate smooth visual motion between.
 ///   - **day tick**  fires once per in-game day.
-///   - **econ tick** fires every `econ_tick_days` — one quarter (three 30-day
-///                   months). Supply/demand and prices will resolve here.
+///   - **econ tick** fires every `econ_tick_days` — one 30-day month (Ben,
+///                   2026-11-11; it was a quarter). Supply/demand and prices
+///                   resolve here.
 ///
 /// Real-time pacing is a speed multiplier (1x–5x). At 1x a day takes
 /// `seconds_per_day_1x` real seconds; higher speeds divide that. Speed 0 pauses
@@ -24,9 +25,11 @@ public:
     // --- tunable calendar / pacing constants ---
     static constexpr int    sim_ticks_per_day  = 12;  ///< Sim steps per in-game day.
     static constexpr int    days_per_month     = 30;  ///< Days per in-game month.
-    static constexpr int    months_per_econ    = 3;   ///< Economy resolves quarterly.
-    static constexpr int    econ_tick_days     = days_per_month * months_per_econ; ///< 90 days.
-    static constexpr double seconds_per_day_1x = 2.0; ///< Real seconds per day at 1x (retuned 3x quicker, 2026-07-15).
+    static constexpr int    months_per_econ    = 1;   ///< Economy resolves monthly (Ben, 2026-11-11; was 3).
+    static constexpr int    econ_tick_days     = days_per_month * months_per_econ; ///< 30 days.
+    /// Real seconds per day at 1x. 6.0 (Ben, 2026-11-11): a month takes the real time a
+    /// quarter did at 2.0, so a campaign year plays three times slower.
+    static constexpr double seconds_per_day_1x = 6.0;
     static constexpr int    max_speed          = 5;
 
     /// Non-linear time multiplier for speed level s (1–5).
@@ -79,7 +82,7 @@ public:
     /// In-game days elapsed since construction.
     uint64_t day_tick()  const { return m_day_tick; }
 
-    /// Economy ticks (quarters) elapsed since construction.
+    /// Economy ticks (months) elapsed since construction.
     uint64_t econ_tick() const { return m_econ_tick; }
 
     /// Continuous in-game days elapsed since construction, including the

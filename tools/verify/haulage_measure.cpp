@@ -172,7 +172,7 @@ double quantile(std::vector<double> v, double q)
 /// not shared (app.hpp drags the whole UI in): change both.
 constexpr int k_validation_ticks = 12;
 /// sim_loop::econ_tick_days — the day tick one quarter advances in play.
-constexpr int k_econ_tick_days = 90;
+// k_econ_tick_days: components.hpp (30, a month - BL-1642)
 
 struct far_options
 {
