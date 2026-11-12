@@ -675,7 +675,10 @@ A nation still short of sixteen ticks of its running bill once the foundings' re
 not open with a state it cannot run: generation sizes its opening state to what its chest can run
 for sixteen ticks — the garrison wage and the state bill together — standing the capital's source
 first and the rest in the order the funding gate pays them, and leaving unbuilt whatever the chest
-cannot carry. Nothing is minted; the nation is smaller, not richer. **Military bases are cut like any
+cannot carry. Nothing is minted; the nation is smaller, not richer. **The cut is the exception
+(Ben, 2026-11-12, naming minors too weak at the opening).** A minor opening smaller is the rare
+poor realm, not the common case: when the cut reaches most minors, the history left too little in
+their chests, and the fix is the earning lever above, never a mint or a granted reserve. **Military bases are cut like any
 building (Ben, 2026-10-29)**, in the gate's order; a garrison whose base is cut keeps its men and
 stands with no recorded base. **A base is priced at its old upkeep in this sizing (Ben, 2026-11-01).**
 Bases carry no upkeep in play (`../military/MILITARY.md` § Recruits), so their running bill is

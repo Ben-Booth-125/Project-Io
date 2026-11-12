@@ -95,6 +95,16 @@ way — "Searching the landscape", "Proving the field" — never a blank wait (`
 Begin. The serve path adopts the searched and settled world; the verify path opens on the
 unsearched seed-candidate world, so a golden reads generation alone.
 
+### The world budget (Ben, 2026-11-12)
+
+**A world reaches play in under 60 seconds, from seed to seat, on the cold path** — the menu's
+Begin with no wizard, which hides none of the work behind rounds the player watches. The budget
+covers the whole ladder above and `finish_campaign_world`'s tail, and it is read on the largest
+curated worlds, not the median one: a seed that opens slowly is the one a player remembers. It is
+spent by measurement, step by step (`tools/verify/gen_step_costs.cpp` reads each captioned step);
+a step that cannot say what it costs cannot be cut. The wizard's own waits (`../ui/STARTUP.md`
+§ Round 6) stay as they are and sit inside this budget.
+
 The three simulated passes — two polity spans and one economic settle — are § Three passes of
 simulated history; `../lore/HISTORY.md` owns the polity spans.
 
@@ -816,8 +826,17 @@ A convergence test makes the amount of work depend on the landscape, so two worl
 search for different lengths and a threshold becomes a hidden tuning knob. A fixed round count
 makes the search a pure function of (world, seed, round count) with a cost known before it starts.
 
+**The search walks placement alone, over fewer rounds (Ben, 2026-11-12, superseding the axis
+list above and the six rounds below).** The roster axis already has nothing to choose where a
+charter budget sets the roster, and the road-tier axis rarely wins a round while costing a third of
+each one. So a candidate differs from the incumbent by its **placement** only, and the round count
+is cut to what the placement curve earns within the world budget (§ The world budget). Because
+roads no longer vary between candidates, term 5 (reach quality) reads the same for every candidate
+and is not scored; terms 1–4 and the spread of 1 and 2 remain. The determinism clauses below are
+unchanged.
+
 **The round count is kept at six, and a round's proposals are scored in parallel (Ben,
-2026-09-26; BL-1136).** The measured curve had no knee — every count below six gave up real gain —
+2026-09-26; BL-1136; its count superseded 2026-11-12, above).** The measured curve had no knee — every count below six gave up real gain —
 so the wait is met by scoring each round's proposals on two threads, which the determinism clauses
 above already allow (proposals scored independently, never in completion order), and the count is
 re-read once the market folds have left a world its tens of markets. The earlier ruling that

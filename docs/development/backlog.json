@@ -1389,6 +1389,102 @@
     "scripts/verify/construction_progress.lua"
    ],
    "design": "The one-building-per-product split (BL-1641) added names such as Spacecraft Assembly Plant and Orbital Defence Battery. Nine build rows now outrun the two-line budget construction_progress allows (it permits two measured names), and the tile-card stack row Inland Logistics Hub wraps rather than eliding. Either shorten the names in recipes.lua or widen the budget with a measured reason; the check is not to be loosened to pass."
+  },
+  {
+   "glyph": "○",
+   "sprint": null,
+   "version_goal": "v0.6.0",
+   "written": "2026-11-12",
+   "parked": false,
+   "blocked_on": null,
+   "requires": [],
+   "status": "proposed",
+   "author": "main session (Ben, 2026-11-12)",
+   "id": "BL-1645",
+   "short_name": "WORLD_UNDER_60S",
+   "title": "A world reaches play in under 60 s on the cold path",
+   "priority": "A",
+   "difficulty": 4,
+   "category": "Generation",
+   "authority_doc": "docs/generation/GENERATION_STRATEGY.md",
+   "files": [
+    "src/world/hard_coded_world.cpp",
+    "src/world/finish_campaign_world.cpp",
+    "tools/verify/gen_step_costs.cpp"
+   ],
+   "design": "GENERATION_STRATEGY.md § The world budget (Ben, 2026-11-12). Measured 2026-11-12 on main: seed 28 about 37 s, seed 0 about 2.5-3 min (search 78 s, the Finishing step 25-50 s, the three spans about 22 s, settle 4 s). First split the Finishing step (label 12: market carve and gravity fold, market roads, other bodies, provinces, garrisons) into its own measured costs in gen_step_costs, then cut the largest until every curated seed opens in under 60 s. Read on the largest curated worlds. Depends on BL-1646 (search placement only) for the search share."
+  },
+  {
+   "glyph": "○",
+   "sprint": null,
+   "version_goal": "v0.6.0",
+   "written": "2026-11-12",
+   "parked": false,
+   "blocked_on": null,
+   "requires": [],
+   "status": "proposed",
+   "author": "main session (Ben, 2026-11-12)",
+   "id": "BL-1646",
+   "short_name": "SEARCH_PLACEMENT_ONLY",
+   "title": "The landscape search walks placement alone, over fewer rounds",
+   "priority": "A",
+   "difficulty": 3,
+   "category": "Generation",
+   "authority_doc": "docs/generation/GENERATION_STRATEGY.md",
+   "files": [
+    "src/world/landscape_search.cpp",
+    "src/world/landscape_search.hpp",
+    "src/world/finish_campaign_world.cpp"
+   ],
+   "design": "GENERATION_STRATEGY.md § How a candidate is PRODUCED, the 2026-11-12 ruling. Drop the road-tier axis (the roster axis is already skipped under a charter budget); stop scoring term 5 (reach quality), which no longer varies; choose the round count from the placement curve on the 16 curated seeds so the search fits the world budget. Determinism clauses unchanged; world_determinism and the digests will move (re-bless is Ben's call)."
+  },
+  {
+   "glyph": "○",
+   "sprint": null,
+   "version_goal": "v0.6.0",
+   "written": "2026-11-12",
+   "parked": false,
+   "blocked_on": null,
+   "requires": [],
+   "status": "proposed",
+   "author": "main session (Ben, 2026-11-12)",
+   "id": "BL-1647",
+   "short_name": "MAJORS_OPEN_PROFITABLE",
+   "title": "Majors carry their running bill from the first month",
+   "priority": "A",
+   "difficulty": 4,
+   "category": "Economy",
+   "authority_doc": "docs/generation/NATION_GENERATION.md",
+   "files": [
+    "src/world/opening_kit.cpp",
+    "src/world/finish_campaign_world.cpp",
+    "scripts/economy.lua",
+    "tools/verify/opening_parity.cpp"
+   ],
+   "design": "NATION_GENERATION.md § Pass 7: the kit's own income carries its running bill from the first tick. The opening-parity census (30:4, 16 seeds, five years) read majors losing money on average 10/64 before the monthly tick and 42/64 after it, with 3/64 ending under 100 credits and the median end treasury 6,441 -> 1,769. Ben ruled the regression folds into this item (2026-11-12). First find which per-tick flow the monthly tick (BL-1642) left at its quarterly rate, then re-read the census; any remaining loss is the kit's balance. Read by the opening-parity skill at --quarters 60."
+  },
+  {
+   "glyph": "○",
+   "sprint": null,
+   "version_goal": "v0.6.0",
+   "written": "2026-11-12",
+   "parked": false,
+   "blocked_on": null,
+   "requires": [],
+   "status": "proposed",
+   "author": "main session (Ben, 2026-11-12)",
+   "id": "BL-1648",
+   "short_name": "MINORS_OPEN_WHOLE",
+   "title": "The opening state cut is the exception for minors",
+   "priority": "B",
+   "difficulty": 4,
+   "category": "Generation",
+   "authority_doc": "docs/generation/NATION_GENERATION.md",
+   "files": [
+    "src/world/state_industry.cpp",
+    "src/world/history_sim.cpp"
+   ],
+   "design": "NATION_GENERATION.md § Pass 7, The cut is the exception (Ben, 2026-11-12). Seed 0 on main: the cut opened 22 of 41 nations smaller (40 state buildings unbuilt, 22 bases); seed 28: 10 of 21. The lever is the earning lever (realms bank more across the spans), never a mint. Note the doc still says sixteen ticks for the cut window while the code reads 48 (the monthly tick); reconcile the wording. Read with treasury_census and opening_parity's minor medians."
   }
  ]
 }
