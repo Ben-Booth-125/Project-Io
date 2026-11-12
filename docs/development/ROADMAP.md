@@ -79,8 +79,9 @@ player can feel, not a list of items.
 - **v0.5.0 — far space** (Ben, 2026-11-10). The whole solar system with the next Eras'
   technology: bases on other bodies run like the home world, and wars span every body a nation
   holds.
-- **v0.6.0 — the polish** (Ben, 2026-11-10). A thorough playtest of what v0.4.0 and v0.5.0
-  built, and the fixes it finds.
+- **v0.6.0 — another pass on generation** (Ben, 2026-11-12, replacing the polish of
+  2026-11-10). Generation takes too long, and the world it hands over opens poorly balanced: the
+  pass makes generation fast and the opening balanced (`../generation/GENERATION_STRATEGY.md`).
 
 **Speed over continuity (Ben, 2026-11-10).** v0.4.0 and v0.5.0 are expected to build quickly. A
 release between them need not keep continuity with the last: v0.6.0 is where it is restored.
