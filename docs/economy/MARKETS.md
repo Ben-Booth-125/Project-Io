@@ -1072,8 +1072,8 @@ first cuts, then measured. Three rules hold whatever the numbers:
 The k cap stays: spoilage is what makes k > 0 safe, not a replacement for it.
 
 Target and result are clamped to the band **[0.25×, 10×] of base**. Prices are therefore
-*anchored*: no scarcity can push a good past 10× its authored base, and no glut below a month
-of it. Untradeable resources (`base_price ≤ 0`) keep their prior price. A resource pegged at the
+*anchored*: no scarcity can push a good past 10× its authored base, and no glut below a quarter
+of it (0.25×). Untradeable resources (`base_price ≤ 0`) keep their prior price. A resource pegged at the
 ceiling is a generation-calibration signal (background production absent or under-target — see
 `docs/generation/CORPORATION_GENERATION.md` § Pass 6), not a legitimate "lucrative fillable gap".
 

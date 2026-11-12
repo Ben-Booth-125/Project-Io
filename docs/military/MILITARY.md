@@ -412,7 +412,7 @@ wounded; the economy is the war's ceiling.
 ### Recruits (Ben, 2026-10-30)
 
 **Soldiers are recruits, and bases make them.** A `military_base` makes **land recruits** and an
-`airbase` makes **air recruits**, each at a fixed number per month authored in `scripts/economy.lua`
+`airbase` makes **air recruits**, each at a fixed number per quarter authored in `scripts/economy.lua`
 (`economy.military.recruits`). There is no other source: recruits replace the labour-pool draw and the
 conscript or professional choice (BL-1424 (soldiers from labour) is superseded).
 
@@ -421,8 +421,9 @@ conscript or professional choice (BL-1424 (soldiers from labour) is superseded).
   province whose centres cannot give makes fewer; a mobilised province is an emptier one.
 - **One pool per theatre per nation.** Every land recruit goes to the nation's one land pool and every
   air recruit to its one air pool, wherever the base stands.
-- **The cap is forty-five months of output.** A pool holds at most 45 x the monthly recruits its
-  theatre's bases make together. A full pool takes no more; its bases make none that month.
+- **The cap is fifteen quarters of output.** A pool holds at most 15 x the quarterly recruits its
+  theatre's bases make together. A full pool takes no more; its bases make none that month. The
+  tick is a month: each month makes its share of the quarter's number, so three make it exactly.
 - **A hire spends its men.** Raising a unit spends recruits equal to its men from the land pool; a
   wing spends its crew from the air pool. A hire the pool cannot fill is refused before money moves,
   in the shelf's words ("Needs 400 recruits; the pool holds 120").
@@ -449,8 +450,8 @@ conscript or professional choice (BL-1424 (soldiers from labour) is superseded).
   sizing), and that sizing prices each base at the upkeep it carried before bases went free. So a
   poor nation opens with fewer bases, as it did; once play begins a base costs nothing to keep.
 - **Ports make sea recruits (Ben, 2026-11-02).** A completed `port` makes **sea recruits** at a fixed
-  number per month (`economy.military.recruits`), taken from its province's centres as a base's are,
-  into the nation's one **sea pool**, capped at forty-five months of its ports' output. Nothing spends
+  number per quarter (`economy.military.recruits`), taken from its province's centres as a base's are,
+  into the nation's one **sea pool**, capped at fifteen quarters of its ports' output. Nothing spends
   the sea pool but a ship's hire (§ Sea).
 - **Seen in the header (Ben, 2026-11-02).** The header's top right shows each theatre's pool - land,
   air and sea - as an icon, recruits held against the cap, and a bar of the pool's fill beneath

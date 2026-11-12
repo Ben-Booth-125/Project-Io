@@ -395,7 +395,7 @@ void draw_balance_ledger(const world& w, const recipe_registry& reg,
 
     // --- Top-8 buildings by profit, with rank change vs a year ago (BL-171). Profit
     // is the per-building estimated net (BL-074); the rank-change column compares the
-    // current rank to `prior_rank` (the ranking 4 econ ticks ago, kept by app). ---
+    // current rank to `prior_rank` (the ranking a year - 12 monthly econ ticks - ago, kept by app). ---
     ImGui::SeparatorText("Top buildings by profit");
     const std::vector<std::pair<entity_id, float>> ranking =
         rank_player_buildings_by_profit(w, reg, report);
@@ -442,7 +442,7 @@ void draw_balance_ledger(const world& w, const recipe_registry& reg,
                            : (net > 0.0f) ? palette::positive : palette::neutral;
             ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(pc), "%+.0f", static_cast<double>(net));
 
-            // Rank change vs 4 econ ticks ago: ▲/▼ places moved, "new" if unranked then.
+            // Rank change vs a year (12 monthly econ ticks) ago: ▲/▼ places moved, "new" if unranked then.
             ImGui::TableSetColumnIndex(2);
             const auto pit = prior_rank.find(id);
             if (pit == prior_rank.end())

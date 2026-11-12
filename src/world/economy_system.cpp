@@ -2755,6 +2755,10 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
     if (const auto pn = w.nations.find(player_nation(w));
         pn != w.nations.end() && !pn->second.state_assets.empty())
         auto_solve_sets.emplace_back(pn->first, &pn->second.state_assets);
+    // BL-1642: the ruling's step is ONE a quarter (AI_OPPONENT.md § 11, 2026-10-13); on
+    // the monthly tick the dial moves one month in three, so its rate is the ruling's.
+    if (!is_quarter_tick(w.current_econ_tick))
+        auto_solve_sets.clear();
     for (const auto& [solve_owner, solve_assets] : auto_solve_sets)
     {
         for (const entity_id building_id : *solve_assets)

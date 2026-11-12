@@ -36,7 +36,7 @@ rank_player_buildings_by_profit(const world& w, const recipe_registry& reg,
 /// @param report      Latest economy report — budget breakdown + per-building output.
 /// @param history     Player balance/income/expenditure series; profit per tick =
 ///                    income − expenditure drives the chart.
-/// @param prior_rank  Player-building ranking (entity → rank) as of 4 econ ticks ago,
+/// @param prior_rank  Player-building ranking (entity → rank) as of a year (12 monthly econ ticks) ago,
 ///                    kept by app; drives the rank-change column (empty → all "new").
 /// @param ui          UI state; the stubbed Tax/Wages tier selectors read/write it.
 /// @param open        Open/closed flag; the window's close button sets it to false.

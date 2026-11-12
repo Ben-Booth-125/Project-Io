@@ -1340,6 +1340,18 @@ inline constexpr int k_econ_ticks_per_quarter = 3;
 /// place in its quarter, so every quarter sums to exactly @p per_quarter (4 regions a
 /// quarter: 1, 1, 2). For a count that cannot be divided by three - regions mapped,
 /// astronauts trained. Pure and integer: the tick alone decides it.
+inline int quarter_count_this_tick(int per_quarter, int econ_tick);
+
+/// A QUARTERLY CADENCE on the monthly tick (BL-1642): true on one month in three -
+/// the month `quarter_count_this_tick(1, ...)` gives its one - so a pass a dated ruling
+/// sets "every quarter" runs at the ruling's rate, not three times as often.
+inline bool is_quarter_tick(int econ_tick)
+{
+    const int m = ((econ_tick % k_econ_ticks_per_quarter) + k_econ_ticks_per_quarter)
+                % k_econ_ticks_per_quarter;
+    return m == k_econ_ticks_per_quarter - 1;
+}
+
 inline int quarter_count_this_tick(int per_quarter, int econ_tick)
 {
     if (per_quarter <= 0)

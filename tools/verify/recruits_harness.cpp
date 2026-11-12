@@ -228,6 +228,38 @@ const recruit_refill* plan_row(const std::vector<recruit_refill>& p, entity_id u
     return nullptr;
 }
 
+/// BL-1642 (the tick is a month): one QUARTER of recruiting - three monthly
+/// run_recruitment calls on consecutive econ ticks, each granting its share of the
+/// quarter's rate (quarter_count_this_tick) - with the three rows summed, so the
+/// mechanic rows read the ruling's per-quarter numbers.
+recruitment_tick recruit_quarter(world& w, const recipe_registry& reg)
+{
+    recruitment_tick sum;
+    for (int m = 0; m < k_econ_ticks_per_quarter; ++m)
+    {
+        const recruitment_tick t = run_recruitment(w, reg);
+        ++w.current_econ_tick;
+        sum.heads_taken += t.heads_taken;
+        sum.centres_lost_thousand += t.centres_lost_thousand;
+        for (const recruitment_row& r : t.nations)
+        {
+            auto it = std::find_if(sum.nations.begin(), sum.nations.end(),
+                                   [&](const recruitment_row& x) { return x.nation == r.nation; });
+            if (it == sum.nations.end())
+            {
+                sum.nations.push_back(recruitment_row{});
+                it = std::prev(sum.nations.end());
+                it->nation = r.nation;
+            }
+            it->land_made += r.land_made;   it->air_made += r.air_made;   it->sea_made += r.sea_made;
+            it->land_short += r.land_short; it->air_short += r.air_short; it->sea_short += r.sea_short;
+        }
+    }
+    std::sort(sum.nations.begin(), sum.nations.end(),
+              [](const recruitment_row& a, const recruitment_row& b) { return a.nation < b.nation; });
+    return sum;
+}
+
 /// The quarter's refill as the economy step runs it.
 struct refill_result
 {
@@ -255,10 +287,10 @@ int main()
     recipe_registry sreg;
     sreg.load_from_lua(lua);
     const recruit_params& rp = sreg.military().recruits;
-    // BL-1642 (the tick is a month): R0 checks the SHIPPED rates (17 / 7 / 7 a month).
-    // The mechanic rows from R1 on run a fixture registry at round rates - 50 land,
-    // 20 air, 20 sea a tick, the quarter tick's figures - so their arithmetic stays
-    // legible; the cap is k_recruit_cap_quarters (45) ticks of output either way.
+    // BL-1642 (the tick is a month): the rates stay authored a QUARTER (50 / 20 / 20)
+    // and each month grants its share (quarter_count_this_tick). The mechanic rows run
+    // a quarter at a time through recruit_quarter (three monthly ticks, summed); R1h
+    // checks the monthly split itself. The fixture registry pins the round rates.
     lua_state flua;
     flua.load("scripts/recipes.lua");
     flua.load("scripts/economy.lua");
@@ -318,10 +350,10 @@ int main()
         check(recruit_quarter_output(f.w, reg, f.nation, recruit_theatre::land) == 50
                   && recruit_quarter_output(f.w, reg, f.nation, recruit_theatre::air) == 20,
               "R1a one military base makes 50 land recruits a quarter, one airbase 20 air");
-        check(recruit_cap(f.w, reg, f.nation, recruit_theatre::land) == 2250
-                  && recruit_cap(f.w, reg, f.nation, recruit_theatre::air) == 900,
-              "R1b the caps are 45 ticks of output (15 quarters): 2250 land, 900 air");
-        const recruitment_tick t = run_recruitment(f.w, reg);
+        check(recruit_cap(f.w, reg, f.nation, recruit_theatre::land) == 750
+                  && recruit_cap(f.w, reg, f.nation, recruit_theatre::air) == 300,
+              "R1b the caps are 15 quarters of output: 750 land, 300 air");
+        const recruitment_tick t = recruit_quarter(f.w, reg);
         std::printf("      pools land %d air %d; heads taken %lld; big carry %d, small carry %d\n",
                     nat(f).land_recruits, nat(f).air_recruits, static_cast<long long>(t.heads_taken),
                     centre(f, big).recruit_heads_taken, centre(f, small).recruit_heads_taken);
@@ -333,7 +365,7 @@ int main()
         add_building(f, 7, building_type::military_base);
         check(recruit_quarter_output(f.w, reg, f.nation, recruit_theatre::land) == 100,
               "R1e two bases make 100: the nation's ONE land pool takes both");
-        (void)run_recruitment(f.w, reg);
+        (void)recruit_quarter(f.w, reg);
         check(nat(f).land_recruits == 150 && nat(f).air_recruits == 40,
               "R1f the next quarter: land 50 + 100, air 20 + 20");
 
@@ -344,10 +376,32 @@ int main()
         g.w.buildings.at(idle).decommissioned = true;
         const entity_id sidle = add_building(g, 7, building_type::airbase);
         g.w.buildings.at(sidle).state_idle = true;
-        const recruitment_tick tg = run_recruitment(g.w, reg);
+        const recruitment_tick tg = recruit_quarter(g.w, reg);
         check(nat(g).land_recruits == 0 && nat(g).air_recruits == 0 && tg.heads_taken == 0
                   && recruit_quarter_output(g.w, reg, g.nation, recruit_theatre::land) == 0,
               "R1g a base under construction, idled, or idled by the state's funding makes none");
+
+        // R1h (BL-1642): a quarter's 50 / 20 is granted month by month, 16 + 17 + 17 and
+        // 6 + 7 + 7 - exactly the ruling's count, with no rounding drift over a year.
+        fixture h; build(h);
+        add_centre(h, 4, 5);
+        add_building(h, 5, building_type::military_base);
+        add_building(h, 6, building_type::airbase);
+        int land_m[12] = {}, air_m[12] = {};
+        for (int m = 0; m < 12; ++m)
+        {
+            h.w.current_econ_tick = m;
+            const int l0 = nat(h).land_recruits, a0 = nat(h).air_recruits;
+            (void)run_recruitment(h.w, reg);
+            land_m[m] = nat(h).land_recruits - l0;
+            air_m[m]  = nat(h).air_recruits - a0;
+        }
+        std::printf("      months 1-3: land %d %d %d, air %d %d %d; a year land %d air %d\n",
+                    land_m[0], land_m[1], land_m[2], air_m[0], air_m[1], air_m[2],
+                    nat(h).land_recruits, nat(h).air_recruits);
+        check(land_m[0] == 16 && land_m[1] == 17 && land_m[2] == 17 && air_m[0] == 6 && air_m[1] == 7
+                  && air_m[2] == 7 && nat(h).land_recruits == 200 && nat(h).air_recruits == 80,
+              "R1h a month grants its share of the quarter (16/17/17 land, 6/7/7 air); a year is 200 and 80");
     }
 
     // -----------------------------------------------------------------------
@@ -358,7 +412,7 @@ int main()
         const entity_id big   = add_centre(f, 4, 5);
         const entity_id other = add_centre(f, 25, 100); // province B
         add_building(f, 5, building_type::military_base);
-        (void)run_recruitment(f.w, reg);
+        (void)recruit_quarter(f.w, reg);
         check(centre(f, big).recruit_heads_taken == 50 && centre(f, small).recruit_heads_taken == 0
                   && centre(f, other).recruit_heads_taken == 0,
               "R2a the base takes from the centre with the most heads, in its own province only");
@@ -367,36 +421,39 @@ int main()
         const entity_id lo = add_centre(t, 3, 4);
         const entity_id hi = add_centre(t, 4, 4);
         add_building(t, 5, building_type::military_base);
+        // Monthly rows (BL-1642): the month at tick 0 grants 16 of the quarter's 50.
+        t.w.current_econ_tick = 0;
         (void)run_recruitment(t.w, reg);
-        check(lo < hi && centre(t, lo).recruit_heads_taken == 50 && centre(t, hi).recruit_heads_taken == 0,
+        check(lo < hi && centre(t, lo).recruit_heads_taken == 16 && centre(t, hi).recruit_heads_taken == 0,
               "R2b a tie goes to the lower centre id");
+        t.w.current_econ_tick = 1;
         (void)run_recruitment(t.w, reg);
-        check(centre(t, lo).recruit_heads_taken == 50 && centre(t, hi).recruit_heads_taken == 50,
-              "R2c ...and next quarter the other now has the most heads, so it gives");
+        check(centre(t, lo).recruit_heads_taken == 16 && centre(t, hi).recruit_heads_taken == 17,
+              "R2c ...and next month the other now has the most heads, so it gives");
 
         fixture s; build(s);
         const entity_id last = add_centre(s, 3, 1, /*carry=*/970); // 30 heads left
         add_building(s, 5, building_type::military_base);
-        const recruitment_tick ts = run_recruitment(s.w, reg);
+        const recruitment_tick ts = recruit_quarter(s.w, reg);
         std::printf("      30 heads: pool %d, short %d, population %d carry %d\n", nat(s).land_recruits,
                     ts.nations.empty() ? -1 : ts.nations[0].land_short, centre(s, last).population,
                     centre(s, last).recruit_heads_taken);
         check(nat(s).land_recruits == 30 && !ts.nations.empty() && ts.nations[0].land_short == 20
                   && centre(s, last).population == 0 && centre(s, last).recruit_heads_taken == 0,
               "R2d a province with 30 heads left makes 30, 20 short, and is emptied");
-        (void)run_recruitment(s.w, reg);
+        (void)recruit_quarter(s.w, reg);
         check(nat(s).land_recruits == 30, "R2e an emptied province makes none");
 
         fixture e; build(e);
         add_building(e, 5, building_type::military_base);
         add_centre(e, 25, 50); // only in B
-        (void)run_recruitment(e.w, reg);
+        (void)recruit_quarter(e.w, reg);
         check(nat(e).land_recruits == 0, "R2f a base in a province with no centre makes none (B's people stay B's)");
 
         fixture k; build(k);
         const entity_id kc = add_centre(k, 3, 5, /*carry=*/990);
         add_building(k, 5, building_type::military_base);
-        const recruitment_tick tk = run_recruitment(k.w, reg);
+        const recruitment_tick tk = recruit_quarter(k.w, reg);
         check(centre(k, kc).population == 4 && centre(k, kc).recruit_heads_taken == 40
                   && tk.centres_lost_thousand == 1,
               "R2g a thousand heads takes one off the centre's population (5 at 990 + 50 -> 4 at 40)");
@@ -405,7 +462,7 @@ int main()
         const entity_id rz = add_centre(r, 3, 9);
         r.w.population_centres.at(rz).razed = true;
         add_building(r, 5, building_type::military_base);
-        (void)run_recruitment(r.w, reg);
+        (void)recruit_quarter(r.w, reg);
         check(nat(r).land_recruits == 0, "R2h a razed centre gives no heads");
     }
 
@@ -415,26 +472,26 @@ int main()
         fixture f; build(f);
         const entity_id c = add_centre(f, 3, 50);
         add_building(f, 5, building_type::military_base);
-        nat(f).land_recruits = 2240;
-        (void)run_recruitment(f.w, reg);
-        check(nat(f).land_recruits == 2250 && centre(f, c).recruit_heads_taken == 10,
+        nat(f).land_recruits = 740;
+        (void)recruit_quarter(f.w, reg);
+        check(nat(f).land_recruits == 750 && centre(f, c).recruit_heads_taken == 10,
               "R3a 10 below the cap: the base makes 10 and takes 10 heads");
-        const recruitment_tick t = run_recruitment(f.w, reg);
-        check(nat(f).land_recruits == 2250 && centre(f, c).recruit_heads_taken == 10 && t.heads_taken == 0,
+        const recruitment_tick t = recruit_quarter(f.w, reg);
+        check(nat(f).land_recruits == 750 && centre(f, c).recruit_heads_taken == 10 && t.heads_taken == 0,
               "R3b a full pool takes no more: no recruit, no head");
-        nat(f).land_recruits = 2400;
-        (void)run_recruitment(f.w, reg);
-        check(nat(f).land_recruits == 2400, "R3c a pool above its cap (its bases gone) is never cut");
+        nat(f).land_recruits = 900;
+        (void)recruit_quarter(f.w, reg);
+        check(nat(f).land_recruits == 900, "R3c a pool above its cap (its bases gone) is never cut");
         int quarters = 0;
         fixture z; build(z);
         add_centre(z, 3, 50);
         add_building(z, 5, building_type::military_base);
         while (nat(z).land_recruits < recruit_cap(z.w, reg, z.nation, recruit_theatre::land) && quarters < 100)
         {
-            (void)run_recruitment(z.w, reg);
+            (void)recruit_quarter(z.w, reg);
             ++quarters;
         }
-        check(quarters == k_recruit_cap_quarters, "R3d an empty pool fills in exactly 45 ticks, 15 quarters (" + std::to_string(quarters) + ")");
+        check(quarters == k_recruit_cap_quarters, "R3d an empty pool fills in exactly 15 quarters (" + std::to_string(quarters) + ")");
     }
 
     // -----------------------------------------------------------------------
@@ -730,15 +787,15 @@ int main()
         const auto avail = available_rows(f.w, f.nation, campaign_roster_band_for(reg.era()));
         const uint16_t row = avail.empty() ? 0
             : static_cast<uint16_t>(avail.front() - unit_roster_table().data());
-        nat(f).land_recruits = 2300; // above the 2250 cap one base gives
-        check(hire_unit(f, reg, 5, row) == corp_command_result::applied && nat(f).land_recruits == 2250
+        nat(f).land_recruits = 800; // above the 750 cap one base gives
+        check(hire_unit(f, reg, 5, row) == corp_command_result::applied && nat(f).land_recruits == 750
                   && f.w.musters.size() == 1,
-              "R11a the hire spends its 50 (2300 -> 2250)");
+              "R11a the hire spends its 50 (800 -> 750)");
         f.w.buildings.erase(base); // the base is lost mid-muster
         const float treasury = nat(f).treasury;
         advance_musters(f.w);
-        check(f.w.musters.empty() && nat(f).land_recruits == 2300 && f.w.units.empty(),
-              "R11b the dropped muster returns its 50 recruits, uncapped by the pool's cap (2250 -> 2300)");
+        check(f.w.musters.empty() && nat(f).land_recruits == 800 && f.w.units.empty(),
+              "R11b the dropped muster returns its 50 recruits, uncapped by the pool's cap (750 -> 800)");
         check(nat(f).treasury == treasury, "R11c credits stay as they are: no refund of money");
 
         fixture d; build(d);
@@ -782,7 +839,7 @@ int main()
         const entity_id c = add_centre(f, 3, 5, /*carry=*/0);
         add_building(f, 5, building_type::military_base);
         add_building(f, 6, building_type::airbase);
-        (void)run_recruitment(f.w, reg);
+        (void)recruit_quarter(f.w, reg);
         const std::string bytes = to_bytes(f.w);
         world back;
         const bool ok = from_bytes(bytes, back);
@@ -867,7 +924,7 @@ int main()
             add_unit(f, 1, 10, 50); add_unit(f, 2, 20, 50);
             for (int q = 0; q < 6; ++q)
             {
-                (void)run_recruitment(f.w, reg);
+                (void)recruit_quarter(f.w, reg);
                 (void)refill_quarter(f, reg);
             }
             return to_bytes(f.w);
@@ -878,12 +935,16 @@ int main()
         add_centre(f, 3, 5);
         add_building(f, 5, building_type::military_base);
         add_building(f, 6, building_type::airbase);
-        const economy_report rep = run_economy_step(f.w, reg, /*spectating=*/false);
-        std::printf("      after one economy step: land %d air %d; report heads %lld\n",
-                    nat(f).land_recruits, nat(f).air_recruits,
-                    static_cast<long long>(rep.recruitment.heads_taken));
-        check(nat(f).land_recruits == 50 && nat(f).air_recruits == 20 && rep.recruitment.heads_taken == 70,
-              "R8b the economy step makes the quarter's recruits");
+        int64_t heads = 0;
+        for (int m = 0; m < k_econ_ticks_per_quarter; ++m)
+        {
+            f.w.current_econ_tick = m; // as the sim loop stamps each step (campaign_settle, main)
+            heads += run_economy_step(f.w, reg, /*spectating=*/false).recruitment.heads_taken;
+        }
+        std::printf("      after three economy steps: land %d air %d; report heads %lld\n",
+                    nat(f).land_recruits, nat(f).air_recruits, static_cast<long long>(heads));
+        check(nat(f).land_recruits == 50 && nat(f).air_recruits == 20 && heads == 70,
+              "R8b three economy steps (a quarter of months) make the quarter's recruits");
     }
 
     // -----------------------------------------------------------------------
@@ -931,9 +992,9 @@ int main()
             check(ok && r.military().recruits.land_per_base == k_recruit_rate_max,
                   "R9g the ceiling itself (1000) loads");
         }
-        check(static_cast<int64_t>(k_recruit_cap_quarters) * k_recruit_rate_max * 23861 > k_recruit_pool_max
-                  && static_cast<int64_t>(k_recruit_cap_quarters) * k_recruit_rate_max * 23860 <= k_recruit_pool_max,
-              "R9h at the ceiling rate a theatre's cap reaches the 2^30 pool ceiling only past 23,860 bases");
+        check(static_cast<int64_t>(k_recruit_cap_quarters) * k_recruit_rate_max * 71583 > k_recruit_pool_max
+                  && static_cast<int64_t>(k_recruit_cap_quarters) * k_recruit_rate_max * 71582 <= k_recruit_pool_max,
+              "R9h at the ceiling rate a theatre's cap reaches the 2^30 pool ceiling only past 71,582 bases");
         {
             // And past it the cap is clamped, never wrapped: 72,000 running bases of one nation.
             fixture f; build(f);
@@ -959,7 +1020,7 @@ int main()
     // -----------------------------------------------------------------------
     std::printf("\nR12 - ports make sea recruits (Ben, 2026-11-02)\n");
     {
-        check(rp.sea_per_port == 7, "R12a the authored rate is 7 sea recruits a port a month (20 a quarter, BL-1642)");
+        check(rp.sea_per_port == 20, "R12a the authored rate is 20 sea recruits a port a quarter");
 
         // Output per port, and the tick's row.
         fixture f; build(f);
@@ -967,10 +1028,10 @@ int main()
         const entity_id small = add_centre(f, 3, 3);
         add_building(f, 5, building_type::port);
         check(recruit_quarter_output(f.w, reg, f.nation, recruit_theatre::sea) == 20
-                  && recruit_cap(f.w, reg, f.nation, recruit_theatre::sea) == 900
+                  && recruit_cap(f.w, reg, f.nation, recruit_theatre::sea) == 300
                   && recruit_quarter_output(f.w, reg, f.nation, recruit_theatre::land) == 0,
-              "R12b one port makes 20 sea recruits a quarter, capped at 900 (45 ticks); it is no base");
-        const recruitment_tick t = run_recruitment(f.w, reg);
+              "R12b one port makes 20 sea recruits a quarter, capped at 300 (15 quarters); it is no base");
+        const recruitment_tick t = recruit_quarter(f.w, reg);
         std::printf("      sea %d land %d air %d; heads %lld; big carry %d small carry %d\n",
                     nat(f).sea_recruits, nat(f).land_recruits, nat(f).air_recruits,
                     static_cast<long long>(t.heads_taken), centre(f, big).recruit_heads_taken,
@@ -983,8 +1044,8 @@ int main()
               "R12d the tick's row reports the sea theatre's 20, none short");
         add_building(f, 8, building_type::port);
         check(recruit_quarter_output(f.w, reg, f.nation, recruit_theatre::sea) == 40
-                  && recruit_cap(f.w, reg, f.nation, recruit_theatre::sea) == 1800,
-              "R12e two ports make 40 into the ONE sea pool, cap 1800");
+                  && recruit_cap(f.w, reg, f.nation, recruit_theatre::sea) == 600,
+              "R12e two ports make 40 into the ONE sea pool, cap 600");
 
         fixture g; build(g);
         add_centre(g, 4, 5);
@@ -993,7 +1054,7 @@ int main()
         g.w.buildings.at(dp).decommissioned = true;
         const entity_id sp = add_building(g, 7, building_type::port);
         g.w.buildings.at(sp).state_idle = true;
-        const recruitment_tick tg = run_recruitment(g.w, reg);
+        const recruitment_tick tg = recruit_quarter(g.w, reg);
         check(nat(g).sea_recruits == 0 && tg.heads_taken == 0
                   && recruit_quarter_output(g.w, reg, g.nation, recruit_theatre::sea) == 0,
               "R12f a port under construction, idled, or idled by the state's funding makes none");
@@ -1006,20 +1067,20 @@ int main()
         const entity_id pb = add_centre(p, 25, 100); // province B
         add_building(p, 5, building_type::port);
         add_building(p, 6, building_type::military_base);
-        (void)run_recruitment(p.w, reg);
+        (void)recruit_quarter(p.w, reg);
         check(centre(p, pa).recruit_heads_taken == 70 && centre(p, pb).recruit_heads_taken == 0
                   && nat(p).land_recruits == 50 && nat(p).sea_recruits == 20,
               "R12h a port and a base in one province draw 50 + 20 = 70 heads from it, none from B");
         fixture e; build(e);
         add_centre(e, 3, 1, /*carry=*/990); // 10 heads left
         add_building(e, 5, building_type::port);
-        const recruitment_tick te = run_recruitment(e.w, reg);
+        const recruitment_tick te = recruit_quarter(e.w, reg);
         check(nat(e).sea_recruits == 10 && !te.nations.empty() && te.nations[0].sea_short == 10,
               "R12i a province with 10 heads left makes 10, 10 short");
         fixture o; build(o);
         add_centre(o, 25, 50); // only in B
         add_building(o, 5, building_type::port);
-        (void)run_recruitment(o.w, reg);
+        (void)recruit_quarter(o.w, reg);
         check(nat(o).sea_recruits == 0, "R12j a port in a province with no centre makes none");
 
         // Any owner nation: a second nation's port fills its own pool.
@@ -1033,9 +1094,9 @@ int main()
         building_component ob{}; ob.tile = tile(n2, 25); ob.type = building_type::port;
         n2.w.buildings[op] = ob;
         n2.w.nations.at(other).state_assets.push_back(op);
-        (void)run_recruitment(n2.w, reg);
+        (void)recruit_quarter(n2.w, reg);
         check(nat(n2).sea_recruits == 20 && n2.w.nations.at(other).sea_recruits == 20
-                  && recruit_cap(n2.w, reg, other, recruit_theatre::sea) == 900,
+                  && recruit_cap(n2.w, reg, other, recruit_theatre::sea) == 300,
               "R12k a port of any owner nation fills that nation's own sea pool");
 
         // The cap.
@@ -1045,17 +1106,17 @@ int main()
         int quarters = 0;
         while (nat(c).sea_recruits < recruit_cap(c.w, reg, c.nation, recruit_theatre::sea) && quarters < 100)
         {
-            (void)run_recruitment(c.w, reg);
+            (void)recruit_quarter(c.w, reg);
             ++quarters;
         }
         const int carry_full = centre(c, cc).recruit_heads_taken;
-        const recruitment_tick tc = run_recruitment(c.w, reg);
-        check(quarters == k_recruit_cap_quarters && nat(c).sea_recruits == 900,
-              "R12l an empty sea pool fills to 900 in exactly 45 ticks (" + std::to_string(quarters) + ")");
-        check(nat(c).sea_recruits == 900 && tc.heads_taken == 0 && centre(c, cc).recruit_heads_taken == carry_full,
+        const recruitment_tick tc = recruit_quarter(c.w, reg);
+        check(quarters == k_recruit_cap_quarters && nat(c).sea_recruits == 300,
+              "R12l an empty sea pool fills to 300 in exactly 15 quarters (" + std::to_string(quarters) + ")");
+        check(nat(c).sea_recruits == 300 && tc.heads_taken == 0 && centre(c, cc).recruit_heads_taken == carry_full,
               "R12m a full sea pool takes no more: no recruit, no head");
         nat(c).sea_recruits = 1000;
-        (void)run_recruitment(c.w, reg);
+        (void)recruit_quarter(c.w, reg);
         check(nat(c).sea_recruits == 1000, "R12n a sea pool above its cap is never cut");
 
         // Nothing spends it: a hire, a wing, a land refill, a wing's plan, a refund.
@@ -1092,19 +1153,20 @@ int main()
         int first = -1;
         for (int q = 0; q < 48; ++q)
         {
+            r.w.current_econ_tick = q; // as the sim loop stamps each step
             (void)run_economy_step(r.w, reg, /*spectating=*/false);
-            if (q == 0) first = nat(r).sea_recruits;
+            if (q == k_econ_ticks_per_quarter - 1) first = nat(r).sea_recruits;
         }
-        std::printf("      economy steps: after 1 sea %d, after 48 sea %d\n", first, nat(r).sea_recruits);
-        check(first == 20 && nat(r).sea_recruits == 900,
-              "R12q the economy step makes the port's 20, and 48 steps stop at the 900 cap");
+        std::printf("      economy steps: after 3 sea %d, after 48 sea %d\n", first, nat(r).sea_recruits);
+        check(first == 20 && nat(r).sea_recruits == 300,
+              "R12q three economy steps make the port's quarter of 20, and 48 months stop at the 300 cap");
 
         // The save (v73).
         fixture v; build(v);
         add_centre(v, 3, 5);
         add_building(v, 5, building_type::military_base);
         add_building(v, 6, building_type::port);
-        (void)run_recruitment(v.w, reg);
+        (void)recruit_quarter(v.w, reg);
         const std::string bytes = to_bytes(v.w);
         world back;
         const bool ok = from_bytes(bytes, back);
@@ -1153,7 +1215,7 @@ int main()
             add_building(q, 6, building_type::military_base);
             add_building(q, 23, building_type::airbase);
             for (int k = 0; k < 20; ++k)
-                (void)run_recruitment(q.w, reg);
+                (void)recruit_quarter(q.w, reg);
             return to_bytes(q.w);
         };
         check(run() == run(), "R12aa twenty quarters of ports and bases recruiting, twice: byte-identical");

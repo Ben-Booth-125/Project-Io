@@ -2668,6 +2668,8 @@ void write_world_snapshot_at(const world& w, std::ostream& out, uint32_t version
             w_id(out, cid);
             w_i32(out, b.founded_tick);
             w_i32(out, b.unfed_quarters);
+            if (world_stream_has_offworld_loss_carry(version))
+                w_i32(out, b.loss_carry_milli); // BL-1642 (v95)
         }
         uint32_t live = 0;
         for (const auto& [uid, n] : w.space_colonists)
@@ -2963,7 +2965,7 @@ std::size_t world_save_space_firsts_section_bytes(const world& w)
 
 std::size_t world_save_offworld_base_section_bytes(const world& w)
 {
-    std::size_t n = 8 + 12 * w.offworld_bases.size();
+    std::size_t n = 8 + 16 * w.offworld_bases.size(); // BL-1642: v95's record carries the loss carry
     for (const auto& [uid, c] : w.space_colonists)
         n += w.space_units.count(uid) != 0 ? 8 : 0;
     return n;
@@ -6610,6 +6612,10 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
             if (!r_id(in, cid) || cid == null_entity || (k > 0 && cid <= prev) || !r_i32(in, b.founded_tick)
                 || !r_i32(in, b.unfed_quarters) || b.founded_tick < 0 || b.unfed_quarters < 0
                 || b.unfed_quarters > k_offworld_unfed_max)
+                return false;
+            if (world_stream_has_offworld_loss_carry(version) // BL-1642 (v95)
+                && (!r_i32(in, b.loss_carry_milli) || b.loss_carry_milli < 0
+                    || b.loss_carry_milli >= k_offworld_loss_carry_max))
                 return false;
             prev = cid;
             const auto ct = s.population_centre_tile.find(cid);

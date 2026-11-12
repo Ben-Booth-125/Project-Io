@@ -1294,6 +1294,7 @@ uint64_t world::state_hash(int tick) const
                 fnv1a_u32(h, cid);
                 fnv1a_u32(h, static_cast<uint32_t>(b.founded_tick));
                 fnv1a_u32(h, static_cast<uint32_t>(b.unfed_quarters));
+                fnv1a_u32(h, static_cast<uint32_t>(b.loss_carry_milli)); // BL-1642
             }
             fnv1a_u32(h, live_colonists);
             for (const auto& [uid, n] : space_colonists)

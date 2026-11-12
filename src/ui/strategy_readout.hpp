@@ -34,10 +34,11 @@ namespace ui {
 /// pre-empt STRATEGIES.md's settled position that the deck is discovered, not
 /// authored. The readout shows the distributions and lets the shape speak.
 
-/// How many econ-tick samples (one per quarter) the rolling window spans.
+/// How many econ-tick samples (one per month) the rolling window spans.
 /// Matches plot_history_cap so the readout's horizon and the other ledgers'
-/// graphs retain the same slice of the run: 64 quarters = 16 in-game years.
-inline constexpr std::size_t strategy_window_samples = 64;
+/// graphs retain the same slice of the run: 192 months = 16 in-game years, the
+/// 64 quarters it held before the tick became a month (BL-1642).
+inline constexpr std::size_t strategy_window_samples = 192;
 
 /// The rolling aggregation state — app-owned, presentation-only, UNSERIALISED
 /// (the same lifetime as the balance history: outside the save seam, survives
@@ -57,7 +58,7 @@ struct strategy_readout_state
     };
 
     /// Per-corp aggregates. Counters cover the rolling window; the series
-    /// cover the last strategy_window_samples quarters (capped in lockstep).
+    /// cover the last strategy_window_samples months (capped in lockstep).
     struct corp_profile
     {
         std::array<std::uint32_t, corp_verb_count>            verbs{};   ///< Window verb mix.

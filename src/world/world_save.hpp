@@ -799,8 +799,11 @@ inline constexpr uint32_t k_world_save_version_pre_recruits = 71;
 /// world is older is refused at the game's load (`save_game_refusal_reason`).
 inline constexpr uint32_t k_world_save_version_one_product = 94;
 
-/// **95 (BL-1642, the tick is a month; Ben, 2026-11-11) - THE MONTHLY TICK.** No byte
-/// moves: v95's layout IS v94's (and v93's). What moved is MEANING - every count the stream holds
+/// **95 (BL-1642, the tick is a month; Ben, 2026-11-11) - THE MONTHLY TICK.** No section
+/// is added or moved; one record grows: each off-world base record (v90's section) carries
+/// an i32 loss carry after unfed_quarters (16 bytes, not 12;
+/// `world_stream_has_offworld_loss_carry`), so a base's shrink is carried between unfed
+/// months. Otherwise v95's layout IS v94's (and v93's). What moved is MEANING - every count the stream holds
 /// in econ ticks (the filed returns' window, cooldowns, lead times, unpaid and unfed
 /// counts, truce and offer ticks, arrival ticks, the econ tick itself) counts months
 /// where v94's and older counted quarters, and every per-tick figure is a month's. So a game save
@@ -1163,6 +1166,9 @@ inline constexpr bool world_stream_has_space_convoys(uint32_t v) { return world_
 inline constexpr bool world_stream_has_debris(uint32_t v) { return world_stream_has_space_section(v, k_world_save_version_debris); }
 inline constexpr bool world_stream_has_space_bombard(uint32_t v) { return world_stream_has_space_section(v, k_world_save_version_space_bombard); }
 inline constexpr bool world_stream_has_offworld_bases(uint32_t v) { return world_stream_has_space_section(v, k_world_save_version_offworld_bases); }
+/// BL-1642: from v95 each off-world base record carries its loss carry (i32
+/// loss_carry_milli in [0, 1000)) after unfed_quarters - 16 bytes, not 12.
+inline constexpr bool world_stream_has_offworld_loss_carry(uint32_t v) { return v >= k_world_save_version_monthly && !world_stream_is_space_line(v); }
 inline constexpr bool world_stream_has_space_firsts(uint32_t v) { return world_stream_has_space_section(v, k_world_save_version_space_firsts); }
 inline constexpr bool world_stream_has_transit_origin(uint32_t v) { return world_stream_has_space_section(v, k_world_save_version_transit_origin); }
 

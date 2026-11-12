@@ -1837,7 +1837,7 @@ boilerplate: pure, seeded, deterministic, replayable, legal verbs only, never a 
   beyond this one dial stays prohibited. See `solve_workforce_target` in economy_system.cpp.
 
   **Amended 2026-10-13 (Ben): the dial is no longer opt-out.** The player's workforce is set
-  by the game alone — one 25 % step a month (shown; 50 internal) toward the solver's best target, up to full employment — shown as 100 %, the internal 200
+  by the game alone — one 25 % step a quarter (every third month; shown; 50 internal) toward the solver's best target, up to full employment — shown as 100 %, the internal 200
   (`../economy/PRODUCTION.md` § Workforce target and the auto-solver). The slider, the Auto
   control and the player's `set_workforce` / `set_workforce_auto` verbs are retired. The grant
   is the same single dial under the same constraints — pure, seeded, deterministic, never a
@@ -2268,7 +2268,7 @@ boilerplate: pure, seeded, deterministic, replayable, legal verbs only, never a 
   what it unlocks — recipes, buildings, the space gate, the next cluster — weighted by the nation's
   budget lines, not only for its read modifiers; the two sides of a pick-one pair break a tie by the
   nation's seed, so nations diverge. After a node completes, the scorer may pick again in the same
-  month while the pool covers the next node — still one node queued at a time, in a bounded loop.
+  quarter while the pool covers the next node — still one node queued at a time, in a bounded loop.
   A node on the route to a major takes a share of that major's worth, read from the route the queue
   previews today; this scores the next pick and is not a plan, since nothing is kept between picks.
 
@@ -2521,7 +2521,7 @@ boilerplate: pure, seeded, deterministic, replayable, legal verbs only, never a 
   **A rival's march may weigh supply — granted (Ben, 2026-11-07; BL-1540, rival march supply;
   `../military/MILITARY.md` § Fronts, "A rival's fronts").** Raised on the measurement: rival marches
   starved 9-16% of their opening armies in 8 quarters. His answer: *"Grant it, scorer weighs supply."* A
-  new reading, on the standing terms. **A rival scores its fronts every month (Ben, 2026-11-09)**: that
+  new reading, on the standing terms. **A rival scores its fronts every quarter (Ben, 2026-11-09)**: that
   pass alone leaves the yearly evaluation clock. A rival nation's scorer, weighing a march of its OWN units, may
   read its OWN network's **cover** at the destination (never the route, and not the pool), what that
   cover does to the unit's stock and men, and the days of the straight march. The price is how fast the

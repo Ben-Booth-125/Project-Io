@@ -847,12 +847,13 @@ economy = {
         --   sea_per_port  20: Ben, 2026-11-02 - a completed, running port makes sea
         --                     recruits into the nation's one sea pool (cap 15 quarters).
         --                     20 matches an airbase; a ship's hire spends the pool.
-        -- Per month (BL-1642): a third of the quarter's 50 / 20 / 20, rounded to whole
-        -- heads (17 / 7 / 7 - a year is 204 / 84 / 84 against 200 / 80 / 80).
+        -- Per QUARTER (BL-1642: the tick is a month). Each month grants its share of
+        -- the quarter's rate (quarter_count_this_tick: 50 -> 16, 17, 17; 20 -> 6, 7, 7),
+        -- so a quarter makes exactly 50 / 20 / 20 and the cap stays fifteen quarters.
         recruits = {
-            land_per_base  = 17,
-            air_per_base   = 7,
-            sea_per_port   = 7,
+            land_per_base  = 50,
+            air_per_base   = 20,
+            sea_per_port   = 20,
             lp_per_recruit = 1.0,
         },
 

@@ -33,7 +33,7 @@ header_recruits_record& recruits_record()
 struct recruit_readout
 {
     int held   = 0; ///< recruits in the nation's pool
-    int cap    = 0; ///< 15 x the quarter's nominal output
+    int cap    = 0; ///< 15 x the quarter's nominal output (forty-five months)
     int output = 0; ///< recruits its running sources make a quarter
     int rate   = 0; ///< the authored rate per source (bases = output / rate)
 };
@@ -165,10 +165,10 @@ void recruit_tooltip(int theatre, const recruit_readout& r)
     ImGui::TextUnformatted(k_what[theatre]);
     const int sources = r.rate > 0 ? r.output / r.rate : 0;
     if (r.rate > 0)
-        ImGui::TextDisabled("%d %s x %d = %d a month; the pool holds at most %d, forty-five months of it.",
+        ImGui::TextDisabled("%d %s x %d = %d every 3 months; the pool holds at most %d, forty-five months of it.",
                             sources, k_source[theatre][sources == 1 ? 0 : 1], r.rate, r.output, r.cap);
     else
-        ImGui::TextDisabled("%d a month; the pool holds at most %d, forty-five months of it.", r.output,
+        ImGui::TextDisabled("%d every 3 months; the pool holds at most %d, forty-five months of it.", r.output,
                             r.cap);
     ImGui::TextDisabled("A full pool takes none: its sources make no recruits that month.");
     if (r.cap > 0 && r.held >= r.cap)

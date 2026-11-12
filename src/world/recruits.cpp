@@ -180,9 +180,13 @@ recruitment_tick run_recruitment(world& w, const recipe_registry& reg)
             if (bases.empty())
                 continue;
             any_base = true;
-            const int rate = rate_of(reg, t);
+            // BL-1642 (the tick is a month): the rate is authored a QUARTER and each
+            // month grants its share (quarter_count_this_tick: 50 -> 16, 17, 17), so a
+            // quarter makes exactly the ruling's count; the cap stays fifteen quarters.
+            const int quarter_rate = rate_of(reg, t);
+            const int rate = quarter_count_this_tick(quarter_rate, w.current_econ_tick);
             const int64_t cap = std::min<int64_t>(static_cast<int64_t>(k_recruit_cap_quarters)
-                                                      * static_cast<int64_t>(bases.size()) * rate,
+                                                      * static_cast<int64_t>(bases.size()) * quarter_rate,
                                                   k_recruit_pool_max);
             int32_t* pool = pool_of(nc, t);
             int made = 0, shortfall = 0;

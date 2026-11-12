@@ -4113,7 +4113,8 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
             // "A rival's march may weigh supply"): that one pass, on the live-only gate it
             // has below. Everything else in the evaluation keeps the staggered clock, and a
             // due actor still scores its fronts after its war, embargo and defence passes.
-            if (actor.is_nation && tick >= k_campaign_settle_ticks)
+            // BL-1642: "every quarter" holds on the monthly tick - one month in three.
+            if (actor.is_nation && tick >= k_campaign_settle_ticks && is_quarter_tick(tick))
                 score_nation_fronts(w, reg, corp, tick);
             continue;
         }
@@ -4168,7 +4169,7 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
         if (actor.is_nation && tick >= k_campaign_settle_ticks)
             score_nation_defence(w, reg, corp, tick); // BL-1504: before the front's assign
 
-        if (actor.is_nation && tick >= k_campaign_settle_ticks)
+        if (actor.is_nation && tick >= k_campaign_settle_ticks && is_quarter_tick(tick)) // BL-1642: a quarter
             score_nation_fronts(w, reg, corp, tick);
 
         // BL-1451 (AI_OPPONENT.md § 11, "Rival nations fly air wings", Ben 2026-10-28):

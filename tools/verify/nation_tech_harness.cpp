@@ -401,11 +401,28 @@ void rows_r6(const recipe_registry& reg)
         const float treasury = f.w.nations.at(f.nation).treasury;
         f.w.nation_tech[f.nation].pool_milli = milli(1.0e6);
         std::vector<research_ai_pick> picks;
-        const int n = run_nation_research_repick(f.w, reg, false, &picks);
+        // BL-1642 (the tick is a month): the bound is per QUARTER, spread over its three
+        // months by quarter_count_this_tick - so the quarter's three calls sum to it, and
+        // no one month takes the whole bound.
+        int n = 0;
+        bool month_under_bound = true;
+        const int t0 = f.w.current_econ_tick; // the fixture's live tick
+        for (int m = 0; m < k_econ_ticks_per_quarter; ++m)
+        {
+            f.w.current_econ_tick = t0 + m;
+            std::vector<research_ai_pick> month;
+            const int got = run_nation_research_repick(f.w, reg, false, &month);
+            month_under_bound &= got == quarter_count_this_tick(reg.nation_ai().research_repicks_per_quarter, t0 + m);
+            n += got;
+            picks.insert(picks.end(), month.begin(), month.end());
+        }
         const auto& st = f.w.nation_tech[f.nation];
         std::int64_t spent = 0;
         for (const research_ai_pick& p : picks) spent += p.cost_milli;
-        check(n == reg.nation_ai().research_repicks_per_quarter
+        std::printf("     a quarter of re-picks: %d (bound %d, months at their share %d), held %d, queue %d\n",
+                    n, reg.nation_ai().research_repicks_per_quarter, month_under_bound ? 1 : 0,
+                    static_cast<int>(st.held.count()), static_cast<int>(st.queue.size()));
+        check(n == reg.nation_ai().research_repicks_per_quarter && month_under_bound
                   && static_cast<int>(st.held.count()) == n && st.queue.empty()
                   && st.pool_milli == milli(1.0e6) - spent
                   && f.w.nations.at(f.nation).treasury == treasury,

@@ -1409,13 +1409,17 @@ int run_nation_research_repick(world& w, const recipe_registry& reg, bool specta
 {
     const nation_ai_params& p = reg.nation_ai();
     int queued = 0;
+    // BL-1642: the ruling's bound is per QUARTER (Ben, 2026-10-15); on the monthly tick
+    // it is spread over the quarter's three months (8 a quarter: 2, 3, 3), so a quarter
+    // still re-picks at most the ruling's count.
+    const int repicks = quarter_count_this_tick(p.research_repicks_per_quarter, w.current_econ_tick);
     for (const entity_id n : research_ai_nations(w, spectating))
     {
         // One node queued at a time: re-pick only while the queue is idle and
         // the pool already holds the next pick's whole cost, so it completes
         // now from RP in hand. No treasury is spent here (the line paid only
         // what the queue owed in advance_research).
-        for (int k = 0; k < p.research_repicks_per_quarter && research_queue_idle(w, n, reg.research()); ++k)
+        for (int k = 0; k < repicks && research_queue_idle(w, n, reg.research()); ++k)
         {
             const auto tit = w.nation_tech.find(n);
             if (tit == w.nation_tech.end())

@@ -85,8 +85,18 @@ class recipe_registry;
 struct offworld_base
 {
     int32_t founded_tick   = 0; ///< The econ tick it was founded at.
-    int32_t unfed_quarters = 0; ///< Consecutive quarters its life support went unbought.
+    int32_t unfed_quarters = 0; ///< Consecutive econ ticks (months since BL-1642) its life support went unbought.
+    /// BL-1642: the shrink CARRIED between unfed months, in milli-heads, [0, 1000). Each
+    /// unfed month adds its share of the people (at least a third of a head, the quarter
+    /// tick's one-head floor spread over its three months); a whole head leaves when the
+    /// carry reaches 1000. Feeding does not clear it, so no pattern of fed and unfed
+    /// months dodges the calendar rate. SERIALISED from world v95.
+    int32_t loss_carry_milli = 0;
 };
+
+/// BL-1642: the carry's bound (exclusive), and the least a month adds to it.
+inline constexpr int32_t k_offworld_loss_carry_max   = 1000;
+inline constexpr int32_t k_offworld_loss_floor_milli = 334; // a third of a head: 3 months >= 1 head
 
 /// The dials. First cut, in-band; not a Lua key yet.
 struct offworld_base_params

@@ -376,14 +376,15 @@ void record_histories(const world& w, const recipe_registry& reg,
     }
 
     // Snapshot the player-building profit ranking for the Budget ledger's rank-change
-    // column (BL-171): keep the last 5 (this tick + the 4 prior = ~a year back).
+    // column (BL-171): keep a year and one (this tick + the year's ticks prior; BL-1642,
+    // the tick is a month, so 13 snapshots and the oldest is a year back).
     {
         std::unordered_map<entity_id, int> ranks;
         const auto ranking = ui::rank_player_buildings_by_profit(w, reg, report);
         for (int i = 0; i < static_cast<int>(ranking.size()); ++i)
             ranks[ranking[i].first] = i;
         h.building_rank.push_back(std::move(ranks));
-        if (h.building_rank.size() > 5)
+        if (h.building_rank.size() > static_cast<std::size_t>(k_econ_ticks_per_year + 1))
             h.building_rank.pop_front();
     }
 

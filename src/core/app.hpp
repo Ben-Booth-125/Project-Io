@@ -1358,14 +1358,14 @@ private:
     std::vector<float> m_income_history;      ///< Recent player income per econ tick (market sales); feeds the Budget ledger's profit chart.
     std::vector<float> m_expenditure_history; ///< Recent player expenditure per econ tick (auto-buys + wages + maintenance); feeds the Budget ledger's profit chart.
     ui::market_plot_history m_market_history; ///< Price / supply / demand history per market, per resource; feeds market ledger graphs.
-    std::deque<std::unordered_map<entity_id, int>> m_building_rank_hist; ///< Player-building profit rankings (entity→rank), one snapshot per econ tick, last 5 kept; the oldest is ~4 ticks (a year) back, feeding the Budget ledger's rank-change column (BL-171).
+    std::deque<std::unordered_map<entity_id, int>> m_building_rank_hist; ///< Player-building profit rankings (entity→rank), one snapshot per econ tick, last k_econ_ticks_per_year + 1 (13) kept; the oldest is a year (12 monthly ticks) back, feeding the Budget ledger's rank-change column (BL-171).
 
     // Resource-deposit time series (BL-198) — app-owned, capped, UNSERIALISED (like
     // the balance history: outside the save seam, so no format change and no
     // determinism risk; survives the session only). Feeds the Selection band's
     // resource drill-down chart (BL-196/197). The body aggregate is recorded every
     // econ tick; a tile's own series only from the first drill-down into it (lazy).
-    ui::strategy_readout_state    m_strategy_readout;    ///< Rolling per-corp decision aggregation (BL-411) — verb mix / spend buckets / reason tally over the last 64 quarters. Same lifetime rules as the histories above: presentation-only, unserialised, advanced once per econ tick.
+    ui::strategy_readout_state    m_strategy_readout;    ///< Rolling per-corp decision aggregation (BL-411) — verb mix / spend buckets / reason tally over the last 192 months (16 years; strategy_window_samples). Same lifetime rules as the histories above: presentation-only, unserialised, advanced once per econ tick.
 
     bool        m_show_help        = false;   ///< Toggle for the F1 key-binding cheat-sheet overlay.
     bool        m_show_options     = false;   ///< Toggle for the F10 display/options window.
