@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*101 entries — 49 open, 52 resolved.*
+*103 entries — 51 open, 52 resolved.*
 
 ---
 
@@ -528,6 +528,34 @@ The Early Space store's check requires every Digitisation quest to key an Early 
 > **Recommendation:** Keep the reserved branch until the Early Space tree is designed past its reserved rows.
 
 *Files: `docs/economy/tech/early_space_tree.json`, `docs/economy/tech/EARLY_SPACE_TREE.md`*
+
+### NR-1223 — Monthly tick: market price smoothing kept at 0.5 a tick, so prices settle three times faster in calendar time
+*decision taken on your behalf · raised 2026-11-12 · from BL-1642 (monthly tick) lane and cold review*
+
+k_price_smoothing was re-derived to 0.2063 a month (the quarter rate spread over three ticks). At that rate processors sat unbid over the fair-price ceiling, because monthly supply arrives in lumps. The lane kept 0.5 per tick: prices now close half the gap to target in a month, not a quarter. Measured: market_viability quick G1 86.8 / G1b 3.2 merged, against main 83.6 / 5.2.
+
+**Why it matters.** Price speed is what the player reads as market volatility; the ruling said every per-tick flow becomes a third, and this one does not.
+
+- Keep 0.5 a tick (faster calendar settling, measured better)
+- Restore the calendar rate (0.2063) and fix the lumpy-supply bidding another way
+
+> **Recommendation:** Keep 0.5 a tick; MARKETS.md states it once with the reason.
+
+*Files: `src/world/market_clearing.hpp`, `docs/economy/MARKETS.md`*
+
+### NR-1224 — Monthly tick: migration runs once a quarter; one recruits check uses fixture rates
+*decision taken on your behalf · raised 2026-11-12 · from BL-1642 (monthly tick) lane and cold review*
+
+Migration moves three months of its rate on the first month of each quarter, so its integer floor does not silence centres of 100-299k. recruits_harness mechanic rows run a fixture registry (50/20/20 a tick) while R0 checks the shipped monthly rates.
+
+**Why it matters.** Migration arrives in quarterly lumps under a monthly tick.
+
+- Keep the quarterly migration cadence
+- Carry a fractional remainder monthly instead
+
+> **Recommendation:** Keep it; heads are conserved and the calendar rate holds.
+
+*Files: `src/world/economy_system.cpp`, `tools/verify/recruits_harness.cpp`*
 
 ---
 
