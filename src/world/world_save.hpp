@@ -373,7 +373,7 @@ inline constexpr uint32_t world_save_magic =
 /// per market; refused whole on the strict-equality contract, no migration.
 /// Claimed through `tools/session/next_save_version.js --kind world --claim`.
 /// Bumped to 41 by sprint 50 PROPELLANT (propellant routes follow the body's air,
-/// Ben 2026-10-09; PRODUCTION.md § Chemical Plant): the body record gains one
+/// Ben 2026-10-09; PRODUCTION.md § Propellant Plant): the body record gains one
 /// byte, `body_component::atmosphere` (an `atmosphere_class`), after
 /// `mass_earths` -- the generated atmosphere, which gates the two propellant
 /// recipes. A v38 stream is one byte short per body, so its next body misreads;
@@ -784,7 +784,21 @@ inline constexpr uint32_t k_world_save_version_pre_recruits = 71;
 /// off-world bases (90), the firsts (91) and the transit origins (92). The reader takes
 /// every version listed above and the readable space-line versions; the section
 /// predicates (`world_stream_has_*`) say which stream holds what.
-inline constexpr uint32_t world_save_version = 93;
+///
+/// **94 (BL-1641, PRODUCTION.md § One building per product) — ONE BUILDING PER
+/// PRODUCT.** The layout of v93, unchanged: no section is added or moved. What changed
+/// is what a world's buildings mean - a processing building makes one product, its
+/// methods are upgrades or variants, and a stack runs one method - so a GAME save of
+/// a world before it is refused whole, not migrated (Ben, 2026-11-11): the game's load
+/// (`app::load_game_from`) asks `save_game_refusal_reason` first and refuses a world
+/// stream below `k_world_save_version_one_product`, saying why. `read_save_game` and
+/// `read_world_snapshot` still read v93 and every older stream they read, for the
+/// verification producers; a bare world snapshot is not a save the game opens.
+inline constexpr uint32_t world_save_version = 94;
+
+/// BL-1641: the first world stream of one building per product. A game save whose
+/// world is older is refused at the game's load (`save_game_refusal_reason`).
+inline constexpr uint32_t k_world_save_version_one_product = 94;
 
 /// The space-mechanics merge: the first version stacking the naval/missile line and the
 /// space line.

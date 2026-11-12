@@ -278,33 +278,36 @@ When the inputs available cannot cover a full conversion, the building does **no
 draw on it (MARKETS.md § Price resolution). An input whose posted price stands over the fair-price
 ceiling is not bought, and counts as no cover. There is one model, not a market special case.
 
-### Recipes by building type
+### Recipes by building
 
-Every recipe runs on the one generic `processing_facility`; the named processor types below are
-the design vocabulary for its **sub-facility groups** (§ Sub-facility groups), and the recipes
-are authored in `scripts/recipes.lua`.
+Every recipe runs on the one generic `processing_facility`, and every processing building makes
+**one product** (§ One building per product): the headings below are the product buildings, and
+the recipes are authored in `scripts/recipes.lua`. Where a building has more than one method, the
+methods are its upgrades and variants (§ Upgrades and variants); the active method is set per
+stack, chosen at construction and changed on the building's own card. Two stacks of one building
+on different tiles may run different methods; one stack runs one.
 
-A building type may support multiple recipes. The active recipe for a given building is configured by the player (or defaulted at construction). Multiple buildings of the same type on the same body can run different recipes simultaneously.
-
-#### Smelter
+#### Steel Mill
 
 | Inputs | Output | Era |
 |--------|--------|-----|
 | Iron ore ×2 + coal ×1 (reagent) | Steel | 0 |
 | Iron-nickel ore ×2 | Steel | 1 |
 
-Coal is consumed as a process fuel and reagent but does not appear as a separate intermediate product. The iron-nickel recipe requires no carbon addition because metallic asteroids are already reduced.
+Coal is consumed as a process fuel and reagent but does not appear as a separate intermediate product. The iron-nickel recipe requires no carbon addition because metallic asteroids are already reduced. The two are variants of one another; the Bessemer Converter is the Smelter's upgrade and the In-Situ Smelter a further variant (§ In-situ and premium routes).
 
-#### Refinery
+#### Fuel Refinery, Silicon Works, Copper Refinery, Rare Earth Refinery
 
-| Inputs | Output | Era |
-|--------|--------|-----|
-| Petroleum | Refined fuel | 0 |
-| Silica | Silicon | 0 |
-| Copper ore | Refined copper | 0 |
-| Rare earth ore | REE alloy | 0 |
+Four buildings, one refining step each.
 
-#### Chemical Plant
+| Building | Inputs | Output | Era |
+|----------|--------|--------|-----|
+| Fuel Refinery | Petroleum | Refined fuel | 0 |
+| Silicon Works | Silica | Silicon | 0 |
+| Copper Refinery | Copper ore | Refined copper | 0 |
+| Rare Earth Refinery | Rare earth ore | REE alloy | 0 |
+
+#### Propellant Plant
 
 | Inputs | Output | Era |
 |--------|--------|-----|
@@ -313,9 +316,9 @@ Coal is consumed as a process fuel and reagent but does not appear as a separate
 
 The two routes are `propellant_atmospheric` and `propellant_electrolysis` (BL-308, propellant).
 Liquid oxygen has no `resource_type`: it is folded into each recipe, because nothing outside the
-Chemical Plant would ever hold it.
+Propellant Plant would ever hold it.
 
-On a body with an atmosphere, liquid oxygen is produced in Era 1 by cryogenic air separation — the Chemical Plant draws oxygen from the local atmosphere and consumes no stockpiled input (energy cost only, abstracted into the recipe rate). Propellant is therefore an Era 1 capability anywhere refined fuel is available. On airless bodies there is no atmosphere to separate, so the water-electrolysis recipe is the only liquid-oxygen route off-world. **And it runs only
+On a body with an atmosphere, liquid oxygen is produced in Era 1 by cryogenic air separation — the Propellant Plant draws oxygen from the local atmosphere and consumes no stockpiled input (energy cost only, abstracted into the recipe rate). Propellant is therefore an Era 1 capability anywhere refined fuel is available. On airless bodies there is no atmosphere to separate, so the water-electrolysis recipe is the only liquid-oxygen route off-world. **And it runs only
 there (Ben, 2026-10-09):** `propellant_electrolysis` may be set only on an airless body, and
 `propellant_atmospheric` only on a body with an atmosphere — each route is the one its body's
 air allows, never a cheaper choice beside the other. "Airless" is planetology's own reading: an
@@ -323,7 +326,7 @@ atmosphere class of `none` or `thin` (a trace atmosphere at zero surface pressur
 bodies planetology routes to the airless tables (`atmosphere_class`, `src/world/components.hpp`;
 Ben's ruling 2026-10-09 applied with the existing definition). Closing the in-situ propellant loop there (water → liquid oxygen, refined fuel shipped or synthesised) is the defining Era 2 logistical problem.
 
-**The airless route is the Electrolysis Plant (ERAS.md § The propellant loop).** A Chemical Plant on
+**The airless route is the Electrolysis Plant (ERAS.md § The propellant loop).** A Propellant Plant on
 `propellant_electrolysis` is what the Early Space tree calls the Electrolysis Plant, and it runs only on
 the ground of a nation holding Electrolysis Plants. A recipe names that key as data (`mechanic` in
 `scripts/recipes.lua`), and every door that asks whether a recipe may run at a tile asks it with the
@@ -335,19 +338,19 @@ body's air: the build door and the retool door refuse it as locked technology wi
 |--------|--------|-----|
 | Silicon + refined copper + REE alloy ×0.5 | Electronics | 0 |
 
-#### Fabricator
+#### Machine Works, Alloy Works, Ordnance Works
 
-| Inputs | Output | Era |
-|--------|--------|-----|
-| Steel + refined copper | Machinery | 0 |
-| Steel + REE alloy | Alloys | 0 |
-| Steel + machinery | **Ordnance** | 0 |
+| Building | Inputs | Output | Era |
+|----------|--------|--------|-----|
+| Machine Works | Steel + refined copper | Machinery | 0 |
+| Alloy Works | Steel + REE alloy | Alloys | 0 |
+| Ordnance Works | Steel + machinery | **Ordnance** | 0 |
 
 The ordnance route is the roster's **military terminal good** (BL-457, ordnance) — see
 `RESOURCES.md` § The two terminal goods for why the tier ends in two places. Three notes that
 belong here rather than there:
 
-- It sits at the **same depth as alloys**, one step below the Assembly Plant, deliberately. That
+- It sits at the **same depth as alloys**, one step below the Spacecraft Assembly Plant, deliberately. That
   is a statement about the roster's shape, not a lock: depth does not gate, so what keeps ordnance
   off a starting nation's tick-one menu is the availability of its inputs, not a refusal.
 - It is `machinery`'s **second** consumer, after the heavy spacecraft route below. A single
@@ -357,11 +360,11 @@ belong here rather than there:
   re-derived rather than re-guessed if either input's price moves.
 
 There is **no industrial ancient-arc shortcut here** — the deliberate omission stands. The
-ancient arc reaches ordnance through the **Smithy** (§ The ancient chain), because unit upkeep
+ancient arc reaches ordnance through the Ordnance Works' **Smithy** method (§ The ancient chain), because unit upkeep
 draws ordnance every tick in either arc, and the ancient roster carries a route to the one good an
 army needs.
 
-#### Assembly Plant
+#### Spacecraft Assembly Plant
 
 | Inputs | Output | Era |
 |--------|--------|-----|
@@ -369,10 +372,11 @@ army needs.
 | Machinery ×2 + steel ×2 | Spacecraft components | 1 |
 
 The second route is the **heavy** one (NR-257): more structural mass and worked machinery, none
-of the refined-electronics chain. It is a *supply route* rather than an alternate method in
-§ Alternate production methods' sense — its inputs are disjoint from the first's, so which one a
-nation runs is decided by what its industry already reaches, not by comparing two prices at one
-building. It is also `machinery`'s first consumer.
+of the refined-electronics chain. It is a **variant** of the alloys and electronics route
+(§ Upgrades and variants): the two draw different goods at the same required depth (2), so neither
+is the deeper route, and they switch both ways. Their inputs are disjoint, so the no-dominance
+guard reads them as a supply route rather than compares their prices. It is also `machinery`'s
+first consumer.
 
 #### In-situ and premium routes
 
@@ -387,8 +391,8 @@ see the note on the recipe in `scripts/recipes.lua`.
 
 | Inputs | Output | Era | Why it exists |
 |--------|--------|-----|---------------|
-| Regolith ×8.5 | Steel | 1 | In-situ reduction on an airless body. Eight and a half regolith per steel against the Smelter's two iron ore: regolith is on every tile of every airless body, so the point is that you can build **from where you are**. |
-| Platinum group metals ×0.5 | Electronics | 1 | Contact-grade/catalytic route. At base price 40 this is a premium alternative to the silicon + copper + REE chain, not a cheap bypass of it. |
+| Regolith ×8.5 | Steel | 1 | The Steel Mill's In-Situ Smelter, a variant. In-situ reduction on an airless body. Eight and a half regolith per steel against the Smelter's two iron ore: regolith is on every tile of every airless body, so the point is that you can build **from where you are**. |
+| Platinum group metals ×0.5 | Electronics | 1 | The Electronics Lab's Contact-Grade root, which the silicon chain upgrades. Contact-grade/catalytic route. At base price 40 this is a premium alternative to the silicon + copper + REE chain, not a cheap bypass of it. |
 
 #### Food Processor
 
@@ -402,10 +406,10 @@ see the note on the recipe in `scripts/recipes.lua`.
 |--------|--------|-----|
 | Water ×1.5 + steel ×0.5 | Agricultural produce ×5 | 0 |
 
-A processing_facility recipe (`hydroponics_bay`, BL-166) that produces `agricultural_produce`
+A product building of its own (`hydroponics_bay`, BL-166) that produces `agricultural_produce`
 from refined inputs instead of a terrain deposit — no "energy" resource exists in the roster, so
 water (irrigation) and steel (the bay's own structure) stand in for it. Feeds the same Food
-Processor → Food rations chain the Farm feeds; no new market good. **Placement is terrain-gated
+Processor → Food rations chain the Farm feeds; no new market good. It is its own building, not a method of the Food Processor: it makes produce, not rations. **Placement is terrain-gated
 the opposite way from the Farm:** only valid where the terrestrial Farm deposit was NOT seeded
 (`resource_deposit[agricultural_produce] == 0`), keyed off the processing_facility's target
 resource in `placement_rules::can_place` (mirror image of the extraction deposit check;
@@ -445,7 +449,7 @@ Every other route clears `alternate_profit_over_marginal` instead (`0` = profita
 the floor half regardless. A recipe whose primary output is an extractable raw is always an
 alternate: extraction is that good's cheapest route. The anchor is chosen among the routes a
 **home body can run**, since the base-price table prices home-body markets: a route that runs only
-on an airless body (§ Chemical Plant, "And it runs only there") is always an alternate (Ben,
+on an airless body (§ Propellant Plant, "And it runs only there") is always an alternate (Ben,
 2026-10-09) — so propellant anchors on `propellant_atmospheric`, at 64.0.
 
 **One price table for both bands.** A good's price is the larger of the two bands' anchor-route
@@ -489,9 +493,9 @@ Amenity buildings are placed on tiles and lock them to amenity land use — no e
 
 ### Habitability production buildings
 
-These produce habitability goods (see `docs/economy/RESOURCES.md`) consumed by population centres. They use processing building mechanics (recipe, workforce scalar, the shelf) and differ from industrial processing buildings only in that their outputs feed population demand rather than further industrial chains. The three are the **Welfare Goods** group of `processing_facility` recipes (BL-368, habitability tranche):
+These produce habitability goods (see `docs/economy/RESOURCES.md`) consumed by population centres. They use processing building mechanics (recipe, workforce scalar, the shelf) and differ from industrial processing buildings only in that their outputs feed population demand rather than further industrial chains. They are three product buildings of `processing_facility`, one welfare good each (BL-368, habitability tranche):
 
-| Recipe | Inputs | Output | Era |
+| Building (recipe) | Inputs | Output | Era |
 |---|---|---|---|
 | Water Treatment Plant (`clean_water`) | Water ×2 | Clean water | 0 |
 | Consumer Goods Factory (`consumer_goods`) | Food rations ×1 + steel ×1 | Consumer goods | 0 |
@@ -1122,8 +1126,8 @@ every one of them is priced and consumed, per the admission rule.
 
 \* The Coking Kiln's own required depth, not `charcoal`'s overall depth — the Burner keeps that at
 1, since chain depth is a **min across recipes** (§ Chain depth below). The Kiln is BL-587's
-alternate method: unreachable until a nation has already smelted blooms, cheaper by the guard's
-reference prices once it is. See § Alternate production methods.
+upgrade of the Charcoal Burner: unreachable until a nation has already smelted blooms, cheaper by the guard's
+reference prices once it is. See § Upgrades and variants.
 
 **Rows five through eight are BL-585/BL-586's first slice of the wide ancient roster** (2026-08-24)
 — named buildings on existing raws, no new deposit or extraction target. The Toolmaker is that
@@ -1143,11 +1147,13 @@ is the roster's chosen name for the design table's "terminal trade good": ropewo
 tackle — a genuine ancient-craft good a shipyard plausibly makes — in the same generic-material-
 noun register as `ceramics`/`dressed_stone`/`tools`.
 
-**The Smithy's second recipe is the ancient arc's route to `ordnance`** (BL-460, ancient
-ordnance) — the same building, same `iron_blooms + charcoal` basket as its steel recipe,
-switchable between the two (§ Alternate production methods). Unit upkeep draws ordnance every
-tick in either arc, so the ancient roster (§ The era band) carries a route to it. See
-§ Fabricator above and `RESOURCES.md` § The two terminal goods.
+**The Smithy's ordnance recipe is the ancient arc's route to `ordnance`** (BL-460, ancient
+ordnance). It is the Ordnance Works' ancient method, not a switch of the Steel Mill's Smithy:
+under one building per product a building that makes steel never turns to ordnance (§ One
+building per product). The two Smithy methods share a name and a basket's raws, and stand as two
+buildings. Unit upkeep draws ordnance every tick in either arc, so the ancient roster (§ The era
+band) carries a route to it. See § Machine Works, Alloy Works, Ordnance Works above and
+`RESOURCES.md` § The two terminal goods.
 
 **The load-bearing authoring is the tag on the coal-fired `steel` recipe, not the additions.**
 That recipe is `industrial`, so the ancient arc reaches steel only through timber → charcoal →
@@ -1279,14 +1285,14 @@ tech permits**, so the start gate is a **tech** question and nothing else.
 A fresh ancient nation — holding no node, no buildings, no treasury — sees the ancient
 band's processing recipes open on tick one:
 
-| Group | Open at tick 0 | Why |
+| Buildings | Open at tick 0 | Why |
 |---|---|---|
-| Fuel Production | Charcoal Burner, Peat Kiln, Coking Kiln | The Burner and the Kiln are a genuine supply-route pair (disjoint raws — R2's own classification). The Coking Kiln is the deeper fuel route; it is open, and what limits it is whether its reagent can be bought, not a lock. |
-| Food Processing | Food Rations, Miller | The any-band/ancient pair, both open. |
-| Artisan Goods | Potter & Weaver, Glassworks, Tannery, Weaver | An early nation may sell trade goods without earning anything first. |
-| Construction Materials | Potter's Kiln, Stonemason, Sawmill | BL-586's slice-1 buildings — foundational, not earned content. |
-| Metal Foundry | Bloomery Furnace (ore + timber → steel, the band's depth-one route), Bloomery, and the Smithy's two routes (steel, ordnance) | Open. The Furnace needs only raws; the bloom chain is limited by charcoal supply and by whether blooms find a buyer — a market fact, not a refusal. |
-| Advanced Fabrication | Shipwright | Open, and shut in practice by its own inputs: it draws `planks` and `cloth`, and the shipped ancient world produces no planks. |
+| Charcoal Works | Charcoal Burner, Peat Kiln, Coking Kiln | The Burner and the Peat Kiln are variants (disjoint raws — R2's supply-route class). The Coking Kiln is the Burner's upgrade; it is open, and what limits it is whether its reagent can be bought, not a lock. |
+| Food Processor | Food Rations, Miller | The any-band/ancient variant pair, both open. |
+| Trade Goods Workshop, Tannery, Weaver | Potter & Weaver, Glassworks, Tannery, Weaver | An early nation may sell trade goods without earning anything first. |
+| Potter's Kiln, Stonemason, Sawmill | Potter's Kiln, Stonemason, Sawmill | BL-586's slice-1 buildings — foundational, not earned content. |
+| Steel Mill, Bloomery, Ordnance Works | Bloomery Furnace (ore + timber → steel, the band's depth-one route) and its Smithy upgrade, the Bloomery, and the Ordnance Works' Smithy | Open. The Furnace needs only raws; the bloom chain is limited by charcoal supply and by whether blooms find a buyer — a market fact, not a refusal. |
+| Shipwright | Shipwright | Open, and shut in practice by its own inputs: it draws `planks` and `cloth`, and the shipped ancient world produces no planks. |
 | Toolmaker | Toolmaker | Open to every nation from the start — NR-1022 (old gates open). |
 
 **No ancient recipe is closed at tick 0 by tech.** That is the whole shape of the start gate.
@@ -1367,135 +1373,136 @@ presenting and never operating.
 
 A save from before the split is refused with a clear message, not migrated.
 
-## Alternate production methods
+### What a product building is
 
-**Ruling (Ben, 2026-08-15): alternates with real trade-offs, not tier upgrades** (BL-430,
-alternate production methods). `recipes.lua` lets several recipes share a primary output (the
-Charcoal Burner and the Peat Kiln both → `charcoal`), and `recipe_registry::recipe_at` /
-`recipe_count` browse every era-allowed recipe for a `processing_facility`, so a building's
-Production dropdown (`construction_panel.cpp`) offers every era-allowed method in its group
-interchangeably. What the mechanic adds is the *cost of choosing*.
+Every processing building is the one generic `processing_facility`; what it **is** is the product
+its recipes make. `recipe::group` (`scripts/recipes.lua`) names that product building, and every
+method of the product carries the same name — so "Steel Mill" is the Build door's row, the card's
+title, the map stamp's form, the stack key and the research scope `group:Steel Mill`. The recipe
+loader refuses a building whose methods make two different goods. A new product is a new building
+name, never a new `building_type` value: the type axis already says *processing*, and the product is
+the one fact that distinguishes one processor from another.
 
-**Switching costs something.** Changing a `processing_facility`'s active recipe through the
-*player-grade* seam — the management UI's method dropdown, or `corp_command`'s `set_recipe` verb
-(which the AI's `dial_recipe` margin-chase also goes through, so it pays the same price) —
-debits a one-off credit cost and starts a cooldown, both authored in `economy.recipe_switch`
-(`scripts/economy.lua`; `switch_cost = 12.0`, `cooldown_ticks = 6`). The single implementation is
-`try_switch_recipe` (`economy_system.{hpp,cpp}`); a refusal (on cooldown, insufficient funds,
-unknown/no-op recipe) mutates nothing. `building_component.recipe_switch_cooldown` carries the
-countdown, decremented once per economy tick.
+### The product buildings
 
-**The BL-079 reflex switch is deliberately exempt.** A building whose output has floored
-(`economy_system.cpp`'s loss-streak rescue) may still auto-switch to a healthier recipe for free
-and instantly — that is sanctioned, narrow, local auto-agency reacting to a sustained loss, not a
-strategic commitment, and it never calls `try_switch_recipe`. See
-`.claude/rules/io-standing-rules.md`'s BL-079 exception for the standing invariant this preserves.
-
-**The no-dominance guard.** `tools/verify/chain_depth.cpp`'s `R2` is the live guard (moved from
-`recipe_switch_harness.cpp`'s retired `R1` on 2026-08-16 — see that file's own header for the
-retraction). It groups recipes by (primary output resource, era band) and buckets every
-same-output sibling pair as a **supply route** (disjoint raws — which one a nation runs is decided
-by deposit access, not price), a named **precondition pair** (differs by a placement fact the
-recipe data cannot carry, e.g. atmosphere vs airless body), or a genuine **interchangeable
-method** — and only the third bucket is compared, on input-basket cost (a fixed reference-price
-snapshot, `world_gen.lua`'s `base_price`) against the chain depth of its deepest input. A pair
-identical or split across the two axes is a real trade-off; a pair dominated on both is dead
-content the moment its sibling is reachable. Wage and build-duration were considered and rejected
-as guard axes: those live on `building_economics` (the *building type*), not the recipe, and every
-`processing_facility` offers the same era-allowed recipe set — so those axes are identical across
-every sibling by construction and carry no discriminating information.
-
-**The four pairs once reported as "dominated" (NR-243) were a false positive of the old grouping,
-not a balance defect.** `steel_from_iron_nickel`/`steel`, `peat_charcoal`/`charcoal` and
-`glass`/`trade_goods` have disjoint raws — supply routes, not methods; the propellant pair is the
-named atmosphere-vs-airless precondition. None of the four is compared by R2 today, and NR-243 is
-closed on that basis rather than by a retune (BL-587, correcting NR-589).
-
-**BL-587 (2026-08-23) authored the roster's first two genuine interchangeable methods**, since
-until then the "methods" bucket was empty — BL-430's ruling had mechanism (the Method page
-compares whatever R2 would call a method) with no content to exercise it. Both trade the chain-
-depth axis: a deeper route that needs a good not yet reached, for a cheaper basket once it is.
-
-| Sibling pair | Shallow route | Deep route (needs) |
+| Building | Product | Methods (recipe, band) |
 |---|---|---|
-| `charcoal` (ancient) | Charcoal Burner — `timber` only, required depth 0 | Coking Kiln — `timber` + a reagent quantity of `iron_blooms`, required depth 2 |
-| `steel` (industrial) | Smelter — `iron_ore` + `coal`, required depth 0 | Bessemer Converter — `iron_ore` + `coal` + a reagent quantity of `machinery`, required depth 2 |
+| Steel Mill | steel | **Industrial:** Smelter `steel` (root); `steel_from_iron_nickel` and In-Situ Smelter `steel_from_regolith` (variants); Bessemer Converter `steel_bessemer` (upgrade of the Smelter). **Ancient:** Bloomery Furnace `steel_bloomery` (root); Smithy `steel_from_blooms` (upgrade of the Bloomery Furnace). |
+| Copper Refinery | refined copper | `refined_copper` |
+| Bloomery | iron blooms | `iron_blooms` (ancient) |
+| Toolmaker | tools | `toolmaker` (ancient) |
+| Fuel Refinery | refined fuel | `refined_fuel` |
+| Propellant Plant | propellant | `propellant_atmospheric` (atmosphere) and `propellant_electrolysis` (airless; the Electrolysis Plant) — a precondition pair, never a choice: each body's air allows exactly one (§ Propellant Plant). |
+| Silicon Works | silicon | `silicon` |
+| Rare Earth Refinery | REE alloy | `ree_alloy` |
+| Electronics Lab | electronics | Contact-Grade `electronics_contact_grade` (root); `electronics` (upgrade: the silicon, copper and REE chain is the deeper route). |
+| Machine Works | machinery | `machinery` |
+| Alloy Works | alloys | `alloys` |
+| Ordnance Works | ordnance | `ordnance` (industrial); Smithy `ordnance_from_blooms` (ancient). The two never share a band. |
+| Spacecraft Assembly Plant | spacecraft components | `spacecraft_components` (root); Heavy Assembly `spacecraft_components_heavy` (variant: machinery and steel against alloys and electronics, both at required depth 2). |
+| Water Treatment Plant | clean water | `clean_water` |
+| Consumer Goods Factory | consumer goods | `consumer_goods` |
+| Pharmaceutical Lab | medical supplies | `medical_supplies` |
+| Food Processor | food rations | `food_rations` (any band, root); Miller `food_rations_milled` (ancient, variant). |
+| Hydroponics Bay | agricultural produce | `hydroponics_bay` |
+| Charcoal Works | charcoal | Charcoal Burner `charcoal` (root); Peat Kiln `peat_charcoal` (variant); Coking Kiln `charcoal_from_kiln` (upgrade of the Burner). |
+| Trade Goods Workshop | trade goods | Potter & Weaver `trade_goods` (root); Glassworks `glass` (variant). |
+| Potter's Kiln, Stonemason, Sawmill, Tannery, Weaver, Shipwright | ceramics, dressed stone, planks, leather, cloth, rigging | one ancient method each |
+| Power Plant | power | Oil-Fired `oil_power_plant` (root); Coal-Fired `coal_power_plant` and Wind Turbine `wind_turbine` (variants; the turbine is opened by research). |
+| Small Arms Works, Armoured Vehicle Works, Artillery Works, Guided Weapons Works, Drone Works, Airframe Works, Hull Works | the seven kit goods | one method each |
+| Construction | — | five retired slots (§ Construction as a rate); nothing browses them |
 
-Neither deep route is a tier upgrade: it is unreachable until the shallow route (or some other
-path to the same reagent) has already been run once, and its reference cost is lower only because
-the guard's fixed snapshot does not price the reagent's own chain. A market where the reagent is
-scarce can still make the shallow route the better-run choice — the point Ben raised authoring
-this sprint (*"it's not always clear that a more advanced method is better, depending on which
-market it builds to"*), and which `R2` now checks under **two** price snapshots (`BL-592`,
-2026-08-24) rather than trusting one as the final word: `fuel_cheap` and `fuel_dear` bracket the
-axis these two methods trade on, and a pair is flagged dominated only if it loses under **both** —
-a genuine alternate needs to win under at least one. Neither Coking Kiln nor the Bessemer
-Converter needed the second vector to pass (both already win on chain depth alone), so this is a
-guard-rail for `BL-586`'s still-widening roster, not a fix to a currently-failing case.
+### Upgrades and variants
 
-**AI scoring.** `corp_ai.cpp`'s `dial_recipe` candidate does not price `switch_cost` into its
-projected gain and does not pre-filter on `recipe_switch_cooldown`; the seam enforces both at
-apply time, so a losing candidate is refused rather than mutating anything. A cost/cooldown-aware
-scorer is real planner scope, recorded as a decision (NR-242).
+Each method of a building that a nation could run beside another — their bands overlap and their
+airs do not exclude each other — is tagged in `scripts/recipes.lua`: `variant_of = "<method>"` or
+`upgrade_of = "<method>"`. At most one method of such a pair is the untagged **root**, and the loader
+refuses two untagged methods of one building that could stand side by side. The test the tags
+follow is mechanical: an upgrade's required chain depth is greater than its base's; variants share
+a required depth (`tools/verify/chain_depth.cpp`).
 
----
+- **A variant** draws different raws at the same depth. Any variant switches to any other variant of
+  the building, both ways, at `economy.recipe_switch.switch_cost` per building.
+- **An upgrade** is the deeper route needing a good the other does not. It is reached only from the
+  method it names, paid in place at `economy.recipe_switch.upgrade_cost` per building, and it does
+  not go back: from an upgrade there is no step at all. The building keeps its tile and its stack.
 
-## Sub-facility groups
+`recipe_registry::method_step_between` answers which a step is; every door asks it — the retool
+seam, the card's control, the ledger's grid and the scorer.
 
-**The generic split.** Every processing recipe runs on the one `building_type::processing_facility`
-enum value. What distinguishes them is a `group` field on `recipe` (`recipe_registry.hpp`,
-authored as `group = "..."` in `recipes.lua`, alongside `era`/`display_name`): a sub-facility
-KIND — "Metal Foundry", "Food Processing" — so the generic building reads and behaves like
-several recognizable facility kinds without a second `building_type` axis (BL-434, sub-facility
-groups). Absent means the literal `"General"` (a real group name, not empty string, so the
-switch-cost lookup below never needs a special case).
+### One method per stack
 
-**The taxonomy.** Every authored recipe has a named group with at least one sibling — nothing
-sits in the `"General"` catch-all:
+A processing stack is every building of one product on one tile (`product_stack_members`, ascending
+id, every stage counted as the placement caps count it). It runs **one** method:
 
-| Group | Recipes (era) | Notes |
+- **Joining a stack takes its method.** The build door seats a new building on its product's stack
+  method, whatever method the caller priced (`construct_building`); the scorer prices only that
+  method on a tile that already stands the product.
+- **A step is the whole stack's.** `try_switch_recipe` moves every member at once, charges the step's
+  cost for each, and refuses if any member is mid-retool.
+- **Generation never leaves a mixed stack.** Its chain walks refuse a method that would mix one
+  (`chain_recipe_tier`), and after the fold `unify_product_stack_methods` sets any member a pass
+  wrote outside both to its stack's oldest member's method.
+
+### The method control
+
+The player's own processing building's card carries one press per legal step from the stack's
+method, labelled with what it is and what it costs the whole stack ("Upgrade to Bessemer Converter
+- 100 cr for the 2 buildings here, one way"). It is the ledger grid's own press
+(`method_grid_press`), so the card and the Construction ledger's Buildings view cannot disagree, and
+a refusal is said beneath it. The ledger grid offers the same steps and nothing else: no other
+building's method, and no step back down an upgrade.
+
+## Switching a method
+
+**Switching costs something.** A step through the *player-grade* seam — the card's control, the
+ledger grid, or `corp_command`'s `set_recipe` verb (which the AI's `dial_recipe` also goes through,
+so it pays the same price) — debits a one-off credit cost per building of the stack and starts a
+cooldown on each, authored in `economy.recipe_switch` (`scripts/economy.lua`; `switch_cost` for a
+variant, `upgrade_cost` for an upgrade, `cooldown_ticks`). The single implementation is
+`try_switch_recipe` (`economy_system.{hpp,cpp}`); a refusal — on cooldown, insufficient funds, an
+unknown or no-op method, another building's method (`cross_group`), the step back down an upgrade
+(`one_way`), locked technology, the wrong air — mutates nothing.
+`building_component.recipe_switch_cooldown` carries the countdown, decremented once per economy
+tick.
+
+**Another building is dismantle and rebuild.** Ben's ruling of 2026-08-16 stands, and one building
+per product makes it structural: *"the only way to access a different building type is fully
+dismantling the building, then using the tile selector to reselect and build a new building."*
+
+**The reflex rescue takes only a variant.** A rival's building whose output has floored (the BL-079
+loss-streak reflex in `economy_system.cpp`) may still switch for free — but only to a variant of its
+running method, never to an upgrade and never to another building's method, and the whole stack
+moves with it. A variant makes the same product, so with one output a method the rescue cannot lift
+a floored price; such a plant idles by its loss streak instead.
+
+**The no-dominance guard.** `tools/verify/chain_depth.cpp`'s `R2` buckets every same-output sibling
+pair as a **supply route** (disjoint raws — which one a nation runs is decided by deposit access,
+not price), a named **precondition pair** (the propellant routes' air), or an **interchangeable
+method**, and compares only the third, on input-basket cost under two reference-price snapshots
+(`fuel_cheap`, `fuel_dear`) against the chain depth of its deepest input. A pair dominated on both
+axes under both snapshots is dead content.
+
+BL-587 authored the roster's first two interchangeable methods, both trading the depth axis — a
+deeper route that needs a good not yet reached, for a cheaper basket once it is. Both are
+**upgrades** under the 2026-11-11 tags:
+
+| Building | Base method | Upgrade (needs) |
 |---|---|---|
-| Metal Foundry | `steel` (industrial), `steel_from_iron_nickel` (industrial), `steel_from_regolith` "In-Situ Smelter" (industrial), `steel_bessemer` "Bessemer Converter" (industrial), `refined_copper` (any), `iron_blooms` "Bloomery" (ancient), `steel_from_blooms` "Smithy" (ancient), `ordnance_from_blooms` "Smithy" (ancient), `toolmaker` "Toolmaker" (ancient) | Every route that smelts or shapes a structural metal — the industrial Smelter and the ancient Bloomery/Smithy chain both land here, since they reach the same terminal goods by different roads. The Bessemer Converter (BL-587) is the roster's first genuine interchangeable method rather than a disjoint-raw supply route — see § Alternate production methods. The Toolmaker (BL-586) is its deepest ancient member, needing a milled good (`planks`) alongside the smelted one. |
-| Refinery | `refined_fuel` (industrial) | A singleton — a real, specific kind (distinct from Metal Foundry's smelting), not a forced catch-all; more refined-fuel-family recipes would join it rather than needing a rename. |
-| Construction Materials | `ceramics_kiln` "Potter's Kiln" (ancient), `stonemason` "Stonemason" (ancient), `sawmill` "Sawmill" (ancient) | BL-586's new group: named buildings on existing raws (clay, stone, timber) that make construction-grade goods rather than trade goods or fuel — distinct from Artisan Goods below even though the Kiln and Potter & Weaver share `clay`, since the two produce different terminal goods and are never compared as siblings (chain_depth's R2 groups by output, not input). |
-| Food Processing | `food_rations` (any), `hydroponics_bay` (industrial), `food_rations_milled` "Miller" (ancient) | Feeding the population, whether growing the produce (Hydroponics Bay) or milling it into rations (Food Processor, Miller). |
-| Chemical Works | `propellant_atmospheric` (industrial), `propellant_electrolysis` (industrial) | The Chemical Plant's two propellant routes. |
-| Electronics | `silicon` (industrial), `ree_alloy` (industrial), `electronics` (industrial), `electronics_contact_grade` "Contact-Grade Electronics Lab" (industrial) | The silicon/REE/electronics chain. |
-| Advanced Fabrication | `machinery` (industrial), `alloys` (industrial), `ordnance` (industrial), `spacecraft_components` (industrial), `spacecraft_components_heavy` "Heavy Assembly Plant" (industrial), `shipwright` "Shipwright" (ancient) | Fabricator + Assembly Plant: goods assembled from refined inputs rather than smelted from ore. The Shipwright (BL-586 slice 2) is the group's first ancient member — new to the ANCIENT roster, not a new group overall, since it shares the name with the industrial machinery/alloys/spacecraft_components chain by the same "goods assembled from refined inputs" argument (planks + cloth, both already-processed goods, not raw hides or fibre). |
-| Welfare Goods | `clean_water` (industrial), `consumer_goods` (industrial), `medical_supplies` (industrial) | The habitability tranche — Water Treatment Plant, Consumer Goods Factory, Pharmaceutical Lab. |
-| Fuel Production | `charcoal` "Charcoal Burner" (ancient), `peat_charcoal` "Peat Kiln" (ancient), `charcoal_from_kiln` "Coking Kiln" (ancient) | Three producers of `charcoal`: the Burner and the Peat Kiln are disjoint-raw supply routes, but the Coking Kiln shares `timber` with the Burner and is the roster's first genuine interchangeable method (BL-587) — see § Alternate production methods. |
-| Artisan Goods | `trade_goods` "Potter & Weaver" (ancient), `glass` "Glassworks" (ancient), `tannery` "Tannery" (ancient), `weaver` "Weaver" (ancient) | Four independent producers, each of a different terminal or intermediate good (`trade_goods_misc`, `leather`, `cloth`) — the Tannery and Weaver (BL-586 slice 2) join on the same "sells finished goods from a raw craft input" argument as the Potter & Weaver and Glassworks. |
+| Charcoal Works (ancient) | Charcoal Burner — `timber` only, required depth 0 | Coking Kiln — `timber` + a reagent quantity of `iron_blooms`, required depth 2 |
+| Steel Mill (industrial) | Smelter — `iron_ore` + `coal`, required depth 0 | Bessemer Converter — `iron_ore` + `coal` + a reagent quantity of `machinery`, required depth 2 |
 
-Judgment calls recorded in `NEEDS_REVIEW.json`: whether Hydroponics Bay (an agriculture
-*producer*, not a food *processor*) belongs in Food Processing or a standalone Agriculture group,
-and whether Advanced Fabrication should instead split into a Fabricator group and an Assembly
-group once more recipes land in either.
+Neither is a free win: its reference cost is lower only because the guard's snapshot does not price
+the reagent's own chain, and a market where the reagent is scarce can still make the base the
+better-run method (Ben, 2026-08-23: *"it's not always clear that a more advanced method is better,
+depending on which market it builds to"*).
 
-**Build door: one row per group, not per recipe.** `draw_construction_ledger`
-(`selection_panel.cpp`) collapses `processing_facility` to one candidate row per GROUP: the
-representative recipe is the highest-expected-profit era-allowed recipe in that group (ties keep
-the first in authored order), and the row is labelled with the group name rather than the
-recipe's own `display_name`. Placing it seeds the fresh building with that representative recipe
-(`construct_building`'s trailing `recipe` parameter, via `ui.construction.pending_recipe`).
-`recipe_registry::default_recipe_id(group)` gives any other caller (AI, a future seam) the same
-"this group's default recipe" lookup without duplicating the era-mask walk.
-
-**Switching within a group stays cheap; switching across groups is refused outright.**
-`try_switch_recipe` (`economy_system.cpp`) looks up both the old and new recipe's `group` via the
-registry: same group pays `switch_cost`/`cooldown_ticks` (`economy.recipe_switch`); different
-groups are REFUSED (`recipe_switch_result::cross_group`), not priced. Ben's ruling: *"switching
-methods can mean changing to a different building type — we should retire that completely. So
-the only way to access a different building type is fully dismantling the building, then using
-the tile selector to reselect and build a new building."* The Method page's candidate list
-(`draw_production_method_section`, `selection_panel.cpp`) is filtered to the active recipe's own
-group for the same reason — a cross-group recipe is never even offered as a choice, not merely
-refused if picked. A recipe with no group tag (the empty-`b.recipe`/`no_recipe` case, e.g.
-mid-construction) falls back to permitting the switch at the intra-group cost rather than
-crashing or refusing on a data edge case — this seam must never crash on missing data.
-
-`tools/verify/recipe_switch_harness.cpp`'s `S6` asserts the refusal mechanically (three dummy
-recipes in two groups, in the same hand-built registry the `S1`-`S5` mechanism checks use): an
-intra-group switch applies at the base cost, a cross-group switch is refused and mutates nothing.
+**AI scoring.** `corp_ai.cpp`'s `dial_recipe` proposes only a legal step from the stack's method,
+once per stack (from its oldest member), with the whole stack's gain and the whole stack's cost as
+the treasury spend. It does not price the switch cost into its projected gain or pre-filter on the
+cooldown; the seam enforces both at apply time (NR-242). Its build candidate is the best method per
+product — one candidate a building — and on a tile that already stands the product, only the stack's
+method is priced.
 
 ---
 
@@ -1511,4 +1518,4 @@ The hand-calibrated core the economy is tuned on:
 - A running per-nation treasury: sales income less input purchases, maintenance, and wages (`docs/economy/FINANCE.md`).
 - The economy panel making all of the above observable.
 
-Introducing a named building type is an enum extension on `building_type`, not an authoring pass; the named vocabulary in this document is design intent carried by the generic types, their `target_resource`, and their recipe groups.
+Introducing a named building type is an enum extension on `building_type`, not an authoring pass; the named vocabulary in this document is design intent carried by the generic types, their `target_resource`, and — for processing — the product building each recipe names (`recipe::group`, § What a product building is).

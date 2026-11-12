@@ -1002,9 +1002,9 @@ const char* construction_fold_of(const recipe_registry& reg, building_type t, st
     {
     case building_type::extraction_site:     return "Extraction";
     case building_type::processing_facility:
-        // Power Generation is infrastructure (Ben, 2026-11-05; SELECTION.md § The tile
+        // A Power Plant is infrastructure (Ben, 2026-11-05; SELECTION.md § The tile
         // construction ledger): a grid is what other plants stand on.
-        if (const recipe* rc = reg.get_recipe(recipe_id); rc != nullptr && rc->group == "Power Generation")
+        if (const recipe* rc = reg.get_recipe(recipe_id); rc != nullptr && rc->group == "Power Plant")
             return "Infrastructure";
         return "Processing";
     case building_type::military_base:

@@ -276,21 +276,21 @@ shape; `nation_tech_harness` holds the store to what the code reads.
 |---|---|---|---|---|---|
 | `DG-PR-PC-T1` | Shop-Floor Practice I | travel | 1 | +1% output per batch at every processing building | — (open) |
 | `DG-PR-PC-T2` | Shop-Floor Practice II | travel | 1 | +1% output per batch at every processing building | Shop-Floor Practice I |
-| `DG-PR-PC-A1` | Catalysts | minor | 1 | Chemical Plants +5% output per batch | Shop-Floor Practice II |
+| `DG-PR-PC-A1` | Catalysts | minor | 1 | Propellant Plants +5% output per batch | Shop-Floor Practice II |
 | `DG-PR-PC-A2` | Polymer Chemistry | minor | 1 | plastics recipe inputs -10%; station Habitation modules may be fitted | Shop-Floor Practice II |
-| `DG-PR-PC-A` | Bulk Petrochemicals | major | 2 | Chemical Plants unlock the plastics recipe; Refineries +20% output per batch | Catalysts + Polymer Chemistry |
+| `DG-PR-PC-A` | Bulk Petrochemicals | major | 2 | Chemical Plants unlock the plastics recipe; Fuel Refineries +20% output per batch | Catalysts + Polymer Chemistry |
 | `DG-PR-PC-T3` | Shop-Floor Practice III | travel | 2 | +1% output per batch at every processing building | Bulk Petrochemicals |
 | `DG-PR-PC-T4` | Shop-Floor Practice IV | travel | 3 | +1% output per batch at every processing building | Reactive Armour |
 | `DG-PR-PC-T5` | Shop-Floor Practice V | travel | 2 | +1% output per batch at every processing building | Bulk Petrochemicals |
 | `DG-PR-PC-T6` | Shop-Floor Practice VI | travel | 3 | +1% output per batch at every processing building | Low-Observable Airframes |
 | `DG-PR-PC-B1` | Clean Rooms | minor | 3 | microchip recipe +10% yield | Shop-Floor Practice IV |
-| `DG-PR-PC-B2` | Photolithography | minor | 3 | Electronics Labs +5% output per batch; station Power modules may be fitted | Shop-Floor Practice IV |
-| `DG-PR-PC-B` | Semiconductor Foundry | major | 4 | Electronics Labs unlock the microchip recipe; Electronics Labs +10% output per batch | Clean Rooms + Photolithography |
-| `DG-PR-PC-C1` | Numerical Control | minor | 3 | Fabricators +5% output per batch; opens lightweight composite tracks (armour); station grids may be upgraded to 7 x 5 | Shop-Floor Practice VI |
+| `DG-PR-PC-B2` | Photolithography | minor | 3 | Silicon Works +5%, Rare Earth Refineries +5% and Electronics Labs +5% output per batch; station Power modules may be fitted | Shop-Floor Practice IV |
+| `DG-PR-PC-B` | Semiconductor Foundry | major | 4 | Electronics Labs unlock the microchip recipe; Silicon Works +10%, Rare Earth Refineries +10% and Electronics Labs +10% output per batch | Clean Rooms + Photolithography |
+| `DG-PR-PC-C1` | Numerical Control | minor | 3 | Machine Works +5%, Alloy Works +5%, Ordnance Works +5% and Spacecraft Assembly Plants +5% output per batch; opens lightweight composite tracks (armour); station grids may be upgraded to 7 x 5 | Shop-Floor Practice VI |
 | `DG-PR-PC-C2` | Process Automation | minor | 3 | wages in processing buildings -5% | Shop-Floor Practice VI |
 | `DG-PR-PC-C` | Industrial Robotics | major | 4 | every processing building +20% output per batch and wages -10%; station Microgravity factory modules may be fitted | Numerical Control + Process Automation |
 | `DG-PR-PC-M` | Industrial Depth | mastery | 4 | +3% output per batch at every processing building | Semiconductor Foundry + Industrial Robotics |
-| `DG-PR-PC-Q` | Domestic Chips | quest | 4 | Electronics Labs +10% output per batch. **Deed:** your microchip output covers your own electronics demand for 4 quarters. **Keys next age:** Orbital Assembly | Semiconductor Foundry |
+| `DG-PR-PC-Q` | Domestic Chips | quest | 4 | Silicon Works +10%, Rare Earth Refineries +10% and Electronics Labs +10% output per batch. **Deed:** your microchip output covers your own electronics demand for 4 quarters. **Keys next age:** Orbital Assembly | Semiconductor Foundry |
 | `DG-PR-PC-D1` | Composite Armour | minor | 2 | opens composite armour (armour, the light-armour applique) | Shop-Floor Practice III |
 | `DG-PR-PC-D2` | Ceramic Plates | minor | 2 | opens the ceramic plate carrier (infantry, motorised and mechanised armour) | Shop-Floor Practice III |
 | `DG-PR-PC-D` | Reactive Armour | major | 3 | opens reactive armour (armour) | Composite Armour + Ceramic Plates |

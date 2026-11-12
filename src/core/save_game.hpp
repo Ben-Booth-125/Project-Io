@@ -533,6 +533,18 @@ bool write_save_game_at(const std::string& path, const world& w, const save_enve
 /// @p base_price (BL-1422): the authored market base prices (world_gen.lua's
 /// `kepler_market.base_price`, the table generation prices markets from), threaded to
 /// `read_world_snapshot` so a pre-v74 world's markets get the five kit goods priced.
+///
+/// ONE BUILDING PER PRODUCT (Ben, 2026-11-11): this reader still reads every older
+/// layout whole (the verification producers exercise it); the GAME refuses a save
+/// whose world predates world v94 before it calls here - see `save_game_refusal_reason`.
 bool read_save_game(const std::string& path, world& w, save_envelope& env,
                     const military_capability_params* mil = nullptr,
                     const std::array<float, resource_count>* base_price = nullptr);
+
+/// Why the game refuses to open @p path, in words a player reads: today, a save whose
+/// world predates one building per product (world v94; Ben, 2026-11-11 - such a save
+/// is refused whole, not migrated: its stacks may mix methods and its buildings may run
+/// another product's recipe). Empty for a file that is not refused for that reason -
+/// including one it cannot classify (missing, corrupt, another format), which the read
+/// itself then refuses on its own terms. `app::load_game_from` asks this first.
+std::string save_game_refusal_reason(const std::string& path);

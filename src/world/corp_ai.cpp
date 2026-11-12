@@ -556,6 +556,34 @@ float corp_reserve_floor(const world& w, const recipe_registry& reg,
     return std::max(p.floor_constant, p.floor_wage_mult * wage_bill);
 }
 
+product_stack_retool product_stack_retool_speaker(const world& w, const recipe_registry& reg,
+                                                  entity_id building,
+                                                  const std::set<entity_id>& actor_assets)
+{
+    product_stack_retool out;
+    const auto bit = w.buildings.find(building);
+    if (bit == w.buildings.end() || bit->second.type != building_type::processing_facility)
+        return out;
+    const recipe* rc = reg.get_recipe(bit->second.recipe);
+    if (rc == nullptr)
+        return out;
+    const std::vector<entity_id> mates = product_stack_members(w, reg, bit->second.tile, rc->group);
+    out.billed = mates.size();
+    for (const entity_id m : mates) // ascending: the first eligible is the lowest id
+    {
+        const auto it = w.buildings.find(m);
+        if (it == w.buildings.end() || actor_assets.count(m) == 0)
+            continue;
+        const building_component& mb = it->second;
+        if (mb.ticks_remaining > 0 || mb.state_idle || mb.decommissioned || mb.ai_cooldown > 0)
+            continue;
+        if (out.speaker == null_entity)
+            out.speaker = m;
+        ++out.active;
+    }
+    return out;
+}
+
 corp_priority_bucket bucket_for_reason(corp_decision_reason reason)
 {
     switch (reason)
@@ -4646,6 +4674,10 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                 // (NR-266), so this remains an over-estimate; the INPUT ACCESS
                 // gate below (BL-1187) is the guard against the worst of it.
                 //
+                // ONE BUILDING PER PRODUCT (Ben, 2026-11-11): `group` now names the
+                // product building ("Steel Mill", "Power Plant"), so "per group" is
+                // the best METHOD per PRODUCT - one candidate a product.
+                //
                 // BL-712: the best is kept PER GROUP, not once. A single argmax
                 // over net margin is a category exclusion rather than a ranking
                 // (AI_OPPONENT.md § Selection must be scale-free): margins span
@@ -4660,7 +4692,7 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                 // std::map, so the emission order below is the group's collation
                 // order rather than registry-walk order — a function of the
                 // roster, not of iteration.
-                std::map<std::string, std::pair<uint16_t, float>> group_best;
+                std::map<std::string, std::pair<uint16_t, float>> product_best;
                 for (int i = 0; i < n_recipes; ++i)
                 {
                     const recipe&  rc  = reg.play_recipe_at(building_type::processing_facility, i);
@@ -4686,6 +4718,11 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                     // a propellant route the body cannot run.
                     if (!recipe_runs_at_tile(w, *abs, tile))
                         continue;
+                    // ONE METHOD PER STACK (Ben, 2026-11-11; PRODUCTION.md § One
+                    // building per product) needs no test here: a tile already
+                    // standing one of this actor's processors never reaches this
+                    // loop (`tiles_with_processor` above), so no candidate here can
+                    // join a stack - the build door's seating rule never binds.
                     // BL-1485: a generator only where its grid is short (above).
                     // Inside the argmax, as the forecast veto is (BL-1227), so a
                     // refused generator never claims its group's slot.
@@ -4814,10 +4851,10 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                             continue;
                     }
                     const float n = bp.net();
-                    auto  slot = group_best.find(abs->group);
-                    if (slot == group_best.end())
+                    auto  slot = product_best.find(abs->group);
+                    if (slot == product_best.end())
                     {
-                        group_best.emplace(abs->group, std::make_pair(rid, n));
+                        product_best.emplace(abs->group, std::make_pair(rid, n));
                         continue;
                     }
                     // Same tie-break as the single argmax had, now applied
@@ -4826,7 +4863,7 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                         || (n == slot->second.second && rid < slot->second.first))
                         slot->second = std::make_pair(rid, n);
                 }
-                if (group_best.empty())
+                if (product_best.empty())
                     continue; // nothing this corp can reach, run and profit from
 
                 // ONE candidate per group, scored on the same curve as the
@@ -4837,7 +4874,7 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                 // still run AFTER the pick: a group whose winner fails either
                 // yields no candidate this evaluation, rather than falling
                 // through to its runner-up.
-                for (const auto& [grp, pick] : group_best)
+                for (const auto& [grp, pick] : product_best)
                 {
                     (void)grp; // the key is the category; the pick is what to build
                     const uint16_t best_recipe = pick.first;
@@ -5147,6 +5184,9 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
         // the top of this loop; only spectate lifts it).
         const auto emit_dials = [&](const std::vector<entity_id>& dial_assets,
                                     entity_id dial_nation) {
+        // ONE METHOD PER STACK: the actor's own buildings, for the retool speaker below
+        // (product_stack_retool_speaker).
+        const std::set<entity_id> dial_set(dial_assets.begin(), dial_assets.end());
         for (const entity_id bid : dial_assets)
         {
             const auto bit = w.buildings.find(bid);
@@ -5377,6 +5417,21 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
             // see NEEDS_REVIEW.json.
             const recipe* cur_rc = (b.type == building_type::processing_facility && b.recipe != no_recipe)
                                        ? reg.get_recipe(b.recipe) : nullptr;
+            // ONE METHOD PER STACK (Ben, 2026-11-11; PRODUCTION.md § One building per
+            // product): a method change is the whole stack's, so the stack proposes it
+            // once - from its lowest-id member ELIGIBLE this pass (`retool_active`
+            // above) - and its gain is every ACTIVE member's. Its spend is every
+            // member's: the seam moves and bills the whole stack, idled members too.
+            std::size_t stack_active = 1; // members whose output the step changes
+            std::size_t stack_billed = 1; // members the seam charges for the step
+            if (cur_rc != nullptr)
+            {
+                const product_stack_retool st = product_stack_retool_speaker(w, reg, bid, dial_set);
+                if (st.speaker != bid)
+                    cur_rc = nullptr; // another member speaks for the stack this pass
+                stack_active = std::max<std::size_t>(1, st.active);
+                stack_billed = std::max<std::size_t>(1, st.billed);
+            }
             if (cur_rc != nullptr)
             {
                 // BL-1187 (build only what runs): every margin in this chase is
@@ -5444,6 +5499,12 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                     // one, above.
                     if (rc.group != cur_rc->group)
                         continue;
+                    // ONE BUILDING PER PRODUCT (Ben, 2026-11-11): and within the
+                    // building, only a legal STEP - a variant, or the upgrade of the
+                    // running method; never the way back down an upgrade, which the
+                    // seam refuses as `one_way`.
+                    if (reg.method_step_between(b.recipe, rid) == method_step::none)
+                        continue;
                     // BL-1401: no strategic-sector limit on a nation's retool —
                     // BL-1399 retired it at the seam (Ben, 2026-10-23), so the
                     // scorer no longer predicts a refusal that cannot happen.
@@ -5470,7 +5531,9 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                     // BL-1206 review: the gain is judged at the same staffing the
                     // gate judged the inputs at (judged_batches).
                     const float batches = sw_batches;
-                    const float gain    = (best_m - cur_margin) * batches;
+                    // The whole stack moves (one method per stack), so the gain is
+                    // every member's.
+                    const float gain    = (best_m - cur_margin) * batches * static_cast<float>(stack_active);
                     if (gain > margin_gate)
                     {
                         candidate c;
@@ -5479,8 +5542,13 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                         c.cmd.recipe = best_id;
                         // BL-1296 fix round: a state retool's switch cost is
                         // the TREASURY's spend, gated against it below.
+                        // Per building of the stack: the variant's switch cost or
+                        // the upgrade's, as try_switch_recipe charges it.
                         if (dial_nation != null_entity)
-                            c.spend = reg.recipe_switch().switch_cost;
+                            c.spend = static_cast<float>(stack_billed)
+                                    * (reg.method_step_between(b.recipe, best_id) == method_step::upgrade
+                                           ? reg.recipe_switch().upgrade_cost
+                                           : reg.recipe_switch().switch_cost);
                         c.score = gain * jitter;
                         c.reason = corp_decision_reason::dial_recipe;
                         c.bucket = bucket_for_reason(c.reason);

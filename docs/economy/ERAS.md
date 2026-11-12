@@ -294,7 +294,7 @@ extraction site that draws water off an ice deposit (`PRODUCTION.md` § Extracti
 nation's home body it stands open as it always has, and on any other body it needs the Early Space
 tree's Ice Extraction (`tech/EARLY_SPACE_TREE.md`). The Electrolysis Plant is the Chemical Plant's
 airless route, `propellant_electrolysis` — water, with refined fuel shipped in or made locally, into
-propellant (`PRODUCTION.md` § Chemical Plant). It runs only on the ground of a nation holding
+propellant (`PRODUCTION.md` § Propellant Plant). It runs only on the ground of a nation holding
 Electrolysis Plants, and only on an airless body, so it is never a home-world building.
 
 **The local shelf is the base's.** A unit in a body's low orbit refuels off the market its owner's

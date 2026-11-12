@@ -701,13 +701,73 @@ std::vector<int> method_grid_candidates(const world& w, const recipe_registry& r
         // gate would refuse"): a route try_switch_recipe refuses as `wrong_air`
         // is never offered. The ACTIVE recipe is always listed, whatever it is.
         const bool is_active = (cur != nullptr && ri.name == cur->name);
+        // ONE BUILDING PER PRODUCT (Ben, 2026-11-11): only the building's own methods,
+        // and of those only a legal step from the running one - a variant, or its
+        // upgrade - never the way back down (try_switch_recipe's `one_way`).
+        const bool a_step = cur == nullptr
+            || reg.method_step_between(b.recipe, reg.recipe_id(ri.name)) != method_step::none;
         if ((cur == nullptr || ri.group == cur->group)
+            && (is_active || a_step)
             && (is_active
                 || (recipe_runs_at_tile(w, ri, b.tile)
                     && recipe_offered(w, reg, player_actor(w), reg.recipe_id(ri.name))))) // same actor as the press
             candidates.push_back(i);
     }
     return candidates;
+}
+
+// One method per stack (Ben, 2026-11-11): the stack's retool lock - the longest
+// recipe-switch cooldown of any member, @p b included - since try_switch_recipe refuses
+// a step while ANY member is still retooling. Zero when none is.
+static int stack_switch_cooldown(const world& w, const recipe_registry& reg,
+                                 const building_component& b)
+{
+    int left = b.recipe_switch_cooldown;
+    if (const recipe* rc = reg.get_recipe(b.recipe); rc != nullptr)
+        for (const entity_id m : product_stack_members(w, reg, b.tile, rc->group))
+            if (const auto it = w.buildings.find(m); it != w.buildings.end())
+                left = std::max(left, it->second.recipe_switch_cooldown);
+    return left;
+}
+
+// One building per product (Ben, 2026-11-11; PRODUCTION.md § Upgrades and variants):
+// what taking method @p to on building @p id's stack is and costs, in the seam's own
+// figures (try_switch_recipe: per building of the stack, the variant's switch cost or
+// the upgrade's). One function, so the card and the ledger grid say one price.
+struct method_step_offer
+{
+    method_step kind   = method_step::none;
+    int         stack  = 1;      ///< Buildings the step moves: the whole product stack.
+    float       total  = 0.0f;   ///< What it debits, all of them.
+    std::string label;           ///< "Upgrade to <method> - 100 cr (2 buildings)".
+};
+
+static method_step_offer method_step_offer_for(const world& w, const recipe_registry& reg,
+                                               entity_id id, std::uint16_t to)
+{
+    method_step_offer o;
+    const auto bit = w.buildings.find(id);
+    const recipe* nr = reg.get_recipe(to);
+    if (bit == w.buildings.end() || nr == nullptr)
+        return o;
+    const building_component& b = bit->second;
+    o.kind = reg.method_step_between(b.recipe, to);
+    if (const recipe* cur = reg.get_recipe(b.recipe); cur != nullptr)
+        o.stack = std::max<int>(1, static_cast<int>(product_stack_members(w, reg, b.tile, cur->group).size()));
+    const float per = (o.kind == method_step::upgrade) ? reg.recipe_switch().upgrade_cost
+                                                       : reg.recipe_switch().switch_cost;
+    o.total = per * static_cast<float>(o.stack);
+    char buf[160];
+    const char* verb = (o.kind == method_step::upgrade) ? "Upgrade to" : "Switch to";
+    const char* note = (o.kind == method_step::upgrade) ? ", one way" : "";
+    if (o.stack > 1)
+        std::snprintf(buf, sizeof buf, "%s %s - %.0f cr for the %d buildings here%s", verb,
+                      nr->display_name.c_str(), static_cast<double>(o.total), o.stack, note);
+    else
+        std::snprintf(buf, sizeof buf, "%s %s - %.0f cr%s", verb, nr->display_name.c_str(),
+                      static_cast<double>(o.total), note);
+    o.label = buf;
+    return o;
 }
 
 recipe_switch_result method_grid_press(world& w, const recipe_registry& reg, entity_id id,
@@ -742,7 +802,8 @@ const char* method_grid_status(entity_id id)
         case recipe_switch_result::tech_locked:        return "Switch refused: not researched yet.";
         case recipe_switch_result::on_cooldown:        return "Switch refused: still locked from the last switch.";
         case recipe_switch_result::wrong_air:          return "Switch refused: that method cannot run on this body's air.";
-        case recipe_switch_result::cross_group:        return "Switch refused: a different kind of facility.";
+        case recipe_switch_result::one_way:            return "Switch refused: an upgrade goes one way.";
+        case recipe_switch_result::cross_group:        return "Switch refused: that is another building's method.";
         default: break;
     }
     return "Switch refused.";
@@ -770,13 +831,14 @@ void draw_production_method_section(world& w, const recipe_registry& reg,
     // cooldown is running, independent of the candidate list below it, since
     // it's informative even with only one same-group method on screen.
     const int cooldown_total = std::max(1, static_cast<int>(reg.recipe_switch().cooldown_ticks));
-    if (b.recipe_switch_cooldown > 0)
+    const int stack_cooldown = stack_switch_cooldown(w, reg, b); // any member retooling locks the stack
+    if (stack_cooldown > 0)
     {
-        const float frac = 1.0f - static_cast<float>(b.recipe_switch_cooldown) /
+        const float frac = 1.0f - static_cast<float>(stack_cooldown) /
                                    static_cast<float>(cooldown_total);
         char overlay[48];
         std::snprintf(overlay, sizeof overlay, "Retooling - %d tick%s left",
-                      b.recipe_switch_cooldown, b.recipe_switch_cooldown == 1 ? "" : "s");
+                      stack_cooldown, stack_cooldown == 1 ? "" : "s");
         ImGui::ProgressBar(frac, {ImGui::GetContentRegionAvail().x, 0.0f}, overlay);
     }
 
@@ -950,7 +1012,7 @@ void draw_production_method_section(world& w, const recipe_registry& reg,
 
         if (!active)
         {
-            const bool  on_cooldown = b.recipe_switch_cooldown > 0;
+            const bool  on_cooldown = stack_cooldown > 0;
 
             // BL-692: the BL-428 chain-depth lock this row used to show ("Your
             // industry cannot make what this needs yet", drawn greyed) is gone
@@ -963,15 +1025,13 @@ void draw_production_method_section(world& w, const recipe_registry& reg,
             // result is no longer discarded.
             const std::uint16_t row_id = reg.recipe_id(ri.name);
 
-            char tip[96];
+            char tip[160];
+            const method_step_offer offer = method_step_offer_for(w, reg, id, row_id);
             if (on_cooldown)
-                std::snprintf(tip, sizeof tip, "Locked %d more tick%s", b.recipe_switch_cooldown,
-                             b.recipe_switch_cooldown == 1 ? "" : "s");
-            else if (reg.recipe_switch().switch_cost > 0.0f)
-                std::snprintf(tip, sizeof tip, "Switch to this method - %.0f cr",
-                             static_cast<double>(reg.recipe_switch().switch_cost));
+                std::snprintf(tip, sizeof tip, "Locked %d more tick%s", stack_cooldown,
+                             stack_cooldown == 1 ? "" : "s");
             else
-                std::snprintf(tip, sizeof tip, "Switch to this method");
+                std::snprintf(tip, sizeof tip, "%s", offer.label.c_str());
 
             // Selection tone, a shade darker than palette::hover's accent blue —
             // Ben's playtest call: the Switch glyph should read as an interactive
@@ -3437,6 +3497,54 @@ void draw_building_recipe_rows(const world& w, const recipe_registry& reg, const
     ImGui::PopStyleVar();
 }
 
+/// THE METHOD CONTROL (Ben, 2026-11-11; PRODUCTION.md § One building per product;
+/// SELECTION.md § A selected building): the one control the card carries. The stack
+/// runs one method; each legal step from it - a variant, or its upgrade - is one
+/// press, labelled with what it is and what it costs the whole stack. The press is
+/// the ledger grid's own (`method_grid_press`, try_switch_recipe for the player), so
+/// the two surfaces cannot disagree; a refusal is said beneath. Nothing is drawn for
+/// a building with only its one method.
+void draw_card_method_steps(world& w, const recipe_registry& reg, ui_state& ui, entity_id bid)
+{
+    ui.tile_card.method_steps.clear();
+    const auto bit = w.buildings.find(bid);
+    if (bit == w.buildings.end())
+        return;
+    const building_component& b = bit->second;
+    const std::vector<int> cands = method_grid_candidates(w, reg, b);
+    // Locked while ANY member of the stack is retooling, as the seam refuses it.
+    const bool locked = stack_switch_cooldown(w, reg, b) > 0;
+    bool any = false;
+    for (const int idx : cands)
+    {
+        const recipe&       ri = reg.play_recipe_at(b.type, idx);
+        const std::uint16_t to = reg.recipe_id(ri.name);
+        if (to == b.recipe)
+            continue;
+        const method_step_offer offer = method_step_offer_for(w, reg, bid, to);
+        if (offer.kind == method_step::none)
+            continue;
+        any = true;
+        ImGui::PushID(static_cast<int>(to));
+        ImGui::BeginDisabled(locked);
+        const std::string text = offer.label;
+        if (ImGui::SmallButton(text.c_str()))
+            method_grid_press(w, reg, bid, to);
+        ImGui::EndDisabled();
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+            ImGui::SetTooltip("%s", locked
+                ? "Retooling: the stack changed method last quarter."
+                : offer.kind == method_step::upgrade
+                    ? "The deeper method: paid in place, kept on this tile and stack, and it does not go back."
+                    : "Another way to make the same product from different raws. It switches back at the same cost.");
+        ui.tile_card.method_steps.push_back(text);
+        ImGui::PopID();
+    }
+    if (any)
+        if (const char* why = method_grid_status(bid); why[0] != '\0')
+            ImGui::TextDisabled("%s", why);
+}
+
 void draw_expanded_building_card(world& w, const recipe_registry& reg,
                                  const economy_report& report, ui_state& ui, entity_id tile_id,
                                  entity_id bid, const std::vector<production_stack>& stacks)
@@ -3675,6 +3783,9 @@ void draw_expanded_building_card(world& w, const recipe_registry& reg,
         if (!god)
             return;
     }
+    // ── The method control: the player's own processing stack (Ben, 2026-11-11) ──
+    if (mine && b.type == building_type::processing_facility)
+        draw_card_method_steps(w, reg, ui, bid);
     // ── The profit row ── (with data: a fresh campaign has the settle's)
     if (const building_profit p = estimate_building_reading(w, reg, report, bid); p.has_data)
     {
@@ -5511,7 +5622,7 @@ void draw_construction_ledger_body(world& w, const recipe_registry& reg, ui_stat
     }
 
     // BL-434: collapse the one-row-per-recipe processing rows above into one row
-    // PER GROUP — "Metal Foundry" once, not five separate metal recipes stacked
+    // PER GROUP — "Steel Mill" once (its product building), not six steel methods stacked
     // in the Processing fold. The representative recipe is the best-expected-profit
     // one among that group's era-allowed recipes (an invalid/no-data row loses to
     // any priced one; among priced rows, highest net wins; ties keep the first
@@ -5527,6 +5638,12 @@ void draw_construction_ledger_body(world& w, const recipe_registry& reg, ui_stat
                 continue;
             const std::string& grp =
                 recipe_group_of(reg, cands[i].recipe);
+            // ONE METHOD PER STACK (Ben, 2026-11-11): where the tile already stands
+            // this product, a new building runs the stack's method (construct_building
+            // seats it there), so that method is the only one this row may quote.
+            if (const std::uint16_t sm = product_stack_method(w, reg, tile_id, grp);
+                sm != no_recipe && sm != cands[i].recipe)
+                continue;
             const auto it = best_idx.find(grp);
             if (it == best_idx.end())
             {

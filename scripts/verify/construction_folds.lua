@@ -1,5 +1,5 @@
 -- The Build door's folds (Ben, 2026-11-05; docs/ui/SELECTION.md § The tile construction
--- ledger): Power Generation sits in Infrastructure, and a Road fold holds Track, Road,
+-- ledger): Power Plant sits in Infrastructure, and a Road fold holds Track, Road,
 -- Highway and Railroad at the shared row height. The Railway Station stays in
 -- Infrastructure. The finder files every building as the door does.
 --
@@ -15,16 +15,16 @@ verify.show_panel("build", true)
 verify.clear_selection() -- a selected tile scopes the finder to its province (Ben, 2026-11-08)
 verify.frames(3)
 
--- THE FINDER'S HALF: one mapping, so a Power Generation recipe is never in Processing.
+-- THE FINDER'S HALF: one mapping, so a Power Plant recipe is never in Processing.
 local power_options = 0
 for _, o in ipairs(verify.site_options()) do
-    if o.group == "Power Generation" then
+    if o.group == "Power Plant" then
         power_options = power_options + 1
         verify.expect(o.category == "Infrastructure",
                       "the finder files '" .. o.name .. "' under Infrastructure, not " .. o.category)
     end
 end
-print(string.format("construction_folds: %d Power Generation options in the finder", power_options))
+print(string.format("construction_folds: %d Power Plant options in the finder", power_options))
 
 -- Aim the door at the player's own ground, by the surface that knows it.
 local aimed = false
@@ -54,11 +54,11 @@ local folds, seen = {}, {}
 for _, r in ipairs(door.rows) do
     if not seen[r.fold] then seen[r.fold] = true; folds[#folds + 1] = r.fold end
     verify.expect(r.fold ~= "Road", "no building row sits in the Road fold: " .. r.name)
-    if r.name == "Power Generation" then
-        verify.expect(r.fold == "Infrastructure", "the door files Power Generation under Infrastructure, not " .. r.fold)
+    if r.name == "Power Plant" then
+        verify.expect(r.fold == "Infrastructure", "the door files Power Plant under Infrastructure, not " .. r.fold)
     end
     if r.fold == "Processing" then
-        verify.expect(r.name ~= "Power Generation", "Processing no longer holds Power Generation")
+        verify.expect(r.name ~= "Power Plant", "Processing no longer holds Power Plant")
     end
 end
 local fold_list = ""

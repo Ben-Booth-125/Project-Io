@@ -2,7 +2,7 @@
 // propellant_loop_harness — BL-1604 (propellant loop)
 // ---------------------------------------------------------------------------
 // docs/economy/ERAS.md § The propellant loop; docs/economy/PRODUCTION.md
-// § Extraction buildings and § Chemical Plant; docs/military/SPACE_FLEETS.md
+// § Extraction buildings and § Propellant Plant; docs/military/SPACE_FLEETS.md
 // § Thrust — the Δv budget; docs/economy/SPACE_ASSETS.md (the Fuel depot).
 //
 // A hand-built fixture on base_harness's pattern: a star, a home planet (all
@@ -267,14 +267,14 @@ regs make_reg()
     r.reg.set_economics(building_type::inland_logistics_hub, hub);
     recipe ra;
     ra.name = "propellant_atmospheric";
-    ra.group = "Chemical Works";
+    ra.group = "Propellant Plant";
     ra.air = recipe_air::atmosphere;
     ra.inputs[RF] = 2.0f;
     ra.outputs[PR] = 1.0f;
     r.atmo = r.reg.add_recipe(ra);
     recipe rv;
     rv.name = "propellant_electrolysis";
-    rv.group = "Chemical Works";
+    rv.group = "Propellant Plant";
     rv.air = recipe_air::airless;
     rv.mechanic = std::string(space_keys::electrolysis_plant);
     rv.inputs[WA] = 3.0f;

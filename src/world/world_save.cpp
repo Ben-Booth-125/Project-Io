@@ -3548,7 +3548,8 @@ std::size_t tail_bytes_after_key(int version, const world& w)
         { k_space_key + k_world_save_version_space_firsts, world_save_space_firsts_section_bytes },       // v91
         { k_space_key + k_world_save_version_transit_origin, world_save_transit_origin_section_bytes },     // v92
     };
-    static_assert(world_save_version == k_world_save_version_space_merge,
+    // BL-1641: v94 (one building per product) adds no section, so the table ends at v92's.
+    static_assert(world_save_version == k_world_save_version_one_product,
                   "BL-1632: a new trailing section joins world_save_tail_bytes_after's table");
     assert(version >= static_cast<int>(k_world_save_version_pre_tax)); // older tails are not today's
     std::size_t n = 0;
@@ -3635,6 +3636,7 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
     // of v48.
     if (!r_u32(in, version)
         || (version != world_save_version && version != k_world_save_version_pre_lp
+            && version != k_world_save_version_space_merge // BL-1641: v93, the same layout as v94
             && version != k_world_save_version_pre_rail
             && version != k_world_save_version_pre_state
             && version != k_world_save_version_pre_space

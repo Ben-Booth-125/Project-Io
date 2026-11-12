@@ -1123,6 +1123,8 @@ enum class recipe_switch_result : uint8_t
                           ///< The only method lock left at this door — see try_switch_recipe.
     wrong_air,            ///< The new recipe cannot run on this building's body's air
                           ///< (`recipe_runs_at_tile`; propellant routes, Ben 2026-10-09).
+    one_way,              ///< Same building, but not a legal step: the way back down from
+                          ///< an upgrade, or an upgrade of some other method (Ben, 2026-11-11).
 };
 
 /// Attempt a PLAYER-grade recipe switch on `b`, gated by `economy.recipe_switch`
@@ -1138,6 +1140,11 @@ enum class recipe_switch_result : uint8_t
 /// recipe_switch_params for the full reasoning.
 ///
 /// A rejection mutates nothing.
+///
+/// ONE BUILDING PER PRODUCT (Ben, 2026-11-11; PRODUCTION.md § One building per
+/// product): the switch applies to the WHOLE product stack on `b`'s tile, priced per
+/// building — `switch_cost` for a variant, `upgrade_cost` for the upgrade of the
+/// running method — and refused as `one_way` for the step back down an upgrade.
 ///
 /// BL-434 retraction (2026-08-16, same session BL-434 landed): a switch to a
 /// recipe in a DIFFERENT `group` than `b`'s current recipe is REFUSED outright

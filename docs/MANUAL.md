@@ -198,7 +198,7 @@ cycling: **Scarcity, Reach, Supply-routes**.
 | Build | Select a tile → **Construct Buildings** → pick a candidate |
 | Build a road | Same panel, the Road fold below the building folds: Track / Road / Highway / Railroad |
 | Manage a building | Select it, then the gear icon on the Selection band |
-| Change recipe | The production-method combo on the band |
+| Change method | Select the building: its card lists each upgrade or variant with its cost; press one |
 | Set workforce | The workforce slider (0–200% of nominal) |
 | Auto-solve workforce | The **Auto** checkbox — the slider is disabled while it is on |
 | Idle / resume | **Idle** on a running building; **Resume** on an idled one |
@@ -308,8 +308,14 @@ dead: its inputs may not be for sale anywhere you can reach, or its output may h
 is the real constraint on early growth, and it is one you read off **prices and supply**, not off a
 locked row. Check that a chain's inputs can actually be bought before you build the far end of it.
 
-Some buildings offer **alternate production methods** for the same output — a real trade-off, not a
-straight upgrade, so the better choice depends on which market the output is going to.
+**Every processing building makes one product** — a Steel Mill makes steel, a Copper Refinery
+refined copper — and never switches to another; a different product is a different building, so
+dismantle and rebuild. Some buildings have more than one **method** for their product. A
+**variant** draws different raws and switches back and forth at a small cost. An **upgrade** is the
+deeper method that needs a good the other does not: you pay for it in place, and it does not go
+back. All the buildings of one product on one tile run one method, and a change moves them
+together. You change it on the building's own card, which lists each step and its cost. The deeper
+method is not always the better one: it depends on what its extra input costs where you build.
 
 *Authority: `docs/economy/PRODUCTION.md`.*
 

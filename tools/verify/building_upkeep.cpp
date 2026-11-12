@@ -1317,7 +1317,7 @@ power_plant_reg power_plant_registry(float need)
     p.reg.set_economics(building_type::processing_facility, pe);
     recipe r;
     r.name  = "test_power_plant";
-    r.group = "Power Generation";
+    r.group = "Power Plant";
     r.inputs [ri(resource_type::petroleum)] = 1.0f;
     r.outputs[ri(resource_type::power)]     = 3.0f;
     p.plant        = p.reg.add_recipe(r);

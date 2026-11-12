@@ -1526,6 +1526,49 @@ int main()
               "ANTI-VACUITY: every pass in the injector registry really moves at least one good");
     }
 
+    // --- R8: the method tags follow depth (Ben, 2026-11-11; PRODUCTION.md § Upgrades
+    // and variants) --------------------------------------------------------------------
+    // An UPGRADE is the deeper route: its required depth exceeds the method it names.
+    // VARIANTS draw different raws at the same depth: a variant's required depth equals
+    // the method it names. Read over the whole authored roster (band `any`), so the tag
+    // an author writes is the depth the graph says, not a label beside it. Counted, so a
+    // green row is never silent.
+    std::printf("\nR8 - method tags follow depth: an upgrade is deeper, a variant level\n");
+    {
+        lua_state lua;
+        lua.load("scripts/recipes.lua");
+        lua.load("scripts/economy.lua");
+        recipe_registry reg;
+        reg.load_from_lua(lua);
+        reg.set_era(era_band::any);
+        int upgrades = 0, variants = 0, bad = 0;
+        for (std::size_t i = 0; i < reg.recipe_count(); ++i)
+        {
+            const recipe* r = reg.get_recipe(static_cast<uint16_t>(i));
+            if (r == nullptr || r->retired)
+                continue;
+            const std::string& base = !r->upgrade_of.empty() ? r->upgrade_of : r->variant_of;
+            if (base.empty())
+                continue;
+            const uint16_t b = reg.recipe_id(base);
+            const int d_self = reg.recipe_required_depth(static_cast<uint16_t>(i));
+            const int d_base = reg.recipe_required_depth(b);
+            const bool up = !r->upgrade_of.empty();
+            const bool ok = up ? (d_self > d_base) : (d_self == d_base);
+            (up ? upgrades : variants)++;
+            if (!ok)
+            {
+                ++bad;
+                std::printf("      %s '%s' (required depth %d) %s '%s' (%d)\n", up ? "UPGRADE" : "VARIANT",
+                            r->name.c_str(), d_self, up ? "is not deeper than" : "is not level with",
+                            base.c_str(), d_base);
+            }
+        }
+        std::printf("      %d upgrade(s), %d variant(s) tagged\n", upgrades, variants);
+        check(upgrades > 0 && variants > 0, "R8a the roster tags both kinds (non-vacuous)");
+        check(bad == 0, "R8b every upgrade is deeper than its base, every variant level with it");
+    }
+
     std::printf("\n=== %s (%d failure%s) ===\n",
                 failures == 0 ? "ALL PASS" : "FAILURES",
                 failures, failures == 1 ? "" : "s");
