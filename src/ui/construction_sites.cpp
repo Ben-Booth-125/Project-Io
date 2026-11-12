@@ -25,7 +25,7 @@
 #include <algorithm>
 #include <array>
 #include <atomic>
-#include <cassert>
+#include <exception>
 #include <chrono>
 #include <cmath>
 #include <cstdio>
@@ -432,12 +432,19 @@ void evaluate(world& w, const recipe_registry& reg, ui_state& ui)
 // joins every one of them before the call returns, so nothing the main thread does - the
 // simulation's tick, a command, another panel - runs while a worker reads the world. And
 // inside the join nothing writes: every lazily-built cache the scoring reads is WARMED on
-// the main thread when the pass starts (`warm_pass`) - each tile's Logistic Point cover,
-// the market raster and the body's indexes, and the pass's own quote context with the
-// reach set of every (market, input) a quote can ask for. An option's figures live in its
-// own cell, which one worker holds at a time. The quotes the door's cache keeps are not
-// touched: the pass prices through its own context, so the door's cache cannot be reset
-// under it. A tripwire checks after each join that no warmed memo grew.
+// the main thread first. When the pass starts (`warm_step`, spread over frames under the
+// same budget): each tile's Logistic Point cover, the market raster and the body's
+// indexes, and the quote context with the reach set of every (market, input) a quote can
+// ask for. And on EVERY frame before the fork (`rewarm_shared`), the indexes that rebuild
+// themselves on the entity cursor or the catchment generation - the markets and centres
+// per body, and each body's catchment raster - because a muster or a hire between two
+// frames moves the cursor without moving the pass's key. What would stale the warmed
+// state itself (ownership, roads, fronts, wars, the market set) is in the key, and
+// restarts the pass. An option's figures live in its own cell, which one worker holds at
+// a time. THE GRID AND THE TABLE PRICE THROUGH ONE CONTEXT: a pass resets the door's quote
+// context when it starts and warms that, and the table re-evaluates on it, so a cell and
+// its row read the same Net. A tripwire checks after each join that no warmed memo grew
+// and no stamp moved, and logs it once if one did.
 //
 // WHY IT IS THE SEQUENTIAL ANSWER. An option's tiles are always scored in tile order, and
 // options never share state, so which thread scored an option, and across how many frames,
@@ -471,8 +478,32 @@ struct grid_key
     float         reach   = -2.0f;
     std::uint32_t scope   = 0;
     std::uint64_t epoch   = 0;
+    // What the warmed state reads that the frame stamp does not see: who holds each tile
+    // and the roads the catchment floods (both stale the tile list, the covers and every
+    // tile's market), the fronts and the wars the lanes detour round, and the market set
+    // the reach memo was warmed for.
+    std::uint64_t catchment = 0;
+    std::uint64_t territory = 0;
+    std::uint64_t wars      = 0;
+    std::size_t   markets   = 0;
+    std::size_t   folded    = 0;
     bool operator==(const grid_key&) const = default;
 };
+
+std::uint64_t wars_digest(const world& w)
+{
+    std::uint64_t h = 1469598103934665603ull;
+    const auto mix = [&](std::uint64_t v) {
+        for (int b = 0; b < 8; ++b) { h ^= (v >> (8 * b)) & 0xFFu; h *= 1099511628211ull; }
+    };
+    for (const auto& [k, rec] : w.wars) // std::map: ascending
+    {
+        (void)rec;
+        mix(k.first);
+        mix(k.second);
+    }
+    return h;
+}
 
 struct grid_pass
 {
@@ -490,10 +521,18 @@ struct grid_pass
     entity_id               actor   = null_entity;
     float                   balance = 0.0f;
     float                   reach   = 0.0f;
-    std::optional<site_quote_context> cx;        ///< The pass's own, warmed before any worker starts.
     std::optional<place_index> places;           ///< Built once per pass, not per frame.
+    // THE WARM-UP, resumable so it keeps to the frame budget: 0 covers and markets per
+    // tile, 1 the quote context, 2 the reach set per (market, good taken), 3 done.
+    int                     warm_phase = 0;
+    std::size_t             warm_i     = 0;
+    std::vector<entity_id>  warm_markets;
+    std::array<bool, resource_count> taken{};
+    std::vector<site_cell>  kept_cells;          ///< The last complete grid, while a new view searches.
+    std::vector<int>        kept_order;
     double                  spent_ms = 0.0;
     double                  warm_ms  = 0.0;      ///< Of which, the warm-up.
+    double                  warm_frame_max_ms = 0.0; ///< The longest single warm-up frame.
     int                     frames   = 0;
     std::chrono::steady_clock::time_point started;
 };
@@ -578,50 +617,124 @@ void finish_cell(grid_pass& p, std::size_t i, bool scope_empty)
         c.refusal = placement_rules::placement_reason_text(static_cast<placement_rules::placement_reason>(best_reason));
 }
 
-/// Build, on the main thread, every lazily-built thing a worker would otherwise build
+//// Build, on the main thread, every lazily-built thing a worker would otherwise build
 /// under the join: the body's tile raster and centre index, each tile's market (the
-/// catchment raster) and Logistic Point cover, and the pass's quote context with the
-/// reach set of every market in scope for every good an offered recipe takes. After
-/// this, scoring only reads.
-void warm_pass(world& w, const recipe_registry& reg, grid_pass& p, entity_id body)
+/// catchment raster) and Logistic Point cover, and the quote context with the reach set
+/// of every market in scope for every good an offered recipe takes. Resumable: it stops
+/// when @p deadline passes (null: never) and carries on next frame; true once done.
+/// After it, scoring only reads.
+bool warm_step(world& w, const recipe_registry& reg, grid_pass& p, entity_id body,
+               const std::chrono::steady_clock::time_point* deadline)
 {
-    p.cover.resize(p.tiles.size());
-    std::vector<entity_id> markets;
-    for (std::size_t i = 0; i < p.tiles.size(); ++i)
+    const auto out_of_time = [&]() {
+        return deadline != nullptr && std::chrono::steady_clock::now() >= *deadline;
+    };
+    if (p.warm_phase == 0)
     {
-        p.cover[i] = site_lp_cover(w, p.tiles[i]);
-        if (const entity_id mid = market_for_tile(w, p.tiles[i]); mid != null_entity)
-            markets.push_back(mid);
+        p.cover.resize(p.tiles.size());
+        while (p.warm_i < p.tiles.size())
+        {
+            const std::size_t i = p.warm_i++;
+            p.cover[i] = site_lp_cover(w, p.tiles[i]);
+            if (const entity_id mid = market_for_tile(w, p.tiles[i]); mid != null_entity)
+                p.warm_markets.push_back(mid);
+            if (out_of_time())
+                return false;
+        }
+        std::sort(p.warm_markets.begin(), p.warm_markets.end());
+        p.warm_markets.erase(std::unique(p.warm_markets.begin(), p.warm_markets.end()), p.warm_markets.end());
+        (void)body_mean_habitability(w, body);
+        p.warm_phase = 1;
+        p.warm_i     = 0;
+        if (out_of_time())
+            return false;
     }
-    std::sort(markets.begin(), markets.end());
-    markets.erase(std::unique(markets.begin(), markets.end()), markets.end());
-    (void)body_mean_habitability(w, body);
-
-    p.cx.emplace(make_site_quote_context(w, reg, quote_report()));
-    std::array<bool, resource_count> taken{};
-    for (const site_cell& c : p.work)
-        if (c.option.type == building_type::processing_facility)
-            if (const recipe* rc = reg.get_recipe(c.option.recipe); rc != nullptr)
-                for (std::size_t r = 0; r < resource_count; ++r)
-                    taken[r] = taken[r] || rc->inputs[r] > 0.0f;
-    for (const entity_id mid : markets)
-        for (std::size_t r = 0; r < resource_count; ++r)
-            if (taken[r])
-                (void)reachable_supply(w, reg, p.cx->reach, mid, r, null_entity);
+    if (p.warm_phase == 1)
+    {
+        // THE DOOR'S CONTEXT IS THE GRID'S: reset here, at the pass's stamp, and the table
+        // re-evaluated on it, so a grid cell and the table's row for it read one Net.
+        quote_cache& qc = quotes();
+        qc.stamp = make_lp_stamp(w);
+        qc.at.clear();
+        qc.runway.clear();
+        qc.cx.emplace(make_site_quote_context(w, reg, quote_report()));
+        last_key() = eval_key{};
+        p.taken.fill(false);
+        for (const site_cell& c : p.work)
+            if (c.option.type == building_type::processing_facility)
+                if (const recipe* rc = reg.get_recipe(c.option.recipe); rc != nullptr)
+                    for (std::size_t r = 0; r < resource_count; ++r)
+                        p.taken[r] = p.taken[r] || rc->inputs[r] > 0.0f;
+        p.warm_phase = 2;
+        p.warm_i     = 0;
+        if (out_of_time())
+            return false;
+    }
+    if (p.warm_phase == 2)
+    {
+        quote_cache& qc = quotes();
+        const std::size_t n = p.warm_markets.size() * resource_count;
+        while (p.warm_i < n)
+        {
+            const std::size_t k = p.warm_i++;
+            const std::size_t r = k % resource_count;
+            if (!p.taken[r])
+                continue;
+            (void)reachable_supply(w, reg, qc.cx->reach, p.warm_markets[k / resource_count], r, null_entity);
+            if (out_of_time())
+                return false;
+        }
+        p.warm_phase = 3;
+    }
+    return true;
 }
 
-/// What the tripwire watches: every memo a quote could grow on a miss.
-std::array<std::size_t, 5> memo_sizes(const world& w, const grid_pass& p)
+/// On EVERY frame, before the fork: the indexes that rebuild themselves on the entity
+/// cursor (any entity created anywhere - a muster, a hire, a ship) or on the catchment
+/// generation, rebuilt here on the main thread if they are stale, so no worker does.
+/// Cheap when they are fresh: two stamp compares and one raster lookup per body.
+void rewarm_shared(const world& w, entity_id body)
 {
-    return { p.cx->reach.haul.size(), p.cx->reach.supply_memo.size(), w.astar_cost_cache.size(),
-             w.leg_path_cache.size(), w.lane_path_cache.size() };
+    // market_for_tile reaches markets_by_body (the per-body market, folded and signature
+    // indexes) and body_mean_habitability reaches centres_by_body: both rebuild there if
+    // the cursor moved, and are only read after.
+    (void)body_mean_habitability(w, body);
+    if (w.markets.empty())
+        return;
+    (void)market_for_tile(w, w.markets.begin()->second.centre_tile);
+    // The index is fresh now, and nothing below moves the cursor, so it is not rebuilt
+    // under this walk.
+    for (const auto& [b, ids] : w.body_market_index)
+    {
+        (void)b;
+        if (ids.empty())
+            continue;
+        if (const auto mit = w.markets.find(ids.front()); mit != w.markets.end())
+            (void)market_for_tile(w, mit->second.centre_tile); // the body's catchment raster
+    }
+}
+
+/// What the tripwire watches across a join: every memo a quote could grow on a miss,
+/// and every stamp a cache rebuilds on. Any of them moving was a worker writing.
+std::vector<std::uint64_t> grid_watch(const world& w, entity_id body)
+{
+    const quote_cache& qc = quotes();
+    std::uint64_t route_sig = 0;
+    if (const auto it = w.body_route_index.find(body); it != w.body_route_index.end())
+        route_sig = it->second.sig;
+    return { qc.cx ? qc.cx->reach.haul.size() : 0, qc.cx ? qc.cx->reach.supply_memo.size() : 0,
+             w.astar_cost_cache.size(), w.leg_path_cache.size(), w.lane_path_cache.size(),
+             w.leg_flood_fields.size(), w.lane_flood_fields.size(), w.body_port_tiles.size(),
+             w.body_tile_index.size(), w.body_route_index.size(), route_sig,
+             w.body_market_index_cursor, w.body_centre_index_cursor, w.next_entity_id(),
+             w.catchment_generation, w.territory_generation, w.lane_cache_territory };
 }
 
 /// Score option @p i's tiles from where it stopped, in tile order, until they are all
 /// scored (true) or @p deadline passes (false; null: no deadline). Touches only the
 /// option's own cell and tallies; reads the world, the warmed context and the pass's
 /// per-tile covers.
-bool score_option(world& w, const recipe_registry& reg, grid_pass& p, std::size_t i,
+bool score_option(world& w, const recipe_registry& reg, grid_pass& p, site_quote_context& cx, std::size_t i,
                   const std::chrono::steady_clock::time_point* deadline)
 {
     site_cell& cell = p.work[i];
@@ -657,7 +770,7 @@ bool score_option(world& w, const recipe_registry& reg, grid_pass& p, std::size_
             long net    = 0;
             if (earns)
             {
-                const site_quote sq = quote_site(w, reg, *p.cx, tid, o.type, o.target, o.recipe, cover);
+                const site_quote sq = quote_site(w, reg, cx, tid, o.type, o.target, o.recipe, cover);
                 priced = sq.profit.has_data;
                 net    = priced ? std::lround(sq.profit.net()) : 0;
                 if (sq.profit.has_data && (!cell.has_figure || sq.profit.net() > cell.best_net))
@@ -703,11 +816,18 @@ void step_site_grid(world& w, const recipe_registry& reg, ui_state& ui, const st
     float balance = 0.0f;
     if (const float* b = purse_of(w, actor); b != nullptr)
         balance = *b;
-    const grid_key key{ ui.active_body, make_lp_stamp(w), balance, ui.max_logistics_reach, sf.scope_province,
-                        quote_epoch() };
+    grid_key key{ ui.active_body, make_lp_stamp(w), balance, ui.max_logistics_reach, sf.scope_province,
+                  quote_epoch() };
+    key.catchment = w.catchment_generation;
+    key.territory = w.territory_generation;
+    key.wars      = wars_digest(w);
+    key.markets   = w.markets.size();
+    key.folded    = w.folded_markets.size();
 
+    // A warmed pass whose context the door dropped is warmed again from the start.
+    const bool context_lost = p.running && p.warm_phase >= 2 && !quotes().cx.has_value();
     const bool options_moved = !same_options(p.running ? p.work : sf.cells, opts);
-    if (!p.have_key || !(key == p.key) || options_moved)
+    if (!p.have_key || !(key == p.key) || options_moved || context_lost)
     {
         const bool new_view = !p.have_key || p.key.body != key.body || p.key.scope != key.scope
                            || !same_options(sf.cells, opts);
@@ -718,6 +838,8 @@ void step_site_grid(world& w, const recipe_registry& reg, ui_state& ui, const st
         p.balance  = balance;
         p.reach    = ui.max_logistics_reach;
         p.spent_ms = 0.0;
+        p.warm_ms  = 0.0;
+        p.warm_frame_max_ms = 0.0;
         p.frames   = 0;
         p.started  = std::chrono::steady_clock::now();
         p.work.assign(opts.size(), site_cell{});
@@ -727,7 +849,10 @@ void step_site_grid(world& w, const recipe_registry& reg, ui_state& ui, const st
         p.air_refused.assign(opts.size(), 0);
         p.next_tile.assign(opts.size(), 0);
         p.done.assign(opts.size(), 0);
-        p.finished = 0;
+        p.finished     = 0;
+        p.warm_phase   = 0;
+        p.warm_i       = 0;
+        p.warm_markets.clear();
 
         p.tiles.clear();
         int grid_w = 0;
@@ -750,14 +875,15 @@ void step_site_grid(world& w, const recipe_registry& reg, ui_state& ui, const st
         sf.scope_foreign = sf.scope_province != 0 && p.tiles.empty();
         p.places.emplace(w, ui.active_body, grid_w);
 
-        const auto tw = std::chrono::steady_clock::now();
-        warm_pass(w, reg, p, ui.active_body);
-        p.warm_ms   = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - tw).count();
-        p.spent_ms += p.warm_ms;
-
         if (new_view)
         {
             // Nothing stands for a grid not yet priced: the search line says how far it is.
+            // The last complete grid is kept aside, to stand again if the pass fails.
+            if (!sf.cells.empty())
+            {
+                p.kept_cells = std::move(sf.cells);
+                p.kept_order = std::move(sf.cell_order);
+            }
             sf.cells.clear();
             sf.cell_order.clear();
         }
@@ -770,6 +896,24 @@ void step_site_grid(world& w, const recipe_registry& reg, ui_state& ui, const st
 
     const auto t0 = std::chrono::steady_clock::now();
     ++p.frames;
+    const auto deadline = t0 + std::chrono::duration_cast<std::chrono::steady_clock::duration>(
+                                   std::chrono::duration<double, std::milli>(k_grid_frame_budget_ms));
+
+    // THE WARM-UP, on the main thread, under the frame's budget (none under --verify). No
+    // worker forks until it is done.
+    if (p.warm_phase < 3)
+    {
+        const bool warmed = warm_step(w, reg, p, ui.active_body, ui.fixed_frame_clock ? nullptr : &deadline);
+        const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
+        p.warm_ms          += ms;
+        p.warm_frame_max_ms = std::max(p.warm_frame_max_ms, ms);
+        if (!warmed)
+        {
+            p.spent_ms += ms;
+            return;
+        }
+    }
+    site_quote_context& cx = *quotes().cx;
 
     // This frame's options: every one not yet done, in option order.
     std::vector<std::size_t> todo;
@@ -777,26 +921,42 @@ void step_site_grid(world& w, const recipe_registry& reg, ui_state& ui, const st
         if (!p.done[i])
             todo.push_back(i);
 
-    const std::array<std::size_t, 5> before = memo_sizes(w, p);
+    // Every frame, before the fork: the cursor- and catchment-stamped indexes, fresh.
+    rewarm_shared(w, ui.active_body);
+    const std::vector<std::uint64_t> before = grid_watch(w, ui.active_body);
+    std::exception_ptr failed;
+    std::string        failed_what;
+    const auto note = [&](std::exception_ptr e) {
+        if (failed)
+            return;
+        failed = e;
+        try { std::rethrow_exception(e); }
+        catch (const std::exception& ex) { failed_what = ex.what(); }
+        catch (...) { failed_what = "an unknown exception"; }
+    };
     if (ui.fixed_frame_clock)
     {
         // --verify: the main thread alone, to completion, so no capture rests on the clock.
-        for (const std::size_t i : todo)
-            p.done[i] = score_option(w, reg, p, i, nullptr) ? 1 : 0;
+        try
+        {
+            for (const std::size_t i : todo)
+                p.done[i] = score_option(w, reg, p, cx, i, nullptr) ? 1 : 0;
+        }
+        catch (...) { note(std::current_exception()); }
     }
     else
     {
-        const auto deadline = t0 + std::chrono::duration_cast<std::chrono::steady_clock::duration>(
-                                       std::chrono::duration<double, std::milli>(k_grid_frame_budget_ms));
         std::atomic<std::size_t> next{0};
+        std::atomic<bool>        stop{false};
         const auto claim = [&]() {
-            while (std::chrono::steady_clock::now() < deadline)
+            while (!stop.load() && std::chrono::steady_clock::now() < deadline)
             {
                 const std::size_t k = next.fetch_add(1);
                 if (k >= todo.size())
                     return;
                 const std::size_t i = todo[k];
-                p.done[i] = score_option(w, reg, p, i, &deadline) ? 1 : 0;
+                try { p.done[i] = score_option(w, reg, p, cx, i, &deadline) ? 1 : 0; }
+                catch (...) { stop.store(true); throw; }
             }
         };
         const unsigned hw = std::max(1u, std::thread::hardware_concurrency());
@@ -807,17 +967,47 @@ void step_site_grid(world& w, const recipe_registry& reg, ui_state& ui, const st
         workers.reserve(helpers);
         for (std::size_t k = 0; k < helpers; ++k)
             workers.push_back(std::async(std::launch::async, claim));
-        claim();
+        try { claim(); }
+        catch (...) { note(std::current_exception()); }
+        // THE JOIN: nothing returns to the frame while a worker reads the world - every
+        // future is waited on, a failed one included.
         for (std::future<void>& f : workers)
-            f.get(); // THE JOIN: nothing returns to the frame while a worker reads the world
+        {
+            try { f.get(); }
+            catch (...) { note(std::current_exception()); }
+        }
     }
-    // The tripwire: a warmed memo that grew under the join was written by a worker.
-    if (memo_sizes(w, p) != before)
+    // The tripwire: a memo that grew, or a stamp that moved, under the join was written
+    // by a worker. Logged once, in every build.
+    if (grid_watch(w, ui.active_body) != before)
     {
-        std::fprintf(stderr, "site finder: a grid worker missed the warm-up (a memo grew under the join)\n");
-        assert(!"site grid: warm_pass missed a memo the scoring writes");
+        static bool told = false;
+        if (!told)
+        {
+            told = true;
+            std::fprintf(stderr, "site finder: a grid worker wrote a shared cache under the join "
+                                 "(warm_step/rewarm_shared missed it)\n");
+        }
     }
     p.spent_ms += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
+
+    if (failed)
+    {
+        // A pass that threw is stopped, not resumed: a tile it was on was never scored. The
+        // last complete grid stands; the pass restarts when its key next moves.
+        std::fprintf(stderr, "site finder: the grid's search stopped: %s\n", failed_what.c_str());
+        p.running    = false;
+        sf.searching = false;
+        p.work.clear();
+        if (sf.cells.empty() && !p.kept_cells.empty())
+        {
+            sf.cells      = std::move(p.kept_cells);
+            sf.cell_order = std::move(p.kept_order);
+        }
+        p.kept_cells.clear();
+        p.kept_order.clear();
+        return;
+    }
 
     p.finished = 0;
     for (const char d : p.done)
@@ -834,10 +1024,12 @@ void step_site_grid(world& w, const recipe_registry& reg, ui_state& ui, const st
     sf.searching = false;
     sf.cells     = std::move(p.work);
     p.work.clear();
-    p.cx.reset();
+    p.kept_cells.clear();
+    p.kept_order.clear();
     order_cells(sf);
-    sf.grid_ms      = p.spent_ms;
-    sf.grid_frames  = p.frames;
+    sf.grid_ms           = p.spent_ms;
+    sf.grid_frames       = p.frames;
+    sf.grid_warm_frame_ms = p.warm_frame_max_ms;
     sf.grid_wall_ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - p.started).count();
 }
 

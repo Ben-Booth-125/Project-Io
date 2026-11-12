@@ -1029,6 +1029,7 @@ struct site_finder_state
     double        grid_ms = 0.0;    ///< Time the last full grid pass spent evaluating (all frames, the warm-up included).
     int           grid_frames = 0;  ///< Frames that pass was spread across.
     double        grid_wall_ms = 0.0; ///< Wall time from that pass's start to its end.
+    double        grid_warm_frame_ms = 0.0; ///< That pass's longest warm-up frame (main thread, before any fork).
 
     /// Sort column (0 place, 1 profit, 2 cost, 3 market, 4 logistics, 5 yield, 6 three-year
     /// earnings) and direction. Default: three-year earnings, descending; every tie broken

@@ -117,6 +117,9 @@ No part-grid stands meanwhile, because cells that fill and re-sort as they go re
 they are one. A re-pass (the treasury or the frame stamp moved) leaves the last complete grid standing
 until the fresh set swaps in whole, so a running game's grid does not flicker. Under `--verify` the
 pass runs on one thread and completes in the frame it starts, so no capture rests on the clock.
+**The grid and the table read one Net.** A pass prices through the same quote context as the Build
+door and the table, fresh when the pass starts, so a cell and the table's row for the same tile
+never disagree. A pass that fails stops; the last complete grid stands until the next pass.
 
 **The province scope** (Ben, 2026-11-08). **A selected tile restricts the finder to its province's own
 ground**: the grid's figures and counts, the table's rows and the placement lens. A province is not a
