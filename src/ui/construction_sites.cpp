@@ -402,9 +402,7 @@ void evaluate(world& w, const recipe_registry& reg, ui_state& ui)
     sf.cell_net.assign(sf.cls.size(), std::numeric_limits<float>::quiet_NaN());
 
     const entity_id actor = player_actor(w);
-    float balance = 0.0f;
-    if (const float* p = purse_of(w, actor); p != nullptr)
-        balance = *p;
+    const float balance = purse_room_of(w, actor); // what construct_nation pays from
 
     const site_option& c = sf.choice;
     const placement_gate gate = reg.placement_gate_for(c.type, c.recipe);
@@ -1015,9 +1013,7 @@ void step_site_grid(world& w, const recipe_registry& reg, ui_state& ui, const st
     grid_pass& p = pass_state();
 
     const entity_id actor = player_actor(w);
-    float balance = 0.0f;
-    if (const float* b = purse_of(w, actor); b != nullptr)
-        balance = *b;
+    const float balance = purse_room_of(w, actor); // what construct_nation pays from
     grid_key key{ ui.active_body, make_lp_stamp(w), ui.max_logistics_reach, sf.scope_province, quote_epoch() };
     key.catchment = w.catchment_generation;
     key.wars      = wars_digest(w);
@@ -1877,9 +1873,7 @@ void update_site_finder(world& w, const recipe_registry& reg, ui_state& ui)
         return;
     }
     const entity_id actor = player_actor(w);
-    float balance = 0.0f;
-    if (const float* p = purse_of(w, actor); p != nullptr)
-        balance = *p;
+    const float balance = purse_room_of(w, actor); // what construct_nation pays from
     const eval_key key{ ui.active_body, make_door_stamp(w), sf.choice.type, sf.choice.target,
                         sf.choice.recipe, balance, ui.max_logistics_reach, sf.scope_province };
     if (!(key == last_key()) || sf.body != ui.active_body)
@@ -1897,9 +1891,7 @@ std::string site_press_refusal(const world& w, const recipe_registry& reg, const
     if (sf.scope_province != 0 && w.provinces.province_of(tile) != sf.scope_province)
         return "That is outside the selected province. Clear the selection to search all your ground.";
     const entity_id actor = player_actor(w);
-    float balance = 0.0f;
-    if (const float* p = purse_of(w, actor); p != nullptr)
-        balance = *p;
+    const float balance = purse_room_of(w, actor); // what construct_nation pays from
     const recipe* rc = (o.type == building_type::processing_facility) ? reg.get_recipe(o.recipe) : nullptr;
     const site_gate_result sg = gate_site(w, reg, o, rc, reg.placement_gate_for(o.type, o.recipe), tile,
                                           ui.max_logistics_reach, actor, balance);

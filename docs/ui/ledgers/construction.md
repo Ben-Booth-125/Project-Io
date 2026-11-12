@@ -120,7 +120,8 @@ standing until the fresh set swaps in whole, so a running game's grid does not f
 the clock. **The treasury is not part of a pass.** A pass judges each tile by its air and the
 placement rules and keeps the site's cost; which sites the treasury can pay for is drawn against
 the treasury as it stands, by the Build door's own rule (a site dearer than the treasury is too
-costly), every time the grid is drawn after the treasury moves. So spending never restarts a pass,
+costly). The treasury read is the part a build may spend: its uncommitted part, the figure
+`construct_nation` pays from, so a site the finder offers is never refused for funds. It is redrawn every time the grid is drawn after the treasury moves. So spending never restarts a pass,
 the grid and the table read the same treasury in the same frame, and in debt every site is too
 costly. **The grid and the table read one Net.** While the grid stands at the moment it was
 published - the same prices, ground, roads, wars and markets - the table's row for a tile shows the
