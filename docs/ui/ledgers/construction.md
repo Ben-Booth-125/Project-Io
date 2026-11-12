@@ -127,8 +127,13 @@ published - the same prices, ground, roads, wars and markets - the table's row f
 grid's own quote as its Net, so a cell and its row never disagree. Publishing a grid, and any move
 of the ownership, the wars or the market set, drops the Build door's quotes, so a pressed tile and a
 row's full-cover figure (which a row short of full Logistic Point cover still asks the door for)
-are priced again from then on. A pass that fails stops; the last complete grid stands again only on
-its own body, province and buildings.
+are priced again from then on. While a re-pass runs, the grid still standing reads each site's
+placement and cost from the moment it was priced, so it can lag the world until the fresh grid
+swaps in; **the Build door's gate is final**, and a Construct press re-checks its tile against the
+body, the player's ground and the province scope it is pressed in. A grid stands only for its own
+body, province and buildings, so a new view shows the search line however often its pass restarts,
+and a pass that fails leaves the last grid standing only on that same view. A new game or a load
+forgets the grid entirely.
 
 **The province scope** (Ben, 2026-11-08). **A selected tile restricts the finder to its province's own
 ground**: the grid's figures and counts, the table's rows and the placement lens. A province is not a

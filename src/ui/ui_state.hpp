@@ -1030,6 +1030,7 @@ struct site_finder_state
     int           grid_frames = 0;  ///< Frames that pass was spread across.
     double        grid_wall_ms = 0.0; ///< Wall time from that pass's start to its end.
     double        grid_warm_frame_ms = 0.0; ///< That pass's longest warm-up frame (main thread, before any fork).
+    double        grid_derive_ms = 0.0; ///< The last split of the shown grid at the treasury (derive_cells).
 
     /// Sort column (0 place, 1 profit, 2 cost, 3 market, 4 logistics, 5 yield, 6 three-year
     /// earnings) and direction. Default: three-year earnings, descending; every tie broken

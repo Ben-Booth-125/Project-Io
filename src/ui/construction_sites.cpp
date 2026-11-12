@@ -200,6 +200,7 @@ struct grid_figures
     std::uint64_t            epoch = 0;
     entity_id                body  = null_entity;
     std::uint32_t            scope = 0;
+    int                      grid_w = 0;      ///< The body's grid width, for place names when drawn.
     bool                     scope_empty = false;
     std::vector<site_option> opts;
     std::vector<entity_id>   tiles;           ///< Own ground in scope, in grid order.
@@ -662,9 +663,11 @@ struct grid_pass
     std::optional<site_quote_context> cx;        ///< The pass's own, warmed before any worker forks.
     grid_figures            figures;             ///< Per option, per tile: filled by its worker.
     int                     grid_w = 0;          ///< The body's grid width, for the place names.
-    std::optional<place_index> shown_places;     ///< The shown grid's, for its cells' place names.
-    bool                    hide_shown    = false; ///< A new view is searching: the shown grid is not drawn.
-    float                   derived_balance = 0.0f; ///< The treasury the drawn cells were split at.
+    // THE SPLIT HOLDS for any treasury in [derive_lo, derive_hi): the dearest site it
+    // could pay for and the cheapest it could not. A move inside that leaves every verdict
+    // as it was, so the cells are recounted only when the treasury crosses a site's cost.
+    float                   derive_lo = 0.0f;
+    float                   derive_hi = 0.0f;
     bool                    derived = false;
     bool                    failed        = false; ///< The pass for this key threw and stopped.
     bool                    failed_logged = false; ///< This key's failure is already in the log.
@@ -729,9 +732,15 @@ void order_cells(site_finder_state& sf)
 /// The cells, from the shown grid's slots, split against @p balance by the door's own
 /// boundary (balance < capex is too costly): in option order, each option's tiles in
 /// tile order, so a cell is the one a pass judging at this treasury would have built.
-void derive_cells(const world& w, const grid_figures& f, const place_index& places, float balance,
-                  site_finder_state& sf)
+/// Returns the treasury range the split holds for: [dearest affordable, cheapest too
+/// costly), the open ends infinite.
+std::pair<float, float> derive_cells(const world& w, const grid_figures& f, float balance, site_finder_state& sf)
 {
+    float lo = -std::numeric_limits<float>::infinity();
+    float hi = std::numeric_limits<float>::infinity();
+    // Built here, when a name is wanted, and dropped on return: nothing that points into
+    // the world is held across frames.
+    std::optional<place_index> places;
     sf.cells.assign(f.opts.size(), site_cell{});
     for (std::size_t i = 0; i < f.opts.size(); ++i)
     {
@@ -747,12 +756,14 @@ void derive_cells(const world& w, const grid_figures& f, const place_index& plac
             const entity_id tid = f.tiles[ti];
             if (balance < fig.capex)
             {
+                hi = std::min(hi, fig.capex);
                 if (cell.unaffordable == 0 || fig.capex < cell.cheapest_unaffordable)
                     cell.cheapest_unaffordable = fig.capex;
                 ++cell.unaffordable;
                 continue;
             }
             ++cell.sites;
+            lo = std::max(lo, fig.capex);
             const float cover = f.cover[ti];
             if (!(cover > 0.0f))
                 ++cell.no_lp;
@@ -782,10 +793,12 @@ void derive_cells(const world& w, const grid_figures& f, const place_index& plac
             }
         }
         if (best_tile != null_entity)
-        {
-            const tile_component& tc = w.tiles.at(best_tile);
-            cell.best_place = places.name(best_tile, tc.grid_x, tc.grid_y, cell.best_near);
-        }
+            if (const auto tit = w.tiles.find(best_tile); tit != w.tiles.end())
+            {
+                if (!places)
+                    places.emplace(w, f.body, f.grid_w);
+                cell.best_place = places->name(best_tile, tit->second.grid_x, tit->second.grid_y, cell.best_near);
+            }
         if (cell.sites > 0)
             continue;
         if (cell.unaffordable > 0)
@@ -818,6 +831,7 @@ void derive_cells(const world& w, const grid_figures& f, const place_index& plac
             cell.refusal = placement_rules::placement_reason_text(static_cast<placement_rules::placement_reason>(best_reason));
     }
     order_cells(sf);
+    return { lo, hi };
 }
 
 /// Build, on the main thread, every lazily-built thing a worker would otherwise build
@@ -862,6 +876,7 @@ bool warm_step(world& w, const recipe_registry& reg, grid_pass& p, entity_id bod
         f.epoch = p.key.epoch;
         f.body  = p.key.body;
         f.scope = p.key.scope;
+        f.grid_w = p.grid_w;
         f.scope_empty = p.key.scope != 0 && p.tiles.empty();
         f.opts  = p.opts;
         f.tiles = p.tiles;
@@ -1013,7 +1028,6 @@ void step_site_grid(world& w, const recipe_registry& reg, ui_state& ui, const st
     const bool options_moved = !same_options(p.have_key ? p.opts : std::vector<site_option>{}, opts);
     if (!p.have_key || !(key == p.key) || options_moved)
     {
-        const bool new_view = !p.have_key || p.key.body != key.body || p.key.scope != key.scope || options_moved;
         p.failed        = false;
         p.failed_logged = false;
         p.key      = key;
@@ -1054,24 +1068,27 @@ void step_site_grid(world& w, const recipe_registry& reg, ui_state& ui, const st
         }
         sf.scope_foreign = sf.scope_province != 0 && p.tiles.empty();
         p.grid_w = grid_w;
-        // Nothing stands for a grid not yet priced on a new view: the search line says
-        // how far it is. A re-pass for the same view leaves the last grid standing.
-        p.hide_shown = new_view;
     }
 
-    // THE SHOWN GRID, split at today's treasury whenever it or the grid moved.
-    const bool show = shown.valid && !p.hide_shown && p.shown_places.has_value();
+    // THE SHOWN GRID stands only for ITS OWN VIEW: the body, scope and options the pass
+    // now running (or last run) is for. A new view therefore shows no cells, only the
+    // search line, however often its pass restarts, and a Construct press can never hand
+    // over a tile from another body or province. A re-pass for the same view leaves the
+    // last grid standing. Split at today's treasury whenever it or the grid moved.
+    const bool show = shown.valid && shown.body == p.key.body && shown.scope == p.key.scope
+                   && same_options(shown.opts, p.opts);
     if (!show)
     {
         sf.cells.clear();
         sf.cell_order.clear();
         p.derived = false;
     }
-    else if (!p.derived || balance != p.derived_balance)
+    else if (!p.derived || balance < p.derive_lo || !(balance < p.derive_hi))
     {
-        derive_cells(w, shown, *p.shown_places, balance, sf);
-        p.derived         = true;
-        p.derived_balance = balance;
+        const auto td = std::chrono::steady_clock::now();
+        std::tie(p.derive_lo, p.derive_hi) = derive_cells(w, shown, balance, sf);
+        sf.grid_derive_ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - td).count();
+        p.derived = true;
     }
 
     sf.searching     = p.running;
@@ -1192,8 +1209,6 @@ void step_site_grid(world& w, const recipe_registry& reg, ui_state& ui, const st
         p.failed     = true;
         sf.searching = false;
         p.cx.reset();
-        if (shown.valid && shown.body == p.key.body && shown.scope == p.key.scope && same_options(shown.opts, p.opts))
-            p.hide_shown = false;
         return;
     }
 
@@ -1213,20 +1228,18 @@ void step_site_grid(world& w, const recipe_registry& reg, ui_state& ui, const st
     p.figures.door  = make_door_stamp(w);
     shown_figures() = std::move(p.figures);
     p.figures       = grid_figures{};
-    p.shown_places.reset();
-    p.shown_places.emplace(w, p.key.body, p.grid_w);
-    p.hide_shown    = false;
     last_key()      = eval_key{};
-    derive_cells(w, shown_figures(), *p.shown_places, balance, sf);
-    p.derived         = true;
-    p.derived_balance = balance;
+    const auto td = std::chrono::steady_clock::now();
+    std::tie(p.derive_lo, p.derive_hi) = derive_cells(w, shown_figures(), balance, sf);
+    sf.grid_derive_ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - td).count();
+    p.derived = true;
     sf.grid_ms            = p.spent_ms;
     sf.grid_frames        = p.frames;
     sf.grid_warm_frame_ms = p.warm_frame_max_ms;
     sf.grid_wall_ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - p.started).count();
 }
 
-// THE SEARCH LINE: a grid still being priced shows how far the search has got, never
+/// THE SEARCH LINE: a grid still being priced shows how far the search has got, never
 /// a part of the grid, which would read as an answer before it is one.
 void draw_site_search(const site_finder_state& sf)
 {
@@ -1272,6 +1285,19 @@ void resolve_scope(const world& w, ui_state& ui)
 }
 
 /// The grid: one cell per option, each its glyph, name, best Net and site count.
+/// @p tile is on the active body, the player's ground, and inside the scope's province.
+bool tile_in_view(const world& w, const ui_state& ui, entity_id tile)
+{
+    const auto tit = w.tiles.find(tile);
+    if (tit == w.tiles.end() || tit->second.body != ui.active_body)
+        return false;
+    const auto nit = w.tile_to_nation.find(tile);
+    if (nit == w.tile_to_nation.end() || nit->second != player_actor(w))
+        return false;
+    const std::uint32_t scope = ui.site_finder.scope_province;
+    return scope == 0 || w.provinces.province_of(tile) == scope;
+}
+
 void draw_site_grid(const world& w, const recipe_registry& reg, ui_state& ui)
 {
     site_finder_state& sf = ui.site_finder;
@@ -1404,7 +1430,10 @@ void draw_site_grid(const world& w, const recipe_registry& reg, ui_state& ui)
 
         // The press: a real button over the cell's right half, so it takes the press
         // and the hover before the cell under it.
-        const bool can_build = c.sites > 0 && c.build_tile != null_entity;
+        // The press re-checks its tile against the view it is pressed in - this body, the
+        // player's ground, the scope's province - so a grid can never hand over a tile from
+        // another view, whatever stands.
+        const bool can_build = c.sites > 0 && c.build_tile != null_entity && tile_in_view(w, ui, c.build_tile);
         const ImVec2 b_mn{half_x + st.ItemInnerSpacing.x * 0.5f, fig_y - 2.0f};
         const ImVec2 b_mx{mx.x - pad, mx.y - 2.0f};
         ImGui::SetCursorScreenPos(b_mn);
@@ -1632,6 +1661,17 @@ void invalidate_site_evaluation()
     quotes() = quote_cache{};
     last_key() = eval_key{};
     ++quote_epoch(); // the grid's pass restarts too
+}
+
+void reset_site_finder()
+{
+    // A new world: nothing the last one's grid, pass or caches hold may be read again.
+    // Ids repeat across worlds, so no stamp could tell them apart; the load and new-game
+    // paths call this beside the world's move.
+    pass_state()    = grid_pass{};
+    shown_figures() = grid_figures{};
+    covers()        = cover_cache{};
+    invalidate_site_evaluation();
 }
 
 shelf_runway shelf_runway_for(const world& w, const recipe_registry& reg, entity_id tile,
