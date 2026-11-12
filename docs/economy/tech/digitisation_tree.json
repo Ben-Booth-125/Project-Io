@@ -5547,6 +5547,32 @@
     }
    ],
    "cost_units": 3
+  },
+  {
+   "id": "DG-ST-FO-G3",
+   "name": "Counter-Battery Radar",
+   "tier": "minor",
+   "ring": 3,
+   "tree": "ST",
+   "branch": "ST-FO",
+   "requires": [
+    [
+     "DG-ST-FO-G1"
+    ],
+    [
+     "DG-ST-FO-A2"
+    ]
+   ],
+   "advantage": "opens the radar-laid howitzer (artillery gun): counter-battery radar finds hostile artillery in range and answers it first",
+   "effects": [
+    {
+     "kind": "unlock_kit",
+     "items": [
+      "art.gun.radar_laid"
+     ]
+    }
+   ],
+   "cost_units": 6
   }
  ]
 }

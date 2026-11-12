@@ -52,7 +52,7 @@
     {
      "name": "type",
      "type": "building_type",
-     "meaning": "Which building — extraction_site, processing_facility, port, launchpad, inland_logistics_hub, military_base, airbase, bunker, research_institute, schooling, university. Set by which row is pressed. A bunker (BL-1426, MILITARY.md § Fortifications) stands one to a tile on any land tile of the nation's own ground; its owner's units defending that tile gain defence and hardness by its condition. Schooling and university (BL-615) are passive education buildings: each has a row in the ledger's Infrastructure fold (Ben, 2026-11-07), and the stratum gate below decides where they may stand."
+     "meaning": "Which building — extraction_site, processing_facility, port, launchpad, inland_logistics_hub, military_base, airbase, bunker, missile_silo, research_institute, schooling, university. Set by which row is pressed. A missile silo (BL-1643, MILITARY.md § Missiles) stands on any land tile of the nation's own ground and fires long-range and tactical nuclear missiles from the magazine at 90 tiles while above half condition. A bunker (BL-1426, MILITARY.md § Fortifications) stands one to a tile on any land tile of the nation's own ground; its owner's units defending that tile gain defence and hardness by its condition. Schooling and university (BL-615) are passive education buildings: each has a row in the ledger's Infrastructure fold (Ben, 2026-11-07), and the stratum gate below decides where they may stand."
     },
     {
      "name": "target",
@@ -3367,7 +3367,7 @@
     "A STRATEGIC mission only over provinces held by a nation the actor has declared hostile toward (rejected_state otherwise). A TACTICAL mission may fly over any province in range - the actor's own, a third nation's, the sea - because it hits only units of nations the actor is hostile to.",
     "The assignment changes something (rejected_state otherwise). A refusal mutates nothing."
    ],
-   "expected_output": "The wing stores the mission and the sorted provinces (air_wing::mission, ::provinces). Each day it is raised and its airbase stands complete it flies: superiority adds its air attack to its nation's superiority over each province (world::air_superiority) and shoots hostile wings there; tactical hits enemy units in the province, units in battle first, by the land soft/hard arithmetic with no terrain divisor; strategic lowers the condition of an enemy building there whose throughput the condition scales - producers, ports, hubs, stations, marketplaces, Universities, research institutes and bunkers (whose condition scales the cover they give), never military bases or airbases (condition repairs by drawing goods); recon raises its side's bombing hits there (up to +50 %) and spots. The side lacking superiority in a province bombs less there, marches slower through it and has its units revealed to the holder (world::air_revealed). Ground air defence shoots every hostile mission flown over its province. Saved (world_save_version 65).",
+   "expected_output": "The wing stores the mission and the sorted provinces (air_wing::mission, ::provinces). Each day it is raised and its airbase stands complete it flies: superiority adds its air attack to its nation's superiority over each province (world::air_superiority) and shoots hostile wings there; tactical hits enemy units in the province, units in battle first, by the land soft/hard arithmetic with no terrain divisor; strategic lowers the condition of an enemy building there whose throughput the condition scales - producers, ports, hubs, stations, marketplaces, Universities, research institutes, bunkers (whose condition scales the cover they give) and missile silos (which fire only above half condition), never military bases or airbases (condition repairs by drawing goods); recon raises its side's bombing hits there (up to +50 %) and spots. The side lacking superiority in a province bombs less there, marches slower through it and has its units revealed to the holder (world::air_revealed). Ground air defence shoots every hostile mission flown over its province. Saved (world_save_version 65).",
    "reason_to_select": "Put a raised wing to work: contest the air over a front, strike the enemy's units or industry, or spot for your own."
   },
   {
@@ -4690,7 +4690,7 @@
     "The seam validates every field as the value that lands: the unit id must name a live space unit (rejected_unknown_unit) of the acting nation (rejected_not_owner); a refusal of any kind mutates nothing.",
     "The nation holds the Early Space tree's Orbital Bombardment mechanic, orbital_bombardment (rejected_tech_locked).",
     "The unit carries the orbital-missile armament (rejected_not_armed), is not in transit (rejected_busy), and stands in the LOW ORBIT of the body the target lies on (rejected_wrong_node).",
-    "There is something there it may strike (rejected_target): the building, or for a province the building in best condition there (ties to the lowest id), must be standing, completed, of a type whose condition bites (condition_bites - the strategic mission's targets: producers, the marketplace, ports, hubs, stations, research houses, bunkers, orbital defence batteries; NOT a Launchpad or a base) and owned by a nation the acting nation is hostile to, either direction."
+    "There is something there it may strike (rejected_target): the building, or for a province the building in best condition there (ties to the lowest id), must be standing, completed, of a type whose condition bites (condition_bites - the strategic mission's targets: producers, the marketplace, ports, hubs, stations, research houses, bunkers, orbital defence batteries, missile silos; NOT a Launchpad or a base) and owned by a nation the acting nation is hostile to, either direction."
    ],
    "expected_output": "ok: a STANDING order (world::space_bombard_orders, keyed by unit; saved, world_save_version 89). Each day, after the battle day, it fires once: the unit's firepower x bombard_condition_per_firepower (1.0) comes off the struck building's condition per-mille (its throughput scales with condition; the daily repair pass mends it), and the building's owner observes force_used toward the bomber, magnitude bombard_force_per_permille (0.1) x the condition lost - the Trust and Alarm a battle's force carries (RELATIONS.md § 6). A province order re-picks its building each day. The order is DROPPED the first day its unit, target or hostility is gone, or the unit has left that low orbit; peace drops it. The munition is not consumed (first cut). An enemy Orbital Defence Battery on the body fires back each day.",
    "reason_to_select": "Wear down a hostile nation's industry, trade or defences on a body your fleet holds the orbit of - at the price of Trust and Alarm in the nation struck."
@@ -5339,8 +5339,8 @@
    "args": [
     {
      "name": "subject",
-     "type": "entity_id (unit, ship or wing)",
-     "meaning": "The actor's launcher: artillery; destroyer, capital ship or submarine; multirole or bomber wing."
+     "type": "entity_id (ship, wing or building)",
+     "meaning": "The actor's launcher: destroyer, capital ship or submarine; multirole or bomber wing; a missile silo (BL-1643). Artillery fires shells and is no launcher."
     },
     {
      "name": "order",
@@ -5366,9 +5366,9 @@
    "preconditions": [
     "The launcher exists (rejected_invalid) and is the actor's (rejected_not_owner).",
     "The kind is 0..2 and one the launcher carries; the salvo is 1..8; the province exists; a named building stands completed in it and its condition matters (rejected_invalid).",
-    "The launcher is raised and not refitting, mustering or aboard; a wing has its own standing airbase (rejected_state).",
+    "The launcher is raised: a ship not mustering or sunk; a wing has its own standing airbase; a silo is complete, not decommissioned, above half condition and its nation alive (rejected_state).",
     "The target belongs to a nation the actor has declared hostile: the building's owner, or the province's holder or a unit standing in it; a province strike needs a hostile unit standing there, a tactical warhead's a hostile unit or building (rejected_state).",
-    "It lies within reach: the kind's range, plus a wing's own range (rejected_placement).",
+    "It lies within reach: the kind's range, plus a wing's own range; a silo's reach is 90 tiles (rejected_placement).",
     "The actor sees the province: its ground, a unit or ship of its within 4 tiles, a wing of its flying there, or a hostile unit or ship it revealed there (rejected_state).",
     "The magazine holds the salvo (rejected_funds). A refusal mutates nothing."
    ],
@@ -5378,7 +5378,7 @@
   {
    "id": "ledger.selection_missile_buy",
    "family": "ledger",
-   "surface": "The Missiles section of the player's own launcher card (artillery unit, destroyer, capital ship, submarine, multirole or bomber wing): one row per kind it carries with the magazine count and Buy.",
+   "surface": "The Missiles section of the player's own launcher card (destroyer, capital ship, submarine, multirole or bomber wing, or a missile silo's building card): one row per kind it carries with the magazine count and Buy.",
    "press": "Click Buy (Buy 4; Buy 1 for tactical warheads).",
    "args": [],
    "preconditions": [

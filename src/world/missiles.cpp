@@ -47,11 +47,6 @@ std::vector<entity_id> sorted_unit_ids(const world& w)
     return ids;
 }
 
-bool unit_ready(const unit_component& u)
-{
-    return u.count > 0 && u.refit_days <= 0 && u.landing_ship == null_entity && u.position != null_entity;
-}
-
 bool ship_ready(const sea_ship& s)
 {
     return s.hp_ppm > 0 && s.muster_days <= 0 && !s.refitting && s.tile != null_entity;
@@ -104,7 +99,22 @@ missile_launcher_type missile_launcher_of(const world& w, entity_id launcher)
         return missile_launcher_type::ship;
     if (w.wings.find(launcher) != w.wings.end())
         return missile_launcher_type::wing;
+    if (const auto bit = w.buildings.find(launcher);
+        bit != w.buildings.end() && bit->second.type == building_type::missile_silo)
+        return missile_launcher_type::silo; // BL-1643
     return missile_launcher_type::none;
+}
+
+entity_id missile_launcher_owner(const world& w, entity_id launcher)
+{
+    switch (missile_launcher_of(w, launcher))
+    {
+        case missile_launcher_type::land_unit: return w.units.at(launcher).owner;
+        case missile_launcher_type::ship:      return w.ships.at(launcher).owner;
+        case missile_launcher_type::wing:      return w.wings.at(launcher).owner;
+        case missile_launcher_type::silo:      return owner_nation_of(w, launcher);
+        default:                               return null_entity;
+    }
 }
 
 bool missile_launcher_carries(const world& w, entity_id launcher, missile_kind k)
@@ -115,7 +125,11 @@ bool missile_launcher_carries(const world& w, entity_id launcher, missile_kind k
     switch (missile_launcher_of(w, launcher))
     {
         case missile_launcher_type::land_unit:
-            return unit_land_class(w.units.at(launcher)) == land_class::artillery && (s || n);
+            // BL-1643 (Ben, 2026-11-11): artillery fires shells, not missiles. No land
+            // unit launches; artillery's reach is its own (artillery.hpp).
+            return false;
+        case missile_launcher_type::silo:
+            return l || n; // BL-1643: the long-range launcher, and the warhead's
         case missile_launcher_type::ship:
             switch (ship_class_of(w.ships.at(launcher)))
             {
@@ -149,10 +163,18 @@ entity_id missile_launch_tile(const world& w, const recipe_registry& reg, entity
     switch (missile_launcher_of(w, launcher))
     {
         case missile_launcher_type::land_unit:
+            break; // BL-1643: no land unit launches
+        case missile_launcher_type::silo:
         {
-            const unit_component& u = w.units.at(launcher);
-            if (unit_ready(u))
-                from = u.position;
+            // BL-1643 (MILITARY.md § Missiles): a completed silo of a living owner, past
+            // half condition, fires at the silo's own reach whatever the kind.
+            const building_component& b = w.buildings.at(launcher);
+            if (b.ticks_remaining > 0 || b.decommissioned
+                || b.condition_permille <= mp(reg).silo_min_condition_permille
+                || !is_live_nation(w, owner_nation_of(w, launcher)))
+                break;
+            from  = b.tile;
+            reach = mp(reg).silo_range;
             break;
         }
         case missile_launcher_type::ship:
@@ -363,9 +385,7 @@ corp_command_result fire_check_scanned(const world& w, const recipe_registry& re
     const missile_launcher_type lt = missile_launcher_of(w, launcher);
     if (lt == missile_launcher_type::none)
         return corp_command_result::rejected_invalid;
-    const entity_id owner = lt == missile_launcher_type::land_unit ? w.units.at(launcher).owner
-                          : lt == missile_launcher_type::ship      ? w.ships.at(launcher).owner
-                                                                   : w.wings.at(launcher).owner;
+    const entity_id owner = missile_launcher_owner(w, launcher);
     if (owner != nation || !is_live_nation(w, nation) || sc.nation != nation)
         return corp_command_result::rejected_not_owner;
     // NO VERB FIRES A STRATEGIC WEAPON (MILITARY.md § Missiles): kind 3 and anything
@@ -735,6 +755,17 @@ void score_nation_missiles(world& w, const recipe_registry& reg, entity_id natio
     for (const auto& [wid, wg] : w.wings)
         if (wg.owner == nation)
             launchers.push_back(wid);
+    // BL-1643: and the silos it already owns, ascending id - its OWN launchers, which the
+    // grant covers. The scorer never builds one (a new verb for the scorer: Ben's call).
+    {
+        std::vector<entity_id> silos;
+        for (const entity_id bid : w.nations.at(nation).state_assets)
+            if (const auto bit = w.buildings.find(bid);
+                bit != w.buildings.end() && bit->second.type == building_type::missile_silo)
+                silos.push_back(bid);
+        std::sort(silos.begin(), silos.end());
+        launchers.insert(launchers.end(), silos.begin(), silos.end());
+    }
 
     const sentiment_params& sp = reg.sentiment();
     const float man_value = 20.0f; // credits per man a strike kills: a first cut, logged with BL-1431

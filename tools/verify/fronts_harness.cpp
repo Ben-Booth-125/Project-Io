@@ -2369,6 +2369,10 @@ int main()
                 military_capability_params mp = rr.military();
                 mp.terrain.rows[static_cast<std::size_t>(land_class::artillery)][static_cast<std::size_t>(class_terrain::mountain)]
                     .blocked_unless_roaded = true;
+                // BL-1643 (missile silos): a gun reaching 2 tiles is a battery and stands
+                // behind the line, off the mountains, so it would have a tile. A 1-tile gun is
+                // a line unit, which is what this row is about: a front with no slot for it.
+                mp.artillery.base_range = 1;
                 rr.set_military(mp);
             }
             build_wide(f, false);

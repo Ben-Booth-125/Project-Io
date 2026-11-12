@@ -16,6 +16,7 @@
 #include "air_params.hpp"  // BL-1449: air_params — the air theatre's authored numbers
 #include "sea_params.hpp"  // BL-1430: sea_params — the sea theatre's authored numbers
 #include "missile_params.hpp" // BL-1431: missile_params — missiles' first-cut numbers
+#include "artillery_params.hpp" // BL-1643: artillery_params — artillery's range and fire
 #include "land_recon_params.hpp" // BL-1453: land_recon_params — land recon's authored rates
 #include "recruit_params.hpp" // BL-1463: recruit_params — what bases make and a refill costs
 #include "unit_roster.hpp" // BL-454: unit_upkeep_params — per-type unit data lives with the roster
@@ -920,6 +921,9 @@ struct military_capability_params
     /// BL-1431 (MILITARY.md § Missiles): the missile kinds, interceptors and the rival
     /// strike dials. C++ defaults only; Lua authoring is owed (missile_params.hpp).
     missile_params missile = default_missile_params();
+    /// BL-1643 (MILITARY.md § Artillery fires shells): artillery's range and bombardment.
+    /// C++ defaults only, as the missiles' (artillery_params.hpp).
+    artillery_params artillery{};
 
     /// BL-1453 (MILITARY.md § Recon): the rates a battle's recon points are built
     /// from, authored under `economy.military.recon`. Defaults equal the Lua values.

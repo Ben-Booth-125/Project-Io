@@ -51,7 +51,7 @@ constexpr auto max_cover      = terrain_cover::urban;
 constexpr auto max_landform   = terrain_landform::rift;
 constexpr auto max_body_type  = body_type::star;
 constexpr auto max_atmosphere = atmosphere_class::thick;
-constexpr auto max_building   = building_type::orbital_defence_battery; // BL-1599 (v88); BL-1585 (v81); BL-1426 (no bump: an older reader refuses the new type at this gate); BL-1449 (v65); BL-1255 (v49); BL-1266 (v46); BL-615 before it.
+constexpr auto max_building   = building_type::missile_silo; // BL-1643 (no bump: a widened gate, as BL-1426); BL-1599 (v88); BL-1585 (v81); BL-1426 (no bump: an older reader refuses the new type at this gate); BL-1449 (v65); BL-1255 (v49); BL-1266 (v46); BL-615 before it.
                                                            // A WIDENED range gate, not a format
                                                            // change: no serialised array is sized
                                                            // by building_type (unlike resource_

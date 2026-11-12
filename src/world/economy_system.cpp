@@ -4845,7 +4845,7 @@ float march_hop_fraction(const world& w, const recipe_registry& reg, const unit_
     const auto to = w.tiles.find(next_id);
     if (from == w.tiles.end() || to == w.tiles.end() || to->second.body != from->second.body)
         return -1.0f;
-    const float rate = march_rate_per_day(reg.military(), u.type);
+    const float rate = artillery_march_rate(w, reg, u, march_rate_per_day(reg.military(), u.type)); // BL-1643
     if (rate <= 0.0f)
         return -1.0f;
     const float cost = march_hop_cost(w, reg, u, to->second, next_id, from->second);
@@ -4859,7 +4859,7 @@ bool march_glide_point(const world& w, const recipe_registry& reg, const unit_co
 {
     if (u.order.dest == null_entity || u.order.next_index >= u.order.path.size())
         return false;
-    const float rate = march_rate_per_day(reg.military(), u.type);
+    const float rate = artillery_march_rate(w, reg, u, march_rate_per_day(reg.military(), u.type)); // BL-1643
     if (rate <= 0.0f)
         return false;
     unit_component probe = u; // the hop price reads the unit's position: walk a copy
@@ -4974,7 +4974,8 @@ unit_march_tick run_unit_march(world& w, const recipe_registry& reg, int day_tic
         // ONE DAY'S MOVEMENT (BL-1445): 1 / the class's days per plains tile, in units of
         // traversal cost. An unknown roster type reads as Era -1 infantry
         // (`march_days_per_tile`).
-        const float rate = march_rate_per_day(mil, u.type);
+        // BL-1643: a self-propelled battery keeps its front's pace (artillery_march_rate).
+        const float rate = artillery_march_rate(w, reg, u, march_rate_per_day(mil, u.type));
         if (rate <= 0.0f)
             continue; // this class cannot march under the authored data
 
@@ -5165,6 +5166,9 @@ bool military_active(const world& w, const recipe_registry& reg, int day_tick)
     // home; at its post in a quiet province it keeps no day walking.
     if (defenders_awake(w))
         return true;
+    // BL-1643: a battery with a hostile unit in range fires today.
+    if (carried_supplies_live(w, day_tick) && artillery_fire_pending(w, reg))
+        return true;
     // BL-1445: out-of-contact recovery is daily, so a day with a unit still
     // recovering is a day with something to do (no battle is live here, so every
     // unit is out of contact).
@@ -5212,6 +5216,21 @@ military_day_result run_military_day(world& w, const recipe_registry& reg, int d
     // battles score and each side's exhaustion, and exhaustion's morale ceiling.
     // A no-op with no wars.
     note_war_battles(w, out.battles);
+    // BL-1643 (MILITARY.md § Artillery fires shells): THE DAY'S BOMBARDMENT, after the
+    // battles (a battery in one fights in it) and before the disband, so a unit the shells
+    // take to no men goes today as a battle-killed one does. Live days only, as starvation:
+    // the settle's wars keep no battery firing.
+    if (carried_supplies_live(w, day_tick))
+    {
+        out.artillery = run_artillery_day(w, reg, fought);
+        // The shells' losses count as a battle's toward the war (MILITARY.md § Artillery
+        // fires shells): the same battle inputs and exhaustion path the battles feed.
+        std::vector<war_losses> shelled;
+        shelled.reserve(out.artillery.losses.size());
+        for (const artillery_loss& l : out.artillery.losses) // battery id order
+            shelled.push_back({ l.firer, l.struck, 0, l.men });
+        note_war_losses(w, shelled);
+    }
     // THE CARRIED SUPPLIES' DAY (BL-1452; MILITARY.md § Carried supplies): after the
     // rounds that read the stocks, drain and refill them at the unit's road share, and
     // starve a unit with no food - before the disband, so a unit starvation takes to

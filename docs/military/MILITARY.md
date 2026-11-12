@@ -555,7 +555,9 @@ span is ever left without a name. A span runs
 farthest from that end. A span that closes on itself, ringing an enclave, runs on round the other
 side. Tiles off that line sit beside their nearest line tile. Every tie goes to the lower tile id.
 
-**Slots.** A front with *n* assigned units cuts its span into *n* equal stretches. Unit *i*, in
+**Artillery stands behind the line (Ben, 2026-11-11).** A front's artillery — a battery reaching 2 tiles or more — takes no line slot and is not pushed. The rest are the **line**, and the slots below are spaced among the line alone. The front's *m* batteries each take an anchor, the middle tile of stretch *j* of *m*. From its anchor a battery stands on the deepest tile of its own nation's ground, no more than its range less one step back, from which it still reaches some neighbour tile across the span. Depth is hex steps to the nearest span tile; ties go to the fewest steps from the anchor, then the lower tile id. A tile where a hostile stack stands is never chosen, so the march there is never an attack. When the line moves, the anchor moves with it, and so does the battery (§ Artillery fires shells).
+
+**Slots.** A front with *n* units on its line cuts its span into *n* equal stretches. Unit *i*, in
 ascending unit id, takes the middle tile of stretch *i*. A unit is on its slot once it stands on
 the slot tile; a march ends on its tile (§ Marching). The front re-issues a march whenever a unit's
 order points anywhere else. **A front fits land tiles only, bridges excepted (Ben, 2026-11-09).** Coast and lake
@@ -838,8 +840,8 @@ port where one stands, so a lake port never leaves a major without a berth
 
 ### Missiles
 
-**A missile is a munition, not a unit**: a good fired by a launcher — a land unit, a ship, an
-aircraft or a silo building — at a province or a building, and consumed on use. **Missile defence**
+**A missile is a munition, not a unit**: a good fired by a launcher — a ship, an aircraft or a
+silo building — at a province or a building, and consumed on use. **Missile defence**
 is an interceptor stock at an air defence unit or building. It thins short-range attacks well and
 long-range ones poorly, and an interceptor costs more than much of what it stops, so defence drains
 the defender's economy.
@@ -868,7 +870,7 @@ A tactical warhead may be stocked only by a nation holding **Uranium Enrichment*
 standard already fields them.
 
 **Launchers, by class.** A launcher fires from where it stands, and only a raised one fires.
-A land unit or ship cannot fire while refitting, mustering or aboard. A wing fires from its
+A ship cannot fire while mustering or sunk. A wing fires from its
 airbase, and its class's range adds to the missile's, since it flies out before it releases.
 **A missile silo is a building (Ben, 2026-11-11).** A nation builds a **silo** on its own ground; it is the long-range launcher. A silo fires long-range and tactical nuclear missiles from the nation's magazine, at **90 tiles** — twice a ship or bomber's long-range reach — and only while it stands undamaged past half condition. A silo is a building a strike may name, so a rival's silos are the first targets of a war.
 
@@ -889,6 +891,25 @@ radar** (it finds and answers hostile artillery in range first) and **precision 
 each strike lands). **The front keeps artillery at its range:** a front's automation places its
 assigned artillery as far behind the line as its range allows while still reaching across it, and
 moves it back when the line moves (§ Fronts).
+
+**Artillery's first cut (calibrated 2026-11-12, BL-1643 (missile silos)).** The numbers are a first
+cut; the design around them is settled. A battery reaches **2 tiles** on its base gun. The longer
+guns add to it: the long barrel and the rocket launcher +1, guided rockets +2, and the radar-laid
+howitzer +1. A battery's range never passes a raised unit's 4-tile sight, so none fires blind. Each live day, a battery that is
+standing — on the ground, under no march order, not refitting and not in a battle — strikes one
+hostile unit in range. It picks a unit in battle first, then the nearest, ties to the lower id; with
+counter-battery radar it picks hostile artillery before either. Every battery aims, and sizes its
+strike, on the day as it began; then every strike lands. So two batteries shelling each other trade
+a full day's fire each, whichever was raised first. A strike is half a battle day's
+fire from the battery (its soft or hard attack by the target's hardness, times its men, rounds and
+readiness), of which **600‰ lands**, or **900‰** with precision shells. What lands takes men and
+readiness as tactical bombing's does (§ Air), and its losses count as a battle's toward the war. A
+self-propelled battery assigned to a front marches at the pace of the slowest other unit on it,
+never slower than its own.
+
+The three kit items are the age tree's: self-propelled guns are the **Tracked Chassis** and
+**Armoured SP** chassis, precision shells are **guided shells**, and counter-battery radar is the
+**radar-laid howitzer**, a gun of its own (`../economy/tech/DIGITISATION_TREE.md`).
 
 **A strike names a province or a building in it.** Range is the straight-line tile distance
 from the launcher to the province's nearest tile, or to the building's tile. A strike is legal

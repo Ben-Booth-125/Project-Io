@@ -22,10 +22,10 @@ enum class tier : std::uint8_t { travel = 0, minor = 1, major = 2, quest = 3 };
 enum class effect_kind : std::uint8_t { modifier = 0, unlock_recipe = 1, unlock_structure = 2, mechanic = 3, unread = 4, unlock_kit = 5 };
 enum class effect_op : std::uint8_t { multiply = 0, add = 1 };
 
-inline constexpr int node_count        = 212;
+inline constexpr int node_count        = 213;
 inline constexpr int max_groups        = 2; ///< Most requirement groups any node has.
 inline constexpr int max_group_members = 2; ///< Most members any one group has.
-inline constexpr int effect_count      = 347; ///< Rows in `effects` (a list scope is one row per member).
+inline constexpr int effect_count      = 348; ///< Rows in `effects` (a list scope is one row per member).
 
 /// One node of the Digitisation tree. `groups[g][m]` is a node index, -1 past the group's end;
 /// a node is open when every one of its `group_count` groups has at least one held member.
@@ -283,6 +283,7 @@ inline constexpr std::array<node, node_count> nodes = {{
     /* 209 */ {"DG-ST-NV-M", "Sea Power", tier::travel, 4, 4, 2, {{{205, -1}, {208, -1}}}, -1, false, false, false, true, false, "ST-NV", "", "", "+3% strength for every ship", 343, 344, ""},
     /* 210 */ {"DG-ST-NV-Q", "Blue Water", tier::quest, 2, 6, 1, {{{198, -1}, {-1, -1}}}, -1, true, false, false, false, false, "ST-NV", "", "a fleet keeps a sea zone through a war", "ship muster time -20%", 344, 345, "sea control"},
     /* 211 */ {"DG-J-STNV-STOR", "Coastal Security", tier::travel, 3, 3, 2, {{{202, -1}, {125, -1}}}, -1, false, false, false, false, true, "", "", "", "+1% strength for every ship and -1% unrest", 345, 347, ""},
+    /* 212 */ {"DG-ST-FO-G3", "Counter-Battery Radar", tier::minor, 3, 6, 2, {{{166, -1}, {105, -1}}}, -1, false, false, false, false, false, "ST-FO", "", "", "opens the radar-laid howitzer (artillery gun): counter-battery radar finds hostile artillery in range and answers it first", 347, 348, ""},
 }};
 
 inline constexpr std::array<effect, effect_count> effects = {{
@@ -633,6 +634,7 @@ inline constexpr std::array<effect, effect_count> effects = {{
     /* 344 */ {210, effect_kind::unread, "", "", effect_op::multiply, 1.0f, "", "ship muster time -20%", "ship muster time"},
     /* 345 */ {211, effect_kind::unread, "", "", effect_op::multiply, 1.0f, "", "+1% strength for every ship", "ship strength"},
     /* 346 */ {211, effect_kind::unread, "", "", effect_op::multiply, 1.0f, "", "-1% unrest", "unrest"},
+    /* 347 */ {212, effect_kind::unlock_kit, "", "", effect_op::multiply, 1.0f, "art.gun.radar_laid", "", ""},
 }};
 
 /// One branch of the ring, in store order (tree by tree, Production / Network / State). The
@@ -874,9 +876,10 @@ inline constexpr std::array<const char*, node_count> keys_next_branch = {{
     /* 209 */ "",
     /* 210 */ "Orbital Fleet",
     /* 211 */ "",
+    /* 212 */ "",
 }};
 
-/// The index of the node with store id @p id, or -1. Linear over 212 nodes: a lookup, not a hot path.
+/// The index of the node with store id @p id, or -1. Linear over 213 nodes: a lookup, not a hot path.
 constexpr int find_node(std::string_view id)
 {
     for (int i = 0; i < node_count; ++i)

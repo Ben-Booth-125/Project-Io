@@ -50,6 +50,12 @@ struct kit_good
 
 inline constexpr std::size_t k_kit_goods_max = 3;
 
+/// BL-1643 (MILITARY.md § Artillery fires shells, Ben 2026-11-11): what an ARTILLERY kit
+/// item does to its battery beyond its stats, as bits on `kit_item::art_traits`.
+inline constexpr uint8_t k_art_keeps_pace      = 1; ///< Self-propelled guns: the battery marches as fast as the force it supports.
+inline constexpr uint8_t k_art_counter_battery = 2; ///< Counter-battery radar: it answers hostile artillery in range first.
+inline constexpr uint8_t k_art_precision       = 4; ///< Precision shells: more of each strike lands.
+
 /// One catalogue row.
 struct kit_item
 {
@@ -61,6 +67,10 @@ struct kit_item
     std::array<kit_good, k_kit_goods_max> goods; ///< Bought per unit raised or refitted to it.
     uint8_t           goods_count;   ///< Used entries of `goods`; 0 for base kit.
     const char*       research_node; ///< The age-tree node that opens it; nullptr for base kit.
+    /// BL-1643: tiles an ARTILLERY item adds to its battery's range (artillery.hpp), and its
+    /// `k_art_*` traits. Zero on every other class's item and on every base item.
+    uint8_t           art_range  = 0;
+    uint8_t           art_traits = 0;
 };
 
 // ---- The catalogue ---------------------------------------------------------
@@ -149,6 +159,11 @@ bool design_valid(land_class c, const unit_design& d);
 
 /// The land class @p u fights as (its row's; an unknown row fights as infantry).
 land_class unit_land_class(const unit_component& u);
+
+/// BL-1643: the tiles design @p d's artillery kit adds to the class's range, and the union of
+/// its `k_art_*` traits. Both 0 for any class but artillery.
+int artillery_kit_range(land_class c, const unit_design& d);
+uint8_t artillery_kit_traits(land_class c, const unit_design& d);
 
 /// Does @p u's recorded design differ from its owner's live design for its class?
 /// Such a unit may refit to the live design in place (`refit_unit` to its own row).

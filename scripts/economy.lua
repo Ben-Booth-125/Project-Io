@@ -382,6 +382,26 @@ economy = {
             build_duration_days = 240,
             resource_costs = { steel = 30.0, ordnance = 10.0 },
         },
+        -- BL-1643 (MILITARY.md § Missiles, Ben 2026-11-11): Missile Silo — the
+        -- long-range launcher on the nation's own ground. Fires long-range and
+        -- tactical nuclear missiles from the nation's magazine at 90 tiles, only
+        -- while its condition stands above half (missile_params, missile_params.hpp).
+        -- Produces nothing and staffs at zero, as the bunker; no research gates it
+        -- (the 1960 standard fields one). A first cut priced in-band above the
+        -- airbase (450, 240 days, steel 50) and the battery (400): a hardened shaft
+        -- and its launch control are more concrete, steel and electronics than a
+        -- runway, and it takes longer to sink. Its maintenance (10) sits between the
+        -- bunker's 5 and the battery's 20: it holds its missiles, it does not fire
+        -- a daily round.
+        missile_silo = {
+            era         = "industrial",
+            base_rate   = 0.0,
+            maintenance = 10.0,
+            base_wage   = 0.0,
+            build_cost  = 600.0,
+            build_duration_days = 300,
+            resource_costs = { stone = 40.0, steel = 50.0, electronics = 10.0 },
+        },
         -- BL-615: Schooling — the education building any settlement can host.
         -- Same passive shape as research_institute (base_rate 0, staffs at
         -- zero); its qualification-raising effect is a separate seam

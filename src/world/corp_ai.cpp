@@ -1707,13 +1707,26 @@ void score_nation_fronts(world& w, const recipe_registry& reg, entity_id nation,
                         || (kit != w.tiles.end() && pair_holds_ground(w, nation, them, kit->second.body)));
     }
 
+    // BL-1643: every member's hold tile on a front, read once per (front, member list) this
+    // pass (`front_hold_slots`: the split, the tiles across and each battery's walk). Nothing
+    // this pass issues moves a unit or a border before the pass ends, so the memo holds.
+    std::map<std::pair<entity_id, std::vector<entity_id>>, std::vector<entity_id>> hold_memo;
+    const auto hold_slots = [&](const front& f, const std::vector<entity_id>& members) -> const std::vector<entity_id>& {
+        auto key = std::make_pair(f.key, members);
+        auto it = hold_memo.find(key);
+        if (it == hold_memo.end())
+            it = hold_memo.emplace(std::move(key), front_hold_slots(w, reg, f, members)).first;
+        return it->second;
+    };
+
     // The hunger of @p members standing on f's slots, each at its index, ascending id.
     const auto slot_hunger = [&](const front& f, const std::vector<entity_id>& members) {
         int64_t sum = 0;
+        const std::vector<entity_id>& slots = hold_slots(f, members);
         for (std::size_t m = 0; m < members.size(); ++m)
         {
             const unit_component& mu = w.units.at(members[m]);
-            const entity_id slot = front_hold_slot(w, reg, mu, f, m, members.size());
+            const entity_id slot = slots[m];
             sum += march_price_permille(w, reg, supply_memo, nation, slot != null_entity ? slot : mu.position,
                                         mu.food_permille);
         }
@@ -1735,7 +1748,7 @@ void score_nation_fronts(world& w, const recipe_registry& reg, entity_id nation,
                 continue;
             // The joiner's test: no slot of its own prices where it stands; one that cannot stand
             // fed pays only what the slot adds over that.
-            const entity_id slot = front_hold_slot(w, reg, u, fronts[i], m, members.size());
+            const entity_id slot = hold_slots(fronts[i], members)[m];
             const int64_t own = march_price_permille(w, reg, supply_memo, nation, slot != null_entity ? slot : u.position,
                                                      u.food_permille);
             if (own == 0
@@ -1796,7 +1809,7 @@ void score_nation_fronts(world& w, const recipe_registry& reg, entity_id nation,
                 continue;
             // No reason to go hungry there, on this unit's OWN slot (the difference in the sum is
             // zero when one more unit respaces the others) or by what it does to the others.
-            const entity_id slot = front_hold_slot(w, reg, u, fronts[i], m, joined.size());
+            const entity_id slot = hold_slots(fronts[i], joined)[m];
             const int64_t own = march_price_permille(w, reg, supply_memo, nation, slot != null_entity ? slot : u.position,
                                                      u.food_permille);
             if ((own > 0 || hunger[i] > 0) && std::max(own, hunger[i]) > (can_stand_fed(uid) ? 0 : here))

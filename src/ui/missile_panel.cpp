@@ -54,9 +54,8 @@ std::string target_words(const world& w, const missile_target& t)
 entity_id owner_of(const world& w, entity_id e)
 {
     if (const auto it = w.units.find(e); it != w.units.end()) return it->second.owner;
-    if (const auto it = w.ships.find(e); it != w.ships.end()) return it->second.owner;
-    if (const auto it = w.wings.find(e); it != w.wings.end()) return it->second.owner;
-    return null_entity;
+    // BL-1643: a ship, wing or silo answers through the launcher's own owner rule.
+    return missile_launcher_owner(w, e);
 }
 
 corp_command base_cmd(const world& w, corp_verb v)
@@ -173,8 +172,15 @@ bool draw_missile_section(const world& w, const recipe_registry& reg, ui_state& 
             for (const auto& [p, b] : tc.targets)
                 targets.push_back({p, b});
         }
-        if (targets.empty())
-            ImGui::TextDisabled("No sighted hostile target in reach (%d tiles).", P.kind[static_cast<std::size_t>(ki)].range);
+        // BL-1643: the reach the launcher fires at now (a silo's 90, a wing's flight added).
+        int reach = -1;
+        const bool can_fire = missile_launch_tile(w, reg, e, k, &reach) != null_entity;
+        if (!can_fire && missile_launcher_of(w, e) == missile_launcher_type::silo)
+            ImGui::TextDisabled("The silo cannot fire: it is unbuilt or at half condition or below (%d%%).",
+                                P.silo_min_condition_permille / 10);
+        else if (targets.empty())
+            ImGui::TextDisabled("No sighted hostile target in reach (%d tiles).",
+                                can_fire ? reach : P.kind[static_cast<std::size_t>(ki)].range);
         else
         {
             int& pick = m.target_pick[{e, ki}];

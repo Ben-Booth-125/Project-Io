@@ -581,6 +581,17 @@ void note_war_battles(world& w, const battle_tick& battles)
 {
     if (w.wars.empty() || battles.dispatches.empty())
         return;
+    std::vector<war_losses> losses;
+    losses.reserve(battles.dispatches.size());
+    for (const battle_dispatch& d : battles.dispatches) // battle order: sorted
+        losses.push_back({ d.attacker, d.defender, d.attacker_men_lost, d.defender_men_lost });
+    note_war_losses(w, losses);
+}
+
+void note_war_losses(world& w, const std::vector<war_losses>& losses)
+{
+    if (w.wars.empty() || losses.empty())
+        return;
     // Men standing per nation, read once (after the day's rounds, before the
     // disband): the denominator of the loss share.
     std::map<entity_id, int64_t> standing;
@@ -601,15 +612,15 @@ void note_war_battles(world& w, const battle_tick& battles)
         e = add_exhaustion(e, static_cast<float>(k_war_exhaustion_loss_full * share));
     };
     bool any = false;
-    for (const battle_dispatch& d : battles.dispatches) // battle order: sorted
+    for (const war_losses& d : losses) // the caller's order: sorted
     {
-        war_record* war = find_war_mut(w, d.attacker, d.defender);
+        war_record* war = find_war_mut(w, d.a, d.b);
         if (war == nullptr)
             continue;
         any = true;
-        const bool att_is_dec = d.attacker == war->declarer;
-        const int dec_lost = att_is_dec ? d.attacker_men_lost : d.defender_men_lost;
-        const int def_lost = att_is_dec ? d.defender_men_lost : d.attacker_men_lost;
+        const bool a_is_dec = d.a == war->declarer;
+        const int dec_lost = a_is_dec ? d.a_lost : d.b_lost;
+        const int def_lost = a_is_dec ? d.b_lost : d.a_lost;
         war->declarer_men_lost += std::max(0, dec_lost);
         war->defender_men_lost += std::max(0, def_lost);
         exhaust(war->declarer_exhaustion, war->declarer, dec_lost);

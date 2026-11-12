@@ -3,7 +3,8 @@
 // ---------------------------------------------------------------------------
 // BL-1431 — the missile section of a card (docs/military/MILITARY.md § Missiles)
 // ---------------------------------------------------------------------------
-// Drawn inside the player's own land unit, ship or wing card. A launcher lists each
+// Drawn inside the player's own ship or wing card, an air defence unit's card, and a
+// missile silo's building card (BL-1643; artillery fires shells and has none). A launcher lists each
 // kind it carries with the nation's magazine count, a Buy press (stock_missiles), the
 // targets it may strike now (`missile_targets`, the seam's own legs) and a Fire press
 // (fire_missile). An air defence unit lists its interceptors and a Stock press
@@ -22,7 +23,7 @@
 
 namespace ui {
 
-/// Draw the section for @p entity (a unit, ship or wing) when it is the player's and it
+/// Draw the section for @p entity (a unit, ship, wing or silo) when it is the player's and it
 /// launches or intercepts anything; draws nothing and returns false otherwise.
 bool draw_missile_section(const world& w, const recipe_registry& reg, ui_state& ui, entity_id entity);
 
