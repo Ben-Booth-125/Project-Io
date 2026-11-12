@@ -176,7 +176,7 @@ void construction_site_card(const world& w, const recipe_registry& reg, entity_i
 /// `extraction_building_name(target_resource)` for an extraction site ("Quarry";
 /// "Well" where `placement_rules::is_well_site` holds, BL-1198, and "Fishing
 /// Wharf" where `placement_rules::is_wharf_site` does, BL-1199 — so it needs @p w),
-/// the active recipe's own `group` for a processing facility ("Metal Foundry", the
+/// the active recipe's own `group` for a processing facility (its product building, "Steel Mill", the
 /// BL-434 grouping vocabulary), and `building_type_name` for everything else.
 ///
 /// The grouping key is the display name itself, deliberately: two buildings the

@@ -120,6 +120,9 @@ bool condition_bites(building_type t)
         // BL-1599 (SPACE_FLEETS.md § Bombardment and fire at orbit): a battery's
         // condition scales its fire, so a strike may wear it down too.
         case building_type::orbital_defence_battery:
+        // BL-1643 (MILITARY.md § Missiles: "A silo is a building a strike may name"): a
+        // silo launches only above half condition, so its condition matters.
+        case building_type::missile_silo:
             return true;
         default:
             return false;

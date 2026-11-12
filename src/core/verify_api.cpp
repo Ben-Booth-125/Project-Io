@@ -5934,6 +5934,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             else if (type == "logistics_hub") bt = building_type::inland_logistics_hub;
             else if (type == "military_base") bt = building_type::military_base; // BL-325 S1
             else if (type == "airbase")       bt = building_type::airbase;       // BL-1450
+            else if (type == "missile_silo")  bt = building_type::missile_silo;  // BL-1643
             else if (type == "marketplace") bt = building_type::planetary_marketplace; // BL-1269
             // "none" leaves placement mode, so a script that placed a building can
             // press the canvas as a player again (BL-1425's group press).
@@ -6169,6 +6170,13 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     // of the chosen recipe). Keys on tile like the panel does (buildings key on their
     // own id; the panel scans for tile == selection). Returns the recipe name applied,
     // or "" if the tile has no building. Non-economic — the next econ_step honours it.
+    // ONE BUILDING PER PRODUCT (BL-1641): only the building's own methods, and only a
+    // legal step from the running one (`method_step_between`: a variant, or the
+    // running method's upgrade) - another product, the way down an upgrade or an
+    // unrelated method is REFUSED ("" back, nothing written) - and the step is written
+    // to every building of the product stack on the tile, so a fixture can never
+    // change what a building makes or leave a mixed stack. The same method is a no-op
+    // that answers its name. Free and instant, unlike the seam (no cost, no cooldown).
     v.set_function("set_building_recipe", [this](unsigned tile_u, int index) -> std::string {
         const entity_id tile = static_cast<entity_id>(tile_u);
         for (auto& [bid, b] : m_world.buildings)
@@ -6204,8 +6212,27 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
                         tile_u, i, r.name.c_str());
                 return std::string("");
             }
+            const std::uint16_t to = m_registry.recipe_id(r.name);
+            if (b.type == building_type::processing_facility && to != b.recipe)
+            {
+                const recipe* cur = m_registry.get_recipe(b.recipe);
+                if (cur != nullptr && m_registry.method_step_between(b.recipe, to) == method_step::none)
+                {
+                    SDL_Log("verify.set_building_recipe: tile=%u index=%d recipe=%s REFUSED (%s)",
+                            tile_u, i, r.name.c_str(),
+                            cur->group != r.group ? "another product" : "not a step from the running method");
+                    return std::string("");
+                }
+                if (cur != nullptr)
+                    for (const entity_id m : product_stack_members(m_world, m_registry, tile, cur->group, bid))
+                    {
+                        building_component& mb = m_world.buildings.at(m);
+                        mb.recipe              = to;
+                        mb.active_recipe_index = i;
+                    }
+            }
             b.active_recipe_index = i;
-            b.recipe              = m_registry.recipe_id(r.name);
+            b.recipe              = to;
             SDL_Log("verify.set_building_recipe: tile=%u index=%d recipe=%s",
                     tile_u, i, r.name.c_str());
             return r.name;
@@ -7431,6 +7458,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             case recipe_switch_result::cross_group:        return "cross_group";
             case recipe_switch_result::tech_locked:        return "tech_locked";
             case recipe_switch_result::wrong_air:          return "wrong_air";
+            case recipe_switch_result::one_way:            return "one_way";
         }
         return "invalid";
     });
@@ -7557,6 +7585,14 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
                 {
                     last = "wrong_air";
                     break;
+                }
+                // ONE METHOD PER STACK (BL-1641): never stage a mixed stack - a tile
+                // standing this product on another method is passed over.
+                if (const std::uint16_t sm = product_stack_method(m_world, m_registry, tid, rc->group);
+                    sm != no_recipe && sm != rid)
+                {
+                    last = "mixed_stack";
+                    continue;
                 }
                 const entity_id bid = m_world.create_entity();
                 building_component b{};
@@ -9167,7 +9203,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     // ordinary building_component (owned, stockpiled, in its corp's assets).
     //
     //   kind    "extraction" (detail = target resource name), "processing"
-    //           (detail = recipe GROUP, e.g. "Metal Foundry"; the first recipe
+    //           (detail = recipe GROUP - the product building, e.g. "Steel Mill"; the first recipe
     //           in that group), "port", "launchpad", "logistics_hub",
     //           "military_base", "research_institute", "schooling", "university".
     //   rival   owned by the lowest-id non-player corporation, else the player.
@@ -9184,6 +9220,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         else if (kind == "logistics_hub")      bc.type = building_type::inland_logistics_hub;
         else if (kind == "military_base")      bc.type = building_type::military_base;
         else if (kind == "airbase")            bc.type = building_type::airbase; // BL-1450
+        else if (kind == "missile_silo")       bc.type = building_type::missile_silo; // BL-1643
         else if (kind == "research_institute") bc.type = building_type::research_institute;
         else if (kind == "schooling")          bc.type = building_type::schooling;
         else if (kind == "university")         bc.type = building_type::university;
@@ -9642,17 +9679,17 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             { "extraction", "timber", false, false },     { "extraction", "agricultural_produce", false, false },
             { "extraction", "coffee", false, false },     { "extraction", "peat", false, false },
             { "extraction", "furs", false, false },
-            { "processing", "Metal Foundry", false, false },          { "processing", "Fuel Production", false, false },
-            { "processing", "Construction Materials", false, false }, { "processing", "Construction", false, false },
-            { "processing", "Artisan Goods", false, false },          { "processing", "Food Processing", false, false },
-            { "processing", "Chemical Works", false, false },         { "processing", "Refinery", false, false },
-            { "processing", "Power Generation", false, false },       { "processing", "Electronics", false, false },
-            { "processing", "Advanced Fabrication", false, false },   { "processing", "Welfare Goods", false, false },
+            { "processing", "Steel Mill", false, false },          { "processing", "Charcoal Works", false, false },
+            { "processing", "Sawmill", false, false }, { "processing", "Construction", false, false },
+            { "processing", "Trade Goods Workshop", false, false },          { "processing", "Food Processor", false, false },
+            { "processing", "Propellant Plant", false, false },         { "processing", "Fuel Refinery", false, false },
+            { "processing", "Power Plant", false, false },       { "processing", "Electronics Lab", false, false },
+            { "processing", "Machine Works", false, false },   { "processing", "Water Treatment Plant", false, false },
             { "launchpad", "", false, false },          { "logistics_hub", "", false, false },
             { "military_base", "", false, false },      { "research_institute", "", false, false },
             { "schooling", "", false, false },          { "university", "", false, false },
-            { "processing", "Metal Foundry", false, true },   // a construction site
-            { "processing", "Refinery", true, false },        // a rival plant
+            { "processing", "Steel Mill", false, true },   // a construction site
+            { "processing", "Fuel Refinery", true, false },        // a rival plant
         };
         int staged = 0;
         if (const cand* c = take(true))
@@ -9672,7 +9709,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         {
             staged += stage_one(c->id, "extraction", "iron_ore", false, false) != null_entity;
             staged += stage_one(c->id, "extraction", "iron_ore", false, false) != null_entity;
-            staged += stage_one(c->id, "processing", "Metal Foundry", false, false) != null_entity;
+            staged += stage_one(c->id, "processing", "Steel Mill", false, false) != null_entity;
             staged += stage_one(c->id, "logistics_hub", "", false, false) != null_entity;
             staged += stage_one(c->id, "extraction", "coal", true, false) != null_entity;
             out["stack_col"] = c->c;

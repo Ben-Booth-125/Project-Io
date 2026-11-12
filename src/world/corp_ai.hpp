@@ -355,6 +355,25 @@ enum class corp_priority_bucket : uint8_t
 /// The bucket a decision reason belongs to — a pure, deterministic mapping.
 corp_priority_bucket bucket_for_reason(corp_decision_reason reason);
 
+/// ONE METHOD PER STACK (BL-1641; PRODUCTION.md § One building per product): who speaks
+/// for a product stack's retool this pass, and how many members the step's gain counts.
+/// A member is ELIGIBLE when it is one of @p actor_assets, standing (no build ticks
+/// left), funded (not `state_idle`), running (not decommissioned) and off the scorer's
+/// cooldown - the skips the dial loop applies before its margin chase. The speaker is
+/// the LOWEST-ID eligible member of @p building's stack (so an idled oldest member does
+/// not silence the stack); `active` counts the eligible members, `billed` every member
+/// (the seam moves and charges the whole stack). Speaker `null_entity` when @p building
+/// is not a processing building with a method, or no member is eligible.
+struct product_stack_retool
+{
+    entity_id   speaker = null_entity;
+    std::size_t active  = 0;
+    std::size_t billed  = 0;
+};
+product_stack_retool product_stack_retool_speaker(const world& w, const recipe_registry& reg,
+                                                  entity_id building,
+                                                  const std::set<entity_id>& actor_assets);
+
 /// Canonical prose label for a corp_command's verb — what the world history
 /// log and the AI Decision Feed both narrate (BL-420: hoisted out of
 /// corp_ai.cpp's anonymous namespace so the feed no longer keeps its own

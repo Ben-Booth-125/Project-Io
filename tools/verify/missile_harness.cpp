@@ -1,6 +1,8 @@
 // ---------------------------------------------------------------------------
-// Headless missile harness (BL-1431 missiles and satellites; no SDL / Lua / ImGui)
+// Headless missile harness (BL-1431 missiles and satellites; BL-1643 missile silos; no SDL / Lua / ImGui)
 // docs/military/MILITARY.md § Missiles; AI_OPPONENT.md § 11, "Rival nations fire missiles".
+// Since BL-1643 artillery fires shells, not missiles: the scene's launchers are a destroyer
+// (short range) and a missile silo (long range and tactical nuclear, at 90 tiles).
 // ---------------------------------------------------------------------------
 // The fixture is a 60 x 10 plains cylinder cut into strips four columns wide, one
 // province each. A holds columns 0-29, B columns 30-59, C (the third nation, the
@@ -253,21 +255,45 @@ void hold_node(world& w, entity_id n, int node)
     w.nation_tech[n].held.set(static_cast<std::size_t>(node));
 }
 
-/// A's artillery at column 29 (strip 7, within sight of strip 8), B's infantry and air defence at column 33 (strip 8),
-/// A hostile toward B, A's magazine stocked.
+entity_id add_ship(fixture& f, entity_id owner, int x, int y, uint16_t type)
+{
+    const entity_id id = f.w.create_entity();
+    sea_ship sh;
+    sh.owner = owner; sh.tile = f.at(x, y); sh.type = type; // ship_roster_table: 0 submarine, 1 destroyer, 2 capital, 3 transport
+    f.w.ships.emplace(id, sh);
+    return id;
+}
+
+/// BL-1643: A's destroyer at column 29 (strip 7, within sight of strip 8) carries short range;
+/// A's silo at column 26 carries long range and tactical nuclear. B's infantry and air defence
+/// at column 33 (strip 8), A hostile toward B.
 struct scene
 {
-    entity_id art = null_entity, b_inf = null_entity, b_ad = null_entity;
+    entity_id art = null_entity;  ///< the short-range launcher (a destroyer)
+    entity_id silo = null_entity; ///< the long-range and nuclear launcher
+    entity_id b_inf = null_entity, b_ad = null_entity;
 };
 
 scene stage(fixture& f, const recipe_registry& reg)
 {
     scene s;
-    s.art   = add_unit(f, f.a, 29, 5, land_class::artillery);
+    s.art   = add_ship(f, f.a, 29, 5, 1);
+    s.silo  = add_building(f, f.a, 26, 5, building_type::missile_silo);
     s.b_inf = add_unit(f, f.b, 33, 5, land_class::infantry);
     s.b_ad  = add_unit(f, f.b, 33, 6, land_class::air_defence);
     f.w.corp_hostile_pairs.insert({f.a, f.b});
     (void)reg;
+    return s;
+}
+
+/// The scene for a save check: the destroyer is dropped, since this land fixture has no
+/// water tile or port and a saved ship must stand on water with one (world_save's ship gate).
+/// The save checks are about the magazine and the interceptors, which the silo keeps.
+scene stage_for_save(fixture& f, const recipe_registry& reg)
+{
+    scene s = stage(f, reg);
+    f.w.ships.erase(s.art);
+    s.art = null_entity;
     return s;
 }
 
@@ -351,14 +377,14 @@ int main()
         refused(f, [&] { return run(f, reg, fire_cmd(f.a, s.art, 0, 1, f.strip(14))); },
                 corp_command_result::rejected_placement, "M3a a province past the reach is refused");
         // Not hostile: B never declared on A, so B firing at A is refused.
-        const entity_id b_art = add_unit(f, f.b, 32, 5, land_class::artillery);
+        const entity_id b_art = add_ship(f, f.b, 32, 5, 1);
         run(f, reg, stock_cmd(f.b, missile_kind::short_range, 2));
         refused(f, [&] { return run(f, reg, fire_cmd(f.b, b_art, 0, 1, f.strip(6))); },
                 corp_command_result::rejected_state, "M3b a target of a nation the firer has not declared hostile is refused");
         // Unsighted: B's strip 11 (columns 44-47), in long reach of nothing A sees.
         add_unit(f, f.b, 45, 5, land_class::infantry);
         f.w.missile_magazines[f.a][1] = 2;
-        // The artillery cannot carry long range; the reach of short (12) from col 29 reaches col 41,
+        // The destroyer cannot carry long range; the reach of short (12) from col 29 reaches col 41,
         // so strip 10 (40-43) is in reach and unsighted.
         add_unit(f, f.b, 41, 5, land_class::infantry);
         refused(f, [&] { return run(f, reg, fire_cmd(f.a, s.art, 0, 1, f.strip(10))); },
@@ -368,8 +394,8 @@ int main()
         refused(f, [&] { return run(f, reg, fire_cmd(f.a, s.art, 3, 1, f.strip(8))); },
                 corp_command_result::rejected_invalid, "M3e a strategic weapon is refused");
         refused(f, [&] { return run(f, reg, fire_cmd(f.a, s.art, 1, 1, f.strip(8))); },
-                corp_command_result::rejected_invalid, "M3f artillery does not carry long range");
-        refused(f, [&] { return run(f, reg, fire_cmd(f.a, s.b_inf, 0, 1, f.strip(8))); },
+                corp_command_result::rejected_invalid, "M3f a destroyer does not carry long range");
+        refused(f, [&] { return run(f, reg, fire_cmd(f.a, b_art, 0, 1, f.strip(8))); },
                 corp_command_result::rejected_not_owner, "M3g another nation's launcher is refused");
         refused(f, [&] { return run(f, reg, fire_cmd(f.a, s.art, 0, 0, f.strip(8))); },
                 corp_command_result::rejected_invalid, "M3h a salvo of 0 is refused");
@@ -441,7 +467,7 @@ int main()
         check(30.0f > worst_row && 30.0f > decl_max,
               "M5b one warhead per observer (+30) exceeds the worst declaration row (" + std::to_string(worst_row) + ")");
         const int men0 = f.w.units.at(s.b_inf).count;
-        check(run(f, reg, fire_cmd(f.a, s.art, 2, 1, f.strip(8))) == corp_command_result::applied,
+        check(run(f, reg, fire_cmd(f.a, s.silo, 2, 1, f.strip(8))) == corp_command_result::applied,
               "M5c the warhead is fired");
         fold_pending_sentiment(f.w, reg);
         const float alarm_b = sentiment_toward(f.w.sentiment, f.b, f.a).alarm;
@@ -466,6 +492,7 @@ int main()
         {
             const snap before = take(f.w);
             none = none && run(f, reg, fire_cmd(f.a, s.art, kind, 1, f.strip(8))) == corp_command_result::rejected_invalid
+                   && run(f, reg, fire_cmd(f.a, s.silo, kind, 1, f.strip(8))) == corp_command_result::rejected_invalid
                    && same(before, f.w);
             none = none && run(f, reg, stock_cmd(f.a, static_cast<missile_kind>(kind & 0xFF), 1))
                                == corp_command_result::rejected_invalid
@@ -495,7 +522,8 @@ int main()
         const auto rival_scene = [&](fixture& f, bool hostile, entity_id* b_art, entity_id* a_inf, entity_id* c_inf) {
             build(f);
             f.w.player_entity = f.c;
-            *b_art = add_unit(f, f.b, 32, 5, land_class::artillery);
+            *b_art = add_ship(f, f.b, 32, 5, 1);               // B's destroyer: short range, and B's eyes
+            add_building(f, f.b, 40, 5, building_type::missile_silo); // B's silo: the warhead's launcher
             *a_inf = add_unit(f, f.a, 28, 5, land_class::infantry);
             *c_inf = add_unit(f, f.c, 34, 2, land_class::infantry); // a neutral's unit beside it
             f.w.missile_magazines[f.b] = {4, 0, 0};
@@ -518,8 +546,9 @@ int main()
             rival_scene(f, true, &b_art, &a_inf, &c_inf);
             const int a0 = f.w.units.at(a_inf).count, c0 = f.w.units.at(c_inf).count;
             score_nation_missiles(f.w, reg, f.b, 20);
-            check(f.w.units.at(a_inf).count < a0 && f.w.units.at(c_inf).count == c0
-                      && missile_stock(f.w, f.b, missile_kind::short_range) < 4,
+            // BL-1643: B may stock long range first and fire it from its silo, so the leg is
+            // the strike itself, not which column of the magazine paid for it.
+            check(f.w.units.at(a_inf).count < a0 && f.w.units.at(c_inf).count == c0,
                   "M7b B, hostile to A, fires its own missiles at A's sighted unit and at nothing of C's");
         }
         {
@@ -535,7 +564,7 @@ int main()
             rival_scene(f, true, &b_art, &a_inf, &c_inf);
             // Move A's unit out of everything B can see: deep in A's west, beyond sight.
             f.w.units.at(a_inf).position = f.at(25, 5); // strip 6, 7 tiles from B's launcher: sighted? no units of B within 4
-            f.w.units.at(b_art).position = f.at(36, 5);
+            f.w.ships.at(b_art).tile = f.at(36, 5);
             const int a0 = f.w.units.at(a_inf).count;
             score_nation_missiles(f.w, reg, f.b, 20);
             check(f.w.units.at(a_inf).count == a0, "M7d an unsighted target is never struck by a rival");
@@ -575,7 +604,7 @@ int main()
             run(f, reg, stock_cmd(f.a, missile_kind::tactical_nuclear, 1));
             run(f, reg, intercept_cmd(f.b, s.b_ad, 3));
             run(f, reg, fire_cmd(f.a, s.art, 0, 2, f.strip(8)));
-            run(f, reg, fire_cmd(f.a, s.art, 2, 1, f.strip(8)));
+            run(f, reg, fire_cmd(f.a, s.silo, 2, 1, f.strip(8)));
             fold_pending_sentiment(f.w, reg);
             out[i] = to_bytes(f.w);
             h[i] = f.w.state_hash(0);
@@ -587,7 +616,7 @@ int main()
     std::printf("\nM9 - the v89 missile section round-trips; v88 reads as nothing stocked; bad streams refused\n");
     {
         fixture f; build(f);
-        const scene s = stage(f, reg);
+        const scene s = stage_for_save(f, reg);
         f.w.missile_magazines[f.a] = {5, 2, 1};
         f.w.interceptor_stocks[s.b_ad] = 7;
         const std::string bytes = to_bytes(f.w);
@@ -644,12 +673,13 @@ int main()
 
         // 3: a v88 stream naming kind 20 (nuclear_used) is refused; v89 carries it.
         fixture f; build(f);
-        const scene s = stage(f, reg);
+        const scene s = stage(f, reg); // the destroyer is the eyes on strip 8 for the shot
         hold_node(f.w, f.a, missile_nuclear_node());
         f.w.missile_magazines[f.a][2] = 1;
-        check(run(f, reg, fire_cmd(f.a, s.art, 2, 1, f.strip(8))) == corp_command_result::applied
+        check(run(f, reg, fire_cmd(f.a, s.silo, 2, 1, f.strip(8))) == corp_command_result::applied
                   && !f.w.sentiment_pending.empty(),
               "M10b setup: a warhead fired leaves nuclear_used conduct pending");
+        f.w.ships.erase(s.art); // then dropped, as stage_for_save does: no water for it to be saved on
         {
             std::ostringstream o(std::ios::binary);
             write_world_snapshot_pre_missiles(f.w, o);
@@ -681,11 +711,11 @@ int main()
         refused(f, [&] { return run(f, reg, fire_cmd(f.a, s.art, 0, 1, f.strip(9))); },
                 corp_command_result::rejected_state,
                 "M10e a conventional strike on a hostile-held province with no hostile unit in it is refused");
-        refused(f, [&] { return run(f, reg, fire_cmd(f.a, s.art, 2, 1, f.strip(9))); },
+        refused(f, [&] { return run(f, reg, fire_cmd(f.a, s.silo, 2, 1, f.strip(9))); },
                 corp_command_result::rejected_state,
                 "M10f an area strike on a province with no hostile unit or building is refused");
         add_building(f, f.b, 37, 5, building_type::processing_facility);
-        check(fire_missile_check(f.w, reg, f.a, s.art, 2, 1, f.strip(9), null_entity) == corp_command_result::applied
+        check(fire_missile_check(f.w, reg, f.a, s.silo, 2, 1, f.strip(9), null_entity) == corp_command_result::applied
                   && fire_missile_check(f.w, reg, f.a, s.art, 0, 1, f.strip(9), null_entity)
                          == corp_command_result::rejected_state,
               "M10g a hostile building there makes it an area target, still not a conventional one");
@@ -713,7 +743,7 @@ int main()
         // 5 and 6b: a strike that kills a unit outright leaves it to the one disband path, which
         // takes its interceptor stock with it, so a save never drops what the world holds.
         fixture f; build(f);
-        const scene s = stage(f, reg);
+        const scene s = stage_for_save(f, reg);
         f.w.interceptor_stocks[s.b_ad] = 4;
         f.w.units.at(s.b_ad).count = 0; // ground to nothing, as a strike or battle can leave it
         disband_orphaned_units(f.w);
@@ -722,6 +752,97 @@ int main()
         world back;
         check(from_bytes(to_bytes(f.w), back) && back.state_hash(0) == f.w.state_hash(0),
               "M10k so the save carries every stock the world holds (hash equal across save and load)");
+    }
+
+    // =====================================================================
+    std::printf("\nM11 - BL-1643: the silo launches long range and warheads at 90 tiles above half condition; artillery launches nothing\n");
+    {
+        fixture f; build(f);
+        const scene s = stage(f, reg);
+        hold_node(f.w, f.a, missile_nuclear_node());
+        f.w.missile_magazines[f.a] = {4, 4, 2};
+        // A silo far west: column 2, about 31 tiles from strip 8 - past a warhead's own 12.
+        const entity_id far = add_building(f, f.a, 2, 5, building_type::missile_silo);
+        int reach_l = -1, reach_n = -1, reach_s = -1;
+        const entity_id from_l = missile_launch_tile(f.w, reg, far, missile_kind::long_range, &reach_l);
+        missile_launch_tile(f.w, reg, far, missile_kind::tactical_nuclear, &reach_n);
+        missile_launch_tile(f.w, reg, far, missile_kind::short_range, &reach_s);
+        check(from_l == f.at(2, 5) && reach_l == 90 && reach_n == 90 && P.silo_range == 90,
+              "M11a a silo fires from its own tile at 90 tiles, long range and warhead alike ("
+                  + std::to_string(reach_l) + ", " + std::to_string(reach_n) + ")");
+        check(missile_launcher_of(f.w, far) == missile_launcher_type::silo
+                  && missile_launcher_carries(f.w, far, missile_kind::long_range)
+                  && missile_launcher_carries(f.w, far, missile_kind::tactical_nuclear)
+                  && !missile_launcher_carries(f.w, far, missile_kind::short_range)
+                  && !missile_launcher_carries(f.w, far, missile_kind::strategic_nuclear),
+              "M11b a silo carries long range and tactical nuclear, never short range or a strategic weapon");
+        refused(f, [&] { return run(f, reg, fire_cmd(f.a, far, 0, 1, f.strip(8))); },
+                corp_command_result::rejected_invalid, "M11c a short-range missile from a silo is refused; nothing moves");
+        const int men0 = f.w.units.at(s.b_inf).count;
+        check(run(f, reg, fire_cmd(f.a, far, 1, 1, f.strip(8))) == corp_command_result::applied
+                  && missile_stock(f.w, f.a, missile_kind::long_range) == 3 && f.w.units.at(s.b_inf).count < men0,
+              "M11d the far silo's long-range strike lands about 31 tiles off");
+        // Half condition: at 500 it cannot fire; at 501 it can.
+        f.w.buildings.at(far).condition_permille = 500;
+        refused(f, [&] { return run(f, reg, fire_cmd(f.a, far, 1, 1, f.strip(8))); },
+                corp_command_result::rejected_state, "M11e a silo at half condition (500) cannot fire; nothing moves");
+        f.w.buildings.at(far).condition_permille = 501;
+        check(fire_missile_check(f.w, reg, f.a, far, 1, 1, f.strip(8), null_entity) == corp_command_result::applied,
+              "M11f just past half (501) it fires again");
+        f.w.buildings.at(far).condition_permille = 1000;
+        f.w.buildings.at(far).ticks_remaining = 1;
+        refused(f, [&] { return run(f, reg, fire_cmd(f.a, far, 1, 1, f.strip(8))); },
+                corp_command_result::rejected_state, "M11g an unbuilt silo cannot fire");
+        f.w.buildings.at(far).ticks_remaining = 0;
+        // Another nation's silo is not A's launcher.
+        const entity_id b_silo = add_building(f, f.b, 50, 5, building_type::missile_silo);
+        refused(f, [&] { return run(f, reg, fire_cmd(f.a, b_silo, 1, 1, f.strip(8))); },
+                corp_command_result::rejected_not_owner, "M11h another nation's silo is refused");
+        // A strike may name a silo: A's long range on B's silo lowers its condition.
+        add_unit(f, f.a, 49, 2, land_class::infantry, 10); // A's eyes on strip 12 (columns 48-51)
+        const corp_command_result rs = run(f, reg, fire_cmd(f.a, far, 1, 1, f.strip(12), b_silo));
+        check(rs == corp_command_result::applied && f.w.buildings.at(b_silo).condition_permille == 700,
+              "M11i' a strike may name a silo: B's silo 1000 -> "
+                  + std::to_string(f.w.buildings.at(b_silo).condition_permille) + " (300 a long-range missile)");
+    }
+    {
+        // Artillery launches nothing (BL-1643, Ben 2026-11-11).
+        fixture f; build(f);
+        const scene s = stage(f, reg);
+        (void)s;
+        const entity_id art = add_unit(f, f.a, 29, 5, land_class::artillery);
+        f.w.missile_magazines[f.a] = {4, 4, 0};
+        bool carries = false;
+        for (int k = 0; k < 4; ++k)
+            carries = carries || missile_launcher_carries(f.w, art, static_cast<missile_kind>(k));
+        int reach = 0;
+        check(!carries && missile_launch_tile(f.w, reg, art, missile_kind::short_range, &reach) == null_entity && reach == -1,
+              "M11i artillery carries no missile and has no launch tile");
+        refused(f, [&] { return run(f, reg, fire_cmd(f.a, art, 0, 1, f.strip(8))); },
+                corp_command_result::rejected_invalid, "M11j a missile fired from artillery is refused; nothing moves");
+        check(missile_targets(f.w, reg, f.a, art, missile_kind::short_range).empty(),
+              "M11k an artillery unit's card lists no missile target");
+    }
+    {
+        // A rival fires from its own silo (the grant: its OWN launchers).
+        fixture f; build(f);
+        f.w.player_entity = f.c;
+        const entity_id b_silo = add_building(f, f.b, 55, 5, building_type::missile_silo);
+        const entity_id a_inf = add_unit(f, f.a, 28, 5, land_class::infantry);
+        add_unit(f, f.b, 31, 5, land_class::infantry, 50); // B's eyes on strip 7
+        f.w.corp_hostile_pairs.insert({f.b, f.a});
+        f.w.missile_magazines[f.b] = {0, 2, 0};
+        for (auto& [mid, m] : f.w.markets)
+            m.inventory.fill(0.0f); // it fires what it holds; nothing more to buy
+        const int a0 = f.w.units.at(a_inf).count;
+        score_nation_missiles(f.w, reg, f.b, 20);
+        check(f.w.units.at(a_inf).count < a0 && missile_stock(f.w, f.b, missile_kind::long_range) < 2,
+              "M11l a rival fires long range from its own silo at a sighted hostile unit");
+        // At half condition its silo is not a launcher, and it holds.
+        f.w.buildings.at(b_silo).condition_permille = 500;
+        const snap before = take(f.w);
+        score_nation_missiles(f.w, reg, f.b, 21);
+        check(same(before, f.w), "M11m a rival's silo at half condition fires nothing");
     }
 
     std::printf("\nRESULT: %d failures / %d checks\n", failures, checks);

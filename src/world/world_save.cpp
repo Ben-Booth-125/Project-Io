@@ -51,7 +51,7 @@ constexpr auto max_cover      = terrain_cover::urban;
 constexpr auto max_landform   = terrain_landform::rift;
 constexpr auto max_body_type  = body_type::star;
 constexpr auto max_atmosphere = atmosphere_class::thick;
-constexpr auto max_building   = building_type::orbital_defence_battery; // BL-1599 (v88); BL-1585 (v81); BL-1426 (no bump: an older reader refuses the new type at this gate); BL-1449 (v65); BL-1255 (v49); BL-1266 (v46); BL-615 before it.
+constexpr auto max_building   = building_type::missile_silo; // BL-1643 (no bump: a widened gate, as BL-1426); BL-1599 (v88); BL-1585 (v81); BL-1426 (no bump: an older reader refuses the new type at this gate); BL-1449 (v65); BL-1255 (v49); BL-1266 (v46); BL-615 before it.
                                                            // A WIDENED range gate, not a format
                                                            // change: no serialised array is sized
                                                            // by building_type (unlike resource_
@@ -3548,7 +3548,9 @@ std::size_t tail_bytes_after_key(int version, const world& w)
         { k_space_key + k_world_save_version_space_firsts, world_save_space_firsts_section_bytes },       // v91
         { k_space_key + k_world_save_version_transit_origin, world_save_transit_origin_section_bytes },     // v92
     };
-    static_assert(world_save_version == k_world_save_version_monthly, // v94 adds no section (BL-1642)
+    // BL-1641: v94 (one building per product) adds no section, nor does v95 (BL-1642, the
+    // monthly tick), so the table ends at v92's.
+    static_assert(world_save_version == k_world_save_version_monthly,
                   "BL-1632: a new trailing section joins world_save_tail_bytes_after's table");
     assert(version >= static_cast<int>(k_world_save_version_pre_tax)); // older tails are not today's
     std::size_t n = 0;
@@ -3634,8 +3636,9 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
     // addition and nothing else moved, so v48 is a strict prefix of v49 as v47 is
     // of v48.
     if (!r_u32(in, version)
-        || (version != world_save_version && version != k_world_save_version_space_merge // v93: v94's layout, the quarter tick (BL-1642)
-            && version != k_world_save_version_pre_lp
+        || (version != world_save_version && version != k_world_save_version_pre_lp
+            && version != k_world_save_version_one_product // v94: v95's layout, the quarter tick (BL-1642)
+            && version != k_world_save_version_space_merge // BL-1641: v93, the same layout as v94
             && version != k_world_save_version_pre_rail
             && version != k_world_save_version_pre_state
             && version != k_world_save_version_pre_space

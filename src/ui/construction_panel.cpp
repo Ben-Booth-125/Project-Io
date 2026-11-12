@@ -1081,9 +1081,9 @@ std::string building_group_name(const world& w, const recipe_registry& reg, cons
     }
     if (b.type == building_type::processing_facility)
     {
-        // The recipe GROUP, not the recipe: "Metal Foundry" once, rather than a row
-        // per method — BL-434's grouping, which is also the axis the Build door
-        // collapses its processing candidates onto.
+        // The PRODUCT BUILDING (the recipe's group), not the method: "Steel Mill" once,
+        // rather than a row per method — one building per product (Ben, 2026-11-11),
+        // which is also the axis the Build door collapses its processing candidates onto.
         if (const recipe* rc = reg.get_recipe(b.recipe); rc != nullptr && !rc->group.empty())
             return rc->group;
         return building_type_name(b.type);

@@ -182,7 +182,7 @@ Three Tier 2 goods belong to the ancient (pre-coal) chain rather than the indust
 
 | Resource | Tier | Base price | Produced by | Notes |
 |----------|------|-----------|-------------|-------|
-| Charcoal | 2 (refined) | 6.5 | Charcoal Burner / Peat Kiln / Coking Kiln | Refined fuel-wood; pre-coal smelting/heating input. Dearer than the timber it comes from — a burn takes days and loses mass. The Coking Kiln (BL-587) is a genuine alternate method, not a third route — see PRODUCTION.md § Alternate production methods. |
+| Charcoal | 2 (refined) | 6.5 | Charcoal Burner / Peat Kiln / Coking Kiln | Refined fuel-wood; pre-coal smelting/heating input. Dearer than the timber it comes from — a burn takes days and loses mass. All three are methods of the Charcoal Works: the Peat Kiln a variant of the Burner, the Coking Kiln (BL-587) its upgrade — see PRODUCTION.md § Upgrades and variants. |
 | Iron blooms | 2 (refined) | 24.6 | Bloomery | Bloomery-refined iron intermediate — distinct from raw iron ore / iron-nickel ore. Carries the charcoal plus the ore. |
 | Trade goods (misc) | 1 (endemic, placeholder) | 8.0 | Potter & Weaver, Glassworks | Generic endemic-luxury-class placeholder, priced as a modest trade good, not a treasure. A specific luxury name is a separate design step. |
 
@@ -317,7 +317,7 @@ Refined goods are the primary goods in inter-body trade during the early game.
 **Liquid oxygen has no enum value of its own.** It is folded into the Chemical Plant's two
 propellant recipes — separated cryogenically from the local air on the Era 1 route, electrolysed
 from water on the Era 1 route — because nothing outside the plant would ever hold it
-(`docs/economy/PRODUCTION.md` § Chemical Plant).
+(`docs/economy/PRODUCTION.md` § Propellant Plant).
 
 ---
 

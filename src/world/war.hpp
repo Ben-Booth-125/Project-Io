@@ -433,6 +433,21 @@ void eliminate_nation(world& w, const sentiment_params& p, entity_id ended, enti
 /// units of every nation at war. A no-op with no wars.
 void note_war_battles(world& w, const battle_tick& battles);
 
+/// One exchange of losses between two nations, outside a battle dispatch (BL-1643: a
+/// battery's shells). `a` lost `a_lost` men and `b` lost `b_lost`.
+struct war_losses
+{
+    entity_id a = null_entity, b = null_entity;
+    int a_lost = 0, b_lost = 0;
+};
+
+/// The battle inputs' path for losses outside a battle (BL-1643, MILITARY.md § Artillery
+/// fires shells: a strike's losses count as a battle's toward the war): each exchange
+/// between two war parties adds its men lost to the war's battle inputs and to each side's
+/// exhaustion, exactly as `note_war_battles` adds a dispatch's; then the morale ceiling. A
+/// no-op with no wars.
+void note_war_losses(world& w, const std::vector<war_losses>& losses);
+
 /// The daily accumulation (advance_quarter_to): adds @p days x each party's share
 /// of its standing units in the field to the war's field-day accumulator. Called
 /// once per military day walked, and once with the REST of the quarter's days when

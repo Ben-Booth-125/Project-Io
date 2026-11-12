@@ -7,8 +7,10 @@
 // A missile is a MUNITION, not a unit: assembled from kit goods into a nation's
 // MAGAZINE (`world::missile_magazines`) by `stock_missiles`, and consumed when a
 // LAUNCHER of that nation fires it at a province or a building (`fire_missile`).
-// Launchers are the nation's own land units, ships and wings, by class (the table in
-// `missile_launcher_carries`); a silo building is not modelled.
+// Launchers are the nation's own ships, wings and MISSILE SILOS, by class (the table in
+// `missile_launcher_carries`). A silo is a building (BL-1643, Ben 2026-11-11): it fires at
+// `missile_params::silo_range` tiles and only while its condition stands above half.
+// Artillery is no launcher: it fires shells at its own range (artillery.hpp).
 //
 // Missile defence is the INTERCEPTOR STOCK at an air defence unit
 // (`world::interceptor_stocks`, `stock_interceptors`). A strike on a province draws
@@ -38,21 +40,25 @@ struct world;
 struct sentiment_params;
 class recipe_registry;
 
-/// What a launcher is: one of the nation's land units, ships or wings.
-enum class missile_launcher_type : uint8_t { none = 0, land_unit, ship, wing };
+/// What a launcher is: one of the nation's ships, wings or silos. APPEND-ONLY. `land_unit`
+/// names a land unit, which carries no missile since BL-1643 (artillery fires shells).
+enum class missile_launcher_type : uint8_t { none = 0, land_unit, ship, wing, silo };
 
-/// The launcher type of entity @p launcher (none when it is no unit, ship or wing).
+/// The launcher type of entity @p launcher (none when it is no unit, ship, wing or silo).
 missile_launcher_type missile_launcher_of(const world& w, entity_id launcher);
 
 /// May launcher @p launcher carry kind @p k (MILITARY.md § Missiles, the launcher table)?
-/// Artillery: short range and tactical nuclear. Destroyer: short. Capital ship: short and
-/// long. Submarine: long and tactical nuclear. Multirole: short. Bomber: long and tactical
-/// nuclear. Nothing carries a strategic weapon.
+/// Silo: long range and tactical nuclear. Destroyer: short. Capital ship: short and long.
+/// Submarine: long and tactical nuclear. Multirole: short. Bomber: long and tactical
+/// nuclear. No land unit carries one (BL-1643: artillery fires shells, not missiles).
+/// Nothing carries a strategic weapon.
 bool missile_launcher_carries(const world& w, entity_id launcher, missile_kind k);
 
-/// The tile a launcher fires from (a unit's or ship's tile, a wing's airbase's), and its
-/// reach for kind @p k in tiles (a wing adds its class's range). Null / -1 when it cannot
-/// fire now: not raised, sunk, refitting, or a wing whose airbase is gone or not its own.
+/// The tile a launcher fires from (a ship's tile, a wing's airbase's, a silo's own), and its
+/// reach for kind @p k in tiles (a wing adds its class's range; a silo reaches `silo_range`
+/// whatever the kind). Null / -1 when it cannot fire now: sunk, refitting, a wing whose
+/// airbase is gone or not its own, or a silo unbuilt, decommissioned, ownerless, or at or
+/// below `silo_min_condition_permille`.
 entity_id missile_launch_tile(const world& w, const recipe_registry& reg, entity_id launcher,
                               missile_kind k, int* reach_out);
 
@@ -107,6 +113,10 @@ struct missile_strike_plan
     int condition = 0;  ///< Summed per-mille.
 };
 
+/// The nation a launcher belongs to: a unit's, ship's or wing's owner, a silo's owner
+/// nation (`owner_nation_of`); null for anything else.
+entity_id missile_launcher_owner(const world& w, entity_id launcher);
+
 /// Every check `fire_missile` makes, READ-ONLY, in its order: the launcher exists
 /// (rejected_invalid) and is @p nation's (rejected_not_owner); @p kind is a fireable kind
 /// the launcher carries — a strategic weapon is refused here, always (rejected_invalid);
@@ -150,7 +160,8 @@ float nuclear_alarm_sum(const world& w, const sentiment_params& sp, entity_id fi
 
 /// BL-1431 (AI_OPPONENT.md § 11, "Rival nations fire missiles"): a rival nation's missile
 /// pass. Never the player's nation; only while mobilised. At most: one stock_missiles, one
-/// stock_interceptors, and one fire_missile from its own launcher at a sighted target of a
+/// stock_interceptors, and one fire_missile from its own launcher (a ship, wing or a silo it
+/// already owns; BL-1643: the scorer never BUILDS a silo) at a sighted target of a
 /// nation it is already hostile to, chosen by scored value against the missiles' cost (a
 /// tactical warhead also charged its Alarm). Every action through `apply_corp_command`.
 void score_nation_missiles(world& w, const recipe_registry& reg, entity_id nation, int tick);

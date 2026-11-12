@@ -472,6 +472,15 @@ finish_campaign_result finish_campaign_world(world& w, generation_report& report
     // and before the opening reserve, so the bill and the settle read a world in which
     // every building is a nation's.
     print_fold(fold_to_ground(w));
+    // ONE METHOD PER STACK (Ben, 2026-11-11; PRODUCTION.md § One building per product):
+    // generation's last word on the rule. The chain walks refuse a mixed stack
+    // (`chain_recipe_tier`) and the build door adopts the stack's method; this catches
+    // any pass that wrote a recipe outside both, so no world leaves generation with one.
+    if (const int unified = unify_product_stack_methods(w, reg); unified > 0)
+    {
+        std::printf("[one product] %d building(s) re-set to their stack's method\n", unified);
+        std::fflush(stdout);
+    }
     // BL-1473 (NATION_GENERATION.md § Pass 7, "A major opens on a flat treasury"): once the
     // kit stands and the fold has moved every balance home, each major's treasury is the
     // kit's authored figure, in place of the chest its history folded. Before the reserve.

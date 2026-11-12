@@ -1,4 +1,4 @@
--- The air gate at the two doors (sprint 50; PRODUCTION.md § Chemical Plant,
+-- The air gate at the two doors (sprint 50; PRODUCTION.md § Propellant Plant,
 -- "And it runs only there"; Ben, 2026-10-09). Scripted in place of a live click
 -- on Ben's request, 2026-10-10.
 --
@@ -11,14 +11,14 @@
 --       propellant_electrolysis — read from the door's OWN list
 --       (`verify.build_door`, the recipe ids behind the folded rows) — and does
 --       list propellant_atmospheric, so the absence is the air filter and not
---       the era or tech mask hiding the whole Chemical Works group.
---   A2  A FINISHED player Chemical Works on Kepler running propellant_atmospheric:
+--       the era or tech mask hiding the whole Propellant Plant group.
+--   A2  A FINISHED player Propellant Plant on Kepler running propellant_atmospheric:
 --       its method grid (`verify.method_grid`, the grid's own offer) does not
 --       offer propellant_electrolysis.
 --   A3  Switching it onto propellant_electrolysis is refused: through the
 --       set_recipe verb (`rejected_wrong_air`) and through the grid's own Switch
 --       press (`wrong_air`), and the status line under the grid says so.
---   A5  The first airless body: a seeded Chemical Works running
+--   A5  The first airless body: a seeded Propellant Plant running
 --       propellant_electrolysis does not offer the atmospheric route, and the
 --       set_recipe verb refuses it (or the seed's refusal is printed, SKIPPED).
 --   A4  Every airless body in the verify world (surveyed first, through the
@@ -94,11 +94,11 @@ verify.expect(has(d.recipes, ATMO),
     .. "(so the absence above is the air filter, not the group masked out)")
 verify.capture("air_gate_door_kepler")
 
--- --- A2: the method grid of a finished Chemical Works on Kepler ------------
+-- --- A2: the method grid of a finished Propellant Plant on Kepler ------------
 verify.set_balance(100000.0)
 local works = verify.seed_processing(ATMO)
 verify.expect(works.result == "placed",
-    "A2 a player Chemical Works running propellant_atmospheric is seeded on Kepler; got "
+    "A2 a player Propellant Plant running propellant_atmospheric is seeded on Kepler; got "
     .. tostring(works.result))
 if works.result ~= "placed" then return end
 verify.expect(works.recipe == ATMO, "A2 the seeded works runs " .. tostring(works.recipe))
@@ -130,7 +130,7 @@ local g2 = verify.method_grid(works.id)
 verify.expect(g2.active == ATMO, "A3 the refusal changed nothing: active=" .. tostring(g2.active))
 verify.expect(g2.status == REFUSED_AIR, "A3 the grid recorded the refusal: " .. g2.status)
 -- The line must be DRAWN, not merely recorded. The grid returns early on "Only one
--- method available." before its status line, and an air-gated Chemical Works
+-- method available." before its status line, and an air-gated Propellant Plant
 -- always has exactly one runnable method, so this is where that shows.
 verify.expect(g2.status_drawn,
     "A3 the status line under the grid SHOWS the refusal (status_drawn=" .. tostring(g2.status_drawn) .. ")")

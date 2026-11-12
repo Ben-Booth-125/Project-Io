@@ -296,7 +296,13 @@ The single progressive-disclosure idiom intended to be shared by every dense sur
 The channel-based chat panel — the surface of the diplomacy-as-communication principle, where the mechanical actions of AI corps surface as messages before any AI "speaks" for real. Docked bottom-left of the shell at the Selection-band height (BL-227, comms dock; `src/ui/chat_panel.{hpp,cpp}`). See `docs/ui/CHAT.md`.
 
 **Recipe**
-The configured input/output specification of a processing building. One building type may support multiple recipes; the active recipe is set per building. Recipe conversion rates are authored in Lua.
+The configured input/output specification of a processing building — in play, a **method**. Every recipe is a method of one **product building**, and a building's methods all make its one product; the active method is set per stack. Recipe conversion rates are authored in Lua.
+
+**Product building**
+A processing building named by the one product it makes — Steel Mill, Copper Refinery, Electronics Lab, Small Arms Works (Ben, 2026-11-11). Every processing building is the generic `processing_facility`; its product building is its recipe's `group`. A building never switches to another product: that is dismantle and rebuild. Replaces the retired *sub-facility group* ("Metal Foundry", "Advanced Fabrication"), which let one building switch between products. See `docs/economy/PRODUCTION.md` § One building per product.
+
+**Method (upgrade, variant)**
+A way a product building makes its product. An **upgrade** is the deeper method needing a good its base does not: paid in place, one way, keeping the tile and the stack. A **variant** draws different raws at the same depth: switchable both ways at the switch cost. A stack — the buildings of one product on one tile — runs one method, and a step moves the whole stack. Changed on the building's own card. See `docs/economy/PRODUCTION.md` § Upgrades and variants.
 
 **Resource**
 Any tradeable good in the economy. Resources occupy one of three tiers: raw materials (extracted from tile deposits), refined goods (produced by processing buildings), or products (manufactured from refined goods). See `docs/economy/RESOURCES.md`.

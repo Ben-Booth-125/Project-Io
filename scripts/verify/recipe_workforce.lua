@@ -77,16 +77,30 @@ if b.found then
     print("recipe_workforce: the game's targets by quarter from a staged 0%: " .. series)
 
     -- If the building type offers more than one recipe, prove the recipe selector
-    -- commits: switching the active recipe writes a non-empty recipe name.
+    -- commits a legal step and refuses the rest. One building per product (BL-1641):
+    -- the roster holds every product's methods, so some index is another product's
+    -- and the selector refuses it ("" back); a step of this building's own, where it
+    -- has one, commits a non-empty recipe name and the economy ticks on it.
     if b.recipes and b.recipes > 1 then
-        local name = verify.set_building_recipe(b.tile, 1)
-        verify.expect(name ~= "",
-            "recipe selector committed a recipe (name='" .. tostring(name) .. "')")
-        verify.stock_building_inputs(b.tile, 1000) -- the NEW recipe's inputs
-        verify.econ_step(1)
-        local out_new = verify.building_output(b.tile)
-        verify.expect(out_new >= 0.0,
-            "economy ticks cleanly on the new recipe (out=" .. out_new .. ")")
+        local start = verify.first_processing_building().index
+        local name, refused = "", 0
+        for i = 0, b.recipes - 1 do
+            if i ~= start then
+                local got = verify.set_building_recipe(b.tile, i)
+                if got == "" then refused = refused + 1 else name = got; break end
+            end
+        end
+        verify.expect(refused >= 1,
+            "the recipe selector refuses another product's method (" .. refused .. " refused)")
+        if name ~= "" then
+            verify.stock_building_inputs(b.tile, 1000) -- the NEW recipe's inputs
+            verify.econ_step(1)
+            local out_new = verify.building_output(b.tile)
+            verify.expect(out_new >= 0.0,
+                "economy ticks cleanly on the new method " .. name .. " (out=" .. out_new .. ")")
+        else
+            print("recipe_workforce: the first processing building has no other method of its own")
+        end
     end
 end
 

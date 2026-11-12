@@ -2299,6 +2299,41 @@ int chain_recipe_tier(world& w, const recipe_registry& reg, chain_reach& cr, ent
     if (const auto sb = w.buildings.find(self);
         sb != w.buildings.end() && !recipe_runs_at_tile(w, rc, sb->second.tile))
         return chain_tier_none;
+    // ONE METHOD PER STACK (Ben, 2026-11-11; PRODUCTION.md § One building per
+    // product): where the processor's tile already stands a building of this
+    // recipe's product on another method, this recipe would make a mixed stack, so
+    // every generation walk that ranks through this tier passes it over. The stack's
+    // method is its oldest other member's (`product_stack_method`), read through the
+    // pass's per-tile index rather than a walk of every building per recipe asked.
+    if (const auto sb = w.buildings.find(self); sb != w.buildings.end())
+    {
+        if (cr.processors_sig_count != w.buildings.size()
+            || cr.processors_sig_next != w.next_entity_id())
+        {
+            cr.processors_by_tile.clear();
+            for (const auto& [bid, b] : w.buildings)
+                if (b.type == building_type::processing_facility)
+                    cr.processors_by_tile[b.tile].push_back(bid);
+            for (auto& [t, ids] : cr.processors_by_tile)
+                std::sort(ids.begin(), ids.end());
+            cr.processors_sig_count = w.buildings.size();
+            cr.processors_sig_next  = w.next_entity_id();
+        }
+        const std::uint16_t own_id = reg.recipe_id(rc.name);
+        if (const auto pt = cr.processors_by_tile.find(sb->second.tile); pt != cr.processors_by_tile.end())
+            for (const entity_id m : pt->second) // ascending: the first match is the oldest
+            {
+                if (m == self)
+                    continue;
+                const auto mb = w.buildings.find(m);
+                const recipe* mr = mb == w.buildings.end() ? nullptr : reg.get_recipe(mb->second.recipe);
+                if (mr == nullptr || mr->group != rc.group)
+                    continue;
+                if (mb->second.recipe != own_id)
+                    return chain_tier_none;
+                break;
+            }
+    }
     int worst = chain_tier_own;
     for (std::size_t r = 0; r < resource_count; ++r)
     {
@@ -5042,7 +5077,7 @@ int assign_default_recipes(world& w, const recipe_registry& reg, const char* sit
     {
         building_component& b = w.buildings.at(id);
         const auto tit = w.tiles.find(b.tile);
-        // The body's air (Ben, 2026-10-09; PRODUCTION.md § Chemical Plant): the
+        // The body's air (Ben, 2026-10-09; PRODUCTION.md § Propellant Plant): the
         // default is the first recipe this tile's body can run -- carry this
         // call across any rewrite of this function.
         const uint16_t rid  = reg.default_recipe_id_at(w, b.tile);

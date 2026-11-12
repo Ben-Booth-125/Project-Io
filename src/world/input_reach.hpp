@@ -194,6 +194,16 @@ struct input_reach
         std::vector<std::pair<std::size_t, float>> out;  ///< (r, output)
         std::vector<std::pair<std::size_t, float>> draw; ///< (r, draw)
     };
+    /// BL-1641 (one building per product): every processing building by tile, ids
+    /// ascending - the index generation's one-method-per-stack test reads instead of
+    /// walking every building per recipe asked (`chain_recipe_tier`). Self-validating:
+    /// rebuilt whenever the world's building count or next entity id moves (a build or
+    /// a demolition), never by a recipe change, which it does not hold (the test reads
+    /// each member's recipe live).
+    std::map<entity_id, std::vector<entity_id>> processors_by_tile;
+    std::size_t                                 processors_sig_count = static_cast<std::size_t>(-1);
+    std::uint32_t                               processors_sig_next  = 0;
+
     bool refresh_mode = false;
     /// Every processor / extraction site the refresh index holds, by id.
     std::unordered_map<entity_id, indexed_building>                        seen;

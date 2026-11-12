@@ -298,6 +298,7 @@ placement_result can_place(const tile_component& tc, building_type type, resourc
                                                   // base is NOT an anchor, so it earns no exemption there.
         case building_type::airbase:              // BL-1449: as the military base — any non-ocean land tile.
         case building_type::bunker:               // BL-1426: any non-ocean land tile; one to a tile (world level).
+        case building_type::missile_silo:         // BL-1643: any non-ocean land tile of the nation's own ground.
         case building_type::research_institute:  // BL-332: same shape as military_base — passive,
                                                   // no deposit needed, any non-ocean land tile.
         case building_type::none:

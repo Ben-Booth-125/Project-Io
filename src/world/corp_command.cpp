@@ -657,6 +657,7 @@ corp_command_result apply_state_command(world& w, const recipe_registry& reg,
                 case recipe_switch_result::cross_group:         return corp_command_result::rejected_invalid;
                 case recipe_switch_result::tech_locked:         return corp_command_result::rejected_tech_locked;
                 case recipe_switch_result::wrong_air:           return corp_command_result::rejected_wrong_air;
+                case recipe_switch_result::one_way:             return corp_command_result::rejected_invalid;
             }
             return corp_command_result::rejected_invalid;
         }

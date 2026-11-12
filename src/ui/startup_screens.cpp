@@ -33,6 +33,7 @@
 #include <future>
 #include <optional>
 #include <random>
+#include <cctype>
 #include <string>
 #include <vector>
 
@@ -1805,8 +1806,14 @@ void app::draw_main_menu()
                     if (ImGui::Button(shown[static_cast<std::size_t>(i)].name.c_str(),
                                       {ImGui::GetContentRegionAvail().x, btn.y}))
                     {
-                        if (load_game_from(shown[static_cast<std::size_t>(i)].path))
+                        std::string why; // BL-1641: a refusal with a reason says it here
+                        if (load_game_from(shown[static_cast<std::size_t>(i)].path, &why))
                             m_load_list_open = false;
+                        else if (!why.empty())
+                        {
+                            why[0] = static_cast<char>(std::toupper(static_cast<unsigned char>(why[0])));
+                            m_menu_message = why + ".";
+                        }
                         else
                             m_menu_message = "That save could not be read: it is missing, corrupt, or from another version.";
                     }

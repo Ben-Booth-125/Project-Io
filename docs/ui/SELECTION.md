@@ -337,13 +337,14 @@ cost (budget + materials), a reason-coded validity read (e.g. *"A port must sit 
 coast"*), an **expected-profit** bar (`quote_site`, `ledgers/construction.md` § What the quote asks, one ceiling shared across
 the list so the bars compare directly), and a **Build** action that enqueues the construction
 on the tile (the `construction.pending_tile` seam `app::render` executes). A processing row
-stands for its group, showing the best-expected-profit recipe (PRODUCTION.md § Sub-facility
-groups). This is the deliberate choice that **building on one tile is a
+stands for its product building, showing the best-expected-profit method (PRODUCTION.md § One
+building per product); on a tile that already stands the product, the row quotes the stack's own
+method, the one a new building there runs. This is the deliberate choice that **building on one tile is a
 targeted action reached through the tile Selection element**, not a reserved menu — the
 nav-rail construction surface stays a broad overview (`docs/ui/MENU.md`). The equivalent
 placement-mode canvas click enqueues the same request.
 
-**Two folds were re-cut (Ben, 2026-11-05).** **Power Generation** sits in **Infrastructure**. A **Road**
+**Two folds were re-cut (Ben, 2026-11-05).** The **Power Plant** sits in **Infrastructure**. A **Road**
 fold holds **Track, Road, Highway and Railroad**, with smaller glyphs than the building rows, in the
 same grid and at the same row height. **Railroad** is the rail track row, in Ben's word: *Track* is the
 first road tier, and the two share the fold. The **Railway Station** stays in Infrastructure. The door
@@ -438,10 +439,14 @@ The preview and the province card do not move; two columns change.
    competitor-visibility rule) — it short-circuits rather than testing each guard against data
    it must not show.
 
-   The card holds no lever: the workforce slider it briefly carried (2026-10-13, round 2) is
-   retired with player workforce control altogether, so § The centre presents holds without
-   exception. The method switch stays in the Construction ledger's Buildings view; the card names
-   the method and does not switch it.
+   The card holds ONE lever, the method (Ben, 2026-11-11; `../economy/PRODUCTION.md` § One
+   building per product): the one exception to § The centre presents. Beneath the method line, the
+   player's own processing building shows one press per legal step from its stack's method — its
+   upgrade, its variants — each saying what it is and what it costs the whole stack
+   ("Upgrade to Bessemer Converter - 100 cr for the 2 buildings here, one way"). A building with
+   one method shows none. The press is the Construction ledger's Buildings-view grid's own, so the
+   two surfaces cannot disagree, and a refused press is said beneath it. The workforce slider the
+   card briefly carried (2026-10-13, round 2) stays retired with player workforce control.
 
 2. **The action grid retargets to the building** — the same 2×3 cell layout, now holding
    three building-level actions. This is the element's designated place to ACT; the cards are

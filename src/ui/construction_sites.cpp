@@ -1002,15 +1002,16 @@ const char* construction_fold_of(const recipe_registry& reg, building_type t, st
     {
     case building_type::extraction_site:     return "Extraction";
     case building_type::processing_facility:
-        // Power Generation is infrastructure (Ben, 2026-11-05; SELECTION.md § The tile
+        // A Power Plant is infrastructure (Ben, 2026-11-05; SELECTION.md § The tile
         // construction ledger): a grid is what other plants stand on.
-        if (const recipe* rc = reg.get_recipe(recipe_id); rc != nullptr && rc->group == "Power Generation")
+        if (const recipe* rc = reg.get_recipe(recipe_id); rc != nullptr && rc->group == "Power Plant")
             return "Infrastructure";
         return "Processing";
     case building_type::military_base:
     case building_type::airbase:
     case building_type::bunker:              // BL-1426
     case building_type::orbital_defence_battery: // BL-1599
+    case building_type::missile_silo:        // BL-1643
     case building_type::research_institute:  return "Military";
     default:                                 return "Infrastructure";
     }
@@ -1051,6 +1052,7 @@ std::vector<site_option> site_options(const world& w, const recipe_registry& reg
         {building_type::airbase, "Airbase"},
         {building_type::bunker, "Bunker"}, // BL-1426
         {building_type::orbital_defence_battery, "Orbital Defence Battery"}, // BL-1599
+        {building_type::missile_silo, "Missile Silo"}, // BL-1643
         {building_type::research_institute, "Research Institute"},
         {building_type::schooling, "Schooling"},   // the stratum gate decides where (Ben, 2026-11-07)
         {building_type::university, "University"},

@@ -388,6 +388,26 @@ economy = {
             build_duration_days = 240,
             resource_costs = { steel = 30.0, ordnance = 10.0 },
         },
+        -- BL-1643 (MILITARY.md § Missiles, Ben 2026-11-11): Missile Silo — the
+        -- long-range launcher on the nation's own ground. Fires long-range and
+        -- tactical nuclear missiles from the nation's magazine at 90 tiles, only
+        -- while its condition stands above half (missile_params, missile_params.hpp).
+        -- Produces nothing and staffs at zero, as the bunker; no research gates it
+        -- (the 1960 standard fields one). A first cut priced in-band above the
+        -- airbase (450, 240 days, steel 50) and the battery (400): a hardened shaft
+        -- and its launch control are more concrete, steel and electronics than a
+        -- runway, and it takes longer to sink. Its maintenance (10) sits between the
+        -- bunker's 5 and the battery's 20: it holds its missiles, it does not fire
+        -- a daily round.
+        missile_silo = {
+            era         = "industrial",
+            base_rate   = 0.0,
+            maintenance = 3.333333, -- /3 per month (was 10.0 a quarter, BL-1642)
+            base_wage   = 0.0,
+            build_cost  = 600.0,
+            build_duration_days = 300,
+            resource_costs = { stone = 40.0, steel = 50.0, electronics = 10.0 },
+        },
         -- BL-615: Schooling — the education building any settlement can host.
         -- Same passive shape as research_institute (base_rate 0, staffs at
         -- zero); its qualification-raising effect is a separate seam
@@ -1636,15 +1656,19 @@ economy = {
     -- a strategic choice. Cost is a round, legible number (half a Track road);
     -- cooldown is short enough that a genuine trade-off is still worth chasing,
     -- long enough that a corp cannot flip-flop every tick for a marginal margin.
-    -- BL-434: a group-tagged recipe roster splits the generic processing_facility
-    -- into recognizable sub-facility kinds (Metal Foundry, Food Processing, ...).
-    -- Switching WITHIN a group (Bloomery -> Smithy, both Metal Foundry) is the
-    -- cost/cooldown below; switching ACROSS groups is refused outright by
-    -- try_switch_recipe (economy_system.cpp) — retracted from an earlier
-    -- cross_group_multiplier price tier in this same session. The only way to
-    -- change a building's group is dismantle + rebuild via the tile selector.
+    -- BL-434 / BL-1641 (one building per product, Ben 2026-11-11): a recipe's
+    -- group is its PRODUCT BUILDING (Steel Mill, Power Plant, ...), and a step
+    -- between its methods is either a VARIANT (other raws, both ways: switch_cost)
+    -- or an UPGRADE (the deeper method, one way: upgrade_cost). Either price is
+    -- PER BUILDING: a step moves every building of the product on the tile at
+    -- once (one method per stack). Another building's method is refused outright
+    -- by try_switch_recipe (economy_system.cpp); a different product is a
+    -- different building, dismantled and rebuilt.
     recipe_switch = {
         switch_cost    = 12.0,
+        -- An upgrade is a quarter of the processing building's 200-credit build
+        -- cost: a real commitment, far short of rebuilding. Playtest-tunable.
+        upgrade_cost   = 50.0,
         -- Was 6 (Ben's playtest, 2026-08-16): 6 ticks x 90 days/tick is ~1.5
         -- in-game years to change what a building makes, which read as "not
         -- possible" rather than as a deliberate commitment. Dropped to 1 tick

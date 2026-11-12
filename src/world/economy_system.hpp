@@ -5,6 +5,7 @@
 #include "battle_system.hpp" // battle_dispatch (BL-467/BL-468)
 #include "air_combat.hpp"    // air_day_tick, wing_upkeep_tick (BL-1449)
 #include "sea_combat.hpp"    // sea_day_tick, ship_upkeep_tick (BL-1430)
+#include "artillery.hpp"     // artillery_day_tick (BL-1643)
 #include "supply_system.hpp" // interception_record (BL-1529)
 #include "carried_supplies.hpp" // BL-1452: carried_supplies_day, the daily stock step
 #include "nation_ai.hpp"     // nation_scorer_report (BL-542; Sprint N3 T4)
@@ -1057,6 +1058,7 @@ struct military_day_result
     int             disbanded = 0; ///< Units removed after the battles and starvation (`disband_orphaned_units`).
     unit_march_tick march;         ///< The march, including the attacks it opened.
     sea_day_tick    sea;           ///< BL-1430: the ships' day.
+    artillery_day_tick artillery;  ///< BL-1643: the day's bombardment.
 };
 
 /// THE DAILY MILITARY PASS (BL-1445, move by days; MILITARY.md § Marching and
@@ -1121,6 +1123,8 @@ enum class recipe_switch_result : uint8_t
                           ///< The only method lock left at this door — see try_switch_recipe.
     wrong_air,            ///< The new recipe cannot run on this building's body's air
                           ///< (`recipe_runs_at_tile`; propellant routes, Ben 2026-10-09).
+    one_way,              ///< Same building, but not a legal step: the way back down from
+                          ///< an upgrade, or an upgrade of some other method (Ben, 2026-11-11).
 };
 
 /// Attempt a PLAYER-grade recipe switch on `b`, gated by `economy.recipe_switch`
@@ -1136,6 +1140,11 @@ enum class recipe_switch_result : uint8_t
 /// recipe_switch_params for the full reasoning.
 ///
 /// A rejection mutates nothing.
+///
+/// ONE BUILDING PER PRODUCT (Ben, 2026-11-11; PRODUCTION.md § One building per
+/// product): the switch applies to the WHOLE product stack on `b`'s tile, priced per
+/// building — `switch_cost` for a variant, `upgrade_cost` for the upgrade of the
+/// running method — and refused as `one_way` for the step back down an upgrade.
 ///
 /// BL-434 retraction (2026-08-16, same session BL-434 landed): a switch to a
 /// recipe in a DIFFERENT `group` than `b`'s current recipe is REFUSED outright
