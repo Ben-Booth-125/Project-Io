@@ -2861,18 +2861,18 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 
 **Reason to select.** Goods answers 'what is each good worth here, and which way is it moving?'; Trades answers 'what am I moving in and out of this market, how much of my trade capacity do I steer, and what could I be moving?'. Convoys is no longer here: 'what is on its way to me' is a logistics question and has its own rail slot (ledger.nav_convoys).
 
-### `ledger.market_goods_sort` — Market Ledger, Goods view, the table headings (Good, Shelf, Price, v.Base, 8 mo)
+### `ledger.market_goods_sort` — Market Ledger, Goods view, the table headings (Good, Shelf, Price, v.Base, 2 yr)
 
 **Press.** Click a heading; click it again to reverse the direction; click it a third time to take the sort off
 
 | Arg | Type | Meaning |
 |---|---|---|
-| `column` | `enum` | Good (name), Shelf (the market's stock of the good), Price, v.Base (price over base price), 8 mo (the good's change across the graph's eight-month window, last sample over first) |
+| `column` | `enum` | Good (name), Shelf (the market's stock of the good), Price, v.Base (price over base price), 2 yr (the good's change across the graph's 8-quarter window, last sample over first) |
 
 **Valid when:**
 - Market Ledger is open on the Goods view
 
-**Expected output.** Re-orders the rows by that heading. Shelf, Price, v.Base and 8 mo open high to low, Good opens A to Z; the second press flips it and the third returns to the roster order the table rests in (toggle rule). Every tie keeps roster order. The headings stay frozen while the rows scroll, and the sort survives leaving the tab. Nothing in the simulation changes.
+**Expected output.** Re-orders the rows by that heading. Shelf, Price, v.Base and 2 yr open high to low, Good opens A to Z; the second press flips it and the third returns to the roster order the table rests in (toggle rule). Every tie keeps roster order. The headings stay frozen while the rows scroll, and the sort survives leaving the tab. Nothing in the simulation changes.
 
 **Reason to select.** Find the goods this market actually holds (Shelf), the dearest, the furthest above base, or the fastest moving, rather than reading all of them in roster order.
 

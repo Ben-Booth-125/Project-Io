@@ -2734,7 +2734,7 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
     };
 
     // ── Pass 3: BL-181 workforce auto-solve, player corp only; BL-1322 (Ben,
-    //    2026-10-13): STEPPED and without the opt-out — each tick the target
+    //    2026-10-13): STEPPED and without the opt-out — each QUARTER (the quarter tick, BL-1642) the target
     //    moves ONE 25 % step toward the solver's best (stays when equal), and
     //    `workforce_auto` is no longer read for the player (the field stays in
     //    the save and still records a rival's dial pin, `dial_idled`).

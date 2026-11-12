@@ -2963,12 +2963,19 @@ std::size_t world_save_space_firsts_section_bytes(const world& w)
     return 4 + 9 * w.space_firsts.size();
 }
 
-std::size_t world_save_offworld_base_section_bytes(const world& w)
+std::size_t world_save_offworld_base_section_bytes(const world& w, uint32_t version)
 {
-    std::size_t n = 8 + 16 * w.offworld_bases.size(); // BL-1642: v95's record carries the loss carry
+    // BL-1642: from v95 a base record carries its loss carry (16 bytes); before, 12.
+    const std::size_t rec = world_stream_has_offworld_loss_carry(version) ? 16 : 12;
+    std::size_t n = 8 + rec * w.offworld_bases.size();
     for (const auto& [uid, c] : w.space_colonists)
         n += w.space_units.count(uid) != 0 ? 8 : 0;
     return n;
+}
+
+std::size_t world_save_offworld_base_section_bytes(const world& w)
+{
+    return world_save_offworld_base_section_bytes(w, world_save_version);
 }
 
 void write_world_snapshot_pre_space_units(const world& w, std::ostream& out)
@@ -3551,7 +3558,9 @@ std::size_t tail_bytes_after_key(int version, const world& w)
         { k_space_key + k_world_save_version_transit_origin, world_save_transit_origin_section_bytes },     // v92
     };
     // BL-1641: v94 (one building per product) adds no section, nor does v95 (BL-1642, the
-    // monthly tick), so the table ends at v92's.
+    // monthly tick), so the table ends at v92's. v95 does GROW one record: each off-world
+    // base carries its loss carry (16 bytes, was 12) - the v90 row above counts today's
+    // stream, which is what a tail "after" an older version is measured in.
     static_assert(world_save_version == k_world_save_version_monthly,
                   "BL-1632: a new trailing section joins world_save_tail_bytes_after's table");
     assert(version >= static_cast<int>(k_world_save_version_pre_tax)); // older tails are not today's

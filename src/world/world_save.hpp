@@ -1467,8 +1467,10 @@ std::size_t world_save_prospecting_section_bytes(const world& w);
 /// record. The LAST section of a v87 stream.
 std::size_t world_save_space_convoy_section_bytes(const world& w);
 /// BL-1601: the byte length of the v88 off-world base section `w` writes - 4 + 12 per
-/// base, 4 + 8 per colonist entry of a live unit. The LAST section of a v88 stream.
+/// base (16 from v95, BL-1642: the loss carry), 4 + 8 per colonist entry of a live unit.
+/// The one-argument form measures today's stream; the other a stream of `version`.
 std::size_t world_save_offworld_base_section_bytes(const world& w);
+std::size_t world_save_offworld_base_section_bytes(const world& w, uint32_t version);
 /// BL-1606: VERIFICATION ONLY - the v90 stream shape (no space-firsts section).
 void write_world_snapshot_pre_space_firsts(const world& w, std::ostream& out);
 /// BL-1606: the byte length of the v91 space-firsts section `w` writes - 4 + 9 per

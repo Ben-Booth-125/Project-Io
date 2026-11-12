@@ -4124,7 +4124,7 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
         // a nation's own units onto its own fronts, and each front's order. Past the
         // player guard above, so never the player's nation in a seated session.
         // NO UNIT IS ASSIGNED TO A FRONT BY DEFAULT (Ben, 2026-10-29; MILITARY.md
-        // § Nation garrisons): the pre-game settle (econ ticks 0..11, under spectate,
+        // § Nation garrisons): the pre-game settle (econ ticks 0..35, three years of months, under spectate,
         // when every nation - the player's too - is evaluated) runs no front scoring at
         // all, so every garrison opens on its post. This NARROWS the BL-1427 grant to
         // live play; it widens nothing. Keyed on the econ tick, the same settle/live

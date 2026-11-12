@@ -1526,11 +1526,12 @@ void draw_market_top_section(const world& w, entity_id mid, float top_h)
 // tint from its net movement across the window — and by the baseline itself.
 //
 // THE WINDOW IS 8 QUARTERS, NOT SIX MONTHS (Ben, 2026-08-29, once the arithmetic
-// was put to him). `record_histories` samples once per econ tick and a tick is a
-// calendar quarter, so "six months" would be two points. 8 of the 64 retained.
+// was put to him): a short window is too few points to read a direction from. The
+// ruling is the calendar span. `record_histories` samples once per econ tick, and a
+// tick is a month (BL-1642), so 8 quarters is 24 samples - 24 of the 192 retained.
 
-/// How many trailing samples the row graph draws. See above: quarters, not months.
-constexpr std::size_t k_graph_quarters = 8;
+/// How many trailing samples the row graph draws: 8 quarters of monthly samples.
+constexpr std::size_t k_graph_quarters = 8 * static_cast<std::size_t>(k_econ_ticks_per_quarter);
 
 /// Mean `price[r]` across every market on `body` — the one new derivation the
 /// Goods table needs (`body_average_price`). A walk the surface does itself.
@@ -1687,7 +1688,7 @@ enum goods_sort_key : int
     goods_sort_change,
 };
 
-/// What the 8 mo column sorts by: the good's move across the window the graph
+/// What the 2 yr column sorts by: the good's move across the window the graph
 /// draws, last sample over first. No window is no move.
 float goods_window_change(const std::vector<float>& ser)
 {
@@ -1898,7 +1899,7 @@ void draw_goods_tab(const world& w, ui_state& s, entity_id body,
         if (show_body)
             ImGui::TableSetupColumn("Body", num, fixed("Body", goods_sort_body, fig_body), goods_sort_body);
         ImGui::TableSetupColumn("v.Base", num, fixed("v.Base", goods_sort_vs_base, fig_vbase), goods_sort_vs_base);
-        ImGui::TableSetupColumn("8 mo", num, fixed("8 mo", goods_sort_change, em * 2.6f), goods_sort_change);
+        ImGui::TableSetupColumn("2 yr", num, fixed("2 yr", goods_sort_change, em * 2.6f), goods_sort_change);
         ImGui::TableSetupScrollFreeze(0, 1);
 
         // The headings by hand: ImGui's header item keeps the press, the hover and the

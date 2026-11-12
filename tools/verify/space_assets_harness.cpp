@@ -274,14 +274,20 @@ int main()
         check(std::fabs(ho.cost - expect) <= 1e-3f * expect && ho.cost == ho.credits + ho.goods_value
                   && ho.market == f.market,
               "A2", fmt("home LO = base + credits/dv x dv + components x price + propellant/dv x dv x price (%.0f), off the home shelf", expect));
-        check(ho.travel_quarters == 0 && mo.travel_quarters == p.travel_quarters[1] && fo.travel_quarters == p.travel_quarters[3]
-                  && fs.travel_quarters == p.travel_quarters[4],
-              "A2", "travel never undercuts the old per-reach floor (home 0, moon 1, far 2, far surface 3)");
+        // BL-1642 (the tick is a month): the floors are months (0/3/3/6/9), and a path's
+        // own days now round to months, so a far trip can run past its floor.
+        check(ho.travel_quarters == 0 && mo.travel_quarters >= p.travel_quarters[1] && fo.travel_quarters >= p.travel_quarters[3]
+                  && fs.travel_quarters >= p.travel_quarters[4],
+              "A2", fmt("travel never undercuts the per-reach floor in months (moon %d >= %d, far %d >= %d, far surface %d >= %d)",
+                        mo.travel_quarters, p.travel_quarters[1], fo.travel_quarters, p.travel_quarters[3],
+                        fs.travel_quarters, p.travel_quarters[4]));
         // A further far body: 3.0 AU away from home.
         const entity_id outer = add_body(w, "Outer", body_type::planet, null_entity, 4.0f);
         const space_launch_quote oo = Q(w, p, f.a, space_asset_class::satellite, LO(outer));
-        check(oo.cost > fo.cost && oo.travel_quarters == p.travel_quarters[3] + 3,
-              "A2", fmt("a body 3 AU out costs more (%.0f) and takes 3 more floor quarters (%d)", oo.cost, oo.travel_quarters));
+        const int au_floor = p.travel_quarters[3] + static_cast<int>(std::floor(p.far_quarters_per_au * 3.0f));
+        check(oo.cost > fo.cost && oo.travel_quarters >= au_floor && oo.travel_quarters > fo.travel_quarters,
+              "A2", fmt("a body 3 AU out costs more (%.0f) and its floor grows by the per-AU months (%d >= %d)",
+                        oo.cost, oo.travel_quarters, au_floor));
     }
 
     // ---- A6 rejection mutates nothing --------------------------------------
@@ -373,31 +379,43 @@ int main()
         const space_launch_quote r = L(w, p, f.a, space_asset_class::rover, SURF(f.far));
         rov = r.asset;
         check(r.result == space_launch_result::launched && w.space_assets.at(rov).arrival_tick == t0 + r.travel_quarters
-                  && r.travel_quarters == p.travel_quarters[4],
-              "A1", fmt("a rover to the far surface arrives after %d quarters", r.travel_quarters));
+                  && r.travel_quarters >= p.travel_quarters[4]
+                  && w.space_assets.at(rov).arrival_tick > w.space_assets.at(sat).arrival_tick,
+              "A1", fmt("a rover to the far surface arrives after %d months, after the satellite", r.travel_quarters));
     }
+    // BL-1642: the arrivals the rows below step to, read off the records (months).
+    const int sat_at = w.space_assets.at(sat).arrival_tick;
+    const int rov_at = w.space_assets.at(rov).arrival_tick;
+    int tk = 10; // the step about to run
 
     // ---- A3/A4 arrival and upkeep ------------------------------------------
     std::printf("--- A3/A4 arrival and upkeep ---\n");
     {
         const float t_before = w.nations.at(f.a).treasury;
         space_asset_step_report r;
-        run_space_asset_step(w, p, 10, &r); // launch quarter: the sat (1q) is still travelling
-        check(w.space_assets.at(sat).state == space_asset_state::in_transit && r.arrived == 0
-                  && w.nations.at(f.a).treasury == t_before && r.upkeep_paid == 0.0f,
+        bool quiet = true;
+        for (; tk < sat_at; ++tk) // launch month onward: the sat is still travelling
+        {
+            run_space_asset_step(w, p, tk, &r);
+            quiet = quiet && w.space_assets.at(sat).state == space_asset_state::in_transit && r.arrived == 0
+                    && r.upkeep_paid == 0.0f;
+        }
+        check(quiet && w.nations.at(f.a).treasury == t_before,
               "A3", "before its arrival tick the asset is in transit and draws no upkeep");
-        run_space_asset_step(w, p, 11, &r);
+        run_space_asset_step(w, p, tk++, &r);
         check(w.space_assets.at(sat).state == space_asset_state::active && r.arrived == 1
                   && w.space_assets.at(rov).state == space_asset_state::in_transit,
-              "A3", "on its arrival tick it becomes active; the rover (3q) is still travelling");
+              "A3", "on its arrival tick it becomes active; the rover is still travelling");
         check(w.nations.at(f.a).treasury == t_before - p.upkeep[0] && r.paid == 1,
-              "A4", fmt("the arrived satellite pays its quarter whole: %.0f", p.upkeep[0]));
+              "A4", fmt("the arrived satellite pays its month whole: %.0f", p.upkeep[0]));
         const float t1 = w.nations.at(f.a).treasury;
-        run_space_asset_step(w, p, 12, &r);
-        run_space_asset_step(w, p, 13, &r); // rover arrives
+        const int more = rov_at - sat_at; // months until the rover arrives
+        for (; tk <= rov_at; ++tk)
+            run_space_asset_step(w, p, tk, &r); // the last is the rover's arrival
         check(w.space_assets.at(rov).state == space_asset_state::active
-                  && w.nations.at(f.a).treasury == t1 - 2 * p.upkeep[0] - p.upkeep[1],
-              "A4", fmt("two more quarters: sat x2 + the arrived rover x1 = %.0f debited", 2 * p.upkeep[0] + p.upkeep[1]));
+                  && std::fabs(w.nations.at(f.a).treasury - (t1 - more * p.upkeep[0] - p.upkeep[1])) <= 1e-3f * t1,
+              "A4", fmt("%d more months: sat x%d + the arrived rover x1 = %.0f debited", more, more,
+                        more * p.upkeep[0] + p.upkeep[1]));
     }
 
     // ---- A3b the tick contract ---------------------------------------------
@@ -410,18 +428,27 @@ int main()
         const space_launch_quote q1 = L(k.w, p, k.a, space_asset_class::satellite, LO(k.moon));
         const space_asset& a0 = k.w.space_assets.at(q0.asset);
         const space_asset& a1 = k.w.space_assets.at(q1.asset);
-        check(a0.launch_tick == 5 && a1.launch_tick == 5 && q0.travel_quarters == 0 && q1.travel_quarters == 1
-                  && a0.launch_cost == q0.cost && a1.launch_cost == q1.cost,
+        const int T = q1.travel_quarters; // the moon's months (BL-1642)
+        check(a0.launch_tick == 5 && a1.launch_tick == 5 && q0.travel_quarters == 0 && T >= 1
+                  && a1.arrival_tick == 5 + T && a0.launch_cost == q0.cost && a1.launch_cost == q1.cost,
               "A3b", "the launch tick is w.current_econ_tick; the record carries the quoted cost");
-        space_asset_step_report r5, r6;
+        space_asset_step_report r5, rn;
         run_space_asset_step(k.w, p, 5, &r5);
         const bool at5 = a0.state == space_asset_state::active && a1.state == space_asset_state::in_transit;
-        run_space_asset_step(k.w, p, 6, &r6);
-        const bool at6 = a1.state == space_asset_state::active;
-        check(at5 && at6, "A3b", "travel 0 is active in the launch quarter's step; travel 1 exactly one step later");
+        bool between = true;
+        for (int t = 6; t < 5 + T; ++t)
+        {
+            space_asset_step_report rb;
+            run_space_asset_step(k.w, p, t, &rb);
+            between = between && a1.state == space_asset_state::in_transit && rb.launched == 0
+                      && rb.upkeep_paid == p.upkeep[0];
+        }
+        run_space_asset_step(k.w, p, 5 + T, &rn);
+        const bool atT = a1.state == space_asset_state::active;
+        check(at5 && between && atT, "A3b", fmt("travel 0 is active in the launch month's step; travel %d exactly %d steps later", T, T));
         check(r5.launched == 2 && r5.launch_spent == q0.cost + q1.cost && r5.upkeep_paid == p.upkeep[0]
-                  && r6.launched == 0 && r6.launch_spent == 0.0f && r6.upkeep_paid == 2 * p.upkeep[0],
-              "A3b", fmt("the step reports the quarter's launches (2, %.0f) then none; upkeep %.0f then %.0f",
+                  && rn.launched == 0 && rn.launch_spent == 0.0f && rn.upkeep_paid == 2 * p.upkeep[0],
+              "A3b", fmt("the step reports the month's launches (2, %.0f) then none; upkeep %.0f, then %.0f on arrival",
                          q0.cost + q1.cost, p.upkeep[0], 2 * p.upkeep[0]));
     }
 
@@ -430,30 +457,32 @@ int main()
     {
         w.nations.at(f.a).treasury = 0.0f;
         space_asset_step_report r;
-        run_space_asset_step(w, p, 14, &r);
+        run_space_asset_step(w, p, tk++, &r);
         const space_asset& s = w.space_assets.at(sat);
         check(s.state == space_asset_state::decaying && s.unpaid_quarters == 1 && r.unpaid == 2
                   && w.nations.at(f.a).treasury == 0.0f,
-              "A5", "an unpaid quarter: decaying, 1 unpaid, nothing debited (treasury stays 0, never negative)");
+              "A5", "an unpaid month: decaying, 1 unpaid, nothing debited (treasury stays 0, never negative)");
         // A partial treasury pays the sat (lower id) and not the rover: whole or nothing, ascending id.
         w.nations.at(f.a).treasury = p.upkeep[0] + 1.0f;
-        run_space_asset_step(w, p, 15, &r);
+        run_space_asset_step(w, p, tk++, &r);
         check(w.space_assets.at(sat).state == space_asset_state::active
                   && w.space_assets.at(sat).unpaid_quarters == 0
                   && w.space_assets.at(rov).state == space_asset_state::decaying
                   && w.space_assets.at(rov).unpaid_quarters == 2
                   && w.nations.at(f.a).treasury == 1.0f,
-              "A5", "a paid quarter restores the satellite; the rover (higher id) finds 1 credit and stays decaying");
+              "A5", "a paid month restores the satellite; the rover (higher id) finds 1 credit and stays decaying");
         w.nations.at(f.a).treasury = 0.0f;
-        int q = 16;
-        while (w.space_assets.at(rov).state != space_asset_state::lost && q < 40)
+        int q = tk;
+        while (w.space_assets.at(rov).state != space_asset_state::lost && q < tk + 100)
             run_space_asset_step(w, p, q++, &r);
         check(w.space_assets.at(rov).state == space_asset_state::lost
                   && w.space_assets.at(rov).unpaid_quarters == p.quarters_to_loss,
-              "A5", fmt("the rover is lost at %d consecutive unpaid quarters", p.quarters_to_loss));
+              "A5", fmt("the rover is lost at %d consecutive unpaid months", p.quarters_to_loss));
         const int sat_unpaid = w.space_assets.at(sat).unpaid_quarters;
-        check(w.space_assets.at(sat).state == space_asset_state::decaying && sat_unpaid == 2,
-              "A5", fmt("the satellite, one paid quarter later, is decaying at %d unpaid", sat_unpaid));
+        // The rover stood at 2 unpaid when the sat was paid, so the sat has gone unpaid
+        // for the rover's remaining months: quarters_to_loss - 2 (BL-1642: 12 months).
+        check(w.space_assets.at(sat).state == space_asset_state::decaying && sat_unpaid == p.quarters_to_loss - 2,
+              "A5", fmt("the satellite, paid a month before the rover's run, is decaying at %d unpaid", sat_unpaid));
         w.nations.at(f.a).treasury = 100000.0f;
         run_space_asset_step(w, p, q++, &r);
         check(w.space_assets.at(rov).state == space_asset_state::lost
@@ -477,10 +506,11 @@ int main()
         if (cm.result == space_launch_result::launched)
         {
             // Drive it to decaying the honest way: one step with an empty treasury.
-            // (The station, arriving at 50, is untouched at tick 21.)
+            // (The station, arriving at 50, is untouched before it.) BL-1642: the
+            // mission travels its months, so the step is the one it arrives on.
             const float keep = w.nations.at(f.a).treasury;
             w.nations.at(f.a).treasury = 0.0f;
-            run_space_asset_step(w, p, 21);
+            run_space_asset_step(w, p, 20 + cm.travel_quarters);
             w.nations.at(f.a).treasury = keep;
         }
         const std::string b = to_bytes(w);

@@ -7,7 +7,7 @@
 ## 1. Top question — the one thing this answers at first glance
 **"What is each good worth here, and which way is it moving?"** The default lands on the **Goods**
 table: one ROW per traded good, with its price, how that price stands against the body and against
-its own base, and a mini 8-month graph inline in the row.
+its own base, and a mini 8-quarter (two-year) graph inline in the row.
 
 **The stacked-sparkline layout it replaces is retired** (Ben, 2026-08-29). Each good took a name
 line plus a 44 px chart — about 72 px of column — so the view showed 3.5 goods at 1280x720 and 9 at
@@ -30,7 +30,7 @@ belongs to `SUPPLY.md`.
 
 | View | Answers (one question) | Content |
 |---|---|---|
-| **Goods** *(default)* | What is each good worth here, and which way is it moving? | A table, one row per traded good: **item glyph · name · shelf · price · price vs base · 8-month graph**, the graph flattened INTO the row rather than stacked under it. Every row is drawn against a **shared `price / base_price` axis with a 1.0 baseline**, which is what makes goods comparable; direction is carried by the line's colour. **`body_average_price` does not fit and is dropped** — see below |
+| **Goods** *(default)* | What is each good worth here, and which way is it moving? | A table, one row per traded good: **item glyph · name · shelf · price · price vs base · 8-quarter graph**, the graph flattened INTO the row rather than stacked under it. Every row is drawn against a **shared `price / base_price` axis with a 1.0 baseline**, which is what makes goods comparable; direction is carried by the line's colour. **`body_average_price` does not fit and is dropped** — see below |
 | **Trades** | What am I moving in and out of this market, how much of my trade capacity do I steer, and what could I be moving? | **Five headed sections** in one scroller, the long ones bounded and scrolling inside themselves (`TRADE.md`): **Trade points** (made / manual / auto, the reserve field and **Set reserve**); **My trades** (the player's trades through this market, an `x` per row, the **Add a trade** form folded under it); **Automatic Trades**, the cargo auto trade has in transit to or from this market, gated on the player owning a building on the body; **Potential trades**, the trade pass's own ranking from this market, highest profit first, listed whatever trade points the acting nation has, a `+` per row that fills the form and is disabled where it has none here; and **Recent exchanges**, over the exchange record. See § 2b |
 
 **Above the tabs, below the selectors: the market's top section** (Ben, 2026-10-13, superseding
@@ -56,7 +56,7 @@ Goods and Trades tabs**, and splits left and right:
 
 **Goods carries shelf stock and sorts (Ben, 2026-11-05).** Each row shows the good's stock on this
 market's shelf, and the table sorts by every heading: **Good** by name, **Shelf**, **Price** and
-**v.Base** by their figures, and **8 mo** by the good's change across the graph's window, last sample
+**v.Base** by their figures, and **2 yr** (the 8-quarter window) by the good's change across the graph's window, last sample
 over first. A press sorts a number high to low first, because the top of the list is the question;
 the next press flips it and the third takes the sort off, back to the roster order the table rests in
 (the toggle rule, on a control whose active state is the arrow). Ties keep roster order, so equal rows
@@ -179,7 +179,7 @@ explicitly — `CONCEPT.md` § Player identity and Ben's qualification of it the
 Arm **`market`** — the per-body price wash keyed to the selected resource — **fixed** across both views, and **disarm it when the ledger closes** (Ben, 2026-10-13; LENSES.md § The other direction). Goods and Trades are both single-market reads that the price wash reinforces, so there is nothing for the lens to follow. The Convoys view that would have wanted `supply_routes` has left for its own ledger, which is where that pairing now lives ([convoys.md](convoys.md) § 3) — one of the quieter arguments for the split, since a tab strip cannot arm two lenses and the old third tab always got the wrong one.
 
 ## 4. Data sources
-Most of it is in `w.markets` (`market_component`: `supply[]`, `demand[]`, `price[]`, `base_price[]`, `body`, `centre_tile`) and `market_plot_history` for the 8-month series (`record_histories` samples once per econ tick and a tick is a month, so the window is eight months; Ben chose 8 of the 64 retained). `price vs base` is `price[r] / base_price[r]`, already to hand. **`body_average_price` is the one new derivation** — mean `price[r]` across the markets on the selected body, which is a walk the surface can do itself.
+Most of it is in `w.markets` (`market_component`: `supply[]`, `demand[]`, `price[]`, `base_price[]`, `body`, `centre_tile`) and `market_plot_history` for the 8-quarter series (Ben, 2026-08-29: *8 quarters, not six months* - a short window is too few points to read a direction from). `record_histories` samples once per econ tick and a tick is a month, so the window is 24 samples, 24 of the 192 retained. `price vs base` is `price[r] / base_price[r]`, already to hand. **`body_average_price` is the one new derivation** — mean `price[r]` across the markets on the selected body, which is a walk the surface can do itself.
 
 **Where Trades reads from.** `w.trades` is world state and carries both the player's trades and everyone else's, so My trades is a filter over it. Automatic Trades reads `w.convoys`, less the routes `w.trades` holds. Potential trades is `rank_trade_routes`' own ranking (§ Potential trades are the trade pass's own ranking, above). The history half reads `w.exchanges`, and **through `oldest_first(i)`**: the raw ring's vector order stops being chronological the moment it wraps at 8192 rows, so a reader walking `entries` directly shows history shuffled at the wrap point. What the record does **not** carry is a realised margin — clearing resolves a price and moves quantity without any cost basis to net it against — so the column is **revenue** (`MARKETS.md` § The exchange record), and a profit must not be invented to fill it.
 

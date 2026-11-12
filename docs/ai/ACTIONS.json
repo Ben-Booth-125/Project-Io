@@ -1678,19 +1678,19 @@
   {
    "id": "ledger.market_goods_sort",
    "family": "ledger",
-   "surface": "Market Ledger, Goods view, the table headings (Good, Shelf, Price, v.Base, 8 mo)",
+   "surface": "Market Ledger, Goods view, the table headings (Good, Shelf, Price, v.Base, 2 yr)",
    "press": "Click a heading; click it again to reverse the direction; click it a third time to take the sort off",
    "args": [
     {
      "name": "column",
      "type": "enum",
-     "meaning": "Good (name), Shelf (the market's stock of the good), Price, v.Base (price over base price), 8 mo (the good's change across the graph's eight-month window, last sample over first)"
+     "meaning": "Good (name), Shelf (the market's stock of the good), Price, v.Base (price over base price), 2 yr (the good's change across the graph's 8-quarter window, last sample over first)"
     }
    ],
    "preconditions": [
     "Market Ledger is open on the Goods view"
    ],
-   "expected_output": "Re-orders the rows by that heading. Shelf, Price, v.Base and 8 mo open high to low, Good opens A to Z; the second press flips it and the third returns to the roster order the table rests in (toggle rule). Every tie keeps roster order. The headings stay frozen while the rows scroll, and the sort survives leaving the tab. Nothing in the simulation changes.",
+   "expected_output": "Re-orders the rows by that heading. Shelf, Price, v.Base and 2 yr open high to low, Good opens A to Z; the second press flips it and the third returns to the roster order the table rests in (toggle rule). Every tie keeps roster order. The headings stay frozen while the rows scroll, and the sort survives leaving the tab. Nothing in the simulation changes.",
    "reason_to_select": "Find the goods this market actually holds (Shelf), the dearest, the furthest above base, or the fastest moving, rather than reading all of them in roster order."
   },
   {
