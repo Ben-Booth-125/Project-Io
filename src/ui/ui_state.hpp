@@ -1157,6 +1157,10 @@ struct site_row
     std::string   place;
     bool          place_near = false;
     bool          priced   = false; ///< The quote's `has_data` (`quote_for_tile`).
+    /// The ranking figure (Ben, 2026-11-12): Net a day over the days of three game years it
+    /// stands built, less its capex; `build_days` is what the build takes here.
+    float         earn3      = 0.0f;
+    int           build_days = 0;
     bool          starved  = false; ///< An input cannot be had here, so it would stand idle.
     resource_type short_of = resource_type::iron_ore; ///< The first such input, when starved.
     /// `shelf_runway_for`'s warning, for a row that is not already starved.
@@ -1194,7 +1198,6 @@ struct site_option
 struct site_cell
 {
     site_option option;
-    bool        pending   = true;   ///< Not yet evaluated: the first pass, or a new scope.
     int         sites        = 0;   ///< Tiles the table would list.
     int         no_lp        = 0;   ///< Of those, how many have no Logistic Points operating.
     int         unaffordable = 0;   ///< Tiles that would take it but cost more than the treasury.
@@ -1231,15 +1234,23 @@ struct site_finder_state
     bool          scope_foreign = false; ///< The scoped province holds none of the player's ground.
 
     /// The building grid, in option order; `cell_order` is the drawn order. Rebuilt on
-    /// its key over several frames (`step_site_grid`), never as one long frame.
+    /// its key, its options scored in parallel within a per-frame budget
+    /// (`step_site_grid`), and replaced only when every option is done.
     std::vector<site_cell> cells;
     std::vector<int>       cell_order;
-    double        grid_ms = 0.0;    ///< Wall time the last full grid pass spent evaluating.
+    bool          searching = false; ///< A pass is running; with no cells, the search line shows.
+    int           search_done  = 0;  ///< Options that pass has finished.
+    int           search_total = 0;  ///< Options it scores.
+    double        grid_ms = 0.0;    ///< Time the last full grid pass spent evaluating (all frames, the warm-up included).
     int           grid_frames = 0;  ///< Frames that pass was spread across.
+    double        grid_wall_ms = 0.0; ///< Wall time from that pass's start to its end.
+    double        grid_warm_frame_ms = 0.0; ///< That pass's longest warm-up frame (main thread, before any fork).
+    double        grid_derive_ms = 0.0; ///< The last split of the shown grid at the treasury (derive_cells).
 
-    /// Sort column (0 place, 1 profit, 2 cost, 3 market, 4 logistics, 5 yield) and
-    /// direction. Default: profit, descending; every tie broken by tile id ascending.
-    int           sort_col  = 1;
+    /// Sort column (0 place, 1 profit, 2 cost, 3 market, 4 logistics, 5 yield, 6 three-year
+    /// earnings) and direction. Default: three-year earnings, descending; every tie broken
+    /// by tile id ascending.
+    int           sort_col  = 6;
     bool          sort_desc = true;
 
     // Published by the evaluation, rebuilt only when its key moves.

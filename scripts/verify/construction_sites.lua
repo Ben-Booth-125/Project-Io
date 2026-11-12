@@ -8,7 +8,7 @@
 -- What this check photographs and asserts:
 --   S1  the Construction view opens, a building is chosen through the picker, and the
 --       lens goes live; the ledger lists sites and the canvas classes the same count.
---   S2  the rows are SORTED by estimated net, descending, every tie by tile id.
+--   S2  the rows are SORTED by 3-year earnings (Ben, 2026-11-12), descending, every tie by tile id.
 --   S3  every row the check samples is a tile the BUILD DOOR ACCEPTS: the row press
 --       selects the tile, and the door's own row for that building carries an enabled
 --       Build press ("Starts the build here") and quotes the same net.
@@ -98,11 +98,21 @@ verify.expect(s.n_rows > 0, "S1: the ledger lists sites")
 verify.expect(s.lens_valid + s.lens_flagged == s.n_rows,
               "S1: the lens classes exactly the tiles the ledger lists")
 verify.expect(s.lens_flagged == s.no_lp_rows, "S1: the lens flags exactly the ledger's no-logistics rows")
-verify.expect(s.sort_col == 1 and s.sort_desc, "S2: the default sort is profit, descending")
+verify.expect(s.sort_col == 6 and s.sort_desc, "S2: the default sort is 3-year earnings, descending (Ben, 2026-11-12)")
 
 -- S7 - the headers fit, the x,y column is gone, and every row names a place.
 local function assert_headers(s7, where)
-  verify.expect(s7.n_headers == 6, string.format("S7 (%s): six headers drawn (%d)", where, s7.n_headers))
+  -- Seven where they fit; at a narrow width Net steps out first (Ben, 2026-11-12:
+  -- "keep profit visible as its own column if the table has room").
+  verify.expect(s7.n_headers == 7 or s7.n_headers == 6,
+                string.format("S7 (%s): seven headers drawn, or six without Net (%d)", where, s7.n_headers))
+  local has_net, has_earn3 = false, false
+  for _, h in ipairs(s7.headers) do
+    if h.label == "Net" then has_net = true end
+    if h.label == "3 yr" then has_earn3 = true end
+  end
+  verify.expect(has_earn3, "S7 (" .. where .. "): the 3 yr ranking column is always drawn")
+  verify.expect(has_net == (s7.n_headers == 7), "S7 (" .. where .. "): only Net steps out")
   for _, h in ipairs(s7.headers) do
     verify.expect(h.label ~= "Tile", "S7 (" .. where .. "): no tile x,y column")
     verify.expect(h.have + 0.5 >= h.need, string.format(
@@ -116,15 +126,15 @@ for _, r in ipairs(s.rows) do if r.place == "" then unnamed = unnamed + 1 end en
 verify.expect(unnamed == 0, string.format("S7: every row names its place (%d of %d unnamed)", unnamed, s.n_rows))
 print(string.format("[construction_sites] S7: first row '%s'%s", s.rows[1].place, s.rows[1].near and " (near)" or ""))
 
--- S2 - sorted by profit, descending, ties by tile id.
+-- S2 - sorted by 3-year earnings, descending, ties by tile id (Ben, 2026-11-12).
 local sorted = true
 for i = 1, s.n_rows - 1 do
   local a, b = s.rows[i], s.rows[i + 1]
   if a.priced and b.priced then
-    if a.profit < b.profit or (a.profit == b.profit and a.tile > b.tile) then
+    if a.earn3 < b.earn3 or (a.earn3 == b.earn3 and a.tile > b.tile) then
       sorted = false
       print(string.format("[construction_sites] S2 out of order at %d: %.3f (%d) then %.3f (%d)",
-            i, a.profit, a.tile, b.profit, b.tile))
+            i, a.earn3, a.tile, b.earn3, b.tile))
       break
     end
   elseif b.priced and not a.priced then
@@ -132,7 +142,7 @@ for i = 1, s.n_rows - 1 do
     break
   end
 end
-verify.expect(sorted, "S2: rows are sorted by estimated net, descending, ties by tile id")
+verify.expect(sorted, "S2: rows are sorted by 3-year earnings, descending, ties by tile id")
 
 print(string.format("[construction_sites] TIES %s: %d rows; sharing a displayed net at full cover %d "
       .. "(%.0f%%), with cover %d (%.0f%%), net+cost %d (%.0f%%)", choice, s.n_rows,

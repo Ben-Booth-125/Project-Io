@@ -43,7 +43,7 @@ verify.show_panel("build",        false)
 -- no tile's owner, by design, so the pick asks the SURFACE that already answers
 -- "where may the player build this?": the site finder, whose rows are exactly the
 -- tiles the build door accepts an Iron Mine on (own ground, tech, road, stack,
--- province ceiling, treasury). Its rows are read in drawn order (profit, ties by tile
+-- province ceiling, treasury). Its rows are read in Net order (profit, ties by tile
 -- id), deterministic for a seed, and they follow the player's ground wherever
 -- generation moves it. The same idiom as construction_progress.lua.
 verify.show_panel("build", true)
@@ -88,9 +88,25 @@ local function find_at(row)
     return nil
 end
 
+-- The rows in Net order (profit descending, ties by tile id), the order this fixture was
+-- tuned on: the ledger's own default is 3-year earnings (Ben, 2026-11-12), which puts a
+-- cheap, quick site first whether or not its market can supply the build's materials.
+local by_net, used = {}, {}
+for _ = 1, sites.n_rows do
+    local best = nil
+    for j = 1, sites.n_rows do
+        local r = sites.rows[j]
+        if not used[j] and (best == nil or r.profit > sites.rows[best].profit
+            or (r.profit == sites.rows[best].profit and r.tile < sites.rows[best].tile)) then
+            best = j
+        end
+    end
+    used[best] = true
+    by_net[#by_net + 1] = sites.rows[best]
+end
 for i = 1, sites.n_rows do
     if tries >= k_tries then break end
-    local row = sites.rows[i]
+    local row = by_net[i]
     local r = verify.build_at(row.x, row.y)
     if r ~= "placed" then
         refusals = refusals .. string.format("%s(%d,%d)=%s", refusals == "" and "" or ", ", row.x, row.y, r)
@@ -116,7 +132,7 @@ for i = 1, sites.n_rows do
 end
 if not placed then
     error("building_element.lua: no Iron Mine site completed within " .. k_quarters ..
-          " quarters; stalled: " .. stalled .. "; refused: " .. refusals)
+          " months; stalled: " .. stalled .. "; refused: " .. refusals)
 end
 print(string.format("building_element: the site at (%d,%d) is complete (stalled first: %s)",
                     placed.x, placed.y, stalled == "" and "none" or stalled))

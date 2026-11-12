@@ -94,7 +94,7 @@ std::string construction_blocker_phrase(const construction_read& rd);
 
 /// The stall's REASON CLAUSE, in the authored words and nothing else: "no Steel
 /// at the market", "Steel is priced above the build ceiling", "no market
-/// supplies this tile", "its treasury could not fund it this quarter", "market
+/// supplies this tile", "its treasury could not fund it this month", "market
 /// can't supply materials". "" when nothing is stalling the build.
 ///
 /// ONE source for the clause, so the two tenses cannot drift (BL-1365): a site

@@ -3533,7 +3533,7 @@ void draw_card_method_steps(world& w, const recipe_registry& reg, ui_state& ui, 
         ImGui::EndDisabled();
         if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
             ImGui::SetTooltip("%s", locked
-                ? "Retooling: the stack changed method last quarter."
+                ? "Retooling: the stack changed method last month."
                 : offer.kind == method_step::upgrade
                     ? "The deeper method: paid in place, kept on this tile and stack, and it does not go back."
                     : "Another way to make the same product from different raws. It switches back at the same cost.");

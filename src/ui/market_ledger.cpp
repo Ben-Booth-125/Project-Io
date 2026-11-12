@@ -1687,7 +1687,7 @@ enum goods_sort_key : int
     goods_sort_change,
 };
 
-/// What the 8 qtr column sorts by: the good's move across the window the graph
+/// What the 8 mo column sorts by: the good's move across the window the graph
 /// draws, last sample over first. No window is no move.
 float goods_window_change(const std::vector<float>& ser)
 {

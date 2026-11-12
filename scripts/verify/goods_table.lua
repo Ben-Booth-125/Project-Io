@@ -180,7 +180,7 @@ for _, h in ipairs(verify.goods_headers()) do
     end
 end
 
-for _, c in ipairs({ {"Shelf", "shelf"}, {"Price", "price"}, {"v.Base", "vs_base"}, {"8 qtr", "change"} }) do
+for _, c in ipairs({ {"Shelf", "shelf"}, {"Price", "price"}, {"v.Base", "vs_base"}, {"8 mo", "change"} }) do
     press_heading(c[1])
     verify.expect(verify.goods_sort().desc, c[1] .. ": the first press sorts high to low")
     local bad = in_order(c[2], true)

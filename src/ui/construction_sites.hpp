@@ -96,6 +96,10 @@ void set_quote_history(const market_plot_history* history);
 /// writes a shelf: nothing in play moves a shelf between the stamps the cache keys on.
 void invalidate_site_evaluation();
 
+/// Forget the site finder's grid, its running pass and every cache, for a world that
+/// replaced the last one (a load, a new game): their tile ids mean nothing in it.
+void reset_site_finder();
+
 /// The runway of a building on @p tile at @p lp_cover, cached with the quote so the door
 /// and the finder read one figure. Never warns for a plant that would not run at all.
 shelf_runway shelf_runway_for(const world& w, const recipe_registry& reg, entity_id tile,
