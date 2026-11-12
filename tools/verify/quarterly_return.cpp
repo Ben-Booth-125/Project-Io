@@ -577,9 +577,13 @@ void run_save_rows(const recipe_registry& reg)
         check(sec == 4 + 2 * (4 + 16 + 4) + rows * (12 * 4 + 4 + 8), "R5",
               "the books section carries exactly the two nations' histories");
         {
-            std::string bad = xb; // the last 8 bytes of a v56 stream are this net
+            // The last 8 bytes of the v56 books section are this net; every later section
+            // follows it (BL-1632: the old offset, the stream's last 8 bytes, had fallen
+            // into the v92 tail and refused the stream for another reason).
+            std::string bad = xb;
             const double wrong = exact + 1.0;
-            std::memcpy(bad.data() + bad.size() - sizeof wrong, &wrong, sizeof wrong);
+            std::memcpy(bad.data() + bad.size() - world_save_tail_bytes_after(k_world_save_version_pre_days, x) - sizeof wrong,
+                        &wrong, sizeof wrong);
             world sentinel = build_fixture(reg).w;
             const std::string before = returns_image(sentinel);
             std::istringstream in(bad, std::ios::binary);

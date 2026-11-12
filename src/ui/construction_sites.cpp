@@ -1010,6 +1010,7 @@ const char* construction_fold_of(const recipe_registry& reg, building_type t, st
     case building_type::military_base:
     case building_type::airbase:
     case building_type::bunker:              // BL-1426
+    case building_type::orbital_defence_battery: // BL-1599
     case building_type::research_institute:  return "Military";
     default:                                 return "Infrastructure";
     }
@@ -1049,6 +1050,7 @@ std::vector<site_option> site_options(const world& w, const recipe_registry& reg
         {building_type::military_base, "Military Base"},
         {building_type::airbase, "Airbase"},
         {building_type::bunker, "Bunker"}, // BL-1426
+        {building_type::orbital_defence_battery, "Orbital Defence Battery"}, // BL-1599
         {building_type::research_institute, "Research Institute"},
         {building_type::schooling, "Schooling"},   // the stratum gate decides where (Ben, 2026-11-07)
         {building_type::university, "University"},

@@ -59,7 +59,67 @@ and/or a version goal (v0.1.1 etc.).
 
 ## Open now
 
-*Nothing open.*
+### Sprint 65 — Near space (v0.4.0)
+*Gated · opened 2026-11-10 · Claude (Ben, 2026-11-10: deliver v0.4.0 and v0.5.0 in lanes)*
+
+**Goal.** A nation reaches orbit and works the bodies near its home world: the orbital graph and slots, stations fitted like a design, satellites with roles, astronauts and signal delay; and rivals do it too. Cuts v0.4.0.
+
+**Planned.**
+- BL-1580 (ORBITAL_GRAPH)
+- BL-1581 (ORBITAL_SLOTS)
+- BL-1582 (LAUNCH_GATE_AND_GOODS)
+- BL-1583 (STATION_MODEL)
+- BL-1584 (STATION_MODULE_EFFECTS)
+- BL-1585 (ASTRONAUTS)
+- BL-1586 (SATELLITE_ROLES)
+- BL-1587 (SIGNAL_DELAY)
+- BL-1588 (SPACE_VERBS_SEAM)
+- BL-1589 (RIVAL_SPACE_AI)
+- BL-1590 (CIRCUMPLANETARY_SPACE_DRAW)
+- BL-1591 (SPACE_LEDGER_AND_DESIGNER)
+- BL-1592 (SPACE_UNLOCKS)
+- BL-1593 (SPACE_SPECTATOR_CHECK)
+- BL-1615 (RIVAL_SPACE_GROUNDWORK)
+
+### Sprint 66 — Far space (v0.5.0)
+*Open · opened 2026-11-10 · Claude (Ben, 2026-11-10: deliver v0.4.0 and v0.5.0 in lanes)*
+
+**Goal.** The whole solar system with the next age's technology: designed space units and fleets, convoys as Haulers, battles, debris, bases that run like the home world, prospecting, and wars across every body. Cuts v0.5.0.
+
+**Planned.**
+- BL-1594 (SPACE_UNIT_DESIGNS)
+- BL-1595 (SPACE_UNIT_MOVEMENT)
+- BL-1596 (SPACE_CONVOYS_AS_HAULERS)
+- BL-1597 (SPACE_BATTLES)
+- BL-1598 (DEBRIS)
+- BL-1599 (BLOCKADE_AND_BOMBARDMENT)
+- BL-1600 (MAPPING_THEN_PROSPECTING)
+- BL-1601 (OFFWORLD_BASES)
+- BL-1602 (WAR_SPANS_BODIES)
+- BL-1603 (FRONT_PINS)
+- BL-1604 (PROPELLANT_LOOP)
+- BL-1605 (SOLAR_STORMS)
+- BL-1606 (SPACE_FIRSTS)
+- BL-1607 (EARLY_SPACE_TREE)
+- BL-1608 (RIVAL_FAR_SPACE_AI)
+- BL-1609 (FLEET_UI)
+- BL-1610 (BASE_AND_PROSPECT_UI)
+- BL-1611 (FAR_SPACE_SPECTATOR_CHECK)
+- BL-1612 (EARLY_SPACE_RESEARCHABLE)
+- BL-1613 (EARLY_SPACE_RESEARCH_SURFACES)
+- BL-1614 (SPACE_TRANSIT_SEGMENT)
+
+### Sprint 67 — Launch fix and space calls
+*Open · opened 2026-11-10 · Claude (Ben's form, 2026-11-10)*
+
+**Goal.** Rivals launch: launch goods reach a pad by trade and are drawn over time as boost, with no pooling of markets. Then the far-space spectate (BL-1611) and the re-pin.
+
+**Planned.**
+- BL-1637 (LAUNCH_BOOST)
+- BL-1638 (GENERATED_BODY_MASS)
+- BL-1639 (RETIRE_SURVEY_PROBE)
+- BL-1630 (LAUNCH_GOODS_SUPPLY)
+- BL-1611 (FAR_SPACE_SPECTATOR_CHECK)
 
 ## Where things stand
 
@@ -148,9 +208,12 @@ and/or a version goal (v0.1.1 etc.).
 | 62 | equal starts for majors | CLOSED 2026-11-04, no version cut (sprint 61 targets v0.3.0). Every major opens on the Rich-core kit, 12,000 credits and a fixed eight-unit army; the logistics cap keeps the nodes that cover the kit and re-sites what it strands; the kit stocks its processors' inputs. Treasury spread at 20:4 21x -> 1.63x; men spread 1.00x; no major loses money; 569 of 578 kit processors run. Wizard default 30 nations. Three re-pins. |
 | 63 | UI, QOL and the opening | CLOSED 2026-11-10; v0.2.5 cut with sprints 61 to 64. 42 of 46 items delivered and archived; four carried (UI scale, the clip it gates, the lighter tileset, tech pacing). The opening is a climb on equal credits; war ends in elimination; the save keeps its economy; population grows at an Earth-anchored rate; marches take their own fastest route on six sides. The naval branch merged onto main the same day. The one re-bless is owed on Ben's go. |
 | 64 | The war at sea | CLOSED 2026-11-10; v0.2.5 cut with sprints 61 to 64. 16 of 17 items delivered and archived; one carried (price falls as supply vanishes). Ships patrol, escort, raid, blockade and land armies for every nation; forces are paid, equipped and sized from income. Merged onto main the same day (world save v88, envelope v29). The re-bless is set aside on Ben's word. |
+| 65 | Near space (v0.4.0) | gated on NR-1203 (trade wall): every item built except BL-1630 (launch goods supply); spectate shows 0 rival launches (BL-1593, NEXT_SESSION.md) |
+| 66 | Far space (v0.5.0) | open: every item built except BL-1611 (far-space spectator check), gated on NR-1203; four live clicks owed (NEXT_SESSION.md) |
+| 67 | Launch fix and space calls | open: boost (BL-1637), generated body mass (BL-1638), probe retirement (BL-1639) in lanes; B measured for NR-1203 |
 
 **Next up.** SPRINT 61 CLOSED 2026-11-05 (no version cut). v0.3.0 needs the naval system and a playtest with a few wars. BL-1470 (sentiment contributors) passed its live click 2026-11-05; BL-1490 (province resource clip) waits on BL-1495 (UI scale down); BL-1494 (new-library tick-50 stall) leads the economy work. SPRINT 63 (UI, QOL and the opening) OPEN 2026-11-05: Ben's playtest list is filed; the payback census has read: research is the missing money and the door quotes mirages on scarce goods.
 
 **The standing debt out of P1**, worth repeating here because it spans four items: nothing built in that sprint was ever *rendered*. The session ran in a container that cannot build the GUI, so every UI half is compile-clean and arithmetically checked and visually unseen, and no golden was blessed. For a sprint whose own method note is *build it, look at it, then rule*, that is the thing to fix first.
 
-*83 sprints archived cold; 0 open/gated in the hot store.*
+*83 sprints archived cold; 3 open/gated in the hot store.*

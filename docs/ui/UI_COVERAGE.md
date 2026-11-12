@@ -8,18 +8,18 @@
 
 ## Headline
 
-**120 elements. 2 committed goldens in the whole repo** (icon_silhouettes_overview.png, icon_silhouettes_supply_lens.png).
+**138 elements. 2 committed goldens in the whole repo** (icon_silhouettes_overview.png, icon_silhouettes_supply_lens.png).
 
-**56 of 120 elements can be changed without any check going red.**
+**59 of 138 elements can be changed without any check going red.**
 That is the number that matters to a UI pass: the re-verification cost is near zero,
 and so is the safety net.
 
 | Class | Count | What green means |
 |---|---|---|
 | **GOLDEN** | 3 | A committed `scripts/verify/golden/*.png` diffs this element on every run. It fails by itself. |
-| **ASSERTED** | 61 | No golden, but a covering check calls `verify.expect` on real content. It fails by itself. |
+| **ASSERTED** | 76 | No golden, but a covering check calls `verify.expect` on real content. It fails by itself. |
 | **CLIP-ONLY** | 12 | The only assertion reaching it is `expect_no_clipping`. Green means "no string overran its box", not "this element is right". |
-| **CAPTURE-ONLY** | 36 | A check frames it and saves a PNG. Nothing fails. A human eye is the entire check. |
+| **CAPTURE-ONLY** | 39 | A check frames it and saves a PNG. Nothing fails. A human eye is the entire check. |
 | **NONE** | 8 | No verify script drives this element at all. |
 
 ## GOLDEN (3)
@@ -30,15 +30,17 @@ and so is the safety net.
 | `UI-040` Lens system (overlay_mode family) > Supply lens | sub-element | `supply_lens`, `lens_modes`, `icon_silhouettes`, `lens_strip_and_fields` | 6 | 0 | 2 |
 | `UI-063` Icon vocabulary | element | `icon_silhouettes` | 0 | 0 | 0 |
 
-## ASSERTED (61)
+## ASSERTED (76)
 
 | Element | Kind | Covering checks | expect | clip | clicks |
 |---|---|---|---|---|---|
 | `UI-006` Solar Canvas > Home halo | sub-element | `player_presence`, `start_framing` | 2 | 0 | 1 |
 | `UI-009` Circumplanetary Canvas | canvas | `canvas_levels`, `survey`, `landform_relief`, `tile_texture`, `spectator_god_view` | 1 | 0 | 0 |
+| `UI-142` Circumplanetary Canvas > Orbital nodes (Circumplanetary) | sub-element | `near_space_nodes` | 5 | 0 | 2 |
+| `UI-145` Circumplanetary Canvas > Satellites and stations (Circumplanetary) | sub-element | `near_space_assets` | 17 | 0 | 2 |
 | `UI-017` Planetary Canvas > Road network render | sub-element | `roads` | 41 | 0 | 5 |
 | `UI-019` Planetary Canvas > Home-cluster ring | sub-element | `player_presence` | 2 | 0 | 1 |
-| `UI-021` Planetary Canvas > Survey region mask | sub-element | `survey`, `visibility`, `survey_dispatch` | 4 | 0 | 0 |
+| `UI-021` Planetary Canvas > Survey region mask | sub-element | `survey`, `visibility`, `survey_dispatch`, `base_prospect_ui` | 35 | 0 | 11 |
 | `UI-022` Planetary Canvas > Activity/vision fog layers (permanent pockets, corridors, convoy beam) | sub-element | `commercial_fog`, `intrabody_fog`, `visibility`, `proximity_glimpse`, `sea_lane` | 25 | 0 | 0 |
 | `UI-027` Minimap > Lens mode bar | control | `lens_strip`, `lens_modes`, `lens_strip_and_fields` | 6 | 0 | 2 |
 | `UI-028` Minimap > Lens legend fold-out | sub-element | `lens_legend`, `lens_strip_and_fields` | 5 | 0 | 3 |
@@ -54,6 +56,7 @@ and so is the safety net.
 | `UI-044` Selection band > Active/Focus/Selection pointer-state model | sub-element | `click_injection`, `lens_structure_pivot`, `hover_freeze`, `lens_selection_paths`, `lens_one_tier`, `lens_strip_and_fields`, `lens_region_destinations` | 58 | 0 | 7 |
 | `UI-045` Selection band > Tile selection layout | sub-element | `selection_tile_layout`, `tile_card`, `ui_shell_fixture` | 57 | 1 | 4 |
 | `UI-117` Selection band > Water tile selection | sub-element | `water_tile_selection` | 1 | 0 | 1 |
+| `UI-046` Selection band > Body selection action/facts | sub-element | `descend_into_selection`, `selection_go_to`, `base_prospect_ui` | 31 | 0 | 11 |
 | `UI-047` Selection band > Building selection (expanded tile card) | sub-element | `building_element`, `tile_card`, `workforce_step`, `construction_ledger_tabs`, `building_management_shell`, `building_recipe_rows` | 144 | 2 | 11 |
 | `UI-048` Selection band > Tile selection layout > Tile construction ledger (build-here fold-out) | sub-element | `tile_build_ledger`, `tile_build_ledger_survives`, `drill_through_fold`, `construction_ledger_tabs`, `air_gate` | 55 | 1 | 7 |
 | `UI-049` Hover Card | element | `hover_freeze`, `sticky_card`, `border_band`, `lens_one_tier`, `lens_strip_and_fields` | 28 | 0 | 4 |
@@ -65,7 +68,7 @@ and so is the safety net.
 | `UI-076` Construction Ledger > Manage view | view | `building_management`, `building_management_shell`, `recipe_workforce`, `building_profit`, `processing_management_ux`, `v009_batch`, `air_gate` | 36 | 0 | 0 |
 | `UI-080` Market Ledger | ledger | `market_ledger`, `lens_structure_pivot`, `goods_table`, `lens_ledger_pairs`, `market_names` | 44 | 1 | 8 |
 | `UI-081` Market Ledger > Goods table | view | `market_ledger`, `goods_table`, `item_glyphs`, `market_density` | 36 | 1 | 1 |
-| `UI-082` Market Ledger > Trades view | view | `trade_offers_sourced`, `market_ledger`, `trades_tab` | 52 | 1 | 2 |
+| `UI-082` Market Ledger > Trades view | view | `trade_offers_sourced`, `market_ledger`, `trades_tab` | 59 | 1 | 2 |
 | `UI-091` Main Menu | view | `main_menu`, `planetology_generation`, `quick_start`, `setup_round`, `shell_pass` | 23 | 1 | 8 |
 | `UI-092` New World wizard | view | `history_lapse_press`, `planetology_generation`, `setup_round`, `wizard_fit` | 53 | 0 | 8 |
 | `UI-093` New World wizard > Wizard planetology round (System or Life) | sub-element | `planetology_generation`, `life_to_people` | 9 | 1 | 0 |
@@ -76,6 +79,7 @@ and so is the safety net.
 | `UI-100` Nation overview | ledger | `corp_dashboard`, `nation_seat_ui` | 26 | 1 | 0 |
 | `UI-105` Generation Ledger | ledger | `save_load`, `generation_ledger` | 6 | 1 | 5 |
 | `UI-108` Research panel | ledger | `tech_tree_panel`, `wind_power_links` | 21 | 0 | 2 |
+| `UI-148` Research panel > Research panel: Early Space tree | view | `early_space_tree` | 18 | 0 | 4 |
 | `UI-111` Spectator god view | element | `spectator_god_view` | 1 | 0 | 0 |
 | `UI-112` Market Ledger > Market top section | sub-element | `goods_table` | 33 | 1 | 1 |
 | `UI-113` Convoys Ledger | ledger | `convoys_ledger`, `ledger_pass` | 7 | 2 | 4 |
@@ -88,13 +92,24 @@ and so is the safety net.
 | `UI-124` Nation selection screen (Begin, before play) | view | `nation_select`, `seat_pick`, `quick_start` | 45 | 0 | 3 |
 | `UI-125` Nation selection screen (Begin, before play) > Nation card (seven parts) | sub-element | `nation_select` | 11 | 0 | 0 |
 | `UI-126` Construction Ledger > Rail rows | sub-element | `rail_construction`, `construction_folds` | 40 | 0 | 9 |
-| `UI-127` Construction Ledger > Site ledger (the site finder) | sub-element | `construction_sites`, `site_picker_glyphs`, `shelf_runway_warning` | 70 | 0 | 5 |
+| `UI-127` Construction Ledger > Site ledger (the site finder) | sub-element | `construction_sites`, `site_grid`, `site_picker_glyphs`, `shelf_runway_warning` | 110 | 0 | 11 |
 | `UI-128` Planetary Canvas > Placement lens | sub-element | `construction_sites` | 29 | 0 | 1 |
 | `UI-132` Unit designer | view | `unit_designer`, `stat_grid` | 4 | 0 | 41 |
 | `UI-135` Planetary Canvas > Marching unit counter | sub-element | `unit_glide` | 1 | 0 | 2 |
 | `UI-136` Planetary Canvas > Convoy marker and card | sub-element | `convoy_map` | 5 | 1 | 4 |
 | `UI-137` Planetary Canvas > Drag-select units | control | `drag_select` | 9 | 1 | 3 |
 | `UI-138` Nation overview Standing | sub-element | `corp_dashboard` | 17 | 1 | 0 |
+| `UI-140` Construction Ledger > Site Finder tab (Construction ledger) | sub-element | `site_grid`, `site_picker_glyphs`, `construction_sites` | 80 | 0 | 11 |
+| `UI-143` Pinned items panel | panel | `pinned_panel` | 17 | 0 | 6 |
+| `UI-146` Space ledger | ledger | `space_ledger` | 1 | 0 | 1 |
+| `UI-144` Selection band > Pin toggle | control | `pinned_panel` | 17 | 0 | 6 |
+| `UI-147` Space ledger > Station designer (Space ledger) | sub-element | `space_ledger` | 1 | 0 | 1 |
+| `UI-149` Circumplanetary Canvas > Space fleets (Circumplanetary) | sub-element | `space_fleets_ui` | 22 | 0 | 12 |
+| `UI-150` Solar Canvas > Space fleets (Solar) | sub-element | `space_fleets_ui` | 22 | 0 | 12 |
+| `UI-151` Selection band > Space-unit card (Selection) | sub-element | `space_fleets_ui` | 22 | 0 | 12 |
+| `UI-152` Unit designer > Space hull designer (Military ledger) | sub-element | `space_fleets_ui` | 22 | 0 | 12 |
+| `UI-153` Circumplanetary Canvas > Debris and storm marks (Circumplanetary) | sub-element | `space_fleets_ui` | 22 | 0 | 12 |
+| `UI-154` Selection band > Space-unit card (Selection) > Base orders on the space-unit card (Selection) | sub-element | `base_prospect_ui` | 31 | 0 | 11 |
 
 ## CLIP-ONLY (12)
 
@@ -107,13 +122,13 @@ and so is the safety net.
 | `UI-026` Minimap > Minimap title bar | sub-element | `shell_pass` | 0 | 1 | 1 |
 | `UI-057` Profile (identity tile) | panel | `shell_pass` | 0 | 1 | 1 |
 | `UI-059` Navigation pane (nav rail) | panel | `nav_rail`, `shell_pass` | 0 | 1 | 1 |
-| `UI-061` Escape menu (full-canvas pause screen) | control | `shell_pass`, `escape_menu` | 0 | 1 | 9 |
+| `UI-061` Escape menu (full-canvas pause screen) | control | `shell_pass`, `escape_menu` | 0 | 1 | 10 |
 | `UI-067` Time panel | panel | `time_controls`, `shell_pass` | 0 | 1 | 1 |
 | `UI-084` History Ledger (Story/Chain/Ages/Tectonics) | ledger | `history_ledger_and_comms`, `drill_through_fold`, `text_overflow_floor` | 0 | 2 | 0 |
 | `UI-116` History Ledger (Story/Chain/Ages/Tectonics) > Ages view | view | `ages_replay` | 0 | 1 | 0 |
 | `UI-115` History Ledger (Story/Chain/Ages/Tectonics) > Tectonics view | view | `ledger_pass` | 0 | 1 | 0 |
 
-## CAPTURE-ONLY (36)
+## CAPTURE-ONLY (39)
 
 | Element | Kind | Covering checks | expect | clip | clicks |
 |---|---|---|---|---|---|
@@ -127,7 +142,6 @@ and so is the safety net.
 | `UI-018` Planetary Canvas > Settlement markers (civic chrome) | sub-element | `settlement_labels`, `pop_markers`, `market_labels` | 0 | 0 | 0 |
 | `UI-023` Planetary Canvas > Placement-suitability surface | sub-element | `build_legibility`, `tile_build_ledger` | 0 | 0 | 0 |
 | `UI-024` Planetary Canvas > Construction placement ghost | sub-element | `construction_panel`, `build_walkthrough` | 0 | 0 | 0 |
-| `UI-046` Selection band > Body selection action/facts | sub-element | `descend_into_selection`, `selection_go_to` | 0 | 0 | 0 |
 | `UI-053` Header Panel > Cargo valuation figure | sub-element | `header` | 0 | 0 | 0 |
 | `UI-054` Header Panel > Net in brackets + trend tooltip | sub-element | `header` | 0 | 0 | 0 |
 | `UI-060` Fold-out ledger column | element | `foldout_shell`, `drill_through_fold` | 0 | 0 | 0 |
@@ -153,6 +167,10 @@ and so is the safety net.
 | `UI-133` Diplomacy Ledger | ledger | `diplomacy_ledger`, `unit_orders` | 0 | 0 | 11 |
 | `UI-134` Header Panel > Recruit readouts | sub-element | `military_ledger`, `air_ui` | 0 | 0 | 34 |
 | `UI-139` Alert strip | element | `alert_strip` | 0 | 0 | 2 |
+| `UI-143` Selection band > Ship card | sub-element | `sea_ui` | 0 | 0 | 14 |
+| `UI-141` War notice | element | `war_notice` | 0 | 0 | 0 |
+| `UI-144` Planetary Canvas > Ship marker | sub-element | `sea_ui` | 0 | 0 | 14 |
+| `UI-142` Convoys Ledger > Convoys: Lost | sub-element | `sea_ui` | 0 | 0 | 14 |
 
 ## NONE (8)
 
@@ -175,10 +193,12 @@ staleness detector — a non-empty list means the UI grew and the spine did not.
 - `border_hard_edges` (4 captures, 1 expects) — BL-1292 (borders hard edges) — the plain canvas at the three widest rungs, framed
 - `campaign_lapse` (4 captures, 1 expects) — campaign_lapse — BL-723's visual half: the spectated campaign as a film strip.
 - `canvas_vector_perf` (1 captures, 0 expects) — The Planetary canvas's vector layer at every rung (sprint 51; PLANETARY.md
+- `construct_tooltip` (2 captures, 1 expects) — Verify a disabled Construct button says why on hover (Ben, 2026-11-09: "When clicking on a
 - `construction_sites_ties` (0 captures, 0 expects) — How often the site ledger's rows TIE on estimated net (Ben, 2026-10-25). A
 - `culture_overrun` (6 captures, 2 expects) — BL-1092 R4 -- THE 400 BCE CLAMP on an OVERRUN seed (Ben, 2026-09-24,
 - `export_mockdata` (0 captures, 0 expects) — Export live economy data to CSV for external ledger mock-ups (e.g. Power BI).
 - `fleets_and_ties` (12 captures, 13 expects) — FLEETS AND TIES (BL-1095; Ben, 2026-09-24, sprint 47 rulings R13;
+- `glide_continuity` (2 captures, 2 expects) — Verify a marching counter moves continuously when its stack changes under it (Ben,
 - `ground_bake` (14 captures, 6 expects) — BL-732 (ground bake renderer) + wave 2 — the baked painterly ground,
 - `ground_crisp` (1 captures, 0 expects) — BL-1254 (ground crisper) — RENDERING.md § Tiles hold their own ground, the
 - `ground_disk_cache` (0 captures, 21 expects) — BL-1259 (ground disk cache) — RENDERING.md § Chunks, cache and invalidation,
@@ -211,7 +231,7 @@ staleness detector — a non-empty list means the UI grew and the spine did not.
 - `trade_flow_routed` (12 captures, 8 expects) — The Trade-flow lens draws a flow ALONG THE ROUTE IT RIDES (Ben, 2026-10-26: "render the
 - `tree_form` (1 captures, 0 expects) — BL-1524 (pointed trees) - RENDERING.md § The bake: a forest tree is a pointed
 - `turbulence_lean` (5 captures, 1 expects) — Verification for BL-839 — the historical turbulence lean, in the wizard.
-- `ui_scale_down` (7 captures, 0 expects) — BL-1495 (UI scale down): the shipped UI draw scale, side by side with a scale of 1.
+- `ui_scale_down` (8 captures, 0 expects) — BL-1495 (UI scale down): the default 12 px UI, side by side with the 16 px step.
 - `unit_counter` (8 captures, 0 expects) — Verify the land unit counter, the unit card and the unit group (BL-1425 R1-R3,
 - `units_survive_quarters` (0 captures, 0 expects) — Do units survive the quarters in the --verify world?
 - `wharf_on_shore` (5 captures, 0 expects) — BL-1218 (wharf placed on shore): the construction ledger offers a Fishing

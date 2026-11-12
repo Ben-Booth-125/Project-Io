@@ -903,7 +903,7 @@ int main()
                                      - world_save_alarm_section_bytes(f.w) // BL-1432 (v68)
                                      - world_save_war_section_bytes(f.w) // BL-1459 (v69)
                                      - world_save_embargo_section_bytes(f.w) - world_save_gen_capital_section_bytes(f.w) // BL-1418 (v70)
-                                     - world_save_recruits_section_bytes(f.w) - world_save_sea_recruits_section_bytes(f.w) - world_save_refusals_section_bytes(f.w) /* BL-1480 (v75) */ - world_save_contributors_section_bytes(f.w) /* BL-1470 (v77) */ - world_save_occupation_section_bytes(f.w) /* BL-1502 (v78) */ - world_save_defend_section_bytes(f.w) - world_save_research_books_section_bytes(f.w) - world_save_ships_section_bytes(f.w) - world_save_growth_carry_section_bytes(f.w) - world_save_ended_section_bytes(f.w) - world_save_missile_section_bytes(f.w) /* BL-1431 (v89) */ /* BL-1504 (v79), last */,
+                                     - world_save_recruits_section_bytes(f.w) - world_save_sea_recruits_section_bytes(f.w) - world_save_refusals_section_bytes(f.w) /* BL-1480 (v75) */ - world_save_contributors_section_bytes(f.w) /* BL-1470 (v77) */ - world_save_occupation_section_bytes(f.w) /* BL-1502 (v78) */ - world_save_defend_section_bytes(f.w) - world_save_research_books_section_bytes(f.w) - world_save_ships_section_bytes(f.w) - world_save_growth_carry_section_bytes(f.w) - world_save_ended_section_bytes(f.w) - world_save_missile_section_bytes(f.w) - world_save_space_tail_bytes_after(80, f.w) /* the space merge: every space-line section */ /* BL-1431 (v89) */ /* BL-1504 (v79), last */,
               "F7c a v61 stream (the section's 33 bytes, v63's 4-byte stack count and v64's 12-byte designs section shorter) reads as no fronts");
 
         // A row naming nothing: the first assignment's key -> a ghost tile.
@@ -913,7 +913,7 @@ int main()
                                + world_save_alarm_section_bytes(f.w)       // BL-1432: v68's Alarm, last
                                + world_save_war_section_bytes(f.w)          // BL-1459: v69's wars
                                + world_save_embargo_section_bytes(f.w) + world_save_gen_capital_section_bytes(f.w)     // BL-1418: v70's embargoes
-                               + world_save_recruits_section_bytes(f.w) + world_save_sea_recruits_section_bytes(f.w) + world_save_refusals_section_bytes(f.w) /* BL-1480 (v75) */ + world_save_contributors_section_bytes(f.w) /* BL-1470 (v77) */ + world_save_occupation_section_bytes(f.w) /* BL-1502 (v78) */ + world_save_defend_section_bytes(f.w) + world_save_research_books_section_bytes(f.w) + world_save_ships_section_bytes(f.w) + world_save_growth_carry_section_bytes(f.w) + world_save_ended_section_bytes(f.w) + world_save_missile_section_bytes(f.w) /* BL-1431 (v89) */ /* BL-1504 (v79), last */;
+                               + world_save_recruits_section_bytes(f.w) + world_save_sea_recruits_section_bytes(f.w) + world_save_refusals_section_bytes(f.w) /* BL-1480 (v75) */ + world_save_contributors_section_bytes(f.w) /* BL-1470 (v77) */ + world_save_occupation_section_bytes(f.w) /* BL-1502 (v78) */ + world_save_defend_section_bytes(f.w) + world_save_research_books_section_bytes(f.w) + world_save_ships_section_bytes(f.w) + world_save_growth_carry_section_bytes(f.w) + world_save_ended_section_bytes(f.w) + world_save_missile_section_bytes(f.w) + world_save_space_tail_bytes_after(80, f.w) /* the space merge: every space-line section */ /* BL-1431 (v89) */ /* BL-1504 (v79), last */;
         const std::size_t key0 = bytes.size() - tail - (4 + 9) - 2 * 8 + 4;
         const entity_id ghost = 0x7FFFFFF0u;
         std::memcpy(&bad[key0], &ghost, sizeof ghost);
@@ -1327,7 +1327,7 @@ int main()
         check(drop.state_hash(7) != f.w.state_hash(7), "F11j state_hash reads the layer");
         // Ghost rows are refused whole.
         {
-            const std::size_t at = b.size() - world_save_defend_section_bytes(f.w) - world_save_research_books_section_bytes(f.w) - world_save_ships_section_bytes(f.w) - world_save_growth_carry_section_bytes(f.w) - world_save_ended_section_bytes(f.w) - world_save_missile_section_bytes(f.w) /* BL-1431 (v89) */ - world_save_occupation_section_bytes(f.w) + 4;
+            const std::size_t at = b.size() - world_save_defend_section_bytes(f.w) - world_save_research_books_section_bytes(f.w) - world_save_ships_section_bytes(f.w) - world_save_growth_carry_section_bytes(f.w) - world_save_ended_section_bytes(f.w) - world_save_missile_section_bytes(f.w) - world_save_space_tail_bytes_after(80, f.w) /* the space merge: every space-line section */ /* BL-1431 (v89) */ - world_save_occupation_section_bytes(f.w) + 4;
             std::string ghost = b;
             const entity_id nobody = 0x7FFFFFF0u;
             std::memcpy(&ghost[at], &nobody, sizeof nobody);
@@ -1351,7 +1351,7 @@ int main()
             const std::string v77 = o.str();
             world old;
             check(from_bytes(v77, old) && old.tile_occupier.empty()
-                      && v77.size() + world_save_occupation_section_bytes(clean) + world_save_defend_section_bytes(clean) + world_save_research_books_section_bytes(clean) + world_save_ships_section_bytes(clean) + world_save_growth_carry_section_bytes(clean) + world_save_ended_section_bytes(clean) + world_save_missile_section_bytes(clean) /* BL-1431 (v89) */ + world_save_ship_hulls_bytes(clean) /* BL-1527 */ == to_bytes(clean).size(),
+                      && v77.size() + world_save_occupation_section_bytes(clean) + world_save_defend_section_bytes(clean) + world_save_research_books_section_bytes(clean) + world_save_ships_section_bytes(clean) + world_save_growth_carry_section_bytes(clean) + world_save_ended_section_bytes(clean) + world_save_missile_section_bytes(clean) + world_save_space_tail_bytes_after(80, clean) /* the space merge: every space-line section */ /* BL-1431 (v89) */ + world_save_ship_hulls_bytes(clean) /* BL-1527 */ == to_bytes(clean).size(),
                   "F11n a v77 stream reads as nothing occupied; v78 is v77 plus the section");
         }
         // A world saved on the day a tile fell replays as the unbroken one does.
@@ -1484,7 +1484,7 @@ int main()
         cleared.units.at(d).defend_post = null_entity;
         check(cleared.state_hash(4) != f.w.state_hash(4), "F12q state_hash reads the order");
         {
-            const std::size_t at = b.size() - world_save_defend_section_bytes(f.w) - world_save_research_books_section_bytes(f.w) - world_save_ships_section_bytes(f.w) - world_save_growth_carry_section_bytes(f.w) - world_save_ended_section_bytes(f.w) - world_save_missile_section_bytes(f.w) /* BL-1431 (v89) */ + 4;
+            const std::size_t at = b.size() - world_save_defend_section_bytes(f.w) - world_save_research_books_section_bytes(f.w) - world_save_ships_section_bytes(f.w) - world_save_growth_carry_section_bytes(f.w) - world_save_ended_section_bytes(f.w) - world_save_missile_section_bytes(f.w) - world_save_space_tail_bytes_after(80, f.w) /* the space merge: every space-line section */ /* BL-1431 (v89) */ + 4;
             std::string bad = b;
             const entity_id nobody = 0x7FFFFFF0u;
             std::memcpy(&bad[at], &nobody, sizeof nobody);
@@ -1500,7 +1500,7 @@ int main()
             write_world_snapshot_pre_defend(f.w, o);
             world old;
             check(from_bytes(o.str(), old) && old.units.at(d).defend_province == no_province
-                      && o.str().size() + world_save_defend_section_bytes(f.w) + world_save_research_books_section_bytes(f.w) + world_save_ships_section_bytes(f.w) + world_save_growth_carry_section_bytes(f.w) + world_save_ended_section_bytes(f.w) + world_save_missile_section_bytes(f.w) /* BL-1431 (v89) */ + world_save_ship_hulls_bytes(f.w) /* BL-1527 */ == b.size(),
+                      && o.str().size() + world_save_defend_section_bytes(f.w) + world_save_research_books_section_bytes(f.w) + world_save_ships_section_bytes(f.w) + world_save_growth_carry_section_bytes(f.w) + world_save_ended_section_bytes(f.w) + world_save_missile_section_bytes(f.w) + world_save_space_tail_bytes_after(80, f.w) /* the space merge: every space-line section */ /* BL-1431 (v89) */ + world_save_ship_hulls_bytes(f.w) /* BL-1527 */ == b.size(),
                   "F12u a v78 stream reads as nobody defending; v79 is v78 plus the section");
         }
 
@@ -1531,6 +1531,70 @@ int main()
         (void)run_military_day(f.w, reg, 1);
         check(f.w.units.at(d).position != post && f.w.units.at(d).defend_province == f.block(1),
               "F12aa run_military_day wakes the defender and walks it at the stack, on its order");
+    }
+    {
+        // THE CHASE MEETS (MILITARY.md § Defend province): a defender closing on a stack
+        // that is pushing through its province meets it. The pusher is the LOWER id, so
+        // the visit order alone would step it first every day; the push prefers empty
+        // tiles, so a defender aimed at the pusher's dawn tile would walk onto the tile it
+        // just left, day after day, and never fight. At war, so the push goes on.
+        fixture f; build(f);
+        // One province for all of B's ground, so the push has room to run inside it.
+        {
+            auto& ps = f.w.provinces.provinces;
+            province* whole = nullptr;
+            for (province& p : ps) if (p.id == f.block(0)) whole = &p;
+            for (int k = 1; k < 4; ++k)
+                for (const province& p : ps)
+                    if (p.id == f.block(k)) whole->tiles.insert(whole->tiles.end(), p.tiles.begin(), p.tiles.end());
+            std::sort(whole->tiles.begin(), whole->tiles.end());
+            for (const entity_id t : whole->tiles) f.w.provinces.tile_province[t] = f.block(0);
+            const uint32_t keep = f.block(0);
+            ps.erase(std::remove_if(ps.begin(), ps.end(), [&](const province& p) {
+                return p.id != keep && p.id >= static_cast<uint32_t>(f.block(1)); }), ps.end());
+        }
+        war_record rec; rec.declarer = f.A; rec.defender = f.B; rec.declarer_goals = { f.block(1) };
+        f.w.wars[{ f.A, f.B }] = rec;
+        (void)declare_hostile(f.w, f.A, f.B);
+        (void)declare_hostile(f.w, f.B, f.A);
+        reanchor_fronts(f.w);
+        const entity_id pusher = add_unit(f, f.A, f.at(0, 2), 40);
+        const entity_id d      = add_unit(f, f.B, f.at(8, 5), 40);
+        (void)cmd_assign(f.w, reg, f.A, pusher, f.at(0, 2));
+        (void)cmd_order(f.w, reg, f.A, nation_fronts(f.w, f.A).front().key, 1);
+        corp_command c; c.corp = f.B; c.as_nation = f.B; c.verb = corp_verb::defend_province;
+        c.subject = d; c.province = f.block(0);
+        const bool ordered = apply_corp_command(f.w, reg, c) == corp_command_result::applied;
+        world twin = f.w;
+        const auto met_by = [&](world& w) {
+            for (int day = 0; day < 16; ++day) // 16 days: without the rule it chases all of them
+            {
+                for (const active_battle& b : w.battles)
+                {
+                    const bool has_d = std::find(b.attacker_units.begin(), b.attacker_units.end(), d) != b.attacker_units.end()
+                                    || std::find(b.defender_units.begin(), b.defender_units.end(), d) != b.defender_units.end();
+                    const bool has_p = std::find(b.attacker_units.begin(), b.attacker_units.end(), pusher) != b.attacker_units.end()
+                                    || std::find(b.defender_units.begin(), b.defender_units.end(), pusher) != b.defender_units.end();
+                    if (has_d && has_p)
+                        return day;
+                }
+                advance_fronts(w, reg);
+                advance_defenders(w, reg);
+                (void)run_unit_march(w, reg);
+                reanchor_fronts(w);
+            }
+            return -1;
+        };
+        const int met = met_by(f.w);
+        std::printf("    chase: battle on day %d; pusher at (%d,%d), defender at (%d,%d), %zu battle(s)\n", met,
+                    f.w.tiles.at(f.w.units.at(pusher).position).grid_x, f.w.tiles.at(f.w.units.at(pusher).position).grid_y,
+                    f.w.tiles.at(f.w.units.at(d).position).grid_x, f.w.tiles.at(f.w.units.at(d).position).grid_y,
+                    f.w.battles.size());
+        check(ordered && pusher < d && met >= 0 && met <= 5 && f.w.units.at(d).defend_province == f.block(0),
+              "F12ab a defender chasing a lower-id pushing stack meets it in battle within 5 days, its order kept");
+        const int met_twin = met_by(twin);
+        check(met_twin == met && twin.state_hash(5) == f.w.state_hash(5),
+              "F12ac the chase replays: a twin meets on the same day, to the same hash");
     }
     {
         // THE START ORDER: a major's units in its capital province, and nobody else's.

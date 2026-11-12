@@ -1037,6 +1037,7 @@ void building(ImDrawList* dl, ImVec2 centre, float r, building_type type,
         case building_type::railway_station:      hub_node(dl, centre, r, fill);  break; // BL-1255: the hub glyph until one is drawn
         case building_type::inland_logistics_hub: hub_node(dl, centre, r, fill);  break; // BL-149
         case building_type::military_base:        shield(dl, centre, r, fill);    break; // BL-325
+        case building_type::orbital_defence_battery: shield(dl, centre, r, fill); break; // BL-1599: the shield until a glyph is drawn; told apart by its gunmetal colour
         case building_type::bunker:               shield(dl, centre, r, fill);    break; // BL-1426: the shield until a glyph is drawn; told apart by its concrete colour
         case building_type::airbase:              aircraft(dl, centre, r, fill, true); break; // BL-1450: its own glyph, the aircraft
         case building_type::research_institute:   research(dl, centre, r, fill);  break; // BL-332
@@ -1838,6 +1839,30 @@ void diplomacy(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
     dl->AddCircle({ centre.x + off, centre.y }, cr, colour, 0, 1.5f);
 }
 
+void satellite(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
+{
+    // A filled body between two outlined panel wings on one boom, the whole
+    // figure rotated -30 degrees. Points are laid out on the boom's axis (u) and
+    // across it (v), then rotated into screen space.
+    const float cs = 0.8660254f, sn = -0.5f; // cos/sin of -30 degrees
+    const auto at = [&](float u, float v) {
+        return ImVec2{centre.x + u * cs - v * sn, centre.y + u * sn + v * cs};
+    };
+    const float body = r * 0.26f;
+    const float wing_in = r * 0.40f, wing_out = r * 1.0f, wing_h = r * 0.34f;
+    dl->AddLine(at(-wing_in, 0.0f), at(wing_in, 0.0f), colour, 1.5f);
+    dl->AddQuadFilled(at(-body, -body), at(body, -body), at(body, body), at(-body, body), colour);
+    for (const float side : {-1.0f, 1.0f})
+    {
+        const ImVec2 a = at(side * wing_in, -wing_h), b = at(side * wing_out, -wing_h);
+        const ImVec2 c = at(side * wing_out, wing_h), d = at(side * wing_in, wing_h);
+        dl->AddQuad(a, b, c, d, colour, 1.5f);
+        // One cell line across the wing, so it reads as a panel rather than a box.
+        dl->AddLine(at(side * (wing_in + wing_out) * 0.5f, -wing_h), at(side * (wing_in + wing_out) * 0.5f, wing_h),
+                    colour, 1.0f);
+    }
+}
+
 void acquisition(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
 {
     // Two OUTLINED squares of different sizes with a short arrow running from
@@ -2255,6 +2280,25 @@ void capital(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
     dl->AddPolyline(ring, 10, outline, ImDrawFlags_Closed, std::max(1.0f, r * 0.12f));
 }
 
+void pin(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
+{
+    // A pushpin leaning right: the head up and to the right, the needle's point down
+    // and to the left. The head is a filled circle; a short collar bar sits under it,
+    // square to the needle; the needle is one stroke from the collar to the point.
+    const ImVec2 dir   = { -0.7071f, 0.7071f };                  // head -> point
+    const ImVec2 perp  = { 0.7071f, 0.7071f };                   // square to the needle
+    const ImVec2 head  = { centre.x + r * 0.32f, centre.y - r * 0.32f };
+    const float  hr    = r * 0.42f;
+    const ImVec2 neck  = { head.x + dir.x * hr * 1.35f, head.y + dir.y * hr * 1.35f };
+    const ImVec2 point = { centre.x - r * 0.95f, centre.y + r * 0.95f };
+    const float  w     = std::max(1.0f, r * 0.14f);
+    dl->AddLine(neck, point, colour, w);
+    dl->AddLine({ neck.x - perp.x * hr * 0.9f, neck.y - perp.y * hr * 0.9f },
+                { neck.x + perp.x * hr * 0.9f, neck.y + perp.y * hr * 0.9f }, colour,
+                std::max(1.0f, r * 0.2f));
+    dl->AddCircleFilled(head, hr, colour, 16);
+}
+
 void corp_emblem(ImDrawList* dl, ImVec2 centre, float r, int shape, ImU32 fill)
 {
     // Simple, legible geometric primitives so the emblem reads at portrait size on
@@ -2542,6 +2586,201 @@ void stat(ImDrawList* dl, ImVec2 c, float r, stat_glyph which, ImU32 col)
             break;
         }
     }
+}
+
+// ---------------------------------------------------------------------------
+// BL-1590: near-space markers (CIRCUMPLANETARY.md § Orbital nodes and what sits
+// at them). Constant pixel size at any zoom; the caller passes r.
+// ---------------------------------------------------------------------------
+
+namespace {
+
+ImU32 half_alpha(ImU32 c)
+{
+    const ImU32 a = (c >> IM_COL32_A_SHIFT) & 0xFFu;
+    return (c & ~IM_COL32_A_MASK) | ((a / 2u) << IM_COL32_A_SHIFT);
+}
+
+} // namespace
+
+void satellite_role(ImDrawList* dl, ImVec2 c, float r, space_satellite_role role, ImU32 colour)
+{
+    const float th = std::max(1.0f, r * 0.22f);
+    switch (role)
+    {
+        case space_satellite_role::comms:
+        {
+            // A feed dot low-left, two signal arcs opening up-right from it.
+            const ImVec2 o{ c.x - r * 0.55f, c.y + r * 0.55f };
+            dl->AddCircleFilled(o, std::max(1.0f, r * 0.25f), colour, 8);
+            constexpr float a0 = -1.5707963f, a1 = 0.0f; // up, round to the right
+            dl->PathArcTo(o, r * 0.75f, a0, a1, 8);
+            dl->PathStroke(colour, ImDrawFlags_None, th);
+            dl->PathArcTo(o, r * 1.30f, a0, a1, 10);
+            dl->PathStroke(colour, ImDrawFlags_None, th);
+            break;
+        }
+        case space_satellite_role::navigation:
+        {
+            // A four-point compass star, filled as four convex kites.
+            const float in = r * 0.28f;
+            const ImVec2 pts[8] = {
+                { c.x, c.y - r }, { c.x + in, c.y - in }, { c.x + r, c.y }, { c.x + in, c.y + in },
+                { c.x, c.y + r }, { c.x - in, c.y + in }, { c.x - r, c.y }, { c.x - in, c.y - in },
+            };
+            for (int i = 0; i < 4; ++i)
+                dl->AddQuadFilled(c, pts[(2 * i + 7) % 8], pts[2 * i], pts[2 * i + 1], colour);
+            break;
+        }
+        case space_satellite_role::observation:
+        {
+            // An eye: a lens of two arcs round a filled pupil.
+            const float rr   = r * 1.25f;
+            const float dy   = std::sqrt(std::max(0.0f, rr * rr - r * r));
+            const float half = std::atan2(r, dy);
+            dl->PathArcTo({ c.x, c.y + dy }, rr, -1.5707963f - half, -1.5707963f + half, 10);
+            dl->PathStroke(colour, ImDrawFlags_None, th);
+            dl->PathArcTo({ c.x, c.y - dy }, rr, 1.5707963f - half, 1.5707963f + half, 10);
+            dl->PathStroke(colour, ImDrawFlags_None, th);
+            dl->AddCircleFilled(c, std::max(1.0f, r * 0.34f), colour, 10);
+            break;
+        }
+        case space_satellite_role::survey:
+        {
+            // A lens up-left with a handle to the lower right.
+            const ImVec2 lc{ c.x - r * 0.25f, c.y - r * 0.25f };
+            const float  lr = r * 0.55f;
+            dl->AddCircle(lc, lr, colour, 12, th);
+            dl->AddLine({ lc.x + lr * 0.72f, lc.y + lr * 0.72f }, { c.x + r * 0.85f, c.y + r * 0.85f },
+                        colour, th * 1.3f);
+            break;
+        }
+        case space_satellite_role::none:
+        default:
+            dl->AddCircleFilled(c, std::max(1.0f, r * 0.3f), colour, 8);
+            break;
+    }
+}
+
+void satellite_marker(ImDrawList* dl, ImVec2 c, float r, space_satellite_role role, ImU32 fill,
+                      bool in_transit)
+{
+    const ImU32 col = in_transit ? half_alpha(fill) : fill;
+    // Solar wings first, so the plate's ring sits over their roots.
+    const float wl = r * 0.55f, wh = std::max(1.5f, r * 0.30f);
+    for (const float s : { -1.0f, 1.0f })
+    {
+        const float x0 = c.x + s * (r - 1.0f);
+        const float x1 = c.x + s * (r + wl);
+        dl->AddRectFilled({ std::min(x0, x1) - 1.0f, c.y - wh - 1.0f },
+                          { std::max(x0, x1) + 1.0f, c.y + wh + 1.0f }, outline);
+        dl->AddRectFilled({ std::min(x0, x1), c.y - wh }, { std::max(x0, x1), c.y + wh }, col);
+    }
+    dl->AddCircleFilled(c, r + 1.0f, outline, 16);
+    dl->AddCircleFilled(c, r, IM_COL32(18, 20, 26, 235), 16);
+    dl->AddCircle(c, r, col, 16, std::max(1.0f, r * 0.16f));
+    satellite_role(dl, c, r * 0.58f, role, col);
+}
+
+void station_marker(ImDrawList* dl, ImVec2 c, float r, ImU32 fill, bool in_transit)
+{
+    const ImU32 col   = in_transit ? half_alpha(fill) : fill;
+    const float core  = r * 0.42f;
+    const float truss = std::max(1.0f, r * 0.12f);
+    const float pw = r * 0.26f, ph = r * 0.62f; // a panel's half-width and half-height
+    // The truss, outlined.
+    dl->AddRectFilled({ c.x - r + pw, c.y - truss - 1.0f }, { c.x + r - pw, c.y + truss + 1.0f }, outline);
+    dl->AddRectFilled({ c.x - r + pw, c.y - truss }, { c.x + r - pw, c.y + truss }, col);
+    // A solar panel at each end.
+    for (const float s : { -1.0f, 1.0f })
+    {
+        const float  xa = c.x + s * r, xb = c.x + s * (r - 2.0f * pw);
+        const ImVec2 tl{ std::min(xa, xb), c.y - ph }, br{ std::max(xa, xb), c.y + ph };
+        dl->AddRectFilled({ tl.x - 1.0f, tl.y - 1.0f }, { br.x + 1.0f, br.y + 1.0f }, outline);
+        dl->AddRectFilled(tl, br, col);
+        dl->AddLine({ tl.x, c.y }, { br.x, c.y }, outline, 1.0f); // the panel's cell line
+    }
+    // The core, over the truss, with a dark hatch so it reads as a hull.
+    dl->AddRectFilled({ c.x - core - 1.0f, c.y - core - 1.0f }, { c.x + core + 1.0f, c.y + core + 1.0f }, outline);
+    dl->AddRectFilled({ c.x - core, c.y - core }, { c.x + core, c.y + core }, col);
+    dl->AddRectFilled({ c.x - core * 0.35f, c.y - core * 0.35f }, { c.x + core * 0.35f, c.y + core * 0.35f },
+                      outline);
+}
+
+void space_fleet_marker(ImDrawList* dl, ImVec2 c, float r, int hull, ImU32 fill, int count, bool in_transit)
+{
+    const ImU32 col = in_transit ? half_alpha(fill) : fill;
+    // The kite hull, nose up: outlined by a slightly larger kite underneath.
+    const auto kite = [&](float s, ImU32 k) {
+        const ImVec2 pts[4] = { { c.x, c.y - r * s }, { c.x + r * 0.62f * s, c.y + r * 0.35f * s },
+                                { c.x, c.y + r * 0.78f * s }, { c.x - r * 0.62f * s, c.y + r * 0.35f * s } };
+        dl->AddConvexPolyFilled(pts, 4, k);
+    };
+    kite(1.0f + 1.6f / std::max(r, 1.0f), outline);
+    kite(1.0f, col);
+    const float t = std::max(1.0f, r * 0.14f);
+    const ImVec2 m{ c.x, c.y + r * 0.1f };
+    switch (hull)
+    {
+        case 0: // hauler: a hold box
+            dl->AddRect({ m.x - r * 0.24f, m.y - r * 0.24f }, { m.x + r * 0.24f, m.y + r * 0.24f }, outline, 0.0f, 0, t);
+            break;
+        case 1: // lander: two legs
+            dl->AddLine({ m.x - r * 0.12f, m.y }, { m.x - r * 0.36f, m.y + r * 0.42f }, outline, t);
+            dl->AddLine({ m.x + r * 0.12f, m.y }, { m.x + r * 0.36f, m.y + r * 0.42f }, outline, t);
+            break;
+        case 2: // tug: a claw
+            dl->PathArcTo(m, r * 0.26f, 0.2f, 2.94f, 10);
+            dl->PathStroke(outline, 0, t);
+            break;
+        case 3: // frigate: one stripe
+            dl->AddLine({ m.x - r * 0.34f, m.y }, { m.x + r * 0.34f, m.y }, outline, t);
+            break;
+        case 4: // cruiser: two stripes
+            dl->AddLine({ m.x - r * 0.38f, m.y - r * 0.14f }, { m.x + r * 0.38f, m.y - r * 0.14f }, outline, t);
+            dl->AddLine({ m.x - r * 0.30f, m.y + r * 0.16f }, { m.x + r * 0.30f, m.y + r * 0.16f }, outline, t);
+            break;
+        default:
+            dl->AddCircleFilled(m, t, outline);
+            break;
+    }
+    if (count > 1)
+    {
+        char buf[8];
+        std::snprintf(buf, sizeof buf, "%d", std::min(count, 99));
+        const ImVec2 ts = ImGui::CalcTextSize(buf);
+        const ImVec2 p{ c.x + r * 0.55f, c.y + r * 0.25f };
+        dl->AddRectFilled({ p.x - 1.0f, p.y - 1.0f }, { p.x + ts.x + 1.0f, p.y + ts.y }, IM_COL32(18, 20, 26, 230), 2.0f);
+        dl->AddText(p, IM_COL32(235, 235, 235, 255), buf); // fit-exempt: glyph badge sized from its own text
+    }
+}
+
+void debris(ImDrawList* dl, ImVec2 c, float r, ImU32 colour)
+{
+    const float s = std::max(r, 4.0f);
+    const float shards[3][3] = { { -0.55f, -0.35f, 0.42f }, { 0.45f, -0.15f, 0.36f }, { -0.05f, 0.5f, 0.32f } };
+    for (int i = 0; i < 3; ++i)
+    {
+        const ImVec2 o{ c.x + shards[i][0] * s, c.y + shards[i][1] * s };
+        const float  k = shards[i][2] * s;
+        const ImVec2 tri[3] = { { o.x - k, o.y + k * 0.6f }, { o.x + k * 0.2f, o.y - k }, { o.x + k, o.y + k * 0.4f } };
+        dl->AddTriangleFilled(tri[0], tri[1], tri[2], colour);
+        dl->AddTriangle(tri[0], tri[1], tri[2], outline, 1.0f);
+    }
+}
+
+void storm_bolt(ImDrawList* dl, ImVec2 c, float r, ImU32 colour)
+{
+    const float s = std::max(r, 4.0f);
+    // Two convex halves of a zig-zag bolt, outlined, then filled.
+    const ImVec2 top[4] = { { c.x + s * 0.15f, c.y - s }, { c.x - s * 0.45f, c.y + s * 0.15f },
+                            { c.x + s * 0.05f, c.y + s * 0.15f }, { c.x + s * 0.45f, c.y - s } };
+    const ImVec2 bot[4] = { { c.x - s * 0.05f, c.y - s * 0.15f }, { c.x - s * 0.15f, c.y + s },
+                            { c.x + s * 0.45f, c.y - s * 0.15f }, { c.x - s * 0.05f, c.y - s * 0.15f } };
+    dl->AddPolyline(top, 4, outline, ImDrawFlags_Closed, 2.0f);
+    dl->AddPolyline(bot, 3, outline, ImDrawFlags_Closed, 2.0f);
+    dl->AddConvexPolyFilled(top, 4, colour);
+    dl->AddTriangleFilled(bot[0], bot[1], bot[2], colour);
 }
 
 } // namespace ui::icons

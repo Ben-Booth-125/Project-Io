@@ -1945,7 +1945,16 @@ float body_km_per_tile(const world& w, entity_id body)
     // Rocky-planet mass-radius relation, R proportional to M^0.27. A generation
     // -time constant, computed per call rather than cached because the callers
     // are per-dispatch, not per-frame.
-    const float mass = (bit->second.mass_earths > 0.0f) ? bit->second.mass_earths : 1.0f;
+    //
+    // HELD AT ITS PRE-BL-1638 READ. Until generated body mass (BL-1638), a
+    // generated world wrote `mass_earths` on the homeworld only, so every other
+    // generated body read the 1.0 default here. Its mass is now generated and
+    // saved, and the orbital graph reads it, but the ground distance scale must
+    // not move with it: on a generated world (one with a home body) a non-home
+    // body keeps reading Earth mass. A hand-built world with no home body reads
+    // its field exactly as before.
+    const bool held = w.home_body != null_entity && body != w.home_body;
+    const float mass = (!held && bit->second.mass_earths > 0.0f) ? bit->second.mass_earths : 1.0f;
     const float radius_km = earth_radius_km * std::pow(mass, 0.27f);
 
     // Columns wrap, so the grid width spans the full circumference.

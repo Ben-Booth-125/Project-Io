@@ -385,7 +385,25 @@ inline constexpr uint32_t save_game_magic =
 /// width with v27's tail: every resource_count-wide array 56 wide, and the last report at the
 /// tail. The reader takes v25 (55, no report), v26 (56, no report), v27 (55, report) and v29
 /// (56, report), each at its own width (`envelope_resource_width`).
-inline constexpr uint32_t save_game_version = 29; // the naval merge: 56 wide plus the report tail
+///
+/// LAYOUT 28 (BL-1603, pinned items; written on the space-mechanics branch off v27) =
+/// LAYOUT 27 PLUS ONE ID LIST AT THE ENVELOPE'S TAIL, after the last report: the player's
+/// pins (`ui_state::pinned.pins`, in pin order), part of the ui slice below - what the
+/// player was WATCHING, beside what it was looking at. 55 wide, as v27. Front pins are
+/// derived from the wars every frame and are never on disk.
+///
+/// LAYOUT 30 (the space-mechanics merge) = v29 PLUS v28's pins tail: every
+/// resource_count-wide array 56 wide, the last report, then the pins. The reader takes
+/// v25, v26, v27, v28 (55, report, pins), v29 (56, report, no pins) and v30; a stream
+/// without the pins tail opens with no pins.
+inline constexpr uint32_t save_game_version = 30; // the space merge: 56 wide, report, pins
+/// The space-mechanics branch's layout (BL-1603): 55 wide, report, pins.
+inline constexpr uint32_t save_game_version_space_pins = 28;
+/// Does an envelope of @p version carry the pins tail? v28 and v30 on (v29 does not).
+inline constexpr bool envelope_has_pins(uint32_t version)
+{
+    return version == save_game_version_space_pins || version >= 30;
+}
 /// The first layout carrying the last economy report (part 5); every later layout carries it.
 inline constexpr uint32_t save_game_version_econ_report = 27;
 /// v25: the v27 layout without the last-report tail.
@@ -454,6 +472,8 @@ struct save_envelope
     entity_id        active_body       = null_entity;
     entity_id        selected_entity   = null_entity;
     uint32_t         selected_province = 0;
+    /// The player's pinned items, in pin order (save_game_version 28, BL-1603).
+    std::vector<entity_id> pins;
 
     float solar_zoom      = 1.0f, solar_pan_x = 0.0f, solar_pan_y = 0.0f;
     float circum_zoom     = 1.0f, circum_pan_x = 0.0f, circum_pan_y = 0.0f;

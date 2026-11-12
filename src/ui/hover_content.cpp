@@ -4,6 +4,7 @@
 
 #include "icons.hpp"
 #include "presentation.hpp"
+#include "prospect_view.hpp"   // BL-1610: deposits hidden until prospected
 #include "wing_card.hpp"      // BL-1450: the wing marker's card
 #include "ship_card.hpp"      // BL-1534: the ship marker's card
 #include "player_side.hpp"    // owner_display_name
@@ -175,10 +176,20 @@ void hover_structure_ground(const ui_state& ui)
 
 // --- Exemplar 1: tile × resource lens -------------------------------------------
 
-void hover_tile_resource(const tile_component& tile, const std::vector<resource_type>& toggled)
+void hover_tile_resource(const tile_component& tile, const std::vector<resource_type>& toggled,
+                         bool prospected)
 {
     // Title: composition terrain name.
     hover_terrain_header(tile);
+
+    // BL-1610: mapped ground the player has not prospected draws its terrain and
+    // nothing of its deposits (DISCOVERY.md § Mapping, then prospecting).
+    if (!prospected)
+    {
+        ImGui::Spacing();
+        ImGui::TextDisabled("Not yet prospected: deposits unknown");
+        return;
+    }
 
     // One stat line per toggled resource this tile carries (Ben, 2026-10-04: the lens
     // shows a toggled set, and a split tile carries several), with a richness band.
@@ -356,7 +367,8 @@ void draw_hover_content(const world& w, const ui_state& ui, entity_id eid,
         // No Population variant: that lens is a pure read with no hover at all
         // (SELECTION.md rule 3), so the canvas never routes a tile here under it.
         if (ui.overlay == overlay_mode::resource)
-            hover_tile_resource(tile, ui.lens_resources);
+            hover_tile_resource(tile, ui.lens_resources,
+                                tile_deposits_readable(w, tile, ui.spectating && ui.god_view));
         else
             hover_tile_default(tile);
         return;

@@ -53,6 +53,11 @@
 //       credit_processing_outputs; research through advance_research;
 //       Rocketry's space_dispatch; logistics_cost through price_trade_leg on
 //       one generated world (haul only, never port handling).
+//   SK  (BL-1592/BL-1607) the space keys (space_tech_keys.hpp): every near-space
+//       key on one Digitisation node, closed until held and for that holder only;
+//       every far-space key an Early Space node's and closed to all; an unknown
+//       key closed under nation_has_mechanic; each Early Space branch keyed by
+//       the Digitisation quest that names it.
 //
 // BL-1324, rising tech prices (RESEARCH.md § Cost, Ben 2026-10-15):
 //   R5  fixture rows: the price index (integer, compounded quarterly from the
@@ -88,6 +93,8 @@
 #include "world/nation_tech.hpp"
 #include "world/recipe_registry.hpp"
 #include "world/resource_names.hpp"
+#include "world/space_tech_keys.hpp" // BL-1592 SK1-SK4
+#include "world/corp_command.hpp"    // BL-1613: the Early Space verbs
 #include "world/spawn_seat.hpp"
 #include "world/supply_system.hpp"
 #include "world/world.hpp"
@@ -834,6 +841,267 @@ void rows_r3()
 }
 
 // ---------------------------------------------------------------------------
+// ES — BL-1612 the Early Space tree is researchable (ERAS.md § Far-space technology)
+// ---------------------------------------------------------------------------
+
+int es_node(const char* id)
+{
+    const int n = io::es::find_node(id);
+    if (n < 0)
+    {
+        std::printf("  FAIL  unknown Early Space node id %s (store changed?)\n", id);
+        ++g_failures;
+    }
+    return n;
+}
+
+/// The gate's ground half on the fixture: a capital tile on the fixture's body, a
+/// Launchpad of the nation's there (staffed or not), and a market on the body holding
+/// @p propellant. Returns the pad and the market.
+struct es_ground { entity_id tile = null_entity, pad = null_entity, market = null_entity; };
+
+es_ground stage_ground(fixture& f, bool staffed, float propellant)
+{
+    es_ground g;
+    g.tile = f.w.create_entity();
+    tile_component t{};
+    t.body = f.body;
+    f.w.tiles[g.tile] = t;
+    f.w.nations[f.nation].capital_tile = g.tile;
+    g.pad = f.w.create_entity();
+    building_component b{};
+    b.tile = g.tile;
+    b.type = building_type::launchpad;
+    b.workforce_assigned = staffed ? 1.0f : 0.0f;
+    f.w.buildings[g.pad] = b;
+    f.w.nations[f.nation].state_assets.push_back(g.pad);
+    g.market = f.w.create_entity();
+    market_component m{};
+    m.body = f.body;
+    m.inventory[static_cast<std::size_t>(resource_type::propellant)] = propellant;
+    f.w.markets[g.market] = m;
+    return g;
+}
+
+void rows_es()
+{
+    std::printf("\nES the Early Space tree is researchable (BL-1612)\n");
+    const research_params rp{};
+    const int rocketry = node("DG-NE-SO-B");
+    const int quest    = early_space_branch_key_node(0); // In-Situ Propellant's key
+    const int major    = quest >= 0 ? io::dg::nodes[static_cast<std::size_t>(quest)].groups[0][0] : -1;
+    const int root     = es_node("ES-PR-IP-T1");
+    const int a1       = es_node("ES-PR-IP-A1"); // Remote Prospecting: T1 -> T2 -> A1
+    const int t2       = es_node("ES-PR-IP-T2");
+    std::printf("     PR-IP keyed by %s (requires %s); gate threshold %.1f propellant\n",
+                quest >= 0 ? io::dg::nodes[static_cast<std::size_t>(quest)].id : "?",
+                major >= 0 ? io::dg::nodes[static_cast<std::size_t>(major)].id : "?",
+                static_cast<double>(rp.space_gate_min_propellant));
+
+    // ES1 the gate, piece by piece.
+    {
+        fixture f = make_fixture();
+        const bool none = !nation_meets_space_gate(f.w, f.nation, rp);
+        f.w.nation_tech[f.nation].held.set(static_cast<std::size_t>(rocketry));
+        const bool rocket_only = !nation_meets_space_gate(f.w, f.nation, rp);
+        es_ground g = stage_ground(f, /*staffed=*/false, 5.0f);
+        const bool unstaffed = !nation_meets_space_gate(f.w, f.nation, rp);
+        f.w.buildings[g.pad].workforce_assigned = 0.5f;
+        const bool met = nation_meets_space_gate(f.w, f.nation, rp);
+        f.w.markets[g.market].inventory[static_cast<std::size_t>(resource_type::propellant)] = 0.5f;
+        const bool dry = !nation_meets_space_gate(f.w, f.nation, rp);
+        f.w.markets[g.market].inventory[static_cast<std::size_t>(resource_type::propellant)] = rp.space_gate_min_propellant;
+        const bool at = nation_meets_space_gate(f.w, f.nation, rp);
+        f.w.buildings[g.pad].ticks_remaining = 3; // under construction
+        const bool building = !nation_meets_space_gate(f.w, f.nation, rp);
+        f.w.buildings[g.pad].ticks_remaining = 0;
+        // The pad on another body does not count.
+        const entity_id far = f.w.create_entity();
+        f.w.bodies[far] = body_component{};
+        f.w.tiles[f.w.buildings[g.pad].tile].body = far;
+        const bool off_body = !nation_meets_space_gate(f.w, f.nation, rp);
+        check(none && rocket_only && unstaffed && met && dry && at && building && off_body,
+              "ES1 the gate: Rocketry AND a completed staffed home Launchpad AND propellant >= the dial on a home market");
+        check(!nation_meets_space_gate(f.w, f.other, rp), "ES1b ...and a nation with none of it never meets it");
+    }
+
+    // ES2 refused before the gate; ES3 refused with the gate met but the branch unkeyed.
+    {
+        fixture f = make_fixture();
+        f.w.nation_tech[f.nation].held.set(static_cast<std::size_t>(major)); // keyed (stand-in)
+        const std::uint64_t before = f.w.state_hash(0);
+        const bool pre = enqueue_early_space_node(f.w, f.nation, root, rp) == enqueue_result::refused_locked
+                      && f.w.state_hash(0) == before && f.w.nation_tech[f.nation].es_queue.empty()
+                      && !early_space_node_available(f.w, f.nation, root, rp);
+        check(pre, "ES2 before the gate an Early Space node is refused (refused_locked), nothing mutated, not available");
+
+        fixture g = make_fixture();
+        g.w.nation_tech[g.nation].held.set(static_cast<std::size_t>(rocketry));
+        stage_ground(g, true, 5.0f);
+        const bool gate = nation_meets_space_gate(g.w, g.nation, rp);
+        const std::uint64_t h = g.w.state_hash(0);
+        const bool unkeyed = !early_space_branch_keyed(g.w, g.nation, 0)
+                          && enqueue_early_space_node(g.w, g.nation, root, rp) == enqueue_result::refused_locked
+                          && g.w.state_hash(0) == h && !early_space_node_available(g.w, g.nation, root, rp);
+        check(gate && unkeyed, "ES3 gate met, branch not keyed: refused, nothing mutated");
+        // Holding PR-IP's major keys PR-IP. Rocketry is itself First Cargo to Orbit's
+        // major, so under the stand-in the gate's own Rocketry keys Interplanetary
+        // Convoys (NE-IC); Space Force (ST-SF), keyed through Proven Readiness's
+        // major, stays locked.
+        g.w.nation_tech[g.nation].held.set(static_cast<std::size_t>(major));
+        check(early_space_branch_keyed(g.w, g.nation, 0) && early_space_branch_keyed(g.w, g.nation, 1)
+                  && !early_space_branch_keyed(g.w, g.nation, 2)
+                  && enqueue_early_space_node(g.w, g.nation, es_node("ES-ST-SF-T1"), rp) == enqueue_result::refused_locked,
+              "ES3b the stand-in keys a branch by its own quest's major only (Rocketry is NE-IC's); ST-SF stays locked");
+    }
+
+    // ES4-ES7 researched after: the gate met and the branch keyed (stand-in).
+    {
+        fixture f = make_fixture();
+        auto& st0 = f.w.nation_tech[f.nation];
+        st0.held.set(static_cast<std::size_t>(rocketry));
+        st0.held.set(static_cast<std::size_t>(major));
+        es_ground g = stage_ground(f, true, 5.0f);
+        check(early_space_node_available(f.w, f.nation, root, rp) && !early_space_node_available(f.w, f.nation, a1, rp),
+              "ES4 gate met + keyed: the branch root is available; a node with an unheld requirement is not");
+        const bool q = enqueue_early_space_node(f.w, f.nation, a1, rp) == enqueue_result::queued;
+        const auto& st = f.w.nation_tech[f.nation];
+        const bool order = st.es_queue.size() == 3 && st.es_queue[0] == root && st.es_queue[1] == t2 && st.es_queue[2] == a1;
+        check(q && order && st.queue.empty(), "ES4b queuing Remote Prospecting queues its requirements ahead, on the Early Space tail");
+        check(enqueue_early_space_node(f.w, f.nation, t2, rp) == enqueue_result::already_queued,
+              "ES4c a node already on the tail is not queued twice");
+
+        const bool closed = !nation_has_mechanic(f.w, f.nation, space_keys::prospecting);
+        // A Digitisation entry waiting on funding stands ahead and holds the pool.
+        const int dg_head = node("DG-ST-FO-T1");
+        enqueue_node(f.w, f.nation, dg_head);
+        const std::int64_t es_cost = early_space_node_cost_milli(root, rp) + early_space_node_cost_milli(t2, rp)
+                                   + early_space_node_cost_milli(a1, rp);
+        f.w.nation_tech[f.nation].pool_milli = node_cost_milli(dg_head, rp) - 1;
+        flow_research_queue(f.w, f.nation, rp);
+        check(f.w.nation_tech[f.nation].es_held.none() && f.w.nation_tech[f.nation].es_queue.size() == 3,
+              "ES5 one queue: a Digitisation entry waiting on funding holds the pool from the Early Space tail");
+
+        // Gate lapses (the shelf runs dry): the tail is passed over, its RP stay in the pool.
+        f.w.nation_tech[f.nation].pool_milli = node_cost_milli(dg_head, rp) + es_cost;
+        f.w.markets[g.market].inventory[static_cast<std::size_t>(resource_type::propellant)] = 0.0f;
+        flow_research_queue(f.w, f.nation, rp);
+        const auto& s1 = f.w.nation_tech[f.nation];
+        check(s1.held.test(static_cast<std::size_t>(dg_head)) && s1.es_held.none() && s1.es_queue.size() == 3
+                  && s1.pool_milli == es_cost,
+              "ES6 the gate lapsed: the Digitisation head completes, the Early Space tail is passed over, RP wait in the pool");
+
+        f.w.markets[g.market].inventory[static_cast<std::size_t>(resource_type::propellant)] = 5.0f;
+        const int done = flow_research_queue(f.w, f.nation, rp);
+        const auto& s2 = f.w.nation_tech[f.nation];
+        check(done == 3 && s2.es_held.test(static_cast<std::size_t>(a1)) && s2.es_queue.empty() && s2.pool_milli == 0,
+              "ES7 researched after: the pool pays the tail in order, the remainder flowing on");
+        check(closed && nation_has_mechanic(f.w, f.nation, space_keys::prospecting)
+                  && !nation_has_mechanic(f.w, f.other, space_keys::prospecting)
+                  && !nation_has_mechanic(f.w, f.nation, space_keys::base_founding),
+              "ES7b the far-space key opens from the Early Space held set, for the holder and that node only");
+        check(nation_holds_early_space(f.w, f.nation, a1) && !nation_holds_early_space(f.w, f.other, a1),
+              "ES7c nation_holds_early_space reads the held set");
+
+        // The accrual's line pays for the tail too: owed counts Early Space entries.
+        fixture h = make_fixture();
+        auto& hs = h.w.nation_tech[h.nation];
+        hs.held.set(static_cast<std::size_t>(rocketry));
+        hs.held.set(static_cast<std::size_t>(major));
+        stage_ground(h, true, 5.0f);
+        enqueue_early_space_node(h.w, h.nation, a1, rp);
+        std::vector<research_accrual> rows;
+        advance_research(h.w, rp, &rows);
+        const research_accrual* r = row_for(rows, h.nation);
+        check(r != nullptr && r->owed_milli == es_cost, "ES7d what the queue owes includes the Early Space tail");
+    }
+
+    // ES8 the save seam: round trip exact; ES9 a tampered tail refused.
+    {
+        fixture f = make_fixture();
+        auto& st = f.w.nation_tech[f.nation];
+        st.held.set(static_cast<std::size_t>(rocketry));
+        st.es_held.set(static_cast<std::size_t>(root));
+        st.es_held.set(static_cast<std::size_t>(io::es::node_count - 1));
+        st.es_queue = { static_cast<std::uint16_t>(t2), static_cast<std::uint16_t>(a1) };
+        f.w.nation_tech[f.other].pool_milli = 7; // an entry with no Early Space progress
+
+        world back;
+        const bool ok = round_trip(f.w, back);
+        bool same = ok && back.nation_tech.size() == f.w.nation_tech.size();
+        if (same)
+            for (const auto& [nid, s] : f.w.nation_tech)
+            {
+                const auto it = back.nation_tech.find(nid);
+                same = same && it != back.nation_tech.end() && it->second.es_held == s.es_held
+                    && it->second.es_queue == s.es_queue && it->second.held == s.held;
+            }
+        check(ok && same && back.state_hash(0) == f.w.state_hash(0),
+              "ES8 the Early Space held set and queue round-trip exactly, equal hash");
+        std::stringstream b82(std::ios::in | std::ios::out | std::ios::binary);
+        write_world_snapshot(f.w, b82);
+        const std::string bytes = b82.str();
+        std::ostringstream o81(std::ios::binary);
+        write_world_snapshot_pre_early_space(f.w, o81);
+        const std::string s81 = o81.str();
+        world old;
+        std::stringstream in81(s81, std::ios::in | std::ios::binary);
+        const bool ok81 = read_world_snapshot(old, in81);
+        check(world_save_version >= k_world_save_version_space_nodes
+                  && s81.size() + world_save_space_tail_bytes_after(k_world_save_version_research_books, f.w) /* the space merge: a v89 stream carries no space section */ == bytes.size()
+                  && ok81 && old.nation_tech.at(f.nation).es_empty(),
+              "ES8b the pre-Early-Space writer (v89 since the space merge) is today less every space section, and reads as no Early Space progress");
+
+        // A world with NO Early Space progress: the section is its 4-byte count only,
+        // and the hash is the Digitisation-only fold (no Early Space tag folded).
+        fixture e = make_fixture();
+        e.w.nation_tech[e.nation].held.set(static_cast<std::size_t>(rocketry));
+        const std::uint64_t h0 = e.w.state_hash(0);
+        e.w.nation_tech[e.nation].es_held.set(static_cast<std::size_t>(root));
+        const std::uint64_t h1 = e.w.state_hash(0);
+        e.w.nation_tech[e.nation].es_held.reset();
+        check(world_save_early_space_section_bytes(e.w) == 4 && h1 != h0 && e.w.state_hash(0) == h0,
+              "ES8c Early Space progress moves the hash; none leaves a 4-byte empty section and the Digitisation-only hash");
+
+        auto refused = [&](void (*corrupt)(world&, const fixture&), const char* what) {
+            world bad = f.w;
+            corrupt(bad, f);
+            world dest = f.w;
+            const std::uint64_t before = dest.state_hash(0);
+            check(!round_trip(bad, dest) && dest.state_hash(0) == before, what);
+        };
+        refused([](world& w, const fixture& fx) {
+                    auto& q = w.nation_tech[fx.nation].es_queue;
+                    q.push_back(q.front());
+                }, "ES9a a duplicate Early Space queue entry refuses the stream, destination untouched");
+        refused([](world& w, const fixture& fx) {
+                    auto& s = w.nation_tech[fx.nation];
+                    s.es_held.set(s.es_queue.front());
+                }, "ES9b a queued Early Space node already held refuses the stream");
+        refused([](world& w, const fixture& fx) {
+                    w.nation_tech[fx.nation].es_queue.push_back(static_cast<std::uint16_t>(io::es::node_count));
+                }, "ES9c a queued index outside the Early Space tree refuses the stream");
+
+        // Byte tampers on the tail itself. The section: count 0, then record 0 at 4 as
+        // (id 4, node count 8, held words 12...).
+        const std::size_t sec = bytes.size() - world_save_early_space_section_bytes(f.w) - (world_save_space_node_section_bytes(f.w) + (world_save_space_unit_section_bytes(f.w) + (world_save_space_battle_section_bytes(f.w) + (world_save_prospecting_section_bytes(f.w) + (world_save_space_convoy_section_bytes(f.w) + (world_save_debris_section_bytes(f.w) + (world_save_space_bombard_section_bytes(f.w) + (world_save_offworld_base_section_bytes(f.w) + (world_save_space_firsts_section_bytes(f.w) + world_save_transit_origin_section_bytes(f.w))))))))));
+        auto tampered = [&](std::size_t off, std::uint32_t v) {
+            std::string tb = bytes;
+            std::memcpy(&tb[off], &v, 4);
+            std::stringstream ts(tb, std::ios::in | std::ios::binary);
+            world vv;
+            vv.current_econ_tick = 77;
+            return !read_world_snapshot(vv, ts) && vv.current_econ_tick == 77;
+        };
+        check(tampered(sec + 8, static_cast<std::uint32_t>(io::es::node_count + 1)),
+              "ES9d a held set wider than this build's tree refuses the stream");
+        check(tampered(sec + 8, 50u), "ES9e a held bit past the written node count refuses the stream");
+        check(tampered(sec + 4, 0x7FFFFFF0u), "ES9f a record naming no nation_tech entry refuses the stream");
+        check(tampered(sec, 9u), "ES9g a count past the nation_tech map refuses the stream");
+    }
+}
+
+// ---------------------------------------------------------------------------
 // T1/T2 — tech-effects-wired (BL-1274): the effect audit and the lever rows
 // ---------------------------------------------------------------------------
 
@@ -1149,8 +1417,23 @@ void rows_t2(const recipe_registry& reg)
                         && recipe_unlocked(f.w, reg, f.corp2, reg.recipe_id(name));
         bool all_types = true;
         for (std::uint8_t ty = 0; ty < building_type_count; ++ty)
+        {
+            // BL-1582: the Astronaut Training Centre is gated by a MECHANIC key
+            // (SPACE_ASSETS.md § Astronauts), not a structure unlock; checked below.
+            if (static_cast<building_type>(ty) == building_type::astronaut_training_centre)
+                continue;
+            // BL-1599: the Orbital Defence Battery is gated by its mechanic key alike.
+            if (static_cast<building_type>(ty) == building_type::orbital_defence_battery)
+                continue;
             all_types = all_types && structure_unlocked(f.w, f.corp2, static_cast<building_type>(ty));
-        check(open && all_types, "T2l no node names propellant or a structure: propellant and every building type open to every nation");
+        }
+        check(open && all_types, "T2l no node names propellant or a structure: propellant and every other building type open to every nation");
+        check(structure_unlocked(f.w, f.corp2, building_type::astronaut_training_centre)
+                  == nation_has_mechanic(f.w, owner_home_nation(f.w, f.corp2), space_keys::astronaut_training),
+              "T2l2 the Astronaut Training Centre opens exactly with its mechanic key");
+        check(structure_unlocked(f.w, f.corp2, building_type::orbital_defence_battery)
+                  == nation_has_mechanic(f.w, owner_home_nation(f.w, f.corp2), space_keys::orbital_defence_battery),
+              "T2l3 the Orbital Defence Battery opens exactly with its mechanic key (BL-1599)");
     }
 
     // (e2) Wind Power (Ben, 2026-11-05): the one recipe a node opens. Closed to both
@@ -1199,6 +1482,61 @@ void rows_t2(const recipe_registry& reg)
         check(closed && holder && other,
               "T2m Rocketry: space_dispatch is closed to every nation at the start, open to its holder only");
         check(nation_mechanic(f.w, f.nation, "no_such_mechanic"), "T2n a mechanic no node names is open");
+    }
+
+    // (g) BL-1592 / BL-1607: the space keys (space_tech_keys.hpp) through nation_has_mechanic.
+    {
+        fixture f = make_fixture();
+        // Every near-space key: closed at the start, open to the holder of its one node only.
+        int near_ok = 0, near_n = 0;
+        for (const std::string_view key : space_keys::near_space)
+        {
+            ++near_n;
+            int carrier = -1, carriers = 0;
+            for (int i = 0; i < io::dg::node_count; ++i)
+                if (node_has_mechanic(i, key)) { carrier = i; ++carriers; }
+            if (carriers != 1)
+            {
+                std::printf("     near-space key %.*s sits on %d nodes\n", static_cast<int>(key.size()), key.data(), carriers);
+                continue;
+            }
+            fixture g = make_fixture();
+            const bool closed = !nation_has_mechanic(g.w, g.nation, key) && !nation_has_mechanic(g.w, g.other, key);
+            g.w.nation_tech[g.nation].held.set(static_cast<std::size_t>(carrier));
+            const bool open = nation_has_mechanic(g.w, g.nation, key) && !nation_has_mechanic(g.w, g.other, key);
+            near_ok += closed && open ? 1 : 0;
+        }
+        check(near_n > 0 && near_ok == near_n,
+              "SK1 every near-space key sits on one Digitisation node: closed at the start, open to its holder only");
+        // Far-space keys are the Early Space tree's: no Digitisation node carries one, and
+        // nation_has_mechanic is closed for them even holding the whole Digitisation tree.
+        f.w.nation_tech[f.nation].held.set();
+        bool far_closed = true;
+        for (const std::string_view key : space_keys::far_space)
+        {
+            bool on_es = false;
+            for (const io::es::effect& e : io::es::effects)
+                on_es = on_es || (e.kind == io::es::effect_kind::mechanic && key == e.target);
+            for (int i = 0; i < io::dg::node_count; ++i)
+                far_closed = far_closed && !node_has_mechanic(i, key);
+            far_closed = far_closed && on_es && !nation_has_mechanic(f.w, f.nation, key);
+        }
+        check(far_closed, "SK2 every far-space key is an Early Space node's, and closed to a nation holding all of Digitisation");
+        check(!nation_has_mechanic(f.w, f.nation, "no_such_mechanic"),
+              "SK3 nation_has_mechanic: a key no node carries is closed (unlike nation_mechanic)");
+        // Each Early Space branch is keyed by the Digitisation quest naming it.
+        bool keyed = io::es::branch_count == 3;
+        for (int b = 0; b < io::es::branch_count; ++b)
+        {
+            const int q = early_space_branch_key_node(b);
+            keyed = keyed && q >= 0 && io::dg::nodes[static_cast<std::size_t>(q)].is_quest;
+            fixture g = make_fixture();
+            keyed = keyed && !early_space_branch_keyed(g.w, g.nation, b);
+            if (q >= 0) g.w.nation_tech[g.nation].held.set(static_cast<std::size_t>(q));
+            keyed = keyed && early_space_branch_keyed(g.w, g.nation, b) && !early_space_branch_keyed(g.w, g.other, b);
+        }
+        check(keyed && early_space_branch_key_node(-1) == -1 && early_space_branch_key_node(io::es::branch_count) == -1,
+              "SK4 each Early Space branch is keyed by the Digitisation quest that names it, for its holder only");
     }
 }
 
@@ -2053,6 +2391,10 @@ void rows_r0(const std::vector<std::uint32_t>& seeds, int quarters, bool twice, 
     constexpr double k_min_reach = 0.90;
     // The targets scale with the RP unit: set at 100 RP a unit (16 quarters, median 8-12, p10 >= 4),
     // and Ben's 200 (an age is ~80 years) doubles them. --quarters should be 16 x the scale.
+    // RE-PINNED (Ben, 2026-11-10, NR-1214): median 6-10 and p10 >= 2.5 x scale. Cause: nations
+    // owning their ground (the 2026-10-24 wave, chiefly the fold, f1d05dfc) brought the first major
+    // forward; pooled over the 16 library seeds the median read 15-19 and p10 5-7 at scale 2 from
+    // 2026-10-25 on, against the old 16-24 and 8.
     const double sc = used.rp_per_cost_unit / 100.0;
     double tree_units = 0.0;
     for (int n = 0; n < io::dg::node_count; ++n) tree_units += io::dg::nodes[static_cast<std::size_t>(n)].cost_units;
@@ -2061,11 +2403,11 @@ void rows_r0(const std::vector<std::uint32_t>& seeds, int quarters, bool twice, 
                 "  the whole tree (%.0f units, %.0f RP at the opening price; R4 runs the rising one) in %.0f quarters (%.1f years).\n",
                 best_full, tree_units, tree_units * used.rp_per_cost_unit, tree_q, tree_q / 4.0);
     std::printf("  thresholds: >= %.0f%% reach it in %d; median in [%.0f, %.0f]; p10 >= %.0f\n",
-                100.0 * k_min_reach, static_cast<int>(16 * sc), 8 * sc, 12 * sc, 4 * sc);
+                100.0 * k_min_reach, static_cast<int>(16 * sc), 6 * sc, 10 * sc, 2.5 * sc);
     check(quarters >= static_cast<int>(16 * sc) && frac >= k_min_reach,
           "R0g PACING: >= 90% of nations with a source reach their first ring-2 major in 16 x scale quarters");
-    check(med_q >= 8.0 * sc && med_q <= 12.0 * sc, "R0h PACING: the median nation reaches it in 8-12 x scale quarters");
-    check(fast_q >= 4.0 * sc, "R0i PACING: the fastest decile takes no fewer than ~4 x scale quarters");
+    check(med_q >= 6.0 * sc && med_q <= 10.0 * sc, "R0h PACING: the median nation reaches it in 6-10 x scale quarters");
+    check(fast_q >= 2.5 * sc, "R0i PACING: the fastest decile takes no fewer than ~2.5 x scale quarters");
 }
 
 // ---------------------------------------------------------------------------
@@ -2538,6 +2880,208 @@ void rows_r7(const std::vector<std::uint32_t>& seeds, int years, const dial_over
     check(med_first >= 4.0 && med_first <= 6.0, "R7d PACING: the median nation's first major lands in about five years (4-6)");
 }
 
+// ---------------------------------------------------------------------------
+// ESS — BL-1613 the Early Space tree's surfaces: the verb, the queue edits and
+// the projection over the tail, the modifier fold, the rival picker
+// ---------------------------------------------------------------------------
+
+corp_command es_cmd(entity_id actor, corp_verb verb, std::uint32_t order)
+{
+    corp_command c;
+    c.corp  = actor;
+    c.verb  = verb;
+    c.order = order;
+    return c;
+}
+
+void rows_es_surfaces(const recipe_registry& reg)
+{
+    std::printf("\nESS the Early Space tree's surfaces (BL-1613)\n");
+    const research_params& rp = reg.research();
+    const int rocketry = node("DG-NE-SO-B");
+    const int quest    = early_space_branch_key_node(0);
+    const int major    = quest >= 0 ? io::dg::nodes[static_cast<std::size_t>(quest)].groups[0][0] : -1;
+    const int root     = es_node("ES-PR-IP-T1");
+    const int t2       = es_node("ES-PR-IP-T2");
+    const int a1       = es_node("ES-PR-IP-A1");
+
+    // The seat's nation, past the gate and keyed for In-Situ Propellant.
+    const auto seated = [&](bool gate) {
+        fixture f = make_fixture();
+        f.w.player_entity = f.nation; // BL-1407: the player IS its nation
+        f.w.current_econ_tick = k_campaign_settle_ticks;
+        auto& st = f.w.nation_tech[f.nation];
+        st.held.set(static_cast<std::size_t>(rocketry));
+        st.held.set(static_cast<std::size_t>(major));
+        if (gate)
+            stage_ground(f, true, 5.0f);
+        return f;
+    };
+
+    // ESS1 the verb, validated as untrusted: every refusal mutates nothing.
+    {
+        fixture g = seated(false);
+        const std::uint64_t h = g.w.state_hash(0);
+        const corp_command_result locked =
+            apply_corp_command(g.w, reg, es_cmd(g.nation, corp_verb::queue_space_research, static_cast<std::uint32_t>(root)));
+        check(locked == corp_command_result::rejected_state && g.w.state_hash(0) == h
+                  && g.w.nation_tech[g.nation].es_queue.empty(),
+              "ESS1 before the gate the verb is refused (rejected_state), nothing mutated");
+
+        fixture f = seated(true);
+        const std::uint64_t hf = f.w.state_hash(0);
+        const bool bad_order =
+            apply_corp_command(f.w, reg, es_cmd(f.nation, corp_verb::queue_space_research,
+                                                static_cast<std::uint32_t>(io::es::node_count))) == corp_command_result::rejected_invalid
+            && apply_corp_command(f.w, reg, es_cmd(f.nation, corp_verb::queue_space_research, 0xFFFFFFFFu)) == corp_command_result::rejected_invalid
+            && apply_corp_command(f.w, reg, es_cmd(f.nation, corp_verb::unqueue_space_research,
+                                                   static_cast<std::uint32_t>(io::es::node_count))) == corp_command_result::rejected_invalid;
+        check(bad_order && f.w.state_hash(0) == hf, "ESS1b an out-of-tree order is rejected_invalid, whole, nothing mutated");
+        const bool not_seat =
+            apply_corp_command(f.w, reg, es_cmd(f.other, corp_verb::queue_space_research, static_cast<std::uint32_t>(root)))
+            == corp_command_result::rejected_state;
+        check(not_seat && f.w.state_hash(0) == hf, "ESS1c a nation that is not the seat may not queue through the verb");
+        const bool unkeyed =
+            apply_corp_command(f.w, reg, es_cmd(f.nation, corp_verb::queue_space_research,
+                                                static_cast<std::uint32_t>(es_node("ES-ST-SF-T1"))))
+            == corp_command_result::rejected_state;
+        check(unkeyed && f.w.state_hash(0) == hf, "ESS1d an unkeyed branch's node is refused past the gate, nothing mutated");
+    }
+
+    // ESS2-ESS4 the verb queues; unqueue, remove-last and clear cover the tail.
+    {
+        fixture f = seated(true);
+        std::vector<std::uint16_t> plan;
+        const enqueue_result pre = preview_enqueue_early_space(f.w, f.nation, a1, &plan, rp);
+        const std::uint64_t h = f.w.state_hash(0);
+        check(pre == enqueue_result::queued && plan.size() == 3 && f.w.state_hash(0) == h,
+              "ESS2 the preview plans Remote Prospecting with two requirements ahead, mutating nothing");
+        const corp_command_result q =
+            apply_corp_command(f.w, reg, es_cmd(f.nation, corp_verb::queue_space_research, static_cast<std::uint32_t>(a1)));
+        const auto& st = f.w.nation_tech[f.nation];
+        check(q == corp_command_result::applied && st.es_queue == plan && st.queue.empty(),
+              "ESS2b the verb queues exactly the previewed plan on the Early Space tail");
+        check(apply_corp_command(f.w, reg, es_cmd(f.nation, corp_verb::queue_space_research, static_cast<std::uint32_t>(t2)))
+                  == corp_command_result::rejected_state,
+              "ESS2c a node already queued is refused (rejected_state)");
+
+        const std::vector<std::uint16_t> deps = queued_early_space_dependents(f.w, f.nation, t2);
+        const corp_command_result u =
+            apply_corp_command(f.w, reg, es_cmd(f.nation, corp_verb::unqueue_space_research, static_cast<std::uint32_t>(t2)));
+        check(deps.size() == 2 && u == corp_command_result::applied && st.es_queue.size() == 1 && st.es_queue[0] == root,
+              "ESS3 unqueue takes Cryogenics II off with Remote Prospecting, which needs it; Cryogenics I stays");
+        const std::uint64_t h3 = f.w.state_hash(0);
+        check(apply_corp_command(f.w, reg, es_cmd(f.nation, corp_verb::unqueue_space_research, static_cast<std::uint32_t>(a1)))
+                      == corp_command_result::rejected_state
+                  && f.w.state_hash(0) == h3,
+              "ESS3b unqueue of a node not queued is refused, nothing mutated");
+
+        // One logical queue: a Digitisation entry, then the tail.
+        enqueue_node(f.w, f.nation, node("DG-ST-FO-T1"));
+        apply_corp_command(f.w, reg, es_cmd(f.nation, corp_verb::queue_space_research, static_cast<std::uint32_t>(t2)));
+        const std::vector<int> arr = project_queue_arrivals(f.w, f.nation, rp);
+        bool ordered = arr.size() == st.queue.size() + st.es_queue.size() && arr.size() == 3;
+        for (std::size_t i = 0; ordered && i < arr.size(); ++i)
+            ordered = arr[i] > 0 && (i == 0 || arr[i] >= arr[i - 1]);
+        std::printf("     arrivals (quarters): %d %d %d\n", arr.size() > 0 ? arr[0] : -9,
+                    arr.size() > 1 ? arr[1] : -9, arr.size() > 2 ? arr[2] : -9);
+        check(ordered, "ESS4 the projection covers the tail: one arrival per entry, Digitisation first, all finite, in order");
+
+        apply_corp_command(f.w, reg, es_cmd(f.nation, corp_verb::unqueue_research, unqueue_last));
+        check(st.queue.size() == 1 && st.es_queue.size() == 1 && st.es_queue[0] == root,
+              "ESS4b Remove last drops the tail's last entry first (the last of the one queue)");
+        check(apply_corp_command(f.w, reg, es_cmd(f.nation, corp_verb::clear_research, 0)) == corp_command_result::applied
+                  && st.queue.empty() && st.es_queue.empty(),
+              "ESS4c Clear empties both halves");
+        fixture e = seated(true);
+        enqueue_early_space_node(e.w, e.nation, root, rp);
+        check(apply_corp_command(e.w, reg, es_cmd(e.nation, corp_verb::clear_research, 0)) == corp_command_result::applied
+                  && e.w.nation_tech[e.nation].es_queue.empty(),
+              "ESS4d Clear applies to a queue holding only an Early Space entry");
+    }
+
+    // ESS5 the modifier fold: Early Space rows reach nation_scalar.
+    {
+        fixture f = seated(true);
+        effect_target prop;
+        prop.resource = static_cast<int>(resource_type::propellant);
+        effect_target steel;
+        steel.resource = static_cast<int>(resource_type::steel);
+        const float before = nation_scalar(f.w, f.nation, modifier_subject::processing_yield, prop, 1.0f);
+        auto& st = f.w.nation_tech[f.nation];
+        st.es_held.set(static_cast<std::size_t>(root));
+        st.es_held.set(static_cast<std::size_t>(t2));
+        const float after = nation_scalar(f.w, f.nation, modifier_subject::processing_yield, prop, 1.0f);
+        const float other = nation_scalar(f.w, f.nation, modifier_subject::processing_yield, steel, 1.0f);
+        const float node_only = early_space_node_scalar_at(root, modifier_subject::processing_yield, prop);
+        std::printf("     propellant yield %.6f -> %.6f; one node %.6f\n", static_cast<double>(before),
+                    static_cast<double>(after), static_cast<double>(node_only));
+        // `before` carries the fixture's held Digitisation rows (its major's propellant
+        // yield); the Early Space rows fold after them, multiplying.
+        check(std::fabs(after - before * 1.01f * 1.01f) < 1e-5f && other == 1.0f
+                  && std::fabs(node_only - 1.01f) < 1e-6f,
+              "ESS5 held Cryogenics I+II fold +1% propellant yield each into nation_scalar; other goods untouched");
+        fixture bare = make_fixture();
+        bare.w.nation_tech[bare.nation].es_held.set(static_cast<std::size_t>(root));
+        check(std::fabs(nation_scalar(bare.w, bare.nation, modifier_subject::processing_yield, prop, 1.0f) - 1.01f) < 1e-6f,
+              "ESS5b a nation holding ONLY Early Space nodes still folds them (no Digitisation short-circuit)");
+    }
+
+    // ESS6 the rival picker weighs Early Space nodes once the gate is met.
+    {
+        const auto rival = [&](bool gate, bool all_dg) {
+            fixture f = make_fixture();
+            f.w.player_entity = f.other; // `nation` is AI-run
+            f.w.current_econ_tick = k_campaign_settle_ticks;
+            auto& st = f.w.nation_tech[f.nation];
+            if (all_dg)
+                st.held.set();
+            st.held.set(static_cast<std::size_t>(rocketry));
+            st.held.set(static_cast<std::size_t>(major));
+            if (gate)
+                stage_ground(f, true, 5.0f);
+            return f;
+        };
+        fixture f = rival(true, true);
+        const research_ai_pick pk = choose_research_node(f.w, reg, f.nation, reg.nation_ai());
+        std::printf("     every Digitisation node held, gate met: pick %s (early_space %d, %d candidates, score %lld)\n",
+                    pk.node < 0 ? "(none)" : (pk.early_space ? io::es::nodes[static_cast<std::size_t>(pk.node)].id
+                                                             : io::dg::nodes[static_cast<std::size_t>(pk.node)].id),
+                    pk.early_space ? 1 : 0, pk.candidates, static_cast<long long>(pk.score_milli));
+        check(pk.node >= 0 && pk.early_space && io::es::nodes[static_cast<std::size_t>(pk.node)].is_root,
+              "ESS6 with the Digitisation tree done and the gate met, the rival picks an Early Space root");
+        std::vector<research_ai_pick> picks;
+        const int queued = run_nation_research_ai(f.w, reg, false, &picks);
+        const auto& st = f.w.nation_tech[f.nation];
+        check(queued == 1 && st.queue.empty() && st.es_queue.size() == 1 && static_cast<int>(st.es_queue[0]) == pk.node,
+              "ESS6b the quarterly pass queues it on the Early Space tail");
+        check(!research_queue_idle(f.w, f.nation, rp) && run_nation_research_ai(f.w, reg, false, nullptr) == 0,
+              "ESS6c a live Early Space entry keeps the queue busy: one node at a time");
+        fixture f2 = rival(true, true);
+        run_nation_research_ai(f2.w, reg, false, nullptr);
+        check(f2.w.state_hash(0) == f.w.state_hash(0), "ESS6d the Early Space pick is deterministic (same state_hash)");
+
+        fixture g = rival(false, true);
+        const research_ai_pick none = choose_research_node(g.w, reg, g.nation, reg.nation_ai());
+        check(none.node < 0 && !none.early_space, "ESS6e gate unmet and the Digitisation tree done: nothing to pick");
+        fixture h = rival(true, false);
+        const std::uint64_t hb = h.w.state_hash(0);
+        const research_ai_pick mixed = choose_research_node(h.w, reg, h.nation, reg.nation_ai());
+        fixture hn = rival(false, false);
+        const research_ai_pick dg_only = choose_research_node(hn.w, reg, hn.nation, reg.nation_ai());
+        std::printf("     early tree, gate met: %d candidates (gate unmet: %d)\n", mixed.candidates, dg_only.candidates);
+        check(mixed.candidates > dg_only.candidates && h.w.state_hash(0) == hb,
+              "ESS6f with the gate met the Early Space roots join the candidates; the pick writes nothing");
+
+        // A lapsed gate leaves a tail-only queue idle, so the nation keeps picking.
+        fixture l = rival(true, true);
+        run_nation_research_ai(l.w, reg, false, nullptr);
+        for (auto& [mid, m] : l.w.markets)
+            m.inventory[static_cast<std::size_t>(resource_type::propellant)] = 0.0f;
+        check(research_queue_idle(l.w, l.nation, rp), "ESS6g a tail locked by a lapsed gate reads idle");
+    }
+}
+
 } // namespace
 
 int main(int argc, char** argv)
@@ -2627,6 +3171,7 @@ int main(int argc, char** argv)
     rows_r1();
     rows_r2();
     rows_r3();
+    rows_es(); // BL-1612
     rows_r5();
     {
         // The real data layer, as app::load_economy loads it: the audit checks
@@ -2640,6 +3185,7 @@ int main(int argc, char** argv)
         rows_t1(reg);
         rows_t2(reg);
         rows_r6(reg);
+        rows_es_surfaces(reg); // BL-1613
         // BL-1432 review: Alarm's capability factors are authored as the level
         // they SETTLE AT, and the loader derives the per-tick weight as level x
         // alarm_decay_per_tick, so a decay retune keeps the authored level.

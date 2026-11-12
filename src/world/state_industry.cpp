@@ -939,8 +939,19 @@ bool capital_free_source(const world& w, entity_id building)
     if (own == w.tile_to_nation.end())
         return false;
     const auto nit = w.nations.find(own->second);
-    if (nit == w.nations.end() || nit->second.capital_tile != bit->second.tile)
+    if (nit == w.nations.end())
         return false;
+    // BL-1601 (NATIONS.md § Off-world bases): a base is its nation's capital on its
+    // body, so the one source on it runs free as the home capital's does.
+    if (nit->second.capital_tile != bit->second.tile)
+    {
+        if (w.offworld_bases.empty())
+            return false;
+        const auto bt = w.tiles.find(bit->second.tile);
+        if (bt == w.tiles.end()
+            || offworld_base_capital(w, own->second, bt->second.body) != bit->second.tile)
+            return false;
+    }
     entity_id lowest = null_entity;
     bool held = false;
     for (const entity_id bid : nit->second.state_assets)

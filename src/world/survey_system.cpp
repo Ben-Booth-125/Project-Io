@@ -149,6 +149,8 @@ void advance_surveys(world& w, int days)
     {
         survey_state& s = b.survey;
         if (s.phase == survey_phase::hidden || s.phase == survey_phase::surveyed) continue;
+        // BL-1600: a body mapped from orbit for the player runs no probe schedule.
+        if (s.phase == survey_phase::scanning && s.ticks_remaining == k_survey_ticks_orbit_mapped) continue;
 
         const survey_schedule sched = survey_compute_schedule(w, id);
         int budget = days;
@@ -189,4 +191,177 @@ void advance_surveys(world& w, int days)
             if (budget <= 0 && s.ticks_remaining > 0) break;
         }
     }
+}
+
+// ---------------------------------------------------------------------------
+// Mapping, then prospecting (BL-1600) — see survey_system.hpp
+// ---------------------------------------------------------------------------
+
+namespace {
+
+int region_count_of(const world& w, entity_id body)
+{
+    const auto it = w.bodies.find(body);
+    return it == w.bodies.end() ? 0 : survey_region_count(it->second.grid_width, it->second.grid_height);
+}
+
+/// The player's mirror into the one per-body store (see the header). Writes only
+/// a body no dispatched probe owns: `hidden`, or already mapped from orbit.
+void mirror_player_view(world& w, entity_id nation, entity_id body, const body_survey_knowledge& k)
+{
+    if (nation == null_entity || nation != player_nation(w))
+        return;
+    survey_state& s = w.bodies.at(body).survey;
+    const bool orbit_owned = s.phase == survey_phase::hidden
+        || (s.phase == survey_phase::scanning && s.ticks_remaining == k_survey_ticks_orbit_mapped);
+    if (!orbit_owned)
+        return;
+    bool all = k.regions_mapped >= k.regions_total;
+    for (std::size_t i = 0; all && i < k.prospected.size(); ++i)
+        all = k.prospected[i] != 0;
+    s.regions_total = k.regions_total;
+    s.regions_done  = k.regions_mapped;
+    if (all)
+    {
+        s.phase           = survey_phase::surveyed;
+        s.ticks_remaining = 0;
+    }
+    else
+    {
+        s.phase           = survey_phase::scanning;
+        s.ticks_remaining = k_survey_ticks_orbit_mapped;
+    }
+}
+
+} // namespace
+
+bool survey_knowledge_applies(const world& w, entity_id body)
+{
+    if (body == null_entity || body == w.home_body || body == w.star_body)
+        return false;
+    const auto it = w.bodies.find(body);
+    return it != w.bodies.end() && it->second.type != body_type::star
+        && survey_region_count(it->second.grid_width, it->second.grid_height) > 0
+        && it->second.grid_width > 0 && it->second.grid_height > 0;
+}
+
+const body_survey_knowledge* survey_knowledge_of(const world& w, entity_id nation, entity_id body)
+{
+    const auto it = w.survey_knowledge.find({nation, body});
+    return it == w.survey_knowledge.end() ? nullptr : &it->second;
+}
+
+bool survey_region_mapped(const world& w, entity_id nation, entity_id body, int region)
+{
+    if (body != null_entity && body == w.home_body)
+        return true;
+    const body_survey_knowledge* k = survey_knowledge_of(w, nation, body);
+    return k != nullptr && region >= 0 && region < k->regions_mapped;
+}
+
+bool survey_region_prospected(const world& w, entity_id nation, entity_id body, int region)
+{
+    if (body != null_entity && body == w.home_body)
+        return true;
+    const body_survey_knowledge* k = survey_knowledge_of(w, nation, body);
+    return k != nullptr && region >= 0 && region < k->regions_mapped
+        && static_cast<std::size_t>(region) < k->prospected.size() && k->prospected[region] != 0;
+}
+
+namespace {
+int tile_region(const world& w, entity_id body, int col, int row)
+{
+    const auto it = w.bodies.find(body);
+    if (it == w.bodies.end())
+        return -1;
+    const int gw = it->second.grid_width, gh = it->second.grid_height;
+    if (col < 0 || row < 0 || col >= gw || row >= gh)
+        return -1;
+    return survey_region_of(gw, gh, col, row);
+}
+} // namespace
+
+bool survey_tile_mapped(const world& w, entity_id nation, entity_id body, int col, int row)
+{
+    const int r = tile_region(w, body, col, row);
+    return r >= 0 && survey_region_mapped(w, nation, body, r);
+}
+
+bool survey_tile_prospected(const world& w, entity_id nation, entity_id body, int col, int row)
+{
+    const int r = tile_region(w, body, col, row);
+    return r >= 0 && survey_region_prospected(w, nation, body, r);
+}
+
+bool survey_body_surveyed_for(const world& w, entity_id nation, entity_id body)
+{
+    if (body != null_entity && body == w.home_body)
+        return true;
+    const body_survey_knowledge* k = survey_knowledge_of(w, nation, body);
+    if (k == nullptr || k->regions_total <= 0 || k->regions_mapped < k->regions_total)
+        return false;
+    for (const uint8_t b : k->prospected)
+        if (b == 0)
+            return false;
+    return true;
+}
+
+int survey_map_regions(world& w, entity_id nation, entity_id body, int k)
+{
+    if (k <= 0 || nation == null_entity || w.nations.count(nation) == 0 || !survey_knowledge_applies(w, body))
+        return 0;
+    const int total = region_count_of(w, body);
+    auto it = w.survey_knowledge.find({nation, body});
+    if (it == w.survey_knowledge.end())
+    {
+        body_survey_knowledge fresh;
+        fresh.regions_total = total;
+        fresh.prospected.assign(static_cast<std::size_t>(total), 0);
+        it = w.survey_knowledge.emplace(std::make_pair(nation, body), std::move(fresh)).first;
+    }
+    body_survey_knowledge& kn = it->second;
+    const int before = kn.regions_mapped;
+    kn.regions_mapped = std::min(kn.regions_total, kn.regions_mapped + k);
+    mirror_player_view(w, nation, body, kn);
+    return kn.regions_mapped - before;
+}
+
+survey_prospect_result survey_prospect_region(world& w, entity_id nation, entity_id body, int* region_out)
+{
+    if (region_out)
+        *region_out = -1;
+    if (nation == null_entity || w.nations.count(nation) == 0 || !survey_knowledge_applies(w, body))
+        return survey_prospect_result::invalid;
+    const auto it = w.survey_knowledge.find({nation, body});
+    if (it == w.survey_knowledge.end())
+        return survey_prospect_result::not_mapped;
+    body_survey_knowledge& kn = it->second;
+    if (survey_body_surveyed_for(w, nation, body))
+        return survey_prospect_result::complete;
+
+    // The landing stands at region 0 (no landing tile is modelled): the nearest
+    // unprospected mapped region by squared region-cell distance, ties low index.
+    const body_component& b = w.bodies.at(body);
+    const int rc = survey_region_cols(b.grid_width);
+    int best = -1;
+    long long best_d = 0;
+    for (int r = 0; r < kn.regions_mapped; ++r)
+    {
+        if (kn.prospected[static_cast<std::size_t>(r)] != 0)
+            continue;
+        const long long cx = r % rc, cy = r / rc;
+        const long long d = cx * cx + cy * cy;
+        if (best < 0 || d < best_d)
+        {
+            best = r;
+            best_d = d;
+        }
+    }
+    if (best < 0)
+        return survey_prospect_result::not_mapped;
+    kn.prospected[static_cast<std::size_t>(best)] = 1;
+    if (region_out)
+        *region_out = best;
+    mirror_player_view(w, nation, body, kn);
+    return survey_prospect_result::prospected;
 }

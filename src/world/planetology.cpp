@@ -176,6 +176,7 @@ enum : uint32_t
     tag_accretion = 0x51A1u,
     tag_breath    = 0xB6EAu,
     tag_green     = 0x67EEu,
+    tag_physique  = 0x9A55u, ///< BL-1638: a non-home body's radius / cmf / mantle roll.
 };
 
 } // namespace
@@ -195,15 +196,19 @@ struct prototype_entry
 };
 
 // Mercury / Earth / Luna / a stripped metallic asteroid. Order matters: it is the
-// order the report and the generation screen list bodies in.
+// order the report and the generation screen list bodies in. The masses here are
+// placeholders for the three non-home bodies (BL-1638): `generated_prototype_body`
+// rolls each one's radius and density from its seed inside its `mass_kind` band.
 const prototype_entry k_prototypes[] = {
-    { [] { body_inputs b{}; b.name = "Cinder"; b.mass_earths = 0.055f;   b.orbit_au = 0.39f; return b; }(), 0xC1D0001u },
+    { [] { body_inputs b{}; b.name = "Cinder"; b.mass_earths = 0.055f;   b.orbit_au = 0.39f;
+           b.mass_kind = body_mass_kind::planet; return b; }(),                                              0xC1D0001u },
     { [] { body_inputs b{}; b.name = "Kepler"; b.mass_earths = 1.000f;   b.orbit_au = 1.00f;
            b.is_homeworld = true; return b; }(),                                                             0xE471001u },
     { [] { body_inputs b{}; b.name = "Selene"; b.mass_earths = 0.0123f;  b.orbit_au = 1.00f;
-           b.parent_mass_earths = 1.0f; b.parent_orbit_au = 0.00257f; b.eccentricity = 0.055f; return b; }(), 0x5E1E001u },
+           b.parent_mass_earths = 1.0f; b.parent_orbit_au = 0.00257f; b.eccentricity = 0.055f;
+           b.mass_kind = body_mass_kind::moon; return b; }(),                                                0x5E1E001u },
     { [] { body_inputs b{}; b.name = "Pallas"; b.mass_earths = 0.000034f; b.orbit_au = 3.05f;
-           b.core_fragment = true; return b; }(),                                                            0x9A11A5u  },
+           b.core_fragment = true; b.mass_kind = body_mass_kind::core_fragment; return b; }(),              0x9A11A5u  },
 };
 
 constexpr int k_prototype_count = static_cast<int>(sizeof(k_prototypes) / sizeof(k_prototypes[0]));
@@ -222,6 +227,35 @@ uint32_t prototype_body_seed(int index)
 {
     const int i = (index < 0) ? 0 : (index >= k_prototype_count ? k_prototype_count - 1 : index);
     return k_prototypes[i].seed;
+}
+
+// BL-1638 (generated body mass; PLANETOLOGY.md § The prototype body set). Three
+// draws on the body's own seed, on a stage tag no chain stage uses, so the roll
+// perturbs nothing downstream: radius, then core mass fraction, then mantle
+// density. Density is the two-layer mix, and mass is density x volume in Earth
+// units — M = (rho / rho_earth) R^3 — so no cube root is taken.
+body_inputs generate_body_physique(const body_inputs& in, uint32_t body_seed,
+                                   const body_mass_bands& bands)
+{
+    if (in.is_homeworld)
+        return in;
+    body_inputs out = in;
+    const body_mass_band& b = bands.of(in.mass_kind);
+    rng r(body_seed, tag_physique);
+    const float radius = r.range(b.radius_min_earths, b.radius_max_earths);
+    const float cmf    = r.range(b.cmf_min, b.cmf_max);
+    const float mantle = r.range(b.mantle_min_gcc, b.mantle_max_gcc);
+    const float rho    = 1.0f / (cmf / bands.core_density_gcc + (1.0f - cmf) / mantle);
+    out.radius_earths      = radius;
+    out.core_mass_fraction = cmf;
+    out.density_gcc        = rho;
+    out.mass_earths        = (rho / bands.earth_density_gcc) * radius * radius * radius;
+    return out;
+}
+
+body_inputs generated_prototype_body(int index, uint32_t world_seed)
+{
+    return generate_body_physique(prototype_body(index), world_seed ^ prototype_body_seed(index));
 }
 
 // ---------------------------------------------------------------------------
@@ -439,7 +473,7 @@ void preview_system(const planetology_params& p, float home_orbit_au, uint32_t s
     const body_naming naming = generate_body_names(seed);
     for (int i = 0; i < k_prototype_count; ++i)
     {
-        body_inputs in = k_prototypes[i].in;
+        body_inputs in = generated_prototype_body(i, seed); // BL-1638: the built body's mass
         in.name = naming.bodies[static_cast<std::size_t>(i)].c_str();
         // The homeworld's orbit is derived from the star, so the preview has to
         // use it too — otherwise the charts describe a world at 1 AU that the
@@ -737,7 +771,8 @@ planetology_state run_planetology(const body_inputs& in,
     rng r1(seed, tag_accretion);
 
     // The homeworld's mass is decided by the player at the Accretion stage; every
-    // other body keeps its authored value. Taken here so v_esc, the heat budget
+    // other prototype body arrives with its GENERATED mass (BL-1638,
+    // generate_body_physique). Taken here so v_esc, the heat budget
     // and the mobile-lid floor all read the same number.
     const float mass = in.is_homeworld ? clampf(p.home_mass, 0.5f, 2.0f) : in.mass_earths;
 
@@ -753,7 +788,11 @@ planetology_state run_planetology(const body_inputs& in,
     // Above the threshold, the rocky relation. Below it, constant density: R
     // scales as the cube root of mass against the Moon's anchor (0.0123 M_E,
     // 0.2725 R_E).
-    const float radius = mass >= 0.05f
+    // A body whose physique was generated (BL-1638) brings its radius with it —
+    // the mass was computed FROM that radius, so re-deriving it would disagree.
+    // The homeworld never carries one.
+    const float radius = (!in.is_homeworld && in.radius_earths > 0.0f) ? in.radius_earths
+        : mass >= 0.05f
         ? std::sqrt(std::sqrt(mass))
         : 0.2725f * det_cbrt(mass / 0.0123f);
 

@@ -31,6 +31,10 @@
 #include "ui/construction_panel.hpp"
 #include "ui/construction_sites.hpp" // the site finder (Ben, 2026-10-25): construction_sites.lua
 #include "ui/selection_panel.hpp"
+#include "ui/prospect_view.hpp"  // BL-1610: verify.prospect_mask, the two-step survey mask as drawn
+#include "world/offworld_base.hpp"   // BL-1610: the base fixture's dials
+#include "world/space_convoy.hpp"    // BL-1610: the base kit held aboard
+#include "world/space_tech_keys.hpp" // BL-1610: space_keys::base_founding
 #include "ui/stat_grid.hpp"      // BL-1454: verify.stat_grids, the grids on screen
 #include "ui/hover_card.hpp"     // freezable_tooltip_frozen: a Raise row's card frozen
 #include "ui/alerts.hpp"        // BL-1515: verify.alerts
@@ -67,6 +71,9 @@
 #include "world/logistic_points.hpp"  // lp_sea_walk: the chain fixture's far port
 #include "world/state_industry.hpp" // BL-1255: state_uncommitted_treasury (rail_state)
 #include "ui/rail_tool.hpp"          // BL-1255: rail_player_nation
+#include "world/orbital_graph.hpp"   // BL-1590: orbital_slot_capacity - the near-space fixture
+#include "ui/circum_units.hpp"      // BL-1609: space_hull_label, the fleet reads
+#include "world/space_units.hpp"     // BL-1609: the space fleet fixture
 #include "world/market_clearing.hpp" // BL-1241: stage_one mirrors place_building's market emergence
 #include "world/trade.hpp"           // BL-1516: market_trade_points, corp_trade_markets - the gate check
 #include "world/placement_rules.hpp"
@@ -79,6 +86,10 @@
 #include "world/stockpile_budget.hpp" // BL-1042: the budget this search-less path states
 #include "world/resource_names.hpp" // resource_from_name(name, ok): the air-gate / sea-lane fixtures
 #include "world/supply_system.hpp"  // price_convoy_leg: the sea-lane fixture prices as the dispatch does
+#include "world/digitisation_tree_data.hpp" // space_ledger_fixture: hold every Digitisation node
+#include "world/early_space_tree_data.hpp" // BL-1613: tech_tree_node / tech_tree_queue name Early Space ids
+#include "world/space_tech_keys.hpp"        // space_ledger_fixture: keep far-space keys closed
+#include "world/stations.hpp"               // space_ledger(): the designer's slot kinds
 
 #include <algorithm>
 #include <array>
@@ -1770,6 +1781,8 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             case ui::selection_kind::corporation: k = "corporation"; break;
             case ui::selection_kind::wing:        k = "wing";        break; // BL-1450
             case ui::selection_kind::ship:        k = "ship";        break; // BL-1534
+            case ui::selection_kind::space_asset: k = "space_asset"; break; // BL-1590
+            case ui::selection_kind::space_unit:  k = "space_unit";  break; // BL-1609
             default:                              k = "none";        break;
             }
             // BL-1427: a front is a fourth non-entity channel; the band draws it
@@ -1883,6 +1896,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             else if (m_ui.show_convoys_ledger)      panel = "convoys";
             else if (m_ui.show_military_ledger)     panel = "military"; // slot 7
             else if (m_ui.show_diplomacy_ledger)    panel = "diplomacy"; // slot 8
+            else if (m_ui.show_space_ledger)        panel = "space";     // slot 9
             else if (m_ui.show_generation_ledger)   panel = "generation_ledger";
             else if (m_ui.show_decision_feed)       panel = "decisions";
             else if (m_ui.show_strategy_readout)    panel = "strategy";
@@ -3039,6 +3053,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         else if (name == "convoys")      m_ui.show_convoys_ledger = open;
         else if (name == "military")     m_ui.show_military_ledger = open; // slot 7
         else if (name == "diplomacy")    m_ui.show_diplomacy_ledger = open; // slot 8
+        else if (name == "space")        m_ui.show_space_ledger = open; // slot 9
         else if (name == "balance")      m_ui.show_balance_ledger = open;
         else if (name == "corporation")  m_ui.show_corporation_panel = open;
         // "build" is the tile-selection BUILD BAR, which is a section of the
@@ -3167,6 +3182,194 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         return out;
     });
 
+    // THE SPACE LEDGER (rail slot 9; docs/ui/ledgers/space.md): what it drew this
+    // frame and nothing else — the open view, every tab's press, the launch class
+    // and role presses, the destination rows (node, free slots, press), the Launch
+    // press with its refusal and quote, the asset rows, the station rows, the
+    // designer's grid (each slot's module kind, edge mark and state), the module
+    // list's presses, the budgets as drawn, the template presses, Upgrade, the
+    // crew read and the pending line's count. Verify-only, behind --verify.
+    v.set_function("space_ledger", [this]() {
+        sol::state& st = m_lua.state();
+        const auto& m = m_ui.space;
+        sol::table out = st.create_table();
+        const auto press_t = [&st](const space_ledger_state::drawn_press& p) {
+            sol::table e = st.create_table();
+            e["x"] = p.x; e["y"] = p.y; e["enabled"] = p.enabled; e["reason"] = p.reason; e["id"] = p.id;
+            return e;
+        };
+        const auto presses_t = [&](const std::vector<space_ledger_state::drawn_press>& v) {
+            sol::table t = st.create_table();
+            int k = 0;
+            for (const auto& p : v)
+                t[++k] = press_t(p);
+            return t;
+        };
+        out["open"]    = m_ui.show_space_ledger;
+        out["view"]    = m.view;
+        out["message"] = m.message;
+        out["pending_orders"] = m.pending_orders;
+        out["view_top"]       = m.view_top;
+        out["view_bottom"]    = m.view_bottom;
+        sol::table tabs = st.create_table();
+        for (int i = 0; i < 4; ++i)
+        {
+            sol::table e = st.create_table();
+            e["x"] = m.tab_x[i]; e["y"] = m.tab_y[i];
+            tabs[i + 1] = e;
+        }
+        out["tabs"] = tabs;
+        out["launch_class"]  = m.launch_class;
+        out["launch_role"]   = m.launch_role;
+        out["class_presses"] = presses_t(m.class_presses);
+        out["role_presses"]  = presses_t(m.role_presses);
+        sol::table nodes = st.create_table();
+        int k = 0;
+        for (const auto& n : m.node_rows)
+        {
+            sol::table e = st.create_table();
+            e["body"] = static_cast<unsigned>(n.body); e["kind"] = n.kind;
+            e["x"] = n.x; e["y"] = n.y; e["free"] = n.free; e["capacity"] = n.capacity; e["chosen"] = n.chosen;
+            nodes[++k] = e;
+        }
+        out["node_rows"]   = nodes;
+        out["launch"]      = press_t(m.launch_press);
+        out["launch_cost"] = m.launch_cost;
+        sol::table assets = st.create_table();
+        k = 0;
+        for (const auto& a : m.asset_rows)
+        {
+            sol::table e = st.create_table();
+            e["id"] = static_cast<unsigned>(a.id); e["cls"] = a.cls; e["role"] = a.role; e["state"] = a.state;
+            e["covered"] = a.covered; e["pending"] = a.pending; e["x"] = a.x; e["y"] = a.y;
+            assets[++k] = e;
+        }
+        out["asset_rows"]     = assets;
+        out["retask_presses"] = presses_t(m.retask_presses);
+        out["station_rows"]   = presses_t(m.station_rows);
+        out["station"]        = static_cast<unsigned>(m.station);
+        out["slot"]           = m.slot;
+        out["moving"]         = m.moving;
+        out["grid_w"]         = m.grid_w;
+        out["grid_h"]         = m.grid_h;
+        sol::table slots = st.create_table();
+        k = 0;
+        for (const auto& s : m.slots)
+        {
+            sol::table e = st.create_table();
+            e["idx"] = s.idx; e["kind"] = s.kind; e["core"] = s.core; e["edge"] = s.edge;
+            e["state"] = s.state; e["x"] = s.x; e["y"] = s.y;
+            slots[++k] = e;
+        }
+        out["slots"]            = slots;
+        out["module_presses"]   = presses_t(m.module_presses);
+        out["remove"]           = press_t(m.remove_press);
+        out["move"]             = press_t(m.move_press);
+        out["save"]             = press_t(m.save_press);
+        out["upgrade"]          = press_t(m.upgrade_press);
+        out["template_presses"] = presses_t(m.template_presses);
+        sol::table b = st.create_table();
+        b["drawn"] = m.budget.drawn;
+        b["power_supply"] = m.budget.power_supply; b["power_draw"] = m.budget.power_draw;
+        b["crew_room"] = m.budget.crew_room; b["life_support"] = m.budget.life_support;
+        b["crew_aboard"] = m.budget.crew_aboard; b["crew_needed"] = m.budget.crew_needed;
+        b["working"] = m.budget.working; b["stopped"] = m.budget.stopped; b["idle_edge"] = m.budget.idle_edge;
+        out["budget"] = b;
+        sol::table c = st.create_table();
+        c["drawn"] = m.crew.drawn; c["pool"] = m.crew.pool; c["cap"] = m.crew.cap;
+        c["centres"] = m.crew.centres; c["running"] = m.crew.running; c["rate"] = m.crew.rate;
+        c["needed"] = m.crew.needed; c["aboard"] = m.crew.aboard;
+        out["crew"] = c;
+        return out;
+    });
+
+    // Type the Space ledger's template name (the InputText a player types into).
+    // Verify-only: a script cannot type into an ImGui field. Clipped to 64 bytes.
+    v.set_function("space_template_name", [this](const std::string& name) {
+        std::snprintf(m_ui.space.template_name, sizeof(m_ui.space.template_name), "%s", name.c_str());
+    });
+
+    // THE SPACE LEDGER'S STAGING FIXTURE. Gives the player nation what a launch
+    // needs, so the ledger's presses can be made through the real seam: every
+    // Digitisation node held (less one side of each pick-one pair - the side that
+    // carries no near-space key goes; far-space keys stay closed by construction),
+    // a completed, staffed Launchpad and Astronaut Training Centre on its capital
+    // tile, 40 astronauts, a treasury of at least 5M, and the home market's shelf
+    // stocked with spacecraft components and propellant. Founds NO station: the
+    // script launches the core through the ledger. Returns whether it staged and
+    // counts only - no position, no tile. Verify-only, behind --verify.
+    v.set_function("space_ledger_fixture", [this]() {
+        sol::state& st = m_lua.state();
+        sol::table out = st.create_table();
+        out["ok"] = false;
+        const entity_id nation = player_nation(m_world);
+        const auto nit = m_world.nations.find(nation);
+        if (nit == m_world.nations.end())
+            return out;
+        nation_component& nc = nit->second;
+        // Every node, less the non-space side of each exclusive pair.
+        const auto carries_space_key = [](int n) {
+            for (const std::string_view key : space_keys::near_space)
+                if (node_has_mechanic(n, key))
+                    return true;
+            return false;
+        };
+        auto& held = m_world.nation_tech[nation].held;
+        held.set();
+        for (int n = 0; n < io::dg::node_count; ++n)
+        {
+            const int ex = io::dg::nodes[static_cast<std::size_t>(n)].excludes;
+            if (ex < 0 || !held.test(static_cast<std::size_t>(n)) || !held.test(static_cast<std::size_t>(ex)))
+                continue;
+            held.reset(static_cast<std::size_t>(carries_space_key(n) ? ex : n));
+        }
+        nc.astronauts = std::max(nc.astronauts, 40);
+        nc.treasury   = std::max(nc.treasury, 5.0e6f);
+        // The pad and the centre stand on the capital tile, when it is on the home body.
+        const entity_id home = space_home_body_of(m_world, nation);
+        entity_id tile = nc.capital_tile;
+        if (const auto tit = m_world.tiles.find(tile); tit == m_world.tiles.end() || tit->second.body != home)
+            tile = null_entity;
+        int staged = 0;
+        const auto stage = [&](building_type type) {
+            building_component bc{};
+            bc.tile = tile;
+            bc.type = type;
+            bc.workforce_assigned = 1.0f;
+            bc.ticks_remaining = 0;
+            const entity_id id = m_world.create_entity();
+            m_world.buildings[id]  = bc;
+            m_world.stockpiles[id] = stockpile_component{};
+            nc.state_assets.push_back(id);
+            ++staged;
+        };
+        if (tile != null_entity)
+        {
+            if (!space_has_staffed_pad(m_world, nation, home))
+                stage(building_type::launchpad);
+            stage(building_type::astronaut_training_centre);
+        }
+        out["staged"] = staged;
+        bool shelf = false;
+        if (const auto mit = m_world.markets.find(space_home_market(m_world, nation)); mit != m_world.markets.end())
+        {
+            for (const resource_type r : {resource_type::spacecraft_components, resource_type::propellant})
+            {
+                const std::size_t i = static_cast<std::size_t>(r);
+                mit->second.inventory[i] = std::max(mit->second.inventory[i], 100000.0f);
+                if (!(mit->second.price[i] > 0.0f))
+                    mit->second.price[i] = mit->second.base_price[i] > 0.0f ? mit->second.base_price[i] : 100.0f;
+            }
+            shelf = true;
+        }
+        out["shelf"]      = shelf;
+        out["pad"]        = space_has_staffed_pad(m_world, nation, home);
+        out["astronauts"] = nc.astronauts;
+        out["home_body"]  = static_cast<unsigned>(home); // the body whose node rows the script presses
+        out["ok"]         = shelf && space_has_staffed_pad(m_world, nation, home);
+        return out;
+    });
+
     v.set_function("military_ledger", [this]() {
         sol::state& st = m_lua.state();
         const auto& m = m_ui.military;
@@ -3221,20 +3424,20 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         // shows; then the Air picker's airbases, every air row's Raise press, the
         // player's wing rows, the Design tab's air class rows and the Sea stub's
         // ports. On screen already.
-        static const char* const k_theatres[3] = {"land", "air", "sea"};
+        static const char* const k_theatres[4] = {"land", "air", "sea", "space"}; // BL-1609: Design adds Space
         sol::table ttabs = st.create_table();
         k = 0;
         for (const auto& h : m.theatre_tabs)
         {
             sol::table e = st.create_table();
             e["tab"] = h.tab;
-            e["theatre"] = std::string(k_theatres[std::clamp(h.theatre, 0, 2)]);
+            e["theatre"] = std::string(k_theatres[std::clamp(h.theatre, 0, 3)]);
             e["x"] = h.x; e["y"] = h.y; e["active"] = h.active; e["count"] = h.count;
             ttabs[++k] = e;
         }
         out["theatre_tabs"]   = ttabs;
         out["recruit_theatre"] = std::string(k_theatres[std::clamp(m.theatre[0], 0, 2)]);
-        out["design_theatre"]  = std::string(k_theatres[std::clamp(m.theatre[1], 0, 2)]);
+        out["design_theatre"]  = std::string(k_theatres[std::clamp(m.theatre[1], 0, 3)]);
         sol::table ports = st.create_table();
         k = 0;
         for (const auto& b : m.ports)
@@ -3931,6 +4134,46 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         }
         return out;
     });
+    // BL-1603 (LAYOUT.md § Pinned items): the pinned panel and the pin toggle as drawn
+    // last frame - each card's kind (front or pin), what it names (a body for a front
+    // pin, the enemy nation beside it) and its centre; the toggle's centre and state;
+    // and the canvas framing a double-click moves (rung, active body, planetary pan,
+    // and whether a centre-on-tile is queued). Everything on screen; no tile position.
+    v.set_function("pinned_panel", [this](sol::this_state ts) {
+        sol::state_view lua(ts);
+        sol::table out = lua.create_table();
+        const auto& d = m_ui.pinned.drawn;
+        out["panel"] = d.panel;
+        out["x"] = d.x; out["y"] = d.y; out["w"] = d.w; out["h"] = d.h;
+        out["pins"] = static_cast<int>(m_ui.pinned.pins.size());
+        int fronts = 0;
+        sol::table cards = lua.create_table();
+        int i = 0;
+        for (const auto& c : d.cards)
+        {
+            sol::table row = lua.create_table();
+            row["front"] = c.front;
+            row["id"]    = static_cast<double>(c.id);
+            row["enemy"] = static_cast<double>(c.enemy);
+            row["x"] = c.x; row["y"] = c.y; row["w"] = c.w; row["h"] = c.h;
+            cards[++i] = row;
+            fronts += c.front ? 1 : 0;
+        }
+        out["cards"]  = cards;
+        out["fronts"] = fronts;
+        out["toggle_x"]  = d.toggle_x;
+        out["toggle_y"]  = d.toggle_y;
+        out["toggle_on"] = d.toggle_on;
+        out["toggle_subject"] = static_cast<double>(d.toggle_subject);
+        out["level"]       = static_cast<int>(m_ui.primary_level);
+        out["active_body"] = static_cast<double>(m_ui.active_body);
+        out["pan_x"]       = m_ui.planetary_pan_x;
+        out["pan_y"]       = m_ui.planetary_pan_y;
+        out["center_pending"] = m_ui.planetary_center_pending;
+        out["selected"]    = static_cast<double>(m_ui.selected_entity);
+        out["front_selected"] = m_ui.has_front_selection();
+        return out;
+    });
     // BL-1515: which ledger stands open, so a check can read where a click-through led.
     v.set_function("open_ledgers", [this](sol::this_state ts) {
         sol::state_view lua(ts);
@@ -4057,6 +4300,513 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         else if (name == "diplomacy")     m_ui.diplomacy.view = view;   // 0 = Nations, 1 = Wars
     });
 
+    // The Circumplanetary rung's orbital nodes (BL-1590): each node as the rung
+    // LAST DREW it — name, screen centre, ring radius (0 for a diamond), slot
+    // capacity and free slots — so a script aims verify.hover at "<moon> L4"
+    // by name. Only what the screen draws; no tile data. Render a frame on the
+    // rung before asking. `circum_node_hovered()` names the hovered node, or "".
+    v.set_function("circum_nodes", [this](sol::this_state ts) -> sol::table {
+        sol::state_view lua(ts);
+        sol::table out = lua.create_table();
+        int i = 1;
+        for (const auto& n : m_ui.circum_nodes_drawn)
+        {
+            sol::table row = lua.create_table();
+            row["name"]     = n.name;
+            row["x"]        = n.x;
+            row["y"]        = n.y;
+            row["ring_r"]   = n.ring_r;
+            row["capacity"] = n.capacity;
+            row["free"]     = n.free;
+            row["clamped"]  = n.clamped;
+            out[i++] = row;
+        }
+        return out;
+    });
+    v.set_function("circum_node_hovered", [this]() -> std::string {
+        return m_ui.circum_node_hovered;
+    });
+    // BL-1590 part 2: each satellite and station as the rung LAST DREW it - its
+    // id, owner, kind ("satellite" / "station"), whether it is in transit, its
+    // screen centre and drawn radius, and the node it is drawn at. Only what
+    // the screen draws. `circum_asset_hovered()` is the hovered one's id, or 0.
+    v.set_function("circum_assets", [this](sol::this_state ts) -> sol::table {
+        sol::state_view lua(ts);
+        sol::table out = lua.create_table();
+        int i = 1;
+        for (const auto& a : m_ui.circum_assets_drawn)
+        {
+            sol::table row = lua.create_table();
+            row["id"]         = static_cast<unsigned>(a.id);
+            row["owner"]      = static_cast<unsigned>(a.owner);
+            row["kind"]       = std::string(a.station ? "station" : "satellite");
+            row["in_transit"] = a.in_transit;
+            row["x"]          = a.x;
+            row["y"]          = a.y;
+            row["r"]          = a.r;
+            row["node"]       = a.node;
+            out[i++] = row;
+        }
+        return out;
+    });
+    v.set_function("circum_asset_hovered", [this]() -> unsigned {
+        return static_cast<unsigned>(m_ui.circum_asset_hovered);
+    });
+    // BL-1614: each transit segment as the rung LAST DREW it - the asset's id,
+    // the segment's two screen ends and the marker's share of the way. Only what
+    // the screen draws.
+    v.set_function("circum_transits", [this](sol::this_state ts) -> sol::table {
+        sol::state_view lua(ts);
+        sol::table out = lua.create_table();
+        int i = 1;
+        for (const auto& s : m_ui.circum_transits_drawn)
+        {
+            sol::table row = lua.create_table();
+            row["id"]    = static_cast<unsigned>(s.id);
+            row["x0"]    = s.x0;
+            row["y0"]    = s.y0;
+            row["x1"]    = s.x1;
+            row["y1"]    = s.y1;
+            row["share"] = s.share;
+            out[i++] = row;
+        }
+        return out;
+    });
+    // BL-1609 (fleet UI): each fleet mark as the Circumplanetary rung LAST DREW it -
+    // its lead unit, owner, hull, count, whether it travels, its screen centre and
+    // radius, the node it sits at (or is bound for) and, travelling, its share of the
+    // way. Only what the screen draws. `circum_fleet_hovered()` is the hovered lead.
+    auto fleet_rows = [](sol::state_view lua, const std::vector<ui_state::fleet_drawn>& rows) {
+        sol::table out = lua.create_table();
+        int i = 1;
+        for (const auto& f : rows)
+        {
+            sol::table row = lua.create_table();
+            row["lead"]       = static_cast<unsigned>(f.lead);
+            row["owner"]      = static_cast<unsigned>(f.owner);
+            row["hull"]       = std::string(ui::space_hull_label(f.hull));
+            row["count"]      = f.count;
+            row["in_transit"] = f.in_transit;
+            row["x"]          = f.x;
+            row["y"]          = f.y;
+            row["r"]          = f.r;
+            row["node"]       = f.node;
+            row["share"]      = f.share;
+            out[i++] = row;
+        }
+        return out;
+    };
+    v.set_function("circum_fleets", [this, fleet_rows](sol::this_state ts) -> sol::table {
+        return fleet_rows(sol::state_view(ts), m_ui.circum_fleets_drawn);
+    });
+    v.set_function("solar_fleets", [this, fleet_rows](sol::this_state ts) -> sol::table {
+        return fleet_rows(sol::state_view(ts), m_ui.solar_fleets_drawn);
+    });
+    v.set_function("circum_fleet_hovered", [this]() -> unsigned {
+        return static_cast<unsigned>(m_ui.circum_fleet_hovered);
+    });
+    // BL-1609: each node's debris mark as drawn - the node's name, its level (the
+    // node's hover card prints it) and the mark's centre.
+    v.set_function("circum_debris", [this](sol::this_state ts) -> sol::table {
+        sol::state_view lua(ts);
+        sol::table out = lua.create_table();
+        int i = 1;
+        for (const auto& d : m_ui.circum_debris_drawn)
+        {
+            sol::table row = lua.create_table();
+            row["node"]  = d.node;
+            row["level"] = d.level;
+            row["x"]     = d.x;
+            row["y"]     = d.y;
+            out[i++] = row;
+        }
+        return out;
+    });
+    // BL-1609: the space-unit card's presses as the Selection band LAST DREW them -
+    // each press's name, centre, whether it is on and its refusal; the destination
+    // rows of an armed Move (node, centre, the path's delta-v, the budget, whether it
+    // fits, whether chosen); the preview; the target rows of an armed Bombard; and
+    // the seam's last message. Only what the card draws.
+    auto press_rows = [](sol::state_view lua, const std::vector<space_fleet_ui_state::press>& ps) {
+        sol::table out = lua.create_table();
+        int i = 1;
+        for (const auto& p : ps)
+        {
+            sol::table row = lua.create_table();
+            row["name"] = p.name; row["x"] = p.x; row["y"] = p.y;
+            row["enabled"] = p.enabled; row["reason"] = p.reason;
+            out[i++] = row;
+        }
+        return out;
+    };
+    v.set_function("fleet_card", [this, press_rows](sol::this_state ts) -> sol::table {
+        sol::state_view lua(ts);
+        const auto& f = m_ui.fleet;
+        sol::table out = lua.create_table();
+        out["unit"]           = static_cast<unsigned>(f.unit);
+        out["move_armed"]     = f.move_armed;
+        out["bombard_armed"]  = f.bombard_armed;
+        out["preview_dv"]     = f.preview_dv;
+        out["preview_budget"] = f.preview_budget;
+        out["message"]        = m_ui.space.message;
+        out["presses"]        = press_rows(lua, f.presses);
+        out["targets"]        = press_rows(lua, f.target_rows);
+        sol::table dests = lua.create_table();
+        int i = 1;
+        for (const auto& r : f.dest_rows)
+        {
+            sol::table row = lua.create_table();
+            row["node"] = r.node; row["x"] = r.x; row["y"] = r.y;
+            row["dv"] = r.dv; row["budget"] = r.budget;
+            row["affordable"] = r.affordable; row["chosen"] = r.chosen;
+            dests[i++] = row;
+        }
+        out["dest_rows"] = dests;
+        return out;
+    });
+    // BL-1610: the space-unit card's base orders as the Selection band LAST DREW
+    // them - an armed Found base's site rows (label, centre, the site tile's grid
+    // position, chosen, whether its deposits are read), the colonists and kit lines
+    // (-1 where the card drew none), and whether each order is lit. Only what the
+    // card draws; the presses themselves are fleet_card().presses.
+    v.set_function("base_card", [this](sol::this_state ts) -> sol::table {
+        sol::state_view lua(ts);
+        const auto& f = m_ui.fleet;
+        sol::table out = lua.create_table();
+        out["unit"]             = static_cast<unsigned>(f.unit);
+        out["embark_armed"]     = f.embark_armed;
+        out["embark_count"]     = f.embark_count;
+        out["found_armed"]      = f.found_armed;
+        out["colonists_aboard"] = f.colonists_aboard;
+        out["free_berths"]      = f.free_berths;
+        out["colonists_here"]   = f.colonists_here;
+        out["colonists_need"]   = f.colonists_need;
+        out["kit_here"]         = f.kit_here;
+        out["kit_need"]         = f.kit_need;
+        sol::table sites = lua.create_table();
+        int i = 1;
+        for (const auto& r : f.site_rows)
+        {
+            sol::table row = lua.create_table();
+            row["name"] = r.name; row["x"] = r.x; row["y"] = r.y;
+            row["col"] = r.col; row["row"] = r.row;
+            row["chosen"] = r.chosen; row["prospected"] = r.prospected;
+            sites[i++] = row;
+        }
+        out["sites"] = sites;
+        return out;
+    });
+    // BL-1610: the two-step survey mask as the Planetary canvas LAST DREW it on the
+    // active body - tiles under the mapped-not-prospected wash, goods the Resource
+    // lens's key offered (-1 before it drew), and the mapped / prospected / total
+    // region counts its title reads for the player (all = true where no mask
+    // applies: the home world, the star, a surveyed body). Only what is drawn.
+    v.set_function("prospect_mask", [this](sol::this_state ts) -> sol::table {
+        sol::state_view lua(ts);
+        sol::table out = lua.create_table();
+        out["washed"]   = m_ui.prospect_drawn.washed;
+        out["key_rows"] = m_ui.prospect_drawn.key_rows;
+        const ui::prospect_view pv = ui::prospect_view_of(m_world, m_ui.active_body);
+        out["all"] = pv.all;
+        int mapped = 0, prospected = 0, total = 0;
+        if (pv.k != nullptr)
+        {
+            mapped = pv.k->regions_mapped;
+            total  = pv.k->regions_total;
+            for (const uint8_t b : pv.k->prospected)
+                prospected += b != 0 ? 1 : 0;
+        }
+        out["mapped"] = mapped; out["prospected"] = prospected; out["total"] = total;
+        return out;
+    });
+    // BL-1610: a verify-only STAGING fixture for the base and prospecting UI. It
+    // writes straight into the stores (no launch, research or haul verb: those are
+    // not what the card check is about), on the home body's first gridded moon:
+    // grants the player nation the Off-World Bases key; clears the moon's mirror and
+    // MAPS every region of it for the player (prospecting none); lands two player
+    // Landers on its surface - a passenger Lander carrying the founding's colonists
+    // and a cargo Lander holding the base kit - and puts a third, empty passenger
+    // Lander idle in the home low orbit. Returns the moon's name and the three unit
+    // ids (selection is by the real press), nothing else.
+    v.set_function("base_prospect_fixture", [this](sol::this_state ts) -> sol::table {
+        sol::state_view lua(ts);
+        sol::table out = lua.create_table();
+        out["staged"] = false;
+        const entity_id pn   = player_nation(m_world);
+        const entity_id home = m_world.home_body;
+        if (pn == null_entity || !m_world.bodies.count(home))
+            return out;
+        entity_id moon = null_entity;
+        for (const auto& [bid, b] : m_world.bodies)
+            if (b.parent == home && survey_knowledge_applies(m_world, bid)) { moon = bid; break; }
+        if (moon == null_entity)
+            return out;
+
+        nation_tech_state& ts_ = m_world.nation_tech[pn];
+        for (const io::es::effect& e : io::es::effects)
+            if (e.kind == io::es::effect_kind::mechanic && e.node >= 0 && e.node < io::es::node_count
+                && std::string_view(e.target) == space_keys::base_founding)
+                ts_.es_held.set(static_cast<std::size_t>(e.node));
+
+        m_world.bodies.at(moon).survey = {};
+        m_world.survey_knowledge.erase({pn, moon});
+        survey_map_regions(m_world, pn, moon, 1 << 20);
+
+        const auto& cat = space_item_catalogue();
+        const auto design_of = [&](const char* bay) {
+            space_design d;
+            d.fill(k_no_space_item);
+            const std::pair<space_unit_slot, const char*> items[] = {
+                {space_unit_slot::drive, "drive.chemical"}, {space_unit_slot::tanks, "tanks.extended"},
+                {space_unit_slot::bay, bay}};
+            for (const auto& [slot, iid] : items)
+                for (std::size_t i = 0; i < cat.size(); ++i)
+                    if (std::string_view(cat[i].id) == iid)
+                        d[static_cast<std::size_t>(slot)] = static_cast<uint8_t>(i);
+            return d;
+        };
+        const auto stage = [&](const char* bay, orbital_node node, space_unit_state state) {
+            space_unit u;
+            u.id     = m_world.create_entity();
+            u.owner  = pn;
+            u.hull   = space_hull::lander;
+            u.design = design_of(bay);
+            u.state  = state;
+            u.node   = node;
+            u.dest   = node;
+            const space_design_stats st = evaluate_space_design(u.hull, u.design);
+            u.hull_points = st.hull_points;
+            u.propellant  = st.tank;
+            u.crew        = st.crew;
+            u.upkeep      = st.upkeep;
+            m_world.space_units.emplace(u.id, u);
+            return u.id;
+        };
+        const offworld_base_params bp{};
+        const orbital_node surface{moon, orbital_node_kind::surface};
+        const entity_id passenger = stage("bay.passenger", surface, space_unit_state::landed);
+        const entity_id carrier   = stage("bay.cargo", surface, space_unit_state::landed);
+        const entity_id at_home   = stage("bay.passenger", {home, orbital_node_kind::low_orbit}, space_unit_state::idle);
+        m_world.space_colonists[passenger] = std::max<int32_t>(1, bp.min_colonists);
+        m_world.space_units.at(carrier).cargo = bp.kit_qty;
+        space_haul h;
+        h.owner     = pn;
+        h.phase     = space_haul_phase::held;
+        h.cargo_res = bp.kit_res;
+        h.target    = surface;
+        h.home      = surface;
+        m_world.space_hauls[carrier] = h;
+
+        out["staged"]    = true;
+        out["body"]      = m_world.bodies.at(moon).name;
+        out["passenger"] = static_cast<unsigned>(passenger);
+        out["carrier"]   = static_cast<unsigned>(carrier);
+        out["at_home"]   = static_cast<unsigned>(at_home);
+        return out;
+    });
+    // BL-1610: a verify-only STAGING call - prospect up to @p n regions of the active
+    // body for the player nation, by the prospecting rule itself (nearest the
+    // landing first, never ahead of mapping). Returns how many it prospected.
+    v.set_function("stage_prospect", [this](int n) -> int {
+        int done = 0;
+        for (int i = 0; i < n; ++i)
+            if (survey_prospect_region(m_world, player_nation(m_world), m_ui.active_body)
+                == survey_prospect_result::prospected)
+                ++done;
+            else
+                break;
+        return done;
+    });
+    // BL-1609: the Design tab's Space theatre as drawn - each hull row (name, centre,
+    // whether a live design stands), the open hull (-1 none) and its Save press.
+    v.set_function("space_designs", [this, press_rows](sol::this_state ts) -> sol::table {
+        sol::state_view lua(ts);
+        sol::table out = lua.create_table();
+        out["hull_rows"]      = press_rows(lua, m_ui.fleet.hull_rows);
+        out["design_presses"] = press_rows(lua, m_ui.fleet.design_presses);
+        out["open_hull"]      = m_ui.fleet.design_hull;
+        return out;
+    });
+    // BL-1609: a verify-only STAGING fixture for the fleet draw. It writes straight
+    // into the stores (no raise verb: the pad, the shelf and the keys are not what
+    // the canvas check is about): the player's Frigate design; two player Frigates
+    // idle in the home low orbit, tanks full; a third in transit from the home low
+    // orbit to the first moon's low orbit, a third of the way; a rival Frigate idle
+    // in the home high orbit; and debris at the home high orbit. Returns the counts
+    // it staged and the player nation's id, nothing else.
+    v.set_function("space_fleet_fixture", [this](sol::this_state ts) -> sol::table {
+        sol::state_view lua(ts);
+        sol::table out = lua.create_table();
+        out["units"] = 0;
+        out["in_transit"] = 0;
+        out["debris"] = false;
+        const entity_id pn   = player_nation(m_world);
+        const entity_id home = m_world.home_body;
+        if (pn == null_entity || !m_world.bodies.count(home))
+            return out;
+        out["player"] = static_cast<unsigned>(pn);
+        entity_id rival = null_entity;
+        for (const auto& [nid, n] : m_world.nations)
+            if (nid != pn) { rival = nid; break; }
+        entity_id moon = null_entity;
+        for (const auto& [bid, b] : m_world.bodies)
+            if (b.parent == home) { moon = bid; break; }
+
+        // The cheapest Frigate design the catalogue fits: the first item per slot.
+        space_design d{};
+        d.fill(k_no_space_item);
+        const auto& cat = space_item_catalogue();
+        for (std::size_t s = 0; s < space_unit_slot_count; ++s)
+        {
+            if (!space_hull_has_slot(space_hull::frigate, static_cast<space_unit_slot>(s)))
+                continue;
+            for (std::size_t i = 0; i < cat.size(); ++i)
+                if (static_cast<std::size_t>(cat[i].slot) == s
+                    && (cat[i].hull_mask & (1u << static_cast<unsigned>(space_hull::frigate))) != 0)
+                {
+                    d[s] = static_cast<uint8_t>(i);
+                    break;
+                }
+        }
+        const space_design_stats st = evaluate_space_design(space_hull::frigate, d);
+        if (!st.valid)
+            return out;
+        m_world.space_unit_designs[pn][static_cast<uint8_t>(space_hull::frigate)] = d;
+
+        int units = 0, moving = 0;
+        auto stage = [&](entity_id owner, orbital_node at, bool transit, orbital_node to) {
+            if (owner == null_entity || !m_world.bodies.count(at.body))
+                return;
+            space_unit u;
+            u.id    = m_world.create_entity();
+            u.owner = owner;
+            u.hull  = space_hull::frigate;
+            u.design = d;
+            u.node  = at;
+            u.dest  = transit ? to : at;
+            u.state = transit ? space_unit_state::in_transit : space_unit_state::idle;
+            if (transit)
+            {
+                const orbital_path_result p = orbital_path(m_world, orbital_graph_params{}, at, to);
+                const int days = std::max(1, static_cast<int>(std::ceil(p.ok ? p.days : 3.0)));
+                u.days_remaining = std::max(1, days - std::max(1, days / 3));
+                ++moving;
+            }
+            u.propellant  = st.tank;
+            u.hull_points = st.hull_points;
+            u.crew        = st.crew;
+            u.upkeep      = st.upkeep;
+            m_world.space_units.emplace(u.id, u);
+            ++units;
+        };
+        const orbital_node low  {home, orbital_node_kind::low_orbit};
+        const orbital_node high {home, orbital_node_kind::high_orbit};
+        stage(pn, low, false, low);
+        stage(pn, low, false, low);
+        if (moon != null_entity)
+            stage(pn, low, true, {moon, orbital_node_kind::low_orbit});
+        stage(rival, high, false, high);
+        m_world.space_debris[high] = 25.0f;
+        out["units"]      = units;
+        out["in_transit"] = moving;
+        out["debris"]     = true;
+        return out;
+    });
+    // BL-1590 part 2: a verify-only STAGING fixture for the near-space draw. It
+    // writes straight into the stores (no launch verb: the gate, the shelf and
+    // the treasury are not what the canvas check is about) and puts, at the home
+    // body's nodes where a slot is free: two player satellites in low orbit
+    // (observation, comms), a player station core in high orbit with one
+    // research module, a rival nation's navigation satellite in high orbit, and
+    // a player survey satellite in transit to the first moon's L4 (BL-1614: left
+    // the home low orbit a quarter ago, a quarter to go, its origin recorded).
+    // Returns the counts it staged and nothing else.
+    v.set_function("near_space_fixture", [this](sol::this_state ts) -> sol::table {
+        sol::state_view lua(ts);
+        sol::table out = lua.create_table();
+        out["satellites"] = 0;
+        out["stations"]   = 0;
+        const entity_id pn   = player_nation(m_world);
+        const entity_id home = m_world.home_body;
+        if (pn == null_entity || !m_world.bodies.count(home))
+            return out;
+        entity_id rival = null_entity;
+        for (const auto& [nid, n] : m_world.nations)
+            if (nid != pn) { rival = nid; break; }
+        entity_id moon = null_entity;
+        for (const auto& [bid, b] : m_world.bodies)
+            if (b.parent == home) { moon = bid; break; }
+
+        int sats = 0, stations = 0;
+        auto stage = [&](entity_id owner, space_asset_class cls, orbital_node node,
+                         space_satellite_role role, bool transit) -> entity_id {
+            if (owner == null_entity || !m_world.bodies.count(node.body))
+                return null_entity;
+            if (orbital_slots_held(m_world, node) >= orbital_slot_capacity(m_world, node))
+                return null_entity;
+            space_asset a;
+            a.id    = m_world.create_entity();
+            a.owner = owner;
+            a.cls   = cls;
+            a.node  = node;
+            a.dest  = {node.body, space_slot_of(node.kind)};
+            a.role  = role;
+            a.state = transit ? space_asset_state::in_transit : space_asset_state::active;
+            a.launch_tick  = m_world.current_econ_tick;
+            a.arrival_tick = m_world.current_econ_tick + (transit ? 2 : 0);
+            if (transit)
+            {
+                // BL-1614: a move out of the home low orbit, one quarter gone of
+                // two, so the rung draws its segment with the marker half-way.
+                a.launch_tick  = m_world.current_econ_tick - 1;
+                a.depart_tick  = a.launch_tick;
+                a.arrival_tick = m_world.current_econ_tick + 1;
+                a.transit_from = {home, orbital_node_kind::low_orbit};
+            }
+            const entity_id id = a.id;
+            m_world.space_assets.emplace(id, a);
+            return id;
+        };
+        const orbital_node low  {home, orbital_node_kind::low_orbit};
+        const orbital_node high {home, orbital_node_kind::high_orbit};
+        if (stage(pn, space_asset_class::satellite, low, space_satellite_role::observation, false)) ++sats;
+        if (stage(pn, space_asset_class::satellite, low, space_satellite_role::comms, false)) ++sats;
+        if (const entity_id core = stage(pn, space_asset_class::station_core, high,
+                                         space_satellite_role::none, false))
+        {
+            space_station st;
+            st.id = core; st.owner = pn; st.core = core; st.node = high; st.level = 0;
+            st.slots.assign(static_cast<std::size_t>(st.width() * st.height()), null_entity);
+            st.slots[static_cast<std::size_t>(st.centre())] = core;
+            space_asset& c = m_world.space_assets.at(core);
+            c.station = core; c.station_slot = static_cast<int16_t>(st.centre()); c.crew = 2;
+            space_asset mod;
+            mod.id = m_world.create_entity(); mod.owner = pn;
+            mod.cls = space_asset_class::station_module; mod.node = high;
+            mod.dest = {home, space_slot::orbit}; mod.state = space_asset_state::active;
+            mod.launch_tick = mod.arrival_tick = m_world.current_econ_tick;
+            mod.station = core; mod.station_slot = 0;
+            mod.module = static_cast<uint8_t>(station_module_kind::research); mod.crew = 1;
+            st.slots[0] = mod.id;
+            m_world.space_assets.emplace(mod.id, mod);
+            m_world.stations.emplace(core, std::move(st));
+            ++stations;
+        }
+        if (stage(rival, space_asset_class::satellite, high, space_satellite_role::navigation, false)) ++sats;
+        if (moon != null_entity
+            && stage(pn, space_asset_class::satellite, {moon, orbital_node_kind::l4},
+                     space_satellite_role::survey, true))
+            ++sats;
+        out["satellites"] = sats;
+        out["stations"]   = stations;
+        return out;
+    });
+    // The selected entity's id (0 = none), so a check can prove a press on a
+    // node leaves the selection as it was.
+    v.set_function("circum_selected", [this]() -> unsigned {
+        return static_cast<unsigned>(m_ui.selected_entity);
+    });
+
     // The research panel (BL-1276). `tech_tree_node(id)` answers the screen
     // centre of a Digitisation node as the ring LAST DREW it (x, y), or
     // (-1, -1) for an unknown id or a ring not on screen — so a script aims
@@ -4066,6 +4816,16 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     // as store ids, head first; `research_message()` the panel's last press
     // outcome (a refusal's reason).
     v.set_function("tech_tree_node", [this](const std::string& id) -> std::tuple<float, float> {
+        // BL-1613: an Early Space id ("ES-...") answers from the Early Space tree
+        // as last drawn - (-1, -1) unless that tree is on screen.
+        if (const int e = io::es::find_node(id); e >= 0)
+        {
+            const std::size_t need = static_cast<std::size_t>(io::es::node_count) * 2;
+            if (m_ui.tech_tree_es_node_screen.size() < need)
+                return {-1.0f, -1.0f};
+            return {m_ui.tech_tree_es_node_screen[static_cast<std::size_t>(e) * 2],
+                    m_ui.tech_tree_es_node_screen[static_cast<std::size_t>(e) * 2 + 1]};
+        }
         const int i = io::dg::find_node(id);
         const std::size_t need = static_cast<std::size_t>(io::dg::node_count) * 2;
         if (i < 0 || m_ui.tech_tree_node_screen.size() < need)
@@ -4084,6 +4844,33 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         for (const std::uint16_t n : it->second.queue)
             if (n < io::dg::node_count)
                 out[k++] = std::string(io::dg::nodes[n].id);
+        // BL-1613: then the Early Space tail - one logical queue, as the column lists it.
+        for (const std::uint16_t n : it->second.es_queue)
+            if (n < io::es::node_count)
+                out[k++] = std::string(io::es::nodes[n].id);
+        return out;
+    });
+
+    // BL-1613: the research canvas's age switch. `tech_tree_age()` reads which
+    // tree is shown (0 Digitisation, 1 Early Space), whether the Early Space tree
+    // was drawn locked (the gate into space unmet) and the lock line it showed,
+    // and each tab's centre as last drawn, so a script presses a tab through the
+    // real hit-test. What the screen shows, nothing more. Verify-only.
+    v.set_function("tech_tree_age", [this](sol::this_state ts) -> sol::table {
+        sol::state_view lua(ts);
+        sol::table out = lua.create_table();
+        out["age"]         = m_ui.tech_tree_age;
+        out["locked"]      = m_ui.tech_tree_es_locked;
+        out["lock_reason"] = m_ui.tech_tree_es_lock_reason;
+        const std::vector<float>& t = m_ui.tech_tree_age_tab_screen;
+        out["drawn"] = t.size() >= 4;
+        if (t.size() >= 4)
+        {
+            out["dg_x"] = t[0];
+            out["dg_y"] = t[1];
+            out["es_x"] = t[2];
+            out["es_y"] = t[3];
+        }
         return out;
     });
     v.set_function("research_message", [this]() -> std::string { return m_ui.research_message; });
@@ -4174,6 +4961,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         // above made the names worth checking against the actual call sites.
         else if (name == "construction")         target = "Construction";
         else if (name == "military")             target = "Military"; // slot 7: foldout_begin("Military")
+        else if (name == "space")                target = "Space";    // slot 9: foldout_begin("Space")
         else if (name == "diplomacy")            target = "##diplomacy_body"; // slot 8: its body scrolls in this child
         // The tile's building list scrolls in its own child (BL-1255: the rail
         // rows sit at the road ladder's foot and inside Infrastructure).

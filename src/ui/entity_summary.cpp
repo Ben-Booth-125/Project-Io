@@ -2,6 +2,7 @@
 #include "ui_scale.hpp" // BL-1495: px
 
 #include "presentation.hpp"
+#include "prospect_view.hpp" // BL-1610: deposits hidden until prospected
 
 #include "format.hpp"
 #include "world/unit_roster.hpp" // BL-459: unit_strength (strength is derived, not stored)
@@ -140,7 +141,13 @@ void draw_tile_summary(const world& w, entity_id id)
     ImGui::Text("Hazard: %.2f", tile.hazard_level);
     ImGui::Text("Habitability: %.2f", tile.habitability);
 
-    // Non-zero deposits, each with its identity swatch.
+    // Non-zero deposits, each with its identity swatch. BL-1610: mapped ground the
+    // player has not prospected names none (DISCOVERY.md § Mapping, then prospecting).
+    if (!tile_deposits_readable(w, tile))
+    {
+        ImGui::TextDisabled("Not yet prospected: deposits unknown");
+        return;
+    }
     bool any_deposit = false;
     for (std::size_t r = 0; r < resource_count; ++r)
     {

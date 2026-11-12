@@ -5,6 +5,7 @@
 #include "world/corp_command.hpp" // corp_command — the seam the ledger presses queue onto
 #include "world/entity.hpp"
 #include "world/sentiment.hpp"    // sentiment_value — the Diplomacy ledger's trend samples
+#include "world/space_command.hpp" // space_command — the Space ledger's presses queue onto it
 
 #include <imgui.h>
 #include <array>
@@ -468,6 +469,198 @@ struct war_notice_state
     std::vector<entity_id> ended_open;
     /// The campaign-lost notice's "Return to menu" press, read and cleared by app::render.
     bool request_menu = false;
+};
+
+/// The pinned-items watch list (LAYOUT.md § Pinned items — right column, middle;
+/// BL-216's pinned slice, BL-1603's front pins). `pins` is the player's own list,
+/// in the order pinned; it travels in the save's ui slice (save_game.hpp, LAYOUT
+/// 28). Front pins are NOT stored: they are derived from the war state each frame.
+/// `drawn` is what the panel and the pin toggle drew last frame, for verify.
+struct pinned_items_state
+{
+    std::vector<entity_id> pins;
+
+    struct card
+    {
+        bool      front  = false;        ///< A front pin (war-placed) rather than a player pin.
+        entity_id id     = null_entity;  ///< The pinned entity; the front's body for a front pin.
+        entity_id enemy  = null_entity;  ///< Front pins: the nation across the front.
+        float     x = 0.0f, y = 0.0f;    ///< Centre of the card as drawn.
+        float     w = 0.0f, h = 0.0f;
+    };
+    struct drawn_state
+    {
+        bool              panel    = false;  ///< The panel drew this frame.
+        float             x = 0.0f, y = 0.0f, w = 0.0f, h = 0.0f;
+        std::vector<card> cards;             ///< Front pins first, then the player's, as drawn.
+        float             toggle_x = -1.0f, toggle_y = -1.0f; ///< Pin toggle centre; -1 = not drawn.
+        bool              toggle_on = false; ///< The toggle's subject is pinned.
+        entity_id         toggle_subject = null_entity;
+    } drawn;
+    /// Where a band layout with NO header row wants the pin toggle this frame: the
+    /// right end (screen x) and top (screen y) of the row it should end. The tile
+    /// element sets it to its tile column's heading (selection_panel.cpp); the toggle
+    /// reads and clears it. -1 = the default, the header row's end.
+    float header_anchor_x = -1.0f, header_anchor_y = -1.0f;
+};
+
+/// The Space ledger's view state (rail slot 9; docs/ui/ledgers/space.md), plus
+/// where its controls landed this frame so a verify script presses the REAL
+/// control. VIEW state, not serialised. Every press queues a `space_command` on
+/// `pending`, which app::render sends through `apply_space_command` — the one
+/// near-space seam an agent's command takes too.
+/// BL-1609 (SELECTION.md § The space-unit element): what the space-unit card has
+/// armed for the selected unit, and the Military ledger's Space designer draft.
+/// Re-set when the selection moves to another unit. Every list below is published
+/// each frame the surface draws, for the verify API.
+struct space_fleet_ui_state
+{
+    entity_id unit = null_entity;   ///< The unit the armed state belongs to.
+    bool      move_armed    = false; ///< Move is lit: the destination list shows (a toggle).
+    bool      move_fleet    = false; ///< "Whole fleet": the move takes every unit of the fleet.
+    bool      dest_set      = false; ///< A destination row is chosen (a toggle).
+    entity_id dest_body     = null_entity;
+    int       dest_kind     = 1;
+    bool      bombard_armed = false; ///< Bombard is lit: the target list shows (a toggle).
+    // BL-1610 (NATIONS.md § Off-world bases): a Lander's two base orders.
+    bool      embark_armed  = false; ///< Embark colonists is lit: the count and its confirm show (a toggle).
+    int       embark_count  = 1;     ///< Thousands to board, held to the free berths.
+    bool      found_armed   = false; ///< Found base is lit: the site list shows (a toggle).
+    entity_id found_tile    = null_entity; ///< The site row chosen (a toggle), null none.
+
+    /// The Design tab's Space theatre: the hull expanded in place (-1 none) and its draft.
+    int design_hull = -1;
+    std::array<uint8_t, 6> draft{0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+
+    // ── Published each frame; empty when the surface did not draw. ──
+    struct press { std::string name; float x = -1.0f, y = -1.0f; bool enabled = false; std::string reason; };
+    std::vector<press> presses;        ///< move, dock / undock, refuel, bombard, confirm_move.
+    std::vector<press> target_rows;    ///< Bombard's targets.
+    /// BL-1610: an armed Found base's site rows — one per province of the body with
+    /// ground the founding could take; `name` the row's label, `enabled` the chosen
+    /// row; `col`/`row` the site tile, `prospected` whether its deposits are read.
+    struct site_row
+    {
+        std::string name;
+        float x = -1.0f, y = -1.0f;
+        int   col = -1, row = -1;
+        bool  chosen = false, prospected = false;
+    };
+    std::vector<site_row> site_rows;
+    /// BL-1610: what the base orders drew — colonists aboard this unit and its free
+    /// berths; colonists and base kit aboard the nation's Landers landed at this body,
+    /// against what a founding needs. -1 when the card did not draw the line.
+    int   colonists_aboard = -1, free_berths = -1;
+    int   colonists_here = -1, colonists_need = -1;
+    float kit_here = -1.0f, kit_need = -1.0f;
+    struct dest_row
+    {
+        std::string node;
+        float x = -1.0f, y = -1.0f;
+        float dv = 0.0f, budget = 0.0f;
+        bool  affordable = false, chosen = false;
+    };
+    std::vector<dest_row> dest_rows;
+    float preview_dv = -1.0f, preview_budget = -1.0f;
+    bool  preview_ok = false;
+    std::vector<press> hull_rows;      ///< The designer's hull rows; `enabled` = a live design stands.
+    std::vector<press> design_presses; ///< The open hull's Save press.
+};
+
+struct space_ledger_state
+{
+    /// 0 = Launch (default), 1 = Assets, 2 = Stations, 3 = Crew.
+    int view = 0;
+
+    // ── Launch ───────────────────────────────────────────────────────────────
+    /// The class picker: 0 satellite, 1 station core, 2 crewed mission, 3 rover.
+    /// A SELECTOR (exempt from the toggle rule): it switches the launch's subject.
+    int       launch_class = 0;
+    /// The satellite's role (a space_satellite_role, 1..4). A selector too.
+    int       launch_role  = 1;
+    /// The destination node; `launch_node_set` false = none chosen.
+    entity_id launch_body = null_entity;
+    int       launch_kind = 1;
+    bool      launch_node_set = false;
+
+    // ── Assets ───────────────────────────────────────────────────────────────
+    /// The satellite row expanded in place (its Retask presses); null = none.
+    entity_id expanded = null_entity;
+
+    // ── Stations / the designer ──────────────────────────────────────────────
+    /// The station the designer shows (a station id); re-validated each frame,
+    /// falling back to the player's lowest-id station.
+    entity_id station = null_entity;
+    /// The pressed slot (-1 none). Pressing it again un-picks it (a toggle).
+    int       slot = -1;
+    /// A Move press armed on `slot`: the next empty-slot press refits there.
+    bool      moving = false;
+    /// The template name being typed for Save.
+    char      template_name[65] = "";
+
+    /// Presses queued this frame, sent by app::render through apply_space_command.
+    std::vector<space_command> pending;
+    /// The seam's answer to the last press (app writes it).
+    std::string message;
+
+    // ── Published each frame the ledger draws; x < 0 = absent. ───────────────
+    float tab_x[4] = {-1.0f, -1.0f, -1.0f, -1.0f};
+    float tab_y[4] = {-1.0f, -1.0f, -1.0f, -1.0f};
+    struct drawn_press { float x = -1.0f, y = -1.0f; bool enabled = false; std::string reason; int id = 0; };
+    std::vector<drawn_press> class_presses;  ///< id = class index.
+    std::vector<drawn_press> role_presses;   ///< id = role.
+    struct drawn_node
+    {
+        entity_id body = null_entity;
+        int   kind = 0;
+        float x = -1.0f, y = -1.0f;
+        int   free = 0, capacity = 0;
+        bool  chosen = false;
+    };
+    std::vector<drawn_node> node_rows;
+    drawn_press launch_press;               ///< The Launch press; reason = the quote's refusal.
+    float       launch_cost = 0.0f;         ///< The quote's whole cost (credits).
+    struct drawn_asset
+    {
+        entity_id id = null_entity;
+        int   cls = 0, role = 0, state = 0;
+        bool  covered = false, pending = false;
+        float x = -1.0f, y = -1.0f;
+    };
+    std::vector<drawn_asset> asset_rows;
+    std::vector<drawn_press> retask_presses; ///< id = role (the expanded satellite's).
+    std::vector<drawn_press> station_rows;   ///< id = station id.
+    struct drawn_slot
+    {
+        int   idx = 0;
+        int   kind = -1;          ///< A station_module_kind, -1 empty.
+        bool  core = false, edge = false;
+        std::string state;        ///< "", "working", "stopped", "idle_edge", "refitting", "not_ready".
+        float x = -1.0f, y = -1.0f;
+    };
+    std::vector<drawn_slot>  slots;          ///< The designer grid, slot order.
+    int grid_w = 0, grid_h = 0;
+    std::vector<drawn_press> module_presses; ///< id = module kind (an empty slot's module list).
+    drawn_press remove_press, move_press, save_press, upgrade_press;
+    std::vector<drawn_press> template_presses; ///< Apply presses; reason = the template's name.
+    struct drawn_budget
+    {
+        bool  drawn = false;
+        float power_supply = 0.0f, power_draw = 0.0f;
+        int   crew_room = 0, life_support = 0, crew_aboard = 0, crew_needed = 0;
+        int   working = 0, stopped = 0, idle_edge = 0;
+    };
+    drawn_budget budget;
+    struct drawn_crew
+    {
+        bool drawn = false;
+        int  pool = 0, cap = 0, centres = 0, running = 0, rate = 0, needed = 0, aboard = 0;
+    };
+    drawn_crew crew;
+    int pending_orders = 0;                  ///< Orders waiting on a signal (the pending line's count).
+    /// The ledger window's visible screen span this frame, so a script can tell a
+    /// press scrolled out of the column from one on screen. < 0 = not drawn.
+    float view_top = -1.0f, view_bottom = -1.0f;
 };
 
 struct diplomacy_ledger_state
@@ -1301,6 +1494,10 @@ struct ui_state
     /// docs/ui/ledgers/diplomacy.md). Nations and Wars tabs.
     bool show_diplomacy_ledger = false;
 
+    /// Whether the Space ledger is open — nav-rail slot 9 (docs/ui/ledgers/space.md).
+    /// Launch, Assets, Stations and Crew tabs.
+    bool show_space_ledger = false;
+
     // BL-1406: the Company ledger, its firm payload and the corporations table's
     // aimed row retired with the company and the corporation (Ben, 2026-10-23).
     bool show_balance_ledger = false; ///< Whether the Balance Ledger is open.
@@ -1322,6 +1519,7 @@ struct ui_state
     /// See `military_ledger_state`.
     military_ledger_state military;
     diplomacy_ledger_state diplomacy; ///< The Diplomacy ledger (rail slot 8; ledgers/diplomacy.md).
+    space_ledger_state     space;     ///< The Space ledger (rail slot 9; ledgers/space.md).
     unit_designer_state   designer; ///< The full-canvas unit designer (military.md § The designer).
     wing_ui_state         wing;         ///< BL-1450: the wing card and the canvas right-click assignment.
     ship_ui_state         ship;         ///< BL-1534: the ship card and the canvas right-click order.
@@ -1546,6 +1744,7 @@ struct ui_state
     /// `no_province` to clear). app::render sends one `defend_province` per pair and clears it.
     std::vector<std::pair<entity_id, uint32_t>> pending_defend_province;
     war_notice_state war_notices; ///< The war notice's bookkeeping (Ben, 2026-11-09).
+    pinned_items_state pinned;    ///< The pinned-items watch list and its front pins (BL-1603).
 
     // --- The selected deposit and plate (BL-659 / BL-660) -----------------
     // Ben, 2026-08-28, choosing option A: follow the battle precedent rather
@@ -1958,6 +2157,105 @@ struct ui_state
     /// (`verify.tech_tree_node`), which aims its hover and press at a node by
     /// id rather than re-deriving the ring's layout in Lua.
     std::vector<float> tech_tree_node_screen;
+
+    /// BL-1613: which age's tree the research canvas shows - 0 the Digitisation
+    /// ring, 1 the Early Space tree (RESEARCH.md: Quests key the next age). The
+    /// switch's two tabs sit top-right of the canvas. The toggle rule holds: a
+    /// press on the tab already shown closes the research panel, as re-clicking
+    /// an active sub-view tab closes its ledger. View state, not saved.
+    int tech_tree_age = 0;
+    /// The two tabs' centres as last drawn (x, y per age), for the verify API to
+    /// press one through the real hit-test. Empty when the canvas is not on screen.
+    std::vector<float> tech_tree_age_tab_screen;
+    /// Each Early Space node's screen centre as last drawn, (x, y) per `io::es`
+    /// index; empty unless the Early Space tree is on screen.
+    std::vector<float> tech_tree_es_node_screen;
+    /// Whether the Early Space tree was drawn LOCKED (the gate into space unmet)
+    /// on the last frame, and the reason line it showed. For the verify API.
+    bool        tech_tree_es_locked = false;
+    std::string tech_tree_es_lock_reason;
+
+    /// BL-1590: the Circumplanetary rung's orbital nodes as drawn this frame
+    /// (primary view only), and the one hovered — what the screen shows, for
+    /// `verify.circum_nodes()` to aim a hover at a node by name.
+    struct circum_node_drawn
+    {
+        std::string name;        ///< "Vother L4", "Rivekhaik high orbit".
+        float       x = 0.0f, y = 0.0f; ///< Diamond centre; for a ring, its body's centre.
+        float       ring_r = 0.0f;      ///< 0 for a diamond.
+        int         capacity = 0;
+        int         free     = 0;
+        bool        clamped  = false;   ///< A diamond held above the bottom strip.
+    };
+    std::vector<circum_node_drawn> circum_nodes_drawn;
+    std::string                    circum_node_hovered; ///< Empty when none.
+
+    /// BL-1590 part 2: each satellite and station as the rung drew it this frame
+    /// (primary view only) — what the screen shows, for `verify.circum_assets()`.
+    struct circum_asset_drawn
+    {
+        entity_id   id      = null_entity; ///< A station's is its core's.
+        entity_id   owner   = null_entity;
+        bool        station = false;
+        bool        in_transit = false;
+        float       x = 0.0f, y = 0.0f, r = 0.0f;
+        std::string node;                  ///< The node it is drawn at.
+        bool        storm = false;         ///< BL-1609: the quarter's solar storm strikes it (the bolt draws).
+    };
+    std::vector<circum_asset_drawn> circum_assets_drawn;
+    entity_id                       circum_asset_hovered = null_entity;
+
+    /// BL-1614: each transit segment as the rung drew it this frame (primary view
+    /// only) — its asset, both ends and the marker's share, for
+    /// `verify.circum_transits()`. What the screen shows; nothing else.
+    struct circum_transit_drawn
+    {
+        entity_id id = null_entity;
+        float     x0 = 0.0f, y0 = 0.0f, x1 = 0.0f, y1 = 0.0f;
+        float     share = 0.0f;
+    };
+    std::vector<circum_transit_drawn> circum_transits_drawn;
+
+    /// BL-1609: each fleet mark as the Circumplanetary (and Solar) rung drew it
+    /// this frame, primary view only — for `verify.circum_fleets()` /
+    /// `verify.solar_fleets()`. What the screen shows; nothing else.
+    struct fleet_drawn
+    {
+        entity_id   lead  = null_entity;
+        entity_id   owner = null_entity;
+        int         hull  = 0;
+        int         count = 0;
+        bool        in_transit = false;
+        float       x = 0.0f, y = 0.0f, r = 0.0f;
+        std::string node;
+        float       share = 0.0f;
+    };
+    std::vector<fleet_drawn> circum_fleets_drawn;
+    std::vector<fleet_drawn> solar_fleets_drawn;
+    entity_id                circum_fleet_hovered = null_entity; ///< The hovered fleet's lead (either rung).
+
+    /// BL-1609: each node's debris mark as drawn (`verify.circum_debris()`).
+    struct debris_drawn
+    {
+        std::string node;
+        float       level = 0.0f;
+        float       x = 0.0f, y = 0.0f;
+    };
+    std::vector<debris_drawn> circum_debris_drawn;
+
+    /// BL-1609: the space-unit card and the Design tab's Space theatre.
+    space_fleet_ui_state fleet;
+
+    /// BL-1610: the two-step survey mask as the Planetary canvas LAST DREW it —
+    /// how many tiles took the mapped-not-prospected wash this frame, and how many
+    /// goods the Resource lens's key offered (-1 before it first drew). Published
+    /// for the verify API; nothing reads it back.
+    struct prospect_drawn_state
+    {
+        int washed   = 0;
+        int key_rows = -1;
+    };
+    prospect_drawn_state prospect_drawn;
 
     /// Research-queue presses from the panel (queue a node, remove the last,
     /// clear), applied by `app::render` through `apply_corp_command` — the

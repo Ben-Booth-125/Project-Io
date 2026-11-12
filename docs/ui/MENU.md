@@ -15,7 +15,7 @@ The **navigation pane** is a fixed, full-height **icon rail** pinned to the left
 
 ## Structure
 
-- A vertical strip of **twelve square icon slots** (`nav_pane.cpp`, `tab_count`; the rail's legibility model is BL-174, nav-rail legibility): the **nine curated player slots** below, then a **three-slot developer / observability tail** (§ The tail), which is the foot of the rail. Of the nine, **six carry their own subject** — Nation overview, Budget, Construction, Market Ledger, Convoys, History; **Diplomacy** lost its corporation stance surface (Ben, 2026-10-23) and carries the nation-grain Diplomacy ledger (Ben, 2026-10-30). **Acquisitions** retired with the buyout (Ben, 2026-10-23), and its slot is not on the rail: every slot after it moved up one (Ben, 2026-10-24). **One carries a provisional occupant** — a surface standing in for the slot's subject, because that surface would otherwise have no door: Research hosts the **tech-tree design mock** (BL-310, tech-tree mock). It keeps its real subject's name and glyph, lit like any other live slot, so the rail does not teach the wrong vocabulary; the tooltip says what the slot holds for now. **Military** holds slot 7 (Ben, 2026-10-27), where the reserved Corp. Strategy stood — its subject, a corporation's standing strategy, retired with the corporations. **Diplomacy** holds slot 9 under its own glyph (Ben, 2026-10-30; `ledgers/diplomacy.md`).
+- A vertical strip of **thirteen square icon slots** (`nav_pane.cpp`, `tab_count`; the rail's legibility model is BL-174, nav-rail legibility): the **ten curated player slots** below, then a **three-slot developer / observability tail** (§ The tail), which is the foot of the rail. Of the ten, **seven carry their own subject** — Nation overview, Budget, Construction, Market Ledger, Convoys, Space, History; **Diplomacy** lost its corporation stance surface (Ben, 2026-10-23) and carries the nation-grain Diplomacy ledger (Ben, 2026-10-30). **Acquisitions** retired with the buyout (Ben, 2026-10-23), and its slot is not on the rail: every slot after it moved up one (Ben, 2026-10-24). **One carries a provisional occupant** — a surface standing in for the slot's subject, because that surface would otherwise have no door: Research hosts the **tech-tree design mock** (BL-310, tech-tree mock). It keeps its real subject's name and glyph, lit like any other live slot, so the rail does not teach the wrong vocabulary; the tooltip says what the slot holds for now. **Military** holds slot 7 (Ben, 2026-10-27), where the reserved Corp. Strategy stood — its subject, a corporation's standing strategy, retired with the corporations. **Diplomacy** holds slot 8 under its own glyph (Ben, 2026-10-30; `ledgers/diplomacy.md`). **Space** holds slot 9 under the satellite glyph (`ledgers/space.md`), inserted after Diplomacy because near space is a curated player system (§ Appending versus inserting).
 - Each slot shows a **vector glyph** (`src/ui/icons.hpp`) instead of a worded label; the slot's name plus a one-line blurb is shown in a wrapping hover tooltip. The rail is deliberately narrow — the profile above keeps its own (wider) `profile_panel_width` rather than matching the rail.
 - Each slot toggles a panel open/closed; the open slot lights its glyph in the selection accent — the same idiom as the minimap lens bar, so the two icon strips read as one vocabulary.
 - Opened menus **fold out into the shell column** to the rail's right (`foldout_begin`, `src/ui/foldout_column.hpp` — see `LAYOUT.md` § Ledger windows). **Nothing floats and there is no ✕**: closing is the toggle — re-click the slot, re-click the active sub-view tab (the toggle rule, `.claude/rules/io-standing-rules.md`), or open another slot (accordion, `close_all_panels`).
@@ -29,19 +29,19 @@ this — default their open-state to closed.
 
 ### The tail — developer / observability slots
 
-Slots 10–12 sit after the curated player slots and never displace them; the tail is where surfaces that are **not player systems** live, and new ones go there rather than interleaving. Each is a live slot with its own glyph and tooltip, toggling like any other:
+Slots 11–13 sit after the curated player slots and never displace them; the tail is where surfaces that are **not player systems** live, and new ones go there rather than interleaving. Each is a live slot with its own glyph and tooltip, toggling like any other:
 
 | # | Slot | Surface |
 |---|---|---|
-| 10 | **Generation Ledger** (`icons::continent`) | why a tile generated as it did — the per-pass derivation and the body's histograms (BL-303, generation ledger; `../generation/GENERATION_LEDGER.md`) |
-| 11 | **AI decisions** (`icons::strategy`, lit) | the rival scorer's rationale — what each AI nation decided and how close the call was (BL-407, decision feed) |
-| 12 | **Strategy readout** (`icons::readout`) | the feed's aggregate companion — verb mix, spend buckets and reason tally per nation over the recent run (BL-411, emergent strategy readout) |
+| 11 | **Generation Ledger** (`icons::continent`) | why a tile generated as it did — the per-pass derivation and the body's histograms (BL-303, generation ledger; `../generation/GENERATION_LEDGER.md`) |
+| 12 | **AI decisions** (`icons::strategy`, lit) | the rival scorer's rationale — what each AI nation decided and how close the call was (BL-407, decision feed) |
+| 13 | **Strategy readout** (`icons::readout`) | the feed's aggregate companion — verb mix, spend buckets and reason tally per nation over the recent run (BL-411, emergent strategy readout) |
 
-Slot 11 draws the pennant glyph the retired Corp. Strategy slot drew dim, because its subject is the strategic decision that slot was reserved for; slot 7, **Military**, draws the filled shield — the military base's own glyph (`icons::building`) — so the ledger and the building it raises force at share a silhouette. Slot 12 has its own glyph because two *lit* slots must not share a silhouette.
+Slot 12 draws the pennant glyph the retired Corp. Strategy slot drew dim, because its subject is the strategic decision that slot was reserved for; slot 7, **Military**, draws the filled shield — the military base's own glyph (`icons::building`) — so the ledger and the building it raises force at share a silhouette. Slot 13 has its own glyph because two *lit* slots must not share a silhouette.
 
 ### Appending versus inserting
 
-The tail is the foot of the rail: **slot 12 is the last slot, and nothing sits below it.**
+The tail is the foot of the rail: **slot 13 is the last slot, and nothing sits below it.**
 
 Where a new surface goes is nonetheless a real decision, and the rail has both routes.
 **Insertion** puts a surface among the curated slots at the point the curated sequence would
@@ -81,7 +81,7 @@ slot.
 The slots are derived from the game systems (`docs/SYSTEMS.md`), filtered through the
 **menus-are-broad-ledgers** rule above: each slot is a broad overview surface, never a targeted
 action. The order is a **curated player-facing sequence** — a deliberate gameplay order, not
-strict SYSTEMS.md tier order. The curated set is **nine slots**: Exploration is not on the rail (the
+strict SYSTEMS.md tier order. The curated set is **ten slots**: Exploration is not on the rail (the
 comms surface is `CHAT.md`; there is no Explorer, `EXPLORER.md`). The `tier-idx` column records
 each slot's position in the SYSTEMS.md tier list, so the curation is auditable.
 
@@ -95,7 +95,8 @@ each slot's position in the SYSTEMS.md tier list, so the curation is auditable.
 | 6 | **Convoys** | — | Supply (`SUPPLY.md`; added 2026-08-29, see below) |
 | 7 | **Military** | 5 | Conflict (`../military/MILITARY.md`; Ben, 2026-10-27, see below) |
 | 8 | **Diplomacy** | 9 | Diplomacy (`../politics/RELATIONS.md`; Ben, 2026-10-30, see below) |
-| 9 | **History** | 6 | Environment |
+| 9 | **Space** | — | Near space (`../economy/SPACE_ASSETS.md`; `ledgers/space.md`) |
+| 10 | **History** | 6 | Environment |
 
 Two slots are **named more broadly than their source ledger** — Budget (not Balance Ledger) and
 History (not Tile Ledger); each widening is settled by Q&A (2026-06-15) and recorded per-slot
@@ -166,6 +167,11 @@ fare stays on the canvas; the labour read is a roll-up on the
   war in the world. The corporation stance surface it once hosted retired with the corporation
   (Ben, 2026-10-23; `ledgers/corporation.md` § Slot 8). It follows the *ledgers-start-closed*
   convention above.
+- **Space** (slot 9) is four tabs, **Launch**, **Assets**, **Stations** and **Crew**
+  (`ledgers/space.md`): what the nation can launch and to where, everything it holds in near
+  space, the station designer, and the astronaut pool. It is broad — every asset, every station,
+  the whole pool — and its subject is a curated system, so it is inserted after Diplomacy rather
+  than appended below the tail. It draws `icons::satellite`, the thing it launches.
 - **Scope-widening names (settled by Q&A 2026-06-15).**
   — **Convoys** (slot 6): **cargo in transit** — one row per convoy in flight, its route, its ETA
     in qtr and the haulage it has cost. Added 2026-08-29 on Ben's call, lifted out of the Market
@@ -183,7 +189,7 @@ fare stays on the canvas; the labour read is a roll-up on the
   — **Corp. Strategy** (slot 7) **retired** with the corporations (Ben, 2026-10-27): its slot went
     to **Military**. Its standing-strategy levers have homes elsewhere — wage and tax levels in the
     Budget, military posture on the Military ledger.
-  — **History** (slot 9): **generation history**, not a live event log (BL-211, player-facing
+  — **History** (slot 10): **generation history**, not a live event log (BL-211, player-facing
     history ledger). It surfaces the **procedural generation as a number-crunch** — the world as
     generated — in two views, **Story / Chain**: the body's dated biography, and the generation
     stage charts (one fold per chain stage, under the wizard's three round tabs). The charts come

@@ -129,6 +129,8 @@ Each kind routes its 'go to' to the right place:
 | **Front** (non-entity) | Its own card — § The front element. | | None: a front is selected from its line on the canvas. |
 | **Market** | **Go to** — locate on the canvas. | (none) | Canvas: `focus_on_surface`. |
 | **Nation** | None — **"Open its ledger via [>]."** | (none) | A ledger (no canvas of its own). |
+| **Space asset** (a satellite or a station) | None. | The shared space-asset summary, the same the hover card draws: owner, role (a satellite) or modules and crew (a station), node, state. | None: it is pressed on the Circumplanetary rung it is drawn on. A station is selected by its core's id; its modules are not selectable on their own. |
+| **Space unit** (a ship; its fleet) | The player's own: **Move**, **Dock** / **Undock**, **Refuel**, **Bombard**; a Lander's **Embark colonists** and **Found base** — § The space-unit element. A rival's: none. | The shared space-unit summary, the same the hover card draws: hull, owner, node or transit, Δv budget, propellant, hull points, cargo, firepower. | None: it is pressed on the Circumplanetary or Solar rung it is drawn on. |
 
 So 'go to' is itself polymorphic: spatial entities navigate a canvas;
 non-spatial entities (a nation) open the relevant ledger.
@@ -598,6 +600,42 @@ along its lane, the lowest id on a tie. When the anchor changes, or a convoy joi
 or leaves, the marker slides to its new point over a few frames rather than snapping, and a
 convoy leaving a shared marker sets out from where the marker was drawn.
 
+### The space-unit element
+
+A press on a fleet mark (`../military/SPACE_FLEETS.md`: one nation's units at one node) selects its
+**lead unit**, the lowest id. The card is the shared space-unit summary, then — for a fleet of more
+than one — a row per unit, a press on which selects that unit instead.
+
+For the player's own unit, not in transit, the card carries its **orders**, the way a land unit's
+right-click carries its march: a ship is ordered from where it is drawn, and the Space ledger is the
+inventory, not the helm. The orders stand in a column beside the summary, so an armed list takes
+the band's height rather than what the summary leaves below it.
+
+- **Move** is a toggle. Lit, it lists every node the unit can be sent to with the path's Δv and
+  days, cheapest burn first, greyed where the budget cannot pay. Picking a row (a toggle again) shows **"Move costs Δv
+  x of y"** against the budget before **Confirm move** sends it. **Whole fleet** sends every unit of
+  the fleet, held to the weakest budget.
+- **Dock** berths it at the player's station at its node; **Undock** releases it.
+- **Refuel** fills the tanks where SPACE_FLEETS.md § Thrust allows.
+- **Bombard** is a toggle, open only to a unit with an orbital-missile armament in a low orbit. Lit,
+  it lists the hostile ground below; a row sets the standing order. While an order stands the
+  button stays lit, and pressing it lifts the order.
+- **Embark colonists** is a toggle on a Lander with passenger berths (`../politics/NATIONS.md`
+  § Off-world bases). It is open at the unit's home body — idle in its low orbit, or landed — with a
+  staffed Launchpad of the nation's there, and a free berth; otherwise it is greyed with the reason.
+  Lit, it shows the count, a thousand to a berth and every free berth by default, and **Confirm
+  embark** boards them from the most populous home centre. The summary reads the colonists aboard
+  against the berths.
+- **Found base** is a toggle on a Lander landed on another body's surface, open once the nation
+  holds Off-World Bases. A Lander lands at a body's surface, not on a tile, so the player picks the
+  site. Lit, it reads the colonists and the base kit aboard every Lander of the nation landed there
+  against what a founding needs, then lists the ground a founding could take: one row per province
+  with mapped, unclaimed land, at its most habitable such tile, most habitable first, each saying
+  whether its deposits are prospected. Picking a row (a toggle) shows **Confirm found base**, greyed
+  with the reason while the colonists or the kit fall short.
+
+A refused order answers on the card's message line with the seam's reason.
+
 ### The front element
 
 A **front** (`../military/MILITARY.md` § Fronts) is one contiguous span of a nation's border with
@@ -633,7 +671,9 @@ rule keeps the rest, so the nation is still reached a little inside each side.
    seat.
 
 **Assign to front** is on the unit card (the action grid's sixth cell) and on the header of a
-group of the player's own units. It opens a menu of the units' own nation's fronts, each named by
+group of the player's own units. It opens a menu of the units' own nation's fronts **on the body
+the units stand on** — a land unit fights on its own body, and an assignment to a front on another
+is refused (`../military/MILITARY.md` § Space) — each named by
 neighbour and span — *Varneth — 14 tiles*, with *(north)*/*(south)*, *(west)*/*(east)* or
 *(n of m)* where one neighbour has more than one — plus **Unassign**. The front every unit is
 already on is checked, and picking it again unassigns (the toggle rule). A pick sends one
@@ -824,7 +864,11 @@ See [DISCOVERY.md](DISCOVERY.md) for the model authority (the geographic fog thi
   derived from size + distance). Affordability-gated against the player nation's treasury;
   disabled with an "Insufficient funds." reason when the player cannot pay.
 - **`in_transit`** — `En route — ETA <days> d`.
-- **`scanning`** — `Surveying <k>/<N> — ETA <days> d`.
+- **`scanning`** — `Surveying <k>/<N> — ETA <days> d` under a dispatched probe. A body the player
+  maps from orbit instead (DISCOVERY.md § Mapping, then prospecting) reads the two steps:
+  `Mapped <k>/<N> from orbit`, `Prospected <p>/<N> on the ground`, then what prospects it — the
+  player's landed Landers and active rovers there, a region a quarter each — or that prospecting
+  waits for mapping, or that nothing on the ground is prospecting yet.
 - **`surveyed`** — the hero action switches to **"Go to surface"**, which descends via
   `focus_on_entity` — surveying is done, the move now is to look.
 

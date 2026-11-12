@@ -1,6 +1,11 @@
 #include "circumplanetary_canvas.hpp"
 
 #include "canvas_scale.hpp"
+#include "circum_assets.hpp"
+#include "circum_nodes.hpp"
+#include "circum_units.hpp" // BL-1609: fleets, debris
+#include "pinned_panel.hpp"   // is_pinned: a pinned body keeps the pinned ring
+#include "foldout_column.hpp" // selection_band_height: the bottom strip a diamond keeps clear of
 #include "highlight.hpp"
 #include "nav_pane.hpp"
 #include "presentation.hpp"
@@ -192,16 +197,85 @@ void draw_circumplanetary_canvas(const world& w, ui_state& state, ImVec2 origin,
         return std::max(floor, s.base_radius * element_scale * mult);
     };
 
+    const ImVec2 mouse = state.mouse.active
+                         ? ImVec2{state.mouse.x, state.mouse.y}
+                         : ImVec2{-1.0f, -1.0f};
+
+    // Orbital nodes (CIRCUMPLANETARY.md § Orbital nodes and what sits at them):
+    // laid out from the live angles, on the moons' own visible-offset frame.
+    // Primary view only — the minimap is too small for a legible pip row.
+    std::vector<circum_node_mark>  node_marks;
+    std::vector<circum_asset_mark> asset_marks;
+    std::vector<circum_transit_mark> transit_marks; // BL-1614
+    std::vector<circum_fleet_mark>   fleet_marks;   // BL-1609
+    std::vector<circum_debris_mark>  debris_marks;  // BL-1609
+    if (apply_view)
+    {
+        std::vector<float> radii;
+        radii.reserve(moons.size() + 1);
+        radii.push_back(body_radius(anchor, true));
+        for (entity_id id : moons)
+            radii.push_back(body_radius(id, false));
+        // Diamonds keep above the bottom strip (the Selection band) with room
+        // for a row of assets under them.
+        circum_frame f{view_origin, zoom, scale};
+        f.safe_bottom = origin.y + size.y - selection_band_height(size.x, size.y) - 28.0f;
+        node_marks  = layout_circum_nodes(w, anchor, moons, radii, f);
+        asset_marks = layout_circum_assets(w, node_marks);
+        state.circum_nodes_drawn.clear();
+        for (const circum_node_mark& m : node_marks)
+            state.circum_nodes_drawn.push_back({ orbital_node_display_name(w, m.node), m.pos.x,
+                                                 m.pos.y, m.ring_r, m.capacity,
+                                                 m.capacity - m.held, m.clamped });
+        state.circum_assets_drawn.clear();
+        for (const circum_asset_mark& m : asset_marks)
+            state.circum_assets_drawn.push_back({ m.id, m.owner, m.station, m.in_transit,
+                                                  m.pos.x, m.pos.y, m.r,
+                                                  orbital_node_display_name(
+                                                      w, node_marks[static_cast<std::size_t>(m.node_index)].node),
+                                                  m.storm });
+        transit_marks = layout_circum_transits(w, node_marks, asset_marks);
+        state.circum_transits_drawn.clear();
+        for (const circum_transit_mark& s : transit_marks)
+            state.circum_transits_drawn.push_back({ s.id, s.from.x, s.from.y, s.to.x, s.to.y, s.share });
+        // BL-1609: fleets at and between the nodes, and the debris beside them.
+        fleet_marks  = layout_circum_fleets(w, node_marks);
+        debris_marks = layout_circum_debris(w, node_marks);
+        state.circum_fleets_drawn.clear();
+        for (const circum_fleet_mark& f : fleet_marks)
+            state.circum_fleets_drawn.push_back({ f.lead, f.owner, f.hull, f.count, f.in_transit,
+                                                  f.pos.x, f.pos.y, f.r, f.node, f.share });
+        state.circum_debris_drawn.clear();
+        for (const circum_debris_mark& d : debris_marks)
+            state.circum_debris_drawn.push_back({ orbital_node_display_name(w, d.node), d.level, d.pos.x, d.pos.y });
+        state.circum_node_hovered.clear();
+        state.circum_asset_hovered = null_entity;
+        state.circum_fleet_hovered = null_entity;
+    }
+
+    // BL-1609: a fleet under the pointer wins over everything: it draws on top.
+    int hovered_fleet = -1;
+    if (input_enabled && !fleet_marks.empty())
+        hovered_fleet = hit_circum_fleet(fleet_marks, mouse);
+    const entity_id hovered_fleet_id =
+        hovered_fleet >= 0 ? fleet_marks[static_cast<std::size_t>(hovered_fleet)].lead : null_entity;
+
+    // A satellite or station under the pointer wins over a body and a node: it
+    // draws on top of both.
+    int hovered_asset = -1;
+    if (input_enabled && !asset_marks.empty() && hovered_fleet < 0)
+        hovered_asset = hit_circum_asset(asset_marks, mouse);
+    const entity_id hovered_asset_id =
+        hovered_asset >= 0 ? asset_marks[static_cast<std::size_t>(hovered_asset)].id : null_entity;
+
     // Moon orbital rings, centred on the anchor.
     for (entity_id id : moons)
     {
         const float r = w.bodies.at(id).orbital_radius_au * scale * zoom;
         dl->AddCircle(to_screen({0.0f, 0.0f}), r, IM_COL32(38, 42, 52, 255), 0, 1.0f);
     }
-
-    const ImVec2 mouse = state.mouse.active
-                         ? ImVec2{state.mouse.x, state.mouse.y}
-                         : ImVec2{-1.0f, -1.0f};
+    // Low and high orbit rings: under the bodies.
+    draw_circum_node_rings(dl, node_marks);
 
     // Draw the anchor first, then the moons on top. Each entry is (id, is_anchor).
     std::vector<std::pair<entity_id, bool>> draw_list;
@@ -215,7 +289,7 @@ void draw_circumplanetary_canvas(const world& w, ui_state& state, ImVec2 origin,
     // highlight tie convention in highlight.hpp). Nearest centre to the cursor
     // wins; the strict `<` keeps an exact tie on the first entry (the anchor).
     entity_id hovered_body = null_entity;
-    if (input_enabled)
+    if (input_enabled && hovered_asset < 0 && hovered_fleet < 0)
     {
         float best_d2 = std::numeric_limits<float>::max();
         for (const auto& [id, is_anchor] : draw_list)
@@ -245,12 +319,29 @@ void draw_circumplanetary_canvas(const world& w, ui_state& state, ImVec2 origin,
 
         dl->AddCircleFilled(pos, radius, style.colour);
 
-        // Shared selection / hover / pinned ring (pinning not yet wired).
+        // Shared selection / hover / pinned ring (pinned: the watch list, BL-1603).
         draw_body_highlight(dl, pos, radius,
-            resolve_highlight(id == state.selected_entity, this_hovered, /*pinned=*/false));
+            resolve_highlight(id == state.selected_entity, this_hovered, is_pinned(state, id)));
+    }
 
-        if (draw_labels)
+    // Diamonds and slot pips: over the rings and bodies, under the labels.
+    draw_circum_node_marks(dl, node_marks);
+    // BL-1614: transit segments, under the asset marks (the ghost caps the run).
+    draw_circum_transits(dl, transit_marks);
+    // BL-1609: debris beside its nodes, under the assets.
+    draw_circum_debris(dl, debris_marks);
+    // Satellites and stations at their nodes: over the node marks.
+    draw_circum_assets(dl, asset_marks, hovered_asset_id, state.selected_entity);
+    // BL-1609: fleets and their transit segments, over everything at a node.
+    draw_circum_fleets(dl, fleet_marks, hovered_fleet_id, state.selected_entity);
+
+    if (draw_labels)
+    {
+        for (const auto& [id, is_anchor] : draw_list)
         {
+            const body_component& body = w.bodies.at(id);
+            const float  radius = body_radius(id, is_anchor);
+            const ImVec2 pos    = to_screen(local_pos(id, is_anchor));
             const ImVec2 ts = ImGui::CalcTextSize(body.name.c_str());
             dl->AddText({pos.x - ts.x * 0.5f, pos.y + radius + 2.0f}, // fit-exempt: on-canvas label; panel/box sized from measured entries
                         IM_COL32(255, 255, 255, 255), body.name.c_str());
@@ -318,6 +409,28 @@ void draw_circumplanetary_canvas(const world& w, ui_state& state, ImVec2 origin,
             body.name.c_str(), body_type_name(body.type), body.orbital_radius_au);
     }
 
+    if (hovered_fleet_id != null_entity)
+    {
+        state.circum_fleet_hovered = hovered_fleet_id;
+        draw_circum_fleet_card(w, hovered_fleet_id, mouse);
+    }
+    // A node answers hover only where no body does: body hover and selection win.
+    if (hovered_asset_id != null_entity)
+    {
+        state.circum_asset_hovered = hovered_asset_id;
+        draw_circum_asset_card(w, hovered_asset_id, mouse);
+    }
+
+    int hovered_node = -1;
+    if (hovered_body == null_entity && hovered_asset < 0 && hovered_fleet < 0 && !node_marks.empty())
+        hovered_node = hit_circum_node(node_marks, mouse);
+    if (hovered_node >= 0)
+    {
+        const circum_node_mark& m = node_marks[static_cast<std::size_t>(hovered_node)];
+        state.circum_node_hovered = orbital_node_display_name(w, m.node);
+        draw_circum_node_card(w, m, mouse);
+    }
+
     // Click handling. Single-click selects (no view change); double-click
     // navigates (descend to the body's surface). On the minimap a single click
     // ascends. See SELECTION.md / CANVASES.md.
@@ -329,7 +442,17 @@ void draw_circumplanetary_canvas(const world& w, ui_state& state, ImVec2 origin,
     }
     else
     {
-        if (ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+        // A node is not a selectable entity: a press on one changes nothing.
+        // A satellite or station is: a press selects it (SELECTION.md).
+        if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) && hovered_fleet_id != null_entity)
+        {
+            state.selected_entity = hovered_fleet_id; // BL-1609: the fleet's lead unit
+        }
+        else if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) && hovered_asset_id != null_entity)
+        {
+            state.selected_entity = hovered_asset_id;
+        }
+        else if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) && hovered_node < 0)
         {
             state.selected_entity = hovered_body;
         }

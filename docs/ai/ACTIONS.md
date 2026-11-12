@@ -24,7 +24,7 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 > **Generated file.** Produced by `node tools/session/render_actions.js`.
 > Edit the JSON, then re-run; hand edits here are overwritten.
 
-*248 entries — 63 gameplay · 41 canvas · 15 lens · 88 ledger · 41 chrome.*
+*288 entries — 85 gameplay · 45 canvas · 15 lens · 100 ledger · 43 chrome.*
 
 ---
 
@@ -57,7 +57,7 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 - The acting corporation exists (rejected_no_corp otherwise).
 - The tile entity exists (rejected_invalid otherwise).
 - A stated recipe (anything but no_recipe) requires type = processing_facility AND an id the recipe registry resolves (rejected_invalid otherwise, checked before placement — BL-388).
-- placement_rules::can_place_in_world accepts (type, target) on this tile — ocean, missing deposit, a port off the coast, or a full per-body slot cap (Launchpad: max 1 per body) all refuse (rejected_placement).
+- placement_rules::can_place_in_world accepts (type, target) on this tile — ocean, missing deposit, a port off the coast, or a full per-body slot cap (Launchpad: one per nation per body) all refuse (rejected_placement).
 - BL-1522 (Ben, 2026-11-10; TILES.md § Water kinds): the ONE building on water is an Oil Platform - type extraction_site, target petroleum - on a SHELF tile (coast water) carrying petroleum, on the acting nation's own water, once the nation holds Offshore Drilling (DG-PR-EX-A; tech_locked -> rejected_tech_locked otherwise). Open ocean and lakes refuse it (ocean), as they refuse every other type and target. A rig is asked no road, reach-field or province-ceiling test; it is supplied only through a standing port of its own nation within 6 water tiles (LOGISTICS.md § Logistic Points, 'A rig is supplied through its own port'), and one with no such port places but produces nothing until one is built.
 - The BL-615 stratum gate accepts the SPECIFIC named building's authored placement_gate (POPULATION.md § Strata gate buildings): schooling must stand ON a population-centre tile (needs_centre otherwise), a university on a centre of stratum City (4)+ (centre_too_small below it), and a heavy processor recipe (the steel-mill class: steel, steel_from_iron_nickel, steel_bessemer) within 6 grid steps of some centre (far_from_centre beyond). All three surface as rejected_placement through the seam; the reason codes are distinct at the placement layer.
 - The building type is UNLOCKED for the acting corporation's nation, AND, if a recipe is stated, that RECIPE is separately unlocked. Technology is held by the NATION (BL-1273, RESEARCH.md): a node of the Digitisation tree that unlocks a structure or recipe gates it for every corporation of a nation that does not hold it. No node carries a machine unlock effect yet, so today NOTHING is tech-locked -- the four old per-corp gates (military_base, Toolmaker, Bessemer Converter, refined_copper) retired with BL-1273 (NR-1022) and are open to every nation. When a node does lock something, the two locks show two different ways: a locked STRUCTURE still appears as a row, with a DISABLED Build press and "Locked - the technology that permits this has not been researched" on its hover card (before BL-1365 the text stood in place of the button), while a tech-locked RECIPE is filtered OUT of the ledger entirely (BL-593, 2026-08-24, Ben's ruling: "the door not showing what the gate would refuse", the same treatment era_locked already had), so it never appears as a row at all, locked or otherwise. Either way construct_building refuses with tech_locked, which the corp-command seam reports as rejected_tech_locked -- an agent driving construct_building/corp_command directly (rather than reading rows off the ledger) sees the SAME refusal code for both, since the door's filtering is a UI convenience, not a second gate.
@@ -711,7 +711,7 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 - The seat has a home nation (rejected_state otherwise).
 - The named node is queued, or (for the last-entry sentinel) the queue is not empty (rejected_state otherwise; nothing touched).
 
-**Expected output.** The node comes off the nation's research queue together with every LATER entry that needs it - an entry with a requirement group that loses its only queued-or-held member (so a press on Field Practice II also takes off Seismic Survey behind it, and keeps Field Practice I ahead of it). The rest of the queue keeps its order. RP in hand stay: the pool is the head's progress, so nothing researched is stranded. With the last-entry sentinel, only the last entry comes off.
+**Expected output.** The node comes off the nation's research queue together with every LATER entry that needs it - an entry with a requirement group that loses its only queued-or-held member (so a press on Field Practice II also takes off Seismic Survey behind it, and keeps Field Practice I ahead of it). The rest of the queue keeps its order. RP in hand stay: the pool is the head's progress, so nothing researched is stranded. With the last-entry sentinel, only the last entry comes off. BL-1613: the last-entry sentinel drops the last entry of the ONE queue - the Early Space tail's last when it has one (gameplay.unqueue_space_research), else the Digitisation queue's.
 
 **Reason to select.** Undo part of the plan: the toggle on the node you queued takes its dependents with it, so the queue never holds an entry that can no longer open.
 
@@ -723,9 +723,9 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 - BL-1406 (Ben, 2026-10-23: the player IS its nation; corporations and companies are retired - docs/CONCEPT.md § Player identity, docs/GLOSSARY.md): THE ACTOR IS THE NATION. On the wire a session acts as its nation - `COMMAND corp=<nation> nation=<nation> ...` (the seam's nation-self form, corp_command::as_nation == corp). The session corporation's id is still accepted as the actor's NAME and, once the world is folded (every campaign start), re-pointed to its nation before the seam; any other actor is rejected_not_owner. The app files the player's press the same way (app::player_command). Money is the treasury's UNCOMMITTED part - a nation never runs into debt (rejected_funds past it) - and what the verb makes or moves is the nation's (its state_assets, units, trades).
 - `corp` is the SEAT (world::player_entity): the player reaches its nation's queue as the nation's operating champion. Any other corporation is refused (rejected_state) - a rival does not plan its nation's research.
 - The seat has a home nation (rejected_state otherwise).
-- The queue is not empty (rejected_state; the button is disabled).
+- The queue - Digitisation entries or the Early Space tail - is not empty (rejected_state; the button is disabled).
 
-**Expected output.** The nation's research queue is emptied. RP in hand stay and keep accruing; with nothing queued the research line spends nothing.
+**Expected output.** The nation's research queue is emptied - the Early Space tail with it (BL-1613: one queue). RP in hand stay and keep accruing; with nothing queued the research line spends nothing.
 
 **Reason to select.** Start the plan over, or stop the research line spending the treasury.
 
@@ -780,6 +780,7 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 **Valid when:**
 - The unit exists (rejected_invalid otherwise) and is the actor's own (rejected_not_owner otherwise).
 - A non-null `tile` lies in one of the actor's own fronts (rejected_invalid otherwise).
+- That front lies on the body the unit stands on: a land unit never marches between bodies (rejected_invalid otherwise; MILITARY.md § Space, 'A war spans every body').
 - The assignment changes something: not the same front again, not unassigning an unassigned unit (rejected_state otherwise).
 - No terrain precondition: a unit is assigned whatever the ground of the span. Its slots then skip ground its land class cannot enter (see the output; BL-1455, terrain class modifiers).
 
@@ -1040,6 +1041,423 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 **Expected output.** Enacted: the pair (actor, counterparty) joins world::nation_embargoes. From then no cargo counterparty owns lands in a market on the actor's ground: a shipment there is never bought, a manual trade naming such a market is refused (rejected_embargo), and cargo already in flight is refused at the border and destroyed. counterparty's sentiment toward the actor takes embargo_imposed (Access -, Trust -). It is one-way: the actor's goods still enter counterparty's markets. Repealed: the pair is erased and trade resumes; a repeal moves no sentiment.
 
 **Reason to select.** Shut a rival's goods out of your markets: protect your producers or punish its conduct, at the cost of its regard and of what its goods would have supplied.
+
+### `gameplay.space_launch` — The Space ledger (nav rail slot 9): ledger.space_launch. In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam — a sibling of corp_command, because the template verbs carry a name and a layout the fixed corp_command record cannot. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed).
+
+**Press.** In-process: apply_space_command({nation, verb=0 launch, cls, role, node_body, node_kind}).
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `cls` | `uint8 space_asset_class` | 0 satellite, 1 rover, 2 crewed mission. Station cores and modules go through space_found_station / space_fit_module (3 and 4 are rejected_invalid here). |
+| `role` | `uint8 space_satellite_role` | A satellite's role: 1 comms, 2 navigation, 3 observation, 4 survey (its key must be held). 0 for a rover or crewed mission. |
+| `node_body` | `entity_id (body)` | The body whose orbital node is named. Never the star. |
+| `node_kind` | `uint8 orbital_node_kind` | 0 surface, 1 low orbit, 2 high orbit, 3 L1, 4 L2, 5 L4, 6 L5 (an L-point keyed on the pair's smaller body). |
+
+**Valid when:**
+- The actor is a nation (rejected_unknown_nation otherwise). The seam validates every field as the value that lands — each enum range-checked as a raw byte, each entity id checked to exist and to be the nation's own, each slot index against the station's grid — and rejects the whole command on any violation (rejected_invalid / rejected_not_owner), mutating nothing.
+- The class may go to the node: a satellite any orbital node; a rover a surface node off the home body; a crewed mission that or any orbital node (rejected_illegal_destination).
+- A satellite's role key is held (space_role_comms / _navigation / _observation / _survey).
+- A satellite needs a free slot at the node (orbital_slot_capacity; rejected_no_slot).
+- The launch gate (BL-1582): the nation holds Rocketry (space_dispatch), owns a STAFFED Launchpad on its home body, and the home market's shelf holds the whole goods lot (spacecraft_components per class, propellant per Δv of the path) under the fair-price ceiling; the treasury pays the goods' value plus the class's base credits plus the path's thrust credits. Any shortfall refuses the launch whole (rejected_refused, with the launch result: rejected_tech_locked / rejected_no_launchpad / rejected_shelf / rejected_insufficient_treasury).
+- Never delayed: the ground stations see the pad.
+
+**Expected output.** applied: a space asset in transit to the node (arrival after the path's quarters, never sooner than the old per-reach floor), the goods gone from the home shelf, the cost gone from the treasury. A satellite holds one slot of its node while in transit or in place.
+
+**Reason to select.** Put a satellite where its role pays (comms coverage, navigation, observation, survey), or reach another body with a rover or a crew.
+
+### `gameplay.space_found_station` — The Space ledger (nav rail slot 9): ledger.space_launch (class Station core). In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam — a sibling of corp_command, because the template verbs carry a name and a layout the fixed corp_command record cannot. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed).
+
+**Press.** In-process: apply_space_command({nation, verb=1 found_station, node_body, node_kind}).
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `node_body` | `entity_id (body)` | The body whose orbital node is named. Never the star. |
+| `node_kind` | `uint8 orbital_node_kind` | 0 surface, 1 low orbit, 2 high orbit, 3 L1, 4 L2, 5 L4, 6 L5 (an L-point keyed on the pair's smaller body). |
+
+**Valid when:**
+- The actor is a nation (rejected_unknown_nation otherwise). The seam validates every field as the value that lands — each enum range-checked as a raw byte, each entity id checked to exist and to be the nation's own, each slot index against the station's grid — and rejects the whole command on any violation (rejected_invalid / rejected_not_owner), mutating nothing.
+- The node is an orbital node (not a surface) with a free slot (the core holds one).
+- The nation holds space_station_core (Rocketry) and its astronaut pool can crew the core (rejected_no_crew).
+- The launch gate (BL-1582): the nation holds Rocketry (space_dispatch), owns a STAFFED Launchpad on its home body, and the home market's shelf holds the whole goods lot (spacecraft_components per class, propellant per Δv of the path) under the fair-price ceiling; the treasury pays the goods' value plus the class's base credits plus the path's thrust credits. Any shortfall refuses the launch whole (rejected_refused, with the launch result: rejected_tech_locked / rejected_no_launchpad / rejected_shelf / rejected_insufficient_treasury).
+- Never delayed.
+
+**Expected output.** applied: a station core in transit to the node, opening a 5x3 grid with the core central; its crew leave the pool.
+
+**Reason to select.** Open a crewed platform: the frame every module is fitted into.
+
+### `gameplay.space_fit_module` — The Space ledger (nav rail slot 9): ledger.space_fit_module. In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam — a sibling of corp_command, because the template verbs carry a name and a layout the fixed corp_command record cannot. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed).
+
+**Press.** In-process: apply_space_command({nation, verb=2 fit_module, subject=station, slot, module}).
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `subject` | `entity_id (station)` | The nation's own station (its core asset's id). |
+| `slot` | `int32 grid slot` | row * width + col of the station's grid; must be empty. |
+| `module` | `uint8 station_module_kind` | 0 research … 12 market (13 truss is refused). Dock and Shipyard only on the outer ring. |
+
+**Valid when:**
+- The actor is a nation (rejected_unknown_nation otherwise). The seam validates every field as the value that lands — each enum range-checked as a raw byte, each entity id checked to exist and to be the nation's own, each slot index against the station's grid — and rejects the whole command on any violation (rejected_invalid / rejected_not_owner), mutating nothing.
+- The slot is empty and in range; an edge-only module sits on the outer ring (rejected_edge_only).
+- The module kind's key is held (space_module_*; the Shipyard's is far space's and closed in Era 1) — rejected_tech_locked.
+- The astronaut pool crews the module.
+- The launch gate (BL-1582): the nation holds Rocketry (space_dispatch), owns a STAFFED Launchpad on its home body, and the home market's shelf holds the whole goods lot (spacecraft_components per class, propellant per Δv of the path) under the fair-price ceiling; the treasury pays the goods' value plus the class's base credits plus the path's thrust credits. Any shortfall refuses the launch whole (rejected_refused, with the launch result: rejected_tech_locked / rejected_no_launchpad / rejected_shelf / rejected_insufficient_treasury).
+- SIGNAL DELAY (SPACE_ASSETS.md § Signal delay): when the target's orbital node is outside the nation's comms coverage (space_node_covered), the command is stored as a pending order and answers `queued` with an order id; the world is otherwise untouched. It is applied at the next econ tick's nation step, re-validated as it lands, and dropped (reported on economy_report::space_orders) if no longer legal. Inside coverage it applies at once.
+
+**Expected output.** applied: a module launched into the slot (it rides inside the core's orbital slot); or queued outside coverage.
+
+**Reason to select.** Give a station power, crew room, research, a dock — whatever its role needs.
+
+### `gameplay.space_remove_module` — The Space ledger (nav rail slot 9): ledger.space_remove_module. In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam — a sibling of corp_command, because the template verbs carry a name and a layout the fixed corp_command record cannot. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed).
+
+**Press.** In-process: apply_space_command({nation, verb=3 remove_module, subject=station, slot}).
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `subject` | `entity_id (station)` | The nation's own station (its core asset's id). |
+| `slot` | `int32 grid slot` | A slot holding a module (never the core). |
+
+**Valid when:**
+- The actor is a nation (rejected_unknown_nation otherwise). The seam validates every field as the value that lands — each enum range-checked as a raw byte, each entity id checked to exist and to be the nation's own, each slot index against the station's grid — and rejects the whole command on any violation (rejected_invalid / rejected_not_owner), mutating nothing.
+- The slot holds a module (rejected_slot_empty otherwise).
+- SIGNAL DELAY (SPACE_ASSETS.md § Signal delay): when the target's orbital node is outside the nation's comms coverage (space_node_covered), the command is stored as a pending order and answers `queued` with an order id; the world is otherwise untouched. It is applied at the next econ tick's nation step, re-validated as it lands, and dropped (reported on economy_report::space_orders) if no longer legal. Inside coverage it applies at once.
+
+**Expected output.** applied: the module asset is removed and its slot freed; nothing is refunded; an arrived module's crew stay aboard on the core. Or queued outside coverage.
+
+**Reason to select.** Free a slot for a better module, or shed a module's upkeep.
+
+### `gameplay.space_refit_module` — The Space ledger (nav rail slot 9): ledger.space_move_module. In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam — a sibling of corp_command, because the template verbs carry a name and a layout the fixed corp_command record cannot. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed).
+
+**Press.** In-process: apply_space_command({nation, verb=4 refit_module, subject=station, slot=from, slot_to=to}).
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `subject` | `entity_id (station)` | The nation's own station (its core asset's id). |
+| `slot` | `int32 grid slot` | The module's slot (in place, not the core). |
+| `slot_to` | `int32 grid slot` | An empty slot; an edge-only module's must be on the outer ring. |
+
+**Valid when:**
+- The actor is a nation (rejected_unknown_nation otherwise). The seam validates every field as the value that lands — each enum range-checked as a raw byte, each entity id checked to exist and to be the nation's own, each slot index against the station's grid — and rejects the whole command on any violation (rejected_invalid / rejected_not_owner), mutating nothing.
+- from != to, both in range; the module has arrived; the destination is empty.
+- SIGNAL DELAY (SPACE_ASSETS.md § Signal delay): when the target's orbital node is outside the nation's comms coverage (space_node_covered), the command is stored as a pending order and answers `queued` with an order id; the world is otherwise untouched. It is applied at the next econ tick's nation step, re-validated as it lands, and dropped (reported on economy_report::space_orders) if no longer legal. Inside coverage it applies at once.
+
+**Expected output.** applied: launch-free — the module moves and works again one quarter later. Or queued outside coverage.
+
+**Reason to select.** Bring an enclosed Dock back to the edge after an upgrade, or rearrange a layout.
+
+### `gameplay.space_apply_template` — The Space ledger (nav rail slot 9): ledger.space_apply_template. In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam — a sibling of corp_command, because the template verbs carry a name and a layout the fixed corp_command record cannot. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed).
+
+**Press.** In-process: apply_space_command({nation, verb=5 apply_template, subject=station, name}).
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `subject` | `entity_id (station)` | The nation's own station (its core asset's id). |
+| `name` | `string (1..64 bytes)` | One of the nation's saved templates. |
+
+**Valid when:**
+- The actor is a nation (rejected_unknown_nation otherwise). The seam validates every field as the value that lands — each enum range-checked as a raw byte, each entity id checked to exist and to be the nation's own, each slot index against the station's grid — and rejects the whole command on any violation (rejected_invalid / rejected_not_owner), mutating nothing.
+- The template exists (rejected_unknown_template).
+- SIGNAL DELAY (SPACE_ASSETS.md § Signal delay): when the target's orbital node is outside the nation's comms coverage (space_node_covered), the command is stored as a pending order and answers `queued` with an order id; the world is otherwise untouched. It is applied at the next econ tick's nation step, re-validated as it lands, and dropped (reported on economy_report::space_orders) if no longer legal. Inside coverage it applies at once.
+
+**Expected output.** applied: one fit per slot the station has not filled to match the template, each its own launch, ascending slot; slots that differ or cannot be filled are skipped and counted. Or queued outside coverage.
+
+**Reason to select.** Build a station out to a saved plan in one order.
+
+### `gameplay.space_save_template` — The Space ledger (nav rail slot 9): ledger.space_save_template. In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam — a sibling of corp_command, because the template verbs carry a name and a layout the fixed corp_command record cannot. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed).
+
+**Press.** In-process: apply_space_command({nation, verb=6 save_template, name, layout}).
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `name` | `string (1..64 bytes)` | The template's name; an existing one is overwritten. |
+| `layout` | `station_template` | A grid level (0..2) and one module kind (or none) per slot, the centre empty. |
+
+**Valid when:**
+- The actor is a nation (rejected_unknown_nation otherwise). The seam validates every field as the value that lands — each enum range-checked as a raw byte, each entity id checked to exist and to be the nation's own, each slot index against the station's grid — and rejects the whole command on any violation (rejected_invalid / rejected_not_owner), mutating nothing.
+- At most 64 templates per nation (rejected_template_full).
+- Never delayed: a template is the nation's own record on the ground.
+
+**Expected output.** applied: the template is stored under its name.
+
+**Reason to select.** Keep a station layout to apply again.
+
+### `gameplay.space_delete_template` — The Space ledger (nav rail slot 9): ledger.space_apply_template (Delete). In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam — a sibling of corp_command, because the template verbs carry a name and a layout the fixed corp_command record cannot. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed).
+
+**Press.** In-process: apply_space_command({nation, verb=7 delete_template, name}).
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `name` | `string (1..64 bytes)` | A saved template. |
+
+**Valid when:**
+- The actor is a nation (rejected_unknown_nation otherwise). The seam validates every field as the value that lands — each enum range-checked as a raw byte, each entity id checked to exist and to be the nation's own, each slot index against the station's grid — and rejects the whole command on any violation (rejected_invalid / rejected_not_owner), mutating nothing.
+- The template exists (rejected_unknown_template).
+- Never delayed.
+
+**Expected output.** applied: the template is forgotten.
+
+**Reason to select.** Tidy away a layout no longer wanted.
+
+### `gameplay.space_upgrade_station` — The Space ledger (nav rail slot 9): ledger.space_upgrade. In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam — a sibling of corp_command, because the template verbs carry a name and a layout the fixed corp_command record cannot. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed).
+
+**Press.** In-process: apply_space_command({nation, verb=8 upgrade_station, subject=station}).
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `subject` | `entity_id (station)` | The nation's own station (its core asset's id). |
+
+**Valid when:**
+- The actor is a nation (rejected_unknown_nation otherwise). The seam validates every field as the value that lands — each enum range-checked as a raw byte, each entity id checked to exist and to be the nation's own, each slot index against the station's grid — and rejects the whole command on any violation (rejected_invalid / rejected_not_owner), mutating nothing.
+- Below the last level (rejected_max_level).
+- The upgrade's key is held: 5x3 -> 7x5 needs space_grid_7x5; 7x5 -> 9x7 needs space_grid_9x7, far space's (closed in Era 1).
+- The launch gate (BL-1582): the nation holds Rocketry (space_dispatch), owns a STAFFED Launchpad on its home body, and the home market's shelf holds the whole goods lot (spacecraft_components per class, propellant per Δv of the path) under the fair-price ceiling; the treasury pays the goods' value plus the class's base credits plus the path's thrust credits. Any shortfall refuses the launch whole (rejected_refused, with the launch result: rejected_tech_locked / rejected_no_launchpad / rejected_shelf / rejected_insufficient_treasury).
+- SIGNAL DELAY (SPACE_ASSETS.md § Signal delay): when the target's orbital node is outside the nation's comms coverage (space_node_covered), the command is stored as a pending order and answers `queued` with an order id; the world is otherwise untouched. It is applied at the next econ tick's nation step, re-validated as it lands, and dropped (reported on economy_report::space_orders) if no longer legal. Inside coverage it applies at once.
+
+**Expected output.** applied: a truss segment launches and the grid grows one ring, the core central and every module keeping its place. Or queued outside coverage.
+
+**Reason to select.** Make room for more modules.
+
+### `gameplay.space_retask_satellite` — The Space ledger (nav rail slot 9): ledger.space_retask. In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam — a sibling of corp_command, because the template verbs carry a name and a layout the fixed corp_command record cannot. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed).
+
+**Press.** In-process: apply_space_command({nation, verb=9 retask_satellite, subject=satellite, role}).
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `subject` | `entity_id (space asset)` | The nation's own satellite (not lost). |
+| `role` | `uint8 space_satellite_role` | 1 comms, 2 navigation, 3 observation, 4 survey; not its current role. |
+
+**Valid when:**
+- The actor is a nation (rejected_unknown_nation otherwise). The seam validates every field as the value that lands — each enum range-checked as a raw byte, each entity id checked to exist and to be the nation's own, each slot index against the station's grid — and rejects the whole command on any violation (rejected_invalid / rejected_not_owner), mutating nothing.
+- The role's key is held (rejected_tech_locked).
+- SIGNAL DELAY (SPACE_ASSETS.md § Signal delay): when the target's orbital node is outside the nation's comms coverage (space_node_covered), the command is stored as a pending order and answers `queued` with an order id; the world is otherwise untouched. It is applied at the next econ tick's nation step, re-validated as it lands, and dropped (reported on economy_report::space_orders) if no longer legal. Inside coverage it applies at once.
+
+**Expected output.** applied: the satellite's role changes, free. Or queued outside coverage.
+
+**Reason to select.** Repurpose a satellite already in a scarce slot.
+
+### `gameplay.space_move_satellite` — No UI surface yet: the Space ledger offers no satellite Move. In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam — a sibling of corp_command, because the template verbs carry a name and a layout the fixed corp_command record cannot. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed).
+
+**Press.** In-process: apply_space_command({nation, verb=10 move_satellite, subject=satellite, node_body, node_kind}).
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `subject` | `entity_id (space asset)` | The nation's own active satellite. |
+| `node_body` | `entity_id (body)` | The body whose orbital node is named. Never the star. |
+| `node_kind` | `uint8 orbital_node_kind` | 0 surface, 1 low orbit, 2 high orbit, 3 L1, 4 L2, 5 L4, 6 L5 (an L-point keyed on the pair's smaller body). |
+
+**Valid when:**
+- The actor is a nation (rejected_unknown_nation otherwise). The seam validates every field as the value that lands — each enum range-checked as a raw byte, each entity id checked to exist and to be the nation's own, each slot index against the station's grid — and rejects the whole command on any violation (rejected_invalid / rejected_not_owner), mutating nothing.
+- The satellite is active (in place and paid); the node is an orbital node other than its own, with a free slot.
+- Rocketry is held; the home shelf holds the path's propellant (from where the satellite sits) and the treasury pays it plus the thrust credits — no Launchpad, no components, no base credits.
+- SIGNAL DELAY (SPACE_ASSETS.md § Signal delay): when the target's orbital node is outside the nation's comms coverage (space_node_covered), the command is stored as a pending order and answers `queued` with an order id; the world is otherwise untouched. It is applied at the next econ tick's nation step, re-validated as it lands, and dropped (reported on economy_report::space_orders) if no longer legal. Inside coverage it applies at once.
+
+**Expected output.** applied: the satellite is in transit to the new node for the path's quarters; its old slot frees at once and the new one is held. Or queued outside coverage.
+
+**Reason to select.** Shift a satellite to a node where its role serves better, or out of a crowded orbit.
+
+### `gameplay.space_load_cargo` — No UI surface yet (the circumplanetary canvas's fleet controls are the UI lane's). In-process: src/world/space_convoy.hpp, the space-unit seam beside order_space_unit / refuel_space_unit. Not on apply_space_command or the --serve / MCP transport yet (a SPACE line beside COMMAND is owed).
+
+**Press.** In-process: load_space_cargo(world, space_unit_params, nation, unit, good, qty).
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `unit` | `entity_id (space unit)` | The nation's own Hauler or Lander. |
+| `good` | `resource index` | The good to lift; below resource_count (rejected_invalid otherwise). |
+| `qty` | `float` | Units to lift; finite and above zero (rejected_invalid otherwise). |
+
+**Valid when:**
+- The seam validates every field as the value that lands: the unit id must name a live space unit (rejected_unknown_unit) of the acting nation (rejected_not_owner); a refusal of any kind mutates nothing - no shelf, treasury, store, convoy or id allocator is touched.
+- The unit is a carrier (Hauler or Lander) with a cargo bay; any cargo already aboard is the same good, and what is aboard plus qty fits the bay (rejected_cargo). A trade's Hauler cannot be loaded by hand (rejected_cargo).
+- The unit is idle (rejected_busy) in a body's LOW ORBIT (rejected_wrong_node), and no armed unit of a nation at war with the owner stands at that node (rejected_hostile).
+- The nation holds a completed, staffed Launchpad on that body (rejected_no_pad); the pad tile's market shelf holds the goods and the lift's propellant - the body's climb Δv x launch_propellant_per_dv x qty - under the space ceiling (rejected_shelf_short / rejected_no_market), and the treasury pays both at the posted prices (rejected_insufficient_treasury).
+- BLOCKADE (SPACE_FLEETS.md § Blockade): refused (rejected_blockaded) when the body is blockaded for the acting nation - an armed unit of a nation hostile to it stands in that low orbit and it has none of its own there - or for the nation whose ground the pad's market stands on (space_bombard.hpp).
+
+**Expected output.** ok: the goods and the lift's propellant leave the pad's shelf, the treasury pays their value, and the cargo is aboard (space_unit::cargo, its good on the unit's space_haul record, held). Loaded is heavier: the unit's Δv falls. Saved (world_save_version 85).
+
+**Reason to select.** Carry goods off a body by hand - to a moon market, or to stock a ship ahead of a move. A moon's lift costs a fraction of the home world's.
+
+### `gameplay.space_unload_cargo` — No UI surface yet (the circumplanetary canvas's fleet controls are the UI lane's). In-process: src/world/space_convoy.hpp, the space-unit seam beside order_space_unit / refuel_space_unit. Not on apply_space_command or the --serve / MCP transport yet (a SPACE line beside COMMAND is owed).
+
+**Press.** In-process: unload_space_cargo(world, space_unit_params, nation, unit).
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `unit` | `entity_id (space unit)` | The nation's own carrier with hand-loaded cargo aboard. |
+
+**Valid when:**
+- The seam validates every field as the value that lands: the unit id must name a live space unit (rejected_unknown_unit) of the acting nation (rejected_not_owner); a refusal of any kind mutates nothing - no shelf, treasury, store, convoy or id allocator is touched.
+- Hand-loaded cargo is aboard (rejected_cargo: nothing aboard, or a trade's cargo, which its Hauler unloads itself).
+- The unit is idle (rejected_busy) in a body's LOW ORBIT (rejected_wrong_node), and no armed unit of a nation at war with the owner stands at that node (rejected_hostile).
+- A completed, staffed Launchpad of ANY nation stands on the body below (rejected_no_pad); its tile's market shelf holds the descent's propellant - the body's climb Δv x launch_propellant_per_dv x the cargo - under the space ceiling (rejected_shelf_short / rejected_no_market), and the treasury pays it (rejected_insufficient_treasury).
+- BLOCKADE (SPACE_FLEETS.md § Blockade): refused (rejected_blockaded) when the body is blockaded for the acting nation, or for the nation whose ground the pad's market stands on (space_bombard.hpp).
+
+**Expected output.** ok: the descent's propellant leaves that shelf, the treasury pays it, the hold empties, and the whole cargo LANDS on that market as an arrived space convoy: the next credit_arrived_convoys lands it and the clear sells it for the owner, with any import duty, as any convoy's cargo.
+
+**Reason to select.** Sell carried goods into another body's market, or bring them home.
+
+### `gameplay.space_bombard` — No UI surface yet (the circumplanetary canvas's fleet controls are the UI lane's). In-process: src/world/space_bombard.hpp, the space-unit seam beside order_space_unit / load_space_cargo. Not on apply_space_command or the --serve / MCP transport yet (a SPACE line beside COMMAND is owed).
+
+**Press.** In-process: order_space_bombard(world, nation, unit, kind, target, clear).
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `unit` | `entity_id (space unit)` | The nation's own warship carrying the orbital-missile armament (armament.missile) - the munition it fires. |
+| `kind` | `u8 (space_bombard_target)` | 0 a building, 1 a province; any other value is rejected_invalid before it is read as a kind. |
+| `target` | `u32` | The building id (kind 0) or the province id (kind 1); 0, or an id naming nothing, is rejected_invalid. |
+| `clear` | `bool` | true clears the unit's standing order instead (rejected_invalid when it has none); kind and target are then ignored. |
+
+**Valid when:**
+- The seam validates every field as the value that lands: the unit id must name a live space unit (rejected_unknown_unit) of the acting nation (rejected_not_owner); a refusal of any kind mutates nothing.
+- The nation holds the Early Space tree's Orbital Bombardment mechanic, orbital_bombardment (rejected_tech_locked).
+- The unit carries the orbital-missile armament (rejected_not_armed), is not in transit (rejected_busy), and stands in the LOW ORBIT of the body the target lies on (rejected_wrong_node).
+- There is something there it may strike (rejected_target): the building, or for a province the building in best condition there (ties to the lowest id), must be standing, completed, of a type whose condition bites (condition_bites - the strategic mission's targets: producers, the marketplace, ports, hubs, stations, research houses, bunkers, orbital defence batteries; NOT a Launchpad or a base) and owned by a nation the acting nation is hostile to, either direction.
+
+**Expected output.** ok: a STANDING order (world::space_bombard_orders, keyed by unit; saved, world_save_version 89). Each day, after the battle day, it fires once: the unit's firepower x bombard_condition_per_firepower (1.0) comes off the struck building's condition per-mille (its throughput scales with condition; the daily repair pass mends it), and the building's owner observes force_used toward the bomber, magnitude bombard_force_per_permille (0.1) x the condition lost - the Trust and Alarm a battle's force carries (RELATIONS.md § 6). A province order re-picks its building each day. The order is DROPPED the first day its unit, target or hostility is gone, or the unit has left that low orbit; peace drops it. The munition is not consumed (first cut). An enemy Orbital Defence Battery on the body fires back each day.
+
+**Reason to select.** Wear down a hostile nation's industry, trade or defences on a body your fleet holds the orbit of - at the price of Trust and Alarm in the nation struck.
+
+### `gameplay.queue_space_research` — The research panel's Early Space tree (the 'Early Space' tab, top-right of the research canvas): SHIFT + left click on a node. A corp_verb (55, `queue_space_research`), so an agent issues it through the same seam.
+
+**Press.** Open the research panel (nav slot 4 or F9), press the 'Early Space' tab, then hold Shift and left-click a node. Holding Shift over a node first rings what the click would queue; the hover card says the count and RP, or why it is refused.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `order` | `uint32` | The Early Space node: its INDEX in io::es::nodes - store order of docs/economy/tech/early_space_tree.json, generated into src/world/early_space_tree_data.hpp, where each row carries its index. 0..53. The MCP server refuses anything else before the wire; the seam range-checks it again (rejected_invalid). |
+
+**Valid when:**
+- BL-1406 (Ben, 2026-10-23: the player IS its nation; corporations and companies are retired - docs/CONCEPT.md § Player identity, docs/GLOSSARY.md): THE ACTOR IS THE NATION. On the wire a session acts as its nation - `COMMAND corp=<nation> nation=<nation> ...` (the seam's nation-self form, corp_command::as_nation == corp). The session corporation's id is still accepted as the actor's NAME and, once the world is folded (every campaign start), re-pointed to its nation before the seam; any other actor is rejected_not_owner. The app files the player's press the same way (app::player_command). Money is the treasury's UNCOMMITTED part - a nation never runs into debt (rejected_funds past it) - and what the verb makes or moves is the nation's (its state_assets, units, trades).
+- `corp` is the SEAT (world::player_entity): the player reaches its nation's queue as the nation's operating champion. Any other corporation is refused (rejected_state) - a rival does not plan its nation's research.
+- The seat has a home nation (rejected_state otherwise).
+- The gate into space is met (ERAS.md § Era 1 -> Era 2 gate): the nation holds Rocketry, owns a completed, staffed Launchpad on its home body, and a market on that body holds the gate's propellant on its shelf. Unmet: rejected_state, nothing queued; the tree draws locked and its caption names what the gate still needs.
+- The node's branch is keyed: the nation holds the Digitisation quest that names it (RESEARCH.md § Quests key the next age) - or, while that quest's deed is unread, the quest's own major. Unkeyed: rejected_state; the branch header reads 'Needs <node>'.
+- The node is not already held or queued (rejected_state; a shift-click on a queued node is the unqueue toggle, gameplay.unqueue_space_research). A refusal queues nothing.
+
+**Expected output.** The nation's ONE research queue gains the node with its unheld requirements ahead of it, on the Early Space tail - behind every Digitisation entry, so the pool reaches it only once no Digitisation entry waits on funding (RESEARCH.md § The research queue). The column lists it after the Digitisation entries, numbered on, with its arrival quarter at the nation's current RP rate. A quest (every Early Space deed is unread) waits in the queue.
+
+**Reason to select.** Plan into the next age once the nation has reached space: one press queues the whole path to a far-space technology.
+
+### `gameplay.unqueue_space_research` — The research panel's Early Space tree: SHIFT + left click on a QUEUED node (the toggle rule). A corp_verb (56, `unqueue_space_research`). 'Remove last' (gameplay.unqueue_research's last-entry form) also drops the Early Space tail's last entry first, since it is the last of the one queue.
+
+**Press.** Hold Shift and left-click a queued node on the Early Space tree (it carries a white ring and its queue position).
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `order` | `uint32` | The queued Early Space node to take off: its INDEX in io::es::nodes (0..53, as queue_space_research). There is no last-entry form; any value outside the tree is rejected_invalid. |
+
+**Valid when:**
+- BL-1406 (Ben, 2026-10-23: the player IS its nation; corporations and companies are retired - docs/CONCEPT.md § Player identity, docs/GLOSSARY.md): THE ACTOR IS THE NATION. On the wire a session acts as its nation - `COMMAND corp=<nation> nation=<nation> ...` (the seam's nation-self form, corp_command::as_nation == corp). The session corporation's id is still accepted as the actor's NAME and, once the world is folded (every campaign start), re-pointed to its nation before the seam; any other actor is rejected_not_owner. The app files the player's press the same way (app::player_command). Money is the treasury's UNCOMMITTED part - a nation never runs into debt (rejected_funds past it) - and what the verb makes or moves is the nation's (its state_assets, units, trades).
+- `corp` is the SEAT (world::player_entity): the player reaches its nation's queue as the nation's operating champion. Any other corporation is refused (rejected_state) - a rival does not plan its nation's research.
+- The seat has a home nation (rejected_state otherwise).
+- The named node is on the Early Space tail (rejected_state otherwise; nothing touched).
+
+**Expected output.** The node comes off the Early Space tail together with every LATER tail entry that needs it (a press on Cryogenics II also takes off Remote Prospecting behind it, and keeps Cryogenics I). The rest of the queue keeps its order; RP in hand stay.
+
+**Reason to select.** Undo part of an Early Space plan without touching the Digitisation queue ahead of it.
+
+### `gameplay.space_embark_colonists` — The Selection band's space-unit card for the player's own Lander with passenger berths (SELECTION.md § The space-unit element): the Embark colonists press, the count slider and Confirm embark. In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam; the verb is offworld_base.hpp's. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed).
+
+**Press.** Press Embark colonists: a TOGGLE - lit, it shows the count (thousands, a berth each; every free berth by default) and Confirm embark <n> thousand; pressing it again while lit disarms it. Greyed with its reason where boarding cannot happen: not at the home body (idle in its low orbit, or landed), no staffed Launchpad there, or every berth taken. The summary reads 'Colonists: n thousand of b berths'. In-process: apply_space_command({nation, verb=12 embark_colonists, subject=lander, slot=colonists}). A refusal answers on the card's message line with the verb's reason.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `subject` | `entity_id (space unit)` | The nation's own Lander with a passenger bay. |
+| `slot` | `int32` | Colonists to board, in thousands of heads (one passenger berth each); 1 .. 65536 at the seam, and no more than the free berths. |
+
+**Valid when:**
+- The actor is a nation (rejected_unknown_nation otherwise). The seam validates every field as the value that lands - each enum range-checked as a raw byte, each entity id checked to exist and to be the nation's own - and rejects the whole command on any violation (rejected_invalid / rejected_not_owner), mutating nothing. A refusal by the verb itself is rejected_refused, with `base` naming the reason; it too mutates nothing.
+- The unit is a Lander with passenger berths (rejected_not_lander), idle in its nation's home body's low orbit or landed on its surface (rejected_wrong_node), and the nation holds a completed, staffed Launchpad on that body (rejected_no_pad).
+- The colonists fit the berths left free (rejected_no_berths), and one of the nation's centres on its home body can spare them and keep a thousand (rejected_no_people); the most populous is drawn from, ties to the lower id.
+- Never delayed.
+
+**Expected output.** applied: the heads leave that home population centre and ride aboard the Lander (world::space_colonists, saved at world_save_version 88). A unit lost with colonists aboard loses them.
+
+**Reason to select.** Carry the people a base is founded with (NATIONS.md § Off-world bases).
+
+### `gameplay.space_found_base` — The Selection band's space-unit card for the player's own Lander landed on another body's surface (SELECTION.md § The space-unit element): the Found base press, the colonists and base-kit lines, the site list and Confirm found base. In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam; the verb is offworld_base.hpp's. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed).
+
+**Press.** Press Found base (open once Off-World Bases is held): a TOGGLE - lit, it reads 'Colonists landed here: n of 2 thousand' and 'Base kit landed here: k of 20 Machinery' (green when enough, red when short; every Lander of the nation landed on that body counts), then lists the ground a founding could take there: one row per province with mapped, unclaimed land - '(col, row)  habitability h  prospected | deposits unknown' - at its most habitable such tile, most habitable first. A Lander lands at the body's surface, not a tile, so the row IS the site pick. Press a row (a toggle: the chosen row un-picks), then Confirm found base, greyed with 'too few colonists landed here' or 'too little base kit landed here' while either falls short. In-process: apply_space_command({nation, verb=11 found_base, subject=tile}). A refusal answers on the card's message line with the verb's reason.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `subject` | `entity_id (tile)` | The tile the base stands on: land on another body's surface. |
+
+**Valid when:**
+- The actor is a nation (rejected_unknown_nation otherwise). The seam validates every field as the value that lands - each enum range-checked as a raw byte, each entity id checked to exist and to be the nation's own - and rejects the whole command on any violation (rejected_invalid / rejected_not_owner), mutating nothing. A refusal by the verb itself is rejected_refused, with `base` naming the reason; it too mutates nothing.
+- The nation holds base_founding (the Early Space tree's Off-World Bases) - rejected_tech_locked.
+- The tile is land on a gridded body other than the star and the nation's home body (rejected_invalid), and the nation has MAPPED it (rejected_unmapped; DISCOVERY.md § Mapping, then prospecting).
+- Nobody owns the tile, no centre or building stands on it, and no nation holds its province (rejected_claimed).
+- The nation's Landers landed on that body's surface carry, between them, at least 2 colonists (thousands; rejected_no_colonists) and 20 machinery held as cargo, the base kit (rejected_no_kit). Both are first-cut stand-ins, not yet authored by a doc.
+- Never delayed.
+
+**Expected output.** applied: a body with no provinces is partitioned; the base's province becomes the nation's (every unowned tile, and the holder); a population centre with every landed colonist stands on the tile; the body's market is founded there if it had none; a Track is laid from the tile; the colonists and the kit are spent. From then on the base buys its life support (water and food rations per thousand, by the habitability its tile lacks) off its own market each quarter, or shrinks. Saved (world_save_version 88).
+
+**Reason to select.** Open ground on another body: build, extract and trade there as at home.
+
+### `gameplay.space_unit_move` — The Selection band's space-unit card (SELECTION.md § The space-unit element): the Move press, the 'Whole fleet' tick, the destination list, the 'Move costs delta-v x of y' line and Confirm move.
+
+**Press.** Press Move: a TOGGLE - lit, it lists every node the unit can be sent to with the path's delta-v and days (greyed '(over budget)' where the budget cannot pay); pressing it again while lit disarms it. Press a destination row (a toggle: the chosen row un-picks) to see the move's delta-v against the budget, then Confirm move. Tick 'Whole fleet' to send every unit of the fleet, held to the weakest budget. Applied through apply_space_command (src/world/space_command.hpp, the near-space seam the Space ledger's presses take), validated whole as the value that lands; a unit verb is never delayed or queued. Not yet on the --serve wire. Verb move_unit (13) or move_fleet (14), subject = the unit, node = the destination.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `subject` | `entity_id` | The unit; for the fleet form, any unit of it (its nation's units at its node, not in transit). |
+| `node` | `orbital node (body, kind)` | The destination. A surface is a Lander's only. |
+
+**Valid when:**
+- The unit is the player nation's own and not in transit (a unit in transit cannot be ordered until it arrives).
+- The path exists on the default orbital graph and its delta-v fits every moving unit's budget (refused whole otherwise: rejected_insufficient_dv).
+
+**Expected output.** The unit (or the fleet) leaves at once: propellant burned for the path, in transit with the path's days; on the canvas it draws on a dashed segment from where it was, its mark advancing each day. A unit engaged in a battle does not leave at once: the move is recorded as its withdrawal and flies after the next day's fire (SPACE_FLEETS.md § Battles). A refusal answers on the card's message line with the seam's reason.
+
+**Reason to select.** Reposition a fleet - to escort, contest an orbit, lift a blockade or reach a target - knowing before the press what the trip costs the tanks.
+
+### `gameplay.space_unit_dock` — The Selection band's space-unit card: the Dock press (Undock while docked).
+
+**Press.** Press Dock to berth the unit at the player's station at its node; press Undock to release a docked unit. One-shot verbs, not toggles: the card's state line says which it is. Applied through apply_space_command (src/world/space_command.hpp, the near-space seam the Space ledger's presses take), validated whole as the value that lands; a unit verb is never delayed or queued. Not yet on the --serve wire. Verb dock_unit (15), target = the station; undock_unit (16).
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `subject` | `entity_id` | The unit. |
+| `target` | `entity_id (station)` | Dock: the station, the player's own at the unit's node. |
+
+**Valid when:**
+- The unit is the player nation's own and not in transit (a unit in transit cannot be ordered until it arrives).
+- Dock: a station of the player's at the unit's node with a working Dock and a free berth (two a Dock). Off when no such station stands there ('No station of yours at this node.').
+
+**Expected output.** Docked: the unit berths (it may refuel from a Fuel depot, unload into a Cargo hold, and is repaired a little each day). Undocked: it is idle at the node.
+
+**Reason to select.** Berth a ship for repair and refuelling at your own station.
+
+### `gameplay.space_unit_refuel` — The Selection band's space-unit card: the Refuel press.
+
+**Press.** Press Refuel. Applied through apply_space_command (src/world/space_command.hpp, the near-space seam the Space ledger's presses take), validated whole as the value that lands; a unit verb is never delayed or queued. Not yet on the --serve wire. Verb refuel_unit (17).
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `subject` | `entity_id` | The unit. |
+
+**Valid when:**
+- The unit is the player nation's own and not in transit (a unit in transit cannot be ordered until it arrives).
+- Docked at a station with a working Fuel depot holding stock, or idle in a body's low orbit over a staffed Launchpad of the player's there (bought off that body's shelf; refused whole when the shelf or treasury is short, or the body is blockaded).
+
+**Expected output.** The tanks fill (to full where the stock and money allow); the card's delta-v budget rises.
+
+**Reason to select.** Restore a ship's reach before a long move.
+
+### `gameplay.space_unit_bombard` — The Selection band's space-unit card: the Bombard press and its list of hostile ground below.
+
+**Press.** Press Bombard: a TOGGLE - lit, it lists the hostile ground on the body below ('<Nation> ground: <building>'); press a row to set the standing order. While an order stands the button stays lit, and pressing it lifts the order. Applied through apply_space_command (src/world/space_command.hpp, the near-space seam the Space ledger's presses take), validated whole as the value that lands; a unit verb is never delayed or queued. Not yet on the --serve wire. Verb bombard (18), target_kind 1 (province), target = the province; clear = lift.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `subject` | `entity_id` | The unit. |
+| `target` | `province id` | The ground struck: each day the hostile building in best condition there. |
+
+**Valid when:**
+- The unit is the player nation's own and not in transit (a unit in transit cannot be ordered until it arrives).
+- The unit carries the orbital-missile armament and stands in the body's low orbit; the nation holds the Orbital Bombardment key; something hostile stands below (SPACE_FLEETS.md § Bombardment and fire at orbit). Off otherwise.
+
+**Expected output.** A standing order: once a day the unit strikes the hostile building in best condition in the province, lowering its condition; the struck owner's Alarm rises. The order lapses when the unit leaves, the target or the hostility is gone.
+
+**Reason to select.** Wear an enemy's ground from orbit while your fleet holds it.
 
 ### `gameplay.hire_ship` — The Military ledger's Sea tab (ledger.military_sea_raise). Also a corp_verb (corp_verb::hire_ship, 55) on the command seam.
 
@@ -1315,6 +1733,38 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 
 **Reason to select.** Read a thing before committing a click — check a tile's landform and movement cost, a deposit's richness, or a price signal, and learn the glyph vocabulary at the point of looking.
 
+### `canvas.hover_orbital_node` — The Circumplanetary canvas (primary view only): the low and high orbit rings around the anchor and each moon, the L1/L2/L4/L5 diamonds of every anchor-moon pair, and the slot-pip row beside each node (CIRCUMPLANETARY.md § Orbital nodes and what sits at them).
+
+**Press.** Hold the pointer over a node: on a diamond, on a ring's line, or on a node's row of slot pips. A satellite or station mark under the pointer wins, then a body: over either, its own card shows instead.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `node` | `orbital_node` | The hovered node: a body's low or high orbit, or an L1/L2/L4/L5 of an anchor-moon pair, named "<body> low orbit", "<moon> L4". |
+
+**Valid when:**
+- The app is in-game with the Circumplanetary rung primary.
+- No satellite, station or body disc is under the pointer.
+
+**Expected output.** The shared hover card appears at once, beside the cursor: the node's name, its free slots out of its capacity, and the thrust cost (∆v) and travel days from the player's home surface along the cheapest route. A press on a node changes nothing: a node is not a selectable entity, so the selection is kept rather than cleared. Pips are hollow for a free slot and filled for a held one, in the identity colour of the nation whose satellite or station holds it. An L-point whose place falls under the bottom strip is held just above it.
+
+**Reason to select.** Compare where around a planet there is room to place an orbital asset, and what reaching each place costs from home, before committing to one.
+
+### `canvas.space_asset_select` — The Circumplanetary canvas (primary view only): a satellite mark (a small round plate in its owner nation's colour, a solar wing out of each side, its role's mark on the plate) or a station mark (a larger square core on a truss between two solar panels, in its owner's colour, larger for a larger grid), drawn at the orbital node it occupies - down the side of a ring, or in a row under a diamond. One in transit draws at its destination at half strength, with a dashed segment back to the node it left and a solid marker at its share of the way when that node is on the rung (CIRCUMPLANETARY.md § Orbital nodes and what sits at them).
+
+**Press.** Hover a mark for its card; left-click it to select it.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `asset` | `entity_id` | The satellite, or the station (whose id is its core's), under the pointer. A station's modules are not selectable on their own. |
+
+**Valid when:**
+- The app is in-game with the Circumplanetary rung primary.
+- Every nation's satellites and stations at the rung's nodes draw, the player's and rivals' alike.
+
+**Expected output.** Hover: the shared hover card - the title ("Observation satellite", "Station"), the owner nation in its colour, the role (a satellite) or modules of the grid's slots and crew (a station), the node, and the state (in place; decaying with the unpaid quarters; in transit with the node it left and the quarters to arrival). Press: the asset becomes the selection, its mark is ringed, and the Selection band shows the same summary. No world change.
+
+**Reason to select.** See who holds which place around a planet and what each satellite there does, before choosing where to launch or move your own.
+
 ### `canvas.construction_site_card` — Planetary canvas: the build-progress circle drawn over each of the player's sites under construction.
 
 **Press.** Point at the circle (no dwell, no click).
@@ -1512,9 +1962,9 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 **Valid when:**
 - The app is in-game and no ImGui text field has keyboard focus.
 
-**Expected output.** Toggles the research panel (the same flag as nav rail slot 4). The research panel: the Digitisation tree drawn as three trees in a ring (Production, Network, State; three branches each and a fourth, Naval, in State; four cost rings inside out; no centre node) on the canvas, and in the fold-out column the seat's nation with its RP a quarter, RP in hand and held count, and its research queue with each entry's arrival quarter, Remove last and Clear - always shown while the seat's nation exists. Shift + left click on a node queues it; shift-click on a queued node takes it off with the entries that need it. Every node, every requirement link (an AND link - a node with two or more requirement groups - in the accent), pick-one pairs outlined in red with a dashed tie, quests as amber diamonds, placeholders dashed and muted; held nodes green, queued nodes ringed with their queue position. Hovering a node opens the shared hover card: name, tier, ring, RP cost, exact advantage, "Requires: A + B" (groups joined by +, members by or), a quest's deed and the next-age branch it keys, a pair's sibling, and the node's state. Opening it closes any other ledger; pressing F9 again closes it (toggle rule). Sim, view, and selection untouched.
+**Expected output.** Toggles the research panel (the same flag as nav rail slot 4). The research panel: the Digitisation tree drawn as three trees in a ring (Production, Network, State; three branches each and a fourth, Naval, in State; four cost rings inside out; no centre node) on the canvas, and in the fold-out column the seat's nation with its RP a quarter, RP in hand and held count, and its research queue with each entry's arrival quarter, Remove last and Clear - always shown while the seat's nation exists. A plain left click on a node makes it the research target: the queue is rebuilt with that node and its unheld requirements first and the old entries behind it (Ben, 2026-11-11). Shift + left click on a node adds it to the queue; shift-click on a queued node takes it off with the entries that need it. Every node, every requirement link (an AND link - a node with two or more requirement groups - in the accent), pick-one pairs outlined in red with a dashed tie, quests as amber diamonds, placeholders dashed and muted; held nodes green, queued nodes ringed with their queue position. Hovering a node opens the shared hover card: name, tier, ring, RP cost, exact advantage, "Requires: A + B" (groups joined by +, members by or), a quest's deed and the next-age branch it keys, a pair's sibling, and the node's state. Opening it closes any other ledger; pressing F9 again closes it (toggle rule). Sim, view, and selection untouched. BL-1613: the canvas carries an age switch (canvas.tech_tree_age_tab) between the Digitisation ring and the Early Space tree; the column adds an Early Space line (held count when the gate into space is met, else what the gate needs) and lists ONE queue - the Digitisation entries, then the Early Space tail behind them, numbered on, each with its arrival quarter.
 
-**Reason to select.** Read which technologies the nation can reach and what each gives, and shift-click nodes to plan its research queue.
+**Reason to select.** Read which technologies the nation can reach and what each gives, click a node to research it next, and shift-click nodes to plan its research queue.
 
 ### `canvas.zoom_keys` — Keyboard.
 
@@ -1777,6 +2227,37 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 **Expected output.** Toggles the province as a goal, at most three; the click is consumed (no selection). The declaration's goal list, justifications and price update on the next frame. Nothing is sent.
 
 **Reason to select.** Name the ground the war is for: the goals are what the war score counts and what a peace can cede.
+
+### `canvas.tech_tree_age_tab` — The research canvas's age switch: two tabs top-right, 'Digitisation' and 'Early Space' (read 'Early Space (locked)' while the gate into space is unmet).
+
+**Press.** Click a tab. Clicking the tab already shown closes the research panel (the toggle rule: re-clicking the active sub-view tab closes it).
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `age` | `one of Digitisation | Early Space` | Which age's tree the canvas draws. |
+
+**Valid when:**
+- The research panel is open (nav slot 4 or F9).
+
+**Expected output.** Digitisation: the ring (as canvas.tech_tree_key describes). Early Space: the next age's tree, three branch columns (In-Situ Propellant, Interplanetary Convoys, Space Force) flowing top to bottom, the same glyphs, links and press idiom as the ring; each column's header names its branch and what keys it ('Keyed: <node> held' in green, or 'Needs <node>' in red). Before the gate into space is met every node draws locked and the caption reads 'Locked: the gate into space needs ...' naming the missing conditions (Rocketry; a staffed Launchpad on the home body; propellant on a home-body market's shelf); the tree stays readable by hover. The camera resets on a switch. Sim untouched.
+
+**Reason to select.** Read the next age: what reaching space opens, what keys each branch, and whether the gate is met.
+
+### `canvas.space_fleet_select` — The Circumplanetary canvas (primary view only): a fleet mark - a pointed hull in its owner nation's colour carrying the lead unit's hull mark, the fleet's size as a badge - one per nation per node, on a ring's upper side or above a diamond; a unit in transit on a dashed segment from the node it left to its destination, at its share of the way. The Solar canvas (primary view only): one mark per nation per body at the body's upper left, and an inter-body move on a segment between the two bodies (CIRCUMPLANETARY.md, SOLAR.md § Space fleets).
+
+**Press.** Hover a fleet mark for its card; left-click it to select its lead unit (the lowest id). A fleet mark wins the pointer over a satellite or station, which wins over a body.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `unit` | `entity_id` | The lead unit of the fleet under the pointer: the lowest id of one nation's units at that node (or travelling together). |
+
+**Valid when:**
+- In-game with the Circumplanetary or Solar rung primary.
+- Every nation's space units draw, the player's and rivals' alike.
+
+**Expected output.** Hover: the shared hover card - the hull ('Frigate'), the owner nation in its colour, the node (or the node it left and the one it is bound for, with the days to go), the delta-v budget against its capacity, propellant, hull points, cargo, firepower and armour, and a standing bombard order. Press: the lead unit becomes the selection, its mark is ringed, and the Selection band shows the same summary, the fleet's units as rows (a row selects that unit), and - for the player's own unit - its orders. No world change.
+
+**Reason to select.** See whose ships are where, how far each can still go, and pick one up to order it.
 
 ### `canvas.ship_select` — Planetary canvas: the ship marker - a diamond with the class's silhouette in its owner's colour, on each water tile holding a ship you can see, with the number there when more than one.
 
@@ -2230,7 +2711,7 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 
 **Reason to select.** The chart says which side is bigger at a glance; the hover says WHICH outflow is the one to act on.
 
-### `ledger.nav_generation` — Nav rail, slot 10 (plate/continent glyph)
+### `ledger.nav_generation` — Nav rail, slot 11 (plate/continent glyph)
 
 **Press.** Click the plate glyph in the developer tail of the left icon rail
 
@@ -2421,7 +2902,7 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 **Valid when:**
 - In-game
 
-**Expected output.** Toggles the research panel open; re-click closes; opening closes any other ledger. The research panel: the Digitisation tree drawn as three trees in a ring (Production, Network, State; three branches each and a fourth, Naval, in State; four cost rings inside out; no centre node) on the canvas, and in the fold-out column the seat's nation with its RP a quarter, RP in hand and held count, and its research queue with each entry's arrival quarter, Remove last and Clear - always shown while the seat's nation exists. Shift + left click on a node queues it; shift-click on a queued node takes it off with the entries that need it. Every node, every requirement link (an AND link - a node with two or more requirement groups - in the accent), pick-one pairs outlined in red with a dashed tie, quests as amber diamonds, placeholders dashed and muted; held nodes green, queued nodes ringed with their queue position. Hovering a node opens the shared hover card: name, tier, ring, RP cost, exact advantage, "Requires: A + B" (groups joined by +, members by or), a quest's deed and the next-age branch it keys, a pair's sibling, and the node's state.
+**Expected output.** Toggles the research panel open; re-click closes; opening closes any other ledger. The research panel: the Digitisation tree drawn as three trees in a ring (Production, Network, State; three branches each and a fourth, Naval, in State; four cost rings inside out; no centre node) on the canvas, and in the fold-out column the seat's nation with its RP a quarter, RP in hand and held count, and its research queue with each entry's arrival quarter, Remove last and Clear - always shown while the seat's nation exists. A plain left click on a node makes it the research target: the queue is rebuilt with that node and its unheld requirements first and the old entries behind it (Ben, 2026-11-11). Shift + left click on a node adds it to the queue; shift-click on a queued node takes it off with the entries that need it. Every node, every requirement link (an AND link - a node with two or more requirement groups - in the accent), pick-one pairs outlined in red with a dashed tie, quests as amber diamonds, placeholders dashed and muted; held nodes green, queued nodes ringed with their queue position. Hovering a node opens the shared hover card: name, tier, ring, RP cost, exact advantage, "Requires: A + B" (groups joined by +, members by or), a quest's deed and the next-age branch it keys, a pair's sibling, and the node's state. BL-1613: the canvas carries an age switch (canvas.tech_tree_age_tab) between the Digitisation ring and the Early Space tree; the column adds an Early Space line (held count when the gate into space is met, else what the gate needs) and lists ONE queue - the Digitisation entries, then the Early Space tail behind them, numbered on, each with its arrival quarter.
 
 **Reason to select.** Answers "which technologies can my nation reach, what does each give, and when will my plan arrive?"
 
@@ -2436,7 +2917,7 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 
 **Reason to select.** Answers 'how well is my nation doing?' - the treasury and the quarter's money, which is the honest answer to that question today.
 
-### `ledger.nav_history` — Nav rail, slot 9 (History icon)
+### `ledger.nav_history` — Nav rail, slot 10 (History icon)
 
 **Press.** Click the history glyph on the left icon rail
 
@@ -2594,9 +3075,9 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 
 **Reason to select.** Done with this building; back to comparing the tile's other stacks, or to building something else here.
 
-### `ledger.decision_feed_open` — Navigation rail slot 11, "AI decisions"
+### `ledger.decision_feed_open` — Navigation rail slot 12, "AI decisions"
 
-**Press.** Click nav rail slot 11 to open the AI decision feed; click it again to close
+**Press.** Click nav rail slot 12 to open the AI decision feed; click it again to close
 
 **Valid when:**
 - In game (not the menu or the generation screen)
@@ -2635,9 +3116,9 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 
 **Reason to select.** To ask a specific question of the run rather than scroll it. 'Every solvency-defence idle' and 'every build' are different questions, and the reason code is what separates them.
 
-### `ledger.strategy_readout_open` — Navigation rail slot 12, "Strategy readout"
+### `ledger.strategy_readout_open` — Navigation rail slot 13, "Strategy readout"
 
-**Press.** Click nav rail slot 12 to open the Strategy readout; click it again to close
+**Press.** Click nav rail slot 13 to open the Strategy readout; click it again to close
 
 **Valid when:**
 - In game (not the menu or the generation screen)
@@ -2768,7 +3249,7 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 
 ### `ledger.selection_assign_front` — Selection band: the unit card's action grid, sixth cell (a flag glyph, tooltip 'Assign to front'), and the unit group's header button 'Assign to front' (the player's own groups only).
 
-**Press.** Click it to open the menu: one entry per front of the unit's own nation, named '<neighbour> - <N> tiles' (with '(north)'/'(south)', '(west)'/'(east)' or '(n of m)' where one neighbour has more than one front), in its stance colour, then 'Unassign'. The current front is checked; pick another to move the unit there, pick the checked one again or 'Unassign' to unassign. The menu's last entry, 'Defend this province', sends gameplay.defend_province per unit for the province it stands in; checked when every unit already defends it, and pressing it then clears the order. From the group, the pick applies to every unit of the stack. Sends one gameplay.assign_front (corp_verb 41) per unit with `subject` = the unit and `tile` = the front's key, or null to unassign.
+**Press.** Click it to open the menu: one entry per front of the unit's own nation on the body the unit stands on (a front on another body is never offered: the assignment would be refused, MILITARY.md § Space; with none there the menu reads 'This nation has no fronts on this body.'), named '<neighbour> - <N> tiles' (with '(north)'/'(south)', '(west)'/'(east)' or '(n of m)' where one neighbour has more than one front), in its stance colour, then 'Unassign'. The current front is checked; pick another to move the unit there, pick the checked one again or 'Unassign' to unassign. The menu's last entry, 'Defend this province', sends gameplay.defend_province per unit for the province it stands in; checked when every unit already defends it, and pressing it then clears the order. From the group, the pick applies to every unit of the stack. Sends one gameplay.assign_front (corp_verb 41) per unit with `subject` = the unit and `tile` = the front's key, or null to unassign.
 
 **Valid when:**
 - A unit of the player nation is selected, or the group of the player's units on one tile.
@@ -2779,19 +3260,19 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 
 **Reason to select.** A front does nothing without units on it: assigned units spread along the span, fill gaps and push when ordered.
 
-### `ledger.military_theatre_tab` — Military ledger (nav rail slot 7), Recruit and Design tabs: the row of theatre tabs under them, 'Land N', 'Air N' and 'Sea N' - each names its theatre and counts its rows (Recruit Land: the land types shown; Recruit Air and Design Air: the six air classes; Design Land: the seven land classes; Sea: 0). The active one is lit.
+### `ledger.military_theatre_tab` — Military ledger (nav rail slot 7), Recruit and Design tabs: the row of theatre tabs under them, 'Land N', 'Air N' and 'Sea N', and under Design a fourth, 'Space N' - each names its theatre and counts its rows (Recruit Land: the land types shown; Recruit Air and Design Air: the six air classes; Design Land: the seven land classes; Sea: 0; Design Space: the five hulls). The active one is lit.
 
 **Press.** Click a theatre tab. A SELECTOR, not a toggle (ledgers/military.md § Grouped by theatre, Ben 2026-11-02): re-pressing the active tab does nothing. Each of Recruit and Design keeps its own theatre; Land by default.
 
 | Arg | Type | Meaning |
 |---|---|---|
 | `tab` | `0 Recruit, 1 Design` | The tab the theatre row sits under. |
-| `theatre` | `0 Land, 1 Air, 2 Sea` | The theatre tab pressed. |
+| `theatre` | `0 Land, 1 Air, 2 Sea, 3 Space (Design only)` | The theatre tab pressed. |
 
 **Valid when:**
 - The Military ledger is open (nav rail slot 7).
 
-**Expected output.** The view lists that theatre alone. Recruit's Land holds the military-base picker, the land roster and the muster queue; Recruit's Air holds the airbase picker, the six air rows and the player's wings; Recruit's Sea holds one row per completed port of your nation under a picker (the first chosen; choosing one is a target selection with no other effect), or 'No port', the four ship rows and your ships. Design's Land holds the land classes and the obsolete toggles; Design's Air the six air classes; Design's Sea reads 'Ships are not designed yet.'. No world change.
+**Expected output.** The view lists that theatre alone. Recruit's Land holds the military-base picker, the land roster and the muster queue; Recruit's Air holds the airbase picker, the six air rows and the player's wings; Recruit's Sea holds one row per completed port of your nation under a picker (the first chosen; choosing one is a target selection with no other effect), or 'No port', the four ship rows and your ships. Design's Land holds the land classes and the obsolete toggles; Design's Air the six air classes; Design's Sea reads 'Ships are not designed yet.'; Design's Space lists the five space hulls (ledger.military_space_design). No world change.
 
 **Reason to select.** Work one theatre at a time: the ledger column is narrow, and land and air together are long.
 
@@ -2894,6 +3375,150 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 **Expected output.** Toggles the Diplomacy ledger open in the fold-out column; re-click closes; opening closes any other ledger. Opening on Nations arms the Nations lens, and closing the ledger, or leaving Nations for Wars, disarms it if it is still armed; a lens the player chose meanwhile stands. The lens paints only on the Planetary canvas: on Solar or Circumplanetary it stays armed and paints when the player descends. Two tabs, Nations (default) and Wars; re-clicking the ACTIVE tab closes the ledger (toggle rule), the other tab is a view change (ledger.diplomacy_tab). NATIONS: a dropdown of the nations holding ground, hostile first then by Alarm toward you (ledger.diplomacy_choose_nation), with the chosen nation below it - its colour swatch, an 'At war' or 'Truce' chip, the stance chips you -> them (Hostile, Friend, Offer sent, Neutral) and them -> you (Hostile, Friend, Offer pending, Neutral), and its Access, Trust and Alarm toward you as signed bars over [-100, 100] with the figure and a trend arrow over the last four ticks (green when the move is good for you; Alarm's bar is amber above zero). Hovering a bar shows the value, its band (adverse, wary, neutral, favourable, trusted), the four-tick change, its largest cause - the conduct with the largest decayed share of that value on its side, e.g. 'Largest cause: trade (+12.0)' - and, while the nation still carries an inherited grudge, the war that seeded it with its region and year ('Seeded by an old war: the seat sacked at <region>, 1196 CE'; RELATIONS.md § Where a grudge lands), then the war that links the pair, if any (the open war, else the last one). Its detail and presses follow (ledger.diplomacy_choose_nation). Closing the ledger by any path closes an open declaration without effect. Explanation is a tooltip: a disabled press says why on hover.
 
 **Reason to select.** Answers 'who could I fight, who might fight me, and what would it cost?'. Read it before declaring war, and to see who is alarmed by you.
+
+### `ledger.nav_space` — Nav rail, slot 9 (the satellite glyph), after Diplomacy.
+
+**Press.** Click the satellite glyph on the left icon rail.
+
+**Valid when:**
+- In-game
+
+**Expected output.** Toggles the Space ledger open in the fold-out column; re-click closes; opening closes any other ledger. No lens on open. Four tabs - Launch (default), Assets, Stations, Crew; re-clicking the ACTIVE tab closes the ledger (toggle rule), another tab is a view change (ledger.space_tab). Under the tabs on every view, the pending line: 'No orders waiting on a signal.' or 'N orders pending - no signal', its tooltip listing each order and the quarter it is due.
+
+**Reason to select.** Answers 'what does my nation have in space, and what can it launch next?'.
+
+### `ledger.space_tab` — Space ledger (nav rail slot 9; docs/ui/ledgers/space.md), the Launch / Assets / Stations / Crew tab strip.
+
+**Press.** Click a tab.
+
+**Valid when:**
+- The Space ledger is open.
+
+**Expected output.** Shows that view. Re-clicking the active tab closes the ledger. LAUNCH: the class picker, the destination picker and the quote (ledger.space_launch). ASSETS: one row per satellite, station core, crewed mission and rover of yours that is not lost - class (and a satellite's role), node, state (in transit with its arrival quarter / active / decaying), upkeep per quarter, 'in coverage' or 'no signal', and 'pending - no signal (N)' when an order to it waits. A station row opens the Stations view on that station; a satellite row expands in place (ledger.space_retask). STATIONS: the station picker and the designer (ledger.space_designer_slot). CREW: the astronaut pool, its cap (per running Astronaut Training Centre), the centres built and running, astronauts trained per quarter (0 at the cap), then each station's crew aboard against crew needed and each crewed mission's crew.
+
+**Reason to select.** Move between the four questions the ledger answers.
+
+### `ledger.space_launch` — Space ledger (nav rail slot 9; docs/ui/ledgers/space.md), Launch view: the class picker (Satellite, Station core, Crewed mission, Rover), the satellite's Role picker (Comms, Navigation, Observation, Survey), the destination list, the quote and the Launch press.
+
+**Press.** Pick a class (and a role for a satellite), press a destination row, then press Launch.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `class` | `Satellite | Station core | Crewed mission | Rover` | The class picker - a selector: re-pressing the active class does nothing. Changing class clears the destination. |
+| `role` | `Comms | Navigation | Observation | Survey` | A satellite's role; a role not researched says so on hover. |
+| `node` | `orbital node` | A destination row: every node the class may go to (space_launch_legal_node), each with its free slots of capacity (a slot-holding class - satellite, station core - lists only nodes with a slot free), and the path's thrust cost and days from the home surface. Pressing the chosen row again un-chooses it. |
+
+**Valid when:**
+- A destination is chosen (Launch is disabled with 'Choose a destination first.' otherwise).
+- The quote (quote_space_launch; for a station core also quote_found_station) is clear. A refused quote disables Launch and prints the refusal beside it, in the seam's own reasons: not researched (Rocketry or the payload's key), no staffed Launchpad on the home body, every slot at the node held, no path, the home shelf cannot fill the goods, the treasury cannot pay, or for a core not enough astronauts.
+
+**Expected output.** The quote above the press: the whole cost; the spacecraft components and propellant the launch buys off the home shelf and their value; launch and thrust credits; travel in quarters and days; for a station core the crew drawn. Launch issues gameplay.space_launch (satellite, crewed mission, rover) or gameplay.space_found_station (station core). The press queues a space_command that app::render sends through apply_space_command (src/world/space_command.hpp) - the same seam an agent's command takes, with its full validation; not a second write path. The seam's answer is the ledger's message line under the tabs ('<verb>: done.', '<verb>: pending - no signal. It waits a quarter.', or '<verb>: refused - <why>').
+
+**Reason to select.** Put a satellite, a station core, a crew or a rover into space, knowing its price first.
+
+### `ledger.space_retask` — Space ledger (nav rail slot 9; docs/ui/ledgers/space.md), Assets view: a satellite row, expanded in place, and its Retask role presses.
+
+**Press.** Click a satellite row to expand it (click again to fold it), then click a role under 'Retask'.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `role` | `Comms | Navigation | Observation | Survey` | The role pressed. |
+
+**Valid when:**
+- The role is not the satellite's own (disabled: 'It already holds this role.') and its key is held (disabled: 'Not researched yet.').
+
+**Expected output.** Issues gameplay.space_retask_satellite. Outside comms coverage it waits a quarter as a pending order and the row shows 'pending - no signal'. The press queues a space_command that app::render sends through apply_space_command (src/world/space_command.hpp) - the same seam an agent's command takes, with its full validation; not a second write path. The seam's answer is the ledger's message line under the tabs ('<verb>: done.', '<verb>: pending - no signal. It waits a quarter.', or '<verb>: refused - <why>').
+
+**Reason to select.** Give a satellite the job its node needs now.
+
+### `ledger.space_designer_slot` — Space ledger (nav rail slot 9; docs/ui/ledgers/space.md), Stations view: the station picker and the designer grid - 5x3, 7x5 or 9x7 slots drawn as they are, the core ('Core') at the centre, each fitted module by its short tag, edge slots outlined, a module stopped by a shortfall outlined red, an edge-only module off the edge outlined amber; the budgets above it (Power, Crew room, Life support, Crew, each supply / demand, red when short).
+
+**Press.** Pick a station row (a selector), then click a grid slot. Click the picked slot again to un-pick it.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `slot` | `grid slot` | row * width + col; the core's centre slot does nothing. |
+
+**Valid when:**
+- You hold a station (the view says to launch a core otherwise).
+
+**Expected output.** An EMPTY slot lists the module kinds research has unlocked, each with its power, crew, life support, room, launch cost and whether it is edge-only (ledger.space_fit_module). A FILLED slot offers Remove and Move (ledger.space_remove_module, ledger.space_move_module). Hovering a slot names its module and state (working, stopped - a budget falls short, idle - needs an edge slot, refitting, in transit) and whether it is an edge slot.
+
+**Reason to select.** See the station as it is and choose what goes where.
+
+### `ledger.space_fit_module` — Space ledger (nav rail slot 9; docs/ui/ledgers/space.md), Stations view, an empty slot picked: the module list.
+
+**Press.** Click a module's name.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `module` | `station_module_kind` | The row pressed; only researched kinds are listed. |
+
+**Valid when:**
+- Disabled with its reason on hover: 'Needs an edge slot.' (Dock, Shipyard on an inner slot), 'Not enough astronauts to crew it.', or the module launch's refusal.
+
+**Expected output.** Issues gameplay.space_fit_module. The module launches to the station's node and takes the slot; it counts in the budgets once it arrives. The press queues a space_command that app::render sends through apply_space_command (src/world/space_command.hpp) - the same seam an agent's command takes, with its full validation; not a second write path. The seam's answer is the ledger's message line under the tabs ('<verb>: done.', '<verb>: pending - no signal. It waits a quarter.', or '<verb>: refused - <why>').
+
+**Reason to select.** Give a station power, crew room, research, a dock - whatever its role needs.
+
+### `ledger.space_remove_module` — Space ledger (nav rail slot 9; docs/ui/ledgers/space.md), Stations view, a filled slot picked: Remove.
+
+**Press.** Click Remove.
+
+**Valid when:**
+- A module (not the core) is in the picked slot.
+
+**Expected output.** Issues gameplay.space_remove_module: the slot frees, nothing is refunded. The press queues a space_command that app::render sends through apply_space_command (src/world/space_command.hpp) - the same seam an agent's command takes, with its full validation; not a second write path. The seam's answer is the ledger's message line under the tabs ('<verb>: done.', '<verb>: pending - no signal. It waits a quarter.', or '<verb>: refused - <why>').
+
+**Reason to select.** Free a slot for a module the station needs more.
+
+### `ledger.space_move_module` — Space ledger (nav rail slot 9; docs/ui/ledgers/space.md), Stations view, a filled slot picked: Move, then an empty slot.
+
+**Press.** Click Move (it reads 'Moving - press an empty slot'; click it again to disarm), then click an empty grid slot.
+
+**Valid when:**
+- The module has arrived.
+
+**Expected output.** Issues gameplay.space_refit_module from the picked slot to the pressed one: a launch-free refit, working again a quarter later. The press queues a space_command that app::render sends through apply_space_command (src/world/space_command.hpp) - the same seam an agent's command takes, with its full validation; not a second write path. The seam's answer is the ledger's message line under the tabs ('<verb>: done.', '<verb>: pending - no signal. It waits a quarter.', or '<verb>: refused - <why>').
+
+**Reason to select.** Put an edge module back on the edge after an upgrade, or rearrange a station.
+
+### `ledger.space_save_template` — Space ledger (nav rail slot 9; docs/ui/ledgers/space.md), Stations view, Templates: the name field and 'Save layout'.
+
+**Press.** Type a name, then click Save layout.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `name` | `string, 1..64 bytes` | The template's name; an existing name is overwritten. |
+
+**Valid when:**
+- A name is typed (Save is disabled with 'Name the template first.' otherwise).
+
+**Expected output.** Issues gameplay.space_save_template with the station's current layout (each slot's module kind, the centre empty) at its grid size. The template appears in the list below. The press queues a space_command that app::render sends through apply_space_command (src/world/space_command.hpp) - the same seam an agent's command takes, with its full validation; not a second write path. The seam's answer is the ledger's message line under the tabs ('<verb>: done.', '<verb>: pending - no signal. It waits a quarter.', or '<verb>: refused - <why>').
+
+**Reason to select.** Keep a working layout to repeat on the next station.
+
+### `ledger.space_apply_template` — Space ledger (nav rail slot 9; docs/ui/ledgers/space.md), Stations view, Templates: a saved template's Apply and Delete presses.
+
+**Press.** Click Apply (or Delete) beside a template.
+
+**Valid when:**
+- The template is yours.
+
+**Expected output.** Apply issues gameplay.space_apply_template on the shown station: a launch per slot not yet filled to match; the message says how many launched and how many were skipped. Delete issues gameplay.space_delete_template. The press queues a space_command that app::render sends through apply_space_command (src/world/space_command.hpp) - the same seam an agent's command takes, with its full validation; not a second write path. The seam's answer is the ledger's message line under the tabs ('<verb>: done.', '<verb>: pending - no signal. It waits a quarter.', or '<verb>: refused - <why>').
+
+**Reason to select.** Fit a station to a known layout in one press.
+
+### `ledger.space_upgrade` — Space ledger (nav rail slot 9; docs/ui/ledgers/space.md), Stations view: 'Upgrade to 7x5' / 'Upgrade to 9x7' with the truss launch's cost.
+
+**Press.** Click Upgrade.
+
+**Valid when:**
+- The grid is not at its largest; the upgrade's key is held ('Not researched yet.'); the truss launch's quote is clear (its refusal on hover).
+
+**Expected output.** Issues gameplay.space_upgrade_station: the grid grows one ring, the core still central and every module keeping its place; an edge module no longer on the edge goes idle. The press queues a space_command that app::render sends through apply_space_command (src/world/space_command.hpp) - the same seam an agent's command takes, with its full validation; not a second write path. The seam's answer is the ledger's message line under the tabs ('<verb>: done.', '<verb>: pending - no signal. It waits a quarter.', or '<verb>: refused - <why>').
+
+**Reason to select.** Room for more modules.
 
 ### `ledger.diplomacy_tab` — Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), the 'Nations' / 'Wars' tab strip.
 
@@ -3112,6 +3737,23 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 
 **Reason to select.** Fight on for better terms.
 
+### `ledger.military_space_design` — Military ledger (nav rail slot 7), Design tab, Space theatre: one row per hull class - Hauler, Lander, Tug, Frigate, Cruiser - with its live design's delta-v, cargo, firepower, armour and hull points, or 'No live design' (the Cruiser 'built at a Shipyard only').
+
+**Press.** Press a hull row: a TOGGLE that expands it in place to a picker per slot (Drive, Tanks, and the hull's payload: Armament, Armour, Bay or Debris arm; items not yet researched are greyed) and a Save design press; pressing the open row folds it. Save design queues set_unit_design through apply_space_command (verb 11, cls = the hull, design = an item per slot).
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `hull` | `0 Hauler, 1 Lander, 2 Tug, 3 Frigate, 4 Cruiser` | The hull designed. |
+| `design` | `an item id per slot kind` | Every slot the hull has must hold an item that fits it. |
+
+**Valid when:**
+- The Military ledger is open on Design, Space theatre.
+- Save: every slot filled, and the nation holds the hull's key and every item's key (refused whole otherwise: rejected_tech_locked).
+
+**Expected output.** The hull's live design is the drafted one: units raised from now on take it (a unit keeps the design it was raised to). The row's figures update.
+
+**Reason to select.** Trade reach against payload and armour before raising a ship.
+
 ### `ledger.military_sea_raise` — Military ledger, Recruit, Sea tab: one row per ship type with its price and a Raise press, under the port picker.
 
 **Press.** Choose a port in the picker, then click Raise on a row.
@@ -3300,6 +3942,28 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 
 **Reason to select.** To learn that a war has begun where the eye already is, and step straight to answering it.
 
+### `chrome.pin_toggle` — The pin toggle: a small pushpin square at the Selection band's top-right corner, over the band's header row, shown whenever the band shows an entity - a body, tile, building, market, unit, nation or air wing (docs/ui/LAYOUT.md § Pinned items).
+
+**Press.** Press the pin toggle. It is a toggle: pressing it while the subject is pinned unpins it.
+
+**Valid when:**
+- App is in game and the Selection band shows an entity (not the resting state, and not a province, front, battle, deposit, plate or convoy).
+
+**Expected output.** Pins the band's entity to the pinned-items panel (the right chrome column between the time panel and the minimap), at the end of the list, as a watch card: kind glyph, kind, and the shared entity_summary stat block. Pressed again, removes it. The toggle reads gold while its subject is pinned. Pins travel in the save; a pin whose entity is gone drops off. Issues no command and changes nothing in the simulation.
+
+**Reason to select.** To keep an entity's figures in view while working elsewhere, without holding the Selection band on it.
+
+### `chrome.pin_press` — A card in the pinned-items panel, the right chrome column between the time panel and the minimap: front pins first (one per body where a war the player's nation is party to has a front, placed by the war), then the player's own pins in pin order (docs/ui/LAYOUT.md § Pinned items).
+
+**Press.** Single-click a card to select; double-click it to navigate.
+
+**Valid when:**
+- App is in game and the panel shows at least one card: the player has pinned something, or the player's nation is at war with a nation that holds provinces on a body where it holds provinces too.
+
+**Expected output.** A player pin: single-click selects its entity (the Selection band shows it); double-click also frames the canvas on it (focus_on_entity; a tile or a nation's capital tile on the Planetary view, centred). A front pin: single-click selects the player's land front toward that enemy on that body (the front card), or the enemy nation where no land front exists; double-click also takes the canvas to that body's Planetary view centred on the front (else a contested province, else the enemy's province nearest the player's ground). The front pin's card shows the body, the enemy, provinces each side holds, provinces occupied either way, and the war score from the player's side. Issues no command.
+
+**Reason to select.** To return to a watched entity, or to reach a front of a war on any body, in one double-click.
+
 ### `chrome.f10_options` — Keyboard; opens the centred Options window
 
 **Press.** Press F10 (press again, click Close, or click the window's X to dismiss).
@@ -3354,7 +4018,7 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 - App is in game.
 - Not while an ImGui widget owns the keyboard.
 
-**Expected output.** Toggles the research panel (nav slot 4) and its fold-out column. The research panel: the Digitisation tree drawn as three trees in a ring (Production, Network, State; three branches each and a fourth, Naval, in State; four cost rings inside out; no centre node) on the canvas, and in the fold-out column the seat's nation with its RP a quarter, RP in hand and held count, and its research queue with each entry's arrival quarter, Remove last and Clear - always shown while the seat's nation exists. Shift + left click on a node queues it; shift-click on a queued node takes it off with the entries that need it. Every node, every requirement link (an AND link - a node with two or more requirement groups - in the accent), pick-one pairs outlined in red with a dashed tie, quests as amber diamonds, placeholders dashed and muted; held nodes green, queued nodes ringed with their queue position. Hovering a node opens the shared hover card: name, tier, ring, RP cost, exact advantage, "Requires: A + B" (groups joined by +, members by or), a quest's deed and the next-age branch it keys, a pair's sibling, and the node's state. Opening it closes any other ledger; F9 again closes it.
+**Expected output.** Toggles the research panel (nav slot 4) and its fold-out column. The research panel: the Digitisation tree drawn as three trees in a ring (Production, Network, State; three branches each and a fourth, Naval, in State; four cost rings inside out; no centre node) on the canvas, and in the fold-out column the seat's nation with its RP a quarter, RP in hand and held count, and its research queue with each entry's arrival quarter, Remove last and Clear - always shown while the seat's nation exists. A plain left click on a node makes it the research target: the queue is rebuilt with that node and its unheld requirements first and the old entries behind it (Ben, 2026-11-11). Shift + left click on a node adds it to the queue; shift-click on a queued node takes it off with the entries that need it. Every node, every requirement link (an AND link - a node with two or more requirement groups - in the accent), pick-one pairs outlined in red with a dashed tie, quests as amber diamonds, placeholders dashed and muted; held nodes green, queued nodes ringed with their queue position. Hovering a node opens the shared hover card: name, tier, ring, RP cost, exact advantage, "Requires: A + B" (groups joined by +, members by or), a quest's deed and the next-age branch it keys, a pair's sibling, and the node's state. Opening it closes any other ledger; F9 again closes it. BL-1613: the canvas carries an age switch (canvas.tech_tree_age_tab) between the Digitisation ring and the Early Space tree; the column adds an Early Space line (held count when the gate into space is met, else what the gate needs) and lists ONE queue - the Digitisation entries, then the Early Space tail behind them, numbered on, each with its arrival quarter.
 
 **Reason to select.** Answers "which technologies can my nation reach, what does each give, and when will my plan arrive?" - the route to the queue_research press.
 

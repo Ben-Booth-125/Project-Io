@@ -3215,7 +3215,8 @@ void app::draw_generation_screen()
             pv.reserve(static_cast<std::size_t>(n_bodies));
             for (int i = 0; i < n_bodies; ++i)
             {
-                const body_inputs& bi = prototype_body(i);
+                // BL-1638: the generated size, the one the world will build.
+                const body_inputs bi = generated_prototype_body(i, m_pending_world_params.seed);
                 pv.push_back(ui::preview_body{
                     m_wiz_names.bodies[static_cast<std::size_t>(i)].c_str(), // BL-257
                     bi.orbit_au, bi.mass_earths, bi.parent_orbit_au,

@@ -2,6 +2,7 @@
 
 #include "components.hpp" // building_type
 #include "digitisation_tree_data.hpp"
+#include "early_space_tree_data.hpp"
 #include "entity.hpp"
 #include "modifier_set.hpp"
 
@@ -109,6 +110,20 @@ struct research_params
     /// completes the tree inside the age), while R0's opening pacing holds
     /// (fastest decile 11 quarters to its first major, floor 8).
     float rp_per_economy_unit = 0.03f;
+
+    /// BL-1612 (ERAS.md § Era 1 -> Era 2 gate, condition 3): the propellant a
+    /// market on the nation's home body must hold on its shelf for the gate into
+    /// space to be met — "the minimum propellant quantity required for an initial
+    /// launch ... a Lua balance value" (economy.research.space_gate_min_propellant).
+    /// No such value existed before this dial; 1.0 is one launch's draw
+    /// (`launch_draw_per_convoy`, supply_system.cpp), the least a launch buys.
+    float space_gate_min_propellant = 1.0f;
+
+    /// BL-1606 (ERAS.md § Firsts): the one-time research grant, in RP, the first
+    /// nation to do each space deed earns (space_firsts.hpp). ERAS.md fixes no
+    /// size; 400 RP is two cost units at the age's opening price, a bit over three
+    /// quarters of the base accrual (economy.research.space_first_grant_rp).
+    float space_first_grant_rp = 400.0f;
 };
 
 /// The price index (ppm: 1'000'000 = the age's opening price) after
@@ -151,13 +166,27 @@ std::int64_t nation_economy_milli(const world& w, entity_id nation);
 inline constexpr std::int64_t k_milli_per_rp = 1000;
 
 /// One nation's tech state.
+///
+/// BL-1612: TWO TREES, ONE POOL, ONE QUEUE. The Early Space tree (`io::es`) has
+/// its own held set and its own queue tail beside the Digitisation ones, and both
+/// are paid from the one pool. RESEARCH.md gives a nation one pool and one queue
+/// ("RP flow to the head of the queue"), so the two tails are ONE LOGICAL QUEUE:
+/// every Digitisation entry stands ahead of every Early Space entry, and the pool
+/// reaches `es_queue` only once the Digitisation tail has no entry waiting on
+/// funding. Stored as two vectors rather than one tagged one so that every
+/// existing reader of `queue` (an `io::dg` index: the panel, the AI, the play log)
+/// stays exactly as it was, and a world with no Early Space progress is the same
+/// bytes and the same hash it was before this tree could be researched.
 struct nation_tech_state
 {
     std::bitset<io::dg::node_count> held;           ///< Nodes held, by `io::dg` index.
     std::int64_t                    pool_milli = 0; ///< RP in hand (milli-RP); the head's progress.
     std::vector<std::uint16_t>      queue;          ///< Node indices, head first.
+    std::bitset<io::es::node_count> es_held;        ///< BL-1612: Early Space nodes held, by `io::es` index.
+    std::vector<std::uint16_t>      es_queue;       ///< BL-1612: Early Space node indices, behind `queue`.
 
-    bool empty() const { return held.none() && pool_milli == 0 && queue.empty(); }
+    bool es_empty() const { return es_held.none() && es_queue.empty(); }
+    bool empty() const { return held.none() && pool_milli == 0 && queue.empty() && es_empty(); }
 };
 
 /// What `enqueue_node` did.
@@ -169,6 +198,8 @@ enum class enqueue_result : std::uint8_t
     refused_pair,    ///< The node, or every route to it, crosses a pick-one pair whose
                      ///< other side is held or queued. Nothing was queued.
     invalid,         ///< Unknown nation or out-of-range node. Nothing was queued.
+    refused_locked,  ///< BL-1612: an Early Space node whose age is not open to the nation -
+                     ///< the gate into space unmet, or its branch not keyed. Nothing was queued.
 };
 
 /// One nation's accrual this quarter — reported, not stored.
@@ -299,7 +330,9 @@ float research_multiplier(const world& w, entity_id nation);
 /// applied to @p base in node-index order. The hook the economy calls where a
 /// node moves a scalar. A nation holding nothing returns @p base untouched —
 /// the same bits, no arithmetic — so a world where nothing is held is
-/// bit-identical to one with no effect layer at all.
+/// bit-identical to one with no effect layer at all. BL-1613: the Early Space
+/// held set's modifier rows fold after the Digitisation ones, in their own
+/// node-index order.
 ///
 /// KNOWN GAP: the read sites apply these to the TICK (the draw, the credited
 /// output, the priced leg); the profitability estimates building_profit.cpp and
@@ -328,12 +361,103 @@ bool node_has_mechanic(int node, std::string_view key);
 /// price_convoy_leg's inter-body branch, beside the launchpad check.
 bool nation_mechanic(const world& w, entity_id nation, std::string_view key);
 
+/// BL-1592: whether @p nation holds a node carrying the read `mechanic` key
+/// @p key - the query every space unlock goes through, with a constant from
+/// space_tech_keys.hpp. Unlike `nation_mechanic`, a key no held node carries is
+/// CLOSED: an unknown key is false for every nation. A far-space key
+/// (`space_keys::far_space`, the Early Space tree's) is answered from the Early
+/// Space held set (BL-1612). Pure; unknown nation: false.
+bool nation_has_mechanic(const world& w, entity_id nation, std::string_view key);
+
+/// BL-1607: the Early Space tree (`io::es`, early_space_tree_data.hpp) is keyed
+/// branch by branch by the Digitisation quests (RESEARCH.md: Quests key the next
+/// age). The `io::dg` index of the quest whose `keys_next_branch` names Early
+/// Space branch @p es_branch (an `io::es::branches` index), or -1.
+int early_space_branch_key_node(int es_branch);
+
+/// Whether Early Space branch @p es_branch is keyed for @p nation: it holds the
+/// Digitisation quest that keys it - or, under the STAND-IN (BL-1612; see
+/// nation_tech.cpp `branch_keyed_in`, the one place it lives), the quest's deed is
+/// declared unread and the nation holds the quest's own requirement (its cluster's
+/// major). The KEY half of a branch's availability only; the gate half is
+/// `nation_meets_space_gate`.
+bool early_space_branch_keyed(const world& w, entity_id nation, int es_branch);
+
+// ---------------------------------------------------------------------------
+// BL-1612 - the Early Space tree is researchable (ERAS.md § Far-space technology)
+// ---------------------------------------------------------------------------
+
+/// The Era 1 -> Era 2 gate (ERAS.md § Era 1 -> Era 2 gate - space access), PURE:
+/// @p nation holds Rocketry (the `space_dispatch` mechanic), owns a completed,
+/// standing, STAFFED (workforce_assigned > 0) Launchpad on its home body
+/// (`space_home_body_of`), and a market on that body holds at least
+/// `p.space_gate_min_propellant` propellant on its shelf. Unknown nation: false.
+bool nation_meets_space_gate(const world& w, entity_id nation, const research_params& p = {});
+
+/// BL-1613: the gate's three conditions, each reported, so a surface can name the
+/// one that is missing. `met()` is exactly `nation_meets_space_gate`. Pure; unknown
+/// nation: all false.
+struct space_gate_status
+{
+    bool rocketry   = false; ///< Holds the node carrying `space_dispatch` (Rocketry).
+    bool launchpad  = false; ///< A completed, standing, staffed Launchpad of its own on its home body.
+    bool propellant = false; ///< A home-body market holds the dial's propellant on its shelf.
+    bool met() const { return rocketry && launchpad && propellant; }
+};
+space_gate_status nation_space_gate_status(const world& w, entity_id nation,
+                                           const research_params& p = {});
+
+/// Whether @p nation holds Early Space node @p es_node. Unknown nation or index: false.
+bool nation_holds_early_space(const world& w, entity_id nation, int es_node);
+
+/// Whether Early Space node @p es_node is AVAILABLE to @p nation: not held, the
+/// gate met, its branch keyed, and every one of its requirement groups held.
+/// (A quest also waits on its deed in the queue; every Early Space deed is unread.)
+bool early_space_node_available(const world& w, entity_id nation, int es_node,
+                                const research_params& p = {});
+
+/// The cost of Early Space node @p es_node - `node_cost_milli`'s arithmetic over
+/// the Early Space node's cost units. 0 for an unknown node.
+std::int64_t early_space_node_cost_milli(int es_node, const research_params& p = {},
+                                         std::int64_t price_ppm = 1'000'000);
+
+/// Queue Early Space node @p es_node for @p nation, with its unheld requirements
+/// (all in its own branch: the tree has no choice group and no pick-one pair)
+/// ahead of it, on `es_queue` - behind every Digitisation entry. Refused with
+/// `refused_locked`, mutating nothing, unless the gate is met and the node's
+/// branch is keyed. The pool pays an entry only while it is available.
+enqueue_result enqueue_early_space_node(world& w, entity_id nation, int es_node,
+                                        const research_params& p = {});
+
+/// BL-1613: what `enqueue_early_space_node` WOULD do, mutating nothing - the same
+/// planner, so the panel's preview cannot disagree with the press. On `queued`,
+/// @p plan (optional) receives the entries it would append, in queue order.
+enqueue_result preview_enqueue_early_space(const world& w, entity_id nation, int es_node,
+                                          std::vector<std::uint16_t>* plan = nullptr,
+                                          const research_params& p = {});
+
+/// BL-1613: `queued_dependents` over the Early Space tail - @p es_node, then every
+/// later tail entry that needs it. Empty when it is not queued. Pure.
+std::vector<std::uint16_t> queued_early_space_dependents(const world& w, entity_id nation, int es_node);
+
+/// BL-1613: take @p es_node off the Early Space tail with every later tail entry
+/// that needs it (the toggle a press on a queued node makes). The pool stays.
+/// Returns how many entries were removed (0 = nothing touched).
+int unqueue_early_space_with_dependents(world& w, entity_id nation, int es_node);
+
+/// BL-1613: `node_scalar_at` for Early Space node @p es_node's own read modifier
+/// rows - the rival research picker prices an Early Space candidate's relief with it.
+float early_space_node_scalar_at(int es_node, modifier_subject subject, const effect_target& target,
+                                 float base = 1.0f);
+
 /// Whether @p corp may build @p type: true unless a node with a read
 /// `unlock_structure` effect naming the type is not held by the corp's home
 /// nation. The single read point the placement check and the construction
 /// door share. No Digitisation node unlocks a structure the registry carries
 /// (the Nuclear Plant and the Container Port are unread), so every type is
-/// open to every nation. `null_entity` = open.
+/// open to every nation. `null_entity` = open. BL-1582: the one exception is
+/// the Astronaut Training Centre, which opens with the `astronaut_training`
+/// mechanic key (Mass Higher Education; `nation_has_mechanic`).
 bool structure_unlocked(const world& w, entity_id corp, building_type type);
 
 /// The recipes a read `unlock_recipe` effect names, in tree order. They are the ones
@@ -402,12 +526,14 @@ std::int64_t estimate_rp_per_quarter_milli(const world& w, entity_id nation,
 /// not complete within @p horizon_quarters (a quest waits on its deed, and an
 /// entry needing it waits with it). Runs the quarterly pass's own accrual and
 /// queue flow on a COPY of the state, holding the treasury where it stands.
+/// BL-1613: the entries are the ONE logical queue - every `queue` entry, then
+/// every `es_queue` entry - so the result has `queue.size() + es_queue.size()` rows.
 std::vector<int> project_queue_arrivals(const world& w, entity_id nation,
                                         const research_params& p = {},
                                         int horizon_quarters = 480);
 
-/// Drop the LAST entry of @p nation's queue. False (nothing touched) when the
-/// queue is empty. The pool is untouched: it is the head's progress.
+/// Drop the LAST entry of @p nation's queue - the Early Space tail's last when it
+/// has one (BL-1613: one logical queue). False (nothing touched) when both are empty. The pool is untouched: it is the head's progress.
 bool remove_last_queued(world& w, entity_id nation);
 
 /// What `unqueue_with_dependents` would take off @p nation's queue for @p node,
@@ -423,7 +549,8 @@ std::vector<std::uint16_t> queued_dependents(const world& w, entity_id nation, i
 /// many entries were removed (0 = nothing touched: the node was not queued).
 int unqueue_with_dependents(world& w, entity_id nation, int node);
 
-/// Empty @p nation's queue. False (nothing touched) when it is already empty.
+/// Empty @p nation's queue, the Early Space tail with it (BL-1613). False (nothing
+/// touched) when both are already empty.
 /// The pool stays, so nothing researched is stranded (RESEARCH.md § The research
 /// queue: the pool IS the head's progress).
 bool clear_research_queue(world& w, entity_id nation);

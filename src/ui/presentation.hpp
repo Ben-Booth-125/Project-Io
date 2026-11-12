@@ -140,6 +140,10 @@ inline constexpr ImU32 air_assigned = IM_COL32(140, 150, 255, 235); ///< A provi
 inline constexpr ImU32 air_refused  = IM_COL32(232,  84,  72, 240); ///< A right-click the seam would refuse (order_attack's red).
 inline constexpr ImU32 sea_assigned = IM_COL32( 88, 206, 214, 235); ///< BL-1534: a sea province the selected ship works; its right-click order preview.
 
+// BL-1609: the near-space hazards (CIRCUMPLANETARY.md § Orbital nodes and what sits at them).
+inline constexpr ImU32 space_debris = IM_COL32(176, 150, 120, 255); ///< Debris shards at a node — rust-grey wreckage.
+inline constexpr ImU32 space_storm  = IM_COL32(250, 214,  70, 255); ///< A solar storm's bolt on a struck asset — storm yellow.
+
 // --- the declaration's goal picking (docs/ui/ledgers/diplomacy.md § The declaration) ---
 // A possible goal reads as the declare-and-attack's orange; a chosen one as the
 // attack's red, thicker, so "may be a goal" and "is a goal" never share a stroke.
@@ -159,6 +163,25 @@ inline constexpr ImU32 sentiment_track = IM_COL32( 60,  64,  74, 255); ///< A ba
 inline constexpr ImU32 site_valid        = IM_COL32( 96, 210, 120, 255); ///< A tile the Build door accepts.
 inline constexpr ImU32 site_no_logistics = IM_COL32(236, 168,  56, 255); ///< Accepted, but no Logistic Points reach it.
 inline constexpr ImU32 site_dim          = IM_COL32(  0,   0,   0, 255); ///< Every other tile, darkened toward this.
+
+// --- the two-step survey mask (BL-1610; PLANETARY.md § Survey mask) ---
+// Off the home world a region is mapped, then prospected (DISCOVERY.md). Mapped
+// ground the player has not prospected draws its terrain under a cool slate wash
+// at `unprospected_alpha`, distinct from the vision fog's near-black; the locked
+// fill is unmapped ground's.
+inline constexpr ImU32 unprospected      = IM_COL32( 92, 112, 150, 255); ///< Mapped, deposits not yet read.
+inline constexpr float unprospected_alpha = 0.30f;
+
+// --- the station designer's grid (Space ledger; docs/ui/ledgers/space.md) ---
+// An empty slot, a fitted module, the core, the outer-ring (edge) mark, and the
+// two states a fitted module can be stopped in: by a shortfall (red) or because
+// an edge-only module no longer sits on the edge (amber).
+inline constexpr ImU32 station_slot    = IM_COL32( 40,  44,  54, 255); ///< An empty slot.
+inline constexpr ImU32 station_module  = IM_COL32( 64,  82, 108, 255); ///< A fitted module.
+inline constexpr ImU32 station_core    = IM_COL32(120, 190, 255, 255); ///< The core, centre slot.
+inline constexpr ImU32 station_edge    = IM_COL32(150, 156, 170, 255); ///< An edge slot's outer mark.
+inline constexpr ImU32 station_stopped = IM_COL32(216, 100,  96, 255); ///< Stopped by a shortfall.
+inline constexpr ImU32 station_idle    = IM_COL32(236, 168,  56, 255); ///< Idle: needs an edge slot.
 
 // --- interaction states (the shared selection / hover / pinned convention) ---
 inline constexpr ImU32 selection = IM_COL32(255, 255, 255, 255); ///< The selected entity.

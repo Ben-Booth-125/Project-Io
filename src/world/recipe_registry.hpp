@@ -8,6 +8,10 @@
 #include "nation_tech.hpp"     // BL-1273: research_params — the research dials
 #include "space_programme.hpp" // BL-644: space_programme_params — the tenth budget line's purchase lumps
 #include "space_assets.hpp"    // BL-1327: space_asset_params — launch, reach, travel and upkeep dials
+#include "stations.hpp"        // BL-1583/BL-1585: station_params — module roster, core, astronaut dials
+#include "space_units.hpp"     // BL-1594/BL-1595: space_unit_params — launch, repair, depot, upkeep-loss dials
+#include "debris.hpp"          // BL-1598: space_debris_params — debris yield, wear, drag, tugs
+#include "space_battle.hpp"    // BL-1597: space_battle_params — Defence module fire, report history
 #include "nation_tax.hpp"       // BL-1335: tax_params — the tax tiers and Discontent dials
 #include "air_params.hpp"  // BL-1449: air_params — the air theatre's authored numbers
 #include "sea_params.hpp"  // BL-1430: sea_params — the sea theatre's authored numbers
@@ -113,6 +117,16 @@ struct recipe
     /// recipes.lua; absent means `any`. Read through `recipe_runs_on_body`, the
     /// one predicate every door asks.
     recipe_air air = recipe_air::any;
+    /// BL-1604 (propellant loop; ERAS.md § The propellant loop): the MECHANIC key a
+    /// nation must hold for this recipe to run on its ground, authored as
+    /// `mechanic = "<key>"` in recipes.lua (a space_tech_keys.hpp key); absent =
+    /// empty = no key. `propellant_electrolysis` is the Electrolysis Plant and names
+    /// `electrolysis_plant` (the Early Space tree's Electrolysis Plants). Asked of the
+    /// TILE'S OWNER through `recipe_runs_at_tile`, so every door that asks a recipe's
+    /// air asks its key too. Not a research unlock (`recipe_unlocked` stays the
+    /// research-opened list): a recipe that names a key stays offered to every nation
+    /// and runs only on the ground of one that holds it.
+    std::string mechanic;
     /// BL-613 (qualification fraction; docs/economy/POPULATION.md
     /// § Qualification): the fraction of this recipe's labour that must be
     /// QUALIFIED, in [0, 1]. 0 (the default, and the value for every
@@ -161,11 +175,16 @@ inline bool recipe_runs_on_body(const recipe& rc, const body_component& b)
     return true;
 }
 
-/// The predicate at a tile: the tile's body's air. True for an unknown tile or
-/// body (no air to read, nothing to refuse on — the callers' own existence
-/// checks refuse those).
+/// The predicate at a tile: the tile's body's air, and (BL-1604) the recipe's
+/// mechanic key held by the tile's owner — a recipe naming a key runs on no
+/// unowned ground. True for an unknown tile or body (no air to read, nothing to
+/// refuse on — the callers' own existence checks refuse those).
 struct world;
 bool recipe_runs_at_tile(const world& w, const recipe& rc, entity_id tile); // defined in construction.cpp (a Lua-free TU)
+/// The key half alone: does the owner of @p tile hold @p rc's mechanic key (true
+/// for a recipe naming none)? The build and retool doors ask it first so the
+/// refusal reads `tech_locked`, not `wrong_air`.
+bool recipe_mechanic_held_at_tile(const world& w, const recipe& rc, entity_id tile); // construction.cpp
 
 /// The primary output resource of a recipe — the argmax of its outputs. Used
 /// to key a processing method's resource pip (construction_panel.cpp) and,
@@ -1323,6 +1342,22 @@ public:
     /// is no Lua key yet, so every registry carries the defaults.
     const space_asset_params& space_assets() const { return m_space_assets; }
 
+    /// BL-1583 / BL-1585 station and astronaut dials (stations.hpp). No Lua key
+    /// yet: every registry carries station_params' first-cut defaults.
+    const station_params& stations() const { return m_stations; }
+
+    /// BL-1594 / BL-1595 space-unit dials (space_units.hpp). No Lua key yet: every
+    /// registry carries space_unit_params' first-cut defaults.
+    const space_unit_params& space_units() const { return m_space_units; }
+
+    /// BL-1597 space-battle dials (space_battle.hpp). No Lua key yet: every
+    /// registry carries space_battle_params' first-cut defaults.
+    const space_battle_params& space_battles() const { return m_space_battles; }
+
+    /// BL-1598 debris dials (debris.hpp). No Lua key yet: every registry carries
+    /// space_debris_params' first-cut defaults.
+    const space_debris_params& space_debris() const { return m_space_debris; }
+
     /// BL-1335 the tax tiers and Discontent dials (economy.tax in Lua;
     /// nation_tax.hpp). Defaults are tax_params' own (the shipped values); every
     /// authored value is range-checked at load and rejected by key.
@@ -1612,6 +1647,10 @@ public:
     void set_nation_ai(const nation_ai_params& p) { m_nation_ai = p; }
     void set_space_programme(const space_programme_params& p) { m_space_programme = p; }
     void set_space_assets(const space_asset_params& p) { m_space_assets = p; } // BL-1327
+    void set_stations(const station_params& p) { m_stations = p; }             // BL-1583
+    void set_space_units(const space_unit_params& p) { m_space_units = p; }    // BL-1594
+    void set_space_battles(const space_battle_params& p) { m_space_battles = p; } // BL-1597
+    void set_space_debris(const space_debris_params& p) { m_space_debris = p; }   // BL-1598
     void set_tax(const tax_params& p) { m_tax = p; } // BL-1335
     /// BL-743: the firm-exit trigger (economy.firm_exit in Lua; inert defaults).
     const firm_exit_params& firm_exit() const { return m_firm_exit; }
@@ -1904,6 +1943,10 @@ private:
     /// derives no state purchase unless it sets them.
     space_programme_params m_space_programme = {};
     space_asset_params m_space_assets = {}; // BL-1327
+    station_params     m_stations     = {}; // BL-1583 / BL-1585
+    space_unit_params  m_space_units  = {}; // BL-1594 / BL-1595
+    space_battle_params m_space_battles = {}; // BL-1597
+    space_debris_params m_space_debris  = {}; // BL-1598
     tax_params m_tax = {}; // BL-1335
 
     /// BL-743 firm-exit trigger (economy.firm_exit). Inert defaults: an

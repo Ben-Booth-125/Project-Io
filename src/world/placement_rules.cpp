@@ -4,6 +4,8 @@
 #include "world/logistics.hpp"
 #include "world/province.hpp"  // BL-513: the province building ceiling
 #include "world/nation_tech.hpp" // structure_unlocked (BL-1273; BL-344 before it)
+#include "world/space_assets.hpp"    // space_home_body_of (BL-1604: the Ice Extractor gate)
+#include "world/space_tech_keys.hpp" // space_keys::ice_extractor
 #include "world/world.hpp"
 
 #include <algorithm>
@@ -18,7 +20,7 @@ const char* placement_reason_text(placement_reason r)
         case placement_reason::ocean:             return "Cannot build on water";
         case placement_reason::no_deposit:        return "No extractable deposit here";
         case placement_reason::not_coastal:       return "A port must sit on the coast";
-        case placement_reason::launchpad_exists:  return "This body already has a launchpad";
+        case placement_reason::launchpad_exists:  return "Your nation already has a launchpad on this body";
         case placement_reason::occupied:          return "Tile already built on";
         case placement_reason::outside_territory: return "Outside your territory";
         case placement_reason::unsurveyed:        return "Body not yet surveyed";
@@ -540,6 +542,20 @@ placement_result can_place_in_world(const world& w, entity_id tile_id,
     if (rig && corp != null_entity
         && !nation_mechanic(w, owner_home_nation(w, corp), k_offshore_mechanic))
         return placement_reason::tech_locked;
+    // BL-1604 (ERAS.md § The propellant loop; PRODUCTION.md § Extraction buildings):
+    // the ICE EXTRACTOR - an extraction site drawing water off an ice deposit - is far
+    // space's to open OFF THE BUILDER'S HOME BODY: there it needs the Early Space
+    // tree's Ice Extraction (`ice_extractor`). On the home body the deposit route stays
+    // open as it always was. A Well (no deposit) is not an Ice Extractor.
+    if (corp != null_entity && type == building_type::extraction_site && target == resource_type::water
+        && tc_it->second.resource_deposit[static_cast<std::size_t>(resource_type::water)] > 0.0f)
+    {
+        const entity_id nation = owner_home_nation(w, corp);
+        const entity_id home   = space_home_body_of(w, nation); // null: no home to be off
+        if (home != null_entity && tc_it->second.body != home
+            && !nation_has_mechanic(w, nation, space_keys::ice_extractor))
+            return placement_reason::tech_locked;
+    }
 
     // BL-1399 OWN GROUND (Ben, 2026-10-23; NATIONS.md § Own ground): a nation builds
     // only on its own tiles - never another nation's, never ground no nation owns. Asked
@@ -578,15 +594,29 @@ placement_result can_place_in_world(const world& w, entity_id tile_id,
     }
     else if (type == building_type::launchpad)
     {
-        // Count launchpads already on this body.
+        // ONE LAUNCHPAD PER NATION PER BODY (BL-1615; SPACE_ASSETS.md § Launching):
+        // a launch needs a staffed pad of the NATION'S on its home body, so every
+        // nation may stand one there, and none a second. The builder's nation is the
+        // named builder's home, else the tile's holder (a generation stamp); a pad's
+        // nation is its owner, else its tile's holder. Any-of: walk order is moot.
         const entity_id body = tc_it->second.body;
+        const auto holder_of = [&](entity_id tile) {
+            const auto it = w.tile_to_nation.find(tile);
+            return it != w.tile_to_nation.end() ? it->second : null_entity;
+        };
+        const entity_id builder = corp != null_entity ? owner_home_nation(w, corp) : holder_of(tile_id);
         for (const auto& [bid, bc] : w.buildings)
         {
             if (bc.type != building_type::launchpad)
                 continue;
             const auto btc_it = w.tiles.find(bc.tile);
-            if (btc_it != w.tiles.end() && btc_it->second.body == body)
-                return placement_reason::launchpad_exists; // Already one on this body.
+            if (btc_it == w.tiles.end() || btc_it->second.body != body)
+                continue;
+            entity_id pad_nation = owner_nation_of(w, bid);
+            if (pad_nation == null_entity)
+                pad_nation = holder_of(bc.tile);
+            if (pad_nation == builder)
+                return placement_reason::launchpad_exists; // this nation already has one here
         }
     }
 

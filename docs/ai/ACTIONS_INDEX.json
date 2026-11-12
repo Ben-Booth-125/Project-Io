@@ -126,6 +126,14 @@
    "The Planetary surface canvas (tiles and buildings; a market centre has no hover target of its own since its glyph retired, (Ben, 2026-10-10: 'We should remove the HQ glyph and market center glyphs')). The Solar and Circumplanetary rungs still use a lightweight ad-hoc tooltip (name, type, orbital radius) — the full card has not migrated there yet."
   ],
   [
+   "canvas.hover_orbital_node",
+   "The Circumplanetary canvas (primary view only): the low and high orbit rings around the anchor and each moon, the L1/L2/L4/L5 diamonds of every anchor-moon pair, and the slot-pip row beside each node (CIRCUMPLANETARY.md § Orbital nodes and what sits at them)."
+  ],
+  [
+   "canvas.space_asset_select",
+   "The Circumplanetary canvas (primary view only): a satellite mark (a small round plate in its owner nation's colour, a solar wing out of each side, its role's mark on the plate) or a station mark (a larger square core on a truss between two solar panels, in its owner's colour, larger for a larger grid), drawn at the orbital node it occupies - down the side of a ring, or in a row under a diamond. One in transit draws at its destination at half strength, with a dashed segment back to the node it left and a solid marker at its share of the way when that node is on the rung (CIRCUMPLANETARY.md § Orbital nodes and what sits at them)."
+  ],
+  [
    "canvas.construction_site_card",
    "Planetary canvas: the build-progress circle drawn over each of the player's sites under construction."
   ],
@@ -311,7 +319,7 @@
   ],
   [
    "ledger.nav_generation",
-   "Nav rail, slot 10 (plate/continent glyph)"
+   "Nav rail, slot 11 (plate/continent glyph)"
   ],
   [
    "ledger.generation_body_selector",
@@ -371,7 +379,7 @@
   ],
   [
    "ledger.nav_history",
-   "Nav rail, slot 9 (History icon)"
+   "Nav rail, slot 10 (History icon)"
   ],
   [
    "ledger.nav_market",
@@ -424,6 +432,14 @@
   [
    "chrome.war_notice",
    "War notice, top centre of the canvas area below the alert strip: one per war the player's nation has become party to, by either side's declaration, naming both parties (docs/ui/LAYOUT.md § War notice)."
+  ],
+  [
+   "chrome.pin_toggle",
+   "The pin toggle: a small pushpin square at the Selection band's top-right corner, over the band's header row, shown whenever the band shows an entity - a body, tile, building, market, unit, nation or air wing (docs/ui/LAYOUT.md § Pinned items)."
+  ],
+  [
+   "chrome.pin_press",
+   "A card in the pinned-items panel, the right chrome column between the time panel and the minimap: front pins first (one per body where a war the player's nation is party to has a front, placed by the war), then the player's own pins in pin order (docs/ui/LAYOUT.md § Pinned items)."
   ],
   [
    "chrome.f10_options",
@@ -547,7 +563,7 @@
   ],
   [
    "ledger.decision_feed_open",
-   "Navigation rail slot 11, \"AI decisions\""
+   "Navigation rail slot 12, \"AI decisions\""
   ],
   [
    "ledger.decision_feed_filter_corp",
@@ -587,7 +603,7 @@
   ],
   [
    "ledger.strategy_readout_open",
-   "Navigation rail slot 12, \"Strategy readout\""
+   "Navigation rail slot 13, \"Strategy readout\""
   ],
   [
    "ledger.strategy_readout_select_corp",
@@ -791,7 +807,7 @@
   ],
   [
    "ledger.military_theatre_tab",
-   "Military ledger (nav rail slot 7), Recruit and Design tabs: the row of theatre tabs under them, 'Land N', 'Air N' and 'Sea N' - each names its theatre and counts its rows (Recruit Land: the land types shown; Recruit Air and Design Air: the six air classes; Design Land: the seven land classes; Sea: 0). The active one is lit."
+   "Military ledger (nav rail slot 7), Recruit and Design tabs: the row of theatre tabs under them, 'Land N', 'Air N' and 'Sea N', and under Design a fourth, 'Space N' - each names its theatre and counts its rows (Recruit Land: the land types shown; Recruit Air and Design Air: the six air classes; Design Land: the seven land classes; Sea: 0; Design Space: the five hulls). The active one is lit."
   ],
   [
    "chrome.header_recruit_hover",
@@ -844,6 +860,50 @@
   [
    "ledger.nav_diplomacy",
    "Nav rail, slot 8 (the Diplomacy glyph), after Military."
+  ],
+  [
+   "ledger.nav_space",
+   "Nav rail, slot 9 (the satellite glyph), after Diplomacy."
+  ],
+  [
+   "ledger.space_tab",
+   "Space ledger (nav rail slot 9; docs/ui/ledgers/space.md), the Launch / Assets / Stations / Crew tab strip."
+  ],
+  [
+   "ledger.space_launch",
+   "Space ledger (nav rail slot 9; docs/ui/ledgers/space.md), Launch view: the class picker (Satellite, Station core, Crewed mission, Rover), the satellite's Role picker (Comms, Navigation, Observation, Survey), the destination list, the quote and the Launch press."
+  ],
+  [
+   "ledger.space_retask",
+   "Space ledger (nav rail slot 9; docs/ui/ledgers/space.md), Assets view: a satellite row, expanded in place, and its Retask role presses."
+  ],
+  [
+   "ledger.space_designer_slot",
+   "Space ledger (nav rail slot 9; docs/ui/ledgers/space.md), Stations view: the station picker and the designer grid - 5x3, 7x5 or 9x7 slots drawn as they are, the core ('Core') at the centre, each fitted module by its short tag, edge slots outlined, a module stopped by a shortfall outlined red, an edge-only module off the edge outlined amber; the budgets above it (Power, Crew room, Life support, Crew, each supply / demand, red when short)."
+  ],
+  [
+   "ledger.space_fit_module",
+   "Space ledger (nav rail slot 9; docs/ui/ledgers/space.md), Stations view, an empty slot picked: the module list."
+  ],
+  [
+   "ledger.space_remove_module",
+   "Space ledger (nav rail slot 9; docs/ui/ledgers/space.md), Stations view, a filled slot picked: Remove."
+  ],
+  [
+   "ledger.space_move_module",
+   "Space ledger (nav rail slot 9; docs/ui/ledgers/space.md), Stations view, a filled slot picked: Move, then an empty slot."
+  ],
+  [
+   "ledger.space_save_template",
+   "Space ledger (nav rail slot 9; docs/ui/ledgers/space.md), Stations view, Templates: the name field and 'Save layout'."
+  ],
+  [
+   "ledger.space_apply_template",
+   "Space ledger (nav rail slot 9; docs/ui/ledgers/space.md), Stations view, Templates: a saved template's Apply and Delete presses."
+  ],
+  [
+   "ledger.space_upgrade",
+   "Space ledger (nav rail slot 9; docs/ui/ledgers/space.md), Stations view: 'Upgrade to 7x5' / 'Upgrade to 9x7' with the truss launch's cost."
   ],
   [
    "ledger.diplomacy_tab",
@@ -904,6 +964,106 @@
   [
    "ledger.diplomacy_refuse_peace",
    "Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Wars tab, 'Refuse' under a peace offer the other party made."
+  ],
+  [
+   "gameplay.space_launch",
+   "The Space ledger (nav rail slot 9): ledger.space_launch. In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam — a sibling of corp_command, because the template verbs carry a name and a layout the fixed corp_command record cannot. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed)."
+  ],
+  [
+   "gameplay.space_found_station",
+   "The Space ledger (nav rail slot 9): ledger.space_launch (class Station core). In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam — a sibling of corp_command, because the template verbs carry a name and a layout the fixed corp_command record cannot. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed)."
+  ],
+  [
+   "gameplay.space_fit_module",
+   "The Space ledger (nav rail slot 9): ledger.space_fit_module. In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam — a sibling of corp_command, because the template verbs carry a name and a layout the fixed corp_command record cannot. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed)."
+  ],
+  [
+   "gameplay.space_remove_module",
+   "The Space ledger (nav rail slot 9): ledger.space_remove_module. In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam — a sibling of corp_command, because the template verbs carry a name and a layout the fixed corp_command record cannot. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed)."
+  ],
+  [
+   "gameplay.space_refit_module",
+   "The Space ledger (nav rail slot 9): ledger.space_move_module. In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam — a sibling of corp_command, because the template verbs carry a name and a layout the fixed corp_command record cannot. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed)."
+  ],
+  [
+   "gameplay.space_apply_template",
+   "The Space ledger (nav rail slot 9): ledger.space_apply_template. In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam — a sibling of corp_command, because the template verbs carry a name and a layout the fixed corp_command record cannot. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed)."
+  ],
+  [
+   "gameplay.space_save_template",
+   "The Space ledger (nav rail slot 9): ledger.space_save_template. In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam — a sibling of corp_command, because the template verbs carry a name and a layout the fixed corp_command record cannot. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed)."
+  ],
+  [
+   "gameplay.space_delete_template",
+   "The Space ledger (nav rail slot 9): ledger.space_apply_template (Delete). In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam — a sibling of corp_command, because the template verbs carry a name and a layout the fixed corp_command record cannot. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed)."
+  ],
+  [
+   "gameplay.space_upgrade_station",
+   "The Space ledger (nav rail slot 9): ledger.space_upgrade. In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam — a sibling of corp_command, because the template verbs carry a name and a layout the fixed corp_command record cannot. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed)."
+  ],
+  [
+   "gameplay.space_retask_satellite",
+   "The Space ledger (nav rail slot 9): ledger.space_retask. In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam — a sibling of corp_command, because the template verbs carry a name and a layout the fixed corp_command record cannot. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed)."
+  ],
+  [
+   "gameplay.space_move_satellite",
+   "No UI surface yet: the Space ledger offers no satellite Move. In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam — a sibling of corp_command, because the template verbs carry a name and a layout the fixed corp_command record cannot. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed)."
+  ],
+  [
+   "gameplay.space_load_cargo",
+   "No UI surface yet (the circumplanetary canvas's fleet controls are the UI lane's). In-process: src/world/space_convoy.hpp, the space-unit seam beside order_space_unit / refuel_space_unit. Not on apply_space_command or the --serve / MCP transport yet (a SPACE line beside COMMAND is owed)."
+  ],
+  [
+   "gameplay.space_unload_cargo",
+   "No UI surface yet (the circumplanetary canvas's fleet controls are the UI lane's). In-process: src/world/space_convoy.hpp, the space-unit seam beside order_space_unit / refuel_space_unit. Not on apply_space_command or the --serve / MCP transport yet (a SPACE line beside COMMAND is owed)."
+  ],
+  [
+   "gameplay.space_bombard",
+   "No UI surface yet (the circumplanetary canvas's fleet controls are the UI lane's). In-process: src/world/space_bombard.hpp, the space-unit seam beside order_space_unit / load_space_cargo. Not on apply_space_command or the --serve / MCP transport yet (a SPACE line beside COMMAND is owed)."
+  ],
+  [
+   "gameplay.queue_space_research",
+   "The research panel's Early Space tree (the 'Early Space' tab, top-right of the research canvas): SHIFT + left click on a node. A corp_verb (55, `queue_space_research`), so an agent issues it through the same seam."
+  ],
+  [
+   "gameplay.unqueue_space_research",
+   "The research panel's Early Space tree: SHIFT + left click on a QUEUED node (the toggle rule). A corp_verb (56, `unqueue_space_research`). 'Remove last' (gameplay.unqueue_research's last-entry form) also drops the Early Space tail's last entry first, since it is the last of the one queue."
+  ],
+  [
+   "canvas.tech_tree_age_tab",
+   "The research canvas's age switch: two tabs top-right, 'Digitisation' and 'Early Space' (read 'Early Space (locked)' while the gate into space is unmet)."
+  ],
+  [
+   "gameplay.space_embark_colonists",
+   "The Selection band's space-unit card for the player's own Lander with passenger berths (SELECTION.md § The space-unit element): the Embark colonists press, the count slider and Confirm embark. In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam; the verb is offworld_base.hpp's. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed)."
+  ],
+  [
+   "gameplay.space_found_base",
+   "The Selection band's space-unit card for the player's own Lander landed on another body's surface (SELECTION.md § The space-unit element): the Found base press, the colonists and base-kit lines, the site list and Confirm found base. In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam; the verb is offworld_base.hpp's. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed)."
+  ],
+  [
+   "canvas.space_fleet_select",
+   "The Circumplanetary canvas (primary view only): a fleet mark - a pointed hull in its owner nation's colour carrying the lead unit's hull mark, the fleet's size as a badge - one per nation per node, on a ring's upper side or above a diamond; a unit in transit on a dashed segment from the node it left to its destination, at its share of the way. The Solar canvas (primary view only): one mark per nation per body at the body's upper left, and an inter-body move on a segment between the two bodies (CIRCUMPLANETARY.md, SOLAR.md § Space fleets)."
+  ],
+  [
+   "gameplay.space_unit_move",
+   "The Selection band's space-unit card (SELECTION.md § The space-unit element): the Move press, the 'Whole fleet' tick, the destination list, the 'Move costs delta-v x of y' line and Confirm move."
+  ],
+  [
+   "gameplay.space_unit_dock",
+   "The Selection band's space-unit card: the Dock press (Undock while docked)."
+  ],
+  [
+   "gameplay.space_unit_refuel",
+   "The Selection band's space-unit card: the Refuel press."
+  ],
+  [
+   "gameplay.space_unit_bombard",
+   "The Selection band's space-unit card: the Bombard press and its list of hostile ground below."
+  ],
+  [
+   "ledger.military_space_design",
+   "Military ledger (nav rail slot 7), Design tab, Space theatre: one row per hull class - Hauler, Lander, Tug, Frigate, Cruiser - with its live design's delta-v, cargo, firepower, armour and hull points, or 'No live design' (the Cruiser 'built at a Shipyard only')."
   ],
   [
    "gameplay.hire_ship",

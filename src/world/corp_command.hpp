@@ -254,6 +254,17 @@ enum class corp_verb : uint8_t
     stock_missiles,       ///< BL-1431: buy `unit_type` (1..16) missiles of kind `order` (0 short range, 1 long range, 2 tactical nuclear) into the actor's magazine, their goods off its shelves. rejected_invalid (another kind - a strategic weapon is never stocked - or count) / rejected_tech_locked (a tactical warhead without Uranium Enrichment) / rejected_state (magazine full, 64 a kind) / rejected_funds — see `stock_missiles_check`.
     stock_interceptors,   ///< BL-1431: buy `unit_type` (1..16) interceptors into the stock of the actor's air defence unit `subject` (24 at most), their goods off its shelves. rejected_invalid / rejected_not_owner / rejected_state / rejected_funds — see `stock_interceptors_check`.
     fire_missile,         ///< BL-1431: launcher `subject` (the actor's own land unit, ship or wing) fires `unit_type` (1..8) missiles of kind `order` from the magazine at province `province`, or at building `counterparty` in it. Kind 3, a strategic weapon, is refused always. rejected_invalid / rejected_not_owner / rejected_state (not ready, target not of a nation the actor has declared hostile, not sighted) / rejected_placement (out of range) / rejected_funds (the magazine is short) — see `fire_missile_check`.
+    // --- BL-1613: the Early Space tree joins the seam (RESEARCH.md § The research queue) ---
+    // Appended after fire_missile (the space-mechanics merge kept main's naval and
+    // missile verbs first), same append-only rule. The Early Space tree
+    // (`io::es`) is a second tree on the ONE queue: its entries stand behind every
+    // Digitisation entry (`nation_tech_state::es_queue`). The seat's nation only, as
+    // queue_research; `clear_research` and `unqueue_research`'s `unqueue_last` already
+    // cover the whole logical queue. `order` is an `io::es::nodes` index, range-checked
+    // before any use. A rival's picks go through `enqueue_early_space_node` directly
+    // (run_nation_research_ai), never this verb.
+    queue_space_research,   ///< The seat's nation queues Early Space node `order` with its unheld requirements ahead of it, on the Early Space tail (`enqueue_early_space_node`). rejected_invalid for an out-of-tree `order`; rejected_state when already held/queued, or locked (the gate into space unmet, or the node's branch not keyed). A refusal mutates nothing.
+    unqueue_space_research, ///< The seat's nation takes queued Early Space node `order` off the tail with every later tail entry that needs it (the toggle). rejected_invalid for an out-of-tree `order`; rejected_state when the node is not queued.
 };
 
 /// One past the highest verb — the wire parser's range gate (BL-396: run_serve
@@ -263,7 +274,7 @@ enum class corp_verb : uint8_t
 /// appending a verb means moving this with it — and only this, since existing
 /// values never renumber.
 inline constexpr uint8_t corp_verb_count =
-    static_cast<uint8_t>(corp_verb::fire_missile) + 1;
+    static_cast<uint8_t>(corp_verb::unqueue_space_research) + 1;
 
 /// `unqueue_research`'s "the last entry" sentinel for `corp_command::order`
 /// (the MCP boundary's -1). UINT32_MAX, never a node index.

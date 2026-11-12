@@ -246,14 +246,34 @@ int main()
     w.nations[corp].state_assets.push_back(control);
 
     // BL-1322 (workforce stepped auto): the game steps the SEATED player's workforce
-    // each tick, and this fixture has no market, so it would step the Well toward 0.
-    // The arithmetic rows pin workforce 100, so the seat moves to an empty corp: the
-    // owner stays is_player (the corp AI never steers it) and nothing steps its sites.
+    // each tick, and this fixture's market prices nothing, so it would step the Well
+    // toward 0. The arithmetic rows pin workforce 100, so the seat moves to an empty
+    // nation and nothing steps the builder's sites.
     {
         const entity_id seat = w.create_entity();
         nation_component sc{};
         w.nations[seat] = sc;
         w.player_entity = seat;
+    }
+    // BL-1407: the builder is now a NATION and, unseated, a rival - so the scored
+    // layer's workforce dial evaluates it and zeroes every unpriced site after its
+    // first tick (the retired corporation stayed is_player and was never asked). The
+    // sites take the hold a building whose state just changed holds for
+    // (AI_OPPONENT.md § "Hysteresis & action budget"), long enough to outlast the six
+    // ticks: the subject here is the site's output, not the dial. The loss reflex
+    // idles at 8 losing ticks, past the run.
+    for (const entity_id b : {well, control, wharf, inland_wharf, farm})
+        w.buildings[b].ai_cooldown = 8;
+    // BL-1309 (LOGISTICS.md § Logistic Points): a producing building runs at the share
+    // of its point need its host nation's pool grants, and the ground is the builder's.
+    // One running inland hub on that ground (120 points against a need of 10 a site)
+    // so the pool never binds - the stack_capacity_harness fixture. A source needs no owner.
+    {
+        const entity_id hub = w.create_entity();
+        building_component hb{};
+        hb.tile = g_tile[2][4];
+        hb.type = building_type::inland_logistics_hub;
+        w.buildings[hub] = hb;
     }
     const std::size_t rw = ri(resource_type::water);
     float last = 0.0f, first_delta = -1.0f;

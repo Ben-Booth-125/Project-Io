@@ -599,26 +599,28 @@ int main()
         std::ostringstream o(std::ios::binary);
         write_world_snapshot_pre_missiles(f.w, o);
         world old;
-        check(o.str().size() + world_save_missile_section_bytes(f.w) == bytes.size()
+        check(o.str().size() + world_save_missile_section_bytes(f.w) + world_save_space_tail_bytes_after(80, f.w) /* the space merge */ == bytes.size()
                   && from_bytes(o.str(), old) && old.missile_magazines.empty() && old.interceptor_stocks.empty(),
               "M9b a v88 stream is the v89 stream less the section, and reads with nothing stocked");
         // An interceptor stock on a non-air-defence unit is refused whole. The writer filters
         // one, so poke the bytes: the good stream with the last record's unit id swapped.
+        // The space merge (v93): every space-line section follows the missiles.
+        const std::size_t space_tail = world_save_space_tail_bytes_after(80, f.w);
         std::string poked = bytes;
-        const std::size_t at = poked.size() - 8; // the last interceptor record: id, count
+        const std::size_t at = poked.size() - space_tail - 8; // the last interceptor record: id, count
         const entity_id inf = s.b_inf;
         std::memcpy(&poked[at], &inf, 4);
         world refused_w;
         check(!from_bytes(poked, refused_w), "M9c an interceptor stock on an infantry unit is refused");
         std::string over = bytes;
         const int32_t too_many = k_interceptor_cap + 1;
-        std::memcpy(&over[over.size() - 4], &too_many, 4);
+        std::memcpy(&over[over.size() - space_tail - 4], &too_many, 4);
         world refused_o;
         check(!from_bytes(over, refused_o), "M9d an interceptor count past the cap is refused");
         // A magazine of all zeros is refused (the writer never writes one).
         std::string zero = bytes;
         // The magazine record sits before the interceptor count (4) and its one record (8).
-        const std::size_t mag_at = zero.size() - 8 - 4 - 12; // A's three counts
+        const std::size_t mag_at = zero.size() - space_tail - 8 - 4 - 12; // A's three counts
         const int32_t z = 0;
         for (int i = 0; i < 3; ++i)
             std::memcpy(&zero[mag_at + 4 * static_cast<std::size_t>(i)], &z, 4);

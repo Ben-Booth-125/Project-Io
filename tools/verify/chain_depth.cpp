@@ -260,10 +260,12 @@ bool injector_moves(const recipe_registry& reg, injector i, std::size_t r)
         case injector::state_purchase:
         {
             const space_programme_params& sp = reg.space_programme();
+            // BL-1630: or the launch-ready pads' standing bid (economy_system.cpp).
+            const bool standing = std::isfinite(sp.standing_lots) && sp.standing_lots > 0.0f;
             if (r == static_cast<std::size_t>(resource_type::spacecraft_components))
-                return std::isfinite(sp.components_lump) && sp.components_lump > 0.0f;
+                return standing || (std::isfinite(sp.components_lump) && sp.components_lump > 0.0f);
             if (r == static_cast<std::size_t>(resource_type::propellant))
-                return std::isfinite(sp.propellant_lump) && sp.propellant_lump > 0.0f;
+                return standing || (std::isfinite(sp.propellant_lump) && sp.propellant_lump > 0.0f);
             return false;
         }
         case injector::unit_upkeep_draw:

@@ -8,6 +8,7 @@
 #include "nav_pane.hpp"           // close_all_panels — the no-base door takes the column
 #include "presentation.hpp"
 #include "unit_designer.hpp"      // the Design tab's class rows open it
+#include "circum_units.hpp"       // BL-1609: the Design tab's Space theatre
 #include "wing_card.hpp"          // BL-1450: air class / mission names
 #include "ship_card.hpp" // BL-1534: the Sea tab's labels and rows
 #include "stat_grid.hpp" // a row's name opens its card on hover
@@ -213,12 +214,15 @@ std::string missing_air_gate(const roster_gate& g, const campaign_roster_gate_in
 /// the view lists, so it is a SELECTOR, not a toggle: `nav_button` without a close
 /// target leaves a re-press of the active tab a no-op (the Recruit / Design tabs keep
 /// the toggle rule). @p tab is 0 Recruit, 1 Design.
-void theatre_tabs(military_ledger_state& m, int tab, const int (&counts)[3])
+/// BL-1609: Design carries a fourth theatre, Space (the space hulls); Recruit keeps three.
+template <int N>
+void theatre_tabs(military_ledger_state& m, int tab, const int (&counts)[N])
 {
-    static const char* const k_names[3] = {"Land", "Air", "Sea"};
-    if (m.theatre[tab] < 0 || m.theatre[tab] > 2)
+    static_assert(N >= 3 && N <= 4, "Land, Air, Sea and (Design) Space");
+    static const char* const k_names[4] = {"Land", "Air", "Sea", "Space"};
+    if (m.theatre[tab] < 0 || m.theatre[tab] > N - 1)
         m.theatre[tab] = 0;
-    for (int t = 0; t < 3; ++t)
+    for (int t = 0; t < N; ++t)
     {
         if (t > 0)
             ImGui::SameLine();
@@ -967,8 +971,15 @@ void draw_design(const world& w, const recipe_registry& reg, ui_state& s)
     const entity_id nation = player_nation(w);
     military_ledger_state& m = s.military;
     {
-        const int counts[3] = {land_class_count - 1, air_class_count, ship_class_count}; // every land class but `none`
+        // every land class but `none`; the ship classes; BL-1609: the five space hulls
+        const int counts[4] = {land_class_count - 1, air_class_count, ship_class_count,
+                               static_cast<int>(space_hull_count)};
         theatre_tabs(m, 1, counts);
+    }
+    if (m.theatre[1] == 3)
+    {
+        draw_space_hull_designs(w, s); // BL-1609 (circum_units.hpp)
+        return;
     }
     if (m.theatre[1] == 2)
     {

@@ -349,6 +349,39 @@ economy = {
             build_duration_days = 240,
             resource_costs = { steel = 35.0 },
         },
+        -- BL-1585 (SPACE_ASSETS.md § Astronauts): Astronaut Training Centre —
+        -- turns its staffed workforce into astronauts each quarter, into its
+        -- owner's pool up to a cap (the rate and cap are station_params'
+        -- astronauts_per_centre / astronaut_cap_per_centre, stations.hpp).
+        -- Produces no good. Staffed at construction like the research institute
+        -- (construction_initial_workforce), counted only while staffed. A modest
+        -- first cut priced as the institute: a campus and a centrifuge, not a
+        -- launch site. Industrial: no astronaut exists in an ancient campaign.
+        astronaut_training_centre = {
+            era         = "industrial",
+            base_rate   = 0.0,
+            maintenance = 15.0,
+            base_wage   = 10.0,
+            build_cost  = 300.0,
+            build_duration_days = 240,
+            resource_costs = { steel = 35.0 },
+        },
+        -- BL-1599 (SPACE_FLEETS.md § Bombardment and fire at orbit): Orbital
+        -- Defence Battery — fires each day at hostile units in its body's low
+        -- orbit (its fire is space_battle_params' battery_firepower, scaled by
+        -- its condition; space_bombard.hpp). Produces nothing and staffs at
+        -- zero, as the bunker. Opened by the Early Space tree's Orbital Defence
+        -- Battery mechanic. First cut priced above the bunker: a gun and its
+        -- magazine; its maintenance stands in for the munitions it fires.
+        orbital_defence_battery = {
+            era         = "industrial",
+            base_rate   = 0.0,
+            maintenance = 20.0,
+            base_wage   = 0.0,
+            build_cost  = 400.0,
+            build_duration_days = 240,
+            resource_costs = { steel = 30.0, ordnance = 10.0 },
+        },
         -- BL-615: Schooling — the education building any settlement can host.
         -- Same passive shape as research_institute (base_rate 0, staffs at
         -- zero); its qualification-raising effect is a separate seam
@@ -1312,8 +1345,25 @@ economy = {
     -- value by key; an absent key (or table) keeps the zero default, which
     -- derives no purchase at all.
     space_programme = {
-        components_lump = 25.0, -- spacecraft_components per purchase
-        propellant_lump = 50.0, -- propellant per purchase
+        -- BL-1630: THE LUMPS ARE OFF (0). A launch is real now (BL-1582): it buys
+        -- its lot off the home shelf and puts an asset in orbit. The lump bought
+        -- the same goods off ANY shelf holding a whole one and consumed them with
+        -- nothing launched, in the nation step BEFORE the space pick - so every
+        -- lot a shelf gathered was eaten first (seed 0 with the standing bid on:
+        -- 80 lumps bought 1983-2000 - 59 of propellant, 21 of components - and 0
+        -- launches). The space programme buys its goods through its launches.
+        -- Was 25 / 50.
+        components_lump = 0.0, -- spacecraft_components per purchase
+        propellant_lump = 0.0, -- propellant per purchase
+        -- BL-1630 (SPACE_ASSETS.md § Launching, "A staffed pad bids for its
+        -- launch"): launch lots a nation holding Rocketry with a staffed pad
+        -- bids for on its home market each quarter, as POSTED demand (one lot
+        -- = one satellite to home low orbit: 25 components, 50 propellant).
+        -- Without it the launch's want was off the book, the goods had no price,
+        -- and no plant was built for them (seed 0: 4 staffed pads, 0 launches by
+        -- 1995). 1.0 = one launch a quarter, the rate a rival's pick can take.
+        -- 0 switches the bid off. Loader bounds [0, 4].
+        standing_lots = 1.0,
     },
 
     -- BL-1335: taxes and Discontent (docs/politics/NATIONS.md § Taxes and
@@ -1335,6 +1385,28 @@ economy = {
         bite_threshold = 0.5,
         max_penalty    = 0.15,
         ai_headroom    = 0.0625,
+    },
+
+    -- BL-1608 (rival far-space AI; AI_OPPONENT.md § 11, "Rival nations go to
+    -- space as the player does", Ben 2026-11-10): the far-space pick's dials,
+    -- read over the C++ defaults in nation_ai_params (nation_ai.hpp), so an
+    -- absent key keeps them. Every other economy.nation_ai key stays at its
+    -- struct default. Loader bounds: integers, rejected by name when outside.
+    nation_ai = {
+        -- Off-world bases a rival founds toward; at the count it stops raising
+        -- Landers for a base (prospecting and its bases go on). [0, 1024]
+        far_space_bases_max            = 1,
+        -- Colonists (thousands) one embark boards: at least the founding
+        -- minimum, at most the Lander's free berths. [1, 65536]
+        far_space_colonists            = 4,
+        -- Armed hulls a rival keeps per nation it is hostile to, and its
+        -- ceiling in all: a war is the reason to raise one. [0, 1024]
+        far_space_warships_per_hostile = 2,
+        far_space_warships_max         = 6,
+        -- NR-1206, GRANTED (Ben, 2026-11-10): 1 keeps a rival's off-world base
+        -- province garrisoned as its capital's is (corp_ai.cpp, the fronts'
+        -- keep-home rule). [0, 1]
+        far_space_keep_base_home       = 1,
     },
 
     -- BL-643: network upkeep — the logistics_maintenance budget line's
@@ -1395,6 +1467,16 @@ economy = {
         -- through the research line, ~0.5% a year from 1970. Faster prices slow it.
         price_growth_per_year       = 0.005, -- nominal, compounded quarterly: 1.49 by 2040
         rp_per_economy_unit         = 0.03,  -- RP a quarter per credit of home firms' previous quarter's filed income
+        -- BL-1612 (ERAS.md § Era 1 -> Era 2 gate, condition 3): the propellant a
+        -- market on the home body must hold on its shelf before the Early Space
+        -- tree opens to a nation. 1.0 = one launch's draw (launch_draw_per_convoy).
+        space_gate_min_propellant   = 1.0,
+        -- BL-1606 (ERAS.md § Firsts): the one-time research grant, in RP, the
+        -- first nation to do each space deed earns (first satellite, crew in
+        -- orbit, station core, crew on a moon, off-world base, space convoy).
+        -- 400 = two cost units at the age's opening price (rp_per_cost_unit),
+        -- a bit over three quarters of base_rp_per_nation. Unmeasured first cut.
+        space_first_grant_rp        = 400.0,
     },
 
     -- BL-545/BL-546: the relational substrate's DECAY (sentiment.hpp). Each

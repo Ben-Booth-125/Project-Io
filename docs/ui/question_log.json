@@ -592,9 +592,9 @@
    "status": "drafted"
   },
   "tech_tree_panel": {
-   "surface": "Research panel (nav slot 4 / F9): the Digitisation ring on the canvas, the queue in the column; shift-click on a node queues it",
+   "surface": "Research panel (nav slot 4 / F9): the Digitisation ring on the canvas, the queue in the column; click sets the target, shift-click queues",
    "answers": "Which technologies can my nation reach, what does each give, and when will my plan arrive?",
-   "because": "The nation holds technology (RESEARCH.md § Who holds technology), and the queue is how it is spent: anything may be queued however far out, with its requirements ahead of it, and every entry shows its arrival date. A queue nobody can see the tree behind is a list of names; a tree nobody can plan on is a poster. The ring earns the whole canvas because the tree's grammar is spatial — three trees, ten branches, four cost rings inside out, AND links where a node needs two paths, pick-one pairs that close each other for good, quests that key the next age — and each of those is drawn in its own way so a glance reads where the power surges are and which choices are traps. The hover card carries the exact advantage, the RP cost and the requirements in the shared card rather than a second tooltip idiom. The column carries the answer to 'when': each queued entry's arrival quarter, projected by the quarterly pass's own accrual and flow on a copy of the state, so the panel and the sim cannot disagree. Queuing is SHIFT + left click (Ben, 2026-10-10, replacing a Plan mode): a plain click or hover only reads, so no stray press spends the treasury, and no mode has to be found first. A shift-click on a queued node takes it off with the entries that need it (the toggle rule, NR-1033); a refused press says which pair closed it. Replaces the retired mock constellation (BL-087/BL-310) and its era tabs.",
+   "because": "The nation holds technology (RESEARCH.md § Who holds technology), and the queue is how it is spent: anything may be queued however far out, with its requirements ahead of it, and every entry shows its arrival date. A queue nobody can see the tree behind is a list of names; a tree nobody can plan on is a poster. The ring earns the whole canvas because the tree's grammar is spatial — three trees, ten branches, four cost rings inside out, AND links where a node needs two paths, pick-one pairs that close each other for good, quests that key the next age — and each of those is drawn in its own way so a glance reads where the power surges are and which choices are traps. The hover card carries the exact advantage, the RP cost and the requirements in the shared card rather than a second tooltip idiom. The column carries the answer to 'when': each queued entry's arrival quarter, projected by the quarterly pass's own accrual and flow on a copy of the state, so the panel and the sim cannot disagree. A plain click makes a node the research target, its requirements and the old queue behind it (Ben, 2026-11-11); SHIFT + left click only adds to the queue (Ben, 2026-10-10, replacing a Plan mode), so no mode has to be found first. Hover alone only reads. A shift-click on a queued node takes it off with the entries that need it (the toggle rule, NR-1033); a refused press says which pair closed it. Replaces the retired mock constellation (BL-087/BL-310) and its era tabs.",
    "backlog_item": [
     "BL-1276",
     "BL-1273"
@@ -1318,6 +1318,169 @@
     "src/core/save_names.hpp",
     "src/core/app.cpp",
     "src/ui/icons.cpp"
+   ],
+   "status": "drafted"
+  },
+  "circumplanetary_orbital_nodes": {
+   "surface": "Circumplanetary orbital nodes: low and high orbit rings around the anchor and each moon, a diamond at each L1/L2/L4/L5 of every anchor-moon pair, a row of slot pips beside every node, and a hover card naming the node with its free slots and the thrust cost and days from the home surface",
+   "answers": "Where around this planet can I put something, how much room is left there, and what does it cost to get there from home?",
+   "because": "Near space is a graph of named nodes (SPACE_ASSETS.md § The orbital graph), and every space decision the player makes - where a satellite sits, where a station goes, whether a slot is still free - is a choice between those nodes. Without them on the rung the graph is invisible and its costs are a number the player can only meet after committing. The rings and diamonds say which places exist; the pips say how full each is at a glance, so the scarce L-points read as scarce; the hover card carries the cost and days, because those are the figures a choice between two nodes turns on, and a press does nothing because a node is a place, not a thing to select.",
+   "backlog_item": "BL-1590",
+   "files": [
+    "src/ui/circum_nodes.hpp",
+    "src/ui/circum_nodes.cpp",
+    "src/ui/circumplanetary_canvas.cpp"
+   ],
+   "status": "drafted"
+  },
+  "pinned_items": {
+   "surface": "Pinned items: the right chrome column's residual middle, between the time panel and the minimap; front pins on top, then the player's own pins as watch cards; the pin toggle at the Selection band's top-right corner",
+   "answers": "What am I keeping an eye on while I work elsewhere, and where are my wars being fought?",
+   "because": "LAYOUT.md reserved the slot (BL-216) and nothing drew in it. A watch card keeps a chosen entity's stat block in view without holding the Selection band, so the band stays free for the thing in hand; acting on a pin is one click away (select), going to it one double-click. Front pins (Ben, 2026-11-10) earn the top of the list because a war spans every body: without them a front on another body is found only by going there. They are placed and removed by the war, never by the player.",
+   "backlog_item": "BL-1603 (pinned panel, front pins)",
+   "files": [
+    "src/ui/pinned_panel.cpp",
+    "src/ui/pinned_panel.hpp",
+    "src/ui/ui_state.hpp",
+    "src/core/app.cpp",
+    "src/core/save_game.cpp"
+   ],
+   "status": "drafted"
+  },
+  "circumplanetary_space_assets": {
+   "surface": "Circumplanetary space assets: every nation's satellites (owner colour, role mark) and stations (a larger square-cored mark sized by its grid) drawn at the node they occupy, one in transit at half strength at its destination with a dashed segment back to the node it left and a marker at its share of the way (BL-1614); slot pips filled in the holder's colour; a hover card and a Selection band card sharing one summary - owner, role or modules and crew, node, state, and for one in transit where it left from",
+   "answers": "Who holds the places around this planet, what is each satellite there doing, and is my station there in working order?",
+   "because": "Slots are scarce (SPACE_ASSETS.md § Orbital slots), so the question the node pips raise - how full is it - is followed at once by whose it is. A satellite's role decides what its owner gains on that body (comms coverage, cheaper logistics, lifted fog, a survey), so a rival's observation satellite over the home planet is a fact the player acts on; the role mark carries that at a glance and the card carries the rest. A station is the largest near-space investment and is told apart from a satellite by size and silhouette. The ghost at the destination shows a slot already spoken for by something not yet in place; the segment back to its origin, with the marker at its share, answers how far along it is and where it came from - a satellite moved out of a contested orbit reads differently from a fresh launch.",
+   "backlog_item": [
+    "BL-1590",
+    "BL-1614"
+   ],
+   "files": [
+    "src/ui/circum_assets.hpp",
+    "src/ui/circum_assets.cpp",
+    "src/ui/circum_nodes.cpp",
+    "src/ui/circumplanetary_canvas.cpp",
+    "src/ui/icons.cpp",
+    "src/ui/selection_panel.cpp"
+   ],
+   "status": "drafted"
+  },
+  "space_ledger": {
+   "surface": "Space ledger (nav rail slot 9): Launch, Assets, Stations and Crew tabs, with the station designer",
+   "answers": "What does my nation have in space, and what can it launch next?",
+   "because": "Near space became a system with launches, slots, roles, stations, crew and signal delay, and every one of its verbs lived only on the command seam: a player could not launch, see what was up there, or fit a station. It is a broad ledger - every asset, every station, the whole pool - which is MENU.md's test for a rail slot, and Space is a curated system, so it is inserted after Diplomacy rather than appended below the developer tail. Launch is the act the ledger exists for, so it opens there: the class and role picked first, the destination list showing only nodes with a slot free and the path's thrust cost, and the quote with the seam's own refusal, so a refused launch says why before the press. Assets is the inventory - class, role, node, state, upkeep, coverage - because coverage decides whether an order lands now or waits a quarter. The designer draws the grid as it is, core at the centre and the edge marked, because edge-only modules and the budgets are spatial facts a list cannot carry; the budgets sit above it as supply against demand so a shortfall is read before a module is fitted. Crew is its own view because the pool gates every crewed launch and its cap is set on the ground. The pending line sits under the tabs on every view because an order waiting on a signal is invisible otherwise. The canvas draws the nodes; the ledger is the list and the designer, not a second card (docs/ui/ledgers/space.md).",
+   "backlog_item": [
+    "BL-1591"
+   ],
+   "files": [
+    "src/ui/space_ledger.cpp",
+    "src/ui/nav_pane.cpp",
+    "src/ui/icons.cpp"
+   ],
+   "status": "drafted"
+  },
+  "tech_tree_early_space": {
+   "surface": "Research panel, Early Space tab (top-right age switch): the next age's tree as three branch columns on the canvas, its entries on the one queue in the column",
+   "answers": "What does reaching space open next, what keys each branch of it, and is my nation through the gate yet?",
+   "because": "RESEARCH.md gives a nation one pool and one queue, and Quests key the next age: the Early Space tree is researchable once the gate into space is met (ERAS.md § Era 1 -> Era 2 gate) and a branch is keyed. A tree the player cannot see is a research line that silently stops paying - the queue would hold far-space entries with no place to plan them, and the gate would be a rule only the sim knew. It earns the canvas the ring already holds by a tab rather than a second panel: the same glyphs, links, hover card and shift-click press, so nothing new is learned. Three branches read as columns, not a ring - one per tree is too few to make a sector shape mean anything. Before the gate the tree stays readable (every node, every link, by hover) but draws locked, and the caption names exactly which of the three gate conditions is missing, so the player learns what to build, not just that a door is shut. Each column header says what keys its branch, so the Digitisation quest that opens it is named where it matters. The column lists the Early Space tail after the Digitisation entries, numbered on, with arrival quarters from the same projection, because it is one queue and the pool reaches the tail last.",
+   "backlog_item": [
+    "BL-1613",
+    "BL-1612"
+   ],
+   "files": [
+    "src/ui/tech_tree_panel.cpp",
+    "src/world/nation_tech.cpp",
+    "src/world/corp_command.cpp"
+   ],
+   "status": "drafted"
+  },
+  "circumplanetary_space_fleets": {
+   "surface": "Space fleets on the Circumplanetary and Solar rungs: every nation's space units grouped per node and owner into one fleet mark - a kite hull in the owner's colour carrying its hull's mark and a count badge - drawn at the node it holds, or, travelling, as a ghost at its destination with the shared dashed segment back to where it set out and a marker at its share of the way; on the Solar rung a body's fleets ring the body. A hover card names owner, hull, count, node, state, propellant and docking; a press selects the fleet's lead",
+   "answers": "Whose warships are around this planet, how many, of what kind, and which are on their way somewhere?",
+   "because": "Blockade, bombardment and space battle are all decided at a node by who holds force there (SPACE_FLEETS.md), so the node is where the player must read force. One mark per owner per node keeps a crowded orbit legible while the count badge keeps the size honest; the hull mark separates a frigate screen from a carrier group. A fleet in transit is a threat that has not arrived yet - drawing it on the link with its share answers when it lands. The Solar rung shows the same marks around each body because a fleet bound for another planet is a far-space decision read at that scale.",
+   "backlog_item": [
+    "BL-1609"
+   ],
+   "files": [
+    "src/ui/circum_units.hpp",
+    "src/ui/circum_units.cpp",
+    "src/ui/circumplanetary_canvas.cpp",
+    "src/ui/solar_system_canvas.cpp",
+    "src/ui/icons.cpp"
+   ],
+   "status": "drafted"
+  },
+  "space_unit_card": {
+   "surface": "The space-unit Selection element: the shared space-unit summary (owner, hull, design, node or transit, propellant against its tank, docking, standing bombard order) and, for the player's own unit, its orders - Move (a toggle opening the reachable destinations, each with its delta-v against the propellant held, an unaffordable one disabled; a chosen destination previews 'Move costs delta-v x of y' and a Confirm), a Whole fleet checkbox, Dock (only where a player station stands), Undock, Refuel, and Bombard (a toggle listing the provinces on the body that hold a target, or lifting a standing order)",
+   "answers": "What can this warship do from here, and what will a move cost it before I commit?",
+   "because": "A space move spends propellant that only a station or a pad restores (SPACE_FLEETS.md § Thrust - the delta-v budget), so a burn is the one order that can strand a fleet. Showing the cost against the budget before Confirm is the whole safeguard; a disabled row with its reason says why a destination is out of reach. Dock, refuel and bombard are the other verbs the seam offers a unit, and each is offered only where it can succeed, so the card is also the list of what the position allows.",
+   "backlog_item": [
+    "BL-1609"
+   ],
+   "files": [
+    "src/ui/circum_units.hpp",
+    "src/ui/circum_units.cpp",
+    "src/ui/selection_panel.cpp",
+    "src/ui/selection.cpp"
+   ],
+   "status": "drafted"
+  },
+  "military_space_designer": {
+   "surface": "The Military ledger's Design tab gains a Space theatre: one row per space hull, each a toggle that expands in place to the hull's slots, each slot a list of the modules it takes (a module whose research is missing is greyed with the node that opens it), and a Save design press",
+   "answers": "What will my next space units carry, and what research would widen the choice?",
+   "because": "A space unit is raised from its nation's saved design for its hull (SPACE_FLEETS.md § A space unit is raised to a design), so without a designer every unit is the default fit. The rows expand in place (DRILL_THROUGH.md) because a hull has at most six slots - a full canvas would be space without content. Greyed modules with their node tell the player what space research buys.",
+   "backlog_item": [
+    "BL-1609"
+   ],
+   "files": [
+    "src/ui/circum_units.cpp",
+    "src/ui/military_ledger.cpp"
+   ],
+   "status": "drafted"
+  },
+  "circumplanetary_debris_storm": {
+   "surface": "Near-space hazard marks: a debris mark (three shards) beside each node whose debris is above zero, with the level on the node's hover card; a storm bolt on a satellite gone dark or a station stormed by an active solar storm, with a line on its card",
+   "answers": "Which orbits around this planet are fouled, and which of my assets is out of action right now?",
+   "because": "Debris raises the loss risk of everything that enters a node and is left by battles and failed launches (SPACE_ASSETS.md § Debris), so it is a reason not to move through an orbit and must be read where the move is chosen. A storm silences a satellite's effect or a station's work for a span (EVENTS.md, solar storms); the bolt explains why a role the player paid for is not paying, without a separate alert.",
+   "backlog_item": [
+    "BL-1609"
+   ],
+   "files": [
+    "src/ui/circum_units.cpp",
+    "src/ui/circum_assets.cpp",
+    "src/ui/circum_nodes.cpp",
+    "src/ui/icons.cpp"
+   ],
+   "status": "drafted"
+  },
+  "space_unit_base_orders": {
+   "surface": "A Lander's base orders on the space-unit Selection element: Embark colonists (a toggle: the count in thousands, a berth each, and Confirm embark; greyed with its reason away from the home body, without a staffed Launchpad, or with no free berth) and Found base (a toggle on a Lander landed on another body: the colonists and base kit landed there against what a founding needs, a site list of one row per province with mapped, unclaimed land - its most habitable tile, its habitability, whether its deposits are prospected - and Confirm found base, greyed with the shortfall). The summary reads the colonists aboard against the berths.",
+   "answers": "Can I found a base here yet, where should it stand, and what is still missing?",
+   "because": "A base is the only way a nation holds ground on another body (NATIONS.md § Off-world bases), and the founding is refused whole unless colonists, the kit, the research and mapped, unclaimed ground all line up across several Landers. Reading each requirement against what is landed turns a silent refusal into a checklist. A Lander lands at a body's surface, not a tile, so the player must choose the site; a row per province - the founding claims the whole province - with its habitability and prospecting state is that choice at the grain it is made.",
+   "backlog_item": [
+    "BL-1610"
+   ],
+   "files": [
+    "src/ui/circum_units.cpp",
+    "src/ui/ui_state.hpp",
+    "src/ui/space_ledger.cpp"
+   ],
+   "status": "drafted"
+  },
+  "planetary_prospect_mask": {
+   "surface": "The second step of the Planetary canvas's survey mask off the home world: mapped ground the player's nation has not prospected draws its terrain under a cool slate wash and no deposits - not in the Resource lens or its key, the hover card, the tile summary, or the province's and deposit's tables; the title reads 'Mapped k/N - Prospected p/N', and the body's Selection card reads both counts and what is prospecting there.",
+   "answers": "What ground on this body do I know the terrain of, which of it have I actually prospected, and how far along is it?",
+   "because": "Off the home world a survey reveals in two steps (DISCOVERY.md § Mapping, then prospecting): orbit maps terrain, the ground reads deposits. A deposit drawn before it is prospected would tell the player what the system says they cannot yet know, and would hide why a Lander on the surface matters. The wash marks where the next landing earns its keep, and the counts say when the body will be read.",
+   "backlog_item": [
+    "BL-1610"
+   ],
+   "files": [
+    "src/ui/prospect_view.hpp",
+    "src/ui/body_surface_canvas.cpp",
+    "src/ui/hover_content.cpp",
+    "src/ui/entity_summary.cpp",
+    "src/ui/selection_panel.cpp",
+    "src/ui/presentation.hpp"
    ],
    "status": "drafted"
   },

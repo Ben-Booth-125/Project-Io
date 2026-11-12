@@ -363,6 +363,8 @@ bool nation_self_shared_verb(corp_verb v)
         case corp_verb::queue_research:
         case corp_verb::unqueue_research:
         case corp_verb::clear_research:
+        case corp_verb::queue_space_research:   // BL-1613
+        case corp_verb::unqueue_space_research: // BL-1613
         // BL-1407: the player IS its nation, so every verb the player sends is
         // sent as the nation. Each body below is keyed on the actor alone.
         case corp_verb::survey:
@@ -1759,6 +1761,14 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
                 const front* f = front_named(fr, cmd.tile);
                 if (f == nullptr)
                     return corp_command_result::rejected_invalid; // no front of the actor's holds it
+                // BL-1602 (MILITARY.md § Space, "A war spans every body"): a land unit
+                // never crosses between bodies on its own, so a front on another body
+                // than the one it stands on is one it could never reach. Read only where
+                // both bodies are known; on a world with one body of ground it never fires.
+                const auto ut = w.tiles.find(uit->second.position);
+                const auto kt = w.tiles.find(f->key);
+                if (ut != w.tiles.end() && kt != w.tiles.end() && ut->second.body != kt->second.body)
+                    return corp_command_result::rejected_invalid;
                 key = f->key;
             }
             if (uit->second.front == key)
@@ -2009,6 +2019,8 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
         case corp_verb::queue_research:
         case corp_verb::unqueue_research:
         case corp_verb::clear_research:
+        case corp_verb::queue_space_research:   // BL-1613
+        case corp_verb::unqueue_space_research: // BL-1613
         {
             // BL-1276 (the research panel). The seat only: the player reaches
             // its nation's queue as the nation's operating champion; a rival
@@ -2033,10 +2045,37 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
                     case enqueue_result::queued:         return corp_command_result::applied;
                     case enqueue_result::already_held:
                     case enqueue_result::already_queued:
-                    case enqueue_result::refused_pair:   return corp_command_result::rejected_state;
+                    case enqueue_result::refused_pair:
+                    case enqueue_result::refused_locked: return corp_command_result::rejected_state;
                     case enqueue_result::invalid:        return corp_command_result::rejected_invalid;
                 }
                 return corp_command_result::rejected_invalid;
+            }
+            if (cmd.verb == corp_verb::queue_space_research)
+            {
+                // BL-1613: the Early Space tree. `order` is an io::es index,
+                // range-checked as the value that lands; the planner refuses a
+                // locked node (gate unmet, branch unkeyed) before it writes.
+                if (cmd.order >= static_cast<uint32_t>(io::es::node_count))
+                    return corp_command_result::rejected_invalid;
+                switch (enqueue_early_space_node(w, nation, static_cast<int>(cmd.order), reg.research()))
+                {
+                    case enqueue_result::queued:         return corp_command_result::applied;
+                    case enqueue_result::already_held:
+                    case enqueue_result::already_queued:
+                    case enqueue_result::refused_pair:
+                    case enqueue_result::refused_locked: return corp_command_result::rejected_state;
+                    case enqueue_result::invalid:        return corp_command_result::rejected_invalid;
+                }
+                return corp_command_result::rejected_invalid;
+            }
+            if (cmd.verb == corp_verb::unqueue_space_research)
+            {
+                if (cmd.order >= static_cast<uint32_t>(io::es::node_count))
+                    return corp_command_result::rejected_invalid;
+                return unqueue_early_space_with_dependents(w, nation, static_cast<int>(cmd.order)) > 0
+                           ? corp_command_result::applied
+                           : corp_command_result::rejected_state;
             }
             if (cmd.verb == corp_verb::unqueue_research)
             {

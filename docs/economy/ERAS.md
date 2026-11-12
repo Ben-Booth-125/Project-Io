@@ -259,7 +259,7 @@ so the space programme is *itself* the largest single contributor to Alarm (§ A
 cannot dodge the dangerous technology — the skill is buying the reassurance that lets them hold it
 while they race for orbit.
 
-When all three conditions hold, space bodies become accessible to trade, and the Ice Extractor and Assembly Plant become available for construction. The operative half of the gate in the shipment layer is launchpad presence and propellant — a trade between bodies ships iff the trader holds a launchpad on the source body (`corp_has_launchpad_on`, `src/world/supply_system.cpp`; SUPPLY.md § Infrastructure gates) and the source shelf holds the launch's propellant at a price the ceiling admits (`TRADE.md` § A trade).
+When all three conditions hold, space bodies become accessible to trade, and the next age's tree opens to the nation (§ Far-space technology), where the Ice Extractor and the rest of far space are researched (Ben, 2026-11-10). The operative half of the gate in the shipment layer is launchpad presence and propellant — a trade between bodies ships iff the trader holds a launchpad on the source body (`corp_has_launchpad_on`, `src/world/supply_system.cpp`; SUPPLY.md § Infrastructure gates) and the source shelf holds the launch's propellant at a price the ceiling admits (`TRADE.md` § A trade).
 
 ---
 
@@ -280,6 +280,61 @@ Water (from icy bodies), iron-nickel ore (from metallic asteroids), platinum gro
 ### Newly available buildings
 
 Ice Extractor, Surface Extractor, Assembly Plant, Orbital Port.
+
+### The propellant loop (Ben, 2026-11-10)
+
+**Propellant made off-world is the loop that pays.** An **Ice Extractor** on an icy body yields water;
+an **Electrolysis Plant** beside it turns water and power into `propellant` on that body's market.
+A space unit refuels off the shelf of the body it orbits, and a station's Fuel depot is stocked from
+the market of its node's body (`../military/SPACE_FLEETS.md` § Thrust — the Δv budget). A nation that makes
+propellant at a moon stops paying the home world's climb for every tank it burns.
+
+**The two buildings are researched, and only off the home world.** The Ice Extractor is the
+extraction site that draws water off an ice deposit (`PRODUCTION.md` § Extraction buildings): on a
+nation's home body it stands open as it always has, and on any other body it needs the Early Space
+tree's Ice Extraction (`tech/EARLY_SPACE_TREE.md`). The Electrolysis Plant is the Chemical Plant's
+airless route, `propellant_electrolysis` — water, with refined fuel shipped in or made locally, into
+propellant (`PRODUCTION.md` § Chemical Plant). It runs only on the ground of a nation holding
+Electrolysis Plants, and only on an airless body, so it is never a home-world building.
+
+**The local shelf is the base's.** A unit in a body's low orbit refuels off the market its owner's
+Launchpad there routes to, home world or base alike. A station's Fuel depot is stocked off the market
+its owner's off-world base on the station's body routes to; with no base of its owner below, it is
+stocked off the home shelf.
+
+### Firsts (Ben, 2026-11-10)
+
+**The first nation to do a thing in space is told so, and so is everyone else.** Each **first** is a
+deed read from state the game already carries (`../META_LAYER.md`): the first satellite in orbit, the
+first crew in orbit, the first station core, the first crew landed on a moon, the first off-world
+base, the first space convoy between two bodies. The first nation to meet each earns a one-time
+research grant and a history-log entry every nation reads; a first is never taken twice. Firsts are
+the space race's successes made visible (§ The point of an Era: *"we want to encourage successes"*).
+
+How each deed reads (`src/world/space_firsts.hpp`), checked at the end of every space day and after
+the quarter's space steps:
+
+| First | The deed in state |
+|---|---|
+| Satellite in orbit | A satellite in place (active or decaying), not in transit. |
+| Crew in orbit | A crewed asset in place at an orbital node, or a space unit with crew aboard at an orbital node, not in transit. |
+| Station core | A station core in place. |
+| Crew on a moon | A crewed mission in place on a moon's surface, or a space unit with crew aboard landed there. |
+| Off-world base | A base whose tile the nation holds. |
+| Space convoy | A Hauler that has delivered a trade's cargo to a market on another body. |
+
+**Ties go to the lowest nation id.** Two nations meeting one first on the same day share no
+grant; the first in the nation store's id order takes it. A day is the grain the deeds are read at,
+so "first" means first by day. **The grant is a flat research-point sum** paid into the nation's
+research pool, the same for every first and every year of the age (`economy.research.space_first_grant_rp`).
+The log entry is one public history-log entry tagged with the nation that took the first.
+
+### Far-space technology (Ben, 2026-11-10)
+
+**Far space is researched in the next age's tree** (`tech/EARLY_SPACE_TREE.md`; `RESEARCH.md` § Quests key the next age): its
+hull classes and drives, landers and tugs, prospecting, base founding, the propellant loop's
+buildings, the orbital defence battery, and the station's last grid upgrade. A nation reaches it
+through the Digitisation tree's space quests, as every age's tree is reached.
 
 ### Era 2's pressure is climate (Ben, 2026-08-31)
 

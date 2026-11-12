@@ -94,4 +94,23 @@ shell_rect pinned_panel_rect(ImVec2 disp, float time_h)
     return { right_chrome_left(disp), y, right_chrome_width(disp), std::max(0.0f, h) };
 }
 
+namespace {
+shell_rect g_lens_chrome{};
+int        g_lens_chrome_frame = -1;
+} // namespace
+
+void note_lens_chrome(const shell_rect& r)
+{
+    g_lens_chrome       = r;
+    g_lens_chrome_frame = ImGui::GetFrameCount();
+}
+
+bool lens_chrome_this_frame(shell_rect& out)
+{
+    if (g_lens_chrome_frame != ImGui::GetFrameCount())
+        return false;
+    out = g_lens_chrome;
+    return true;
+}
+
 } // namespace ui

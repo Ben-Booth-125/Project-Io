@@ -1,6 +1,7 @@
 #pragma once
 
 #include "world/components.hpp"
+#include "world/space_assets.hpp" // space_satellite_role (the satellite glyph)
 
 #include <imgui.h>
 
@@ -475,6 +476,16 @@ void readout(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
 /// @param colour Stroke colour of both outlines.
 void diplomacy(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
 
+/// Draw the Space nav-rail glyph — a satellite: a small filled body between two
+/// outlined solar-panel wings on a thin boom, tilted 30 degrees so it never reads
+/// as the level Market bars or the History hourglass at rail radius.
+///
+/// @param dl     Draw list to render into.
+/// @param centre Glyph centre, screen pixels.
+/// @param r      Half-extent of the glyph, screen pixels.
+/// @param colour Stroke and fill colour.
+void satellite(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
+
 /// Draw the Contracts nav-rail glyph — a page with its top-right corner cut
 /// away (a dog-ear fold) plus a short check mark near the bottom (a signed
 /// document motif) — in @p colour. Distinct from `ledger` (a plain ruled
@@ -719,6 +730,17 @@ void rail_line(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
 /// @param colour Fill colour (the nation's identity colour).
 void capital(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
 
+/// BL-1603 (LAYOUT.md § Pinned items): the PIN glyph - a pushpin leaning right, a
+/// filled round head over a short collar and a needle running down-left to the point.
+/// Stroke family: @p colour fills the head and strokes the needle. The pin toggle on
+/// the Selection band draws it, and every player pin card carries it as its badge.
+///
+/// @param dl     Draw list to render into.
+/// @param centre Glyph centre, screen pixels.
+/// @param r      Half-extent of the glyph, screen pixels.
+/// @param colour Fill and stroke colour (caller - `palette::pinned` when active).
+void pin(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
+
 /// BL-1454 (docs/ui/ledgers/military.md § The stat grid): the STAT glyphs - one per
 /// number a land unit or an air wing fights with, the icon at the left of each stat
 /// grid cell (a cell carries no text label; its name is the hover tooltip). Line
@@ -756,5 +778,42 @@ enum class stat_glyph : uint8_t
 /// @param which  The stat to depict.
 /// @param colour Stroke colour.
 void stat(ImDrawList* dl, ImVec2 centre, float r, stat_glyph which, ImU32 colour);
+
+/// BL-1590 (CIRCUMPLANETARY.md § Orbital nodes and what sits at them): a satellite
+/// ROLE's mark in @p colour inside a 2r box — comms: a feed dot under two signal
+/// arcs; navigation: a four-point compass star; observation: an eye (a lens of two
+/// arcs round a filled pupil); survey: a lens with a handle. `none` draws a dot.
+/// Built to hold at r = 4 px.
+void satellite_role(ImDrawList* dl, ImVec2 centre, float r, space_satellite_role role, ImU32 colour);
+
+/// BL-1590: a SATELLITE marker — a round dark plate of radius @p r ringed in the
+/// owner's colour (@p fill), a short solar wing out of each side, and the role's
+/// mark on the plate in that colour. @p in_transit draws it at half strength: on
+/// its way to the node, holding its slot, not yet in place.
+void satellite_marker(ImDrawList* dl, ImVec2 centre, float r, space_satellite_role role,
+                      ImU32 fill, bool in_transit = false);
+
+/// BL-1590: a STATION marker — a filled square core in the owner's colour
+/// (@p fill) on a truss that runs out to a solar panel at each side, all outlined
+/// dark. Larger than the satellite's plate and square-cored where it is round, so
+/// the two never read alike; the caller sizes @p r by the station's grid.
+/// @p in_transit draws it at half strength, as the satellite does.
+void station_marker(ImDrawList* dl, ImVec2 centre, float r, ImU32 fill, bool in_transit = false);
+
+/// BL-1609: a SPACE FLEET marker — a pointed hull (a kite, nose up) in the owner's
+/// colour (@p fill), outlined dark, carrying its lead hull's mark (@p hull, a
+/// space_hull value: hauler a hold box, lander two legs, tug a claw, frigate one
+/// stripe, cruiser two). @p count > 1 prints as a badge at its lower right.
+/// @p in_transit draws it at half strength.
+void space_fleet_marker(ImDrawList* dl, ImVec2 centre, float r, int hull, ImU32 fill, int count,
+                        bool in_transit = false);
+
+/// BL-1609: DEBRIS at an orbital node — three small angular shards around the
+/// centre, filled in @p colour and outlined dark. Holds at r = 4 px.
+void debris(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
+
+/// BL-1609: STRUCK BY A SOLAR STORM — a lightning bolt, filled in @p colour and
+/// outlined dark. Drawn at a dark satellite's or a stormed station's upper right.
+void storm_bolt(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
 
 } // namespace ui::icons

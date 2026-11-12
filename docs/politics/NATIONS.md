@@ -137,6 +137,27 @@ sentiment model, not two.
 
 `world::tile_to_nation` is the reverse index, and it is what gives a law its **jurisdiction**.
 
+### Off-world bases — a nation's ground on another body (Ben, 2026-11-10)
+
+**A base is a capital on another body.** A nation founds one by landing **colonists** and a
+**base kit** on a mapped tile of another body's surface (`../military/SPACE_FLEETS.md`, the Lander).
+The colonists are population drawn from one of the nation's home population centres, and a base
+needs a minimum number of them to be founded (`../economy/POPULATION.md`).
+
+**From the base, the body works like the home world.** The base is a population centre and the
+nation's capital on that body: it claims the province it stands on, its Logistic Points carry along
+roads from it (`../economy/LOGISTICS.md`), the nation builds on the ground it holds there under the
+own-ground rule above, and the body's market works as every body's does (`../economy/MARKETS.md`).
+Nothing about production, logistics or markets is special off-world; only the ground is.
+
+**A body with no provinces is partitioned when the first base lands on it**, by the same rules the
+home world's provinces were (`../generation/PROVINCES.md`), so ground off-world is held, built and
+taken as ground at home is.
+
+**A base must be kept alive.** Its population needs the habitability its body gives
+(`../CLIMATE.md`) and, where that falls short, life-support goods bought off its own market each
+quarter — water, food and oxygen. A base that cannot buy them shrinks.
+
 ### Elimination — a nation with no ground ends (Ben, 2026-11-09)
 
 A nation that owns no province has **ended**. Its one cause is a peace that cedes its last province
@@ -273,7 +294,9 @@ the fair-price ceiling admits — pays the posted price as a direct, whole-or-no
 and the goods leave the shelf **without landing anywhere** — state demand is terminal. The supplier
 is always a market: no actor holds stock (`../economy/MARKETS.md` § The shelf economy), and
 whoever stocked the shelf was paid when the goods landed. The lump sizes are data
-(`economy.space_programme`, scripts/economy.lua).
+(`economy.space_programme`, scripts/economy.lua). **They are authored at zero**: the launch is the
+space programme's goods buyer, bidding through its staffed pad (`../economy/SPACE_ASSETS.md`
+§ Launching), and a lump consumed with nothing launched would empty the shelf it waits on.
 
 ### Taxes and Discontent (Ben, 2026-10-16)
 

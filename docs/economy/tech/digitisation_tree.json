@@ -143,12 +143,17 @@
      "DG-PR-EX-T2"
     ]
    ],
-   "advantage": "deposits in your provinces reveal 1 province further",
+   "advantage": "deposits in your provinces reveal 1 province further; Survey satellites may be launched",
    "effects": [
     {
      "kind": "unread",
      "what": "deposits in your provinces reveal 1 province further",
      "waits_on": "survey reach"
+    },
+    {
+     "kind": "mechanic",
+     "key": "space_role_survey",
+     "what": "Survey satellites may be launched"
     }
    ],
    "cost_units": 2
@@ -433,7 +438,7 @@
      "DG-PR-EX-T6"
     ]
    ],
-   "advantage": "coastal Water extraction sites; Water extraction +10%",
+   "advantage": "coastal Water extraction sites; Water extraction +10%; station Life support modules may be fitted",
    "effects": [
     {
      "kind": "unread",
@@ -446,6 +451,11 @@
      "scope": "resource:water",
      "op": "multiply",
      "value": 1.1
+    },
+    {
+     "kind": "mechanic",
+     "key": "space_module_life_support",
+     "what": "Life support modules may be fitted"
     }
    ],
    "cost_units": 6
@@ -628,12 +638,17 @@
      "DG-PR-PC-T2"
     ]
    ],
-   "advantage": "plastics recipe inputs -10%",
+   "advantage": "plastics recipe inputs -10%; station Habitation modules may be fitted",
    "effects": [
     {
      "kind": "unread",
      "what": "plastics recipe inputs -10%",
      "waits_on": "plastics recipe"
+    },
+    {
+     "kind": "mechanic",
+     "key": "space_module_habitation",
+     "what": "Habitation modules may be fitted"
     }
    ],
    "cost_units": 2
@@ -800,7 +815,7 @@
      "DG-PR-PC-T4"
     ]
    ],
-   "advantage": "Electronics Labs +5% output per batch",
+   "advantage": "Electronics Labs +5% output per batch; station Power modules may be fitted",
    "effects": [
     {
      "kind": "modifier",
@@ -808,6 +823,11 @@
      "scope": "group:Electronics",
      "op": "multiply",
      "value": 1.05
+    },
+    {
+     "kind": "mechanic",
+     "key": "space_module_power",
+     "what": "Power modules may be fitted"
     }
    ],
    "cost_units": 6
@@ -856,7 +876,7 @@
      "DG-PR-PC-T6"
     ]
    ],
-   "advantage": "Fabricators +5% output per batch; opens lightweight composite tracks (armour)",
+   "advantage": "Fabricators +5% output per batch; opens lightweight composite tracks (armour); station grids may be upgraded to 7 x 5",
    "effects": [
     {
      "kind": "modifier",
@@ -870,6 +890,11 @@
      "items": [
       "arm.tracks.composite_tracks"
      ]
+    },
+    {
+     "kind": "mechanic",
+     "key": "space_grid_7x5",
+     "what": "a station grid may be upgraded from 5 x 3 to 7 x 5"
     }
    ],
    "cost_units": 6
@@ -911,7 +936,7 @@
      "DG-PR-PC-C2"
     ]
    ],
-   "advantage": "every processing building +20% output per batch and wages -10%",
+   "advantage": "every processing building +20% output per batch and wages -10%; station Microgravity factory modules may be fitted",
    "effects": [
     {
      "kind": "modifier",
@@ -924,6 +949,11 @@
      "kind": "unread",
      "what": "wages in processing buildings -10%",
      "waits_on": "wage_floor"
+    },
+    {
+     "kind": "mechanic",
+     "key": "space_module_microgravity_factory",
+     "what": "Microgravity factory modules may be fitted"
     }
    ],
    "cost_units": 24
@@ -1277,12 +1307,17 @@
      "DG-PR-EN-T6"
     ]
    ],
-   "advantage": "propellant holding losses -50%",
+   "advantage": "propellant holding losses -50%; station Fuel depot modules may be fitted",
    "effects": [
     {
      "kind": "unread",
      "what": "propellant holding losses -50%",
      "waits_on": "holding losses by nation"
+    },
+    {
+     "kind": "mechanic",
+     "key": "space_module_fuel_depot",
+     "what": "Fuel depot modules may be fitted"
     }
    ],
    "cost_units": 6
@@ -1472,7 +1507,7 @@
      "DG-NE-SO-T2"
     ]
    ],
-   "advantage": "universities +20% research",
+   "advantage": "universities +20% research; the Astronaut Training Centre may be built",
    "effects": [
     {
      "kind": "modifier",
@@ -1480,6 +1515,11 @@
      "scope": "building:university",
      "op": "multiply",
      "value": 1.2
+    },
+    {
+     "kind": "mechanic",
+     "key": "astronaut_training",
+     "what": "the Astronaut Training Centre may be built"
     }
    ],
    "cost_units": 2
@@ -1666,12 +1706,17 @@
      "DG-NE-SO-B2"
     ]
    ],
-   "advantage": "the Launchpad may operate (with the staffed pad and propellant reserve); convoys may dispatch to other bodies",
+   "advantage": "the Launchpad may operate (with the staffed pad and propellant reserve); convoys may dispatch to other bodies; station cores may be launched",
    "effects": [
     {
      "kind": "mechanic",
      "key": "space_dispatch",
      "what": "the Launchpad may operate; convoys may dispatch to other bodies"
+    },
+    {
+     "kind": "mechanic",
+     "key": "space_station_core",
+     "what": "station cores may be launched"
     }
    ],
    "cost_units": 24
@@ -1761,7 +1806,7 @@
      "DG-NE-SO-B"
     ]
    ],
-   "advantage": "+3% national research",
+   "advantage": "+3% national research; Research modules may be fitted",
    "effects": [
     {
      "kind": "modifier",
@@ -1769,6 +1814,11 @@
      "scope": "all",
      "op": "add",
      "value": 0.03
+    },
+    {
+     "kind": "mechanic",
+     "key": "space_module_research",
+     "what": "Research modules may be fitted"
     }
    ],
    "pending_requires": [
@@ -1905,7 +1955,7 @@
      "DG-NE-MK-A2"
     ]
    ],
-   "advantage": "trades settle the tick they clear; Ports earn +25% trade points",
+   "advantage": "trades settle the tick they clear; Ports earn +25% trade points; station Market modules may be fitted",
    "effects": [
     {
      "kind": "unread",
@@ -1916,6 +1966,11 @@
      "kind": "unread",
      "what": "Ports earn +25% trade points",
      "waits_on": "trade points"
+    },
+    {
+     "kind": "mechanic",
+     "key": "space_module_market",
+     "what": "Market modules may be fitted"
     }
    ],
    "cost_units": 12
@@ -2020,12 +2075,12 @@
      "DG-NE-MK-T4"
     ]
    ],
-   "advantage": "activity fog lifts on every market you trade with",
+   "advantage": "activity fog lifts on every market you trade with; Comms satellites may be launched",
    "effects": [
     {
-     "kind": "unread",
-     "what": "activity fog lifts on every market you trade with",
-     "waits_on": "activity fog"
+     "kind": "mechanic",
+     "key": "space_role_comms",
+     "what": "Comms satellites may be launched; while one is active, the activity fog lifts on every market you trade with"
     }
    ],
    "cost_units": 6
@@ -2067,7 +2122,7 @@
      "DG-NE-MK-B2"
     ]
    ],
-   "advantage": "trade capacity +30% at every Marketplace; national research +10%",
+   "advantage": "trade capacity +30% at every Marketplace; national research +10%; station Comms relay modules may be fitted",
    "effects": [
     {
      "kind": "unread",
@@ -2080,6 +2135,11 @@
      "scope": "all",
      "op": "add",
      "value": 0.1
+    },
+    {
+     "kind": "mechanic",
+     "key": "space_module_comms_relay",
+     "what": "Comms relay modules may be fitted"
     }
    ],
    "cost_units": 24
@@ -2290,12 +2350,17 @@
      "DG-NE-FR-T2"
     ]
    ],
-   "advantage": "Port throughput +10%",
+   "advantage": "Port throughput +10%; station Dock modules may be fitted",
    "effects": [
     {
      "kind": "unread",
      "what": "Port throughput +10%",
      "waits_on": "Port throughput"
+    },
+    {
+     "kind": "mechanic",
+     "key": "space_module_dock",
+     "what": "Dock modules may be fitted"
     }
    ],
    "cost_units": 2
@@ -2315,7 +2380,7 @@
      "DG-NE-FR-A2"
     ]
    ],
-   "advantage": "convoys carry +50% cargo per dispatch; Ports upgrade to Container Ports",
+   "advantage": "convoys carry +50% cargo per dispatch; Ports upgrade to Container Ports; station Cargo hold modules may be fitted",
    "effects": [
     {
      "kind": "unread",
@@ -2326,6 +2391,11 @@
      "kind": "unread",
      "what": "Ports upgrade to Container Ports",
      "waits_on": "Container Port"
+    },
+    {
+     "kind": "mechanic",
+     "key": "space_module_cargo_hold",
+     "what": "Cargo hold modules may be fitted"
     }
    ],
    "cost_units": 12
@@ -2529,12 +2599,17 @@
      "DG-NE-FR-T6"
     ]
    ],
-   "advantage": "travel time -5% everywhere",
+   "advantage": "travel time -5% everywhere; Navigation satellites may be launched",
    "effects": [
     {
      "kind": "unread",
      "what": "travel time -5% everywhere",
      "waits_on": "travel time by nation"
+    },
+    {
+     "kind": "mechanic",
+     "key": "space_role_navigation",
+     "what": "Navigation satellites may be launched"
     }
    ],
    "cost_units": 6
@@ -4753,7 +4828,7 @@
      "DG-NE-SO-D2"
     ]
    ],
-   "advantage": "opens thermal sights (armour and light-armour armament, helicopter night vision, the targeting pod)",
+   "advantage": "opens thermal sights (armour and light-armour armament, helicopter night vision, the targeting pod); Observation satellites may be launched",
    "effects": [
     {
      "kind": "unlock_kit",
@@ -4763,6 +4838,11 @@
       "hel.avionics.night_vision",
       "mr.avionics.targeting_pod"
      ]
+    },
+    {
+     "kind": "mechanic",
+     "key": "space_role_observation",
+     "what": "Observation satellites may be launched"
     }
    ],
    "cost_units": 18
@@ -4779,7 +4859,7 @@
      "DG-NE-SO-T5"
     ]
    ],
-   "advantage": "opens scanned-array radar (fighter, multirole sensor fusion, helicopter mast radar)",
+   "advantage": "opens scanned-array radar (fighter, multirole sensor fusion, helicopter mast radar); station Observatory modules may be fitted",
    "effects": [
     {
      "kind": "unlock_kit",
@@ -4788,6 +4868,11 @@
       "mr.avionics.sensor_fusion",
       "hel.avionics.mast_radar"
      ]
+    },
+    {
+     "kind": "mechanic",
+     "key": "space_module_observatory",
+     "what": "Observatory modules may be fitted"
     }
    ],
    "cost_units": 4
@@ -4830,7 +4915,7 @@
      "DG-NE-SO-E2"
     ]
    ],
-   "advantage": "opens the integrated air-defence network and the airborne early-warning aircraft",
+   "advantage": "opens the integrated air-defence network and the airborne early-warning aircraft; station Defence modules may be fitted",
    "effects": [
     {
      "kind": "unlock_kit",
@@ -4838,6 +4923,11 @@
       "ad.fire_control.integrated",
       "rcn.airframe.early_warning"
      ]
+    },
+    {
+     "kind": "mechanic",
+     "key": "space_module_defence",
+     "what": "Defence modules may be fitted"
     }
    ],
    "cost_units": 18

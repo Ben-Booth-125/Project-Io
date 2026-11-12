@@ -64,6 +64,40 @@ moderate / sparse); exact amounts confirm once an extraction site is placed.
 The exploration loop: spot a promising body by orbital position and type → spend to survey → decide
 whether the deposit profile justifies building.
 
+### Mapping, then prospecting (Ben, 2026-11-10)
+
+**Off the home world, a survey reveals in two steps, in this order.** Each region is first **mapped**
+— its tiles and terrain become readable — and only then **prospected** — its deposit bands become
+readable.
+
+- **Mapping is done from orbit**: by a Survey satellite at one of the body's nodes, or by a station
+  Observatory with the body in its owner's comms coverage (`../economy/SPACE_ASSETS.md` § Satellites,
+  § Signal delay). It runs region by region, in the same raster order as a scan.
+- **Prospecting is done on the ground**: by a **rover** or a **Lander** at the body's surface
+  (`../military/SPACE_FLEETS.md`). It prospects mapped regions only, one at a time, nearest the
+  landing first.
+
+A body is **surveyed** when every region is both mapped and prospected. A region that is mapped but
+not prospected draws its terrain with its deposits hidden. The home world begins surveyed, as before.
+
+**The rules of the two steps:**
+
+- **Knowledge is the nation's own.** Mapping and prospecting are recorded per nation and per body:
+  what one nation's satellite maps, or its Lander prospects, reveals nothing to another. The home
+  world is surveyed for every nation; the star is never surveyed.
+- **Rates.** A Survey satellite maps **four regions a quarter**; a working Observatory maps **two
+  regions a quarter** on each body in its owner's coverage; a rover or a landed Lander prospects
+  **one region a quarter**. Mapping comes first in the quarter, so a region mapped this quarter can
+  be prospected in it.
+- **Prospecting never runs ahead of mapping.** A prospector on ground with no mapped region left to
+  prospect does nothing that quarter. Prospecting needs no comms coverage: § Signal delay
+  (`../economy/SPACE_ASSETS.md`) gates only what orbital assets send home.
+- **Nearest the landing first.** The landing stands at the body's first region, the one mapping
+  reaches first; the next region prospected is the unprospected mapped one nearest it, in region
+  cells, ties to the earlier in raster order.
+- **The player's map.** The player's mapping and prospecting are what its Planetary canvas draws.
+  A body a dispatched probe (above) is already surveying is left to its probe.
+
 ---
 
 ## Competitor visibility
