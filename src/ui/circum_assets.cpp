@@ -154,9 +154,9 @@ float space_transit_share(int depart_tick, int arrival_tick, int econ_tick, floa
 
 float circum_quarter_fraction(const world& w)
 {
-    // The live day tick runs 90 days a quarter (the econ cadence); a harness world
-    // whose day tick stands still reads the quarter's start.
-    constexpr int k_days = 90;
+    // The live day tick runs k_econ_tick_days a tick (a month since BL-1642, the econ
+    // cadence); a harness world whose day tick stands still reads the tick's start.
+    constexpr int k_days = k_econ_tick_days;
     const int d = ((w.current_day_tick % k_days) + k_days) % k_days;
     return static_cast<float>(d) / static_cast<float>(k_days);
 }

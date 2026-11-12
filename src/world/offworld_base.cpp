@@ -411,9 +411,18 @@ void run_offworld_base_quarter(world& w, const offworld_base_params& p, offworld
         }
         ++r.unfed;
         base.unfed_quarters = std::min(base.unfed_quarters + 1, k_offworld_unfed_max);
+        // BL-1642 (the tick is a month): the loss is taken a quarter at a time - on
+        // every third consecutive unfed month, at the quarter's share 1-(1-s)^3 with
+        // its minimum of one head - so a small base shrinks at the old calendar rate
+        // rather than losing its floor head every month.
+        if (base.unfed_quarters % k_econ_ticks_per_quarter != 0)
+            continue;
+        const double s_month   = std::clamp(static_cast<double>(p.shrink_share), 0.0, 1.0);
+        const double keep      = 1.0 - s_month;
+        const double s_quarter = 1.0 - keep * keep * keep; // three months; no pow on the tick
         const int lost = std::min(pc.population,
                                   std::max(1, static_cast<int>(std::ceil(static_cast<double>(pc.population)
-                                                                         * std::clamp(p.shrink_share, 0.0f, 1.0f)))));
+                                                                         * s_quarter - 1e-9))));
         pc.population -= lost;
         r.heads_lost += lost;
         if (pc.population <= 0)

@@ -23,18 +23,18 @@ verify.set_balance(50000000.0)
 verify.show_panel("build", true)
 verify.frames(3)
 
-local k_threshold = 4.0 -- k_shelf_runway_warn_quarters, the default Ben reads live
+local k_threshold = 12.0 -- k_shelf_runway_warn_quarters (months since BL-1642), the default Ben reads live
 
 local function has(text, part) return text:find(part, 1, true) ~= nil end
 
 -- What the sentence says. The reading is checked against the drawn figures, so nothing
 -- about the shelf reaches this script that the player cannot read.
 local function read_sentence(t)
-    local use = tonumber(t:match("it would use ([%d%.]+) a quarter")) or tonumber(t:match("at the ([%d%.]+) a quarter"))
+    local use = tonumber(t:match("it would use ([%d%.]+) a month")) or tonumber(t:match("at the ([%d%.]+) a month"))
     local drain = tonumber((t:match("already falling ([%d]+%.?%d?)"))) or 0.0
-    local good = t:match("quarters? of (.-) left on")
-    local whole = tonumber(t:match("about (%d+) quarter"))
-    return { use = use or 0.0, drain = drain, good = good or "", whole = whole, under = has(t, "Under a quarter") }
+    local good = t:match("months? of (.-) left on")
+    local whole = tonumber(t:match("about (%d+) month"))
+    return { use = use or 0.0, drain = drain, good = good or "", whole = whole, under = has(t, "Under a month") }
 end
 -- The quarters the sentence states agree with shelf / (use + drain), to its rounding.
 local function agrees(s, shelf)
@@ -261,13 +261,15 @@ local single = row_at(picked.x, picked.y)
 verify.expect(single ~= nil and single.runway_warn, "W7: a quarter and a half warns")
 if single ~= nil and single.runway_warn then
     print("shelf_runway_warning: single: " .. single.runway_text)
-    verify.expect(not has(single.runway_text, "1 quarters"), "W7: no '1 quarters': " .. single.runway_text)
-    verify.expect(has(single.runway_text, "about 1 quarter of"), "W7: 'about 1 quarter': " .. single.runway_text)
+    verify.expect(not has(single.runway_text, "1 months"), "W7: no '1 months': " .. single.runway_text)
+    verify.expect(has(single.runway_text, "about 1 month of"), "W7: 'about 1 month': " .. single.runway_text)
 end
 
 -- W5: a falling shelf, staged down a step a tick so the whole trail reads the fall.
-for _, shelf in ipairs({ 5000.0, 4000.0, 3000.0, 2000.0, 1000.0 }) do
-    verify.set_input_shelf(picked.option.name, picked.market, shelf)
+-- BL-1642: the trail spans k_shelf_trail_quarters = 12 months, so the fall is staged
+-- over thirteen ticks (5000 down to 1000), the whole window.
+for i = 0, 12 do
+    verify.set_input_shelf(picked.option.name, picked.market, 5000.0 - i * (4000.0 / 12.0))
     verify.econ_step(1)
 end
 verify.set_input_shelf(picked.option.name, picked.market, k_stage)

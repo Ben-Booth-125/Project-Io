@@ -1504,20 +1504,20 @@ economy = {
     -- sheds per tick; the substrate was inert until this table existed.
     --
     -- Ben's ruling (NR-568, 2026-08-23): a cancellation is forgotten in NINE
-    -- QUARTERS. One tick is one quarter, so that is a HALF-LIFE of 9 ticks, and
-    -- the rate is authored from it rather than guessed:
+    -- QUARTERS. One tick is one MONTH (BL-1642), so that is a HALF-LIFE of 27
+    -- ticks, and the rate is authored from it rather than guessed:
     --
-    --     rate = 1 - 2^(-1 / half_life_ticks) = 1 - 2^(-1/9) = 0.0741253...
+    --     rate = 1 - 2^(-1 / half_life_ticks) = 1 - 2^(-1/27) = 0.025345...
     --
     -- Authored as the RATE, not the half-life, because deriving it in-engine
     -- would put a std::pow on the tick (sentiment.hpp says why that is refused).
     -- Re-derive it from the line above if the ruling ever changes.
     --
     -- TRUST takes its own, slower half-life (Ben, 2026-11-03, NR-1129): 18
-    -- ticks, 1 - 2^(-1/18) = 0.037776. At nine ticks no conduct between two
-    -- nations reached the grievance edge; a betrayal is remembered longer than
-    -- it is feared. Six significant figures: a -2 Trust event is -1.000003
-    -- after eighteen ticks in float32, which the sentiment harness asserts.
+    -- quarters, 54 monthly ticks, 1 - 2^(-1/54) = 0.012754. At nine quarters no
+    -- conduct between two nations reached the grievance edge; a betrayal is
+    -- remembered longer than it is feared. A -2 Trust event is -1.0 within 5e-5
+    -- after fifty-four ticks in float32, which the sentiment harness asserts.
     --
     -- Access decays at the SAME rate until something emits into it (BL-540 is
     -- the first nation->corp emitter); there is no separate ruling for it yet.
@@ -1579,16 +1579,17 @@ economy = {
         -- Every weight below is a FIRST CUT (BL-1458 / BL-1432, 2026-10-30): small,
         -- signed per RELATIONS.md § Who emits each factor, and calibration only.
         -- At a decay r a factor emitted EVERY tick at weight w and magnitude m
-        -- settles at w*m/r; a one-off of weight w on Trust is half gone in eighteen
-        -- ticks, on Access and Alarm in nine.
+        -- settles at w*m/r; a one-off of weight w on Trust is half gone in fifty-four
+        -- monthly ticks (eighteen quarters), on Access and Alarm in twenty-seven (nine).
         -- The Trust-negative weights are DOUBLED from the first cut (Ben, 2026-11-03,
-        -- NR-1129): with them and the 18-tick Trust decay a sustained offence
+        -- NR-1129): with them and the 18-quarter (54-month) Trust decay a sustained offence
         -- reaches the grievance edge (-15); at the first cut nothing passed -6.
         factors = {
             contract_failed = { trust = -8.0 },
             -- Magnitude: credits of cargo landed this tick between the pair, each
-            -- way. 0.002 a credit: a pair landing 500 a tick settles near +13.5 Access
-            -- and, at Trust's slower decay, near +26.5 Trust.
+            -- way. 0.002 a credit: a pair landing 500 a quarter (~167 a month) settles
+            -- near +13.2 Access and, at Trust's slower decay, near +26.1 Trust - the
+            -- level is w x m / r, and both m and r are a month's (BL-1642).
             trade_conducted     = { access = 0.002, trust = 0.002, alarm = -0.002 },
             -- Lane W emits these from declare_war and the peace (BL-1459, BL-1428).
             hostility_declared  = { access = -5.0, trust = -10.0, alarm = 5.0 },
@@ -2010,7 +2011,8 @@ economy = {
         reservation_mult = 2.0,  -- BL-654/BL-1172: a goods draw declines to buy above this (a fair price; see above)
         -- BL-1172 (Ben, 2026-10-03, MARKETS.md § Price resolution): the shelf
         -- counts as supply only as far as it can sell — min(inventory, k x
-        -- demand), k in econ ticks (one tick is a quarter). 0 = listings only.
+        -- demand), k in econ ticks (one tick is a month, BL-1642; the sweeps
+        -- below ran when a tick was a quarter). 0 = listings only.
         -- k = 0 BY MEASUREMENT (Ben, 2026-10-05, NR-972): with the shelf
         -- draining (households eat, BL-1196; it spoils, BL-1179), the sweep on
         -- market_viability's G5 row (seeds 0,43,10; pairs a market's

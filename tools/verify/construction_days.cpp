@@ -20,6 +20,10 @@
 //       with one under construction; and the quote is the flat credit the site pays
 //       plus its materials at the market's price
 //
+// BL-1642 (the tick is a month): a "quarter" below is one econ tick, Q = 30 days.
+// The fixture type is authored at 6 ticks (180 days), so its day figures are the
+// quarter tick's, and its steel is 3 a full tick.
+//
 // Hand-builds a minimal world (no Lua / SDL / ImGui), the construction_gate_harness
 // shape: one nation, one market, one extraction site.
 
@@ -50,7 +54,7 @@ constexpr int Q = k_construction_quarter_days;
 struct scene { world w; entity_id site = null_entity; entity_id market = null_entity; entity_id nation = null_entity; };
 
 // One nation on one tile with an iron deposit, a market there, and an extraction site
-// under construction that needs @p days of work (steel 18 over 2 authored quarters).
+// under construction that needs @p days of work (steel 18 over 6 authored ticks).
 scene make_scene(float steel_on_shelf, int days)
 {
     scene s;
@@ -130,8 +134,8 @@ recipe_registry make_reg()
     building_economics ex;
     ex.base_rate = 10.0f; ex.maintenance = 0.0f; ex.base_wage = 0.0f;
     ex.build_cost = 180.0f;
-    ex.build_duration_ticks = 2.0f; // 180 days
-    ex.resource_build_cost[ri(resource_type::steel)] = 18.0f; // 9 a full quarter
+    ex.build_duration_ticks = 6.0f; // 180 days (BL-1642: six monthly ticks)
+    ex.resource_build_cost[ri(resource_type::steel)] = 18.0f; // 3 a full tick
     reg.set_economics(building_type::extraction_site, ex);
     construction_params cp; cp.max_stretch = 10.0f; reg.set_construction(cp);
     return reg;
@@ -145,7 +149,7 @@ float output_of(const economy_report& rep, entity_id b)
     return 0.0f;
 }
 
-/// Step one quarter. @p daily: advance the day loop 1..90 first, as the app does;
+/// Step one tick. @p daily: advance the day loop 1..Q first, as the app does;
 /// otherwise the economy step's own catch-up advances the quarter. Returns (daily
 /// only) the absolute day the site completed on, -1 if not this quarter, counting
 /// @p quarter quarters already elapsed since the first clearing.
@@ -173,35 +177,38 @@ int main()
     const recipe_registry reg = make_reg();
     std::printf("Construction is measured in days (Ben, 2026-10-24)\n");
 
-    // R1 + R2: a 150-day site under full supply, day by day. Its first clearing is
-    // quarter 0's step; it then advances 90 days in quarter 1 and completes on day 60
-    // of quarter 2 — absolute day 150 after the first clearing.
+    // R1 + R2: a 140-day site under full supply, day by day. Its first clearing is
+    // tick 0's step; it then advances 30 days a tick and completes on day 20 of its
+    // fifth tick — absolute day 140 after the first clearing (BL-1642: the quarter
+    // tick's 150-day site completed mid-quarter; 150 is a whole number of months).
+    constexpr int D = 140;
     float prorated = 0.0f;
     int   share_pm = -1;
     {
-        scene s = make_scene(/*steel=*/1000.0f, /*days=*/150);
+        scene s = make_scene(/*steel=*/1000.0f, /*days=*/D);
         run_economy_step(s.w, reg); // the first clearing: rate set, nothing advanced yet
-        check(s.w.buildings.at(s.site).days_remaining == 150,
-              "R1 a clearing sets the quarter's rate and advances no day itself",
-              s.w.buildings.at(s.site).days_remaining, 150);
+        check(s.w.buildings.at(s.site).days_remaining == D,
+              "R1 a clearing sets the tick's rate and advances no day itself",
+              s.w.buildings.at(s.site).days_remaining, D);
         check(s.w.buildings.at(s.site).build_rate_permille == 1000,
               "R1 full supply sets the full rate", s.w.buildings.at(s.site).build_rate_permille, 1000);
         int done = -1;
-        for (int q = 0; q < 4 && done < 0; ++q)
+        for (int q = 0; q < 8 && done < 0; ++q)
             done = step_quarter(s, reg, /*daily=*/true, q);
-        check(done == 150, "R1 completion day = first clearing + 150 days", done, 150);
-        // The step that closed the completion quarter set the share: 30 of 90 days.
+        check(done == D, "R1 completion day = first clearing + 140 days", done, D);
+        // The step that closed the completion tick set the share: 10 of 30 days.
         share_pm = s.w.buildings.at(s.site).output_share_permille;
-        check(share_pm == (Q - 60) * 1000 / Q, "R2 the share is the 30 of 90 days it stood complete",
-              share_pm, (Q - 60) * 1000 / Q);
+        check(share_pm == (Q - D % Q) * 1000 / Q, "R2 the share is the 10 of 30 days it stood complete",
+              share_pm, (Q - D % Q) * 1000 / Q);
     }
     // R2: that step's OUTPUT against a control world whose site stood complete all quarter.
     {
-        scene s = make_scene(1000.0f, 150);
+        scene s = make_scene(1000.0f, D);
         run_economy_step(s.w, reg);
         economy_report rep;
-        step_quarter(s, reg, true, 0);
-        step_quarter(s, reg, true, 1, &rep); // the clearing that closes the completion quarter
+        for (int q = 0; q < D / Q; ++q)
+            step_quarter(s, reg, true, q);
+        step_quarter(s, reg, true, D / Q, &rep); // the clearing that closes the completion tick
         prorated = output_of(rep, s.site);
 
         scene c = make_scene(1000.0f, 0);
@@ -218,37 +225,37 @@ int main()
               "R2 the completion quarter's output is the prorated share of a whole quarter's",
               prorated, want);
         economy_report rep2;
-        step_quarter(s, reg, true, 2, &rep2);
+        step_quarter(s, reg, true, D / Q + 1, &rep2);
         check(std::fabs(output_of(rep2, s.site) - whole) < 1e-3f * std::max(1.0f, whole),
               "R2 from then on it runs whole quarters", output_of(rep2, s.site), whole);
     }
 
     // R3: a paused quarter (no steel on the shelf) adds no days.
     {
-        scene s = make_scene(/*steel=*/0.0f, 150);
+        scene s = make_scene(/*steel=*/0.0f, D);
         run_economy_step(s.w, reg);
         step_quarter(s, reg, true, 0);
-        check(s.w.buildings.at(s.site).days_remaining == 150 && s.w.buildings.at(s.site).build_rate_permille == 0,
-              "R3 a paused quarter adds no days", s.w.buildings.at(s.site).days_remaining, 150);
+        check(s.w.buildings.at(s.site).days_remaining == D && s.w.buildings.at(s.site).build_rate_permille == 0,
+              "R3 a paused tick adds no days", s.w.buildings.at(s.site).days_remaining, D);
     }
     // R3b: a stretched quarter (half the steel) adds half its days.
     {
-        scene s = make_scene(/*steel=*/4.5f, 150);
+        scene s = make_scene(/*steel=*/1.5f, D); // half of a tick's 3
         run_economy_step(s.w, reg);
         step_quarter(s, reg, true, 0);
-        check(s.w.buildings.at(s.site).days_remaining == 150 - 45,
-              "R3 a half-supplied quarter adds 45 days", s.w.buildings.at(s.site).days_remaining, 105);
+        check(s.w.buildings.at(s.site).days_remaining == D - Q / 2,
+              "R3 a half-supplied tick adds 15 days", s.w.buildings.at(s.site).days_remaining, D - Q / 2);
     }
 
     // R4: headless (quarters only, the economy step's catch-up) against day by day.
     {
-        scene a = make_scene(1000.0f, 150);
-        scene b = make_scene(1000.0f, 150);
+        scene a = make_scene(1000.0f, D);
+        scene b = make_scene(1000.0f, D);
         run_economy_step(a.w, reg);
         run_economy_step(b.w, reg);
         bool same = true;
         int  done_q_a = -1, done_q_b = -1, done_b = -1, share_a = -1, share_b = -1;
-        for (int q = 0; q < 5; ++q)
+        for (int q = 0; q < 7; ++q)
         {
             const bool open_a = a.w.buildings.at(a.site).ticks_remaining > 0;
             step_quarter(a, reg, /*daily=*/false, q);
@@ -259,7 +266,7 @@ int main()
             same = same && a.w.state_hash(q) == b.w.state_hash(q);
         }
         // Same quarter and the same share of it stood complete = the same day.
-        check(done_b == 150 && done_q_a == done_q_b && share_a == share_b && share_a >= 0,
+        check(done_b == D && done_q_a == done_q_b && share_a == share_b && share_a >= 0,
               "R4 headless catch-up completes on the day-by-day day (same quarter, same share)",
               share_a, share_b);
         check(same, "R4 the two worlds hash identically after every quarter", same ? 1 : 0, 1);
@@ -269,8 +276,8 @@ int main()
     // A 180-day site placed on day 10 of a quarter pays its WHOLE flat build cost at
     // placement (180 = build_cost x 180 / 180), builds from that day, and completes on
     // day 190. Each tick draws the materials for the days built since the last one —
-    // 80 days (8 steel), then 90 (9), then 10 (1): never more than a quarter, 18 in
-    // all — and pays no credits. A quarters-only world placing on the same day
+    // 20 days (2 steel), then five ticks of 30 (3 each), then 10 (1): never more than
+    // a tick, 18 in all — and pays no credits (BL-1642: 30-day ticks). A quarters-only world placing on the same day
     // completes it on the same day and hashes identically.
     {
         scene a = make_scene(1000.0f, 180); // day by day
@@ -284,18 +291,18 @@ int main()
             begin_construction_on_placement(sc->w, reg, sc->nation, b, /*founding=*/false); // placed today
         }
         const building_component& pb = a.w.buildings.at(a.site);
-        check(pb.build_rate_permille == 1000 && pb.build_paid_days == 80 && pb.build_arrears_milli == 0,
-              "R6 a placed site builds at once, for the 80 days left in its quarter, owing nothing yet",
-              pb.build_paid_days, 80);
+        check(pb.build_rate_permille == 1000 && pb.build_paid_days == Q - 10 && pb.build_arrears_milli == 0,
+              "R6 a placed site builds at once, for the 20 days left in its tick, owing nothing yet",
+              pb.build_paid_days, Q - 10);
         const float credit = t0 - a.w.nations.at(a.nation).treasury;
         check(std::fabs(credit - 180.0f) < 1e-3f && std::fabs(pb.build_credit_paid - 180.0f) < 1e-3f
                   && std::fabs(pb.construction_paid - 180.0f) < 1e-3f,
               "R6 placement pays the WHOLE flat build cost from the treasury, once", credit, 180.0);
         int done = -1;
         float steel = 0.0f, tick_credits = 0.0f;
-        float per_tick[4] = {0, 0, 0, 0};
+        float per_tick[8] = {0, 0, 0, 0, 0, 0, 0, 0};
         bool same = true;
-        for (int q = 0; q < 4; ++q)
+        for (int q = 0; q < 8; ++q)
         {
             const bool open = a.w.buildings.at(a.site).ticks_remaining > 0;
             for (int d = (q == 0 ? 11 : 1); d <= Q; ++d)
@@ -313,16 +320,20 @@ int main()
             run_economy_step(h.w, reg);
             same = same && a.w.state_hash(q) == h.w.state_hash(q);
         }
-        std::printf("     steel drawn per tick: %.3f %.3f %.3f %.3f\n", per_tick[0], per_tick[1], per_tick[2], per_tick[3]);
+        std::printf("     steel drawn per tick:");
+        for (float x : per_tick) std::printf(" %.3f", x);
+        std::printf("\n");
         check(done == 190, "R6 placed on day 10, a 180-day site completes on day 190 (placement + duration)",
               done, 190);
-        check(std::fabs(per_tick[0] - 8.0f) < 1e-3f && std::fabs(per_tick[1] - 9.0f) < 1e-3f
-                  && std::fabs(per_tick[2] - 1.0f) < 1e-3f && per_tick[3] == 0.0f,
-              "R6 each tick draws the days built since the last, in arrears (8, 9, 1 steel)", per_tick[0], 8.0);
+        bool arrears = std::fabs(per_tick[0] - 2.0f) < 1e-3f && std::fabs(per_tick[6] - 1.0f) < 1e-3f
+                    && per_tick[7] == 0.0f;
+        for (int q = 1; q <= 5; ++q) arrears = arrears && std::fabs(per_tick[q] - 3.0f) < 1e-3f;
+        check(arrears,
+              "R6 each tick draws the days built since the last, in arrears (2, 3 x5, 1 steel)", per_tick[0], 2.0);
         bool one_quarter = true;
-        for (float x : per_tick) one_quarter = one_quarter && x <= 9.0f + 1e-3f;
+        for (float x : per_tick) one_quarter = one_quarter && x <= 3.0f + 1e-3f;
         check(one_quarter && std::fabs(steel - 18.0f) < 1e-3f,
-              "R6 no tick draws more than one quarter of materials; 18 steel in all", steel, 18.0);
+              "R6 no tick draws more than one tick of materials; 18 steel in all", steel, 18.0);
         check(tick_credits == 0.0f, "R6 no economy tick pays construction credits", tick_credits, 0.0);
         check(same && h.w.buildings.at(h.site).ticks_remaining == 0
                   && h.w.buildings.at(h.site).output_share_permille == a.w.buildings.at(a.site).output_share_permille,
@@ -330,41 +341,41 @@ int main()
     }
 
     // R7: A SHORTFALL IS CARRIED AND DRAWN FIRST. Placed on day 0 at full rate, the
-    // site builds 90 days (9 steel owed); the shelf then falls to 3. The tick draws 3,
-    // and 6 stay owed — claimed ahead of the quarter ahead, so it pauses (the shelf
-    // left is short of its own debt). Restocked to 10, the next tick draws the 6 owed
-    // FIRST and sets the quarter ahead from the 4 left: rate 4/9.
+    // site builds 30 days (3 steel owed); the shelf then falls to 1. The tick draws 1,
+    // and 2 stay owed — claimed ahead of the tick ahead, so it pauses (the shelf
+    // left is short of its own debt). Restocked to 3, the next tick draws the 2 owed
+    // FIRST and sets the tick ahead from the 1 left: rate 1/3.
     {
         scene s = make_scene(1000.0f, 180);
         building_component& b = s.w.buildings.at(s.site);
         b.build_rate_permille = 0; b.build_paid_days = 0;
         begin_construction_on_placement(s.w, reg, s.nation, b, false);
         const std::size_t st = ri(resource_type::steel);
-        s.w.markets.at(s.market).inventory[st] = 3.0f;
+        s.w.markets.at(s.market).inventory[st] = 1.0f;
         economy_report r1 = run_economy_step(s.w, reg);
         const float d1 = r1.purchases[{s.nation, s.market}][st];
         const building_component& b1 = s.w.buildings.at(s.site);
-        check(std::fabs(d1 - 3.0f) < 1e-3f && b1.build_arrears_milli == 60000 && b1.build_rate_permille == 0,
-              "R7 a short shelf: 3 of 9 drawn, 60 days' materials (6 steel) stay owed, the quarter ahead pauses",
-              b1.build_arrears_milli, 60000);
-        s.w.markets.at(s.market).inventory[st] = 10.0f;
+        check(std::fabs(d1 - 1.0f) < 1e-3f && b1.build_arrears_milli == 20000 && b1.build_rate_permille == 0,
+              "R7 a short shelf: 1 of 3 drawn, 20 days' materials (2 steel) stay owed, the tick ahead pauses",
+              b1.build_arrears_milli, 20000);
+        s.w.markets.at(s.market).inventory[st] = 3.0f;
         economy_report r2 = run_economy_step(s.w, reg);
         const float d2 = r2.purchases[{s.nation, s.market}][st];
         const building_component& b2 = s.w.buildings.at(s.site);
-        check(std::fabs(d2 - 6.0f) < 1e-3f && b2.build_arrears_milli == 0,
-              "R7 the next tick draws the 6 owed first", d2, 6.0);
-        check(b2.build_rate_permille == 444,
-              "R7 ...and sets the quarter ahead from what is left after it (4 of 9 = 444 per mille)",
-              b2.build_rate_permille, 444);
+        check(std::fabs(d2 - 2.0f) < 1e-3f && b2.build_arrears_milli == 0,
+              "R7 the next tick draws the 2 owed first", d2, 2.0);
+        check(b2.build_rate_permille == 333,
+              "R7 ...and sets the tick ahead from what is left after it (1 of 3 = 333 per mille)",
+              b2.build_rate_permille, 333);
     }
 
-    // R8: NO OVER-PROMISE. Two sites placed in one tick on a shelf of 13.5 steel (a
-    // quarter of one is 9): the first claims 9, the second reads what is left (4.5) and
+    // R8: NO OVER-PROMISE. Two sites placed in one tick on a shelf of 4.5 steel (a
+    // tick of one is 3): the first claims 3, the second reads what is left (1.5) and
     // builds at half rate — the claims never exceed the shelf, and the tick draws
     // exactly what was claimed, with nothing short. At a tick, two sites on a short
     // shelf share it pro-rata (BL-1209), again claiming no more than it holds.
     {
-        scene s = make_scene(13.5f, 180);
+        scene s = make_scene(4.5f, 180);
         const entity_id site2 = s.w.create_entity();
         {
             building_component b2 = s.w.buildings.at(s.site);
@@ -382,15 +393,15 @@ int main()
         const int r2 = s.w.buildings.at(site2).build_rate_permille;
         const float claimed = construction_claims_on(s.w, reg, s.market)[st];
         check(r1 == 1000 && r2 == 500, "R8 placement: the second site reads what the first left (1000, 500)", r2, 500);
-        check(claimed <= 13.5f + 1e-3f, "R8 a quarter's claims on one shelf never exceed it", claimed, 13.5);
+        check(claimed <= 4.5f + 1e-3f, "R8 a tick's claims on one shelf never exceed it", claimed, 4.5);
         const economy_report rep = run_economy_step(s.w, reg);
         const auto pit = rep.purchases.find({s.nation, s.market});
         const float drawn = pit != rep.purchases.end() ? pit->second[st] : 0.0f;
-        check(std::fabs(drawn - 13.5f) < 1e-3f && s.w.buildings.at(s.site).build_arrears_milli == 0
+        check(std::fabs(drawn - 4.5f) < 1e-3f && s.w.buildings.at(s.site).build_arrears_milli == 0
                   && s.w.buildings.at(site2).build_arrears_milli == 0,
-              "R8 the tick draws what was claimed, and nothing is short", drawn, 13.5);
-        // The shelf is now empty; restock to 13.5 and let the NEXT tick set both rates.
-        s.w.markets.at(s.market).inventory[st] = 13.5f + 0.0f;
+              "R8 the tick draws what was claimed, and nothing is short", drawn, 4.5);
+        // The shelf is now empty; restock to 4.5 and let the NEXT tick set both rates.
+        s.w.markets.at(s.market).inventory[st] = 4.5f;
         // (no days are built in between: a quarters-only step closes the quarter first)
         const economy_report rep2 = run_economy_step(s.w, reg);
         (void)rep2;
@@ -412,7 +423,7 @@ int main()
         building_component& b = s.w.buildings.at(s.site);
         b.build_rate_permille = 0; b.build_paid_days = 0;
         begin_construction_on_placement(s.w, reg, s.nation, b, false);
-        run_economy_step(s.w, reg); // 90 days built: 9 steel drawn and billed
+        run_economy_step(s.w, reg); // 30 days built: 3 steel drawn and billed
         const float paid = s.w.buildings.at(s.site).construction_paid;
         const float before = s.w.nations.at(s.nation).treasury;
         const float inv_before = s.w.markets.at(s.market).inventory[ri(resource_type::steel)];
@@ -432,18 +443,18 @@ int main()
               c.w.nations.at(c.nation).treasury - cb, 0.0);
     }
 
-    // R5: the last quarter draws only the days it needs. 150 days at full supply:
-    // a full quarter (9 steel), then 60 days (6 steel) — 15 = 18 x 150 / 180.
+    // R5: the last tick draws only the days it needs. 140 days at full supply:
+    // four full ticks (3 steel each), then 20 days (2 steel) — 14 = 18 x 140 / 180.
     {
-        scene s = make_scene(1000.0f, 150);
+        scene s = make_scene(1000.0f, D);
         float steel = 0.0f;
-        for (int q = 0; q < 3; ++q)
+        for (int q = 0; q < 8; ++q)
         {
             const economy_report rep = run_economy_step(s.w, reg);
             if (const auto it = rep.purchases.find({s.nation, s.market}); it != rep.purchases.end())
                 steel += it->second[ri(resource_type::steel)];
         }
-        check(std::fabs(steel - 15.0f) < 1e-3f, "R5 the whole build draws 18 x 150 / 180 steel", steel, 15.0);
+        check(std::fabs(steel - 14.0f) < 1e-3f, "R5 the whole build draws 18 x 140 / 180 steel", steel, 14.0);
         // And construction_capex prices the same days.
         const entity_id tile = s.w.buildings.at(s.site).tile;
         check(construction_build_days(s.w, reg, tile, building_type::extraction_site, resource_type::iron_ore) >= 1,
@@ -451,10 +462,10 @@ int main()
     }
 
     // R10 (Ben, 2026-10-26: "it's better with costs depending on market prices"). A
-    // DRAW IS A PURCHASE. A site placed on day 0 builds 90 days; the next tick draws
-    // their 9 steel off the shelf AS A PURCHASE: the register holds them, the clear
+    // DRAW IS A PURCHASE. A site placed on day 0 builds 30 days; the next tick draws
+    // their 3 steel off the shelf AS A PURCHASE: the register holds them, the clear
     // bills the nation the steel at the shelf's posted price and writes the purchase
-    // row at it, the site's record adds the same credits, and the 9 steel are the
+    // row at it, the site's record adds the same credits, and the 3 steel are the
     // market's demand, so the price stands above a control world's with no site.
     {
         scene s = make_scene(1000.0f, 180);
@@ -476,19 +487,19 @@ int main()
         bool purchase_row = false;
         for (const exchange_record& e : s.w.exchanges.entries)
             if (e.side == 1 && e.resource == resource_type::steel
-                && std::fabs(e.quantity - 9.0f) < 1e-3f && e.unit_price == px)
+                && std::fabs(e.quantity - 3.0f) < 1e-3f && e.unit_price == px)
                 purchase_row = true;
         std::printf("     drew %.4f, bought %.4f at posted %.4f; billed %.4f, recorded %.4f\n",
                     drawn, bought, px, spent, recorded);
-        check(std::fabs(drawn - 9.0f) < 1e-3f && bought == drawn,
-              "R10 the tick drew the 90 days' 9 steel off the shelf, every unit a purchase", bought, 9.0);
+        check(std::fabs(drawn - 3.0f) < 1e-3f && bought == drawn,
+              "R10 the tick drew the 30 days' 3 steel off the shelf, every unit a purchase", bought, 3.0);
         check(px > 0.0f && spent == bought * px,
               "R10 the clear bills the draw at the shelf's posted price, exactly", spent, bought * px);
         check(purchase_row, "R10 ...and writes the purchase row at that price", purchase_row ? 1 : 0, 1);
         check(std::fabs(recorded - spent) < 1e-3f,
               "R10 the site's record adds what the draw was billed", recorded, spent);
         const float demand = s.w.markets.at(s.market).demand[st];
-        check(demand >= 9.0f - 1e-3f, "R10 the draw is the market's demand (the clearing sees it)", demand, 9.0);
+        check(demand >= 3.0f - 1e-3f, "R10 the draw is the market's demand (the clearing sees it)", demand, 3.0);
 
         scene c = make_scene(1000.0f, 0); // control: the same world with the site standing
         c.w.buildings.at(c.site).ticks_remaining = 0;

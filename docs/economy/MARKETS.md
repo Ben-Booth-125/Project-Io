@@ -977,18 +977,22 @@ number.
 target = base_price × √(demand / supply)     — damped elasticity
          base_price                           when neither side has a signal
          base_price × ceil_mult               demand with zero supply
-price  = prior + 0.2063 × (target − prior)    — EMA smoothing
+price  = prior + 0.5 × (target − prior)       — EMA smoothing
 ```
 
-**The smoothing keeps its calendar half-life.** The weight is `1 − 0.5^(1/3)` = 0.2063 a monthly
-tick, so three ticks move a price halfway to a steady target: a quarter-year, as it was when
-one tick moved it halfway (Ben, 2026-11-11, the tick is a month).
+**The smoothing is per tick, not per calendar span.** With the tick a month (Ben, 2026-11-11) the
+weight stays 0.5, so a price moves halfway to its target each month — faster in calendar time than
+under the quarter tick. Re-deriving it to the quarter's half-life (`1 − 0.5^(1/3)` = 0.2063 a
+month) was measured and refused: the target reads one tick's supply, a month's supply is lumpier
+than a quarter's, and the slower EMA held each dry month's spike over the fair-price ceiling long
+enough to leave processors unbid (market_viability: processors running at handoff 83.6% against
+85.8% at 0.5; input-starved 5.4% against 3.1%).
 
 **The target reads one tick; the EMA is the price's only memory (BL-1618, price falls as supply
 vanishes).** `supply` and `demand` are this tick's figures, never a running average. So a market
-fed in lumps saws: every empty tick pulls the price a fifth of the way to the ceiling, and one landing
-pulls it a fifth of the way back toward `base × √(demand / supply)`. One landing of 4.25 against a
-demand of 7.47 aims at about 1.3× base, and takes a price at the ceiling to about 8.2× in a single tick. A price read at
+fed in lumps saws: every empty tick pulls the price halfway to the ceiling, and one landing pulls it
+halfway back toward `base × √(demand / supply)`. One landing of 4.25 against a demand of 7.47 aims
+at about 1.3× base, and takes a price at the ceiling to under 6× in a single tick. A price read at
 one tick after a landing can therefore sit lower than it stood before supply thinned, though the
 mean supply fell. Compare prices over a window, or at ticks with no landing, not at single ticks.
 

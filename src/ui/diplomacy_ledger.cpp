@@ -33,8 +33,8 @@ namespace ui {
 
 namespace {
 
-constexpr std::size_t k_trend_samples = 5; ///< Now and four ticks back (diplomacy.md, open question 1).
-constexpr std::size_t k_trade_window  = 4; ///< Ticks of landings the exposure reads.
+constexpr std::size_t k_trend_samples = 13; ///< Now and twelve monthly ticks back - the four quarters of diplomacy.md, open question 1 (BL-1642).
+constexpr std::size_t k_trade_window  = 12; ///< Ticks (months) of landings the exposure reads - a year, the four quarters (BL-1642).
 
 ImVec4 col4(ImU32 c) { return ImGui::ColorConvertU32ToFloat4(c); }
 
@@ -866,7 +866,7 @@ void draw_expanded(const world& w, const recipe_registry& reg, const std::vector
         ImGui::Text("  Exports to them %s", exp_all > 0.0 ? fmt::percent(exp_them / exp_all).c_str() : "-");
     }
     if (ImGui::IsItemHovered())
-        ImGui::SetTooltip("Shares of the cargo landed between nations over the last %d ticks this "
+        ImGui::SetTooltip("Shares of the cargo landed between nations over the last %d months this "
                           "session has watched. A war cuts it: hostile cargo is intercepted.",
                           static_cast<int>(k_trade_window));
 

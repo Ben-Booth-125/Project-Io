@@ -785,7 +785,7 @@ inline constexpr uint32_t k_world_save_version_pre_recruits = 71;
 /// every version listed above and the readable space-line versions; the section
 /// predicates (`world_stream_has_*`) say which stream holds what.
 ///
-/// **94 (BL-1642, the tick is a month; Ben, 2026-11-11) â€” THE MONTHLY TICK.** No byte
+/// **94 (BL-1642, the tick is a month; Ben, 2026-11-11) - THE MONTHLY TICK.** No byte
 /// moves: v94's layout IS v93's. What moved is MEANING - every count the stream holds
 /// in econ ticks (the filed returns' window, cooldowns, lead times, unpaid and unfed
 /// counts, truce and offer ticks, arrival ticks, the econ tick itself) counts months

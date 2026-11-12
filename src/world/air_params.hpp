@@ -128,6 +128,6 @@ inline air_params default_air_params()
 
     g(p.repair_goods_per_permille, rt::steel, 0.05f);
     g(p.repair_goods_per_permille, rt::machinery, 0.02f);
-    g(p.wing_upkeep_goods, rt::refined_fuel, 1.0f / 3.0f); // a month (a quarter 1.0, BL-1642)
+    g(p.wing_upkeep_goods, rt::refined_fuel, 0.333333f); // the authored literal: a month (a quarter 1.0, BL-1642)
     return p;
 }

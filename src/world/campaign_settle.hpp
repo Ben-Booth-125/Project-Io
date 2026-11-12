@@ -47,7 +47,7 @@ struct generation_progress;
 inline constexpr int k_campaign_settle_ticks = 36;
 
 /// `world::current_econ_tick` BETWEEN passes after the settle and @p live_steps
-/// live passes: the step the last pass ran at (the settle's last is 11). A
+/// live passes: the step the last pass ran at (the settle's last is 35, k_campaign_settle_ticks - 1). A
 /// fresh campaign holds it by construction (`run_settle_tick` writes it); a
 /// loaded one is seeded with it (app::load_game_from), so a read between
 /// passes — the research projection's next price (BL-1324) — sees the same

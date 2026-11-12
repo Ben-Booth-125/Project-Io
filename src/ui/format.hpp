@@ -126,14 +126,6 @@ const char* month_abbrev(int month);
 /// @return         The corresponding calendar date.
 calendar_date date_from_day(uint64_t day_tick);
 
-/// Fraction (0..1) of the way through the current in-year quarter, for a quarter
-/// progress bar. Day 0 of a quarter reads 0.0; the value advances one quarter-day
-/// step per day and reaches just under 1.0 on the quarter's final day.
-///
-/// @param day_tick In-game days elapsed since the campaign start.
-/// @return         Progress through the quarter, clamped to [0, 1).
-float quarter_progress(uint64_t day_tick);
-
 /// Fraction (0..1) of the way through the current month - the economy tick since
 /// BL-1642 (Ben, 2026-11-11). Day 1 of a month reads 0.0, its last day just under 1.
 float month_progress(uint64_t day_tick);

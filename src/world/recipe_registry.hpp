@@ -661,7 +661,7 @@ struct population_demand_params
     float demand_elasticity = 0.80f; ///< exponent on (base_price / price).
     float elasticity_min    = 0.30f; ///< clamp lo on the elasticity factor.
     float elasticity_max    = 2.50f; ///< clamp hi on the elasticity factor.
-    float demand_scale      = 1.00f; ///< global population → demand scale.
+    float demand_scale      = 0.3333333f; ///< global population → demand scale, per month (BL-1642: a third of the quarter's 1.0).
 };
 
 /// BL-340/BL-365 background-industrial-demand tunables, authored in
@@ -690,7 +690,7 @@ struct background_demand_params
     float demand_elasticity = 0.80f; ///< exponent on (base_price / price).
     float elasticity_min    = 0.30f; ///< clamp lo on the elasticity factor.
     float elasticity_max    = 2.50f; ///< clamp hi on the elasticity factor.
-    float demand_scale      = 1.00f; ///< global scale → demand scale.
+    float demand_scale      = 0.3333333f; ///< global scale → demand scale, per month (BL-1642: a third of the quarter's 1.0).
     /// BL-1217 lever D: authored TRUE in scripts/economy.lua; false here (the
     /// pre-lever behaviour, for hand-built registries): when true the background basket DRAWS its bid
     /// off the market's shelf after the households' draw (draw_background_basket).
@@ -1421,7 +1421,7 @@ public:
         float station_handling      = 0.05f;
         float track_build_cost      = 20.0f;
         float track_steel_per_tile  = 2.0f;
-        float track_upkeep_per_tile = 0.25f;
+        float track_upkeep_per_tile = 0.0833333f; // per month (BL-1642: a third of the quarter's 0.25)
     };
     const rail_params& rail() const { return m_rail; }
     void set_rail(const rail_params& r) { m_rail = r; }

@@ -3666,8 +3666,17 @@ migration_tick run_population_migration(world& w, const recipe_registry& reg,
     // integer, so the pass is replay-identical by construction.
     migration_tick t;
     const migration_params& mp = reg.migration();
-    // BL-1642: the rate is fractional (per month); read in millionths, integer from here.
-    const int64_t rate_ppm = std::llround(static_cast<double>(mp.rate_permille) * 1000.0);
+    // BL-1642 (the tick is a month): the rate is authored per month, but heads move
+    // whole and a centre's emigrant pool is floored, so a monthly floor would silence
+    // every centre whose month's share is under one head (the 100-299 k band) and
+    // change the calendar rate. The pass therefore runs once a quarter - on the
+    // first month of each - moving a quarter's worth (three months of the rate) at
+    // once: the old calendar flow exactly, heads conserved, no carried state.
+    if (((w.current_econ_tick % k_econ_ticks_per_quarter) + k_econ_ticks_per_quarter)
+            % k_econ_ticks_per_quarter != 0)
+        return t;
+    const int64_t rate_ppm = std::llround(static_cast<double>(mp.rate_permille)
+                                          * static_cast<double>(k_econ_ticks_per_quarter) * 1000.0);
     if (rate_ppm <= 0 || w.population_centres.size() < 2)
         return t;
 

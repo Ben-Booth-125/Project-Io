@@ -58,8 +58,8 @@ local function expect_no_quarter(c, when)
     for _, r in ipairs(c.recipe_rows) do
         verify.expect(r.good ~= r.id, when .. ": the row reads a display name, not the id: " .. r.good)
     end
-    verify.expect(c.recipe_heading:find("no quarter yet", 1, true) ~= nil,
-                  when .. ": the heading says no quarter is read: '" .. c.recipe_heading .. "'")
+    verify.expect(c.recipe_heading:find("no month yet", 1, true) ~= nil,
+                  when .. ": the heading says no month is read: '" .. c.recipe_heading .. "'")
     for _, r in ipairs(c.recipe_rows) do
         if not r.input then
             verify.expect(r.figure ~= "+0.0" and not r.figure:find("%d"),

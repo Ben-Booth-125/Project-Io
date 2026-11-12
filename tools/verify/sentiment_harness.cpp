@@ -381,28 +381,29 @@ int main()
     }
 
     // --- R3h-R3m: THE AUTHORED RATE (Sprint N3 T10, NR-568) --------------------
-    std::printf("\n-- R3  the authored rate: Trust halves in eighteen quarters --\n");
+    std::printf("\n-- R3  the authored rate: Trust halves in fifty-four months --\n");
     {
         // Ben's ruling (NR-568, 2026-08-23) set a NINE-tick half-life; Trust's is
         // EIGHTEEN since Ben, 2026-11-03 (NR-1129), so scripts/economy.lua authors
-        //     trust_decay_per_tick = 1 - 2^(-1/18) = 0.037776  (six sig. figs)
-        // Access keeps the nine-tick 0.074125.
+        // BL-1642 made the tick a month, so the same calendar half-lives are
+        //     trust_decay_per_tick = 1 - 2^(-1/54) = 0.012754  (five sig. figs)
+        // and Access's 27-tick 0.025345.
         // This fixture does not load Lua, so the SAME LITERAL is hand-set here;
         // if economy.lua's number moves, this one must move with it.
         //
         // REPRESENTATION. `sentiment_value::trust` is an IEEE-754 binary32 and
         // decay is the multiplicative step `v -= v * r` (sentiment.cpp,
-        // `decayed`). Eighteen of those from -2 give -2 * (1 - r)^18, which is -1.0
-        // exactly only if r were the irrational 1 - 2^(-1/18). The authored
-        // decimal is six significant figures, so (1 - r)^18 is off by about
-        // 18 * |dr| / (1 - r) ~ 3e-6 relative, plus eighteen float roundings of
-        // ~6e-8 each. The tolerance below is 1e-5 — about 80 ulps at 1.0 —
+        // `decayed`). Fifty-four of those from -2 give -2 * (1 - r)^54, which is -1.0
+        // exactly only if r were the irrational 1 - 2^(-1/54). The authored
+        // decimal is rounded at 5e-7, so (1 - r)^54 is off by up to about
+        // 54 * |dr| / (1 - r) ~ 2.7e-5 relative, plus fifty-four float roundings of
+        // ~6e-8 each. The tolerance below is 5e-5 — about 80 ulps at 1.0 —
         // which is that decimal rounding and nothing looser; "+-1 fixed-point
         // step" has no meaning for a float, so this is the honest equivalent.
-        const float authored_rate = 0.037776f;
+        const float authored_rate = 0.012754f;
         sentiment_params p = authored_params();
         p.trust_decay_per_tick  = authored_rate;
-        p.access_decay_per_tick = 0.074125f;
+        p.access_decay_per_tick = 0.025345f;
         // The fold uses this harness's small-integer weights, where
         // contract_cancelled is pure ACCESS; the ruling is about Trust, so the
         // -2 is driven through the seeded procurement weight instead, exactly
@@ -422,27 +423,27 @@ int main()
             return d <= tol && d >= -tol;
         };
 
-        for (int i = 0; i < 18; ++i)
+        for (int i = 0; i < 54; ++i)
             decay_sentiment(t, p);
         const float after_half = sentiment_toward(t, buyer, supplier).trust;
-        check(within(after_half, -1.0f, 1e-5f),
-              "R3i ...eighteen ticks later it has HALVED (-1.0 within 1e-5: the "
+        check(within(after_half, -1.0f, 5e-5f),
+              "R3i ...fifty-four ticks later it has HALVED (-1.0 within 5e-5: the "
               "authored decimal's rounding, binary32 multiplicative decay)");
 
-        for (int i = 0; i < 18; ++i)
+        for (int i = 0; i < 54; ++i)
             decay_sentiment(t, p);
-        check(within(sentiment_toward(t, buyer, supplier).trust, -0.5f, 1e-5f),
-              "R3j ...and QUARTERED at thirty-six: the half-life is a half-life, "
+        check(within(sentiment_toward(t, buyer, supplier).trust, -0.5f, 5e-5f),
+              "R3j ...and QUARTERED at a hundred and eight: the half-life is a half-life, "
               "not a one-off");
 
         // No floor: keep going until the row is gone. Magnitude must fall
         // STRICTLY every tick until the epsilon snap erases it - a tick on
         // which it did not move would be a floor by another name. From -2 at
-        // this rate the snap lands at tick 258; 400 is a generous ceiling.
+        // this rate the snap lands near tick 770; 1500 is a generous ceiling.
         bool strictly_shrinking = true;
         int  erased_at = -1;
         float prev = sentiment_toward(t, buyer, supplier).trust;
-        for (int tick = 37; tick <= 400 && erased_at < 0; ++tick)
+        for (int tick = 109; tick <= 1500 && erased_at < 0; ++tick)
         {
             decay_sentiment(t, p);
             const auto row = t.pairs.find({buyer, supplier});
@@ -844,14 +845,15 @@ int main()
             check(alternating == 0.0f && w.sentiment.pairs.empty(),
                   "E5a convoys landing on alternate ticks for 16 folds raise NO severed event "
                   "(a missed tick is not a severing)");
-            const float one_stop = run("LLL....");
+            // BL-1642: the window is six monthly folds (two quarters), so every pattern is x3.
+            const float one_stop = run("LLLLLLLLL............");
             check(one_stop == 2.0f,
-                  "E5b an established trade (3 folds landing) then stopped (4 folds idle) "
+                  "E5b an established trade (9 folds landing) then stopped (12 folds idle) "
                   "severs exactly once: the receiver's Alarm toward the shipper +2");
-            const float no_rearm = run("L..L..");
+            const float no_rearm = run("LLL......LLL......");
             check(no_rearm == 2.0f,
-                  "E5c ...and not again until the trade is re-established for 2 folds");
-            const float rearmed = run("LL..");
+                  "E5c ...and not again until the trade is re-established for 6 folds");
+            const float rearmed = run("LLLLLL......");
             check(rearmed == 4.0f && sentiment_toward(w.sentiment, A, B).alarm == 0.0f
                       && w.sentiment_trade_streaks.empty(),
                   "E5d re-established then stopped again severs once more; the shipper "
@@ -948,7 +950,7 @@ int main()
         sentiment_params p;
         p.factors[static_cast<std::size_t>(sentiment_factor_kind::border_force)] = sentiment_factor{ 0.0f, 0.0f, 8.0f };
         p.factors[static_cast<std::size_t>(sentiment_factor_kind::trade_conducted)] = sentiment_factor{ 1.0f, 0.0f, -1.0f };
-        p.alarm_decay_per_tick = 0.074125f; // the authored nine-tick half-life
+        p.alarm_decay_per_tick = 0.074125f; // a FIXTURE nine-tick half-life (the authored rate is 27 months since BL-1642)
         const entity_id a = 7, b = 8;
 
         // A1 folded by its weight, independent of the other two.

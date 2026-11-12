@@ -137,7 +137,7 @@ enum class space_asset_state : uint8_t
 {
     in_transit = 0, ///< Launched; arrives at `arrival_tick`.
     active     = 1, ///< In place, upkeep paid.
-    decaying   = 2, ///< In place, upkeep unpaid for `unpaid_quarters` (>= 1) quarters.
+    decaying   = 2, ///< In place, upkeep unpaid for `unpaid_quarters` (>= 1) econ ticks (months, BL-1642).
     lost       = 3, ///< Gone. Kept as a record; never steps again.
 };
 
@@ -160,11 +160,11 @@ struct space_asset
     space_asset_class cls   = space_asset_class::satellite;
     space_destination dest{};
     space_asset_state state = space_asset_state::in_transit;
-    int32_t           launch_tick  = 0;    ///< Econ tick (quarter) of launch.
+    int32_t           launch_tick  = 0;    ///< Econ tick (month) of launch.
     int32_t           arrival_tick = 0;    ///< Econ tick it becomes active; >= launch_tick.
-    float             upkeep       = 0.0f; ///< Credits per quarter, fixed at launch.
-    int32_t           unpaid_quarters = 0; ///< Consecutive unpaid quarters; 0 when paid.
-    float             launch_cost  = 0.0f; ///< Credits the launch debited (the quote), for the quarter's report.
+    float             upkeep       = 0.0f; ///< Credits per econ tick (a month), fixed at launch.
+    int32_t           unpaid_quarters = 0; ///< Consecutive unpaid econ ticks (months); 0 when paid.
+    float             launch_cost  = 0.0f; ///< Credits the launch debited (the quote), for the tick's report.
 
     // ---- BL-1583 / BL-1585: the station fields (stations.hpp). SERIALISED in
     // the v81 station section, only for an asset where any differs from these

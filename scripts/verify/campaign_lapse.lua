@@ -27,7 +27,7 @@ verify.frames(2)
 verify.capture("lapse_corp_y00")
 
 for year = 1, 30 do
-    verify.econ_step(4)             -- one game-year of quarters
+    verify.econ_step(12)            -- one game-year of months (BL-1642)
     verify.frames(2)
     verify.capture(string.format("lapse_corp_y%02d", year))
 end

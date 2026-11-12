@@ -44,7 +44,6 @@ constexpr std::array<magnitude_suffix, 4> magnitude_suffixes = {{
     { 1e3,  "k" },
 }};
 
-constexpr int days_per_quarter = days_per_month * months_per_quarter; // 90
 
 // Month abbreviations, indexed 0-11 (January..December). The 12 thirty-day
 // calendar months map directly onto Jan–Dec.
@@ -155,13 +154,6 @@ calendar_date date_from_day(uint64_t day_tick)
     d.day     = static_cast<int>(day_of_year % static_cast<uint64_t>(days_per_month)) + 1;
     d.quarter = month_index / months_per_quarter + 1;
     return d;
-}
-
-float quarter_progress(uint64_t day_tick)
-{
-    const uint64_t day_of_year     = day_tick % static_cast<uint64_t>(days_per_year);
-    const int      day_of_quarter  = static_cast<int>(day_of_year) % days_per_quarter; // 0..89
-    return static_cast<float>(day_of_quarter) / static_cast<float>(days_per_quarter);
 }
 
 float month_progress(uint64_t day_tick)

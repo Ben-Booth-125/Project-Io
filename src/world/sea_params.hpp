@@ -132,7 +132,7 @@ inline sea_params default_sea_params()
     t.targets  = 0;
 
     g(p.refit_goods, rt::steel, 1.0f);              // a month's full refit (a quarter 3.0, BL-1642)
-    g(p.refit_goods, rt::machinery, 1.0f / 3.0f);   // (a quarter 1.0)
-    g(p.ship_upkeep_goods, rt::refined_fuel, 2.0f / 3.0f); // a month (a quarter 2.0, BL-1642)
+    g(p.refit_goods, rt::machinery, 0.333333f);     // (a quarter 1.0); the authored literal
+    g(p.ship_upkeep_goods, rt::refined_fuel, 0.666667f); // the authored literal: a month (a quarter 2.0, BL-1642)
     return p;
 }

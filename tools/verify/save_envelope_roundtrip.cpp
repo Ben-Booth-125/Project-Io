@@ -952,12 +952,11 @@ int main()
         save_envelope le;
         le.params.nation_total_target = 33; // must be overwritten with 0
         le.params.major_target        = 5;
-        check(read_save_game(k_path, lw, le), "S9 a v22 stream (no targets) is ACCEPTED");
-        check(le.params.nation_total_target == 0 && le.params.major_target == 0,
-              "S9 a v22 stream reads both nation targets as 0 (unset)");
-        check(le.params.seed == env.params.seed && le.params.span_seed[3] == 0x5A3Du
-                  && le.planetary_pan_y == env.planetary_pan_y,
-              "S9 the rest of a v22 envelope reads whole (seed, span seeds, the last view float)");
+        // BL-1642 (the tick is a month): every envelope before v30-with-world-v94 carries a
+        // world written under the quarter tick, and read_save_game refuses it cleanly. The
+        // genuine old file is still written; the row now pins its REFUSAL, destination untouched.
+        check(!read_save_game(k_path, lw, le) && le.params.nation_total_target == 33 && le.params.major_target == 5,
+              "S9 a v22 stream is REFUSED: its world predates the monthly tick (world v94, BL-1642)");
 
         // v21 is still refused: the exception is one layout wide.
         {
@@ -992,25 +991,11 @@ int main()
               "S9b the verification writer wrote a v23 file");
         world         lw;
         save_envelope le;
+        // BL-1642 (the tick is a month): every envelope before v30-with-world-v94 carries a
+        // world written under the quarter tick, and read_save_game refuses it cleanly. The
+        // genuine old file is still written; the row now pins its REFUSAL, destination untouched.
         const bool ok = read_save_game(k_path, lw, le);
-        check(ok, "S9b a narrow v23 file with bodies is ACCEPTED");
-        bool endow = ok && !le.report.bodies.empty();
-        if (endow)
-        {
-            const auto& got = le.report.bodies[0].state.endowment;
-            const auto& und = le.report.bodies[0].undrawn.endowment;
-            for (std::size_t r = 0; r < resource_count; ++r)
-            {
-                const float want = r < k_resource_count_pre_kit_goods ? 1.0f + 0.125f * static_cast<float>(r) : 0.0f;
-                endow = endow && got[r] == want && und[r] == want;
-            }
-        }
-        check(endow, "S9b each body's endowment (state and undrawn) reads its 49 slots as written, the kit goods 0");
-        check(ok && same_market_history(le.market_history, env.market_history)
-                  && le.planetary_pan_y == env.planetary_pan_y
-                  && le.params.nation_total_target == env.params.nation_total_target
-                  && le.params.major_target == env.params.major_target,
-              "S9b everything after the bodies reads whole: market history, the last view float, the targets");
+        check(!ok && le.report.bodies.empty(), "S9b a narrow v23 file with bodies is REFUSED: its world predates the monthly tick (world v94, BL-1642)");
         // The same narrow bytes stamped v24 misread and are REFUSED (the width matters).
         {
             std::fstream f(k_path, std::ios::binary | std::ios::in | std::ios::out);
@@ -1045,21 +1030,11 @@ int main()
               "S9c the verification writer wrote a v24 file");
         world         lw;
         save_envelope le;
+        // BL-1642 (the tick is a month): a v24 envelope carries a world written under the
+        // quarter tick, and read_save_game refuses it cleanly; the row pins the REFUSAL.
         const bool ok = read_save_game(k_path, lw, le);
-        bool endow = ok && !le.report.bodies.empty();
-        if (endow)
-        {
-            const auto& got = le.report.bodies[0].state.endowment;
-            for (std::size_t r = 0; r < resource_count; ++r)
-            {
-                const float want = r < k_resource_count_pre_airframes ? 1.0f + 0.125f * static_cast<float>(r) : 0.0f;
-                endow = endow && got[r] == want;
-            }
-        }
-        check(endow && same_market_history(le.market_history, env.market_history)
-                  && le.planetary_pan_y == env.planetary_pan_y
-                  && le.params.major_target == env.params.major_target,
-              "S9c a v24 file reads whole: its 54 endowment slots as written, airframes 0, everything after intact");
+        check(!ok && le.report.bodies.empty(),
+              "S9c a v24 file is REFUSED: its world predates the monthly tick (world v94, BL-1642)");
         {
             std::fstream f(k_path, std::ios::binary | std::ios::in | std::ios::out);
             f.seekp(4, std::ios::beg);
@@ -1093,21 +1068,11 @@ int main()
               "S9d the verification writer wrote a v25 file");
         world         lw;
         save_envelope le;
+        // BL-1642 (the tick is a month): every envelope before v30-with-world-v94 carries a
+        // world written under the quarter tick, and read_save_game refuses it cleanly. The
+        // genuine old file is still written; the row now pins its REFUSAL, destination untouched.
         const bool ok = read_save_game(k_path, lw, le);
-        bool endow = ok && !le.report.bodies.empty();
-        if (endow)
-        {
-            const auto& got = le.report.bodies[0].state.endowment;
-            for (std::size_t r = 0; r < resource_count; ++r)
-            {
-                const float want = r < k_resource_count_pre_ship_hulls ? 1.0f + 0.125f * static_cast<float>(r) : 0.0f;
-                endow = endow && got[r] == want;
-            }
-        }
-        check(endow && same_market_history(le.market_history, env.market_history)
-                  && le.planetary_pan_y == env.planetary_pan_y
-                  && le.params.major_target == env.params.major_target,
-              "S9d a v25 file reads whole: its 55 endowment slots as written, ship hulls 0, everything after intact");
+        check(!ok && le.report.bodies.empty(), "S9d a v25 file is REFUSED: its world predates the monthly tick (world v94, BL-1642)");
         {
             std::fstream f(k_path, std::ios::binary | std::ios::in | std::ios::out);
             f.seekp(4, std::ios::beg);
@@ -1325,37 +1290,26 @@ int main()
         save_envelope ve;
         ve.last_econ_report.buildings.push_back(building_report{}); // must be replaced
         ve.last_corp_standings.push_back(corp_standing{});
+        // BL-1642 (the tick is a month): every envelope before v30-with-world-v94 carries a
+        // world written under the quarter tick, and read_save_game refuses it cleanly. The
+        // genuine old file is still written; the row now pins its REFUSAL, destination untouched.
         const bool vok = read_save_game(k_path, vw, ve);
-        check(vok, "S12 a v25 stream (no report tail) is ACCEPTED");
-        check(vok && ve.last_econ_report.buildings.empty() && ve.last_econ_report.budgets.empty()
-                  && ve.last_econ_report.building_row.empty()
-                  && ve.last_econ_report.logistic_points.buildings.empty()
-                  && !ve.last_econ_report.logistic_points.resolved
-                  && ve.last_corp_standings.empty(),
-              "S12 a v25 stream opens with an EMPTY report and no standings");
-        check(vok && ve.planetary_pan_y == env.planetary_pan_y
-                  && ve.params.major_target == env.params.major_target
-                  && same_market_history(ve.market_history, env.market_history),
-              "S12 the rest of a v25 envelope reads whole");
+        check(!vok && ve.last_econ_report.buildings.size() == 1 && ve.last_corp_standings.size() == 1,
+              "S12 a v25 stream is REFUSED: its world predates the monthly tick (world v94, BL-1642)");
         // The naval merge: v26 (BL-1527, 56 wide, no tail) reads like v25 - an EMPTY report.
         check(write_save_game_at(k_path, w, env, save_game_version_ship_hulls),
               "S12 the verification writer wrote a v26 file");
         save_envelope ne;
         ne.last_corp_standings.push_back(corp_standing{});
         const bool nok = read_save_game(k_path, vw, ne);
-        check(nok && ne.last_econ_report.buildings.empty() && ne.last_corp_standings.empty()
-                  && same_market_history(ne.market_history, env.market_history)
-                  && ne.params.major_target == env.params.major_target,
-              "S12 a v26 stream (56 wide, no report tail) is ACCEPTED and opens with an EMPTY report");
+        check(!nok && ne.last_corp_standings.size() == 1,
+              "S12 a v26 stream is REFUSED: its world predates the monthly tick (world v94, BL-1642)");
         // The naval merge: v27 (55 wide, with the tail) still reads its report.
         check(write_save_game_at(k_path, w, env, save_game_version_econ_report),
               "S12 the verification writer wrote a v27 file");
         save_envelope te;
         const bool tok = read_save_game(k_path, vw, te);
-        check(tok && te.last_econ_report.buildings.size() == r.buildings.size()
-                  && te.last_corp_standings.size() == 2
-                  && same_market_history(te.market_history, env.market_history),
-              "S12 a v27 stream (55 wide, report tail) is ACCEPTED with its report");
+        check(!tok && te.last_corp_standings.empty(), "S12 a v27 stream is REFUSED: its world predates the monthly tick (world v94, BL-1642)");
         // S14 (BL-1603; the space merge): the pins ride at the tail of v28 (the space
         // branch's layout, 55 wide) and v30; v27 and v29 carry none and open with none.
         // Every one reads its report whole.
@@ -1371,12 +1325,8 @@ int main()
             save_envelope pe;
             pe.pins = { 99 }; // must be replaced
             const bool pok = read_save_game(k_path, pw, pe);
-            check(pok, "S14 a v27, v28 or v29 stream is ACCEPTED");
-            check(pok && (envelope_has_pins(pv) ? pe.pins == env.pins : pe.pins.empty()),
-                  "S14 v28 opens with its pins in pin order; v27 and v29 (no pins tail) open with none");
-            check(pok && pe.last_econ_report.buildings.size() == env.last_econ_report.buildings.size()
-                      && same_market_history(pe.market_history, env.market_history),
-                  "S14 each one's report tail and market history read whole");
+            check(!pok && pe.pins == std::vector<uint32_t>{ 99 },
+                  "S14 a v27, v28 or v29 stream is REFUSED: its world predates the monthly tick (world v94, BL-1642)");
         }
         // A version no build has written is refused.
         write_save_game(k_path, w, env);

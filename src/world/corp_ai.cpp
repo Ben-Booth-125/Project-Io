@@ -5288,10 +5288,11 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
 
             // Idle: sustained loss where stopping (wages saved, the fixed share
             // of maintenance still owed) beats running. Rides the BL-079
-            // loss_streak; the 4-tick gate keeps "no idling without a sustained
-            // streak" true while letting the strategic tier act ahead of the
-            // 8-tick reflex.
-            if (bp.has_data && bp.net() < 0.0f && b.loss_streak >= 4)
+            // loss_streak; the one-year gate (12 months, the quarter tick's 4)
+            // keeps "no idling without a sustained streak" true while letting the
+            // strategic tier act ahead of the two-year reflex (k_loss_streak_to_idle).
+            // BL-1642: counted in calendar time - left at 4 it idled after 4 months.
+            if (bp.has_data && bp.net() < 0.0f && b.loss_streak >= k_econ_ticks_per_year)
             {
                 // net idle − net running. Same correction as the resume side
                 // above, in the opposite direction: subtracting the RUNNING
