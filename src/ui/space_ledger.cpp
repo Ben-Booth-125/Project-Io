@@ -284,10 +284,10 @@ void draw_pending_line(const world& w, entity_id nation, space_ledger_state& m)
     if (ImGui::IsItemHovered())
     {
         ImGui::BeginTooltip();
-        ImGui::TextUnformatted("Outside comms coverage: each waits a quarter.");
+        ImGui::TextUnformatted("Outside comms coverage: each waits a month.");
         for (const space_order& o : w.space_orders)
             if (o.cmd.nation == nation)
-                ImGui::Text("%s - due quarter %d", verb_name(o.cmd.verb), o.due_tick);
+                ImGui::Text("%s - due month %d", verb_name(o.cmd.verb), o.due_tick);
         ImGui::EndTooltip();
     }
 }
@@ -424,7 +424,7 @@ void draw_launch(const world& w, const recipe_registry& reg, entity_id nation, s
         char crew_part[48] = "";
         if (crew > 0)
             std::snprintf(crew_part, sizeof(crew_part), ", %d astronaut%s aboard", crew, crew == 1 ? "" : "s");
-        ImGui::TextWrapped("Goods %s (%.0f components, %.0f propellant); launch and thrust %s; %d qtr (%.0f days)%s.",
+        ImGui::TextWrapped("Goods %s (%.0f components, %.0f propellant); launch and thrust %s; %d mo (%.0f days)%s.",
                            fmt::credits(q.goods_value).c_str(), static_cast<double>(q.components),
                            static_cast<double>(q.propellant), fmt::credits(q.credits).c_str(), q.travel_quarters,
                            q.days, crew_part);
@@ -552,16 +552,16 @@ void draw_assets(const world& w, entity_id nation, space_ledger_state& m)
         {
             const int to_go = a.arrival_tick - w.current_econ_tick;
             if (to_go <= 0)
-                ImGui::TextDisabled("in transit, arrives this quarter");
+                ImGui::TextDisabled("in transit, arrives this month");
             else
-                ImGui::TextDisabled("in transit, %d qtr to go", to_go);
+                ImGui::TextDisabled("in transit, %d mo to go", to_go);
         }
         else
             ImGui::TextDisabled("%s", state);
         ImGui::SameLine();
-        ImGui::TextDisabled("| %s/qtr |", fmt::credits(a.upkeep).c_str());
+        ImGui::TextDisabled("| %s/mo |", fmt::credits(a.upkeep).c_str());
         if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("Upkeep per quarter, paid from the treasury.");
+            ImGui::SetTooltip("Upkeep per month, paid from the treasury.");
         ImGui::SameLine();
         if (covered)
             ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::positive), "in coverage");
@@ -867,7 +867,7 @@ void draw_designer(const world& w, const recipe_registry& reg, entity_id nation,
             ImGui::SameLine();
             // Move is a toggle: armed, the next empty slot pressed takes the module.
             const char* mv = m.moving ? "Moving - press an empty slot##mv" : "Move##mv";
-            if (press(mv, true, "A launch-free refit: it works again a quarter later.", m.move_press))
+            if (press(mv, true, "A launch-free refit: it works again three months later.", m.move_press))
                 m.moving = !m.moving;
         }
     }
@@ -1028,9 +1028,9 @@ void draw_crew(const world& w, const recipe_registry& reg, entity_id nation, spa
     ImGui::TextDisabled("Pool cap %d (%d per running centre)", m.crew.cap, stp.astronaut_cap_per_centre);
     ImGui::Text("Training centres: %d (%d running)", m.crew.centres, m.crew.running);
     if (m.crew.running > 0 && m.crew.rate == 0)
-        ImGui::TextDisabled("Trained per quarter: 0 - the pool is at its cap");
+        ImGui::TextDisabled("Trained every three months: 0 - the pool is at its cap");
     else
-        ImGui::TextDisabled("Trained per quarter: %d", m.crew.rate);
+        ImGui::TextDisabled("Trained every three months: %d", m.crew.rate);
     if (m.crew.centres == 0)
         ImGui::TextDisabled("Build an Astronaut Training Centre to train crew.");
 
@@ -1074,7 +1074,7 @@ std::string space_outcome_text(const space_command& c, const space_command_outco
                      + std::to_string(o.skipped) + " skipped.";
             return std::string(what) + ": done.";
         case space_command_result::queued:
-            return std::string(what) + ": pending - no signal. It waits a quarter.";
+            return std::string(what) + ": pending - no signal. It waits a month.";
         case space_command_result::rejected_queue_full:
             return std::string(what) + ": refused - too many orders are waiting.";
         case space_command_result::rejected_not_owner:

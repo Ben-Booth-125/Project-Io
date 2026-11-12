@@ -24,7 +24,7 @@ The panel owns the **bottom-left tile of the screen's bottom strip**
   `selection_band_height` (itself derived from the minimap height), so the bottom
   strip reads as one level band: comms dock → Selection band → minimap.
 - **Width is 0.75 of the fold-out column's width** (Ben, 2026-07-30) — comms is
-  ambient chatter, not a decision surface; the quarter it gives back goes to the
+  ambient chatter, not a decision surface; the month it gives back goes to the
   Selection band, which starts at the dock's right edge so the strip stays solid
   with no canvas sliver punched between the two.
 - **Layout consequence:** `foldout_column_rect` stops at the dock's top edge,

@@ -660,7 +660,7 @@ buildings.
 
 **The background economy is the landscape phase 6 selected** — not a separate injection pass bolted
 on after generation. The settle that hands play its opening position is phase 6's single
-validation run of the winner — twelve quarterly econ ticks, `k_campaign_settle_ticks` (`src/world/campaign_settle.hpp`), a length
+validation run of the winner — thirty-six monthly econ ticks, `k_campaign_settle_ticks` (`src/world/campaign_settle.hpp`), a length
 measured on the per-tick convoy dispatch count rather than chosen (`../economy/ERAS.md` § The
 opening position; BL-978, warm start retired, owns the work). There is no other pre-game tick
 loop: the prices play opens on are the ones those twelve clearings leave. Generation scores candidate landscapes
@@ -830,7 +830,7 @@ One row per exchange, appended by the clearing tick, ring-capped the way the plo
 
 | Field | Why |
 |---|---|
-| `tick` | The econ tick it cleared on. A tick is a quarter, so this is the date. |
+| `tick` | The econ tick it cleared on. A tick is a month, so this is the date. |
 | `market` | Which board. The surface is per-market. |
 | `resource` | What moved. |
 | `quantity` | How much. |
@@ -977,14 +977,18 @@ number.
 target = base_price × √(demand / supply)     — damped elasticity
          base_price                           when neither side has a signal
          base_price × ceil_mult               demand with zero supply
-price  = prior + 0.5 × (target − prior)       — EMA smoothing
+price  = prior + 0.2063 × (target − prior)    — EMA smoothing
 ```
+
+**The smoothing keeps its calendar half-life.** The weight is `1 − 0.5^(1/3)` = 0.2063 a monthly
+tick, so three ticks move a price halfway to a steady target: a quarter-year, as it was when
+one tick moved it halfway (Ben, 2026-11-11, the tick is a month).
 
 **The target reads one tick; the EMA is the price's only memory (BL-1618, price falls as supply
 vanishes).** `supply` and `demand` are this tick's figures, never a running average. So a market
-fed in lumps saws: every empty tick pulls the price halfway to the ceiling, and one landing pulls it
-halfway back toward `base × √(demand / supply)`. One landing of 4.25 against a demand of 7.47 aims
-at about 1.3× base, and takes a price at the ceiling to under 6× in a single tick. A price read at
+fed in lumps saws: every empty tick pulls the price a fifth of the way to the ceiling, and one landing
+pulls it a fifth of the way back toward `base × √(demand / supply)`. One landing of 4.25 against a
+demand of 7.47 aims at about 1.3× base, and takes a price at the ceiling to about 8.2× in a single tick. A price read at
 one tick after a landing can therefore sit lower than it stood before supply thinned, though the
 mean supply fell. Compare prices over a window, or at ticks with no landing, not at single ticks.
 
@@ -1064,7 +1068,7 @@ first cuts, then measured. Three rules hold whatever the numbers:
 The k cap stays: spoilage is what makes k > 0 safe, not a replacement for it.
 
 Target and result are clamped to the band **[0.25×, 10×] of base**. Prices are therefore
-*anchored*: no scarcity can push a good past 10× its authored base, and no glut below a quarter
+*anchored*: no scarcity can push a good past 10× its authored base, and no glut below a month
 of it. Untradeable resources (`base_price ≤ 0`) keep their prior price. A resource pegged at the
 ceiling is a generation-calibration signal (background production absent or under-target — see
 `docs/generation/CORPORATION_GENERATION.md` § Pass 6), not a legitimate "lucrative fillable gap".
@@ -1160,7 +1164,7 @@ erases in a year was never a working international market.
 
 **The far trade reading** (BL-1006, far trade reading) is `haulage_measure --far-trade`. It follows
 every convoy from dispatch to its first clear after arrival, on the world the app builds, in two
-windows of four quarterly dispatches — the first year of play, and the year after N years — and
+windows of four monthly dispatches — the first year of play, and the year after N years — and
 reads three things:
 
 - **(a)** volume delivered **and sold** at its destination, where that is not the source market.

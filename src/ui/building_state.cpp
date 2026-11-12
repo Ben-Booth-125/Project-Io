@@ -256,7 +256,7 @@ building_recipe_read read_building_recipe(const world& w, const recipe_registry&
     else if (building_supply_scalar(b) <= 0.0f)
         out.no_draw = "It is unsupplied, so it draws nothing.";
     else if (row != nullptr && row->effective_workforce <= 0.0f)
-        out.no_draw = "No labour reached it last quarter, so it drew nothing.";
+        out.no_draw = "No labour reached it last month, so it drew nothing.";
     const bool  draws    = out.no_draw == nullptr;
 
     for (std::size_t r = 0; r < resource_count; ++r)

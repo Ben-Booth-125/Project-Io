@@ -81,7 +81,7 @@ body, and each launch burns propellant the trader buys from that body's shelf
 
 ### The trade value record
 
-**Each market records the value trade moved out of and into it, per quarter** (Ben, 2026-10-13),
+**Each market records the value trade moved out of and into it, per month** (Ben, 2026-10-13),
 so the Market ledger can say how much of a market's business is trade (`../ui/ledgers/market.md`
 § 2). Two figures per market:
 
@@ -92,10 +92,10 @@ so the Market ledger can say how much of a market's business is trade (`../ui/le
   cargo intercepted on its lane never lands and is never counted in.
 
 Every nation's trades count, the player's and every AI's alike: the figure describes the
-market, not the trader. Each accumulates through a quarter and is published at the quarter's
-end, so the ledger reads the **last completed quarter**. **It is a report, never an input**: no
+market, not the trader. Each accumulates through a month and is published at the month's
+end, so the ledger reads the **last completed month**. **It is a report, never an input**: no
 simulation step reads it, so it moves no price, decision or digest. **It is not saved**: a loaded
-game reads zero until its first quarter completes, which the ledger says rather than showing a
+game reads zero until its first month completes, which the ledger says rather than showing a
 false zero.
 
 ## Auto and reserved trade
@@ -160,7 +160,7 @@ approval (Ben, 2026-10-10). No value is final until he has approved it.
 **Steel moves six a point (Ben, 2026-11-07).** Steel's trade capacity is six units a point. The
 table otherwise holds roughly one value per point (a point of coal and a point of steel each moved
 about forty credits of base value), and steel is set above that line on purpose: it is the good
-construction buys most, a market without a mill wants it by the hundred a quarter, and at the
+construction buys most, a market without a mill wants it by the hundred a month, and at the
 table's own line a whole Marketplace's points moved only a fraction of that.
 
 ## What trade replaces

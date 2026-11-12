@@ -3616,7 +3616,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     {
         // Fraction through the current econ tick (90 days); mirrors sim_loop::econ_tick_days.
         const float frac = static_cast<float>(
-            std::fmod(std::max(0.0, state.sim_now_days), 90.0) / 90.0);
+            std::fmod(std::max(0.0, state.sim_now_days), static_cast<double>(k_econ_tick_days)) / static_cast<double>(k_econ_tick_days)); // BL-1642: a month
         constexpr int beam_radius = 2; // Ben's spec: a radius-2 beam of vision.
 
         // Flood radius-2 around a path tile, marking each at `inten` (keeping the max).
@@ -6765,7 +6765,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     if (draw_r >= 6.0f && !state.convoy_markers.empty())
     {
         const float frac = static_cast<float>(
-            std::fmod(std::max(0.0, state.sim_now_days), 90.0) / 90.0);
+            std::fmod(std::max(0.0, state.sim_now_days), static_cast<double>(k_econ_tick_days)) / static_cast<double>(k_econ_tick_days)); // BL-1642: a month
         const float local_period = static_cast<float>(gw) * col_step;
         struct head_mark { const ui_state::convoy_marker* m; float p; };
         std::map<entity_id, std::vector<head_mark>> by_tile; // ascending: a stable pick

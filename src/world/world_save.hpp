@@ -460,7 +460,7 @@ inline constexpr uint32_t world_save_magic =
 /// two tiers (`migrate_legacy_roads`). On load the mirror invariant is checked over the
 /// whole field and the stream is refused whole if two halves of a crossing disagree.
 ///
-/// Bumped to 54 by BL-1337 (return net crosses zero; FINANCE.md § The quarterly return):
+/// Bumped to 54 by BL-1337 (return net crosses zero; FINANCE.md § The monthly return):
 /// `quarterly_return::net` is a double, the exact balance delta. The record keeps its f32
 /// slot (the double rounded to float), and a TRAILING SECTION after the returns' taxes
 /// carries the exact figure for every corporation whose history holds any net the f32
@@ -713,7 +713,7 @@ inline constexpr uint32_t k_world_save_version_pre_recruits = 71;
 /// names a unit of the stream, a province of the stream and a tile of it. Refused whole
 /// otherwise. v78 is a STRICT PREFIX of v79 and is read too, as no unit defending.
 ///
-/// **80 (BL-1539, FINANCE.md § The quarterly return) — THE RESEARCH BOOKS.** Appended last:
+/// **80 (BL-1539, FINANCE.md § The monthly return) — THE RESEARCH BOOKS.** Appended last:
 /// after a u32 count, every nation with an unbooked debit or a return that booked research,
 /// ascending id, as (id, f64 research_unbooked, f64 upkeep_unbooked, u32 n = its return
 /// count, n x f32 research in filed order). All finite and never negative. v79 is a STRICT
@@ -784,7 +784,22 @@ inline constexpr uint32_t k_world_save_version_pre_recruits = 71;
 /// off-world bases (90), the firsts (91) and the transit origins (92). The reader takes
 /// every version listed above and the readable space-line versions; the section
 /// predicates (`world_stream_has_*`) say which stream holds what.
-inline constexpr uint32_t world_save_version = 93;
+///
+/// **94 (BL-1642, the tick is a month; Ben, 2026-11-11) â€” THE MONTHLY TICK.** No byte
+/// moves: v94's layout IS v93's. What moved is MEANING - every count the stream holds
+/// in econ ticks (the filed returns' window, cooldowns, lead times, unpaid and unfed
+/// counts, truce and offer ticks, arrival ticks, the econ tick itself) counts months
+/// where v93's counted quarters, and every per-tick figure is a month's. So a game save
+/// (`read_save_game`, src/core) refuses any world stream below v94 whole, with no
+/// migration (an old campaign's clock cannot be re-read at the new grain). This reader
+/// still DECODES v93 and the legacy streams, because the layout harness rows
+/// (save_roundtrip) exercise the section readers through them; it is the game's door
+/// that refuses them.
+inline constexpr uint32_t world_save_version = 94;
+
+/// BL-1642: the first stream whose econ ticks are months. Every game save below it is
+/// refused (`read_save_game`).
+inline constexpr uint32_t k_world_save_version_monthly = 94;
 
 /// The space-mechanics merge: the first version stacking the naval/missile line and the
 /// space line.

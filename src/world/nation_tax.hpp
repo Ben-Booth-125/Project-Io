@@ -44,7 +44,9 @@ struct tax_params
     /// Discontent added per quarter at each tier I..V (negative = ebbs). Each
     /// finite in [-1, 1]. Binary fractions so the quarterly sum is exact: tier IV
     /// reaches the 0.5 threshold in exactly 8 quarters, tier V in 4.
-    std::array<float, k_tax_tier_count> pressure = {-0.125f, -0.0625f, 0.0f, 0.0625f, 0.125f};
+    /// Per month (BL-1642): a third of the quarter's {-0.125, -0.0625, 0, 0.0625, 0.125}.
+    std::array<float, k_tax_tier_count> pressure = {-0.125f / 3.0f, -0.0625f / 3.0f, 0.0f,
+                                                    0.0625f / 3.0f, 0.125f / 3.0f};
 
     /// Discontent above which output is cut. In [0, 1].
     float bite_threshold = 0.5f;

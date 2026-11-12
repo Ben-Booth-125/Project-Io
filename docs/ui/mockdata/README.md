@@ -1,6 +1,6 @@
 # Ledger mock-up data (Power BI seed)
 
-Real economy data exported from the deterministic seeded world after **16 quarterly economy
+Real economy data exported from the deterministic seeded world after **16 monthly economy
 ticks** (~4 game-years on the home body, Kepler), for designing the ledger surfaces in Power BI.
 Regenerate any time with:
 

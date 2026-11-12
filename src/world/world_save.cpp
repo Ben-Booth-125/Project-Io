@@ -3548,7 +3548,7 @@ std::size_t tail_bytes_after_key(int version, const world& w)
         { k_space_key + k_world_save_version_space_firsts, world_save_space_firsts_section_bytes },       // v91
         { k_space_key + k_world_save_version_transit_origin, world_save_transit_origin_section_bytes },     // v92
     };
-    static_assert(world_save_version == k_world_save_version_space_merge,
+    static_assert(world_save_version == k_world_save_version_monthly, // v94 adds no section (BL-1642)
                   "BL-1632: a new trailing section joins world_save_tail_bytes_after's table");
     assert(version >= static_cast<int>(k_world_save_version_pre_tax)); // older tails are not today's
     std::size_t n = 0;
@@ -3634,7 +3634,8 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
     // addition and nothing else moved, so v48 is a strict prefix of v49 as v47 is
     // of v48.
     if (!r_u32(in, version)
-        || (version != world_save_version && version != k_world_save_version_pre_lp
+        || (version != world_save_version && version != k_world_save_version_space_merge // v93: v94's layout, the quarter tick (BL-1642)
+            && version != k_world_save_version_pre_lp
             && version != k_world_save_version_pre_rail
             && version != k_world_save_version_pre_state
             && version != k_world_save_version_pre_space

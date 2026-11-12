@@ -53,7 +53,7 @@ std::string signed_delta(double value);
 /// serves day, quarter, and tick rates.
 ///
 /// @param value    The signed amount per period.
-/// @param per_unit Period label appended after " / " (e.g. "qtr", "day").
+/// @param per_unit Period label appended after " / " (e.g. "mo", "day").
 /// @return         Signed rate string.
 std::string rate(double value, const char* per_unit);
 
@@ -133,6 +133,10 @@ calendar_date date_from_day(uint64_t day_tick);
 /// @param day_tick In-game days elapsed since the campaign start.
 /// @return         Progress through the quarter, clamped to [0, 1).
 float quarter_progress(uint64_t day_tick);
+
+/// Fraction (0..1) of the way through the current month - the economy tick since
+/// BL-1642 (Ben, 2026-11-11). Day 1 of a month reads 0.0, its last day just under 1.
+float month_progress(uint64_t day_tick);
 
 /// The labour-contention read for a (corp, body) workforce scalar — the single
 /// phrasing every surface uses, so the same ceiling seen from a ledger,

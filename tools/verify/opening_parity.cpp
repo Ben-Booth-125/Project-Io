@@ -188,7 +188,7 @@ template <class T> T median_of(std::vector<T> v)
     return v[v.size() / 2];
 }
 
-constexpr int k_econ_tick_days_diag = 90; ///< --diagnose-idle: the first play quarter's day
+constexpr int k_econ_tick_days_diag = k_econ_tick_days; // BL-1642: a month; ///< --diagnose-idle: the first play quarter's day
 
 double ratio(double hi, double lo) { return lo > 0.0 ? hi / lo : (hi > 0.0 ? 999.0 : 1.0); }
 } // namespace
@@ -487,7 +487,7 @@ int main(int argc, char** argv)
             }
 
             // Play: N quarters, nobody seated (every nation's scorer acts).
-            constexpr int k_econ_tick_days = 90;
+            constexpr int k_econ_tick_days = ::k_econ_tick_days; // BL-1642: 30, a month;
             std::map<entity_id, std::vector<double>> nets;
             for (int k = 1; k <= quarters; ++k)
             {

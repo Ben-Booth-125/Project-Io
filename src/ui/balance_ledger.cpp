@@ -65,7 +65,7 @@ void draw_profit_chart(ImDrawList* dl, ImVec2 mn, ImVec2 mx, const std::vector<f
     if (profit.size() < 2)
     {
         dl->AddText({plot_x0, (y_top + y_bot) * 0.5f}, label_col, // fit-exempt: axis/tick labels inside a gutter measured by the host
-                    "Run economy quarters to chart profit.");
+                    "Run economy months to chart profit.");
         return;
     }
 
@@ -277,7 +277,7 @@ void draw_balance_ledger(const world& w, const recipe_registry& reg,
             const nation_component& nc = pit->second;
             const int want = draw_tier_control(
                 "Taxes", nc.tax_tier,
-                "The share of your home firms' income your nation takes each quarter\n"
+                "The share of your home firms' income your nation takes each month\n"
                 "(the firms headquartered on its ground; their operating profit).\n"
                 "Sustained high taxes (IV, V) raise Discontent; above half, every\n"
                 "building on your ground loses output, up to 15%. Lower tiers let it ebb.",
@@ -309,7 +309,7 @@ void draw_balance_ledger(const world& w, const recipe_registry& reg,
             ImGui::TextColored(col, "%s", dbuf);
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip("Your population's mood toward its taxes, 0-100%%.\n"
-                                  "Tier IV raises it 6.25%% a quarter, V 12.5%%; III holds it;\n"
+                                  "Tier IV raises it 6.25%% every three months, V 12.5%%; III holds it;\n"
                                   "II and I lower it. Above 50%% it cuts the output of every\n"
                                   "building on your nation's ground, up to 15%% at 100%%.");
         }
@@ -401,13 +401,13 @@ void draw_balance_ledger(const world& w, const recipe_registry& reg,
         rank_player_buildings_by_profit(w, reg, report);
     if (ranking.empty())
     {
-        ImGui::TextDisabled("No buildings reporting yet - run an economy quarter.");
+        ImGui::TextDisabled("No buildings reporting yet - run an economy month.");
     }
     else if (ImGui::BeginTable("##bldg_rank", 3,
                  ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_SizingStretchProp))
     {
         ImGui::TableSetupColumn("Building",   ImGuiTableColumnFlags_WidthStretch, 3.0f);
-        ImGui::TableSetupColumn("Profit/qtr", ImGuiTableColumnFlags_WidthStretch, 2.0f);
+        ImGui::TableSetupColumn("Profit/mo", ImGuiTableColumnFlags_WidthStretch, 2.0f);
         ImGui::TableSetupColumn("vs yr",       ImGuiTableColumnFlags_WidthStretch, 1.4f);
         ImGui::TableHeadersRow();
 

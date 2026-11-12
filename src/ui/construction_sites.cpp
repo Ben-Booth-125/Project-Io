@@ -933,11 +933,11 @@ void draw_site_grid(const world& w, const recipe_registry& reg, ui_state& ui)
                                                                : c.best_place;
                 if (c.best_starved)
                     std::snprintf(buf, sizeof buf,
-                                  "The best site, %s, would likely stand idle: its Est. net %+d cr / qtr is upkeep alone.",
+                                  "The best site, %s, would likely stand idle: its Est. net %+d cr / mo is upkeep alone.",
                                   where.c_str(), static_cast<int>(std::lround(c.best_net)));
                 else
                     std::snprintf(buf, sizeof buf,
-                                  "Est. net %+d cr / qtr at the best site, %s, at %d%% Logistic Point cover.",
+                                  "Est. net %+d cr / mo at the best site, %s, at %d%% Logistic Point cover.",
                                   static_cast<int>(std::lround(c.best_net)), where.c_str(),
                                   static_cast<int>(std::lround(c.best_cover * 100.0f)));
                 card("net", {mn.x, fig_y - 1.0f}, {mid, mx.y}, buf, value_colour(static_cast<double>(c.best_net)));
@@ -1170,21 +1170,21 @@ std::string shelf_runway_text(const shelf_runway& s)
     const std::string good = resource_name(s.good);
     char lead[120];
     if (s.quarters < 1.0f)
-        std::snprintf(lead, sizeof lead, "Under a quarter of %s left on this market's shelf", good.c_str());
+        std::snprintf(lead, sizeof lead, "Under a month of %s left on this market's shelf", good.c_str());
     else if (s.quarters < 2.0f)
-        std::snprintf(lead, sizeof lead, "Only about 1 quarter of %s left on this market's shelf", good.c_str());
+        std::snprintf(lead, sizeof lead, "Only about 1 month of %s left on this market's shelf", good.c_str());
     else
-        std::snprintf(lead, sizeof lead, "Only about %.0f quarters of %s left on this market's shelf",
+        std::snprintf(lead, sizeof lead, "Only about %.0f months of %s left on this market's shelf",
                       std::floor(s.quarters), good.c_str());
     char tail[160];
     if (s.drain > 0.0f)
-        std::snprintf(tail, sizeof tail, ": it would use %.1f a quarter, and the shelf is already falling %.1f.",
+        std::snprintf(tail, sizeof tail, ": it would use %.1f a month, and the shelf is already falling %.1f.",
                       static_cast<double>(s.plant_use), static_cast<double>(s.drain));
     else if (s.drain_known)
-        std::snprintf(tail, sizeof tail, " at the %.1f a quarter it would use.", static_cast<double>(s.plant_use));
+        std::snprintf(tail, sizeof tail, " at the %.1f a month it would use.", static_cast<double>(s.plant_use));
     else // An unread trail is not a flat shelf, so the sentence does not read as one.
         std::snprintf(tail, sizeof tail,
-                      " at the %.1f a quarter it would use. That is its own use alone: this shelf has no "
+                      " at the %.1f a month it would use. That is its own use alone: this shelf has no "
                       "trail read yet, so a fall would not show.", static_cast<double>(s.plant_use));
     std::string out = std::string(lead) + tail;
     if (s.others > 0)
@@ -1522,7 +1522,7 @@ void draw_site_finder(world& w, const recipe_registry& reg, ui_state& ui)
             e.key  = "net_header";
             e.mn   = ImGui::GetItemRectMin();
             e.mx   = ImGui::GetItemRectMax();
-            e.text = "Est. net / qtr at today's local prices, at 50% staffing, no labour shortage and "
+            e.text = "Est. net / mo at today's local prices, at 50% staffing, no labour shortage and "
                      "each tile's Logistic Point cover.";
             construction_column_card("Net", {std::move(e)});
         }
@@ -1601,12 +1601,12 @@ void draw_site_finder(world& w, const recipe_registry& reg, ui_state& ui)
                 else if (r.starved)
                     std::snprintf(buf, sizeof buf,
                                   "It would likely stand idle: this market cannot get it %s at a price it "
-                                  "will pay. Est. net %+d cr / qtr is its upkeep alone.",
+                                  "will pay. Est. net %+d cr / mo is its upkeep alone.",
                                   resource_name(r.short_of),
                                   static_cast<int>(std::lround(r.profit)));
                 else if (r.cover < 1.0f)
                     std::snprintf(buf, sizeof buf,
-                                  "Est. net %+d cr / qtr: it would run at %d%% while its Logistic "
+                                  "Est. net %+d cr / mo: it would run at %d%% while its Logistic "
                                   "Point cover is %d%%. Fully served it would make %+d.",
                                   static_cast<int>(std::lround(r.profit)),
                                   static_cast<int>(std::lround(r.cover * 100.0f)),
@@ -1614,7 +1614,7 @@ void draw_site_finder(world& w, const recipe_registry& reg, ui_state& ui)
                                   static_cast<int>(std::lround(r.profit_full_cover)));
                 else
                     std::snprintf(buf, sizeof buf,
-                                  "Est. net %+d cr / qtr once its output is selling here, fully served.",
+                                  "Est. net %+d cr / mo once its output is selling here, fully served.",
                                   static_cast<int>(std::lround(r.profit)));
                 const ImU32 ink = r.priced ? value_colour(static_cast<double>(r.profit)) : 0u;
                 const std::string net_text = r.runway_warn ? r.runway_text + " " + buf : std::string(buf);
@@ -1703,11 +1703,11 @@ void draw_site_finder(world& w, const recipe_registry& reg, ui_state& ui)
                 char buf[240];
                 if (r.has_yield && r.depositless)
                     std::snprintf(buf, sizeof buf,
-                                  "About %.1f units / qtr. No deposit: it draws on the river or the "
+                                  "About %.1f units / mo. No deposit: it draws on the river or the "
                                   "sea, which never runs out.", static_cast<double>(r.yield));
                 else if (r.has_yield)
                     std::snprintf(buf, sizeof buf,
-                                  "About %.1f units / qtr from a deposit of richness %.2f, %.0f units "
+                                  "About %.1f units / mo from a deposit of richness %.2f, %.0f units "
                                   "left in the ground.", static_cast<double>(r.yield),
                                   static_cast<double>(r.deposit), static_cast<double>(r.remaining));
                 else

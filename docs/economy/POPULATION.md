@@ -265,7 +265,7 @@ and the upper rungs' fill is the bonus (below). A good the band does not make is
 the basket is era-masked as the bid is.
 
 **Growth is a rate, anchored on Earth's history (Ben, 2026-11-10).** A centre's heads grow by a
-natural increase each quarter, a quarter of an annual rate, with fractional heads carried so a
+natural increase each month, a twelfth of an annual rate, with fractional heads carried so a
 small village still grows. The rate has two parts:
 
 - **A base that falls with development.** The base is 3.0 % a year for a nation with no qualified

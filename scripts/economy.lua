@@ -41,9 +41,15 @@ economy = {
     -- of deep insolvency; the sweep battery owns tuning them.
     firm_exit = {
         balance_floor        = -2000.0,
-        consecutive_quarters = 12,
+        consecutive_quarters = 36, -- months (BL-1642: three years, was 12 quarters)
     },
 
+    -- THE TICK IS A MONTH (Ben, 2026-11-11; BL-1642). Every per-tick figure in this
+    -- file is authored PER MONTH, at a third of the per-quarter value it carried when
+    -- the tick was a quarter, so a year's totals are unchanged; every count of ticks
+    -- is a count of months (three times the old count). A comment below that still
+    -- reasons in quarters reasons about the old figure, now restated per month.
+    --
     -- Per building_type constants.
     --   base_rate   — extraction: output units per tick at richness 1, workforce 1.
     --                 processing: recipe batches per tick at workforce 1.
@@ -97,9 +103,9 @@ economy = {
             -- those numbers clear stone at 1.0 (5 x price at the floor against
             -- 4.5 of costs) without touching a raw price; it also halves the
             -- wage per unit. tools/verify/recipe_margin R3/R4 are the check.
-            base_rate   = 40.0,
-            maintenance = 2.0,
-            base_wage   = 4.0,
+            base_rate   = 13.333333, -- /3 per month (was 40.0 a quarter, BL-1642)
+            maintenance = 0.666667, -- /3 per month (was 2.0 a quarter, BL-1642)
+            base_wage   = 1.333333, -- /3 per month (was 4.0 a quarter, BL-1642)
             build_cost  = 100.0,
             build_duration_days = 120,
             resource_costs = { steel = 20.0 },
@@ -197,9 +203,9 @@ economy = {
             -- inputs (clean_water 3 -> 11.9 with it, 7.6 without). The
             -- 2026-09-01 ledger named maintenance as 80% of every credit
             -- leaving the field. recipe_margin R1/R2 are the check.
-            base_rate   = 16.0,
-            maintenance = 2.0,
-            base_wage   = 12.0,
+            base_rate   = 5.333333, -- /3 per month (was 16.0 a quarter, BL-1642)
+            maintenance = 0.666667, -- /3 per month (was 2.0 a quarter, BL-1642)
+            base_wage   = 4.0, -- /3 per month (was 12.0 a quarter, BL-1642)
             build_cost  = 200.0,
             build_duration_days = 180,
             resource_costs = { steel = 25.0 },
@@ -244,8 +250,8 @@ economy = {
         },
         port = {
             base_rate   = 0.0,
-            maintenance = 8.0,
-            base_wage   = 6.0,
+            maintenance = 2.666667, -- /3 per month (was 8.0 a quarter, BL-1642)
+            base_wage   = 2.0, -- /3 per month (was 6.0 a quarter, BL-1642)
             build_cost  = 150.0,
             build_duration_days = 120,
             resource_costs = { steel = 20.0 },
@@ -258,8 +264,8 @@ economy = {
         launchpad = {
             era         = "industrial",
             base_rate   = 0.0,
-            maintenance = 20.0,
-            base_wage   = 15.0,
+            maintenance = 6.666667, -- /3 per month (was 20.0 a quarter, BL-1642)
+            base_wage   = 5.0, -- /3 per month (was 15.0 a quarter, BL-1642)
             build_cost  = 500.0,
             build_duration_days = 360,
             resource_costs = { steel = 50.0, refined_fuel = 20.0 },
@@ -272,7 +278,7 @@ economy = {
         railway_station = {
             era         = "industrial",
             base_rate   = 0.0,
-            maintenance = 6.0,
+            maintenance = 2.0, -- /3 per month (was 6.0 a quarter, BL-1642)
             base_wage   = 0.0,
             build_cost  = 120.0,
             build_duration_days = 120,
@@ -285,8 +291,8 @@ economy = {
         -- Cheaper than a launchpad but dearer than a port, reflecting its network reach.
         inland_logistics_hub = {
             base_rate   = 0.0,
-            maintenance = 12.0,
-            base_wage   = 8.0,
+            maintenance = 4.0, -- /3 per month (was 12.0 a quarter, BL-1642)
+            base_wage   = 2.666667, -- /3 per month (was 8.0 a quarter, BL-1642)
             build_cost  = 250.0,
             build_duration_days = 180,
             resource_costs = { steel = 30.0 },
@@ -329,7 +335,7 @@ economy = {
         -- military base: stone and a little steel, a short build, small upkeep.
         bunker = {
             base_rate   = 0.0,
-            maintenance = 5.0,
+            maintenance = 1.666667, -- /3 per month (was 5.0 a quarter, BL-1642)
             base_wage   = 0.0,
             build_cost  = 120.0,
             build_duration_days = 60,
@@ -343,8 +349,8 @@ economy = {
         -- installation, not a waypoint.
         research_institute = {
             base_rate   = 0.0,
-            maintenance = 15.0,
-            base_wage   = 10.0,
+            maintenance = 5.0, -- /3 per month (was 15.0 a quarter, BL-1642)
+            base_wage   = 3.333333, -- /3 per month (was 10.0 a quarter, BL-1642)
             build_cost  = 300.0,
             build_duration_days = 240,
             resource_costs = { steel = 35.0 },
@@ -360,8 +366,8 @@ economy = {
         astronaut_training_centre = {
             era         = "industrial",
             base_rate   = 0.0,
-            maintenance = 15.0,
-            base_wage   = 10.0,
+            maintenance = 5.0, -- /3 per month (was 15.0 a quarter, BL-1642)
+            base_wage   = 3.333333, -- /3 per month (was 10.0 a quarter, BL-1642)
             build_cost  = 300.0,
             build_duration_days = 240,
             resource_costs = { steel = 35.0 },
@@ -376,7 +382,7 @@ economy = {
         orbital_defence_battery = {
             era         = "industrial",
             base_rate   = 0.0,
-            maintenance = 20.0,
+            maintenance = 6.666667, -- /3 per month (was 20.0 a quarter, BL-1642)
             base_wage   = 0.0,
             build_cost  = 400.0,
             build_duration_days = 240,
@@ -393,8 +399,8 @@ economy = {
         -- stratum (POPULATION.md § Strata gate buildings).
         schooling = {
             base_rate   = 0.0,
-            maintenance = 8.0,
-            base_wage   = 6.0,
+            maintenance = 2.666667, -- /3 per month (was 8.0 a quarter, BL-1642)
+            base_wage   = 2.0, -- /3 per month (was 6.0 a quarter, BL-1642)
             build_cost  = 150.0,
             build_duration_days = 180,
             resource_costs = { timber = 12.0, stone = 8.0 },
@@ -408,8 +414,8 @@ economy = {
         -- reason as the schooling basket.
         university = {
             base_rate   = 0.0,
-            maintenance = 18.0,
-            base_wage   = 12.0,
+            maintenance = 6.0, -- /3 per month (was 18.0 a quarter, BL-1642)
+            base_wage   = 4.0, -- /3 per month (was 12.0 a quarter, BL-1642)
             build_cost  = 400.0,
             build_duration_days = 300,
             resource_costs = { stone = 30.0, timber = 12.0 },
@@ -425,8 +431,8 @@ economy = {
         -- building materials is in building_upkeep.goods below.
         planetary_marketplace = {
             base_rate   = 0.0,
-            maintenance = 10.0,
-            base_wage   = 8.0,
+            maintenance = 3.333333, -- /3 per month (was 10.0 a quarter, BL-1642)
+            base_wage   = 2.666667, -- /3 per month (was 8.0 a quarter, BL-1642)
             build_cost  = 200.0,
             build_duration_days = 180,
             resource_costs = { timber = 14.0, stone = 10.0 },
@@ -580,8 +586,8 @@ economy = {
     -- and its era bands all built and verified (tools/verify/building_upkeep).
     -- ===================================================================
     building_upkeep = {
-        supply_decay_permille    = 50,   -- the ONE subtraction, per tick, on an unmet draw
-        supply_recovery_permille = 100,  -- regained per tick while the draw is met
+        supply_decay_permille    = 17,   -- the ONE subtraction, per tick (month), on an unmet draw (50 a quarter / 3, rounded; BL-1642)
+        supply_recovery_permille = 33,   -- regained per tick (month) while the draw is met (100 / 3, rounded)
         -- BL-746 (Ben, 2026-09-02, NR-782 (a)): the FLOOR. An unmet draw dims a
         -- building to half its nominal output and no further - PRODUCTION.md's
         -- "the lights go dim, not out", which at floor 0 the decay did not
@@ -646,13 +652,14 @@ economy = {
         -- exists — the rates return, same first-cut values, re-measured by the
         -- round-two campaign_lapse cell.
         goods = {
+            -- Per month (BL-1642): a third of the per-quarter rates in the trailing comments.
             extraction_site = {
-                ancient    = { tools = 0.0, planks = 0.0 }, -- derived 0.07 / 0.15
-                industrial = { machinery = 0.0, power = 0.25, timber = 0.05, stone = 0.05 },  -- derived 0.11; power BL-708; repair BL-738 stage 2
+                ancient    = { tools = 0.0, planks = 0.0 }, -- derived 0.07 / 0.15 a quarter
+                industrial = { machinery = 0.0, power = 0.083333, timber = 0.016667, stone = 0.016667 },  -- a quarter: power 0.25, timber/stone 0.05; derived machinery 0.11; power BL-708; repair BL-738 stage 2
             },
             processing_facility = {
-                ancient    = { tools = 0.0, planks = 0.0 }, -- derived 0.14 / 0.30
-                industrial = { machinery = 0.0, electronics = 0.0, power = 0.40, timber = 0.08, stone = 0.08 }, -- derived 0.15 / 0.06; power BL-708; repair BL-738 stage 2
+                ancient    = { tools = 0.0, planks = 0.0 }, -- derived 0.14 / 0.30 a quarter
+                industrial = { machinery = 0.0, electronics = 0.0, power = 0.133333, timber = 0.026667, stone = 0.026667 }, -- a quarter: power 0.40, timber/stone 0.08; derived 0.15 / 0.06; power BL-708; repair BL-738 stage 2
             },
             -- BL-1266 (Ben, 2026-10-10): TRADE BUILDINGS CARRY AN UPKEEP OF FUEL
             -- AND BUILDING MATERIALS, bought off their own market's shelf like any
@@ -664,13 +671,14 @@ economy = {
             -- materials are the repair line's timber and stone. First cut, sized
             -- at roughly a fifth of each building's credit maintenance at authored
             -- base prices — proposed for Ben with the capacity table (BL-1270).
+            -- Per month (BL-1642): a third of the per-quarter figures (the trailing sums are a quarter's).
             port = {
-                ancient    = { charcoal = 0.10, timber = 0.10, stone = 0.10 },     -- 0.65 + 0.15 + 0.10 = 0.90
-                industrial = { coal = 0.15, timber = 0.10, stone = 0.10 }, -- 0.30 + 0.15 + 0.10 = 0.55
+                ancient    = { charcoal = 0.033333, timber = 0.033333, stone = 0.033333 }, -- a quarter 0.10 each: 0.65 + 0.15 + 0.10 = 0.90
+                industrial = { coal = 0.05, timber = 0.033333, stone = 0.033333 },       -- a quarter 0.15/0.10/0.10: 0.30 + 0.15 + 0.10 = 0.55
             },
             planetary_marketplace = {
-                ancient    = { charcoal = 0.15, timber = 0.15, stone = 0.15 },     -- 0.98 + 0.23 + 0.15 = 1.36
-                industrial = { coal = 0.25, timber = 0.15, stone = 0.15 }, -- 0.50 + 0.23 + 0.15 = 0.88
+                ancient    = { charcoal = 0.05, timber = 0.05, stone = 0.05 },           -- a quarter 0.15 each: 0.98 + 0.23 + 0.15 = 1.36
+                industrial = { coal = 0.083333, timber = 0.05, stone = 0.05 },           -- a quarter 0.25/0.15/0.15: 0.50 + 0.23 + 0.15 = 0.88
             },
         },
     },
@@ -704,9 +712,10 @@ economy = {
         -- 3,909.4 units carrying 15,544.1 credits of base value; holding those
         -- units, 15,544.1 / 3,909.4 = 3.976 draws the same 3,909 by value.
         lp_value_per_point = 3.98,
+        -- Per month (BL-1642): a third of the quarter's 20 / 4.
         points = {
-            planetary_marketplace = 20.0,
-            port                  = 4.0,
+            planetary_marketplace = 6.666667,
+            port                  = 1.333333,
         },
         capacity = {
             -- bulk raws
@@ -818,10 +827,12 @@ economy = {
         --   sea_per_port  20: Ben, 2026-11-02 - a completed, running port makes sea
         --                     recruits into the nation's one sea pool (cap 15 quarters).
         --                     20 matches an airbase; a ship's hire spends the pool.
+        -- Per month (BL-1642): a third of the quarter's 50 / 20 / 20, rounded to whole
+        -- heads (17 / 7 / 7 - a year is 204 / 84 / 84 against 200 / 80 / 80).
         recruits = {
-            land_per_base  = 50,
-            air_per_base   = 20,
-            sea_per_port   = 20,
+            land_per_base  = 17,
+            air_per_base   = 7,
+            sea_per_port   = 7,
             lp_per_recruit = 1.0,
         },
 
@@ -1003,8 +1014,11 @@ economy = {
             -- band. A cheaper goods draw is also a draw the fair-price ceiling
             -- fills more often, so a guard is better fed, not only cheaper.
             -- "A year's keep < a fresh hire": 4 x 50 x 0.1041 = 20.8 < 120.
-            credits_per_head           = 0.1041,  -- flat wage per head per tick (BL-1191 x0.25; was 0.4164; 0.15 before BL-744; 6.0 before BL-635)
-            credits_per_head_per_power = 0.00007, -- wage scaled by the roster row's power_mod (BL-1191 x0.25; was 0.00028; bound now <= 0.0000828)
+            -- BL-1642 (the tick is a month): every rate below is a third of its per-quarter
+            -- figure, so a year's keep is unchanged ("a year's keep < a fresh hire" reads
+            -- 12 x 50 x 0.0347 = 20.8 < 120 as before).
+            credits_per_head           = 0.0347,    -- flat wage per head per tick (a quarter 0.1041; BL-1191 x0.25; was 0.4164; 0.15 before BL-744; 6.0 before BL-635)
+            credits_per_head_per_power = 0.0000233, -- wage scaled by the roster row's power_mod (a quarter 0.00007; BL-1191 x0.25; was 0.00028)
 
             -- The goods half of the vector, per head per tick. ORDNANCE is the
             -- good (BL-457 added it as the roster's first terminal MILITARY
@@ -1012,12 +1026,12 @@ economy = {
             -- the sanctioned second line. Both rescaled by the same 0.025, so
             -- value_anchor's equipment:wage ratio is untouched.
             goods_per_head = {
-                ordnance     = 0.000875, -- BL-1191 x0.25 (was 0.0035; 0.14 before BL-635)
-                food_rations = 0.00625,  -- BL-1191 x0.25 (was 0.025; 1.0 before BL-635)
+                ordnance     = 0.00029167, -- a quarter 0.000875 (BL-1191 x0.25; was 0.0035; 0.14 before BL-635)
+                food_rations = 0.00208333, -- a quarter 0.00625 (BL-1191 x0.25; was 0.025; 1.0 before BL-635)
             },
 
-            supply_decay_permille    = 50,   -- the ONE decay subtraction, per tick
-            supply_recovery_permille = 100,  -- regained per tick while supplied
+            supply_decay_permille    = 17,   -- the ONE decay subtraction, per tick (month; 50 a quarter / 3, rounded)
+            supply_recovery_permille = 33,   -- regained per tick while supplied (100 / 3, rounded)
             out_of_supply_reach      = 24.0, -- reach cost past which a unit is out of supply; <= 0 disables
         },
 
@@ -1212,10 +1226,10 @@ economy = {
             dock_morale_per_day       = 10,
             resume_hp_permille        = 700,
             resume_morale_permille    = 600,
-            refit_ppm_per_quarter     = 200000,
+            refit_ppm_per_quarter     = 66667, -- per econ tick, a month (BL-1642: a third of the quarter's 200000; the key keeps its name)
             bomb_hp_per_hit_permille  = 10000,
-            refit_goods               = { steel = 3.0, machinery = 1.0 },
-            ship_upkeep_goods         = { refined_fuel = 2.0 },
+            refit_goods               = { steel = 1.0, machinery = 0.333333 }, -- a month's full refit (a quarter 3.0 / 1.0, BL-1642)
+            ship_upkeep_goods         = { refined_fuel = 0.666667 }, -- per ship per month (a quarter 2.0)
             classes = {
                 submarine = {
                     hp = 60, attack = 3000, detection = 20, stealth = 600, range = 40,
@@ -1257,7 +1271,7 @@ economy = {
             ad_attack                = 1000, -- one air defence unit: 1 HP a day to each wing over it
             repair_permille_per_day  = 4,   -- a bombed building regains 0.4 % a day
             repair_goods_per_permille = { steel = 0.05, machinery = 0.02 },
-            wing_upkeep_goods        = { refined_fuel = 1.0 }, -- per wing per tick, at its airbase
+            wing_upkeep_goods        = { refined_fuel = 0.333333 }, -- per wing per tick (month; a quarter 1.0), at its airbase
             classes = {
                 fighter = {
                     hp = 100, air = 2000, superiority_permille = 1000, range = 15,
@@ -1319,7 +1333,7 @@ economy = {
     -- First-cut authored constants; retune by playtest.
     procurement = {
         deposit_fraction       = 0.25, -- debited at accept_quote; remainder paced across lead_time_ticks
-        base_lead_ticks        = 2.0,
+        base_lead_ticks        = 6.0, -- months (BL-1642: two quarters)
         reputation_floor       = -5.0, -- request_quote declines below this; 0 for an unseen pair
         reputation_on_complete = 1.0,
         reputation_on_cancel   = -2.0,
@@ -1363,7 +1377,7 @@ economy = {
         -- and no plant was built for them (seed 0: 4 staffed pads, 0 launches by
         -- 1995). 1.0 = one launch a quarter, the rate a rival's pick can take.
         -- 0 switches the bid off. Loader bounds [0, 4].
-        standing_lots = 1.0,
+        standing_lots = 0.333333, -- lots a month (BL-1642: one a quarter)
     },
 
     -- BL-1335: taxes and Discontent (docs/politics/NATIONS.md § Taxes and
@@ -1380,8 +1394,10 @@ economy = {
     -- rates, threshold, penalty, headroom finite in [0, 1]; pressures in [-1, 1].
     tax = {
         rate_1 = 0.00, rate_2 = 0.05, rate_3 = 0.10, rate_4 = 0.15, rate_5 = 0.20,
-        pressure_1 = -0.125, pressure_2 = -0.0625, pressure_3 = 0.0,
-        pressure_4 = 0.0625, pressure_5 = 0.125,
+        -- Per month (BL-1642): a third of the quarter's pressures, so tier IV still
+        -- reaches the bite threshold in two years (24 months) and tier V in one.
+        pressure_1 = -0.041666667, pressure_2 = -0.020833333, pressure_3 = 0.0,
+        pressure_4 = 0.020833333, pressure_5 = 0.041666667,
         bite_threshold = 0.5,
         max_penalty    = 0.15,
         ai_headroom    = 0.0625,
@@ -1431,15 +1447,16 @@ economy = {
     -- then ~37% of the stone and ~20% of the timber dug - a real demand, not a
     -- drain (in-band calibration, logged). A nation buys only from its own
     -- markets (network_upkeep.cpp).
+    -- Per month (BL-1642): a third of each per-quarter rate in the trailing comments.
     network_upkeep = {
-        stone_track    = 0.005,  -- stone per Track tile per quarter
-        stone_road     = 0.015,  -- ...per Road tile
-        stone_highway  = 0.040,  -- ...per Highway tile
-        timber_track   = 0.0025, -- timber per Track tile per quarter
-        timber_road    = 0.0075, -- ...per Road tile
-        timber_highway = 0.020,  -- ...per Highway tile
-        stone_hub      = 0.5,    -- stone per active port / inland hub per quarter
-        timber_hub     = 0.25,   -- timber per active port / inland hub per quarter
+        stone_track    = 0.0016667, -- stone per Track tile per month (a quarter 0.005)
+        stone_road     = 0.005,     -- ...per Road tile (0.015)
+        stone_highway  = 0.0133333, -- ...per Highway tile (0.040)
+        timber_track   = 0.0008333, -- timber per Track tile per month (0.0025)
+        timber_road    = 0.0025,    -- ...per Road tile (0.0075)
+        timber_highway = 0.0066667, -- ...per Highway tile (0.020)
+        stone_hub      = 0.1666667, -- stone per active port / inland hub per month (0.5)
+        timber_hub     = 0.0833333, -- timber per active port / inland hub per month (0.25)
     },
 
     -- BL-1273: the research dials (RESEARCH.md § What is open; the conversion is
@@ -1449,24 +1466,27 @@ economy = {
     -- queue still owes. The SHAPE is these dials: base + sqrt (Ben, 2026-10-10).
     -- 200 RP a cost unit: an age is ~80 years (Ben, 2026-10-10); harness R0 measures it. The
     -- loader rejects a negative or non-finite value by key.
+    -- BL-1642 (Ben, 2026-11-11): the tick is a month, so every RP rate is a third of its
+    -- per-quarter figure (sqrt term: 10 / sqrt(3), because the spend it reads is a third
+    -- too) and the RP unit triples - research costs three times the 2026-10-10 price.
     research = {
-        base_rp_per_nation          = 120.0,
+        base_rp_per_nation          = 40.0, -- a month (a quarter 120)
         rp_per_research_credit      = 0.0,
         -- BL-1305 (sprint 53): 20 -> 10. Real treasuries (BL-1298) made the
         -- concave term outrun the band (median 14 quarters, p10 7); re-fit in band
         -- (nation_tech_harness R0, 16 seeds, 32 q): sqrt 20: p10 7 p50 14 p90 25 |
         -- 12: 11/18/27 | 10: 12/20/28 | 8: 14/22/28. Base 120 kept (Ben's).
-        rp_per_research_credit_sqrt = 10.0,
-        rp_per_university           = 100.0, -- unmeasured: no University stands on any curated seed
-        rp_per_institute            = 50.0,  -- unmeasured: likewise
-        rp_per_cost_unit            = 200.0,
+        rp_per_research_credit_sqrt = 5.7735027, -- a month: 10 / sqrt(3) (a quarter 10)
+        rp_per_university           = 33.333333, -- a month (a quarter 100); unmeasured: no University stands on any curated seed
+        rp_per_institute            = 16.666667, -- a month (a quarter 50); unmeasured: likewise
+        rp_per_cost_unit            = 600.0, -- x3 (Ben, 2026-11-11: research costs triple; was 200)
         -- BL-1324 (rising tech prices; RESEARCH.md § Cost, Ben 2026-10-15): node
         -- prices rise through the age and RP grow with the economy. The price is
         -- calibrated to the MEDIAN nation's RP growth (nation_tech_harness --age 80,
         -- R4, 16 seeds): the median nation has no firms of its own, so it grows only
         -- through the research line, ~0.5% a year from 1970. Faster prices slow it.
-        price_growth_per_year       = 0.005, -- nominal, compounded quarterly: 1.49 by 2040
-        rp_per_economy_unit         = 0.03,  -- RP a quarter per credit of home firms' previous quarter's filed income
+        price_growth_per_year       = 0.005, -- nominal, compounded monthly: 1.49 by 2040
+        rp_per_economy_unit         = 0.03,  -- RP a tick per credit of home firms' previous tick's filed income (both a month: unchanged)
         -- BL-1612 (ERAS.md § Era 1 -> Era 2 gate, condition 3): the propellant a
         -- market on the home body must hold on its shelf before the Early Space
         -- tree opens to a nation. 1.0 = one launch's draw (launch_draw_per_convoy).
@@ -1476,7 +1496,7 @@ economy = {
         -- orbit, station core, crew on a moon, off-world base, space convoy).
         -- 400 = two cost units at the age's opening price (rp_per_cost_unit),
         -- a bit over three quarters of base_rp_per_nation. Unmeasured first cut.
-        space_first_grant_rp        = 400.0,
+        space_first_grant_rp        = 1200.0, -- two cost units: x3 with the RP unit (BL-1642; was 400)
     },
 
     -- BL-545/BL-546: the relational substrate's DECAY (sentiment.hpp). Each
@@ -1539,16 +1559,18 @@ economy = {
     --
     -- Rejected at load, never clamped, if it is not a finite number >= 0.
     acquisition = {
-        multiple = 8.0,
+        multiple = 24.0, -- months of trailing net: two years (BL-1642; was 8 quarters)
     },
 
     sentiment = {
-        trust_decay_per_tick  = 0.037776, -- 18-tick half-life (NR-1129)
-        access_decay_per_tick = 0.074125,
+        -- BL-1642 (the tick is a month): the half-lives hold in calendar time, so they
+        -- are counted in months - Trust 54 (18 quarters), Access and Alarm 27 (9).
+        trust_decay_per_tick  = 0.012754, -- 54-month half-life: 1 - 2^(-1/54) (NR-1129's 18 quarters)
+        access_decay_per_tick = 0.025345, -- 27-month half-life: 1 - 2^(-1/27)
         -- BL-1432 (RELATIONS.md § 6): Alarm, the third dimension, decays at the
         -- same nine-quarter half-life (1 - 2^(-1/9)); there is no separate ruling
         -- for it, so it takes the anchor the other two take.
-        alarm_decay_per_tick  = 0.074125,
+        alarm_decay_per_tick  = 0.025345,
         -- BL-1432: a building whose authored build_cost reaches this is a LARGE
         -- SINGLE-SITE FACILITY for facility_visible. 450 picks the launchpad (500)
         -- and the airbase (450): the sites a rival cannot miss and has reason to
@@ -1628,7 +1650,7 @@ economy = {
         -- (one quarter) — still a real cooldown, not an instant flip, but not
         -- multi-year friction on a routine dial. Flagged for further playtest
         -- tuning, see NR-253.
-        cooldown_ticks = 1,
+        cooldown_ticks = 3, -- months (BL-1642: one quarter)
     },
 
     -- Player-placeable roads, now a three-tier ladder (BL-172; BL-147 shipped a single tier). A
@@ -1684,7 +1706,7 @@ economy = {
     -- REJECTS out-of-range values (permille outside [0,1000], wage_weight
     -- non-finite/negative, selectivity below 1) rather than clamping.
     migration = {
-        rate_permille         = 10,   -- share of a below-mean centre's heads seeking to move per tick
+        rate_permille         = 3.333333, -- share of a below-mean centre's heads seeking to move per tick (month; a quarter 10)
         neutral_gate_permille = 250,  -- throttle between NEUTRAL nations (friendly 1000, hostile 0)
         wage_weight           = 0.02, -- credits -> attractiveness on the clearing-wage signal
         qualified_selectivity = 1.5,  -- movers skew qualified: migrants carry min(1, origin_q x this)
@@ -1726,7 +1748,7 @@ economy = {
         demand_elasticity = 0.80,
         elasticity_min     = 0.30,
         elasticity_max     = 2.50,
-        demand_scale       = 1.00,
+        demand_scale       = 0.333333, -- a month's demand: a third of the quarter's 1.00 (BL-1642)
         -- BL-1217 lever D (Ben, 2026-10-07: adopted): the basket DRAWS its bid
         -- off the market's shelf after the households' draw (no money moves,
         -- no ceiling). MARKETS.md step 3 / step 12.
@@ -1853,7 +1875,7 @@ economy = {
         demand_elasticity = 0.80, -- exponent on (base_price / price); matches the substrate shape
         elasticity_min    = 0.30,
         elasticity_max    = 2.50,
-        demand_scale      = 1.00,
+        demand_scale      = 0.333333, -- a month's demand: a third of the quarter's 1.00 (BL-1642)
     },
 
     -- BL-647 (2026-09-01): ENDEMIC LUXURY DEMAND — the Endemic trade channel
@@ -1895,7 +1917,7 @@ economy = {
         demand_elasticity = 0.80, -- the population basket's elasticity shape, reused
         elasticity_min    = 0.30,
         elasticity_max    = 2.50,
-        wealth_scale      = 0.01, -- credits of national wealth -> demand units
+        wealth_scale      = 0.0033333, -- credits of national wealth -> demand units a month (a quarter 0.01, BL-1642)
         preference_spread = 0.90, -- craving in [0.1, 1.9): near-ignore to near-double
     },
 
@@ -2011,7 +2033,7 @@ economy = {
         --     G3 firms     88.9%  83.5%  83.5%  83.0%
         -- k = 1 is the smallest k that takes a consuming price at the ceiling
         -- against a stocked shelf to 0 and passes run-rate income.
-        shelf_supply_ticks = 1,
+        shelf_supply_ticks = 3, -- months: the quarter's k = 1 in calendar time (BL-1642)
     },
 
     -- ===================================================================
@@ -2035,72 +2057,75 @@ economy = {
     --              components, and raw WATER (stored water does not rot like
     --              food; NR-972): ~8% a year (half-life ~34 q), never zero.
     -- ===================================================================
+    -- PER MONTH (BL-1642): each rate is 1 - (1 - r_quarter)^(1/3), so a shelf loses the
+    -- same share over a quarter as it did under the quarter tick: perishable 0.25 a
+    -- quarter -> 0.091440 a month, consumable 0.10 -> 0.034511, durable 0.02 -> 0.006712.
     shelf_spoilage = {
         -- perishable
-        agricultural_produce  = 0.25,
-        food_rations          = 0.25,
-        clean_water           = 0.25,
-        medical_supplies      = 0.25,
+        agricultural_produce  = 0.091440,
+        food_rations          = 0.091440,
+        clean_water           = 0.091440,
+        medical_supplies      = 0.091440,
         -- consumable: fuels and power-adjacent stocks
-        coal                  = 0.10,
-        petroleum             = 0.10,
-        peat                  = 0.10,
-        refined_fuel          = 0.10,
-        charcoal              = 0.10,
-        propellant            = 0.10,
-        power                 = 0.10,
-        construction_capacity = 0.10, -- retired slot (BL-1438): spoils away any old-save stock
+        coal                  = 0.034511,
+        petroleum             = 0.034511,
+        peat                  = 0.034511,
+        refined_fuel          = 0.034511,
+        charcoal              = 0.034511,
+        propellant            = 0.034511,
+        power                 = 0.034511,
+        construction_capacity = 0.034511, -- retired slot (BL-1438): spoils away any old-save stock
         -- consumable: consumer and organic goods
-        consumer_goods        = 0.10,
-        tobacco               = 0.10,
-        spices                = 0.10,
-        coffee                = 0.10,
-        furs                  = 0.10,
-        hides                 = 0.10,
-        fibre                 = 0.10,
-        trade_goods_misc      = 0.10,
-        cloth                 = 0.10,
-        leather               = 0.10,
-        rigging               = 0.10,
+        consumer_goods        = 0.034511,
+        tobacco               = 0.034511,
+        spices                = 0.034511,
+        coffee                = 0.034511,
+        furs                  = 0.034511,
+        hides                 = 0.034511,
+        fibre                 = 0.034511,
+        trade_goods_misc      = 0.034511,
+        cloth                 = 0.034511,
+        leather               = 0.034511,
+        rigging               = 0.034511,
         -- durable: raw water (NR-972: stored water does not rot like food)
-        water                 = 0.02,
+        water                 = 0.006712,
         -- durable: ores
-        iron_ore              = 0.02,
-        silica                = 0.02,
-        copper_ore            = 0.02,
-        rare_earth_ore        = 0.02,
-        iron_nickel_ore       = 0.02,
-        platinum_group_metals = 0.02,
-        regolith              = 0.02,
+        iron_ore              = 0.006712,
+        silica                = 0.006712,
+        copper_ore            = 0.006712,
+        rare_earth_ore        = 0.006712,
+        iron_nickel_ore       = 0.006712,
+        platinum_group_metals = 0.006712,
+        regolith              = 0.006712,
         -- durable: materials
-        stone                 = 0.02,
-        timber                = 0.02,
-        sand                  = 0.02,
-        clay                  = 0.02,
-        ceramics              = 0.02,
-        dressed_stone         = 0.02,
-        planks                = 0.02,
+        stone                 = 0.006712,
+        timber                = 0.006712,
+        sand                  = 0.006712,
+        clay                  = 0.006712,
+        ceramics              = 0.006712,
+        dressed_stone         = 0.006712,
+        planks                = 0.006712,
         -- durable: metals and alloys
-        steel                 = 0.02,
-        iron_blooms           = 0.02,
-        silicon               = 0.02,
-        refined_copper        = 0.02,
-        ree_alloy             = 0.02,
-        alloys                = 0.02,
+        steel                 = 0.006712,
+        iron_blooms           = 0.006712,
+        silicon               = 0.006712,
+        refined_copper        = 0.006712,
+        ree_alloy             = 0.006712,
+        alloys                = 0.006712,
         -- durable: components
-        machinery             = 0.02,
-        electronics           = 0.02,
-        spacecraft_components = 0.02,
-        ordnance              = 0.02,
-        tools                 = 0.02,
+        machinery             = 0.006712,
+        electronics           = 0.006712,
+        spacecraft_components = 0.006712,
+        ordnance              = 0.006712,
+        tools                 = 0.006712,
         -- durable: the kit goods by kind (BL-1422)
-        small_arms            = 0.02,
-        armoured_vehicles     = 0.02,
-        artillery_pieces      = 0.02,
-        guided_weapons        = 0.02,
-        drones                = 0.02,
-        airframes             = 0.02, -- BL-1436
-        ship_hulls            = 0.02, -- BL-1527
+        small_arms            = 0.006712,
+        armoured_vehicles     = 0.006712,
+        artillery_pieces      = 0.006712,
+        guided_weapons        = 0.006712,
+        drones                = 0.006712,
+        airframes             = 0.006712, -- BL-1436
+        ship_hulls            = 0.006712, -- BL-1527
     },
 
     -- ===================================================================
@@ -2301,7 +2326,7 @@ logistics = {
         station_handling      = 0.08,
         track_build_cost      = 20.0,
         track_steel_per_tile  = 2.0,
-        track_upkeep_per_tile = 0.25,
+        track_upkeep_per_tile = 0.083333, -- per tile per month (a quarter 0.25, BL-1642)
     },
 }
 

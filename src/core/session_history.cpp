@@ -133,11 +133,11 @@ void post_solar_storm_notices(const world& w, const economy_report& report,
                               + (r.satellites_dark == 1 ? "" : "s") + " dark and "
                               + std::to_string(r.modules_stopped) + " station module"
                               + (r.modules_stopped == 1 ? "" : "s")
-                              + " stopped outside a planet's shelter this quarter.");
+                              + " stopped outside a planet's shelter this month.");
         if (r.warned)
             ui::chat_post(chat, day_tick, null_entity, field,
-                          "Observatory: a solar storm will strike next quarter. Satellites and "
-                          "stations at Lagrange points and asteroids will stop for the quarter.");
+                          "Observatory: a solar storm will strike next month. Satellites and "
+                          "stations at Lagrange points and asteroids will stop for three months.");
     }
 }
 

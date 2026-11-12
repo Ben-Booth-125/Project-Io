@@ -345,7 +345,7 @@ void run_seed(std::uint32_t seed, int ticks)
 
     const std::set<int> readings = {1, 50, 200, 400};
     std::map<int, reading> rds;
-    constexpr int k_econ_tick_days = 90;
+    constexpr int k_econ_tick_days = ::k_econ_tick_days; // BL-1642: 30, a month;
     double cum_stalled_opex = 0.0;
     for (int k = 1; k <= ticks; ++k)
     {

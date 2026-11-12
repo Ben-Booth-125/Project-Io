@@ -96,7 +96,7 @@ dashboard's roll-up cards use), one row per corporation, **sortable on every col
 | Type (the holdings mix: Extraction / Processing / Mixed) | **yes** |
 | End resource (the recipe's output) | **yes** |
 | Input resource | **yes** |
-| Profit/qtr (the filed `net`) | **yes** |
+| Profit/mo (the filed `net`) | **yes** |
 | Price | **yes**, and additionally absent on the player's own row — it is not for sale |
 | Ownership | no — it is the thing that explains every dash |
 
@@ -144,7 +144,7 @@ is the population this ledger is *not* about.
 - **`is_background` is deliberately NOT a gate.** The verb does not test it, so neither does the
   ledger: the buyable field is *every* public filed firm, which in practice is mostly background
   companies. Adding such a gate would make the ledger disagree with the verb behind it.
-- Profit → `corporation_component::returns.back().net`, the filed quarterly return (BL-626).
+- Profit → `corporation_component::returns.back().net`, the filed monthly return (BL-626).
 - Type / end resource / input resource → derived at draw time by walking `cc.assets` →
   `building_component` → `recipe_registry::get_recipe`. There is no stored "what this firm makes"
   field, and inventing one would be a second source of truth that could disagree with the buildings.

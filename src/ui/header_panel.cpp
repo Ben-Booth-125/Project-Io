@@ -147,11 +147,11 @@ void recruit_tooltip(int theatre, const recruit_readout& r)
 {
     static const char* const k_what[3] = {
         "The men every land unit is raised with and refills from. Each running military base "
-        "takes them from its province's people, every quarter.",
+        "takes them from its province's people, every month.",
         "The crews every wing is raised with and refills from. Each running airbase takes them "
-        "from its province's people, every quarter.",
+        "from its province's people, every month.",
         "The crews ships will be raised with. Each port takes them from its province's people, "
-        "every quarter.",
+        "every month.",
     };
     static const char* const k_source[3][2] = {
         {"running military base", "running military bases"},
@@ -165,12 +165,12 @@ void recruit_tooltip(int theatre, const recruit_readout& r)
     ImGui::TextUnformatted(k_what[theatre]);
     const int sources = r.rate > 0 ? r.output / r.rate : 0;
     if (r.rate > 0)
-        ImGui::TextDisabled("%d %s x %d = %d a quarter; the pool holds at most %d, fifteen quarters of it.",
+        ImGui::TextDisabled("%d %s x %d = %d a month; the pool holds at most %d, forty-five months of it.",
                             sources, k_source[theatre][sources == 1 ? 0 : 1], r.rate, r.output, r.cap);
     else
-        ImGui::TextDisabled("%d a quarter; the pool holds at most %d, fifteen quarters of it.", r.output,
+        ImGui::TextDisabled("%d a month; the pool holds at most %d, forty-five months of it.", r.output,
                             r.cap);
-    ImGui::TextDisabled("A full pool takes none: its sources make no recruits that quarter.");
+    ImGui::TextDisabled("A full pool takes none: its sources make no recruits that month.");
     if (r.cap > 0 && r.held >= r.cap)
         ImGui::TextDisabled("Full now: nothing is made until a hire spends from it.");
     else if (r.cap == 0 && r.held == 0)
@@ -346,33 +346,33 @@ void draw_header_panel(const world& w,
     {
         const int quarters = static_cast<int>(std::max(0.0f, treasury) / -burn);
         char      buf[32];
-        std::snprintf(buf, sizeof(buf), "%dq", quarters);
+        std::snprintf(buf, sizeof(buf), "%dmo", quarters); // BL-1642: months
         runway_text = buf;
         // Under two years of cushion is the point it needs acting on.
-        runway_urgent = quarters < 8;
+        runway_urgent = quarters < 24; // two years of months (BL-1642)
         char tip[320];
         if (subsidies > 0.0f)
             std::snprintf(tip, sizeof(tip),
-                          "About %d quarters of cushion: treasury divided by how far it fell\n"
-                          "last quarter, construction included. Assumes the burn holds steady - it moves as\n"
+                          "About %d months of cushion: treasury divided by how far it fell\n"
+                          "last month, construction included. Assumes the burn holds steady - it moves as\n"
                           "prices, wages and upkeep change. Includes Cr %.0f of contract\n"
-                          "income this quarter - a one-off payment, not a steady rate.\n"
+                          "income this month - a one-off payment, not a steady rate.\n"
                           "When the treasury runs out, a losing building idles.",
                           quarters, static_cast<double>(subsidies));
         else
             std::snprintf(tip, sizeof(tip),
-                          "About %d quarters of cushion: treasury divided by how far it fell\n"
-                          "last quarter, construction included. Assumes the burn holds steady - it moves as\n"
+                          "About %d months of cushion: treasury divided by how far it fell\n"
+                          "last month, construction included. Assumes the burn holds steady - it moves as\n"
                           "prices, wages and upkeep change.\n"
                           "When the treasury runs out, a losing building idles.", quarters);
         runway_tip = tip;
     }
 
-    // HEADER.md § Contents: TREASURY 1.2M (+34/qtr)   |   CARGO 40K
+    // HEADER.md § Contents: TREASURY 1.2M (+34/mo)   |   CARGO 40K
     float used_width = ImGui::CalcTextSize("TREASURY").x + item_spacing.x +
                        ImGui::CalcTextSize(fmt::credits(treasury).c_str()).x + item_spacing.x +
                        ImGui::CalcTextSize("(").x +
-                       ImGui::CalcTextSize(fmt::rate(net, "qtr").c_str()).x +
+                       ImGui::CalcTextSize(fmt::rate(net, "mo").c_str()).x +
                        ImGui::CalcTextSize(")").x +
                        ImGui::CalcTextSize("   |   CARGO").x + item_spacing.x +
                        ImGui::CalcTextSize(fmt::credits(valuation).c_str()).x;
@@ -400,7 +400,7 @@ void draw_header_panel(const world& w,
     //   none                          - folded into the treasury's tooltip instead
     const float runway_sep_w   = ImGui::CalcTextSize("   |   ").x;
     const float runway_label_w = ImGui::CalcTextSize("RUNWAY").x + item_spacing.x;
-    const float runway_val_w   = ImGui::CalcTextSize(runway_meaningful ? runway_text.c_str() : "12q").x;
+    const float runway_val_w   = ImGui::CalcTextSize(runway_meaningful ? runway_text.c_str() : "36mo").x;
     {
         header_recruits_record& rec = recruits_record();
         rec.room        = money_room;
@@ -462,7 +462,7 @@ void draw_header_panel(const world& w,
     };
     constexpr const char* k_treasury_tip = "Your nation's treasury. A nation never runs into debt.";
     constexpr const char* k_net_tip =
-        "Last quarter's operating net: income, less expenditure, maintenance, wages and\n"
+        "Last month's operating net: income, less expenditure, maintenance, wages and\n"
         "research, plus tax income. Construction and refunds are not operating flows.";
     constexpr const char* k_cargo_tip = "Your trades' goods in transit, at the price where they land.";
 
@@ -489,7 +489,7 @@ void draw_header_panel(const world& w,
     {
         const ImU32 col = value_colour(fmt::sign_of(net));
         ImGui::PushStyleColor(ImGuiCol_Text, col);
-        fit_text(text_box::header_strip, "header.net", fmt::rate(net, "qtr").c_str(),
+        fit_text(text_box::header_strip, "header.net", fmt::rate(net, "mo").c_str(),
                  ImGui::GetContentRegionAvail().x);
         ImGui::PopStyleColor();
     }

@@ -239,17 +239,17 @@ is the condition on which an inherited grudge is admissible at all.
 
 Decay lives in `scripts/economy.lua` § `economy.sentiment`, as a **rate, not a half-life** —
 deriving it in-engine would put a `std::pow` on the tick. Ben's anchor (NR-568, 2026-08-23): *a
-cancellation is forgotten in nine quarters.* One tick is one quarter, so that is a half-life of
-nine ticks, and
+cancellation is forgotten in nine quarters.* One tick is one month, so that is a half-life of
+twenty-seven ticks, and
 
-    rate = 1 − 2^(−1 / 9) = 0.074125
+    rate = 1 − 2^(−1 / 27) = 0.025345
 
 is `access_decay_per_tick` and `alarm_decay_per_tick`. **Trust decays on its own, slower
-half-life of eighteen ticks** (Ben, 2026-11-03, NR-1129):
+half-life of eighteen quarters, fifty-four monthly ticks** (Ben, 2026-11-03, NR-1129):
 
-    rate = 1 − 2^(−1 / 18) = 0.037776
+    rate = 1 − 2^(−1 / 54) = 0.012754
 
-is `trust_decay_per_tick`. A betrayal is remembered longer than it is feared: at nine ticks no
+is `trust_decay_per_tick`. A betrayal is remembered longer than it is feared: at nine quarters no
 conduct between two nations ever reached the grievance edge (§ 7). What counts as a *large* single-site facility for
 § 6 is authored beside them, as `alarm_large_facility_cost`: a building whose authored build cost
 reaches it. The loader (`recipe_registry.cpp`) rejects either rate unless it is a finite number in

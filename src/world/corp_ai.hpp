@@ -79,7 +79,7 @@ const char* standing_component_name(standing_component c);
 /// a harness may tighten them to force behaviour into few ticks.
 struct corp_ai_params
 {
-    int   cadence_k       = 4;     ///< Corp c evaluates when tick % k == index(c) % k.
+    int   cadence_k       = 12;    ///< Corp c evaluates when tick % k == index(c) % k. 12 months, a year: the quarter tick's 4 (BL-1642).
     /// BL-711: build-site pre-filter width, PER RESOURCE - not a global cap.
     ///
     /// It was `top_m_sites = 8`, a global top-M over deposit x affinity x
@@ -175,9 +175,9 @@ struct corp_ai_params
     float trade_floor_multiple = 0.25f;
 
     /// Solvency reserve floor = max(floor_constant, floor_wage_mult × the corp's
-    /// per-tick wage bill). A tick is one quarter, so the default is two
-    /// quarters of wages — the accepted design's "≈ 2× quarterly wage bill".
-    float floor_wage_mult = 2.0f;
+    /// per-tick wage bill). A tick is one month (BL-1642), so the default is six
+    /// months (two quarters) of wages — the accepted design's "≈ 2× quarterly wage bill".
+    float floor_wage_mult = 6.0f; ///< BL-1642: six months of wages, the two quarters.
     float floor_constant  = 50.0f;
 
     /// Seed folded into the per-corp personality hash. The world does not store

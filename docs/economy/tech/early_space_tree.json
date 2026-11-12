@@ -1307,7 +1307,7 @@
     }
    ],
    "cost_units": 6,
-   "deed": "an armed fleet of yours holds your home world’s low orbit for 4 quarters",
+   "deed": "an armed fleet of yours holds your home world’s low orbit for 12 months",
    "keys_next_branch": "Deep-Space Fleets",
    "deed_effect": {
     "kind": "unread",

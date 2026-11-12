@@ -92,7 +92,7 @@ you have, and rebuild. That is a real strategic choice with a real cost in time.
 
 ### 1.6 Time
 
-The simulation advances in **quarters** — a tick is three months of campaign time, four to a year.
+The simulation advances in **months** — a tick is one month of campaign time, twelve to a year.
 Between ticks the game runs in real time, so you can look around, read ledgers and give orders
 without the world moving under you.
 
@@ -317,7 +317,7 @@ straight upgrade, so the better choice depends on which market the output is goi
 
 Each market is independent. Base prices come from global rarity; local prices respond to local
 supply and demand, smoothed rather than jumping. You hold no stock: everything you make lands on
-your market's shelf and is sold there at that quarter's price, and everything your buildings use
+your market's shelf and is sold there at that month's price, and everything your buildings use
 they buy off a shelf at the posted price — your own output included.
 
 Goods move between markets only by **trade**. Your Planetary Marketplaces and Ports make **trade
@@ -343,7 +343,7 @@ and **time**.
 
 A tile is about **128 km across** — derived from the planet's generated mass, not authored. A laden
 caravan makes ~25 km/day overland and ~130 km/day by sea, and terrain multiplies that: a mountain
-crossing costs about twice a plain. So a regional haul clears in a single quarter and a
+crossing costs about twice a plain. So a regional haul clears in a month or two and a
 cross-continental one takes several, which is what makes siting and sea access strategic rather
 than cosmetic.
 

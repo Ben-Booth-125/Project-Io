@@ -810,7 +810,7 @@ void draw_recruit_sea(const world& w, const recipe_registry& reg, ui_state& s)
             if (ImGui::Selectable(label, m.sea_base == pid))
                 m.sea_base = pid;
             if (ImGui::IsItemHovered())
-                ImGui::SetTooltip("Raise ships here. This port makes sea recruits every quarter.");
+                ImGui::SetTooltip("Raise ships here. This port makes sea recruits every month.");
             m.ports.push_back({pid, (ImGui::GetItemRectMin().x + ImGui::GetItemRectMax().x) * 0.5f,
                                (ImGui::GetItemRectMin().y + ImGui::GetItemRectMax().y) * 0.5f, homed});
             ImGui::PopID();

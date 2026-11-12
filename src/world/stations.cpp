@@ -606,7 +606,8 @@ int astronaut_cap(const world& w, const station_params& stp, entity_id nation)
 
 int run_astronaut_training(world& w, const station_params& stp)
 {
-    const int rate = std::max(0, stp.astronauts_per_centre);
+    // BL-1642: a per-QUARTER count, spread over the quarter's three monthly ticks.
+    const int rate = quarter_count_this_tick(std::max(0, stp.astronauts_per_centre), w.current_econ_tick);
     const int per_cap = std::max(0, stp.astronaut_cap_per_centre);
     int trained = 0;
     if (rate == 0 || per_cap == 0)

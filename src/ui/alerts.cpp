@@ -31,7 +31,7 @@ std::vector<alert_drawn>& drawn_rows()
 
 /// Under this many quarters of cushion the runway is the player's problem: the same
 /// bar the header colours red (HEADER.md § Contents, Runway).
-constexpr int k_low_runway_quarters = 8;
+constexpr int k_low_runway_quarters = 24; // months: two years (BL-1642; was 8 quarters)
 
 constexpr ImU32 k_alert_fill  = IM_COL32(138, 84, 26, 245);
 constexpr ImU32 k_alert_hover = IM_COL32(170, 106, 34, 250);
@@ -45,11 +45,11 @@ const char* alert_why(alert_kind k)
         return "Your nation has nothing in its research queue, so its research points buy nothing.\n"
                "Opens Research.";
     case alert_kind::idle_buildings:
-        return "These buildings produced nothing last quarter. Opens the Buildings tab, which says why.";
+        return "These buildings produced nothing last month. Opens the Buildings tab, which says why.";
     case alert_kind::wars:
         return "Your nation is at war. Opens the Wars tab.";
     case alert_kind::low_runway:
-        return "Under two years of cushion at last quarter's burn. Opens the Budget.";
+        return "Under two years of cushion at last month's burn. Opens the Budget.";
     case alert_kind::construction_stalled:
         return "These sites made no progress: a material is short, or the treasury cannot fund them.\n"
                "Opens Construction.";
@@ -158,7 +158,7 @@ std::vector<alert_drawn> read_alerts(const world& w, const recipe_registry& reg,
     if (runway >= 0 && runway < k_low_runway_quarters)
     {
         char buf[32];
-        std::snprintf(buf, sizeof buf, "Runway %dq", runway);
+        std::snprintf(buf, sizeof buf, "Runway %dmo", runway);
         add(alert_kind::low_runway, buf);
     }
 

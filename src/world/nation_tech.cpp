@@ -185,16 +185,16 @@ namespace {
 constexpr std::int64_t k_price_unit_ppm = 1'000'000;
 constexpr std::int64_t k_price_cap_ppm  = 1'000'000'000'000LL; // a millionfold: overflow guard only
 
-/// The quarterly rate the growth dial compounds at, integer ppm (0 = flat).
+/// The per-tick (monthly, BL-1642) rate the growth dial compounds at, integer ppm (0 = flat).
 std::int64_t price_rate_ppm(const research_params& p)
 {
     const double g = static_cast<double>(p.price_growth_per_year);
     if (!std::isfinite(g) || g <= 0.0)
         return 0;
-    return std::llround(std::min(g, 10.0) * 1.0e6 / 4.0);
+    return std::llround(std::min(g, 10.0) * 1.0e6 / static_cast<double>(k_econ_ticks_per_year)); // BL-1642: compounded monthly
 }
 
-/// One quarter of compounding: the index plus rate/4 of it, integer, capped.
+/// One tick (a month) of compounding: the index plus rate/12 of it, integer, capped.
 /// The ONE step both the index at a quarter and the projection's walk take.
 std::int64_t compound_one(std::int64_t idx, std::int64_t rate_ppm)
 {
@@ -252,7 +252,7 @@ std::int64_t priced_cost_milli(int cost_units, const research_params& p, std::in
 
 std::int64_t research_price_ppm_at(int age_quarter, const research_params& p)
 {
-    // A nominal annual rate compounded quarterly: each quarter adds rate/4 of
+    // A nominal annual rate compounded monthly (BL-1642): each tick adds rate/12 of
     // the index. The dial becomes an integer ppm rate ONCE; the compounding is
     // integer, so the index is the same on every platform.
     const std::int64_t rate = price_rate_ppm(p);

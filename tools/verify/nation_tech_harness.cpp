@@ -1859,12 +1859,12 @@ void rows_r5()
     check(research_price_ppm_at(0, g) == 1'000'000 && research_price_ppm_at(-5, g) == 1'000'000
               && research_price_ppm_at(320, flat) == 1'000'000,
           "R5a the index opens at 1 (ppm 1'000'000) and a zero growth dial holds it flat");
-    check(research_price_ppm_at(1, g) == 1'010'000 && research_price_ppm_at(4, g) == 1'040'604,
-          "R5b 4% a year compounds quarterly in integers: 1.01 after a quarter, 1.040604 after a year");
+    check(research_price_ppm_at(1, g) == 1'003'333 && research_price_ppm_at(12, g) == 1'040'737,
+          "R5b 4% a year compounds monthly in integers: 1.003333 after a month, 1.040737 after a year (BL-1642)");
     bool mono = true;
     for (int q = 1; q <= 400; ++q)
         if (research_price_ppm_at(q, g) <= research_price_ppm_at(q - 1, g)) mono = false;
-    check(mono, "R5c ...and rises every quarter of a long age");
+    check(mono, "R5c ...and rises every month of a long age");
 
     const int n = node("DG-PR-EX-A");
     check(node_cost_milli(n, g, 1'000'000) == node_cost_milli(n, g)
@@ -1889,17 +1889,18 @@ void rows_r5()
         p.base_rp_per_nation = 100.0f;
         p.rp_per_research_credit_sqrt = 0.0f;
         p.rp_per_cost_unit = 100.0f;
-        p.price_growth_per_year = 4.0f; // +100% a quarter: an index of 2 after one quarter
+        p.price_growth_per_year = 4.0f; // BL-1642: +33.3% a month, an index of 4/3 after one month
         fixture f = make_fixture(0.0f);
         const int root = node("DG-PR-EX-T1");
         enqueue_node(f.w, f.nation, root);
         f.w.current_econ_tick = k_campaign_settle_ticks + 1;
         std::vector<research_accrual> rows;
         advance_research(f.w, p, &rows);
-        const bool first = !nation_holds(f.w, f.nation, root) && row_for(rows, f.nation)->price_ppm == 2'000'000;
+        const bool first = !nation_holds(f.w, f.nation, root) && row_for(rows, f.nation)->price_ppm == 1'333'333;
         advance_research(f.w, p);
-        check(first && nation_holds(f.w, f.nation, root) && f.w.nation_tech.at(f.nation).pool_milli == 0,
-              "R5f the quarterly pass charges the priced cost (200 RP at index 2: two passes of 100)");
+        check(first && nation_holds(f.w, f.nation, root)
+                  && f.w.nation_tech.at(f.nation).pool_milli == 200'000 - node_cost_milli(root, p, 1'333'333),
+              "R5f the monthly pass charges the priced cost (133.3 RP at index 4/3: two passes of 100, the rest kept)");
     }
 
     // The economy term (BL-1407 re-point): RP per credit of the nation's own
@@ -2240,7 +2241,7 @@ seed_run run_seed(std::uint32_t seed, int quarters, const dial_override& ov)
     }
 
     const int first = k_app_validation_ticks;
-    constexpr int k_econ_tick_days = 90; // sim_loop::econ_tick_days
+    constexpr int k_econ_tick_days = ::k_econ_tick_days; // BL-1642: 30, a month; // sim_loop::econ_tick_days
     for (int qtr = 1; qtr <= quarters; ++qtr)
     {
         // run_app_live_window's body, one quarter at a time so the tech state
@@ -2401,7 +2402,7 @@ void rows_r0(const std::vector<std::uint32_t>& seeds, int quarters, bool twice, 
     const double tree_q = best_full > 0.0 ? tree_units * used.rp_per_cost_unit / best_full : -1.0;
     std::printf("  the richest nation, spending its whole research share every quarter, converts %.1f RP a quarter:\n"
                 "  the whole tree (%.0f units, %.0f RP at the opening price; R4 runs the rising one) in %.0f quarters (%.1f years).\n",
-                best_full, tree_units, tree_units * used.rp_per_cost_unit, tree_q, tree_q / 4.0);
+                best_full, tree_units, tree_units * used.rp_per_cost_unit, tree_q, tree_q / static_cast<double>(k_econ_ticks_per_year));
     std::printf("  thresholds: >= %.0f%% reach it in %d; median in [%.0f, %.0f]; p10 >= %.0f\n",
                 100.0 * k_min_reach, static_cast<int>(16 * sc), 6 * sc, 10 * sc, 2.5 * sc);
     check(quarters >= static_cast<int>(16 * sc) && frac >= k_min_reach,
@@ -2498,11 +2499,11 @@ age_run run_age(std::uint32_t seed, int years, const dial_override& ov)
     std::map<entity_id, int> held_majors;
 
     const int first = k_app_validation_ticks;
-    constexpr int k_econ_tick_days = 90;
-    const int quarters = years * 4;
+    constexpr int k_econ_tick_days = ::k_econ_tick_days; // BL-1642: 30, a month;
+    const int quarters = years * k_econ_ticks_per_year;
     for (int qtr = 1; qtr <= quarters; ++qtr)
     {
-        const std::size_t d   = static_cast<std::size_t>((qtr - 1) / 40);
+        const std::size_t d   = static_cast<std::size_t>((qtr - 1) / (10 * k_econ_ticks_per_year));
         const double      per = 1.0 / std::min(40, quarters - static_cast<int>(d) * 40);
         const int day = qtr * k_econ_tick_days;
         advance_orbits(w, static_cast<double>(k_econ_tick_days));
@@ -2602,7 +2603,7 @@ void rows_r4(const std::vector<std::uint32_t>& seeds, int years, const dial_over
                 int    prev = 0;
                 for (const int q : n.major_q)
                 {
-                    if (static_cast<std::size_t>((q - 1) / 40) == d) { sum += (q - prev) / 4.0; ++cnt; }
+                    if (static_cast<std::size_t>((q - 1) / (10 * k_econ_ticks_per_year)) == d) { sum += (q - prev) / static_cast<double>(k_econ_ticks_per_year); ++cnt; }
                     prev = q;
                 }
                 const double v = cnt > 0 ? sum / cnt : k_never;
@@ -2751,8 +2752,8 @@ ai_run run_ai_age(std::uint32_t seed, int years, const dial_override& ov, const 
     std::map<entity_id, int> held_majors;
 
     const int first = k_app_validation_ticks;
-    constexpr int k_econ_tick_days = 90;
-    for (int qtr = 1; qtr <= years * 4; ++qtr)
+    constexpr int k_econ_tick_days = ::k_econ_tick_days; // BL-1642: 30, a month;
+    for (int qtr = 1; qtr <= years * k_econ_ticks_per_year; ++qtr)
     {
         const int day = qtr * k_econ_tick_days;
         advance_orbits(w, static_cast<double>(k_econ_tick_days));
@@ -2768,7 +2769,7 @@ ai_run run_ai_age(std::uint32_t seed, int years, const dial_override& ov, const 
                 for (const int m : majors) held += it->second.held.test(static_cast<std::size_t>(m)) ? 1 : 0;
             for (int k = held_majors[nid]; k < held; ++k) a.major_q.push_back(qtr);
             held_majors[nid] = held;
-            if (qtr % 40 == 0 || qtr == years * 4)
+            if (qtr % (10 * k_econ_ticks_per_year) == 0 || qtr == years * k_econ_ticks_per_year)
                 a.held_d.push_back(it != w.nation_tech.end() ? static_cast<int>(it->second.held.count()) : 0);
         }
     }
@@ -2821,14 +2822,14 @@ void rows_r7(const std::vector<std::uint32_t>& seeds, int years, const dial_over
         std::vector<double> sf;
         for (const auto& [nid, n] : a.nations)
         {
-            const double f = n.major_q.empty() ? k_never : n.major_q.front() / 4.0;
+            const double f = n.major_q.empty() ? k_never : n.major_q.front() / static_cast<double>(k_econ_ticks_per_year);
             first_y.push_back(f);
             sf.push_back(f);
-            for (std::size_t i = 1; i < n.major_q.size(); ++i) gap_y.push_back((n.major_q[i] - n.major_q[i - 1]) / 4.0);
+            for (std::size_t i = 1; i < n.major_q.size(); ++i) gap_y.push_back((n.major_q[i] - n.major_q[i - 1]) / static_cast<double>(k_econ_ticks_per_year));
             for (std::size_t d = 0; d < decades; ++d)
             {
                 int c = 0;
-                for (const int q : n.major_q) c += static_cast<std::size_t>((q - 1) / 40) == d ? 1 : 0;
+                for (const int q : n.major_q) c += static_cast<std::size_t>((q - 1) / (10 * k_econ_ticks_per_year)) == d ? 1 : 0;
                 majors_in[d].push_back(c);
                 if (d < n.held_d.size()) held_at[d].push_back(n.held_d[d]);
             }
@@ -3090,7 +3091,7 @@ int main(int argc, char** argv)
     int  age_years  = 0;     // BL-1324: --age Y runs R4 over Y years (80 = the age)
     bool age_only   = false; // --age-only: skip the fixture rows and R0
     bool r0_only    = false; // --r0-only (BL-1561): skip the fixture and live rows, run R0 alone
-    int  quarters   = 32; // 16 x the RP-unit scale (200 / 100)
+    int  quarters   = 96; // 16 x the RP-unit scale (600 / 100; BL-1642: was 32 at 200)
     bool twice      = true;
     dial_override ov;
     ai_dials ad;

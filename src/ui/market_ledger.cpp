@@ -1057,9 +1057,9 @@ void draw_history_table(const std::vector<exchange_row_record>& rows)
     const float w_rev = std::max(ImGui::CalcTextSize("000.0k").x,
                                  ImGui::CalcTextSize("Revenue").x) + pad;
 
-    // "qtr", never "tick" — an econ tick IS a calendar quarter and the display
+    // "mo", never "tick" — an econ tick IS a calendar month (BL-1642) and the display
     // word is the calendar one.
-    ImGui::TableSetupColumn("qtr",     ImGuiTableColumnFlags_WidthFixed, w_qtr);
+    ImGui::TableSetupColumn("mo",     ImGuiTableColumnFlags_WidthFixed, w_qtr);
     ImGui::TableSetupColumn("Good",    ImGuiTableColumnFlags_WidthStretch, 0.9f);
     // The widest stretch, because it carries the counterparty. Even so it only
     // fits by dropping the redundant half of the pair; the full pair, labelled
@@ -1122,7 +1122,7 @@ void draw_history_table(const std::vector<exchange_row_record>& rows)
 
         if (ImGui::BeginItemTooltip())
         {
-            ImGui::Text("%s, qtr %d", r.name, r.tick);
+            ImGui::Text("%s, mo %d", r.name, r.tick);
             ImGui::Separator();
             ImGui::Text("Seller   %s", r.seller.c_str());
             ImGui::Text("Buyer    %s", r.buyer.c_str());
@@ -1483,11 +1483,11 @@ void draw_market_top_section(const world& w, entity_id mid, float top_h)
     if (ImGui::BeginChild("##market_metrics", {0.0f, top_h}, false))
     {
         draw_metric(0, "Sold", g_market_top.sold_known, g_market_top.sold_here,
-                    "Nothing has cleared yet: the exchange record holds no quarter.");
+                    "Nothing has cleared yet: the exchange record holds no month.");
         ImGui::Spacing();
         // BL-1320: the trade value record, last completed quarter. Not saved,
         // so before a quarter completes there is no figure, not a zero.
-        static constexpr const char* k_no_quarter = "No quarter completed yet";
+        static constexpr const char* k_no_quarter = "No month completed yet";
         draw_metric(1, "In", g_market_top.traded_known, g_market_top.traded_in,
                     k_no_quarter);
         ImGui::Spacing();
@@ -1898,7 +1898,7 @@ void draw_goods_tab(const world& w, ui_state& s, entity_id body,
         if (show_body)
             ImGui::TableSetupColumn("Body", num, fixed("Body", goods_sort_body, fig_body), goods_sort_body);
         ImGui::TableSetupColumn("v.Base", num, fixed("v.Base", goods_sort_vs_base, fig_vbase), goods_sort_vs_base);
-        ImGui::TableSetupColumn("8 qtr", num, fixed("8 qtr", goods_sort_change, em * 2.6f), goods_sort_change);
+        ImGui::TableSetupColumn("8 mo", num, fixed("8 mo", goods_sort_change, em * 2.6f), goods_sort_change);
         ImGui::TableSetupScrollFreeze(0, 1);
 
         // The headings by hand: ImGui's header item keeps the press, the hover and the

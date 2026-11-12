@@ -462,7 +462,7 @@ struct sentiment_trade_streak
 };
 
 /// The window, in folds (ticks), on both sides of a severing.
-inline constexpr uint8_t sentiment_trade_window = 2;
+inline constexpr uint8_t sentiment_trade_window = 6; ///< BL-1642: six monthly folds, the two quarters.
 
 inline bool operator==(const sentiment_trade_streak& a, const sentiment_trade_streak& b)
 {

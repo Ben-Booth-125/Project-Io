@@ -328,7 +328,7 @@ int main(int argc, char** argv)
         }
         std::map<entity_id, double> last;
         for (const entity_id nid : majors) last[nid] = w.nations.at(nid).treasury;
-        constexpr int k_econ_tick_days = 90;
+        constexpr int k_econ_tick_days = ::k_econ_tick_days; // BL-1642: 30, a month;
         // The holdout: a building the moment it is ordered is a real answer to "what
         // would a site earn", with its output not yet in any market. Quote it then, read
         // what it earns a year after it stands.

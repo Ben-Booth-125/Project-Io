@@ -127,7 +127,7 @@ Dijkstra itself.
 ### 3a. Power rides this network (Ben, 2026-08-31)
 
 **Power is transmitted on the road network, and it needs no new graph.** Ben: *"Power travels via
-road infrastructure, although it is different from a convoy, it has a 1 qtr travel time."*
+road infrastructure, although it is different from a convoy, it has a 1 mo travel time."*
 
 Three properties, and each one reuses something already here:
 
@@ -520,7 +520,7 @@ world, the bill is a fraction of the stone and timber dug, so the network is a r
 quarry and the sawmill without emptying the shelves the Marketplaces and Ports draw their own upkeep
 from.
 Unlike the space programme's lumps the claim is **pro-rata** (rule 3): upkeep is continuous, so
-half the repair budget buys half the materials, and an underfunded quarter is a reported partial
+half the repair budget buys half the materials, and an underfunded month is a reported partial
 fill, never a banked lump. Consistent with the binary ruling above, an unfunded draw degrades
 nothing — the network's failure state remains insolvency, not decay.
 
@@ -707,13 +707,13 @@ rather than needing a parallel table:
 
 ```
 days   = path.cost × km_per_tile ÷ km_per_day
-ticks  = ceil(days ÷ 90)          # the economy clears quarterly; minimum 1
+ticks  = ceil(days ÷ 90)          # the economy clears monthly; minimum 1
 ```
 
 **Two speeds, and the gap between them is a design lever:** **land ~25 km/day** (an ox-and-cart
 caravan) against **sea ~130 km/day** (a coasting vessel). Roughly five times, *"and that difference
 is the whole reason coastal trade is worth designing"* — BL-188 (coastal ports) owns the sea-trade
-design that reaches the faster speed. A short regional haul lands in one quarter; a long one takes
+design that reaches the faster speed. A short regional haul lands in one month; a long one takes
 several.
 
 The **space leg** is the one leg the AU calibration is right for: it keeps its own ~1-tick-per-AU
@@ -1040,7 +1040,7 @@ was tried.
 **A unit's supply draws on the pool, and claims first (Ben, 2026-10-28, overturning the
 2026-10-16 march draw).** Movement draws no points: a march is paid in days
 (`../military/MILITARY.md` § Marching). What draws is a unit's **supply** — food, ammunition, the
-weaponry lost to attrition and the recruits and equipment that refill it — requested once a quarter
+weaponry lost to attrition and the recruits and equipment that refill it — requested once a month
 **from where the unit stands** and served by the routed cover of the closest road its network
 reaches — its own tile when it stands on the network, otherwise the paying road below — like any
 building's request. Guns, butter and freight still compete in one currency. **The supply draw claims before the
@@ -1155,7 +1155,7 @@ Neither replaces the other.
 The cap/price split holds. What changes is **which side of the game pays**. A convoy pays credits
 per unit-distance. An army in the field is **priced in credits by active LP** — so keeping an army
 supplied is not free, which was never a decision anyone made. Since 2026-10-28 the active draw is a
-unit's quarterly supply at its tile, not its march (§ A unit's supply draws on the pool).
+unit's monthly supply at its tile, not its march (§ A unit's supply draws on the pool).
 
 So: **passive LP caps trade, which is already priced; active LP caps force, which this ruling
 prices.** Read that way it is a widening of the existing rule rather than an exception to it. The

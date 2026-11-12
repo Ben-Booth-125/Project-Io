@@ -41,7 +41,10 @@ struct generation_progress;
 /// level (`haulage_measure --per-tick`, pooled over five seeds). `app` resumes
 /// a loaded campaign's cadence counter at this plus the envelope's econ tick,
 /// and the seat card's trailing net reads the returns these ticks file.
-inline constexpr int k_campaign_settle_ticks = 12;
+/// BL-1642 (the tick is a month): THIRTY-SIX monthly ticks, the twelve quarters' three
+/// years in calendar time. The 12-quarter measurement above was taken under the
+/// quarter tick; it is owed a re-measure at the monthly grain.
+inline constexpr int k_campaign_settle_ticks = 36;
 
 /// `world::current_econ_tick` BETWEEN passes after the settle and @p live_steps
 /// live passes: the step the last pass ran at (the settle's last is 11). A

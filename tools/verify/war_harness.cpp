@@ -696,8 +696,8 @@ int main()
         run_war_quarter(w);
         const float r1 = w.war_exhaustion_residual.count(f.A) ? w.war_exhaustion_residual.at(f.A) : -1.0f;
         check(r0 == 40.0f && std::fabs(r1 - 40.0f * (1.0f - k_war_exhaustion_decay)) < 1e-4f,
-              "P2i at peace the nation's exhaustion carries out of the war and decays (40 -> 30 a quarter)");
-        for (int q = 0; q < 40; ++q) run_war_quarter(w);
+              "P2i at peace the nation's exhaustion carries out of the war and decays (40 -> 36.3 a month)");
+        for (int q = 0; q < 120; ++q) run_war_quarter(w); // BL-1642: 40 quarters as 120 months
         check(w.war_exhaustion_residual.count(f.A) == 0 && war_morale_ceiling(w, f.A) == 1000,
               "P2j and is gone in time, the morale ceiling back at 1000");
         // A nation still at war does not shed its residual.
@@ -1479,9 +1479,9 @@ int main()
         // The days the walk skips (nothing military moving) count at today's share.
         w.units.at(u).position = abroad;
         w.construction_quarter_day = 0;
-        const int walked = advance_quarter_to(w, reg, 90, 0);
-        check(walked == 90 && std::fabs(w.wars.at({ f.A, f.B }).declarer_field_days - 90.0f) < 1e-3f,
-              "F3b a quarter the military pass skips still counts every one of its days (90 field days)");
+        const int walked = advance_quarter_to(w, reg, k_construction_quarter_days, 0); // BL-1642: a month
+        check(walked == k_construction_quarter_days && std::fabs(w.wars.at({ f.A, f.B }).declarer_field_days - static_cast<float>(k_construction_quarter_days)) < 1e-3f,
+              "F3b a month the military pass skips still counts every one of its days (30 field days)");
     }
     {
         // F4: state_hash folds the cessions, the history, opened_day and the offer.
@@ -1629,11 +1629,11 @@ int main()
             w.current_econ_tick = 10;
             (void)declare_war(w, sp, f.A, f.B, { f.provs[f.B][0] });
             (void)answer_war(w, f.B, f.A, { f.provs[f.A][0] });
-            w.current_econ_tick = 20;
+            w.current_econ_tick = 40; // BL-1642: 30 months in (was 10 quarters)
             w.wars.at({ f.A, f.B }).declarer_exhaustion = 80.0f;
             (void)offer_peace(w, f.B, f.A, peace_terms{});
             trace.clear();
-            score_nation_war(w, reg, f.A, 20);
+            score_nation_war(w, reg, f.A, 40);
             check(!at_war(w, f.A, f.B) && !w.war_history.empty() && w.war_history.back().end == war_end::white_peace
                       && did(war_ai_choice::accept, f.A, f.B),
                   "RW4 a weary rival (exhaustion 80) accepts the white peace offered it, through accept_peace");
@@ -1659,14 +1659,14 @@ int main()
             w.current_econ_tick = 10;
             (void)declare_war(w, sp, f.A, f.B, { f.provs[f.B][0] });
             (void)answer_war(w, f.B, f.A, { f.provs[f.A][0] });
-            w.current_econ_tick = 18;
+            w.current_econ_tick = 34; // BL-1642: 24 months in (was 8 quarters)
             w.wars.at({ f.A, f.B }).defender_exhaustion = 60.0f;
             trace.clear();
-            score_nation_war(w, reg, f.B, 18);
+            score_nation_war(w, reg, f.B, 34);
             const auto oit = w.peace_offers.find({ f.A, f.B });
             check(at_war(w, f.A, f.B) && oit != w.peace_offers.end() && oit->second.offerer == f.B
                       && oit->second.terms.kind == peace_kind::white && did(war_ai_choice::offer, f.B, f.A),
-                  "RW6 a weary rival (exhaustion 60, eight ticks in) offers a white peace through offer_peace");
+                  "RW6 a weary rival (exhaustion 60, twenty-four months in) offers a white peace through offer_peace");
         }
         // RW7 - a declaration: a motive, an edge on the front, through declare_war only.
         {
@@ -1766,7 +1766,7 @@ int main()
             // and leave the offer standing - the freeze this row pins.
             w.wars.at({ f.A, f.B }).defender_exhaustion = 80.0f;
             if (from_player) w.player_entity = f.A;
-            w.current_econ_tick = 20;
+            w.current_econ_tick = 40; // BL-1642: 30 months in
             {
                 world probe = w;
                 check(filed && accept_peace(probe, sp, f.B, f.A) == war_result::rejected_state
@@ -1775,32 +1775,32 @@ int main()
                           + ") the stale offer: accept_peace refuses it and the offer stands");
             }
             trace.clear();
-            score_nation_war(w, reg, f.B, 20);
+            score_nation_war(w, reg, f.B, 40);
             check(at_war(w, f.A, f.B) && w.peace_offers.empty() && did(war_ai_choice::refuse, f.B, f.A)
                       && !did(war_ai_choice::accept, f.B, f.A),
                   std::string("RW10") + (from_player ? "b a stale offer from the PLAYER'S nation" : " a stale offer")
                       + " is refused through refuse_peace; the war goes on and the offer is gone");
             trace.clear();
-            score_nation_war(w, reg, f.B, 20);
+            score_nation_war(w, reg, f.B, 40);
             const auto oit = w.peace_offers.find({ f.A, f.B });
             check(oit != w.peace_offers.end() && oit->second.offerer == f.B && did(war_ai_choice::offer, f.B, f.A),
                   std::string("RW10") + (from_player ? "b'" : "'") + " a new offer can follow: the weary rival now offers peace");
         }
-        // RW11 - a refused offer may not be repeated for four ticks (Ben, 2026-11-03,
+        // RW11 - a refused offer may not be repeated for twelve months (four quarters until BL-1642) (Ben, 2026-11-03,
         // NR-1120): the VERB refuses it, for any offerer, mutating nothing; the other
-        // side may still offer; the fifth tick admits it.
+        // side may still offer; the thirteenth tick admits it.
         {
             fixture f; build(f);
             world& w = f.w;
             w.current_econ_tick = 10;
             (void)declare_war(w, sp, f.A, f.B, { f.provs[f.B][0] });
             (void)answer_war(w, f.B, f.A, { f.provs[f.A][0] });
-            w.current_econ_tick = 20;
+            w.current_econ_tick = 40;
             const bool refused = offer_peace(w, f.A, f.B, peace_terms{}) == war_result::applied
                               && refuse_peace(w, f.B, f.A) == war_result::applied
-                              && w.peace_refusals.count({ f.A, f.B }) == 1 && w.peace_refusals.at({ f.A, f.B }) == 20;
+                              && w.peace_refusals.count({ f.A, f.B }) == 1 && w.peace_refusals.at({ f.A, f.B }) == 40;
             bool cooling = true;
-            for (int t = 20; t < 24; ++t)
+            for (int t = 40; t < 40 + k_war_offer_cooldown_ticks; ++t)
             {
                 w.current_econ_tick = t;
                 const snap s = take(w);
@@ -1808,15 +1808,15 @@ int main()
                        && offer_peace(w, f.A, f.B, peace_terms{}) == war_result::rejected_state && same(s, w);
             }
             check(refused && cooling,
-                  "RW11a a refused offer records its tick; for ticks 20..23 the offerer's next offer is refused, mutating nothing");
+                  "RW11a a refused offer records its tick; for ticks 40..51 the offerer's next offer is refused, mutating nothing");
             {
                 world other = w;
                 check(offer_peace(other, f.B, f.A, peace_terms{}) == war_result::applied,
                       "RW11b the side that refused may still offer while the other's offer cools");
             }
-            w.current_econ_tick = 24;
+            w.current_econ_tick = 40 + k_war_offer_cooldown_ticks;
             check(!peace_offer_cooling(w, f.A, f.B) && offer_peace(w, f.A, f.B, peace_terms{}) == war_result::applied,
-                  "RW11c four ticks on (tick 24) the offerer may offer again");
+                  "RW11c twelve months on (tick 52) the offerer may offer again");
             (void)accept_peace(w, sp, f.B, f.A);
             check(!at_war(w, f.A, f.B) && w.peace_refusals.empty(), "RW11d a refusal's record ends with the war");
         }
@@ -1831,7 +1831,7 @@ int main()
             w.wars.at({ f.A, f.B }).defender_exhaustion = 60.0f;
             int offers = 0, refused_verbs = 0;
             std::vector<int> offered_at;
-            for (int t = 18; t <= 26; ++t)
+            for (int t = 34; t <= 58; ++t) // BL-1642: 24 months in, then every 12
             {
                 w.current_econ_tick = t;
                 trace.clear();
@@ -1846,8 +1846,8 @@ int main()
                     (void)refuse_peace(w, f.A, f.B); // A refuses every one
             }
             check(at_war(w, f.A, f.B) && offers == 3 && refused_verbs == 0
-                      && offered_at == std::vector<int>({ 18, 22, 26 }),
-                  "RW12 a weary rival refused at every offer offers at ticks 18, 22, 26 - once per cooldown, never a refused verb (NR-1120)");
+                      && offered_at == std::vector<int>({ 34, 46, 58 }),
+                  "RW12 a weary rival refused at every offer offers at ticks 34, 46, 58 - once per cooldown, never a refused verb (NR-1120)");
         }
         // RW13 - under spectate the pass scores the player's nation like any rival
         // (BL-409's rule; Ben, 2026-11-03, NR-1120): it answers a war on it.

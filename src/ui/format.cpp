@@ -17,7 +17,7 @@ namespace {
 // completes the calendar (sim_loop defines no year) and is documented as the
 // natural 4-quarter year.
 constexpr int days_per_month     = sim_loop::days_per_month;   // 30
-constexpr int months_per_quarter = sim_loop::months_per_econ;  // 3
+constexpr int months_per_quarter = 3; // the calendar's quarter (no longer the econ tick, BL-1642)
 constexpr int quarters_per_year  = 4;
 constexpr int months_per_year    = months_per_quarter * quarters_per_year; // 12
 constexpr int days_per_year      = days_per_month * months_per_year;       // 360
@@ -162,6 +162,12 @@ float quarter_progress(uint64_t day_tick)
     const uint64_t day_of_year     = day_tick % static_cast<uint64_t>(days_per_year);
     const int      day_of_quarter  = static_cast<int>(day_of_year) % days_per_quarter; // 0..89
     return static_cast<float>(day_of_quarter) / static_cast<float>(days_per_quarter);
+}
+
+float month_progress(uint64_t day_tick)
+{
+    const int day_of_month = static_cast<int>(day_tick % static_cast<uint64_t>(days_per_month)); // 0..29
+    return static_cast<float>(day_of_month) / static_cast<float>(days_per_month);
 }
 
 std::string labour_contention(float scalar)

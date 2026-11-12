@@ -542,7 +542,7 @@ through retires (Ben, 2026-10-23); a major is read through its own buildings.
    profit).** During the settle the seated nation's scorer started builds the player never chose.
    At the seat, every building of the seated nation still under construction is cancelled, and
    each refunds exactly what any cancelled site does (Ben, 2026-10-26, NR-1075): its credit cost
-   in full, booked on the nation's quarterly return as a refund. The materials it drew stay spent
+   in full, booked on the nation's monthly return as a refund. The materials it drew stay spent
    (`economy/PRODUCTION.md`, "A cancelled site is refunded its credits in full"). Finished
    buildings stay.
 
@@ -561,7 +561,7 @@ against — `actual × balance` — and the seat's score is the mean over its bu
   in a market where the roster closes a chain *and* some resource sits inside the pin band.
 - **The order:** highest score first, entity id breaking a tie.
 - **The trailing figures stay, as information.** The settle's closing treasury and the trailing net
-  over the last 8 filed quarterly returns are read for every candidate and shown on the seat card.
+  over the last 24 filed monthly returns are read for every candidate and shown on the seat card.
   They never gate and never rank.
 
 **The headless draw is WEIGHTED, not uniform.** Ben, 2026-08-26: *"mostly random for now, targeted

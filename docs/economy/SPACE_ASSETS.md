@@ -38,8 +38,8 @@ The near-space classes:
 - **Launch infrastructure** — the ground side: launch sites, tracking stations and the industry that
   makes rockets and propellant. These are buildings (PRODUCTION) that a space asset requires.
 
-**Upkeep** is paid each quarter; an asset unpaid decays and is lost. It counts inside the nation's
-net (`FINANCE.md` § The quarterly return; Ben, 2026-11-07).
+**Upkeep** is paid each month; an asset unpaid decays and is lost. It counts inside the nation's
+net (`FINANCE.md` § The monthly return; Ben, 2026-11-07).
 
 ## The orbital graph (Ben, 2026-11-10)
 
@@ -166,7 +166,7 @@ may not go to that node, or the node has no free slot.
 | **Comms** | Puts its body's nodes inside its owner's comms coverage (§ Signal delay). With the *Communication Satellites* technology, it also lifts the activity fog on every market its owner trades with. |
 | **Navigation** | Cuts its owner's logistics cost on the body it orbits. |
 | **Observation** | Lifts the vision fog over the body it orbits, for its owner. |
-| **Survey** | **Maps** the body it orbits, for its owner: four regions a quarter, in raster order (`../ui/DISCOVERY.md` § Mapping, then prospecting). |
+| **Survey** | **Maps** the body it orbits, for its owner: four regions every three months, in raster order (`../ui/DISCOVERY.md` § Mapping, then prospecting). |
 
 **A role works from where the satellite sits.** A satellite's body is the body whose node it
 occupies; an L-point satellite serves the pair's smaller body.
@@ -178,7 +178,7 @@ holds a count of workforce. `../PEOPLE.md` makes a person only where a role gate
 one astronaut among a hundred gates nothing.
 
 **Astronauts are trained on the ground** by an **Astronaut Training Centre**, a building
-(PRODUCTION) that turns its staffed workforce into astronauts at a fixed rate per quarter, up to a
+(PRODUCTION) that turns its staffed workforce into astronauts at a fixed rate per month, up to a
 pool cap.
 
 **A crewed asset takes its astronauts with it.** A station core, a crewed module or a crewed mission
@@ -211,7 +211,7 @@ at the centre; existing modules keep their place.
 **Edge modules.** A **Dock** and a **Shipyard** must sit on an **edge slot** — a slot on the grid's
 outer ring — because ships come and go from them. Every other module may sit anywhere. When an
 upgrade grows the grid, an edge module that is no longer on the edge **stops working** until it is
-moved to an edge slot; moving a module is a launch-free refit that takes one quarter.
+moved to an edge slot; moving a module is a launch-free refit that takes three months.
 
 **Power and crew are budgets.** Each module draws power and needs crew. The station's power is what
 its Power modules and its core supply; its crew room is what its Habitation modules and core hold;
@@ -225,16 +225,16 @@ yields less further out.
 
 | Module | What it does while working |
 |---|---|
-| **Research** | Earns research points for its owner each quarter. |
+| **Research** | Earns research points for its owner each month. |
 | **Defence** | Protects the station and its node in space combat (`../military/SPACE_FLEETS.md`). |
 | **Power** | Supplies power. |
 | **Dock** | Lets space units dock, refuel and unload (`../military/SPACE_FLEETS.md`). Edge only. |
 | **Habitation** | Adds crew room. |
-| **Life support** | Adds life support; buys food rations off the home shelf each quarter. |
+| **Life support** | Adds life support; buys food rations off the home shelf each month. |
 | **Fuel depot** | Holds propellant, for refuelling docked space units. Stocked off the market of its owner's base on the body below, else off the home shelf (`ERAS.md` § The propellant loop). |
 | **Shipyard** | Builds space units too large to launch from a surface. Edge only. |
 | **Microgravity factory** | Turns goods bought off the home shelf into goods only orbit can make, sold onto the home market. |
-| **Observatory** | **Maps** every body in its owner's comms coverage that its owner has not mapped whole: two regions a quarter on each (`../ui/DISCOVERY.md` § Mapping, then prospecting). |
+| **Observatory** | **Maps** every body in its owner's comms coverage that its owner has not mapped whole: two regions every three months on each (`../ui/DISCOVERY.md` § Mapping, then prospecting). |
 | **Comms relay** | Puts the nodes around its station inside its owner's comms coverage (§ Signal delay). |
 | **Cargo hold** | A stockpile in orbit, for space convoys (`../military/SPACE_FLEETS.md`). |
 | **Market** | Makes the station a market centre, trading with its owner's home market by convoy. |
@@ -250,7 +250,7 @@ nodes:
 - A **Comms satellite** covers every node of the body it orbits.
 - A **Comms relay** module covers its station's node and every node one link from it.
 
-**An order to an asset outside coverage waits one quarter** before it takes effect: fitting a
+**An order to an asset outside coverage waits one month** before it takes effect: fitting a
 module, applying a template, moving a satellite or retasking it. The order is shown as *pending —
 no signal* until then. An order inside coverage takes effect at once.
 
@@ -269,14 +269,14 @@ commons (`../CLIMATE.md`), though it behaves like one: every nation's wreckage f
 **What makes debris.** A destroyed space unit, a lost satellite or a lost station leaves debris at
 its node, in proportion to its mass.
 
-**What debris does.** Each quarter, every satellite and station core at a node gains **wear** in
+**What debris does.** Each month, every satellite and station core at a node gains **wear** in
 proportion to the node's debris level; at full wear it is lost — and leaves debris of its own, which
 is how a crowded orbit can cascade. A space unit that passes through or sits at a node takes hull
 damage in proportion to the debris there. All of it is arithmetic on the level: no roll.
 
 **How debris clears.** Low orbit clears slowly by itself, as drag pulls fragments down; high orbit
 and the Lagrange points never clear by themselves. A **Tug** with a debris arm at a node removes a
-fixed amount each quarter (`../military/SPACE_FLEETS.md`).
+fixed amount each month (`../military/SPACE_FLEETS.md`).
 
 **The rules in full** (BL-1598 (debris), first cut, 2026-11-10):
 
@@ -284,13 +284,13 @@ fixed amount each quarter (`../military/SPACE_FLEETS.md`).
   unit's dry mass and cargo, a fixed mass per satellite, station core and module. Losses count
   whatever their cause — a battle, wear, debris damage, or unpaid upkeep — since the wreck stays in
   orbit either way. A module its owner removes is taken away, not lost, and leaves nothing.
-- **Wear** is read each quarter off the level as it stood at the quarter's start. What it destroys
-  adds its debris after the pass, so a cascade grows quarter on quarter, never within one.
+- **Wear** is read each month off the level as it stood at the month's start. What it destroys
+  adds its debris after the pass, so a cascade grows month on month, never within one.
 - **Hull damage** is daily: a unit idle or docked at a node takes damage in proportion to the level,
   and a unit that arrives takes one day's damage at each node its path passed through. A docked
   unit's repair still runs, so a Dock can hold a fouled node.
 - **A Tug clears where it is parked**, idle at a node: moving it there is the order, so clearing has
-  no verb of its own. Each quarter runs wear, then the Tugs, then drag; a level that falls to nearly
+  no verb of its own. Each month runs wear, then the Tugs, then drag; a level that falls to nearly
   nothing is gone.
 
 ## Open

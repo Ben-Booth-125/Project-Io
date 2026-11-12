@@ -414,9 +414,11 @@ struct growth_params
 struct migration_params
 {
     /// Share (thousandths) of a below-mean centre's heads that seeks to move
-    /// each tick. Integer permille: the flow arithmetic is integer-exact so
-    /// heads are conserved head-for-head. [0, 1000]; loader rejects outside.
-    int rate_permille = 10;
+    /// each tick (a month). Fractional since BL-1642 (a third of the quarter's 10);
+    /// the flow arithmetic stays integer-exact - the rate is read in millionths
+    /// (llround(rate x 1000)) - so heads are conserved head-for-head. [0, 1000];
+    /// loader rejects outside.
+    float rate_permille = 10.0f / 3.0f;
 
     /// Throttle (thousandths) on a flow between two NEUTRAL nations — neither
     /// friends nor hostile in the stance store. Friendly pairs pass at 1000,
@@ -943,7 +945,7 @@ struct procurement_params
 
     /// Base lead time, ticks — multiplied by ceil(quantity / supplier_throughput)
     /// to get the quote's lead_time_ticks.
-    float base_lead_ticks = 2.0f;
+    float base_lead_ticks = 6.0f; // months: the two quarters (BL-1642)
 
     /// (buyer, supplier) reputation floor below which request_quote declines
     /// outright (BL-350 Q2's fourth condition). Reputation starts at 0 for an
@@ -995,7 +997,7 @@ struct acquisition_params
     ///
     /// The term is SIGNED and unclamped by design: a loss-making firm prices
     /// below its book value, which is the ledger telling the truth about it.
-    float multiple = 8.0f;
+    float multiple = 24.0f; // months of trailing net: two years (BL-1642; was 8 quarters)
 };
 
 /// BL-546: THE TWO PROCUREMENT RATES ARE TWO SENTIMENT FACTOR WEIGHTS.

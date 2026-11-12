@@ -1318,10 +1318,36 @@ inline float building_supply_scalar(const building_component& b)
     return supply * cond;
 }
 
+/// THE CALENDAR'S WORLD-SIDE MIRROR (Ben, 2026-11-11: the tick is a month). An
+/// economy tick is one 30-day month, so twelve make a year; a month is worth a
+/// third of the old quarter. Every per-tick flow is authored per month, every
+/// duration counted in ticks is counted in months. MIRRORS sim_loop (core/), which
+/// world/* may not include; save_roundtrip / the stepped-clock harness hold them equal.
+inline constexpr int k_econ_tick_days         = 30;
+inline constexpr int k_econ_ticks_per_year    = 12;
+/// Ticks in the old quarter tick - the factor a per-quarter figure divides by and a
+/// count of quarters multiplies by when it is restated per month.
+inline constexpr int k_econ_ticks_per_quarter = 3;
+
+/// A WHOLE-NUMBER per-quarter count spread over the quarter's three monthly ticks
+/// (BL-1642): the tick's share is floor(n x (m+1) / 3) - floor(n x m / 3), m the tick's
+/// place in its quarter, so every quarter sums to exactly @p per_quarter (4 regions a
+/// quarter: 1, 1, 2). For a count that cannot be divided by three - regions mapped,
+/// astronauts trained. Pure and integer: the tick alone decides it.
+inline int quarter_count_this_tick(int per_quarter, int econ_tick)
+{
+    if (per_quarter <= 0)
+        return 0;
+    const int m = ((econ_tick % k_econ_ticks_per_quarter) + k_econ_ticks_per_quarter)
+                % k_econ_ticks_per_quarter;
+    const long long n = per_quarter;
+    return static_cast<int>(n * (m + 1) / k_econ_ticks_per_quarter - n * m / k_econ_ticks_per_quarter);
+}
+
 /// Construction is measured in DAYS (Ben, 2026-10-24; PRODUCTION.md § Construction
-/// is measured in days). The days of a quarter: an economy tick is 90 days
-/// (sim_loop::econ_tick_days).
-inline constexpr int k_construction_quarter_days = 90;
+/// is measured in days). The days of one economy tick - a month, 30 days (the name
+/// is the quarter tick's, kept to spare the churn).
+inline constexpr int k_construction_quarter_days = k_econ_tick_days;
 
 /// The days of work a site has left. 0 once complete (`ticks_remaining <= 0` is the
 /// gate). Where `days_remaining` disagrees with `ticks_remaining` (a writer set the
@@ -2413,10 +2439,10 @@ enum class industrial_focus : uint8_t
 // ---------------------------------------------------------------------------
 
 /// One NATION's filed balance sheet for one economy tick (BL-1407: re-subjected
-/// from the retired corporation, FINANCE.md § The quarterly return). An economy
-/// tick IS one quarter (`k_ticks_per_year` == 4), so the ledger's cadence is the
+/// from the retired corporation, FINANCE.md § The monthly return). An economy
+/// tick IS one month (`k_econ_ticks_per_year` == 12), so the ledger's cadence is the
 /// money loop's own; `apply_budget`'s state pass files one of these per nation at
-/// the end of every tick, into `nation_component::returns`. Authority: docs/economy/FINANCE.md § The quarterly return.
+/// the end of every tick, into `nation_component::returns`. Authority: docs/economy/FINANCE.md § The monthly return.
 ///
 /// **It is a RETAIN, not a second computation.** Every flow here already exists
 /// in `corp_budget` and is copied across unchanged; `net` is the movement the
@@ -2438,7 +2464,7 @@ enum class industrial_focus : uint8_t
 /// would make this row mark-to-market, moving a firm's book value every quarter
 /// with commodity prices it does not own and swinging the acquisition price with
 /// it. A book value that moves on its own is not a book value.
-/// Authority: `docs/economy/FINANCE.md` § The quarterly return.
+/// Authority: `docs/economy/FINANCE.md` § The monthly return.
 ///
 /// Nothing here is estimated, and nothing here is read during the tick that
 /// writes it: the record is a pure downstream observation of the money loop and
@@ -2456,7 +2482,7 @@ struct quarterly_return
 
     /// BL-1206 (seat clean slate): credits REFUNDED to the firm since its last
     /// return — the credits of cancelled construction, the seat's clean slate among
-    /// them, credited at the cancellation and booked on the next return (FINANCE.md § The quarterly return).
+    /// them, credited at the cancellation and booked on the next return (FINANCE.md § The monthly return).
     /// A credit, so `net` = income − expenditure − maintenance − wages − interest
     /// − levies − upkeep + refunds. Zero on every other row. world_save_version 37.
     float refunds     = 0.0f;
@@ -2468,7 +2494,7 @@ struct quarterly_return
     /// SERIALISED in the v52 trailing tax section (only firms that ever paid).
     float taxes       = 0.0f;
 
-    /// BL-1539 (Ben, 2026-11-05: research counts inside net; FINANCE.md § The quarterly
+    /// BL-1539 (Ben, 2026-11-05: research counts inside net; FINANCE.md § The monthly
     /// return): the credits the nation's research line spent since its last return. A
     /// debit, paid in the nation step AFTER the return is written and booked on the
     /// next one, as a refund is, so `net` = the flows - research + refunds. Other debits
@@ -2509,7 +2535,7 @@ static_assert(sizeof(quarterly_return) == 64,
 /// economy ticks to the year (Ben, 2026-08-26). Bounded by construction, and
 /// that is the point — the record is world state and crosses the serialisation
 /// seam, so it must not grow with campaign length. Oldest dropped first.
-inline constexpr std::size_t k_quarterly_return_retention = 40;
+inline constexpr std::size_t k_quarterly_return_retention = 120; ///< Months: ten years, the 40 quarters (BL-1642).
 
 // BL-1407: `corporation_component` — and with it the whole-firm acquisition's
 // trailing window — is DELETED (Ben, 2026-10-23: no corporation and no company;
@@ -2741,8 +2767,8 @@ struct nation_component
     float trade_reserve = 0.0f;
     float trade_points  = 0.0f;
 
-    /// BL-1407 — THE NATION'S QUARTERLY RETURNS (FINANCE.md § The quarterly
-    /// return; GLOSSARY.md § Quarterly return): oldest first, at most
+    /// BL-1407 — THE NATION'S QUARTERLY RETURNS (FINANCE.md § The monthly
+    /// return; GLOSSARY.md § Monthly return): oldest first, at most
     /// `k_quarterly_return_retention` of them, one appended per economy tick by
     /// `apply_budget`'s state pass in ascending nation id. A pure downstream
     /// observation of the money loop. SERIALISED in the v56 nation-books section

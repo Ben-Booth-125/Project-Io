@@ -148,17 +148,18 @@ float construction_rate(const world& w, const recipe_registry& reg,
     return read_construction(w, reg, type, target, recipe, tile).rate;
 }
 
-// Compact quarter-count label; a Tick is ~3 months, so 4 make a year (BL-095).
+// Compact month-count label; a Tick is a month, so 12 make a year (BL-1642).
 //
-// The DISPLAY word is "qtr", not "tick" (NR-002, Ben 2026-08-01): Tick is the internal
+// The DISPLAY word is "mo" (BL-1642; was "qtr"), not "tick" (NR-002, Ben 2026-08-01): Tick is the internal
 // term for the economy step and reads as engineering to a player. It is also the less
 // accurate of the two here — the step is literally a calendar quarter, which is why this
 // function could already gloss it in years.
 std::string ticks_label(int ticks)
 {
-    std::string s = std::to_string(ticks) + (ticks == 1 ? " qtr" : " qtrs");
-    if (ticks >= 4)
-        s += " (~" + std::to_string(ticks / 4) + " yr)";
+    // BL-1642 (Ben, 2026-11-11): the tick is a month, and the display word is "mo".
+    std::string s = std::to_string(ticks) + " mo";
+    if (ticks >= k_econ_ticks_per_year)
+        s += " (~" + std::to_string(ticks / k_econ_ticks_per_year) + " yr)";
     return s;
 }
 
@@ -195,7 +196,7 @@ std::string construction_stall_reason(const construction_read& rd)
 {
     const std::string good = rd.has_binding ? resource_name(rd.binding) : std::string();
     if (rd.waiting_on_funding)
-        return "its treasury could not fund it this quarter";
+        return "its treasury could not fund it this month";
     if (rd.has_binding && rd.binding_priced_out)
         return good + " is priced above the build ceiling";
     if (rd.has_binding)
@@ -504,7 +505,7 @@ std::string draw_construction_site_card_body(const construction_site_reading& rd
     }
     if (any_short)
     {
-        const char* foot = "! the market holds less than this quarter's draw needs.";
+        const char* foot = "! the market holds less than this month's draw needs.";
         ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(warn));
         ImGui::TextUnformatted(foot);
         ImGui::PopStyleColor();
@@ -535,8 +536,8 @@ namespace {
 // Sums compute_building_opex's maintenance + wages (budget_system.hpp — the
 // same formula the live budget loop and building_profit use, so no drift)
 // over every player building still under construction. One economy tick is
-// one quarter (k_ticks_per_year = 4), so a single tick's opex *is* the
-// per-quarter figure — no further scaling needed.
+// one month (k_econ_ticks_per_year = 12, BL-1642), so a single tick's opex *is* the
+// per-month figure — no further scaling needed.
 float estimated_quarterly_construction_cost(const world& w, const recipe_registry& reg)
 {
     float total = 0.0f;
@@ -587,7 +588,7 @@ void draw_queue_section(const world& w, const recipe_registry& reg, ui_state& ui
 
     const float est_cost = estimated_quarterly_construction_cost(w, reg);
     char hdr[96];
-    std::snprintf(hdr, sizeof hdr, "Queue - %.0f cr / qtr###queue_section",
+    std::snprintf(hdr, sizeof hdr, "Queue - %.0f cr / mo###queue_section",
                   static_cast<double>(est_cost));
     const bool open = ImGui::CollapsingHeader(hdr);
     if (open != ui.construction.queue_open)

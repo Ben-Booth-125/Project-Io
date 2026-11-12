@@ -49,7 +49,7 @@ inline constexpr std::size_t k_war_goals_max = 3;
 
 /// A truce bars either party declaring on the other for this many economy ticks
 /// (Ben, 2026-10-30: sixteen ticks, four years).
-inline constexpr int k_war_truce_ticks = 16;
+inline constexpr int k_war_truce_ticks = 48; ///< Months: four years, the 16 quarters (BL-1642).
 
 /// `war_declared`'s magnitude multiplier for a nation bordering either party
 /// (RELATIONS.md § 7: "watches twice as hard").
@@ -73,12 +73,14 @@ inline constexpr float k_war_exhaustion_loss_full = 60.0f;
 /// A whole army abroad for a quarter (90 days) gains 9.
 inline constexpr float k_war_exhaustion_per_field_day = 0.1f;
 
-/// Exhaustion a party gains per quarter for each of its own provinces the enemy holds.
-inline constexpr float k_war_exhaustion_per_held_province = 2.0f;
+/// Exhaustion a party gains per tick (a month) for each of its own provinces the enemy
+/// holds: a third of the quarter's 2.0 (BL-1642).
+inline constexpr float k_war_exhaustion_per_held_province = 2.0f / 3.0f;
 
 /// Fraction of its remaining exhaustion a nation at peace (in no open war) sheds
-/// each quarter. ~ a 2.4-quarter half-life.
-inline constexpr float k_war_exhaustion_decay = 0.25f;
+/// each tick (a month): 1 - 0.75^(1/3), the quarter's 0.25 restated per month, so the
+/// ~2.4-quarter (~7.2-month) half-life holds (BL-1642).
+inline constexpr float k_war_exhaustion_decay = 0.0914397f;
 
 /// A residual exhaustion below this snaps to zero and its row is erased.
 inline constexpr float k_war_exhaustion_epsilon = 0.5f;
@@ -86,7 +88,7 @@ inline constexpr float k_war_exhaustion_epsilon = 0.5f;
 /// A refused peace offer may not be repeated by its offerer, in that war, for this
 /// many economy ticks (Ben, 2026-11-03, NR-1120: four ticks, one year). The refusal
 /// tick is saved (`world::peace_refusals`, world_save_version 75).
-inline constexpr int k_war_offer_cooldown_ticks = 4;
+inline constexpr int k_war_offer_cooldown_ticks = 12; ///< Months: a year, the 4 quarters (BL-1642).
 
 /// Morale's ceiling falls by this many per-mille per point of exhaustion: at 100
 /// exhaustion no unit of the nation may stand above 500 morale.

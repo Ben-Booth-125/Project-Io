@@ -19,7 +19,7 @@ to be.
 
 ## 1. Top question
 **"What is on its way, and what is it costing me?"** One row per convoy in flight: origin →
-destination, the resource and quantity, a progress bar with its ETA in **qtr**, and the haul cost
+destination, the resource and quantity, a progress bar with its ETA in **mo**, and the haul cost
 already paid. Held convoys and stalled convoys say so on the bar rather than in a separate list.
 
 ## 2. Sub-levels — views & default

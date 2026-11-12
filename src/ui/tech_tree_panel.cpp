@@ -859,14 +859,15 @@ const research_projection& projection(const world& w, entity_id nation, const re
     return c;
 }
 
-/// "Q3 1963" for the quarter @p quarters_ahead after the current one.
-std::string quarter_label(const world& w, int quarters_ahead)
+/// "Mar 1963" for the month @p months_ahead after the current one (BL-1642: a
+/// projection step is an econ tick, a month).
+std::string quarter_label(const world& w, int months_ahead)
 {
     const fmt::calendar_date d = fmt::date_from_day(
         static_cast<std::uint64_t>(std::max(0, w.current_day_tick)));
-    const int idx = d.year * 4 + (d.quarter - 1) + quarters_ahead;
+    const int idx = d.year * 12 + (d.month - 1) + months_ahead;
     char b[24];
-    std::snprintf(b, sizeof b, "Q%d %d", idx % 4 + 1, idx / 4);
+    std::snprintf(b, sizeof b, "%s %d", fmt::month_abbrev(idx % 12 + 1), idx / 12);
     return b;
 }
 
@@ -963,7 +964,7 @@ void draw_tech_tree_menu(const world& w, const research_params& p, ui_state& s)
 
         ImGui::Text("Nation: %s", nc.name.c_str());
         ImGui::PushStyleColor(ImGuiCol_Text, palette::text_secondary);
-        ImGui::TextWrapped("%lld RP a quarter | %lld RP in hand | %d of %d held",
+        ImGui::TextWrapped("%lld RP a month | %lld RP in hand | %d of %d held",
                            static_cast<long long>(rate / k_milli_per_rp),
                            static_cast<long long>((st != nullptr ? st->pool_milli : 0) / k_milli_per_rp),
                            st != nullptr ? static_cast<int>(st->held.count()) : 0, dg::node_count);

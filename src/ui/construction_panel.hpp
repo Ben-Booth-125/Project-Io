@@ -84,7 +84,7 @@ int construction_eta_days(const construction_read& rd, int days_left);
 /// A compact day count — "1 day", "180 days".
 std::string days_label(int days);
 
-/// A compact quarter count — "3 qtrs", "8 qtrs (~2 yr)". The display word is **qtr**,
+/// A compact month count — "3 mo", "24 mo (~2 yr)". The display word is **mo** (BL-1642),
 /// never tick (NR-002, Ben 2026-08-01).
 std::string ticks_label(int ticks);
 

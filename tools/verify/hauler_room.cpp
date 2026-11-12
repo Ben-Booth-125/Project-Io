@@ -79,7 +79,7 @@ void check(bool ok, const char* what)
     if (!ok) ++g_fail;
 }
 
-constexpr int k_econ_tick_days = 90;
+// k_econ_tick_days: components.hpp (30, a month - BL-1642)
 
 void play_tick(world& w, const recipe_registry& reg, int k)
 {

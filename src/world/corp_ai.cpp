@@ -2711,7 +2711,7 @@ namespace {
 
 constexpr float k_force_base_share = 0.20f;  ///< Of income, with no neighbour stronger. First cut.
 constexpr float k_force_threat_span = 3.0f;  ///< Threat over 1 that reaches the ceiling. First cut.
-constexpr int   k_force_income_returns = 4;  ///< Returns averaged: a year.
+constexpr int   k_force_income_returns = 12; ///< Returns averaged: a year of months (BL-1642; was 4 quarters).
 
 float land_row_price(const recipe_registry& reg, uint16_t type)
 {
@@ -3435,7 +3435,7 @@ constexpr float k_war_ai_min_motive   = 0.025f;
 
 /// Peace: a war younger than this is neither offered nor accepted (a declaration
 /// is not withdrawn the quarter it is made).
-constexpr int   k_war_ai_min_peace_ticks    = 4;
+constexpr int   k_war_ai_min_peace_ticks    = 12; // months: a year, the 4 quarters (BL-1642)
 constexpr float k_war_ai_peace_w_exhaustion = 0.8f; ///< x own exhaustion / 100
 constexpr float k_war_ai_peace_w_losing     = 0.6f; ///< x max(0, -score) / 100
 constexpr float k_war_ai_peace_w_duration   = 0.4f; ///< x min(1, ticks at war / truce length)
@@ -3722,7 +3722,7 @@ void score_nation_war(world& w, const recipe_registry& reg, entity_id nation, in
         if (dur < k_war_ai_min_peace_ticks)
             continue;
         if (peace_offer_cooling(w, nation, other))
-            continue; // its last offer was refused under four ticks ago (NR-1120)
+            continue; // its last offer was refused under a year ago (NR-1120; twelve monthly ticks)
         std::vector<uint32_t> provs;
         uint32_t order = 0; // white
         if (mine >= k_war_ai_demand_score)

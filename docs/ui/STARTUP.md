@@ -653,7 +653,7 @@ presentation half:
    seated nation, so nothing they emit has a reader.
    **Their READINGS do have a reader** (Ben, 2026-10-13: *"since we simulate a few economy
    ticks before the game starts, we should be able to use those values for anything that needs
-   an economy tick to update"*). This REVERSES the 2026-09-24 reading for every per-quarter
+   an economy tick to update"*). This REVERSES the 2026-09-24 reading for every per-month
    figure a surface shows — a market's sales and trade values, a building's profit, a price
    series, the balance series: a fresh campaign opens on the last settle tick's values, never
    on a "no data yet" dash. Calendar-dated records (comms, history samples) still take nothing
@@ -683,7 +683,7 @@ is built and waits as needed. Other bodies bake in the background once play open
 4. **Rebase the clock** (fresh `sim_loop`; speed from the Lua config — generation, search and
    settle wall time must not become in-game days), then `m_screen = in_game`.
 
-**The settle keeps its meaning.** It is twelve quarterly econ ticks with no calendar meaning
+**The settle keeps its meaning.** It is thirty-six monthly econ ticks with no calendar meaning
 (`../economy/ERAS.md` § The opening position; BL-978, warm start retired), run **in spectate**
 — `corp_ai_params::spectating`, nobody seated — because the seat comes after it, so the card
 can show the figures it files; every nation opens onto non-empty pools and live markets rather

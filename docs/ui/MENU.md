@@ -123,8 +123,8 @@ fare stays on the canvas; the labour read is a roll-up on the
   BL-691, corp: how am I doing).** Its question is **"how well am I doing?"**, asked of the
   player's own nation (re-subjected, Ben, 2026-10-23), and it holds **one card, Balance**, folded
   out into the shell column (`src/ui/corporation_dashboard.{hpp,cpp}`). The card **rests as one verdict
-  line** (`±X/qtr, treasury Y`) **over its chart** — a two-column graph, earnings against the
-  quarter's expenses stacked by flow, with the net beneath it. `›` gives it the canvas
+  line** (`±X/mo, treasury Y`) **over its chart** — a two-column graph, earnings against the
+  month's expenses stacked by flow, with the net beneath it. `›` gives it the canvas
   (BL-214, drill-through; `DRILL_THROUGH.md`); there is no expand-in-place control,
   because the card already shows its content at rest. There is no chart question log on the card
   (NR-018; see `DRILL_THROUGH.md` § No chart question log).
@@ -174,7 +174,7 @@ fare stays on the canvas; the labour read is a roll-up on the
   than appended below the tail. It draws `icons::satellite`, the thing it launches.
 - **Scope-widening names (settled by Q&A 2026-06-15).**
   — **Convoys** (slot 6): **cargo in transit** — one row per convoy in flight, its route, its ETA
-    in qtr and the haulage it has cost. Added 2026-08-29 on Ben's call, lifted out of the Market
+    in mo and the haulage it has cost. Added 2026-08-29 on Ben's call, lifted out of the Market
     Ledger where it had been a third tab. It was never a market question: `MARKETS.md` owns
     clearing and the order book, and a convoy is `SUPPLY.md`'s subject — *Logistics is the road,
     Supply is the traffic*. Placing it directly after Market keeps the commercial run of the rail

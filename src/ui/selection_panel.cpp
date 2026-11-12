@@ -249,7 +249,7 @@ void draw_survey_section(const world& w, ui_state& ui, entity_id body_id)
                     ImGui::TextDisabled("%s", mapped < total ? "Prospecting waits for mapping."
                                                              : "Every region prospected.");
                 else if (ground > 0)
-                    ImGui::TextDisabled("Prospecting: %d on the ground, a region a quarter each.", ground);
+                    ImGui::TextDisabled("Prospecting: %d on the ground, a region every three months each.", ground);
                 else
                     ImGui::TextDisabled("Land a Lander or a rover here to prospect.");
                 break;
@@ -454,7 +454,7 @@ void draw_building_profit(const world& w, const recipe_registry& reg,
     const building_profit p = estimate_building_reading(w, reg, report, id);
     if (!p.has_data)
     {
-        ImGui::TextDisabled("Run an economy quarter to estimate.");
+        ImGui::TextDisabled("Run an economy month to estimate.");
         return;
     }
 
@@ -466,8 +466,8 @@ void draw_building_profit(const world& w, const recipe_registry& reg,
     const float       net    = p.net();
     const float       exp    = p.input_cost + p.maintenance + p.wages;
 
-    const std::string net_s = fmt::rate(net, "qtr");
-    const std::string exp_s = fmt::credits(exp) + " / qtr";
+    const std::string net_s = fmt::rate(net, "mo");
+    const std::string exp_s = fmt::credits(exp) + " / mo";
     const float fig_w  = std::max(ImGui::CalcTextSize(net_s.c_str()).x,
                                   ImGui::CalcTextSize(("Exp " + exp_s).c_str()).x);
     const float chart_w = std::max(ui::px(40.0f), box_w - fig_w - style.ItemSpacing.x);
@@ -494,7 +494,7 @@ void draw_building_profit(const world& w, const recipe_registry& reg,
     ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::value_colour(static_cast<double>(net))),
                        "%s", net_s.c_str());
     if (ImGui::IsItemHovered())
-        ImGui::SetTooltip("Net profit per quarter: revenue %s less expenses %s.",
+        ImGui::SetTooltip("Net profit per month: revenue %s less expenses %s.",
                           fmt::credits(p.revenue).c_str(), fmt::credits(exp).c_str());
     ImGui::TextDisabled("Exp %s", exp_s.c_str());
     if (ImGui::IsItemHovered())
@@ -507,7 +507,7 @@ void draw_building_profit(const world& w, const recipe_registry& reg,
             ri = reg.get_recipe(bit->second.recipe);
         const std::string names = input_basket_names(ri);
         ImGui::BeginTooltip();
-        ImGui::TextUnformatted("Expenses per quarter");
+        ImGui::TextUnformatted("Expenses per month");
         ImGui::Separator();
         ImGui::Text("Input cost   %s", fmt::credits(p.input_cost).c_str());
         if (!names.empty())
@@ -1365,7 +1365,7 @@ std::string draw_workforce_bar(const building_component& b)
     ImGui::ProgressBar(static_cast<float>(target) / static_cast<float>(workforce_target_max),
                        {bar_w, ImGui::GetTextLineHeight()}, "");
     if (ImGui::IsItemHovered())
-        ImGui::SetTooltip("Workforce target, set by the game: each quarter it moves one\n"
+        ImGui::SetTooltip("Workforce target, set by the game: each month it moves one\n"
                           "25%% step toward the most profitable level (100%% = full employment).");
     ImGui::SameLine();
     ImGui::TextUnformatted(pct);
@@ -2325,8 +2325,8 @@ bool draw_convoy_selection(const world& w, ui_state& ui)
     else
     {
         const int eta = static_cast<int>(std::ceil(std::max(0.0f, 1.0f - c.progress) / c.speed));
-        std::snprintf(overlay, sizeof overlay, "%.0f%%  arrives in %d qtr%s",
-                      static_cast<double>(c.progress) * 100.0, eta, eta == 1 ? "" : "s");
+        std::snprintf(overlay, sizeof overlay, "%.0f%%  arrives in %d mo",
+                      static_cast<double>(c.progress) * 100.0, eta);
     }
     ImGui::SetNextItemWidth(std::min(ImGui::GetContentRegionAvail().x, 320.0f));
     ImGui::ProgressBar(c.progress, ImVec2{std::min(ImGui::GetContentRegionAvail().x, ui::px(320.0f)), 0.0f}, overlay);
@@ -2854,11 +2854,11 @@ stack_reading read_stack(const world& w, const recipe_registry& reg,
     }
     if (!data)
     {
-        out.text      = "\xe2\x80\x94 / qtr";
+        out.text      = "\xe2\x80\x94 / mo";
         out.net_short = "\xe2\x80\x94";
         return out;
     }
-    out.text      = fmt::rate(net, "qtr");
+    out.text      = fmt::rate(net, "mo");
     out.net_short = fmt::signed_delta(static_cast<double>(net));
     out.colour    = ui::value_colour(static_cast<double>(net));
     return out;
@@ -3115,7 +3115,7 @@ std::string building_method_line(const world& w, const recipe_registry& reg,
             if (b.decommissioned)
                 return "Mothballed: makes no trade points";
             if (report.upkeep_unmet.count(bid) != 0)
-                return "No trade points this quarter: upkeep unmet";
+                return "No trade points this month: upkeep unmet";
             // The figure `market_trade_points` sums for this building: its
             // (owner, body) labour scalar this tick, 1 where the tick has none.
             float contention = 1.0f;
@@ -3130,7 +3130,7 @@ std::string building_method_line(const world& w, const recipe_registry& reg,
             if (b.type == building_type::port && w.closed_ports.count(b.tile) != 0)
                 std::snprintf(buf, sizeof buf, "Blockaded: makes no trade points");
             else if (pts > 0.0f)
-                std::snprintf(buf, sizeof buf, "Makes %.1f trade points / qtr", static_cast<double>(pts));
+                std::snprintf(buf, sizeof buf, "Makes %.1f trade points / mo", static_cast<double>(pts));
             else
                 std::snprintf(buf, sizeof buf, "Makes trade points for %s", market.c_str());
             if (market_out != nullptr)
@@ -3207,7 +3207,7 @@ void draw_building_recipe_rows(const world& w, const recipe_registry& reg, const
     };
 
     // The columns: each the wider of its heading and its widest figure.
-    const char* const k_fig_head   = "Est./qtr";
+    const char* const k_fig_head   = "Est./mo";
     const char* const k_shelf_head = "Shelf";
     float fig_w = ImGui::CalcTextSize(k_fig_head).x, shelf_w = ImGui::CalcTextSize(k_shelf_head).x;
     for (const building_recipe_row& row : rd.rows)
@@ -3230,12 +3230,12 @@ void draw_building_recipe_rows(const world& w, const recipe_registry& reg, const
         ui.tile_card.recipe_hover_who  = who;
         ui.tile_card.recipe_hover_text = cs[static_cast<std::size_t>(hit)].text;
     };
-    const std::string heading = rd.reported ? "Recipe" : "Recipe, no quarter yet";
+    const std::string heading = rd.reported ? "Recipe" : "Recipe, no month yet";
     ui.tile_card.recipe_heading = heading;
     // The empty report is the one thing here that must read whole, and the good column
     // cannot hold it, so it takes the card's width on a line of its own.
     std::vector<grid_explainer> head_cells;
-    const char* const k_no_quarter_hover = "No quarter has been read for this building yet, as after a load. "
+    const char* const k_no_quarter_hover = "No month has been read for this building yet, as after a load. "
                                            "Reported figures wait for the next tick; a dash is not a zero.";
     if (!rd.reported)
     {
@@ -3270,8 +3270,8 @@ void draw_building_recipe_rows(const world& w, const recipe_registry& reg, const
         ImGui::TextDisabled("%s", heading.c_str());
         head_cells.push_back(construction_cell(
             "heading", hp, hw,
-            std::string("What this building's recipe takes and makes, per quarter. The last "
-                        "quarter's report is read.")));
+            std::string("What this building's recipe takes and makes, per month. The last "
+                        "month's report is read.")));
     }
     ImGui::TableSetColumnIndex(2);
     {
@@ -3279,7 +3279,7 @@ void draw_building_recipe_rows(const world& w, const recipe_registry& reg, const
         ImGui::TextDisabled("%s", k_fig_head);
         head_cells.push_back(construction_cell(
             "figure_head", hp, fig_w,
-            std::string("An estimate per quarter. The sim reports one input, the one that held the run; "
+            std::string("An estimate per month. The sim reports one input, the one that held the run; "
                         "the rest are worked out from the recipe.")));
     }
     ImGui::TableSetColumnIndex(3);
@@ -3323,19 +3323,19 @@ void draw_building_recipe_rows(const world& w, const recipe_registry& reg, const
                 std::snprintf(buf, sizeof buf, "%s", rd.no_draw != nullptr ? rd.no_draw : "It draws nothing.");
             else if (row.input)
                 std::snprintf(buf, sizeof buf,
-                              "About %.1f a quarter, worked out from the recipe at this building's "
+                              "About %.1f a month, worked out from the recipe at this building's "
                               "staffing. An estimate, not a report.", static_cast<double>(row.per_qtr));
             else if (row.has_figure && row.estimated)
                 std::snprintf(buf, sizeof buf,
-                              "About %.1f a quarter: an estimate. The reported total is %.1f, and this "
+                              "About %.1f a month: an estimate. The reported total is %.1f, and this "
                               "share of it is worked out by how rich each deposit on the tile is.",
                               static_cast<double>(row.per_qtr), static_cast<double>(row.total));
             else if (row.has_figure)
-                std::snprintf(buf, sizeof buf, "About %.1f a quarter, from the last quarter's reported output.",
+                std::snprintf(buf, sizeof buf, "About %.1f a month, from the last month's reported output.",
                               static_cast<double>(row.per_qtr));
             else
                 std::snprintf(buf, sizeof buf,
-                              "No quarter has been read for this building yet, so there is no figure. "
+                              "No month has been read for this building yet, so there is no figure. "
                               "It is not a zero.");
             cells.push_back(construction_cell("figure", p, fig_w, buf));
         }
@@ -3376,7 +3376,7 @@ void draw_building_recipe_rows(const world& w, const recipe_registry& reg, const
                     mark = "binding";
                     ink  = red;
                     std::snprintf(buf, sizeof buf,
-                                  "Short: the last quarter's report names %s as the input that held the "
+                                  "Short: the last month's report names %s as the input that held the "
                                   "run, at %d%%.%s",
                                   good.c_str(), static_cast<int>(std::lround(rd.run * 100.0f)), cause);
                 }
@@ -3385,7 +3385,7 @@ void draw_building_recipe_rows(const world& w, const recipe_registry& reg, const
                     mark = "short";
                     ink  = amber;
                     std::snprintf(buf, sizeof buf,
-                                  "Short, by estimate: the shelf would not meet about %.1f a quarter. Only the "
+                                  "Short, by estimate: the shelf would not meet about %.1f a month. Only the "
                                   "one binding input is reported.%s",
                                   static_cast<double>(row.per_qtr), cause);
                 }
@@ -3517,7 +3517,7 @@ void draw_expanded_building_card(world& w, const recipe_registry& reg,
             ImGui::TableSetupColumn("##glyph", ImGuiTableColumnFlags_WidthFixed, construction_grid::glyph);
             ImGui::TableSetupColumn("##label", ImGuiTableColumnFlags_WidthStretch, 1.0f);
             ImGui::TableSetupColumn("##done",  ImGuiTableColumnFlags_WidthFixed, construction_grid::bar);
-            ImGui::TableSetupColumn("##qtrs",  ImGuiTableColumnFlags_WidthFixed, construction_grid::eta);
+            ImGui::TableSetupColumn("##mo",  ImGuiTableColumnFlags_WidthFixed, construction_grid::eta);
             ImGui::TableSetupColumn("##cost",  ImGuiTableColumnFlags_WidthFixed, construction_grid::cost);
             ImGui::TableSetupColumn("##state", ImGuiTableColumnFlags_WidthFixed, construction_grid::state);
             ImGui::TableNextRow(ImGuiTableRowFlags_None, row_h);
@@ -5840,19 +5840,19 @@ void draw_construction_ledger_body(world& w, const recipe_registry& reg, ui_stat
             if (c.group == 0 && c.starved)
                 std::snprintf(nbuf, sizeof nbuf,
                               "It would likely stand idle: this market cannot get it %s at a price it will "
-                              "pay. Est. net %+d cr / qtr is its upkeep alone. The bar is that figure "
+                              "pay. Est. net %+d cr / mo is its upkeep alone. The bar is that figure "
                               "against the best row in this list.",
                               resource_name(c.short_of), static_cast<int>(c.profit.net()));
             else if (c.group == 0)
                 std::snprintf(nbuf, sizeof nbuf,
-                              "Est. net %+d cr / qtr once its output is selling here, at 50%% staffing "
+                              "Est. net %+d cr / mo once its output is selling here, at 50%% staffing "
                               "with no labour shortage and %d%% Logistic Point cover. The bar is "
                               "that figure against the best row in this list.",
                               static_cast<int>(c.profit.net()),
                               static_cast<int>(std::lround(lp_cover * 100.0f)));
             else if (c.pr.ok() && !c.produces && c.profit.has_data)
                 std::snprintf(nbuf, sizeof nbuf,
-                              "No direct revenue - upkeep %d cr / qtr. It earns through what it "
+                              "No direct revenue - upkeep %d cr / mo. It earns through what it "
                               "enables, so the column stays empty rather than showing a loss.",
                               static_cast<int>(c.profit.maintenance + c.profit.wages));
             else

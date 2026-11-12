@@ -79,8 +79,8 @@ centred bar, each side's exhaustion, and days since it opened. Every war is publ
 - **Offer peace** — white peace, or cession of named goals the receiving side holds. Terms that would
   take the loser's last province are allowed and marked: the loser's nation ends (RELATIONS § 7,
   Ben, 2026-11-09). **Impose**
-  replaces Offer while the score is 100 in the player's favour. For four quarters after the other
-  side refuses the player's offer, **Offer peace** is disabled, its tooltip naming the quarters left
+  replaces Offer while the score is 100 in the player's favour. For four months after the other
+  side refuses the player's offer, **Offer peace** is disabled, its tooltip naming the months left
   (RELATIONS § 7, the offer cooldown). The composer says what imposing would take, the score it
   stands at, and when the terms would end the loser's nation (Ben, 2026-11-09).
 - **Answer** — on a war declared against the player that it has not yet answered: name goals among

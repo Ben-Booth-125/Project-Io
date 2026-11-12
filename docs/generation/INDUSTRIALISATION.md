@@ -906,7 +906,7 @@ the framing are the shell's, and nothing that shapes the world waits for Begin
 there is never a second build. The round's record is published at the 1960 close, so its playback
 starts while the same worker builds the tail behind it; landing swaps the world alone, and the
 caption names only the step under way. The settle keeps its meaning from `../economy/ERAS.md`
-§ Where the ladder starts — twelve quarterly ticks with no calendar meaning, the clock rebased at
+§ Where the ladder starts — thirty-six monthly ticks with no calendar meaning, the clock rebased at
 Begin — and the wait's caption is the only thing that names it. Neither the search nor the settle is
 written twice, and the viability check the search exists for survives: a budget spent on buildings
 that cannot pay is exactly what its terms score down.

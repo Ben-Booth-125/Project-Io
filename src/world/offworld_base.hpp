@@ -94,9 +94,9 @@ struct offworld_base_params
     int32_t       min_colonists = 2;                      ///< Thousands of heads a founding needs.
     resource_type kit_res       = resource_type::machinery; ///< The base kit's good.
     float         kit_qty       = 20.0f;                  ///< Of it, aboard the landed Landers.
-    float         water_per_k   = 1.0f;                   ///< Water per thousand a quarter at habitability 0.
-    float         food_per_k    = 1.0f;                   ///< Food rations per thousand a quarter at habitability 0.
-    float         shrink_share  = 0.25f;                  ///< Of its people a base loses an unfed quarter.
+    float         water_per_k   = 1.0f / 3.0f;            ///< Water per thousand a tick (a month; a quarter 1.0, BL-1642) at habitability 0.
+    float         food_per_k    = 1.0f / 3.0f;            ///< Food rations per thousand a tick (a month; a quarter 1.0) at habitability 0.
+    float         shrink_share  = 0.0914397f;             ///< Of its people a base loses an unfed tick: 1 - 0.75^(1/3), the quarter's 0.25 a month (BL-1642).
     float         reservation_mult = 0.0f;                ///< The fair-price ceiling (0 = buy what the shelf holds).
 };
 

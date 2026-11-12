@@ -223,7 +223,7 @@ int main(int argc, char** argv)
         }
         seat_player_corporation(w, seed, start->land.search.winner_score);
         reading h; read(w, reg, &last, h); print("HANDOFF", h, true); add(PH, h);
-        constexpr int k_econ_tick_days = 90;
+        constexpr int k_econ_tick_days = ::k_econ_tick_days; // BL-1642: 30, a month;
         std::set<std::uint32_t> seen;
         for (const convoy_component& c : w.convoys) seen.insert(c.id);
         int fuelled_ever = 0;

@@ -305,7 +305,8 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
 /// clear: next = prior + k_price_smoothing x (target - prior). Exported for
 /// BL-1203's first-clear guard in `dispatch_absorbable` (supply_system.cpp), which
 /// projects the price a cargo will SELL at on its arrival tick.
-inline constexpr float k_price_smoothing = 0.5f;
+/// BL-1642: 1 - 0.5^(1/3) a month, so the half-life is the quarter tick's 0.5 a quarter.
+inline constexpr float k_price_smoothing = 0.2062995f;
 
 /// The UNSMOOTHED price a market aims at for one good this tick: `base x
 /// sqrt(demand / supply)`, `base x ceil` for demand with no supply, `base` with

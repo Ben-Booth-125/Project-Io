@@ -149,7 +149,7 @@ struct space_unit
     float            cargo       = 0.0f;  ///< Mass units carried, in [0, cargo cap]; its good is the unit's `space_haul` (space_convoy.hpp).
     float            hull_points = 0.0f;  ///< In (0, max].
     int32_t          crew        = 0;     ///< Astronauts aboard.
-    float            upkeep      = 0.0f;  ///< Credits a quarter, fixed at raise.
+    float            upkeep      = 0.0f;  ///< Credits a tick (a month), fixed at raise.
     int32_t          unpaid_quarters = 0;
 };
 
@@ -229,7 +229,7 @@ struct space_unit_params
     float launch_propellant_per_dv = 0.1f; ///< Climb propellant per Δv of climb per unit of wet mass.
     float repair_per_day          = 1.0f;  ///< Hull points a docked unit regains a day.
     float depot_stock_per_depot   = 200.0f;///< A station's propellant stock cap per working Fuel depot.
-    int32_t quarters_to_loss      = 4;     ///< Clamped into [1, k_space_quarters_to_loss_ceiling].
+    int32_t quarters_to_loss      = 12;    ///< Months (BL-1642; was 4 quarters). Clamped into [1, k_space_quarters_to_loss_ceiling].
     int32_t berths_per_dock       = 2;
     /// The fair-price ceiling every draw obeys (components.hpp `shelf_admits`). 0 =
     /// off: buy whatever the shelf holds (the launch/procurement OFF behaviour).

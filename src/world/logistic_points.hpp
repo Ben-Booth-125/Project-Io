@@ -116,7 +116,8 @@ inline constexpr std::size_t lp_network_count = 3;
 // --- counts TRACK STEPS between stations - point to point, no off-network step at all.
 
 /// Points a source makes per tick, by network.
-inline constexpr std::array<float, lp_network_count> lp_source_points = {120.0f, 150.0f, 120.0f};
+/// Per tick, a month: a third of the quarter tick's {120, 150, 120} (BL-1642).
+inline constexpr std::array<float, lp_network_count> lp_source_points = {40.0f, 50.0f, 40.0f};
 /// Full-strength distance, by network.
 ///
 /// BL-1360 (Ben, 2026-10-16; LOGISTICS.md § One pool): a better road carries points
@@ -141,7 +142,7 @@ inline constexpr std::array<float, 4> lp_road_step = {3.0f, 1.0f, 0.75f, 0.6f};
 inline constexpr float lp_offnet_step = 3.0f;
 /// Points a producing building needs per tick per unit of run
 /// (workforce_assigned x workforce_target/100).
-inline constexpr float lp_need_per_run = 10.0f;
+inline constexpr float lp_need_per_run = 10.0f / 3.0f; ///< A month's: the quarter's 10 / 3 (BL-1642).
 
 /// One producing building's line.
 struct lp_building_row

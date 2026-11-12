@@ -30,7 +30,8 @@ constexpr space_good g(rt r, float q) { return {r, q}; }
 constexpr space_good none() { return {rt::spacecraft_components, 0.0f}; }
 
 /// THE HULL TABLE (first cut, in-band; see the report). Mass in mass units, hull
-/// points, crew drawn from the astronaut pool, credits of upkeep a quarter.
+/// points, crew drawn from the astronaut pool, credits of upkeep a QUARTER (a tick,
+/// a month, pays a third: evaluate_space_design, BL-1642).
 const std::array<space_hull_spec, space_hull_count> k_hulls{{
     {"Hauler",  10.0f,  20.0f, 1,  400.0f, true,  space_keys::hull_hauler,
      {g(rt::spacecraft_components, 10.0f), g(rt::alloys, 4.0f), none()}},
@@ -413,7 +414,7 @@ space_design_stats evaluate_space_design(space_hull h, const space_design& d)
     st.dry_mass    = hs.mass;
     st.hull_points = hs.hull_points;
     st.crew        = hs.crew;
-    st.upkeep      = hs.upkeep;
+    st.upkeep      = hs.upkeep / static_cast<float>(k_econ_ticks_per_quarter); // BL-1642: the table is per quarter; a tick is a month
     for (const space_good& gd : hs.goods)
         if (gd.qty > 0.0f)
             st.goods[static_cast<std::size_t>(gd.res)] += gd.qty;

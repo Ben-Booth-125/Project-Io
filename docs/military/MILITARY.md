@@ -229,8 +229,8 @@ check**: hardness alone carries "infantry cannot hurt tanks".
 **A unit carries three stocks — food, ammunition and equipment — each in per-mille of full.** They
 are stored on the unit and move every day: food is eaten at the unit's ration rate, ammunition is
 spent by every day the unit fights, and equipment is lost to battle and to attrition. They are
-**refilled by the quarterly supply draw** (§ Upkeep, "Supply is drawn where the unit stands"): the
-share the network granted for the quarter arrives as a daily resupply. **Restock scales with cover
+**refilled by the monthly supply draw** (§ Upkeep, "Supply is drawn where the unit stands"): the
+share the network granted for the month arrives as a daily resupply. **Restock scales with cover
 (Ben, 2026-10-29):** each day a stock receives `share × (daily need + restock rate)`, capped at full
 — *"half cover then drains more slowly, full cover refills"*. A unit covered in full refills by the
 restock rate a day; a unit covered in part drains at the shortfall, more slowly than its bare need;
@@ -404,7 +404,7 @@ wounded; the economy is the war's ceiling.
   gated hire goods, over the men a hire raises. It is bought off the nation's shelves at the posted
   price, from its uncommitted treasury, as a hire buys. HP is men, so the men a unit regains equal
   the recruits its pool gives, and the goods drawn equal those men times the share.
-- **The refill rides the quarterly supply draw.** The recruits a unit plans to take, and their
+- **The refill rides the monthly supply draw.** The recruits a unit plans to take, and their
   equipment's quantity, join its Logistic Point request at its paying road (§ Upkeep); it receives
   the whole recruits its granted share pays for, each with his equipment. Units are served in
   ascending id, so when a pool or a shelf runs short the order decides who stays wounded.
@@ -412,7 +412,7 @@ wounded; the economy is the war's ceiling.
 ### Recruits (Ben, 2026-10-30)
 
 **Soldiers are recruits, and bases make them.** A `military_base` makes **land recruits** and an
-`airbase` makes **air recruits**, each at a fixed number per quarter authored in `scripts/economy.lua`
+`airbase` makes **air recruits**, each at a fixed number per month authored in `scripts/economy.lua`
 (`economy.military.recruits`). There is no other source: recruits replace the labour-pool draw and the
 conscript or professional choice (BL-1424 (soldiers from labour) is superseded).
 
@@ -421,8 +421,8 @@ conscript or professional choice (BL-1424 (soldiers from labour) is superseded).
   province whose centres cannot give makes fewer; a mobilised province is an emptier one.
 - **One pool per theatre per nation.** Every land recruit goes to the nation's one land pool and every
   air recruit to its one air pool, wherever the base stands.
-- **The cap is fifteen quarters of output.** A pool holds at most 15 x the quarterly recruits its
-  theatre's bases make together. A full pool takes no more; its bases make none that quarter.
+- **The cap is forty-five months of output.** A pool holds at most 45 x the monthly recruits its
+  theatre's bases make together. A full pool takes no more; its bases make none that month.
 - **A hire spends its men.** Raising a unit spends recruits equal to its men from the land pool; a
   wing spends its crew from the air pool. A hire the pool cannot fill is refused before money moves,
   in the shelf's words ("Needs 400 recruits; the pool holds 120").
@@ -449,8 +449,8 @@ conscript or professional choice (BL-1424 (soldiers from labour) is superseded).
   sizing), and that sizing prices each base at the upkeep it carried before bases went free. So a
   poor nation opens with fewer bases, as it did; once play begins a base costs nothing to keep.
 - **Ports make sea recruits (Ben, 2026-11-02).** A completed `port` makes **sea recruits** at a fixed
-  number per quarter (`economy.military.recruits`), taken from its province's centres as a base's are,
-  into the nation's one **sea pool**, capped at fifteen quarters of its ports' output. Nothing spends
+  number per month (`economy.military.recruits`), taken from its province's centres as a base's are,
+  into the nation's one **sea pool**, capped at forty-five months of its ports' output. Nothing spends
   the sea pool but a ship's hire (§ Sea).
 - **Seen in the header (Ben, 2026-11-02).** The header's top right shows each theatre's pool - land,
   air and sea - as an icon, recruits held against the cap, and a bar of the pool's fill beneath
@@ -642,7 +642,7 @@ soft. Ground air defence engages every mission flown over its province.
 **The airbase is its own building (Ben, 2026-10-28).** An airbase is built and placed on a nation's
 own ground as a military base is, and is the one door a wing is hired at: a wing records its airbase
 as a land unit records its `muster_base`, and the same orphan rule disbands a wing whose airbase is
-torn down. A military base hosts no wings. A wing's quarterly supply is drawn at its airbase's tile
+torn down. A military base hosts no wings. A wing's monthly supply is drawn at its airbase's tile
 (§ Upkeep — supply is drawn where the unit stands).
 
 **Six classes (Ben, 2026-10-28).**
@@ -713,7 +713,7 @@ mask** (which classes it can hit). There is no hardness and no terrain: water gi
 **A port is the one door (Ben, 2026-11-02).** A ship is hired at a completed port on the nation's own
 ground, for credits, its kit and sea recruits from the sea pool, and it records that port as its home.
 The orphan rule is the wing's, by water: a ship whose home port is torn down takes up the nearest other
-own port it can sail to, and disbands with none. A lake is not sea: no ship stands on or crosses one. Its quarterly supply is drawn at its home port (§ Upkeep), and HP is refit there by drawing
+own port it can sail to, and disbands with none. A lake is not sea: no ship stands on or crosses one. Its monthly supply is drawn at its home port (§ Upkeep), and HP is refit there by drawing
 goods, so a damaged ship goes home to mend. A dropped hire refunds its recruits as a land hire does.
 
 **The kit is the designer's (Ben, 2026-11-05).** Upgrades are designs, not purchases per ship: one live
@@ -726,7 +726,7 @@ class's mask, never so far that a capital ship can hit a submarine. Base kit dra
 class's hire goods. A ship keeps the kit it recorded until it **refits**: lying at its home port with no
 mission, it buys each changed slot's goods and is out of action for its class's muster days. Its hull
 share is kept, so a ship refitted while damaged is still damaged. In refit it is in dock: it neither
-fights nor can be hit, still draws its quarterly supply, and does not mend. It is a fielded ship, not a
+fights nor can be hit, still draws its monthly supply, and does not mend. It is a fielded ship, not a
 hire: lose its port and it takes up another by the rule above, finishing the refit before it sails.
 
 **A ship sails, then works a zone (Ben, 2026-11-05).** A ship stands on one water tile, on coast and
@@ -1300,7 +1300,7 @@ checked before either is debited, so a refusal leaves the nation wholly uncharge
 a building enters construction, and becomes a unit when its muster completes; the Military
 ledger's **Recruit** tab (rail slot 7, `../ui/ledgers/military.md`) shows the queue and is the
 door to every hire. A muster takes **90 days** for infantry, motorised infantry and light armour,
-**135** for artillery and air defence, and **180** for mechanised infantry and armour — a quarter
+**135** for artillery and air defence, and **180** for mechanised infantry and armour — a month
 a tick, so one, two or two ticks (`muster_days_for`). A hire still mustering counts against a
 rival nation's force sizing (§ What a force costs). An order whose base is demolished or decommissioned is
 dropped with no unit, as a unit whose base is torn down is disbanded. On completion: a new unit entity at the muster tile with
@@ -1327,7 +1327,7 @@ row of the same class (`land_class_for`), newer — a later band, or the same ba
 `power_mod` — and one the nation can field now; an obsolete row is allowed, listed after the live
 ones. The unit must be the nation's own, out of battle, not already refitting, and standing on its
 own nation's ground. It pays at once: the hire price difference, floored at zero, plus the target's
-gated goods off the shelf as a hire buys them. It takes the target's muster days, a quarter a tick.
+gated goods off the shelf as a hire buys them. It takes the target's muster days, a month a tick.
 Until then the unit keeps its old type, fights as it and is drawn into battles as it, but does not
 march: re-equipping is done in place, so a standing march order is cleared. On completion it takes
 the new type and keeps its men, establishment, readiness and morale. The press is on the unit card
@@ -1485,7 +1485,7 @@ never changes post-generation, so the guard is defensive, and the determinism ha
 directly.
 
 **Units march by the day, at their class's speed (Ben, 2026-10-28).** A march no longer waits on the
-quarterly economy tick: it advances every day. Each land class takes an authored number of **days
+monthly economy tick: it advances every day. Each land class takes an authored number of **days
 to cross one plains tile** — foot infantry 3, motorised infantry 1, mechanised infantry 1, light
 armour 1, medium armour 1.5, towed artillery 2, air defence 1.5 — so trucks and tracks are what make
 a force fast. Terrain multiplies the days by the tile's traversal cost
@@ -1497,13 +1497,13 @@ not on this land table. A composite unit (BL-472, formations) moves at its **slo
 speed.
 
 **Movement takes no Logistic Points (Ben, 2026-10-28).** A march is paid in days, never in points, so
-an order given mid-quarter moves at once. What a unit costs the network is its **supply**: once a
-quarter it draws Logistic Points from where it stands — at its own tile on the network, or at the
+an order given mid-month moves at once. What a unit costs the network is its **supply**: once a
+month it draws Logistic Points from where it stands — at its own tile on the network, or at the
 closest road within 8 tiles of it (§ Upkeep — supply is drawn where the unit stands).
 
 **Out of contact, readiness and morale recover daily (Ben, 2026-10-28)**, on the same day step as the
 march and the battle, and **a unit a battle kills is removed that same day** — it does not stand on
-its tile, blocking a step, until the quarter ends.
+its tile, blocking a step, until the month ends.
 
 The days are authored data: `economy.military.march_days_per_tile`, keyed by land class, and
 `economy.military.march_days_per_tile_by_cls` for a **pre-modern row**, which declares no land
@@ -1550,12 +1550,12 @@ Both run **every day**, in the daily military pass (`run_military_day`, economy_
 fronts issue their orders, then `run_battles` steps every live battle a day's rounds, then
 `run_unit_march` walks the day's marches and opens the battles their contacts make. A unit in contact
 fights today before it can march out. The pass runs from the app's day loop between economy ticks,
-and every driver that steps whole quarters walks the same days in the economy step's own catch-up
-(`advance_quarter_to`, one cursor with construction's days). After the battles the same pass runs
+and every driver that steps whole months walks the same days in the economy step's own catch-up
+(` 1 `, one cursor with construction's days). After the battles the same pass runs
 the one orphan cleanup (`disband_orphaned_units`), so a unit a battle reduced to zero is removed that
-day, and after the march it runs out-of-contact recovery. What stays in the quarterly step is
+day, and after the march it runs out-of-contact recovery. What stays in the monthly step is
 economic: musters, refits, each unit's supply request on the Logistic Point resolve (§ Upkeep), and
-`run_unit_upkeep`, which runs the same orphan cleanup for a base torn down that quarter. There is
+`run_unit_upkeep`, which runs the same orphan cleanup for a base torn down that month. There is
 deliberately no second disband mechanism.
 
 **Three rulings** (Ben, 2026-08-19):
@@ -1713,12 +1713,12 @@ Each post above is chosen among the province's tiles where its nation's supply c
 at the handoff, by the same rule (the anchor centre; the tile facing the neighbour). The test is the
 claim's own: the tile the unit pays at (its own, or the closest road within the 8-tile off-road draw,
 § Carried supplies) stands at full routed cover. Being reached is not enough, because a claim's share
-is the cover where it pays, and a share of a tenth starves a unit within two quarters. A province
+is the cover where it pays, and a share of a tenth starves a unit within six months. A province
 with no such tile posts its garrison on the nearest such tile of the nation's own ground, ties to the
 lowest tile id. A nation whose ground feeds it whole nowhere posts it on the nearest ground the draw
 reaches. A tile another nation's units stand on is never a post (§ One nation per tile). Once every
 garrison stands, each unit's opening share is read off the resolver's own grant on that world, never
-assumed: it is what the unit eats until the first live quarter's claim. A nation's
+assumed: it is what the unit eats until the first live month's claim. A nation's
 opening army therefore starts fed (§ Carried supplies), for as long as its nation's sources run and
 its pool lasts.
 
@@ -1753,7 +1753,7 @@ artillery and one light armour, each on its class's base kit. Four stand at the 
 infantry, the artillery and the light armour. The other four are one unit each at the border posts,
 taken in descending grudge order and wrapping round when there are fewer than four posts. A major
 with no border post holds all eight at the capital. The opening unit `seed_starting_military`
-raises is one of the eight, not a ninth. Its land pool opens holding **200 recruits**, four quarters
+raises is one of the eight, not a ninth. Its land pool opens holding **200 recruits**, about twelve months
 of one base. The army is equal; the threat each major faces is not, and that is the intended
 asymmetry.
 
@@ -1843,7 +1843,7 @@ income**. The player's nation is never sized; the player reads the same numbers 
   their running goods at posted prices.
 - **Income** is the nation's operating surplus over its last four returns: income and taxes less
   expenditure, maintenance and wages, never below zero (`../economy/FINANCE.md`
-  § The quarterly return). A good or bad quarter does not swing the army.
+  § The monthly return). A good or bad month does not swing the army.
 - **The target share** is a base share raised by threat. **Threat** is the largest **force value**
   among its neighbours over its own. Below 1 it adds nothing: a nation does not shrink its share
   for being the strongest. Above 1 the share climbs, to a ceiling.
@@ -1879,12 +1879,12 @@ The authored table, `scripts/economy.lua` § `economy.military.unit_upkeep`:
 
 | Rate | Authored | Meaning |
 |---|---|---|
-| `credits_per_head` | `0.1041` | Flat wage per head per tick |
-| `credits_per_head_per_power` | `0.00007` | Wage scaled by the roster row's `power_mod` |
-| `goods_per_head.ordnance` | `0.000875` | The **ordnance** draw |
-| `goods_per_head.food_rations` | `0.00625` | The sanctioned second line |
-| `supply_decay_permille` | `50` | The one decay subtraction, per tick |
-| `supply_recovery_permille` | `100` | Regained per tick while supplied |
+| `credits_per_head` | `0.0347` | Flat wage per head per tick |
+| `credits_per_head_per_power` | `0.0000233` | Wage scaled by the roster row's `power_mod` |
+| `goods_per_head.ordnance` | `0.00029167` | The **ordnance** draw |
+| `goods_per_head.food_rations` | `0.00208333` | The sanctioned second line |
+| `supply_decay_permille` | `17` | The one decay subtraction, per tick |
+| `supply_recovery_permille` | `33` | Regained per tick while supplied |
 | `out_of_supply_reach` | `24.0` | Reach cost past which a unit is out of supply; ≤ 0 disables the trigger |
 
 The numbers are anchored by BL-543 (value anchor) — a unit's annual equipment costs twice its
@@ -1933,7 +1933,7 @@ reports the count as `unit_upkeep_tick::disbanded`.
 border garrison — and is never orphaned. A capital garrison records its capital base (§ Nation
 garrisons), so it is held to that base like any unit raised there.
 
-**Supply is drawn where the unit stands (Ben, 2026-10-28).** Once a quarter each unit asks the
+**Supply is drawn where the unit stands (Ben, 2026-10-28).** Once a month each unit asks the
 Logistic Points its supplies need, **scored on its current tile**: a request on that tile, served by
 the tile's routed cover — or, off the road, the paying road's (below) — from the nation's pool exactly as a building's is
 ([`LOGISTICS.md`](../economy/LOGISTICS.md) § A unit's supply draws on the pool). The supplies are
@@ -1973,7 +1973,7 @@ nothing**, which is why it earns no exemption from the reach rule that governs i
 
 **To project force further, you extend the same road and hub network everyone else uses.** There is
 one distance metric in the game and armies pay it: a march spends its days against the same
-traversal cost a convoy does, a unit's quarterly supply is drawn on that network at its tile, and a
+traversal cost a convoy does, a unit's monthly supply is drawn on that network at its tile, and a
 unit beyond the envelope takes the upkeep pass's decay
 (§ Upkeep — `run_unit_upkeep` calls `body_reach_field` and `tile_reach_cost`, and a unit whose tile
 cost exceeds `out_of_supply_reach`, or is unreachable outright, loses supply each tick). This is
@@ -2065,13 +2065,13 @@ recompute guard's trigger) recomputes identically across two independent runs.
 days per plains tile measured over twelve tiles (3 / 1 / 1 / 1 / 1.5 / 2 / 1.5), and the pre-modern
 rows by `cls`. D2: a mountain doubles the days, a road halves them. D3: progress banks from day to
 day. D4: movement takes no Logistic Points — a march on a zero pool arrives on time and pays
-nothing, and an order given mid-quarter moves at once, on the day loop's path too. D5: contact opens the battle on
+nothing, and an order given mid-month moves at once, on the day loop's path too. D5: contact opens the battle on
 the day of contact. D6: battle length in days by force ratio. D7: twice-equal. D8: a save mid-march
-round-trips and marches on identically. D9: a quarter walked day by day and one caught up by the
+round-trips and marches on identically. D9: a month walked day by day and one caught up by the
 economy step hash alike. D10: the loader rejects a non-positive, non-finite or unknown entry. D11:
 supply is drawn where the unit stands — the request is the supplies' quantity, a unit on its hub's
 tile is granted it whole and keeps full supply, one past the network is granted nothing and decays a
-step a quarter by the one rule. D12: a unit a battle kills is gone that day, and no battle names it.
+step a month by the one rule. D12: a unit a battle kills is gone that day, and no battle names it.
 D13: readiness and morale recover a step a day out of contact, and not in it.
 
 **`rival_military_seeding_harness.cpp`** — `seed_starting_military`. R1: every seeded owner
