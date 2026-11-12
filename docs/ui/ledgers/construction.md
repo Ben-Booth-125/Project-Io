@@ -117,12 +117,15 @@ No part-grid stands meanwhile, because cells that fill and re-sort as they go re
 they are one. A re-pass (the treasury or the frame stamp moved) leaves the last complete grid standing
 until the fresh set swaps in whole, so a running game's grid does not flicker. Under `--verify` the
 pass runs on one thread and completes in the frame it starts, so no capture rests on the clock.
-**The grid and the table read one Net.** Each tile is quoted once a pass, and while the grid
-priced at the current prices stands, the table's row for a tile shows that same quote, so a cell
-and its row never disagree. A pass restarts on what its figures read, and on the treasury at most
-once a game month (it moves daily while a site draws its materials); until then the grid's "too
-costly" counts read the month's opening treasury. A pass that fails stops; the last complete grid
-stands again only on its own body and province.
+**The grid and the table read one Net.** While the grid priced at the current prices stands, the
+table's row for a tile shows the grid's own quote as its Net, so a cell and its row never disagree.
+When a pass completes, and whenever ownership, the wars or the market set move, the Build door's quotes are dropped and priced again, so a pressed tile and a
+row's full-cover figure (which a row short of full Logistic Point cover still asks for) read the
+same moment as the grid. A pass restarts on what its figures read, and on a treasury move only when
+the move crosses the cost of a site it has judged: an affordable site now dearer than the treasury,
+or a too-costly one now within it. A move that crosses nothing changes no verdict, so the grid
+and the table always agree on what the treasury can pay for, paused or running. A pass that
+fails stops; the last complete grid stands again only on its own body and province.
 
 **The province scope** (Ben, 2026-11-08). **A selected tile restricts the finder to its province's own
 ground**: the grid's figures and counts, the table's rows and the placement lens. A province is not a
