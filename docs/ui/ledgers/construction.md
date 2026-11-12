@@ -80,7 +80,7 @@ ledger).
 **A cell** draws the building's glyph, its name whole (the column count is the most at which every name
 wraps inside its cell, and the cell is as tall as the tallest name needs), the **best estimated Net / qtr** among the tiles the table would list for it, and
 **how many such sites exist** (Ben, 2026-11-08). The figure is the table's own: every cell asks the
-table's gates and `quote_for_tile` at each tile's own Logistic Point cover, so a cell's count is its
+table's gates and the table's quote (`quote_site`, which `quote_for_tile` caches) at each tile's own Logistic Point cover, so a cell's count is its
 table's row count and its figure is that table's top Net.
 
 **The lower line is halved, and its right half builds (Ben, 2026-11-10: *"truncate the lower
@@ -93,7 +93,7 @@ site before an unpriced one), ties to the highest Logistic Point cover, then the
 answer, whatever the order the tiles were priced in. It goes through the map press's own path (the
 pending construction `construct_nation` runs, with its own treasury test), so it can never build
 where the map press would not. Under the province scope it builds inside that province. It is
-disabled while the cell is still being priced, and where no listed tile takes it; its hover then says
+disabled where no listed tile takes it; its hover then says
 why (the treasury, or the commonest refusal), and when live names the tile it will build on. It is a
 door, not a toggle: nothing about it stays lit.
 
@@ -104,11 +104,19 @@ quote would be upkeep alone, show the count and no Net: a fake loss reads worse 
 options with **no site at all**, dimmed, each explaining why on its hover — the treasury and the
 cheapest cost, or the commonest refusal among its tiles. Every tie falls to the door's option order.
 
-**The grid is priced over several frames.** Pricing every option on every tile of the scope is far more
-work than the one chosen building, so the evaluation is spread across frames within a fixed budget and
-never spends one long frame. The first pass, and a pass for a new province or body, shows its cells
-pending as they fill; a re-pass (the treasury or the frame stamp moved) leaves the last figures standing
-until the fresh set swaps in whole, so a running game's grid does not flicker.
+**The grid is searched in parallel and shown once, sorted** (Ben, 2026-11-11: *"check all different
+options in parallel, rather than sequentially, then display the full list at the end, rather than
+displaying an unsorted list meanwhile"*). Pricing every option on every tile of the scope is far more
+work than the one chosen building, so the options are priced concurrently, each on its own worker,
+within a fixed budget a frame, and never in one long frame. Each option's tiles are priced in tile
+order and the cells are merged in option order, so the grid is the one a single thread would build,
+whatever thread priced which option. While the first pass, or a pass for a new province, body or
+option set, runs, **the grid shows no cells**: a **search line** in its place reads *"Searching... N
+of M buildings"* with a bar, and the whole grid appears, in its order, when the last option is done.
+No part-grid stands meanwhile, because cells that fill and re-sort as they go read as an answer before
+they are one. A re-pass (the treasury or the frame stamp moved) leaves the last complete grid standing
+until the fresh set swaps in whole, so a running game's grid does not flicker. Under `--verify` the
+pass runs on one thread and completes in the frame it starts, so no capture rests on the clock.
 
 **The province scope** (Ben, 2026-11-08). **A selected tile restricts the finder to its province's own
 ground**: the grid's figures and counts, the table's rows and the placement lens. A province is not a
@@ -148,12 +156,13 @@ door accepts** the chosen building on — `placement_rules::can_place_in_world` 
 actor named (own ground, tech, the road a building needs, stacks, the province ceiling), the
 recipe's air, and the treasury against `construction_capex`, exactly the door's enabled-press
 test. Tiles that fit but cost more than the treasury are counted on a line above the table, not listed.
-Six columns, **every one sortable** by its header, and **every header legible at every supported width** (Ben, 2026-10-26: no "Yi…" elision) — each fixed column is sized to the wider of its widest figure and its header, the two named columns share the rest in proportion to their headers, and the sort arrow's width is reserved only on the column the rows are sorted by — the one place the arrow draws — so a header never loses its tail to it:
+Seven columns, **every one sortable** by its header, and **every header legible at every supported width** (Ben, 2026-10-26: no "Yi…" elision) — each fixed column is sized to the wider of its widest figure and its header, the two named columns share the rest in proportion to their headers, and the sort arrow's width is reserved only on the column the rows are sorted by — the one place the arrow draws — so a header never loses its tail to it:
 
 | Column | Figure |
 |---|---|
 | **Place** | The row's identity: the named **population centre whose province holds the tile**, or, where no centre's province covers it, the nearest named centre on the body, read **"near X"**. There is no grid-position column (Ben, 2026-10-26): an x,y is an address only the map can read, and a place name is one the player already knows. A province has no name of its own (`../../GLOSSARY.md` § Province) but it is its centre's ground, so the centre names it; where a province holds two centres, the lower id names it, so the name is one answer. The row's press: it **selects the tile and frames it** on the map; a press on the tile places the building. The press is the whole row. Sorted by name, ties by tile id. |
-| **Net** | Est. net / qtr — `quote_site`, the door's own figure with the same assumptions (§ What the quote asks; 50 % staffing, no labour shortage), **with the tile's Logistic Point cover applied** (below). Sign-coloured. The default sort, **descending**. |
+| **3 yr** | **The ranking figure** (Ben, 2026-11-12: *"Instead of scoring by profit, we should score by projected earnings in 3 years. This helps by incorporating build cost and time into the estimate."*): the **projected earnings over three years** of placing the building here — the **Net a day** (the Net a tick over the days in a tick) times the days of the three years it stands built (three years less the days it takes to build here, `construction_build_days`, never below zero), less its **Cost** (the column's own figure: the credits and the build's goods at their posted prices, what the door charges). It is reckoned in **calendar days**, three years of the game's calendar (twelve 30-day months), never in economy ticks, so it reads the same whatever an economy tick's length. A build longer than three years scores **minus its cost**. Sign-coloured; the hover gives the days to build, the days it runs, the Net and the cost. **The default sort, descending**, an unpriced row last, every tie by tile id. |
+| **Net** | Est. net / qtr — `quote_site`, the door's own figure with the same assumptions (§ What the quote asks; 50 % staffing, no labour shortage), **with the tile's Logistic Point cover applied** (below). Sign-coloured. Sorts descending; it is no longer the ranking, which is **3 yr**. **Net keeps its own column where the table has room** (Ben, 2026-11-12): where seven columns would elide a header, Net steps out first and the 3 yr cell's hover still gives it. |
 | **Cost** | `construction_capex` — the flat cost times the site multiplier, paid once at placement, plus the materials at the local market's posted price, bought in arrears as each tick draws them (Ben, 2026-10-26: costs depend on market prices; PRODUCTION.md § Construction is measured in days). The hover splits the two halves and names the multiplier. |
 | **Market** | The market the tile clears in, by its city's name (`market_city_name`). |
 | **LP** | The tile's Logistic Point cover, 0–100 % (`lp_route_to(...).cover`). **Zero is the no-logistics flag** (`icons::no_logistics`, a struck truck, in amber), drawn in place of the figure — the flag is the zero, and the width a "0%" beside it took was the width the headers needed (Ben, 2026-10-26): no source both reaches the tile and is tied to the capital, so a building there would stand and not run. The hover says which — no source reaches it, or one does and has no chain to the capital. |
@@ -395,7 +404,7 @@ ledger releases whichever other ledger held the column, exactly as a rail press 
 band is independent of the column and stays where it is.
 
 ## Open questions for Ben
-- ~~Sort order of the type rows.~~ **Answered** (Ben, 2026-08-29): *"I'm fine with alphabetical, we will probably reconsider it for a later version anyhow."* Alphabetical stands — a neutral, deterministic order that asserts nothing. The case for ranking by total profit is recorded rather than lost: since Ben's 2026-10-25 ruling (`CONCEPT.md` § Player identity) a ranking is information, and the site ledger now ranks build sites by profit, so nothing stands in its way. Revisit with the version that reconsiders it.
+- ~~Sort order of the type rows.~~ **Answered** (Ben, 2026-08-29): *"I'm fine with alphabetical, we will probably reconsider it for a later version anyhow."* Alphabetical stands — a neutral, deterministic order that asserts nothing. The case for ranking by total profit is recorded rather than lost: since Ben's 2026-10-25 ruling (`CONCEPT.md` § Player identity) a ranking is information, and the site ledger ranks build sites by projected three-year earnings, so nothing stands in its way. Revisit with the version that reconsiders it.
 - **Should the roster narrow to the SELECTION?** The design says "group all selected buildings, or
   all of them if none". Selection is single-entity today, so grouping over it collapses the roster
   to one row — and collapses it *under the press that selected the building*, destroying the

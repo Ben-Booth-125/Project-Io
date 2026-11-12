@@ -103,7 +103,7 @@ end
 -- SURFACE that already answers "where may the player build this?": the site finder,
 -- whose rows are exactly the tiles the build door accepts an Iron Mine on (own
 -- ground, tech, road, stack, province ceiling, treasury). Its first row under the
--- default sort (profit, ties by tile id) is deterministic for a seed, and it follows
+-- default sort (3-year earnings, ties by tile id) is deterministic for a seed, and it follows
 -- the player's ground wherever generation moves it, so the pick cannot rot again.
 verify.show_panel("build", true)
 verify.clear_selection() -- a selected tile scopes the finder to its province (Ben, 2026-11-08)

@@ -8,6 +8,7 @@
 #include "presentation.hpp"       // palette, extraction_building_name, value_colour
 #include "text_fit.hpp"           // fitted - the market column
 
+#include "world/budget_system.hpp"    // body_mean_habitability - warmed before the grid's workers start
 #include "world/building_profit.hpp"  // estimate_prospective_profit - THE profit figure (no second estimator)
 #include "world/input_reach.hpp"      // judged_batches - the plant's use, as the quote judges it
 #include "world/construction.hpp"     // construction_capex / construction_site_multiplier
@@ -23,11 +24,15 @@
 
 #include <algorithm>
 #include <array>
+#include <atomic>
+#include <cassert>
 #include <chrono>
 #include <cmath>
 #include <cstdio>
 #include <limits>
+#include <future>
 #include <map>
+#include <thread>
 #include <unordered_map>
 
 namespace ui {
@@ -133,6 +138,21 @@ int count_ties(std::vector<std::pair<long long, long long>> keys)
         i = j;
     }
     return ties;
+}
+
+/// THE RANKING FIGURE (Ben, 2026-11-12: "Instead of scoring by profit, we should score by
+/// projected earnings in 3 years. This helps by incorporating build cost and time into the
+/// estimate."). Three years of the game's calendar - twelve 30-day months a year
+/// (format.hpp) - in DAYS, never ticks, so the figure does not move when the economy
+/// tick's length does: the Net a tick becomes a Net a day over `econ_tick_days_world`.
+constexpr int k_site_horizon_days = 3 * 12 * 30;
+
+/// Earnings over the horizon: the Net a day over the days it stands built, less what it
+/// costs. A build longer than the horizon earns nothing and scores minus its cost.
+float three_year_earnings(float net_per_tick, int build_days, float capex)
+{
+    const float run_days = static_cast<float>(std::max(0, k_site_horizon_days - build_days));
+    return net_per_tick / static_cast<float>(econ_tick_days_world) * run_days - capex;
 }
 
 float market_price(const world& w, entity_id market, resource_type r)
@@ -328,6 +348,8 @@ void evaluate(world& w, const recipe_registry& reg, ui_state& ui)
                 r.runway_warn = true;
                 r.runway_text = shelf_runway_text(sr);
             }
+        r.build_days = construction_build_days(w, reg, tid, c.type, c.target);
+        r.earn3      = three_year_earnings(r.profit, r.build_days, r.capex);
         r.profit_full_cover = (r.cover >= 1.0f)
             ? r.profit
             : quote_for_tile(w, reg, tid, c.type, c.target, c.recipe, 1.0f).profit.net();
@@ -400,15 +422,46 @@ void evaluate(world& w, const recipe_registry& reg, ui_state& ui)
 
 // --- THE BUILDING GRID (Ben, 2026-11-08) -------------------------------------------
 // Every option scored over every tile in scope is far more work than the one chosen
-// building the table scores, so a pass is SPREAD OVER FRAMES (k_grid_frame_budget_ms,
-// resumable between tiles) and never one long frame. A pass for a new scope or body
-// shows its cells pending as they fill; a pass for the same scope (the treasury or the
-// frame stamp moved) keeps showing the last figures until the fresh set swaps in whole,
-// so a running game's grid does not flicker. Under --verify a pass completes in the
-// frame it starts, because a wall-clock budget would make a capture depend on the clock.
+// building the table scores. A pass therefore SCORES ITS OPTIONS IN PARALLEL (Ben,
+// 2026-11-11: "check all different options in parallel, rather than sequentially, then
+// display the full list at the end"): each frame, the main thread and a set of workers
+// claim options one at a time and score their tiles, in tile order, until the frame's
+// budget runs out; an option cut short resumes at its next tile on the next frame.
+//
+// WHY IT IS RACE-FREE. The workers run only INSIDE `step_site_grid`, and the main thread
+// joins every one of them before the call returns, so nothing the main thread does - the
+// simulation's tick, a command, another panel - runs while a worker reads the world. And
+// inside the join nothing writes: every lazily-built cache the scoring reads is WARMED on
+// the main thread when the pass starts (`warm_pass`) - each tile's Logistic Point cover,
+// the market raster and the body's indexes, and the pass's own quote context with the
+// reach set of every (market, input) a quote can ask for. An option's figures live in its
+// own cell, which one worker holds at a time. The quotes the door's cache keeps are not
+// touched: the pass prices through its own context, so the door's cache cannot be reset
+// under it. A tripwire checks after each join that no warmed memo grew.
+//
+// WHY IT IS THE SEQUENTIAL ANSWER. An option's tiles are always scored in tile order, and
+// options never share state, so which thread scored an option, and across how many frames,
+// cannot change its cell. The cells are merged by option index and ordered once, when
+// every option is done (`order_cells`); nothing is shown in completion order.
+//
+// WHAT SHOWS MEANWHILE. A pass for a new scope, body or option set shows no cells, only
+// how far the search has got, and the whole ordered grid appears when it ends: a cell list
+// that filled and re-sorted as it went read as an answer before it was one. A re-pass for
+// the same view (the treasury or the frame stamp moved) leaves the last complete grid
+// standing until the fresh one swaps in whole, so a running game's grid does not flicker.
+// Under --verify a pass is scored on the main thread alone and completes in the frame it
+// starts, because a wall-clock budget would make a capture depend on the clock.
 
-constexpr double k_grid_frame_budget_ms = 3.0;
-constexpr int    k_grid_clock_every     = 8; ///< Tiles between looks at the clock.
+constexpr double   k_grid_frame_budget_ms = 3.0;
+constexpr unsigned k_grid_max_workers     = 15; ///< Beside the main thread.
+
+/// Moved by `invalidate_site_evaluation`: a world change the frame stamp cannot see
+/// restarts the grid's pass as it resets the door's quotes.
+std::uint64_t& quote_epoch()
+{
+    static std::uint64_t e = 0;
+    return e;
+}
 
 struct grid_key
 {
@@ -417,6 +470,7 @@ struct grid_key
     float         balance = -1.0f;
     float         reach   = -2.0f;
     std::uint32_t scope   = 0;
+    std::uint64_t epoch   = 0;
     bool operator==(const grid_key&) const = default;
 };
 
@@ -425,15 +479,23 @@ struct grid_pass
     grid_key                key;
     bool                    have_key = false;
     bool                    running  = false;
-    bool                    provisional = false; ///< Publish each cell as it finishes.
     std::vector<site_cell>  work;
     std::vector<std::map<int, int>> refusals;    ///< Per option: reason -> tiles, for the commonest.
     std::vector<int>        air_refused;
+    std::vector<std::size_t> next_tile;          ///< Per option: the tile it resumes at.
+    std::vector<char>       done;                ///< Per option: every tile scored.
+    std::size_t             finished = 0;
     std::vector<entity_id>  tiles;               ///< Own ground in scope, in grid order.
-    std::size_t             option = 0, tile = 0;
-    double                  spent_ms = 0.0;
-    int                     frames   = 0;
+    std::vector<float>      cover;               ///< Per tile: its Logistic Point cover, read when warming.
+    entity_id               actor   = null_entity;
+    float                   balance = 0.0f;
+    float                   reach   = 0.0f;
+    std::optional<site_quote_context> cx;        ///< The pass's own, warmed before any worker starts.
     std::optional<place_index> places;           ///< Built once per pass, not per frame.
+    double                  spent_ms = 0.0;
+    double                  warm_ms  = 0.0;      ///< Of which, the warm-up.
+    int                     frames   = 0;
+    std::chrono::steady_clock::time_point started;
 };
 
 grid_pass& pass_state()
@@ -484,7 +546,6 @@ void order_cells(site_finder_state& sf)
 void finish_cell(grid_pass& p, std::size_t i, bool scope_empty)
 {
     site_cell& c = p.work[i];
-    c.pending = false;
     if (c.sites > 0)
         return;
     if (c.unaffordable > 0)
@@ -517,7 +578,122 @@ void finish_cell(grid_pass& p, std::size_t i, bool scope_empty)
         c.refusal = placement_rules::placement_reason_text(static_cast<placement_rules::placement_reason>(best_reason));
 }
 
-/// Advance the grid's pass by one frame's budget, starting a new pass when its key moves.
+/// Build, on the main thread, every lazily-built thing a worker would otherwise build
+/// under the join: the body's tile raster and centre index, each tile's market (the
+/// catchment raster) and Logistic Point cover, and the pass's quote context with the
+/// reach set of every market in scope for every good an offered recipe takes. After
+/// this, scoring only reads.
+void warm_pass(world& w, const recipe_registry& reg, grid_pass& p, entity_id body)
+{
+    p.cover.resize(p.tiles.size());
+    std::vector<entity_id> markets;
+    for (std::size_t i = 0; i < p.tiles.size(); ++i)
+    {
+        p.cover[i] = site_lp_cover(w, p.tiles[i]);
+        if (const entity_id mid = market_for_tile(w, p.tiles[i]); mid != null_entity)
+            markets.push_back(mid);
+    }
+    std::sort(markets.begin(), markets.end());
+    markets.erase(std::unique(markets.begin(), markets.end()), markets.end());
+    (void)body_mean_habitability(w, body);
+
+    p.cx.emplace(make_site_quote_context(w, reg, quote_report()));
+    std::array<bool, resource_count> taken{};
+    for (const site_cell& c : p.work)
+        if (c.option.type == building_type::processing_facility)
+            if (const recipe* rc = reg.get_recipe(c.option.recipe); rc != nullptr)
+                for (std::size_t r = 0; r < resource_count; ++r)
+                    taken[r] = taken[r] || rc->inputs[r] > 0.0f;
+    for (const entity_id mid : markets)
+        for (std::size_t r = 0; r < resource_count; ++r)
+            if (taken[r])
+                (void)reachable_supply(w, reg, p.cx->reach, mid, r, null_entity);
+}
+
+/// What the tripwire watches: every memo a quote could grow on a miss.
+std::array<std::size_t, 5> memo_sizes(const world& w, const grid_pass& p)
+{
+    return { p.cx->reach.haul.size(), p.cx->reach.supply_memo.size(), w.astar_cost_cache.size(),
+             w.leg_path_cache.size(), w.lane_path_cache.size() };
+}
+
+/// Score option @p i's tiles from where it stopped, in tile order, until they are all
+/// scored (true) or @p deadline passes (false; null: no deadline). Touches only the
+/// option's own cell and tallies; reads the world, the warmed context and the pass's
+/// per-tile covers.
+bool score_option(world& w, const recipe_registry& reg, grid_pass& p, std::size_t i,
+                  const std::chrono::steady_clock::time_point* deadline)
+{
+    site_cell& cell = p.work[i];
+    const site_option& o = cell.option;
+    const recipe* rc = (o.type == building_type::processing_facility) ? reg.get_recipe(o.recipe) : nullptr;
+    const placement_gate gate = reg.placement_gate_for(o.type, o.recipe);
+    const bool earns = option_earns(o);
+    std::size_t& t = p.next_tile[i];
+
+    while (t < p.tiles.size())
+    {
+        const std::size_t ti  = t++;
+        const entity_id   tid = p.tiles[ti];
+        const site_gate_result sg = gate_site(w, reg, o, rc, gate, tid, p.reach, p.actor, p.balance);
+        if (sg.verdict == site_verdict::air)
+            ++p.air_refused[i];
+        else if (sg.verdict == site_verdict::refused)
+            ++p.refusals[i][static_cast<int>(sg.why)];
+        else if (sg.verdict == site_verdict::unaffordable)
+        {
+            if (cell.unaffordable == 0 || sg.capex < cell.cheapest_unaffordable)
+                cell.cheapest_unaffordable = sg.capex;
+            ++cell.unaffordable;
+        }
+        else
+        {
+            ++cell.sites;
+            // THE ROW'S OWN FIGURE: the same cover and the same quote the table asks for.
+            const float cover = p.cover[ti];
+            if (!(cover > 0.0f))
+                ++cell.no_lp;
+            bool priced = false;
+            long net    = 0;
+            if (earns)
+            {
+                const site_quote sq = quote_site(w, reg, *p.cx, tid, o.type, o.target, o.recipe, cover);
+                priced = sq.profit.has_data;
+                net    = priced ? std::lround(sq.profit.net()) : 0;
+                if (sq.profit.has_data && (!cell.has_figure || sq.profit.net() > cell.best_net))
+                {
+                    const tile_component& tc = w.tiles.at(tid);
+                    cell.has_figure   = true;
+                    cell.best_net     = sq.profit.net();
+                    cell.best_cover   = cover;
+                    cell.best_starved = sq.starved;
+                    cell.best_place   = p.places->name(tid, tc.grid_x, tc.grid_y, cell.best_near);
+                }
+            }
+            // The Construct press's site: highest Net, then cover, then lowest id.
+            const bool better =
+                cell.build_tile == null_entity
+                || (priced != cell.build_priced ? priced
+                    : net != cell.build_net     ? net > cell.build_net
+                    : cover != cell.build_cover ? cover > cell.build_cover
+                                                : tid < cell.build_tile);
+            if (better)
+            {
+                cell.build_tile   = tid;
+                cell.build_priced = priced;
+                cell.build_net    = net;
+                cell.build_cover  = cover;
+            }
+        }
+        // A look at the clock every tile: a tile's quote costs far more than the look,
+        // and a worker that ran on past the deadline would hold the frame's join.
+        if (deadline != nullptr && std::chrono::steady_clock::now() >= *deadline)
+            break;
+    }
+    return t >= p.tiles.size();
+}
+
+/// Advance the grid's pass by one frame, starting a new pass when its key moves.
 void step_site_grid(world& w, const recipe_registry& reg, ui_state& ui, const std::vector<site_option>& opts)
 {
     site_finder_state& sf = ui.site_finder;
@@ -527,7 +703,8 @@ void step_site_grid(world& w, const recipe_registry& reg, ui_state& ui, const st
     float balance = 0.0f;
     if (const float* b = purse_of(w, actor); b != nullptr)
         balance = *b;
-    const grid_key key{ ui.active_body, make_lp_stamp(w), balance, ui.max_logistics_reach, sf.scope_province };
+    const grid_key key{ ui.active_body, make_lp_stamp(w), balance, ui.max_logistics_reach, sf.scope_province,
+                        quote_epoch() };
 
     const bool options_moved = !same_options(p.running ? p.work : sf.cells, opts);
     if (!p.have_key || !(key == p.key) || options_moved)
@@ -537,20 +714,27 @@ void step_site_grid(world& w, const recipe_registry& reg, ui_state& ui, const st
         p.key      = key;
         p.have_key = true;
         p.running  = true;
-        p.option   = 0;
-        p.tile     = 0;
+        p.actor    = actor;
+        p.balance  = balance;
+        p.reach    = ui.max_logistics_reach;
         p.spent_ms = 0.0;
         p.frames   = 0;
+        p.started  = std::chrono::steady_clock::now();
         p.work.assign(opts.size(), site_cell{});
         for (std::size_t i = 0; i < opts.size(); ++i)
             p.work[i].option = opts[i];
         p.refusals.assign(opts.size(), {});
         p.air_refused.assign(opts.size(), 0);
+        p.next_tile.assign(opts.size(), 0);
+        p.done.assign(opts.size(), 0);
+        p.finished = 0;
 
         p.tiles.clear();
+        int grid_w = 0;
         if (const auto bit = w.bodies.find(ui.active_body);
             bit != w.bodies.end() && bit->second.grid_width > 0 && bit->second.grid_height > 0)
         {
+            grid_w = bit->second.grid_width;
             for (const entity_id tid : body_tile_grid(w, ui.active_body))
             {
                 if (tid == null_entity)
@@ -564,123 +748,115 @@ void step_site_grid(world& w, const recipe_registry& reg, ui_state& ui, const st
             }
         }
         sf.scope_foreign = sf.scope_province != 0 && p.tiles.empty();
+        p.places.emplace(w, ui.active_body, grid_w);
 
-        {
-            const auto gw_it = w.bodies.find(ui.active_body);
-            p.places.emplace(w, ui.active_body, gw_it != w.bodies.end() ? gw_it->second.grid_width : 0);
-        }
-        p.provisional = new_view;
+        const auto tw = std::chrono::steady_clock::now();
+        warm_pass(w, reg, p, ui.active_body);
+        p.warm_ms   = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - tw).count();
+        p.spent_ms += p.warm_ms;
+
         if (new_view)
         {
-            sf.cells = p.work; // every cell pending; order is the options' until settled
-            sf.cell_order.resize(sf.cells.size());
-            for (std::size_t i = 0; i < sf.cells.size(); ++i)
-                sf.cell_order[i] = static_cast<int>(i);
+            // Nothing stands for a grid not yet priced: the search line says how far it is.
+            sf.cells.clear();
+            sf.cell_order.clear();
         }
     }
+    sf.searching     = p.running;
+    sf.search_done   = static_cast<int>(p.finished);
+    sf.search_total  = static_cast<int>(p.work.size());
     if (!p.running)
         return;
 
     const auto t0 = std::chrono::steady_clock::now();
-    const auto elapsed = [&]() {
-        return std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
-    };
-    const bool to_completion = ui.fixed_frame_clock;
     ++p.frames;
 
-    int since_clock = 0;
-    bool out_of_budget = false;
-    while (p.option < p.work.size() && !out_of_budget)
-    {
-        site_cell& cell = p.work[p.option];
-        const site_option& o = cell.option;
-        const recipe* rc = (o.type == building_type::processing_facility) ? reg.get_recipe(o.recipe) : nullptr;
-        const placement_gate gate = reg.placement_gate_for(o.type, o.recipe);
-        const bool earns = option_earns(o);
+    // This frame's options: every one not yet done, in option order.
+    std::vector<std::size_t> todo;
+    for (std::size_t i = 0; i < p.work.size(); ++i)
+        if (!p.done[i])
+            todo.push_back(i);
 
-        while (p.tile < p.tiles.size())
-        {
-            const entity_id tid = p.tiles[p.tile++];
-            const site_gate_result sg = gate_site(w, reg, o, rc, gate, tid, ui.max_logistics_reach, actor, balance);
-            if (sg.verdict == site_verdict::air)
-                ++p.air_refused[p.option];
-            else if (sg.verdict == site_verdict::refused)
-                ++p.refusals[p.option][static_cast<int>(sg.why)];
-            else if (sg.verdict == site_verdict::unaffordable)
-            {
-                if (cell.unaffordable == 0 || sg.capex < cell.cheapest_unaffordable)
-                    cell.cheapest_unaffordable = sg.capex;
-                ++cell.unaffordable;
-            }
-            else
-            {
-                ++cell.sites;
-                // THE ROW'S OWN FIGURE: the same cover and the same quote the table asks for.
-                const float cover = site_lp_cover(w, tid);
-                if (!(cover > 0.0f))
-                    ++cell.no_lp;
-                bool priced = false;
-                long net    = 0;
-                if (earns)
-                {
-                    const site_quote sq = quote_for_tile(w, reg, tid, o.type, o.target, o.recipe, cover);
-                    priced = sq.profit.has_data;
-                    net    = priced ? std::lround(sq.profit.net()) : 0;
-                    if (sq.profit.has_data && (!cell.has_figure || sq.profit.net() > cell.best_net))
-                    {
-                        const tile_component& tc = w.tiles.at(tid);
-                        cell.has_figure   = true;
-                        cell.best_net     = sq.profit.net();
-                        cell.best_cover   = cover;
-                        cell.best_starved = sq.starved;
-                        cell.best_place   = p.places->name(tid, tc.grid_x, tc.grid_y, cell.best_near);
-                    }
-                }
-                // The Construct press's site: highest Net, then cover, then lowest id.
-                const bool better =
-                    cell.build_tile == null_entity
-                    || (priced != cell.build_priced ? priced
-                        : net != cell.build_net     ? net > cell.build_net
-                        : cover != cell.build_cover ? cover > cell.build_cover
-                                                    : tid < cell.build_tile);
-                if (better)
-                {
-                    cell.build_tile   = tid;
-                    cell.build_priced = priced;
-                    cell.build_net    = net;
-                    cell.build_cover  = cover;
-                }
-            }
-            if (!to_completion && ++since_clock >= k_grid_clock_every)
-            {
-                since_clock = 0;
-                if (elapsed() >= k_grid_frame_budget_ms)
-                {
-                    out_of_budget = true;
-                    break;
-                }
-            }
-        }
-        if (p.tile >= p.tiles.size())
-        {
-            finish_cell(p, p.option, sf.scope_province != 0 && p.tiles.empty());
-            if (p.provisional)
-                sf.cells[p.option] = p.work[p.option];
-            ++p.option;
-            p.tile = 0;
-        }
-    }
-    p.spent_ms += elapsed();
-
-    if (p.option >= p.work.size())
+    const std::array<std::size_t, 5> before = memo_sizes(w, p);
+    if (ui.fixed_frame_clock)
     {
-        p.running = false;
-        sf.cells  = std::move(p.work);
-        p.work.clear();
-        order_cells(sf);
-        sf.grid_ms     = p.spent_ms;
-        sf.grid_frames = p.frames;
+        // --verify: the main thread alone, to completion, so no capture rests on the clock.
+        for (const std::size_t i : todo)
+            p.done[i] = score_option(w, reg, p, i, nullptr) ? 1 : 0;
     }
+    else
+    {
+        const auto deadline = t0 + std::chrono::duration_cast<std::chrono::steady_clock::duration>(
+                                       std::chrono::duration<double, std::milli>(k_grid_frame_budget_ms));
+        std::atomic<std::size_t> next{0};
+        const auto claim = [&]() {
+            while (std::chrono::steady_clock::now() < deadline)
+            {
+                const std::size_t k = next.fetch_add(1);
+                if (k >= todo.size())
+                    return;
+                const std::size_t i = todo[k];
+                p.done[i] = score_option(w, reg, p, i, &deadline) ? 1 : 0;
+            }
+        };
+        const unsigned hw = std::max(1u, std::thread::hardware_concurrency());
+        const std::size_t helpers = std::min<std::size_t>({ static_cast<std::size_t>(hw - 1),
+                                                            static_cast<std::size_t>(k_grid_max_workers),
+                                                            todo.size() > 0 ? todo.size() - 1 : 0 });
+        std::vector<std::future<void>> workers;
+        workers.reserve(helpers);
+        for (std::size_t k = 0; k < helpers; ++k)
+            workers.push_back(std::async(std::launch::async, claim));
+        claim();
+        for (std::future<void>& f : workers)
+            f.get(); // THE JOIN: nothing returns to the frame while a worker reads the world
+    }
+    // The tripwire: a warmed memo that grew under the join was written by a worker.
+    if (memo_sizes(w, p) != before)
+    {
+        std::fprintf(stderr, "site finder: a grid worker missed the warm-up (a memo grew under the join)\n");
+        assert(!"site grid: warm_pass missed a memo the scoring writes");
+    }
+    p.spent_ms += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
+
+    p.finished = 0;
+    for (const char d : p.done)
+        p.finished += d ? 1 : 0;
+    sf.search_done = static_cast<int>(p.finished);
+    if (p.finished < p.work.size())
+        return;
+
+    // Every option is scored: settle each cell in option order, then show the whole grid.
+    const bool scope_empty = sf.scope_province != 0 && p.tiles.empty();
+    for (std::size_t i = 0; i < p.work.size(); ++i)
+        finish_cell(p, i, scope_empty);
+    p.running    = false;
+    sf.searching = false;
+    sf.cells     = std::move(p.work);
+    p.work.clear();
+    p.cx.reset();
+    order_cells(sf);
+    sf.grid_ms      = p.spent_ms;
+    sf.grid_frames  = p.frames;
+    sf.grid_wall_ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - p.started).count();
+}
+
+/// THE SEARCH LINE: a grid still being priced shows how far the search has got, never
+/// a part of the grid, which would read as an answer before it is one.
+void draw_site_search(const site_finder_state& sf)
+{
+    char label[96];
+    std::snprintf(label, sizeof label, "Searching... %d of %d buildings", sf.search_done, sf.search_total);
+    const float share = sf.search_total > 0 ? static_cast<float>(sf.search_done) / static_cast<float>(sf.search_total)
+                                            : 0.0f;
+    ImGui::ProgressBar(share, {-FLT_MIN, 0.0f}, label);
+    grid_explainer e;
+    e.key  = "search";
+    e.mn   = ImGui::GetItemRectMin();
+    e.mx   = ImGui::GetItemRectMax();
+    e.text = "Every building is being priced on every tile of your ground in scope. The grid appears, "
+             "best first, when the last one is done.";
+    construction_column_card("Search", {std::move(e)});
 }
 
 /// Where the finder is looking (Ben, 2026-11-08): the selected tile's province, unless
@@ -790,7 +966,7 @@ void draw_site_grid(const world& w, const recipe_registry& reg, ui_state& ui)
         const ImVec2 mn{origin.x + static_cast<float>(col) * (cell_w + gap),
                         origin.y + static_cast<float>(row) * row_step};
         const ImVec2 mx{mn.x + cell_w, mn.y + cell_h};
-        const bool dim       = !c.pending && c.sites == 0;
+        const bool dim       = c.sites == 0;
         const bool is_choice = sf.armed && same_option(sf.choice, o);
         if (is_choice)
             chosen_at = at;
@@ -828,18 +1004,13 @@ void draw_site_grid(const world& w, const recipe_registry& reg, ui_state& ui)
         ImFont* const font   = ImGui::GetFont();
         char count_text[32] = "";
         float count_x = half_x - st.ItemInnerSpacing.x;
-        if (!c.pending)
-        {
-            std::snprintf(count_text, sizeof count_text, "%d", c.sites);
-            count_x -= font->CalcTextSizeA(small, FLT_MAX, 0.0f, count_text).x;
-            dl->AddText(font, small, {count_x, fig_y + small_dy}, dim_ink, count_text); // fit-exempt: measured above
-        }
+        std::snprintf(count_text, sizeof count_text, "%d", c.sites);
+        count_x -= font->CalcTextSizeA(small, FLT_MAX, 0.0f, count_text).x;
+        dl->AddText(font, small, {count_x, fig_y + small_dy}, dim_ink, count_text); // fit-exempt: measured above
         const ImVec4 net_clip{mn.x + pad, fig_y - 2.0f, count_x - 3.0f, mx.y};
         const ImVec2 net_at{mn.x + pad, fig_y + small_dy};
         std::string net_text;
-        if (c.pending)
-            dl->AddText(font, small, net_at, dim_ink, "...");
-        else if (c.has_figure)
+        if (c.has_figure)
         {
             net_text = "Cr " + fmt::abbreviate(static_cast<double>(c.best_net));
             dl->AddText(font, small, net_at, value_colour(static_cast<double>(c.best_net)), net_text.c_str(),
@@ -848,7 +1019,7 @@ void draw_site_grid(const world& w, const recipe_registry& reg, ui_state& ui)
 
         // The press: a real button over the cell's right half, so it takes the press
         // and the hover before the cell under it.
-        const bool can_build = !c.pending && c.sites > 0 && c.build_tile != null_entity;
+        const bool can_build = c.sites > 0 && c.build_tile != null_entity;
         const ImVec2 b_mn{half_x + st.ItemInnerSpacing.x * 0.5f, fig_y - 2.0f};
         const ImVec2 b_mx{mx.x - pad, mx.y - 2.0f};
         ImGui::SetCursorScreenPos(b_mn);
@@ -867,9 +1038,7 @@ void draw_site_grid(const world& w, const recipe_registry& reg, ui_state& ui)
         if (build_hovered)
         {
             std::string why;
-            if (c.pending)
-                why = "Still being priced.";
-            else if (can_build)
+            if (can_build)
             {
                 const tile_component& bt = w.tiles.at(c.build_tile);
                 char buf[200];
@@ -905,9 +1074,7 @@ void draw_site_grid(const world& w, const recipe_registry& reg, ui_state& ui)
             e.key = key; e.mn = a; e.mx = b; e.text = std::move(text); e.ink = ink;
             cards.push_back(std::move(e));
         };
-        if (c.pending)
-            card("cell", mn, mx, "Still being priced.");
-        else if (dim)
+        if (dim)
             card("cell", mn, mx, c.refusal + (is_choice ? " Press to clear it."
                                                         : " Press to see it on the map anyway."));
         else
@@ -1079,6 +1246,7 @@ void invalidate_site_evaluation()
 {
     quotes() = quote_cache{};
     last_key() = eval_key{};
+    ++quote_epoch(); // the grid's pass restarts too
 }
 
 shelf_runway shelf_runway_for(const world& w, const recipe_registry& reg, entity_id tile,
@@ -1251,7 +1419,7 @@ void sort_site_rows(std::vector<site_row>& rows, int col, bool desc)
     std::sort(rows.begin(), rows.end(), [col, desc](const site_row& a, const site_row& b) {
         // An unpriced row (no market resolves) has nothing honest to rank on: it goes
         // last in either direction rather than posing as a zero.
-        if (col == 1 && a.priced != b.priced)
+        if ((col == 1 || col == 6) && a.priced != b.priced)
             return a.priced;
         int c = 0; // <0: a first ascending
         switch (col)
@@ -1261,6 +1429,7 @@ void sort_site_rows(std::vector<site_row>& rows, int col, bool desc)
         case 2: c = (a.capex != b.capex) ? (a.capex < b.capex ? -1 : 1) : 0; break;
         case 3: c = a.market_name.compare(b.market_name); c = (c < 0) ? -1 : (c > 0 ? 1 : 0); break;
         case 4: c = (a.cover != b.cover) ? (a.cover < b.cover ? -1 : 1) : 0; break;
+        case 6: c = (a.earn3 != b.earn3) ? (a.earn3 < b.earn3 ? -1 : 1) : 0; break;
         case 5:
             if (a.has_yield != b.has_yield)
                 return a.has_yield;
@@ -1386,6 +1555,8 @@ void draw_site_finder(world& w, const recipe_registry& reg, ui_state& ui)
     // prices, and pressing it again clears it, so the visible choice is a toggle.
     const std::vector<site_option> opts = site_options(w, reg);
     step_site_grid(w, reg, ui, opts);
+    if (sf.searching && sf.cells.empty())
+        draw_site_search(sf);
     draw_site_grid(w, reg, ui);
 
     update_site_finder(w, reg, ui);
@@ -1421,8 +1592,8 @@ void draw_site_finder(world& w, const recipe_registry& reg, ui_state& ui)
     if (sf.rows.empty())
         return;
 
-    // THE SITE LEDGER. One row per tile, every column sortable, profit descending by
-    // default, every tie broken by tile id (sort_site_rows).
+    // THE SITE LEDGER. One row per tile, every column sortable, three-year earnings
+    // descending by default, every tie broken by tile id (sort_site_rows).
     const float line_h  = ImGui::GetTextLineHeightWithSpacing();
     const int   shown   = std::min<int>(static_cast<int>(sf.rows.size()), 9);
     const float table_h = line_h * static_cast<float>(shown + 1) + 6.0f;
@@ -1441,10 +1612,12 @@ void draw_site_finder(world& w, const recipe_registry& reg, ui_state& ui)
     // The figures' widest is measured off the rows themselves rather than a
     // worst-case sample, because at the fold-out's narrowest every pixel a fixed
     // column does not need is a pixel the two named columns' headers do.
-    float fig_net = 0.0f, fig_cost = 0.0f, fig_yield = 0.0f;
+    float fig_net = 0.0f, fig_cost = 0.0f, fig_yield = 0.0f, fig_earn3 = 0.0f;
     constexpr float k_runway_mark_w = 8.0f; // the amber mark beside a warned row's figure
     for (const site_row& r : sf.rows)
     {
+        if (r.priced)
+            fig_earn3 = std::max(fig_earn3, ImGui::CalcTextSize(fmt::abbreviate(static_cast<double>(r.earn3)).c_str()).x);
         if (r.priced)
             fig_net = std::max(fig_net, ImGui::CalcTextSize(fmt::abbreviate(static_cast<double>(r.profit)).c_str()).x
                                             + (r.runway_warn ? k_runway_mark_w : 0.0f));
@@ -1466,6 +1639,7 @@ void draw_site_finder(world& w, const recipe_registry& reg, ui_state& ui)
         return std::ceil(std::max(header_need(label, uid), widest)) + 1.0f;
     };
     const float lh0     = ImGui::GetTextLineHeight();
+    const float w_earn3 = fixed_w("3 yr", 6, fig_earn3);
     const float w_net   = fixed_w("Net", 1, fig_net);
     const float w_cost  = fixed_w("Cost", 2, fig_cost);
     // A zero cover reads as the struck truck ALONE: the flag is the zero, and a
@@ -1476,17 +1650,30 @@ void draw_site_finder(world& w, const recipe_registry& reg, ui_state& ui)
     // headers need, so neither elides while the other has room to spare.
     const float need_place  = header_need("Place", 0);
     const float need_market = header_need("Market", 3);
-    ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, {2.0f, 1.0f});
-    if (!ImGui::BeginTable("##site_ledger", 6, tf, {0.0f, table_h}))
+    // NET KEEPS ITS OWN COLUMN WHERE THE TABLE HAS ROOM (Ben, 2026-11-12). At the
+    // fold-out's narrowest seven columns elide Place and Market, so Net - no longer
+    // the ranking - steps out first; its figure stays on the 3 yr cell's card.
+    constexpr float k_cell_pad_x = 2.0f;
+    const float scroll_w = static_cast<int>(sf.rows.size()) > shown ? ImGui::GetStyle().ScrollbarSize : 0.0f;
+    const float seven_w  = need_place + need_market + w_earn3 + w_net + w_cost + w_lp + w_yield
+                         + 7.0f * (2.0f * k_cell_pad_x + 1.0f) + scroll_w;
+    const bool  net_on   = seven_w <= ImGui::GetContentRegionAvail().x;
+    ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, {k_cell_pad_x, 1.0f});
+    if (!ImGui::BeginTable("##site_ledger", 7, tf, {0.0f, table_h}))
     {
         ImGui::PopStyleVar();
         return;
     }
     ImGui::TableSetupScrollFreeze(0, 1);
     ImGui::TableSetupColumn("Place",  ImGuiTableColumnFlags_WidthStretch, need_place, 0);
-    ImGui::TableSetupColumn("Net",    ImGuiTableColumnFlags_WidthFixed
+    // The ranking column (Ben, 2026-11-12), the default sort; Net keeps its own column.
+    ImGui::TableSetupColumn("3 yr",   ImGuiTableColumnFlags_WidthFixed
                                       | ImGuiTableColumnFlags_DefaultSort
-                                      | ImGuiTableColumnFlags_PreferSortDescending, w_net, 1);
+                                      | ImGuiTableColumnFlags_PreferSortDescending, w_earn3, 6);
+    ImGui::TableSetupColumn("Net",    ImGuiTableColumnFlags_WidthFixed
+                                      | ImGuiTableColumnFlags_PreferSortDescending
+                                      | (net_on ? ImGuiTableColumnFlags_None : ImGuiTableColumnFlags_Disabled),
+                            w_net, 1);
     ImGui::TableSetupColumn("Cost",   ImGuiTableColumnFlags_WidthFixed, w_cost, 2);
     ImGui::TableSetupColumn("Market", ImGuiTableColumnFlags_WidthStretch, need_market, 3);
     ImGui::TableSetupColumn("LP",     ImGuiTableColumnFlags_WidthFixed
@@ -1496,7 +1683,9 @@ void draw_site_finder(world& w, const recipe_registry& reg, ui_state& ui)
     // The header row, drawn by hand so each header can report its own fit.
     sf.headers.clear();
     ImGui::TableNextRow(ImGuiTableRowFlags_Headers);
-    for (int ci = 0; ci < 6; ++ci)
+    // Drawn position -> the column's sort id (`sort_site_rows`): 3 yr was added as id 6.
+    constexpr int k_sort_id[7] = {0, 6, 1, 2, 3, 4, 5};
+    for (int ci = 0; ci < 7; ++ci)
     {
         if (!ImGui::TableSetColumnIndex(ci))
             continue;
@@ -1507,7 +1696,17 @@ void draw_site_finder(world& w, const recipe_registry& reg, ui_state& ui)
         std::snprintf(id, sizeof id, "##site_hdr%d", ci);
         ImGui::TableHeader(id); // the press, the hover and the sorted column's arrow
         ImGui::GetWindowDrawList()->AddText(at, ImGui::GetColorU32(ImGuiCol_Text), name);
-        if (ci == 1) // the assumptions every Net in the column shares (Ben, 2026-11-09)
+        if (ci == 1) // what the ranking figure is (Ben, 2026-11-12)
+        {
+            grid_explainer e;
+            e.key  = "earn3_header";
+            e.mn   = ImGui::GetItemRectMin();
+            e.mx   = ImGui::GetItemRectMax();
+            e.text = "Est. earnings over 3 years: the Net, a day, over the days of the 3 years it stands "
+                     "built, less its Cost. A build longer than 3 years scores minus its Cost.";
+            construction_column_card("3 yr", {std::move(e)});
+        }
+        if (ci == 2) // the assumptions every Net in the column shares (Ben, 2026-11-09)
         {
             grid_explainer e;
             e.key  = "net_header";
@@ -1517,7 +1716,7 @@ void draw_site_finder(world& w, const recipe_registry& reg, ui_state& ui)
                      "each tile's Logistic Point cover.";
             construction_column_card("Net", {std::move(e)});
         }
-        sf.headers.push_back({name, header_need(name, ci), have});
+        sf.headers.push_back({name, header_need(name, k_sort_id[ci]), have});
     }
 
     if (ImGuiTableSortSpecs* specs = ImGui::TableGetSortSpecs(); specs && specs->SpecsDirty)
@@ -1583,8 +1782,36 @@ void draw_site_finder(world& w, const recipe_registry& reg, ui_state& ui)
             ImGui::TextUnformatted(fitted(place.c_str(), pw).c_str());
             sf.drawn.push_back({r.tile, rp.x + 12.0f, rp.y + ImGui::GetTextLineHeight() * 0.5f, std::string()});
 
-            // Net / qtr — the door's estimate, cover applied.
+            // 3 yr — the ranking figure: Net a day over the days it stands built, less Cost.
             ImGui::TableSetColumnIndex(1);
+            {
+                char buf[260];
+                if (!r.priced)
+                    std::snprintf(buf, sizeof buf, "No market prices this tile, so there is no estimate.");
+                else if (r.build_days >= k_site_horizon_days)
+                    std::snprintf(buf, sizeof buf,
+                                  "Est. %+d cr over 3 years: it takes %d days to build, longer than 3 years, so "
+                                  "it scores minus its cost.",
+                                  static_cast<int>(std::lround(r.earn3)), r.build_days);
+                else
+                    std::snprintf(buf, sizeof buf,
+                                  "Est. %+d cr over 3 years: %d days to build, then %d days at %+d cr / qtr, "
+                                  "less its cost of %d cr.",
+                                  static_cast<int>(std::lround(r.earn3)), r.build_days,
+                                  k_site_horizon_days - r.build_days, static_cast<int>(std::lround(r.profit)),
+                                  static_cast<int>(std::lround(r.capex)));
+                const ImU32 ink = r.priced ? value_colour(static_cast<double>(r.earn3)) : 0u;
+                cell("earn3", w_earn3, buf, ink);
+                if (r.priced)
+                    ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ink), "%s",
+                                       fmt::abbreviate(static_cast<double>(r.earn3)).c_str());
+                else
+                    ImGui::TextDisabled("-");
+            }
+
+            // Net / qtr — the door's estimate, cover applied. Its card text is
+            // published even where the column has stepped out at a narrow width.
+            const bool net_drawn = ImGui::TableSetColumnIndex(2) && net_on;
             {
                 char buf[240];
                 if (!r.priced)
@@ -1610,14 +1837,17 @@ void draw_site_finder(world& w, const recipe_registry& reg, ui_state& ui)
                 const ImU32 ink = r.priced ? value_colour(static_cast<double>(r.profit)) : 0u;
                 const std::string net_text = r.runway_warn ? r.runway_text + " " + buf : std::string(buf);
                 // A warning reads amber on its card, however good the net beneath it is.
-                cell("profit", w_net, net_text,
-                     r.runway_warn ? ImGui::ColorConvertFloat4ToU32(construction_rate_colour(0.5f)) : ink);
-                if (r.priced)
-                    ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ink), "%s",
-                                       fmt::abbreviate(static_cast<double>(r.profit)).c_str());
-                else
-                    ImGui::TextDisabled("-");
-                if (r.runway_warn)
+                if (net_drawn)
+                {
+                    cell("profit", w_net, net_text,
+                         r.runway_warn ? ImGui::ColorConvertFloat4ToU32(construction_rate_colour(0.5f)) : ink);
+                    if (r.priced)
+                        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ink), "%s",
+                                           fmt::abbreviate(static_cast<double>(r.profit)).c_str());
+                    else
+                        ImGui::TextDisabled("-");
+                }
+                if (net_drawn && r.runway_warn)
                 {
                     const ImVec2 fm = ImGui::GetItemRectMax();
                     const float  lh = ImGui::GetTextLineHeight();
@@ -1630,7 +1860,7 @@ void draw_site_finder(world& w, const recipe_registry& reg, ui_state& ui)
             // Cost — the flat credits times the site multiplier, paid at placement,
             // plus the materials at this market's posted prices, bought in arrears as
             // each tick draws them (Ben, 2026-10-26: costs depend on market prices).
-            ImGui::TableSetColumnIndex(2);
+            ImGui::TableSetColumnIndex(3);
             {
                 char buf[260];
                 std::snprintf(buf, sizeof buf,
@@ -1646,7 +1876,7 @@ void draw_site_finder(world& w, const recipe_registry& reg, ui_state& ui)
             }
 
             // Market — which market the tile clears in.
-            ImGui::TableSetColumnIndex(3);
+            ImGui::TableSetColumnIndex(4);
             {
                 const float mw = std::max(16.0f, ImGui::GetContentRegionAvail().x);
                 cell("market", mw, r.market == null_entity
@@ -1658,7 +1888,7 @@ void draw_site_finder(world& w, const recipe_registry& reg, ui_state& ui)
             }
 
             // LP — the routed Logistic Point cover, and the flag where it is zero.
-            ImGui::TableSetColumnIndex(4);
+            ImGui::TableSetColumnIndex(5);
             {
                 const ImVec2 p  = ImGui::GetCursorScreenPos();
                 const float  lh = ImGui::GetTextLineHeight();
@@ -1689,7 +1919,7 @@ void draw_site_finder(world& w, const recipe_registry& reg, ui_state& ui)
             }
 
             // Yield — units of what it makes per qtr (extraction: the deposit's figure).
-            ImGui::TableSetColumnIndex(5);
+            ImGui::TableSetColumnIndex(6);
             {
                 char buf[240];
                 if (r.has_yield && r.depositless)

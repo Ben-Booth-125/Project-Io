@@ -5804,6 +5804,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             row["tile"]    = static_cast<unsigned>(r.tile);
             row["priced"]  = r.priced;
             row["profit"]  = r.profit;
+            row["earn3"]   = r.earn3; // the 3 yr column, the default sort (Ben, 2026-11-12)
             row["full"]    = r.profit_full_cover;
             row["capex"]   = r.capex;
             row["cover"]   = r.cover;
