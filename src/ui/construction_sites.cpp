@@ -122,6 +122,72 @@ eval_key& last_key()
     return k;
 }
 
+/// Moved by `invalidate_site_evaluation`: a world change the frame stamp cannot see
+/// restarts the grid's pass as it resets the door's quotes.
+std::uint64_t& quote_epoch()
+{
+    static std::uint64_t e = 0;
+    return e;
+}
+
+/// One tile's quote, as the grid priced it: what the table's row shows of it.
+struct tile_figure
+{
+    float         net      = 0.0f;
+    float         revenue  = 0.0f;  ///< For the Yield column, at the price it was valued at.
+    float         price_share = 1.0f;
+    bool          quoted   = false; ///< The grid quoted this tile for this option.
+    bool          priced   = false;
+    bool          starved  = false;
+    resource_type short_of = resource_type::iron_ore;
+};
+
+/// A grid pass's quotes: per option, per tile in scope, each slot written by the one
+/// worker that holds its option, sized before any worker forks. THE ROW READS THESE
+/// (Ben's one Net): while a grid priced at the current stamp stands, the table's row for
+/// one of its tiles shows the cell's own figure, so the two cannot disagree and a tile
+/// is quoted once a pass.
+struct grid_figures
+{
+    bool                     valid = false;
+    lp_stamp                 stamp;
+    std::uint64_t            epoch = 0;
+    entity_id                body  = null_entity;
+    std::vector<site_option> opts;
+    std::unordered_map<entity_id, std::uint32_t> tile_ix;
+    std::vector<float>       cover;           ///< Per tile, the cover it was quoted at.
+    std::vector<std::vector<tile_figure>> at; ///< Per option (empty: it earns nothing).
+};
+
+grid_figures& shown_figures()
+{
+    static grid_figures f;
+    return f;
+}
+
+/// The shown grid's quote for @p tile under this option at @p cover, or null when no
+/// grid priced at the world's current stamp holds it.
+const tile_figure* grid_figure(const world& w, entity_id body, building_type type, resource_type target,
+                               std::uint16_t recipe, entity_id tile, float cover)
+{
+    const grid_figures& f = shown_figures();
+    if (!f.valid || f.body != body || f.epoch != quote_epoch() || !(f.stamp == make_lp_stamp(w)))
+        return nullptr;
+    const auto tit = f.tile_ix.find(tile);
+    if (tit == f.tile_ix.end() || f.cover[tit->second] != cover)
+        return nullptr;
+    for (std::size_t i = 0; i < f.opts.size(); ++i)
+    {
+        const site_option& o = f.opts[i];
+        if (o.type != type || o.target != target || o.recipe != recipe)
+            continue;
+        if (f.at[i].empty() || !f.at[i][tit->second].quoted)
+            return nullptr;
+        return &f.at[i][tit->second];
+    }
+    return nullptr;
+}
+
 /// Rows whose displayed figure (whole credits) another row shares — the tie the
 /// player would see. Deterministic: counted off a sorted copy.
 int count_ties(std::vector<std::pair<long long, long long>> keys)
@@ -335,14 +401,30 @@ void evaluate(world& w, const recipe_registry& reg, ui_state& ui)
 
         // THE PROFIT IS THE DOOR'S FIGURE, never a second estimator: the same
         // quote, the tile's cover applied.
-        const site_quote sq = quote_for_tile(w, reg, tid, c.type, c.target, c.recipe, r.cover);
-        const building_profit& bp = sq.profit;
-        r.priced = bp.has_data;
-        r.profit = bp.net();
-        r.starved  = sq.starved;
-        r.short_of = sq.short_of;
+        // One quote a tile a pass: the shown grid's figure where it has one, so the
+        // cell and the row read one Net; the door's own quote otherwise.
+        float revenue = 0.0f, price_share = 1.0f;
+        if (const tile_figure* gf = grid_figure(w, ui.active_body, c.type, c.target, c.recipe, tid, r.cover))
+        {
+            r.priced    = gf->priced;
+            r.profit    = gf->net;
+            r.starved   = gf->starved;
+            r.short_of  = gf->short_of;
+            revenue     = gf->revenue;
+            price_share = gf->price_share;
+        }
+        else
+        {
+            const site_quote sq = quote_for_tile(w, reg, tid, c.type, c.target, c.recipe, r.cover);
+            r.priced    = sq.profit.has_data;
+            r.profit    = sq.profit.net();
+            r.starved   = sq.starved;
+            r.short_of  = sq.short_of;
+            revenue     = sq.profit.revenue;
+            price_share = sq.price_share;
+        }
         // ONE WARNING TO A ROW: a starved row already says it would stand idle.
-        if (bp.has_data && !sq.starved)
+        if (r.priced && !r.starved)
             if (const shelf_runway sr = shelf_runway_for(w, reg, tid, c.type, c.recipe, r.cover); sr.warn)
             {
                 r.runway_warn = true;
@@ -373,11 +455,11 @@ void evaluate(world& w, const recipe_registry& reg, ui_state& ui)
             // it can never be a different reading of the tile from the profit beside it.
             const float p = market_price(w, r.market, c.target);
             // The price the quote settled at: the forecast the revenue was valued at.
-            const float settled = p * sq.price_share;
-            if (bp.has_data && settled > 0.0f)
+            const float settled = p * price_share;
+            if (r.priced && settled > 0.0f)
             {
                 r.has_yield = true;
-                r.yield     = bp.revenue / settled;
+                r.yield     = revenue / settled;
             }
         }
 
@@ -439,12 +521,13 @@ void evaluate(world& w, const recipe_registry& reg, ui_state& ui)
 // themselves on the entity cursor or the catchment generation - the markets and centres
 // per body, and each body's catchment raster - because a muster or a hire between two
 // frames moves the cursor without moving the pass's key. What would stale the warmed
-// state itself (ownership, roads, fronts, wars, the market set) is in the key, and
-// restarts the pass. An option's figures live in its own cell, which one worker holds at
-// a time. THE GRID AND THE TABLE PRICE THROUGH ONE CONTEXT: a pass resets the door's quote
-// context when it starts and warms that, and the table re-evaluates on it, so a cell and
-// its row read the same Net. A tripwire checks after each join that no warmed memo grew
-// and no stamp moved, and logs it once if one did.
+// state itself (ownership, roads, wars, the market set) is in the key, and restarts the
+// pass. An option's figures live in its own cell and its own per-tile slots, which one
+// worker holds at a time. ONE QUOTE A TILE A PASS: the pass prices through its own
+// context, and when it completes the table reads each row's figure from the pass's slots
+// (`grid_figure`) while the stamp they were priced at holds, so a cell and its row read
+// the same Net and the door's cache is never reset under the table. A tripwire checks
+// after each join that no warmed memo grew and no stamp moved, and logs it once if one did.
 //
 // WHY IT IS THE SEQUENTIAL ANSWER. An option's tiles are always scored in tile order, and
 // options never share state, so which thread scored an option, and across how many frames,
@@ -462,28 +545,21 @@ void evaluate(world& w, const recipe_registry& reg, ui_state& ui)
 constexpr double   k_grid_frame_budget_ms = 3.0;
 constexpr unsigned k_grid_max_workers     = 15; ///< Beside the main thread.
 
-/// Moved by `invalidate_site_evaluation`: a world change the frame stamp cannot see
-/// restarts the grid's pass as it resets the door's quotes.
-std::uint64_t& quote_epoch()
-{
-    static std::uint64_t e = 0;
-    return e;
-}
-
 struct grid_key
 {
     entity_id     body = null_entity;
     lp_stamp      stamp;
-    float         balance = -1.0f;
     float         reach   = -2.0f;
     std::uint32_t scope   = 0;
     std::uint64_t epoch   = 0;
     // What the warmed state reads that the frame stamp does not see: who holds each tile
     // and the roads the catchment floods (both stale the tile list, the covers and every
-    // tile's market), the fronts and the wars the lanes detour round, and the market set
-    // the reach memo was warmed for.
+    // tile's market), the wars the lanes detour round, and the market set the reach memo
+    // was warmed for. NOT the territory generation: an occupation anywhere moves it at day
+    // grain, so in a war a pass keyed on it would never finish, and the scoring reads the
+    // lanes only through the warmed haul memo. NOT the treasury either, which moves daily
+    // while a site draws its materials (below: at most a restart a month).
     std::uint64_t catchment = 0;
-    std::uint64_t territory = 0;
     std::uint64_t wars      = 0;
     std::size_t   markets   = 0;
     std::size_t   folded    = 0;
@@ -521,7 +597,16 @@ struct grid_pass
     entity_id               actor   = null_entity;
     float                   balance = 0.0f;
     float                   reach   = 0.0f;
+    int                     balance_month = -1;  ///< The game month the pass took its treasury in.
+    std::optional<site_quote_context> cx;        ///< The pass's own, warmed before any worker forks.
+    grid_figures            figures;             ///< Per option, per tile: the quote, filled by its worker.
     std::optional<place_index> places;           ///< Built once per pass, not per frame.
+    entity_id               shown_body  = null_entity; ///< The view the shown grid belongs to.
+    std::uint32_t           shown_scope = 0;
+    entity_id               kept_body  = null_entity; ///< The view the kept grid belongs to.
+    std::uint32_t           kept_scope = 0;
+    bool                    failed        = false; ///< The pass for this key threw and stopped.
+    bool                    failed_logged = false; ///< This key's failure is already in the log.
     // THE WARM-UP, resumable so it keeps to the frame budget: 0 covers and markets per
     // tile, 1 the quote context, 2 the reach set per (market, good taken), 3 done.
     int                     warm_phase = 0;
@@ -651,14 +736,28 @@ bool warm_step(world& w, const recipe_registry& reg, grid_pass& p, entity_id bod
     }
     if (p.warm_phase == 1)
     {
-        // THE DOOR'S CONTEXT IS THE GRID'S: reset here, at the pass's stamp, and the table
-        // re-evaluated on it, so a grid cell and the table's row for it read one Net.
-        quote_cache& qc = quotes();
-        qc.stamp = make_lp_stamp(w);
-        qc.at.clear();
-        qc.runway.clear();
-        qc.cx.emplace(make_site_quote_context(w, reg, quote_report()));
-        last_key() = eval_key{};
+        // The pass's own context (the door's cache is never reset under the table), and
+        // its per-tile figures sized for every option that earns: a worker only writes
+        // its own option's slots.
+        p.cx.emplace(make_site_quote_context(w, reg, quote_report()));
+        grid_figures& f = p.figures;
+        f.valid = false;
+        f.stamp = p.key.stamp;
+        f.epoch = p.key.epoch;
+        f.body  = p.key.body;
+        f.opts.clear();
+        f.at.assign(p.work.size(), {});
+        for (std::size_t i = 0; i < p.work.size(); ++i)
+        {
+            f.opts.push_back(p.work[i].option);
+            if (option_earns(p.work[i].option))
+                f.at[i].assign(p.tiles.size(), tile_figure{});
+        }
+        f.cover = p.cover;
+        f.tile_ix.clear();
+        f.tile_ix.reserve(p.tiles.size());
+        for (std::size_t t = 0; t < p.tiles.size(); ++t)
+            f.tile_ix.emplace(p.tiles[t], static_cast<std::uint32_t>(t));
         p.taken.fill(false);
         for (const site_cell& c : p.work)
             if (c.option.type == building_type::processing_facility)
@@ -672,7 +771,6 @@ bool warm_step(world& w, const recipe_registry& reg, grid_pass& p, entity_id bod
     }
     if (p.warm_phase == 2)
     {
-        quote_cache& qc = quotes();
         const std::size_t n = p.warm_markets.size() * resource_count;
         while (p.warm_i < n)
         {
@@ -680,7 +778,7 @@ bool warm_step(world& w, const recipe_registry& reg, grid_pass& p, entity_id bod
             const std::size_t r = k % resource_count;
             if (!p.taken[r])
                 continue;
-            (void)reachable_supply(w, reg, qc.cx->reach, p.warm_markets[k / resource_count], r, null_entity);
+            (void)reachable_supply(w, reg, p.cx->reach, p.warm_markets[k / resource_count], r, null_entity);
             if (out_of_time())
                 return false;
         }
@@ -716,13 +814,12 @@ void rewarm_shared(const world& w, entity_id body)
 
 /// What the tripwire watches across a join: every memo a quote could grow on a miss,
 /// and every stamp a cache rebuilds on. Any of them moving was a worker writing.
-std::vector<std::uint64_t> grid_watch(const world& w, entity_id body)
+std::vector<std::uint64_t> grid_watch(const world& w, const grid_pass& p, entity_id body)
 {
-    const quote_cache& qc = quotes();
     std::uint64_t route_sig = 0;
     if (const auto it = w.body_route_index.find(body); it != w.body_route_index.end())
         route_sig = it->second.sig;
-    return { qc.cx ? qc.cx->reach.haul.size() : 0, qc.cx ? qc.cx->reach.supply_memo.size() : 0,
+    return { p.cx ? p.cx->reach.haul.size() : 0, p.cx ? p.cx->reach.supply_memo.size() : 0,
              w.astar_cost_cache.size(), w.leg_path_cache.size(), w.lane_path_cache.size(),
              w.leg_flood_fields.size(), w.lane_flood_fields.size(), w.body_port_tiles.size(),
              w.body_tile_index.size(), w.body_route_index.size(), route_sig,
@@ -773,6 +870,15 @@ bool score_option(world& w, const recipe_registry& reg, grid_pass& p, site_quote
                 const site_quote sq = quote_site(w, reg, cx, tid, o.type, o.target, o.recipe, cover);
                 priced = sq.profit.has_data;
                 net    = priced ? std::lround(sq.profit.net()) : 0;
+                // This option's own slot for this tile, sized before the fork: the row's figure.
+                tile_figure& fig = p.figures.at[i][ti];
+                fig.net         = sq.profit.net();
+                fig.revenue     = sq.profit.revenue;
+                fig.price_share = sq.price_share;
+                fig.quoted      = true;
+                fig.priced      = sq.profit.has_data;
+                fig.starved     = sq.starved;
+                fig.short_of    = sq.short_of;
                 if (sq.profit.has_data && (!cell.has_figure || sq.profit.net() > cell.best_net))
                 {
                     const tile_component& tc = w.tiles.at(tid);
@@ -816,19 +922,25 @@ void step_site_grid(world& w, const recipe_registry& reg, ui_state& ui, const st
     float balance = 0.0f;
     if (const float* b = purse_of(w, actor); b != nullptr)
         balance = *b;
-    grid_key key{ ui.active_body, make_lp_stamp(w), balance, ui.max_logistics_reach, sf.scope_province,
-                  quote_epoch() };
+    grid_key key{ ui.active_body, make_lp_stamp(w), ui.max_logistics_reach, sf.scope_province, quote_epoch() };
     key.catchment = w.catchment_generation;
-    key.territory = w.territory_generation;
     key.wars      = wars_digest(w);
     key.markets   = w.markets.size();
     key.folded    = w.folded_markets.size();
 
-    // A warmed pass whose context the door dropped is warmed again from the start.
-    const bool context_lost = p.running && p.warm_phase >= 2 && !quotes().cx.has_value();
-    const bool options_moved = !same_options(p.running ? p.work : sf.cells, opts);
-    if (!p.have_key || !(key == p.key) || options_moved || context_lost)
+    // THE TREASURY restarts a pass at most once a game month: it moves daily while a site
+    // draws its materials, and a pass restarted on every move would never finish while
+    // time ran. Until then the grid's "too costly" counts read the month's opening
+    // treasury; the table beside it reads today's. Under --verify any move restarts, so a
+    // script that sets the treasury sees it at once.
+    const int  month         = w.current_day_tick / 30;
+    const bool balance_moved = balance != p.balance && (ui.fixed_frame_clock || month != p.balance_month);
+    const bool options_moved = !same_options((p.running || p.failed) ? p.work : sf.cells, opts);
+    if (!p.have_key || !(key == p.key) || options_moved || balance_moved)
     {
+        p.balance_month = month;
+        p.failed        = false;
+        p.failed_logged = false;
         const bool new_view = !p.have_key || p.key.body != key.body || p.key.scope != key.scope
                            || !same_options(sf.cells, opts);
         p.key      = key;
@@ -883,6 +995,8 @@ void step_site_grid(world& w, const recipe_registry& reg, ui_state& ui, const st
             {
                 p.kept_cells = std::move(sf.cells);
                 p.kept_order = std::move(sf.cell_order);
+                p.kept_body  = p.shown_body;
+                p.kept_scope = p.shown_scope;
             }
             sf.cells.clear();
             sf.cell_order.clear();
@@ -913,7 +1027,7 @@ void step_site_grid(world& w, const recipe_registry& reg, ui_state& ui, const st
             return;
         }
     }
-    site_quote_context& cx = *quotes().cx;
+    site_quote_context& cx = *p.cx;
 
     // This frame's options: every one not yet done, in option order.
     std::vector<std::size_t> todo;
@@ -923,7 +1037,7 @@ void step_site_grid(world& w, const recipe_registry& reg, ui_state& ui, const st
 
     // Every frame, before the fork: the cursor- and catchment-stamped indexes, fresh.
     rewarm_shared(w, ui.active_body);
-    const std::vector<std::uint64_t> before = grid_watch(w, ui.active_body);
+    const std::vector<std::uint64_t> before = grid_watch(w, p, ui.active_body);
     std::exception_ptr failed;
     std::string        failed_what;
     const auto note = [&](std::exception_ptr e) {
@@ -979,7 +1093,7 @@ void step_site_grid(world& w, const recipe_registry& reg, ui_state& ui, const st
     }
     // The tripwire: a memo that grew, or a stamp that moved, under the join was written
     // by a worker. Logged once, in every build.
-    if (grid_watch(w, ui.active_body) != before)
+    if (grid_watch(w, p, ui.active_body) != before)
     {
         static bool told = false;
         if (!told)
@@ -995,17 +1109,27 @@ void step_site_grid(world& w, const recipe_registry& reg, ui_state& ui, const st
     {
         // A pass that threw is stopped, not resumed: a tile it was on was never scored. The
         // last complete grid stands; the pass restarts when its key next moves.
-        std::fprintf(stderr, "site finder: the grid's search stopped: %s\n", failed_what.c_str());
+        // Logged once for this key: a world that throws every pass does not flood the log.
+        // Its options stay in p.work, so the stopped pass is not restarted every frame.
+        if (!p.failed_logged)
+        {
+            p.failed_logged = true;
+            std::fprintf(stderr, "site finder: the grid's search stopped: %s\n", failed_what.c_str());
+        }
         p.running    = false;
+        p.failed     = true;
         sf.searching = false;
-        p.work.clear();
-        if (sf.cells.empty() && !p.kept_cells.empty())
+        // Another view's grid never stands for this one: the kept grid comes back only on
+        // its own body and scope, for the same buildings.
+        if (sf.cells.empty() && !p.kept_cells.empty() && p.kept_body == p.key.body && p.kept_scope == p.key.scope
+            && same_options(p.kept_cells, opts))
         {
             sf.cells      = std::move(p.kept_cells);
             sf.cell_order = std::move(p.kept_order);
         }
         p.kept_cells.clear();
         p.kept_order.clear();
+        p.cx.reset();
         return;
     }
 
@@ -1026,6 +1150,15 @@ void step_site_grid(world& w, const recipe_registry& reg, ui_state& ui, const st
     p.work.clear();
     p.kept_cells.clear();
     p.kept_order.clear();
+    p.shown_body  = p.key.body;
+    p.shown_scope = p.key.scope;
+    p.cx.reset();
+    // The pass's quotes become the shown grid's, and the table re-reads its rows from
+    // them: one quote a tile, the cell's and the row's.
+    p.figures.valid = true;
+    shown_figures() = std::move(p.figures);
+    p.figures       = grid_figures{};
+    last_key()      = eval_key{};
     order_cells(sf);
     sf.grid_ms           = p.spent_ms;
     sf.grid_frames       = p.frames;
