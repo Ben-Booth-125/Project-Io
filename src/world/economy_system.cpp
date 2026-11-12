@@ -1923,15 +1923,12 @@ recipe_switch_result try_switch_recipe(world& w, const recipe_registry& reg,
         return recipe_switch_result::invalid;
     if (b.recipe == new_recipe_id)
         return recipe_switch_result::invalid; // no-op
-    if (b.recipe_switch_cooldown > 0)
-        return recipe_switch_result::on_cooldown;
 
     // BL-1296: @p corp may name a NATION switching one of its own buildings
     // (NATIONS.md § What a nation owns). Then the cost comes out of the
     // treasury's uncommitted part. BL-1399 (Ben, 2026-10-23): the nation is its
     // own actor - the tech gate reads its own tree, so a minor with no champion
-    // retools too - and any recipe is admitted, the strategic-sector limit having
-    // retired with the state/private split.
+    // retools too.
     const auto nit = w.nations.find(corp); // BL-1407: every owner is a nation
     if (nit == w.nations.end())
         return recipe_switch_result::invalid;
@@ -1939,59 +1936,70 @@ recipe_switch_result try_switch_recipe(world& w, const recipe_registry& reg,
 
     const recipe_switch_params& sw = reg.recipe_switch();
 
-    // BL-434 retraction (2026-08-16, minutes after BL-434 itself landed in this
-    // same session): cross-GROUP switching used to cost more (a tiered
-    // multiplier); Ben reconsidered and it is now REFUSED outright instead —
-    // "switching methods can mean changing to a different building type — we
-    // should retire that completely. So the only way to access a different
-    // building type is fully dismantling the building, then using the tile
-    // selector to reselect and build a new building." Looked up by group name
-    // rather than id/enum, since `group` is the whole point of the field
-    // (recipe_registry.hpp). A missing old recipe (e.g. a fresh
-    // processing_facility mid-construction, whose b.recipe may be `no_recipe`)
-    // or an unrecognised group falls back to PERMITTING the switch at the
-    // intra-group cost rather than refusing on a data edge case — this seam
-    // must never crash or silently misbehave on missing data.
+    // ONE BUILDING PER PRODUCT (Ben, 2026-11-11; PRODUCTION.md § One building per
+    // product). A method is a way the one building makes its one product, so a
+    // switch to another building's method is REFUSED (`cross_group`, the BL-434
+    // retraction's refusal: another building is dismantle and rebuild). Within the
+    // building the step must be legal: a VARIANT (both ways, `switch_cost`) or the
+    // UPGRADE of the running method (one way, `upgrade_cost`, paid in place); the way
+    // back down from an upgrade is `one_way`. A building with no method set keeps the
+    // old fallback - permitted at the variant cost, alone - so this seam never
+    // crashes on missing data.
     const recipe* old_r = reg.get_recipe(b.recipe);
     const recipe* new_r = reg.get_recipe(new_recipe_id);
-    if (old_r != nullptr && new_r != nullptr && old_r->group != new_r->group)
-        return recipe_switch_result::cross_group;
+    method_step step = method_step::variant;
+    if (old_r != nullptr)
+    {
+        if (old_r->group != new_r->group)
+            return recipe_switch_result::cross_group;
+        step = reg.method_step_between(b.recipe, new_recipe_id);
+        if (step == method_step::none)
+            return recipe_switch_result::one_way;
+    }
 
-    // BL-692 (2026-08-29): the BL-428 chain-depth gate that mirrored
-    // construct_building's is GONE from both doors together — retiring it at the
-    // build door alone would have left this one refusing a retool the front door
-    // now permits. Depth no longer gates anything; tech is the only method lock.
+    // ONE METHOD PER STACK: the switch is the whole stack's - every building of this
+    // product on the tile - and none of them may be mid-retool.
+    std::vector<building_component*> stack;
+    if (old_r != nullptr)
+        for (const entity_id m : product_stack_members(w, reg, b.tile, old_r->group))
+            stack.push_back(&w.buildings.at(m));
+    if (std::find(stack.begin(), stack.end(), &b) == stack.end())
+        stack.push_back(&b); // a building outside w.buildings (a harness's own) still switches
+    for (const building_component* m : stack)
+        if (m->recipe_switch_cooldown > 0)
+            return recipe_switch_result::on_cooldown;
 
-    // BL-588 tech-recipe gate, mirroring construct_building's — it guards BOTH
-    // doors for the reason the depth gate used to: guarding only placement
-    // leaves the one-click bypass (place the ungated method, retool onto the
-    // tech-locked one in the same group).
+    // BL-692 (2026-08-29): chain depth no longer gates a retool; tech is the only
+    // method lock. BL-588's tech-recipe gate, mirroring construct_building's.
     if (!recipe_unlocked(w, reg, gate_corp, new_recipe_id))
         return recipe_switch_result::tech_locked;
 
     // Propellant routes follow the body's air (Ben, 2026-10-09; PRODUCTION.md
-    // § Chemical Plant): the build door's gate, mirrored at the retool door - its
+    // § Propellant Plant): the build door's gate, mirrored at the retool door - its
     // key half first (BL-1604), as the build door asks it.
     if (!recipe_mechanic_held_at_tile(w, *new_r, b.tile))
         return recipe_switch_result::tech_locked;
     if (!recipe_runs_at_tile(w, *new_r, b.tile))
         return recipe_switch_result::wrong_air;
 
-    const float cost = sw.switch_cost;
+    const float per_building = (step == method_step::upgrade) ? sw.upgrade_cost : sw.switch_cost;
+    const float cost         = per_building * static_cast<float>(stack.size());
     // BL-1296 fix round: a state retool must also fund what the NEW recipe's
     // inputs add to this tick's bill (the gate priced the old recipe), so the
     // switch cost and that increase both come out of the uncommitted treasury,
-    // and the increase is committed when the retool applies.
+    // and the increase is committed when the retool applies - for every member.
     float bill_rise = 0.0f;
-    if (nit != w.nations.end() && !b.state_idle)
+    for (const building_component* m : stack)
     {
-        building_component after = b;
+        if (m->state_idle)
+            continue;
+        building_component after = *m;
         after.recipe = new_recipe_id;
-        bill_rise = std::max(0.0f, (state_building_cost_bound(w, reg, after)
-                                    - state_building_cost_bound(w, reg, b)) * 1.0005f);
-        if (!std::isfinite(bill_rise))
-            return recipe_switch_result::insufficient_funds;
+        bill_rise += std::max(0.0f, (state_building_cost_bound(w, reg, after)
+                                     - state_building_cost_bound(w, reg, *m)) * 1.0005f);
     }
+    if (!std::isfinite(bill_rise))
+        return recipe_switch_result::insufficient_funds;
     const float funds = state_uncommitted_treasury(w, corp) - bill_rise;
     if (funds < cost)
         return recipe_switch_result::insufficient_funds;
@@ -2000,10 +2008,13 @@ recipe_switch_result try_switch_recipe(world& w, const recipe_registry& reg,
 
     nit->second.treasury -= cost; // a one-off retool, paid from the treasury
 
-    b.recipe                 = new_recipe_id;
-    b.active_recipe_index    = static_cast<int>(new_recipe_id); // registry index == id (recipe_at)
-    b.loss_streak            = 0;                                // give the new recipe a chance
-    b.recipe_switch_cooldown = sw.cooldown_ticks;
+    for (building_component* m : stack)
+    {
+        m->recipe                 = new_recipe_id;
+        m->active_recipe_index    = static_cast<int>(new_recipe_id); // registry index == id (recipe_at)
+        m->loss_streak            = 0;                                // give the new recipe a chance
+        m->recipe_switch_cooldown = sw.cooldown_ticks;
+    }
     return recipe_switch_result::applied;
 }
 
@@ -3462,7 +3473,16 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
                         {
                             const recipe& cand = reg.play_recipe_at(building_type::processing_facility, i);
                             const float ratio  = output_ratio(reg.recipe_id(cand.name));
+                            // ONE BUILDING PER PRODUCT (Ben, 2026-11-11): the rescue
+                            // takes only a VARIANT of the running method - never
+                            // another building's method, never an upgrade for free.
+                            // A variant makes the same product, so it can lift a
+                            // floored output only where a method's outputs differ;
+                            // with one output a method, a floored plant idles by its
+                            // loss streak instead (PRODUCTION.md § One building per
+                            // product).
                             if (ratio > best_ratio
+                                && reg.method_step_between(b.recipe, reg.recipe_id(cand.name)) == method_step::variant
                                 && recipe_unlocked(w, reg, corp, reg.recipe_id(cand.name)) // this writes b.recipe past the retool door
                                 && recipe_runs_at_tile(w, cand, b.tile) // the body's air (Ben, 2026-10-09)
                                 // BL-1399: a nation's building takes any recipe; the
@@ -3486,6 +3506,15 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
                         if (best_i >= 0)
                         {
                             const recipe& chosen  = reg.play_recipe_at(building_type::processing_facility, best_i);
+                            // One method per stack: the whole stack takes it.
+                            if (const recipe* was = reg.get_recipe(b.recipe); was != nullptr)
+                                for (const entity_id m : product_stack_members(w, reg, b.tile, was->group, bid))
+                                {
+                                    building_component& mb = w.buildings.at(m);
+                                    mb.recipe              = reg.recipe_id(chosen.name);
+                                    mb.active_recipe_index = static_cast<int>(mb.recipe);
+                                    mb.loss_streak         = 0;
+                                }
                             b.recipe              = reg.recipe_id(chosen.name);
                             b.active_recipe_index = best_i;
                             b.loss_streak         = 0; // give the new recipe a chance before idling

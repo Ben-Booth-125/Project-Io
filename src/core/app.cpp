@@ -2572,6 +2572,14 @@ bool app::load_game_from(const std::string& path)
     // takes the registry's military walls (BL-1455).
     if (m_registry.recipe_count() == 0)
         load_recipe_registry();
+    // ONE BUILDING PER PRODUCT (Ben, 2026-11-11; world_save.hpp v94): a save whose
+    // world predates the split is refused whole, not migrated, and says why.
+    if (const std::string why = save_game_refusal_reason(path); !why.empty())
+    {
+        ui::chat_post(m_chat, static_cast<int>(m_sim_loop.day_tick()), null_entity,
+                      ui::chat_state::k_field_channel, "LOAD FAILED: " + path + ": " + why);
+        return false;
+    }
     if (!read_save_game(path, w, env, &m_registry.military(), // BL-1455: legacy step-offs read the walls
                         &m_worldgen_cfg.kepler_base_price))
     {

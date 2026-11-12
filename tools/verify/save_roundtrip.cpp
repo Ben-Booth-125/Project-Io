@@ -2318,7 +2318,8 @@ int main()
         // and v88 is read as its strict prefix; every PG size below adds that section.
         // The space merge: today is v93 (every space section after the missiles); v89 is read
         // as its prefix less the space sections.
-        static_assert(world_save_version == k_world_save_version_space_merge && k_world_save_version_stacked == 88
+        static_assert(world_save_version == k_world_save_version_one_product && k_world_save_version_one_product == 94
+                          && k_world_save_version_space_merge == 93 && k_world_save_version_stacked == 88
                           && k_world_save_version_ship_kit == 81 && k_world_save_version_ended == 83
                           && k_world_save_version_missiles == 89,
                       "PG pins v88 as the stacked version over v81 and v83, v89 the missiles after it");
@@ -2412,13 +2413,13 @@ int main()
 
         // The space merge gave v84..v87 and v90..v92 the space line's layouts, so no version
         // in 81..93 is unclaimed any more; a stream stamped past today is refused.
-        for (const uint32_t v : {94u, 95u})
+        for (const uint32_t v : {95u, 96u})
         {
             std::string other = b88;
             std::memcpy(&other[4], &v, sizeof v);
             world sentinel;
             check(!from_bytes(other, sentinel) && sentinel.tiles.empty(),
-                  "PG a stream stamped past today (v94, v95) is REFUSED");
+                  "PG a stream stamped past today (v95, v96) is REFUSED");
         }
     }
 
@@ -2429,7 +2430,8 @@ int main()
     // collide with this line's numbers and read as this line's.
     // -----------------------------------------------------------------------
     {
-        static_assert(world_save_version == 93 && k_world_save_version_space_merge == 93
+        // BL-1641: v94 (one building per product) adds no section, so today's stream is v93's layout.
+        static_assert(world_save_version == 94 && k_world_save_version_space_merge == 93
                           && k_world_save_version_pre_space_merge == 89,
                       "PH pins v93 as the space merge over main's v89");
         static_assert(world_stream_is_space_line(84) && world_stream_is_space_line(87)

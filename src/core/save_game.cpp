@@ -1399,6 +1399,35 @@ bool write_save_game_at(const std::string& path, const world& w, const save_enve
     return static_cast<bool>(out);
 }
 
+namespace {
+
+/// The world stream at @p in's position: does it predate one building per product
+/// (world v94)? Reads its magic and version and puts the position back. False for a
+/// stream too short to say (the read that follows refuses it on its own terms).
+bool save_world_predates_product_split(std::istream& in)
+{
+    const std::streampos at = in.tellg();
+    uint32_t magic = 0, version = 0;
+    const bool read = r_u32(in, magic) && r_u32(in, version);
+    in.clear();
+    in.seekg(at);
+    return read && magic == world_save_magic && version < k_world_save_version_one_product;
+}
+
+} // namespace
+
+std::string save_game_refusal_reason(const std::string& path)
+{
+    std::ifstream in(path, std::ios::binary);
+    uint32_t magic = 0, version = 0;
+    if (!in || !r_u32(in, magic) || magic != save_game_magic || !r_u32(in, version))
+        return {};
+    if (save_world_predates_product_split(in))
+        return "this save is from before one building per product (every processing building "
+               "now makes one product) and cannot be opened; start a new game";
+    return {};
+}
+
 bool read_save_game(const std::string& path, world& w, save_envelope& env,
                     const military_capability_params* mil,
                     const std::array<float, resource_count>* base_price)

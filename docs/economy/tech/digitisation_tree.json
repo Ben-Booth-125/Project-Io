@@ -614,12 +614,12 @@
      "DG-PR-PC-T2"
     ]
    ],
-   "advantage": "Chemical Plants +5% output per batch",
+   "advantage": "Propellant Plants +5% output per batch",
    "effects": [
     {
      "kind": "modifier",
      "subject": "processing_yield",
-     "scope": "group:Chemical Works",
+     "scope": "group:Propellant Plant",
      "op": "multiply",
      "value": 1.05
     }
@@ -668,7 +668,7 @@
      "DG-PR-PC-A2"
     ]
    ],
-   "advantage": "Chemical Plants unlock the plastics recipe; Refineries +20% output per batch",
+   "advantage": "Chemical Plants unlock the plastics recipe; Fuel Refineries +20% output per batch",
    "effects": [
     {
      "kind": "unread",
@@ -678,7 +678,7 @@
     {
      "kind": "modifier",
      "subject": "processing_yield",
-     "scope": "group:Refinery",
+     "scope": "group:Fuel Refinery",
      "op": "multiply",
      "value": 1.2
     }
@@ -815,12 +815,26 @@
      "DG-PR-PC-T4"
     ]
    ],
-   "advantage": "Electronics Labs +5% output per batch; station Power modules may be fitted",
+   "advantage": "Silicon Works +5%, Rare Earth Refineries +5% and Electronics Labs +5% output per batch; station Power modules may be fitted",
    "effects": [
     {
      "kind": "modifier",
      "subject": "processing_yield",
-     "scope": "group:Electronics",
+     "scope": "group:Silicon Works",
+     "op": "multiply",
+     "value": 1.05
+    },
+    {
+     "kind": "modifier",
+     "subject": "processing_yield",
+     "scope": "group:Rare Earth Refinery",
+     "op": "multiply",
+     "value": 1.05
+    },
+    {
+     "kind": "modifier",
+     "subject": "processing_yield",
+     "scope": "group:Electronics Lab",
      "op": "multiply",
      "value": 1.05
     },
@@ -847,7 +861,7 @@
      "DG-PR-PC-B2"
     ]
    ],
-   "advantage": "Electronics Labs unlock the microchip recipe; Electronics Labs +10% output per batch",
+   "advantage": "Electronics Labs unlock the microchip recipe; Silicon Works +10%, Rare Earth Refineries +10% and Electronics Labs +10% output per batch",
    "effects": [
     {
      "kind": "unread",
@@ -857,7 +871,21 @@
     {
      "kind": "modifier",
      "subject": "processing_yield",
-     "scope": "group:Electronics",
+     "scope": "group:Silicon Works",
+     "op": "multiply",
+     "value": 1.1
+    },
+    {
+     "kind": "modifier",
+     "subject": "processing_yield",
+     "scope": "group:Rare Earth Refinery",
+     "op": "multiply",
+     "value": 1.1
+    },
+    {
+     "kind": "modifier",
+     "subject": "processing_yield",
+     "scope": "group:Electronics Lab",
      "op": "multiply",
      "value": 1.1
     }
@@ -876,12 +904,33 @@
      "DG-PR-PC-T6"
     ]
    ],
-   "advantage": "Fabricators +5% output per batch; opens lightweight composite tracks (armour); station grids may be upgraded to 7 x 5",
+   "advantage": "Machine Works +5%, Alloy Works +5%, Ordnance Works +5% and Spacecraft Assembly Plants +5% output per batch; opens lightweight composite tracks (armour); station grids may be upgraded to 7 x 5",
    "effects": [
     {
      "kind": "modifier",
      "subject": "processing_yield",
-     "scope": "group:Advanced Fabrication",
+     "scope": "group:Machine Works",
+     "op": "multiply",
+     "value": 1.05
+    },
+    {
+     "kind": "modifier",
+     "subject": "processing_yield",
+     "scope": "group:Alloy Works",
+     "op": "multiply",
+     "value": 1.05
+    },
+    {
+     "kind": "modifier",
+     "subject": "processing_yield",
+     "scope": "group:Ordnance Works",
+     "op": "multiply",
+     "value": 1.05
+    },
+    {
+     "kind": "modifier",
+     "subject": "processing_yield",
+     "scope": "group:Spacecraft Assembly Plant",
      "op": "multiply",
      "value": 1.05
     },
@@ -1003,12 +1052,26 @@
     "kind": "unread",
     "waits_on": "microchip recipe"
    },
-   "advantage": "Electronics Labs +10% output per batch",
+   "advantage": "Silicon Works +10%, Rare Earth Refineries +10% and Electronics Labs +10% output per batch",
    "effects": [
     {
      "kind": "modifier",
      "subject": "processing_yield",
-     "scope": "group:Electronics",
+     "scope": "group:Silicon Works",
+     "op": "multiply",
+     "value": 1.1
+    },
+    {
+     "kind": "modifier",
+     "subject": "processing_yield",
+     "scope": "group:Rare Earth Refinery",
+     "op": "multiply",
+     "value": 1.1
+    },
+    {
+     "kind": "modifier",
+     "subject": "processing_yield",
+     "scope": "group:Electronics Lab",
      "op": "multiply",
      "value": 1.1
     }

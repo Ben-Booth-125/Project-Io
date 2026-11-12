@@ -67,8 +67,9 @@ enum class extraction_family : std::uint8_t
     count
 };
 
-/// A processing facility's form family — its active recipe's `group`
-/// (recipes.lua, BL-434), so *what is made here* reads before a hover.
+/// A processing facility's form family — the family of its product building (its
+/// recipe's `group`, recipes.lua; one building per product, Ben 2026-11-11), so *what
+/// is made here* reads before a hover. Several product buildings share a family's form.
 enum class processing_family : std::uint8_t
 {
     general = 0,

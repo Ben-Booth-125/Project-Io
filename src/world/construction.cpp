@@ -168,6 +168,18 @@ construction_result construct_for(world& w, const recipe_registry& reg,
     if (!reg.building_available(type))
         return construction_result::era_locked;
 
+    // ONE METHOD PER STACK (Ben, 2026-11-11; PRODUCTION.md § One building per product):
+    // a processing building joining a stack of its product on this tile runs the
+    // stack's method, whatever method the caller priced. Asked first, so every gate
+    // below asks of the method the building will actually run.
+    if (type == building_type::processing_facility)
+    {
+        const std::uint16_t asked = (recipe != no_recipe) ? recipe : reg.default_recipe_id_at(w, tile);
+        if (const ::recipe* rc = reg.get_recipe(asked); rc != nullptr)
+            if (const std::uint16_t m = product_stack_method(w, reg, tile, rc->group); m != no_recipe)
+                recipe = m;
+    }
+
     // BL-692 (2026-08-29): the BL-428 chain-depth gate that stood here is GONE.
     // Ben's ruling: "most direct unlocks should be a consequence of research, not
     // just economy... allow both corporations and companies to build any building,
@@ -189,7 +201,7 @@ construction_result construct_for(world& w, const recipe_registry& reg,
         return construction_result::tech_locked;
 
     // Propellant routes follow the body's air (Ben, 2026-10-09; PRODUCTION.md
-    // § Chemical Plant): the one predicate, asked at the build door. Its key half
+    // § Propellant Plant): the one predicate, asked at the build door. Its key half
     // first (BL-1604, the Electrolysis Plant's research), so the refusal says so.
     if (type == building_type::processing_facility)
         if (const ::recipe* rc = reg.get_recipe(recipe); rc != nullptr)
@@ -690,4 +702,55 @@ bool recipe_mechanic_held_at_tile(const world& w, const recipe& rc, entity_id ti
         return true;
     const auto hn = w.tile_to_nation.find(tile);
     return hn != w.tile_to_nation.end() && nation_has_mechanic(w, hn->second, rc.mechanic);
+}
+
+// ONE BUILDING PER PRODUCT (Ben, 2026-11-11; PRODUCTION.md § One building per
+// product). Declared beside `method_step` in recipe_registry.hpp. A product stack is
+// every processing building on one tile whose recipe names the same building
+// (`recipe::group`); walked in ascending id, never `world::buildings`' own order.
+std::vector<entity_id> product_stack_members(const world& w, const recipe_registry& reg,
+                                             entity_id tile, const std::string& group,
+                                             entity_id except)
+{
+    std::vector<entity_id> members;
+    for (const auto& [bid, b] : w.buildings)
+    {
+        if (bid == except || b.tile != tile || b.type != building_type::processing_facility)
+            continue;
+        const recipe* rc = reg.get_recipe(b.recipe);
+        if (rc != nullptr && rc->group == group)
+            members.push_back(bid);
+    }
+    std::sort(members.begin(), members.end());
+    return members;
+}
+
+std::uint16_t product_stack_method(const world& w, const recipe_registry& reg,
+                                   entity_id tile, const std::string& group, entity_id except)
+{
+    const std::vector<entity_id> members = product_stack_members(w, reg, tile, group, except);
+    return members.empty() ? no_recipe : w.buildings.at(members.front()).recipe;
+}
+
+int unify_product_stack_methods(world& w, const recipe_registry& reg)
+{
+    std::vector<entity_id> ids;
+    ids.reserve(w.buildings.size());
+    for (const auto& [bid, b] : w.buildings)
+        if (b.type == building_type::processing_facility && reg.get_recipe(b.recipe) != nullptr)
+            ids.push_back(bid);
+    std::sort(ids.begin(), ids.end());
+    int reset = 0;
+    for (const entity_id bid : ids) // ascending: a stack's oldest member is met first
+    {
+        building_component& b = w.buildings.at(bid);
+        const std::uint16_t m = product_stack_method(w, reg, b.tile, reg.get_recipe(b.recipe)->group);
+        if (m != no_recipe && m != b.recipe)
+        {
+            b.recipe              = m;
+            b.active_recipe_index = static_cast<int>(m);
+            ++reset;
+        }
+    }
+    return reset;
 }

@@ -234,6 +234,10 @@ void recipe_registry::load_from_lua(lua_state& lua)
         // (not "") when absent — see recipe_registry.hpp's field comment for why
         // an empty string is not the fallback.
         r.group = entry->get_or<std::string>("group", "General");
+        // One building per product (Ben, 2026-11-11): the method's relation to its
+        // building's other methods. Validated against the whole roster below.
+        r.variant_of = entry->get_or<std::string>("variant_of", "");
+        r.upgrade_of = entry->get_or<std::string>("upgrade_of", "");
 
         // BL-615: per-recipe stratum-gate radius (the heavy processor class).
         // Absent = 0 = ungated. A negative value is authored nonsense and is
@@ -276,6 +280,71 @@ void recipe_registry::load_from_lua(lua_state& lua)
                                              + "' must author no inputs and no outputs");
 
         m_recipes.push_back(std::move(r));
+    }
+
+    // ONE BUILDING PER PRODUCT (Ben, 2026-11-11; PRODUCTION.md § One building per
+    // product). Refused at load, never coerced:
+    //   (1) a building (`group`) makes ONE product — every live recipe in it shares
+    //       its primary output;
+    //   (2) `upgrade_of` / `variant_of` name a live recipe of the same building, never
+    //       both on one row, and a variant never names an upgrade;
+    //   (3) every pair of a building's methods a nation could run side by side (their
+    //       bands overlap and their airs do not exclude each other) is TAGGED: at most
+    //       one of them is the untagged root. Propellant's air pair is a precondition,
+    //       not a choice, so (3) does not ask it.
+    {
+        std::map<std::string, std::size_t> product_of; // group -> first recipe's index
+        for (std::size_t i = 0; i < m_recipes.size(); ++i)
+        {
+            const recipe& r = m_recipes[i];
+            if (r.retired)
+                continue;
+            const auto [it, fresh] = product_of.emplace(r.group, i);
+            if (!fresh && primary_output_resource(m_recipes[it->second]) != primary_output_resource(r))
+                throw std::runtime_error("recipe_registry: building '" + r.group + "' makes two products ('"
+                                         + m_recipes[it->second].name + "' and '" + r.name
+                                         + "'); one building makes one product");
+            if (!r.upgrade_of.empty() && !r.variant_of.empty())
+                throw std::runtime_error("recipe_registry: recipe '" + r.name
+                                         + "' is tagged both upgrade_of and variant_of");
+            for (const std::string* tag : {&r.upgrade_of, &r.variant_of})
+            {
+                if (tag->empty())
+                    continue;
+                const recipe* base = nullptr;
+                for (const recipe& o : m_recipes)
+                    if (o.name == *tag)
+                        base = &o;
+                if (base == nullptr || base->retired || base->group != r.group || base == &r)
+                    throw std::runtime_error("recipe_registry: recipe '" + r.name + "' names '" + *tag
+                                             + "', which is not another method of its building '"
+                                             + r.group + "'");
+                if (tag == &r.variant_of && !base->upgrade_of.empty())
+                    throw std::runtime_error("recipe_registry: recipe '" + r.name
+                                             + "' is a variant of an upgrade ('" + *tag + "')");
+            }
+        }
+        const auto bands_overlap = [](era_band a, era_band b) {
+            return a == era_band::any || b == era_band::any || a == b;
+        };
+        const auto airs_meet = [](recipe_air a, recipe_air b) {
+            return a == recipe_air::any || b == recipe_air::any || a == b;
+        };
+        for (std::size_t i = 0; i < m_recipes.size(); ++i)
+            for (std::size_t j = i + 1; j < m_recipes.size(); ++j)
+            {
+                const recipe& a = m_recipes[i];
+                const recipe& b = m_recipes[j];
+                if (a.retired || b.retired || a.group != b.group)
+                    continue;
+                if (!a.upgrade_of.empty() || !a.variant_of.empty()
+                    || !b.upgrade_of.empty() || !b.variant_of.empty())
+                    continue;
+                if (bands_overlap(a.era, b.era) && airs_meet(a.air, b.air))
+                    throw std::runtime_error("recipe_registry: '" + a.name + "' and '" + b.name
+                                             + "' are two untagged methods of '" + a.group
+                                             + "'; tag one `upgrade_of` or `variant_of` the other");
+            }
     }
 
     // BL-433: a fresh load starts band-agnostic. The caller (app::load_economy)
@@ -1682,6 +1751,11 @@ void recipe_registry::load_from_lua(lua_state& lua)
         recipe_switch_params rs;
         rs.switch_cost    = recipe_switch->get_or("switch_cost",    rs.switch_cost);
         rs.cooldown_ticks = recipe_switch->get_or("cooldown_ticks", rs.cooldown_ticks);
+        rs.upgrade_cost   = recipe_switch->get_or("upgrade_cost",   rs.upgrade_cost);
+        // Refused, never clamped: a cost is a finite non-negative figure.
+        if (!(rs.switch_cost >= 0.0f) || !(rs.upgrade_cost >= 0.0f) || !std::isfinite(rs.switch_cost)
+            || !std::isfinite(rs.upgrade_cost))
+            throw std::runtime_error("recipe_registry: economy.recipe_switch costs must be finite and >= 0");
         // cross_group_multiplier retired (BL-434 retraction, 2026-08-16): cross-group
         // switching is refused outright now, not priced — see recipe_switch_params.
         m_recipe_switch = rs;

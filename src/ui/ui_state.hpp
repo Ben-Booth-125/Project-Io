@@ -2069,6 +2069,10 @@ struct ui_state
         int         count    = 1;           ///< The expanded stack's member count.
         std::string title;                  ///< The expanded header's name + " ×N" as drawn.
         std::string method;                 ///< The production method line, "" when none.
+        /// One building per product (Ben, 2026-11-11): the method control's presses as
+        /// drawn - each legal step from the stack's method, "Upgrade to ... - N cr" -
+        /// empty when the building has only its one method or is not the player's.
+        std::vector<std::string> method_steps;
         /// BL-1365: the stack LIST's row height and one text line, as drawn —
         /// so a check can assert the construction grid's "one line a row" rule
         /// on this surface too rather than inferring it from a capture.

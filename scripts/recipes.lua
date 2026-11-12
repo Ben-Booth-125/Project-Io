@@ -16,12 +16,14 @@
 -- stable across bands; see recipe_registry.hpp § BL-433 era band. An unknown
 -- string is a load-time error, not a silent fallback.
 --
--- BL-434: an optional `group` field ("Metal Foundry", "Food Processing", ...) says
--- which sub-facility KIND a recipe belongs to, so the generic processing_facility
--- building type reads (Build door) and switches (recipe-switch cost) as several
--- distinct facility kinds. Absent means "General" (see recipe_registry.hpp); every
--- recipe below is tagged since a natural sibling group exists for all of them
--- (see docs/economy/PRODUCTION.md § Sub-facility groups for the taxonomy table).
+-- BL-434 / BL-1641: the `group` field names the PRODUCT BUILDING a recipe is a
+-- method of ("Steel Mill", "Power Plant", ...). One building per product (Ben,
+-- 2026-11-11): every recipe of a group makes the same primary output, and the
+-- loader refuses a group that makes two. A group's methods are tagged:
+--   upgrade_of = "<recipe>"  the deeper method of that base, a step one way;
+--   variant_of = "<recipe>"  the same product from other raws, both ways;
+--   neither                  the group's root method.
+-- See docs/economy/PRODUCTION.md § The product buildings and § Upgrades and variants.
 --
 -- The ancient roster is deliberately thin right now — steel, food_rations and
 -- refined_copper are the only untagged processing chains — because tagging is
@@ -44,7 +46,7 @@ recipes = {
     {
         name    = "steel",
         era     = "industrial", -- BL-429
-        group   = "Metal Foundry", -- BL-434
+        group   = "Steel Mill", -- BL-1641: the product building
         inputs  = { iron_ore = 2.0, coal = 1.0 },
         outputs = { steel = 1.0 },
         -- BL-615: the heavy processor class — a steel mill must sit NEAR a
@@ -60,7 +62,7 @@ recipes = {
     {
         name    = "refined_fuel",
         era     = "industrial", -- BL-433
-        group   = "Refinery", -- BL-434
+        group   = "Fuel Refinery", -- BL-1641: the product building
         inputs  = { petroleum = 2.0 },
         outputs = { refined_fuel = 1.0 },
     },
@@ -68,7 +70,7 @@ recipes = {
     -- id 2 — Food Processor: agricultural produce -> food rations.
     {
         name    = "food_rations",
-        group   = "Food Processing", -- BL-434
+        group   = "Food Processor", -- BL-1641: the product building
         inputs  = { agricultural_produce = 2.0 },
         outputs = { food_rations = 1.0 },
     },
@@ -82,7 +84,7 @@ recipes = {
     {
         name    = "hydroponics_bay",
         era     = "industrial", -- BL-433
-        group   = "Food Processing", -- BL-434: agriculture-adjacent, same feed-the-population kind
+        group   = "Hydroponics Bay", -- BL-1641: the product building
         inputs  = { water = 1.5, steel = 0.5 },
         -- BL-744 (2026-09-02): one batch grows 5 units, not 1. At 1 unit the
         -- bay sold 3.0 of produce for 9.0 of water and steel - the only recipe
@@ -98,14 +100,15 @@ recipes = {
     {
         name    = "steel_from_iron_nickel",
         era     = "industrial", -- BL-433
-        group   = "Metal Foundry", -- BL-434
+        group   = "Steel Mill", -- BL-1641: the product building
+        variant_of = "steel", -- BL-1641: same product, other raws, both ways
         inputs  = { iron_nickel_ore = 2.0 },
         outputs = { steel = 1.0 },
         centre_proximity_radius = 6, -- BL-615: heavy processor class — see the steel recipe's note.
     },
 
     -- id 5 — Chemical Plant, ATMOSPHERE route (BL-308, Era 0). PRODUCTION.md
-    -- § Chemical Plant: on a body with an atmosphere the plant separates its own
+    -- § Propellant Plant: on a body with an atmosphere the plant separates its own
     -- liquid oxygen cryogenically from the local air, so the oxidiser costs no
     -- stockpiled input (energy only, abstracted into the rate). Refined fuel is
     -- therefore the whole authored input. Liquid oxygen is folded into the
@@ -113,10 +116,10 @@ recipes = {
     {
         name    = "propellant_atmospheric",
         era     = "industrial", -- BL-433
-        group   = "Chemical Works", -- BL-434
+        group   = "Propellant Plant", -- BL-1641: the product building
         inputs  = { refined_fuel = 2.0 },
         outputs = { propellant = 1.0 },
-        air     = "atmosphere", -- runs only under air (Ben, 2026-10-09; PRODUCTION.md § Chemical Plant)
+        air     = "atmosphere", -- runs only under air (Ben, 2026-10-09; PRODUCTION.md § Propellant Plant)
     },
 
     -- id 6 — Chemical Plant, AIRLESS route (BL-308, Era 1). No atmosphere to
@@ -134,7 +137,7 @@ recipes = {
     {
         name    = "propellant_electrolysis",
         era     = "industrial", -- BL-433
-        group   = "Chemical Works", -- BL-434
+        group   = "Propellant Plant", -- BL-1641: the product building
         inputs  = { water = 3.0, refined_fuel = 1.0 },
         outputs = { propellant = 1.0 },
         air     = "airless",    -- runs only on an airless body (Ben, 2026-10-09)
@@ -155,7 +158,7 @@ recipes = {
     {
         name    = "silicon",
         era     = "industrial", -- BL-433
-        group   = "Electronics", -- BL-434
+        group   = "Silicon Works", -- BL-1641: the product building
         inputs  = { silica = 2.0 },
         outputs = { silicon = 1.0 },
     },
@@ -172,7 +175,7 @@ recipes = {
     {
         name    = "refined_copper",
         era     = "industrial", -- NR-675
-        group   = "Metal Foundry", -- BL-434
+        group   = "Copper Refinery", -- BL-1641: the product building
         inputs  = { copper_ore = 2.0 },
         outputs = { refined_copper = 1.0 },
     },
@@ -181,7 +184,7 @@ recipes = {
     {
         name    = "ree_alloy",
         era     = "industrial", -- BL-433
-        group   = "Electronics", -- BL-434
+        group   = "Rare Earth Refinery", -- BL-1641: the product building
         inputs  = { rare_earth_ore = 2.0 },
         outputs = { ree_alloy = 1.0 },
     },
@@ -201,7 +204,7 @@ recipes = {
     {
         name    = "machinery",
         era     = "industrial", -- BL-433
-        group   = "Advanced Fabrication", -- BL-434
+        group   = "Machine Works", -- BL-1641: the product building
         inputs  = { steel = 1.0, refined_copper = 1.0 },
         outputs = { machinery = 1.0 },
         qualified_workforce = 0.25, -- BL-613: depth-3 fabrication
@@ -211,7 +214,7 @@ recipes = {
     {
         name    = "alloys",
         era     = "industrial", -- BL-433
-        group   = "Advanced Fabrication", -- BL-434
+        group   = "Alloy Works", -- BL-1641: the product building
         inputs  = { steel = 1.0, ree_alloy = 1.0 },
         outputs = { alloys = 1.0 },
         qualified_workforce = 0.25, -- BL-613: depth-3 fabrication
@@ -221,7 +224,8 @@ recipes = {
     {
         name    = "electronics",
         era     = "industrial", -- BL-433
-        group   = "Electronics", -- BL-434
+        group   = "Electronics Lab", -- BL-1641: the product building
+        upgrade_of = "electronics_contact_grade", -- BL-1641: the deeper method, one way
         inputs  = { silicon = 1.0, refined_copper = 1.0, ree_alloy = 0.5 },
         outputs = { electronics = 1.0 },
         qualified_workforce = 0.35, -- BL-613: precision work above plain fabrication
@@ -233,7 +237,7 @@ recipes = {
     {
         name    = "spacecraft_components",
         era     = "industrial", -- BL-433
-        group   = "Advanced Fabrication", -- BL-434
+        group   = "Spacecraft Assembly Plant", -- BL-1641: the product building
         inputs  = { alloys = 2.0, electronics = 1.0 },
         outputs = { spacecraft_components = 1.0 },
         qualified_workforce = 0.50, -- BL-613: the roster's deepest chain terminal
@@ -250,7 +254,7 @@ recipes = {
     {
         name    = "clean_water",
         era     = "industrial", -- BL-433
-        group   = "Welfare Goods", -- BL-434
+        group   = "Water Treatment Plant", -- BL-1641: the product building
         inputs  = { water = 2.0 },
         outputs = { clean_water = 1.0 },
     },
@@ -261,7 +265,7 @@ recipes = {
     {
         name    = "consumer_goods",
         era     = "industrial", -- BL-433
-        group   = "Welfare Goods", -- BL-434
+        group   = "Consumer Goods Factory", -- BL-1641: the product building
         inputs  = { food_rations = 1.0, steel = 1.0 },
         outputs = { consumer_goods = 1.0 },
     },
@@ -274,7 +278,7 @@ recipes = {
     {
         name    = "medical_supplies",
         era     = "industrial", -- BL-433
-        group   = "Welfare Goods", -- BL-434
+        group   = "Pharmaceutical Lab", -- BL-1641: the product building
         inputs  = { water = 1.0, agricultural_produce = 1.0 },
         outputs = { medical_supplies = 1.0 },
         qualified_workforce = 0.30, -- BL-613: pharma is skilled work
@@ -303,7 +307,7 @@ recipes = {
         name         = "charcoal",
         display_name = "Charcoal Burner", -- BL-429 slice 2
         era          = "ancient",
-        group        = "Fuel Production", -- BL-434: fuel/energy, not metal itself; the Bloomery/Smithy's supplier
+        group        = "Charcoal Works", -- BL-1641: the product building
         -- BL-744 (2026-09-02): 3.0 -> 1.5 timber per charcoal. The Peat Kiln
         -- is the cheapest charcoal route and sets the price; at 3.0 timber the
         -- Burner could not cover its fixed cost at the floor (M2).
@@ -317,7 +321,7 @@ recipes = {
         name         = "iron_blooms",
         display_name = "Bloomery", -- BL-429 slice 2
         era          = "ancient",
-        group        = "Metal Foundry", -- BL-434
+        group        = "Bloomery", -- BL-1641: the product building
         inputs       = { iron_ore = 2.0, charcoal = 1.0 },
         outputs      = { iron_blooms = 1.0 },
     },
@@ -330,7 +334,8 @@ recipes = {
         name         = "steel_from_blooms",
         display_name = "Smithy", -- BL-429 slice 2
         era          = "ancient",
-        group        = "Metal Foundry", -- BL-434
+        group        = "Steel Mill", -- BL-1641: the product building
+        upgrade_of   = "steel_bloomery", -- BL-1641: the deeper method, one way
         -- BL-744 (Ben, 2026-09-02, overturning NR-778): the ancient chain to
         -- steel is DEPTH ONE - the Bloomery at the end of this file smelts ore
         -- and timber straight to steel and is the band's anchor route. The
@@ -350,7 +355,7 @@ recipes = {
         name         = "trade_goods",
         display_name = "Potter & Weaver", -- BL-429 slice 2
         era          = "ancient",
-        group        = "Artisan Goods", -- BL-434: shares its terminal good with the Glassworks below
+        group        = "Trade Goods Workshop", -- BL-1641: the product building
         inputs       = { clay = 2.0, timber = 1.0 },
         outputs      = { trade_goods_misc = 1.0 },
     },
@@ -363,7 +368,8 @@ recipes = {
         name         = "food_rations_milled",
         display_name = "Miller", -- BL-429 slice 2
         era          = "ancient",
-        group        = "Food Processing", -- BL-434
+        group        = "Food Processor", -- BL-1641: the product building
+        variant_of   = "food_rations", -- BL-1641: same product, other raws, both ways
         inputs       = { agricultural_produce = 2.0, stone = 1.0 },
         outputs      = { food_rations = 1.0 },
     },
@@ -385,7 +391,8 @@ recipes = {
         name         = "glass",
         display_name = "Glassworks", -- BL-429 slice 2
         era          = "ancient",
-        group        = "Artisan Goods", -- BL-434: second producer of trade_goods_misc, same group as Potter & Weaver
+        group        = "Trade Goods Workshop", -- BL-1641: the product building
+        variant_of   = "trade_goods", -- BL-1641: same product, other raws, both ways
         inputs       = { sand = 2.0 },
         outputs      = { trade_goods_misc = 1.0 },
     },
@@ -398,7 +405,8 @@ recipes = {
         name         = "peat_charcoal",
         display_name = "Peat Kiln", -- BL-429 slice 2
         era          = "ancient",
-        group        = "Fuel Production", -- BL-434: second producer of charcoal, same group as Charcoal Burner
+        group        = "Charcoal Works", -- BL-1641: the product building
+        variant_of   = "charcoal", -- BL-1641: same product, other raws, both ways
         inputs       = { peat = 2.0 },
         outputs      = { charcoal = 1.0 },
     },
@@ -428,7 +436,8 @@ recipes = {
         name         = "spacecraft_components_heavy",
         display_name = "Heavy Assembly Plant",
         era          = "industrial",
-        group        = "Advanced Fabrication", -- same group as id 13
+        group        = "Spacecraft Assembly Plant", -- BL-1641: the product building
+        variant_of   = "spacecraft_components", -- BL-1641: same product, other raws, both ways
         inputs       = { machinery = 2.0, steel = 2.0 },
         outputs      = { spacecraft_components = 1.0 },
         qualified_workforce = 0.40, -- BL-613: below id 13's 0.50 — the crude route needs fewer specialists, a real trade
@@ -449,7 +458,7 @@ recipes = {
         name         = "electronics_contact_grade",
         display_name = "Contact-Grade Electronics Lab",
         era          = "industrial",
-        group        = "Electronics", -- same group as id 12
+        group        = "Electronics Lab", -- BL-1641: the product building
         inputs       = { platinum_group_metals = 0.5 },
         outputs      = { electronics = 1.0 },
         qualified_workforce = 0.35, -- BL-613: same precision tier as id 12
@@ -474,7 +483,8 @@ recipes = {
         name         = "steel_from_regolith",
         display_name = "In-Situ Smelter",
         era          = "industrial",
-        group        = "Metal Foundry", -- same group as ids 0, 4 and 19
+        group        = "Steel Mill", -- BL-1641: the product building
+        variant_of   = "steel", -- BL-1641: same product, other raws, both ways
         -- BL-744 (2026-09-02): 12 -> 8.5 regolith per unit. Regolith rose
         -- 0.6 -> 1.0 so an off-world site pays its lights at the floor
         -- (NR-779), and at 12 units this alternate no longer did (M2).
@@ -506,7 +516,7 @@ recipes = {
     {
         name    = "ordnance",
         era     = "industrial", -- BL-433
-        group   = "Advanced Fabrication", -- BL-434, with machinery and alloys
+        group   = "Ordnance Works", -- BL-1641: the product building
         inputs  = { steel = 1.0, machinery = 1.0 },
         outputs = { ordnance = 1.0 },
         qualified_workforce = 0.25, -- BL-613: same depth tier as machinery/alloys
@@ -520,7 +530,7 @@ recipes = {
     -- it could never make: BL-454's unit upkeep is band-independent (units
     -- exist in both arcs), but ordnance's only producer was industrial-only.
     --
-    -- SAME BUILDING AS id 19 (Smithy, "Metal Foundry" group), not a new one —
+    -- SAME SMITHY AS id 19 by name, now the Ordnance Works product building (BL-1641) —
     -- the task explicitly asks to reuse the roster rather than invent a
     -- fourth ancient metalworking building. The Smithy already turns
     -- iron_blooms + charcoal into steel; this is BL-430's alternate-recipe
@@ -537,7 +547,7 @@ recipes = {
         name    = "ordnance_from_blooms",
         display_name = "Smithy", -- same building as id 19
         era     = "ancient",
-        group   = "Metal Foundry", -- BL-434, with the Bloomery/Smithy steel chain
+        group   = "Ordnance Works", -- BL-1641: the product building
         inputs  = { iron_blooms = 2.0, charcoal = 1.0 },
         outputs = { ordnance = 1.0 },
     },
@@ -568,7 +578,8 @@ recipes = {
         name         = "charcoal_from_kiln",
         display_name = "Coking Kiln",
         era          = "ancient",
-        group        = "Fuel Production", -- BL-434, with the Charcoal Burner and Peat Kiln
+        group        = "Charcoal Works", -- BL-1641: the product building
+        upgrade_of   = "charcoal", -- BL-1641: the deeper method, one way
         -- BL-744 (2026-09-02): timber 1.5 -> 0.8, blooms 0.1 -> 0.05. The kiln
         -- is the deeper charcoal method; at the old quantities its inputs
         -- exceeded the Peat Kiln's price and it failed the floor half (M2).
@@ -587,7 +598,8 @@ recipes = {
         name         = "steel_bessemer",
         display_name = "Bessemer Converter",
         era          = "industrial",
-        group        = "Metal Foundry", -- BL-434, with the Smelter and its siblings
+        group        = "Steel Mill", -- BL-1641: the product building
+        upgrade_of   = "steel", -- BL-1641: the deeper method, one way
         -- BL-744 (2026-09-02): machinery 0.15 -> 0.05 per unit. The converter
         -- saves coal for capital; at 0.15 the capital share alone (8.3 at
         -- machinery's anchored price) exceeded the whole steel price.
@@ -622,7 +634,7 @@ recipes = {
         name         = "ceramics_kiln",
         display_name = "Potter's Kiln",
         era          = "ancient",
-        group        = "Construction Materials", -- BL-434, new group — see PRODUCTION.md
+        group        = "Potter's Kiln", -- BL-1641: the product building
         inputs       = { clay = 2.0 },
         outputs      = { ceramics = 1.0 },
     },
@@ -634,7 +646,7 @@ recipes = {
         name         = "stonemason",
         display_name = "Stonemason",
         era          = "ancient",
-        group        = "Construction Materials", -- BL-434, with the Kiln above
+        group        = "Stonemason", -- BL-1641: the product building
         inputs       = { stone = 2.0 },
         outputs      = { dressed_stone = 1.0 },
     },
@@ -648,7 +660,7 @@ recipes = {
         name         = "sawmill",
         display_name = "Sawmill",
         era          = "ancient",
-        group        = "Construction Materials", -- BL-434, with the Kiln and Stonemason
+        group        = "Sawmill", -- BL-1641: the product building
         inputs       = { timber = 2.0 },
         outputs      = { planks = 1.0 },
     },
@@ -666,7 +678,7 @@ recipes = {
         name         = "toolmaker",
         display_name = "Toolmaker",
         era          = "ancient",
-        group        = "Metal Foundry", -- BL-434, with the Bloomery/Smithy chain — its deepest member
+        group        = "Toolmaker", -- BL-1641: the product building
         inputs       = { iron_blooms = 1.5, planks = 1.0 },
         outputs      = { tools = 1.0 },
     },
@@ -692,7 +704,7 @@ recipes = {
         name         = "tannery",
         display_name = "Tannery",
         era          = "ancient",
-        group        = "Artisan Goods", -- BL-434, with the Potter & Weaver and Glassworks
+        group        = "Tannery", -- BL-1641: the product building
         inputs       = { hides = 2.0 },
         outputs      = { leather = 1.0 },
     },
@@ -704,7 +716,7 @@ recipes = {
         name         = "weaver",
         display_name = "Weaver",
         era          = "ancient",
-        group        = "Artisan Goods", -- BL-434, with the Tannery above
+        group        = "Weaver", -- BL-1641: the product building
         inputs       = { fibre = 2.0 },
         outputs      = { cloth = 1.0 },
     },
@@ -722,7 +734,7 @@ recipes = {
         name         = "shipwright",
         display_name = "Shipwright",
         era          = "ancient",
-        group        = "Advanced Fabrication", -- BL-434 — new to the ancient roster (already used by the industrial machinery/alloys/spacecraft_components chain)
+        group        = "Shipwright", -- BL-1641: the product building
         inputs       = { planks = 1.5, cloth = 1.0 },
         outputs      = { rigging = 1.0 },
     },
@@ -779,7 +791,7 @@ recipes = {
         name         = "oil_power_plant",
         display_name = "Oil-Fired Power Plant",
         era          = "industrial",
-        group        = "Power Generation", -- BL-434: a sub-facility kind of its own, so the Build door reads it as a distinct plant
+        group        = "Power Plant", -- BL-1641: the product building
         inputs       = { petroleum = 1.0 },
         outputs      = { power = 3.5 },
     },
@@ -788,7 +800,8 @@ recipes = {
         name         = "coal_power_plant",
         display_name = "Coal-Fired Power Plant",
         era          = "industrial",
-        group        = "Power Generation", -- BL-434, with the oil route above
+        group        = "Power Plant", -- BL-1641: the product building
+        variant_of   = "oil_power_plant", -- BL-1641: same product, other raws, both ways
         inputs       = { coal = 1.5 },
         outputs      = { power = 3.0 },
     },
@@ -829,7 +842,7 @@ recipes = {
         name         = "steel_bloomery",
         display_name = "Bloomery Furnace",
         era          = "ancient",
-        group        = "Metal Foundry",
+        group        = "Steel Mill", -- BL-1641: the product building
         inputs       = { iron_ore = 2.0, timber = 1.5 },
         outputs      = { steel = 1.0 },
         centre_proximity_radius = 6, -- the heavy processor class, as the steel recipe
@@ -856,45 +869,45 @@ recipes = {
     -- unit draws it, so generation charters no Arms Works on its own.
     {
         name         = "small_arms",
-        display_name = "Arms Works (small arms)",
+        display_name = "Small Arms Works",
         era          = "industrial",
-        group        = "Arms Works",
+        group        = "Small Arms Works", -- BL-1641: the product building
         inputs       = { steel = 1.0, machinery = 0.5 },
         outputs      = { small_arms = 1.0 },
         qualified_workforce = 0.25,
     },
     {
         name         = "armoured_vehicles",
-        display_name = "Arms Works (armoured vehicles)",
+        display_name = "Armoured Vehicle Works",
         era          = "industrial",
-        group        = "Arms Works",
+        group        = "Armoured Vehicle Works", -- BL-1641: the product building
         inputs       = { steel = 2.0, machinery = 1.0, alloys = 1.0 },
         outputs      = { armoured_vehicles = 1.0 },
         qualified_workforce = 0.25,
     },
     {
         name         = "artillery_pieces",
-        display_name = "Arms Works (artillery pieces)",
+        display_name = "Artillery Works",
         era          = "industrial",
-        group        = "Arms Works",
+        group        = "Artillery Works", -- BL-1641: the product building
         inputs       = { steel = 2.0, machinery = 1.0 },
         outputs      = { artillery_pieces = 1.0 },
         qualified_workforce = 0.25,
     },
     {
         name         = "guided_weapons",
-        display_name = "Arms Works (guided weapons)",
+        display_name = "Guided Weapons Works",
         era          = "industrial",
-        group        = "Arms Works",
+        group        = "Guided Weapons Works", -- BL-1641: the product building
         inputs       = { electronics = 1.0, ordnance = 0.5 },
         outputs      = { guided_weapons = 1.0 },
         qualified_workforce = 0.25,
     },
     {
         name         = "drones",
-        display_name = "Arms Works (drones)",
+        display_name = "Drone Works",
         era          = "industrial",
-        group        = "Arms Works",
+        group        = "Drone Works", -- BL-1641: the product building
         inputs       = { electronics = 1.0, alloys = 0.5 },
         outputs      = { drones = 1.0 },
         qualified_workforce = 0.25,
@@ -905,9 +918,9 @@ recipes = {
     -- APPENDED, as the five before it; same Arms Works group and tier.
     {
         name         = "airframes",
-        display_name = "Arms Works (airframes)",
+        display_name = "Airframe Works",
         era          = "industrial",
-        group        = "Arms Works",
+        group        = "Airframe Works", -- BL-1641: the product building
         inputs       = { alloys = 1.0, machinery = 0.5, electronics = 0.5 },
         outputs      = { airframes = 1.0 },
         qualified_workforce = 0.25,
@@ -929,7 +942,8 @@ recipes = {
         name         = "wind_turbine",
         display_name = "Wind Turbine",
         era          = "industrial",
-        group        = "Power Generation",
+        group        = "Power Plant", -- BL-1641: the product building
+        variant_of   = "oil_power_plant", -- BL-1641: same product, other raws, both ways
         outputs      = { power = 2.0 },
         research_opened = true,
     },
@@ -939,9 +953,9 @@ recipes = {
     -- id is its index, and the turbine was on main first); same Arms Works group and tier.
     {
         name         = "ship_hulls",
-        display_name = "Arms Works (ship hulls)",
+        display_name = "Hull Works",
         era          = "industrial",
-        group        = "Arms Works",
+        group        = "Hull Works", -- BL-1641: the product building
         inputs       = { steel = 1.0, alloys = 0.5, machinery = 0.5 },
         outputs      = { ship_hulls = 1.0 },
         qualified_workforce = 0.25,

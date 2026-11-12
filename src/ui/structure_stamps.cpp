@@ -1620,20 +1620,40 @@ extraction_family family_of_target(resource_type t)
 
 processing_family family_of_group(const std::string& g)
 {
+    // ONE BUILDING PER PRODUCT (Ben, 2026-11-11): `g` names a product building now,
+    // and each takes the form of the family it always stood in - a Copper Refinery is
+    // a foundry, an Electronics Lab is electronics. The Arms Works goods keep the
+    // general form they had as one Arms Works.
     struct row { const char* name; processing_family f; };
     static constexpr row rows[] = {
-        { "Metal Foundry",          processing_family::metal_foundry },
-        { "Fuel Production",        processing_family::fuel_production },
-        { "Construction Materials", processing_family::construction_materials },
-        { "Construction",           processing_family::construction },
-        { "Artisan Goods",          processing_family::artisan_goods },
-        { "Food Processing",        processing_family::food_processing },
-        { "Chemical Works",         processing_family::chemical_works },
-        { "Refinery",               processing_family::refinery },
-        { "Power Generation",       processing_family::power_generation },
-        { "Electronics",            processing_family::electronics },
-        { "Advanced Fabrication",   processing_family::advanced_fabrication },
-        { "Welfare Goods",          processing_family::welfare_goods },
+        { "Steel Mill",                processing_family::metal_foundry },
+        { "Copper Refinery",           processing_family::metal_foundry },
+        { "Bloomery",                  processing_family::metal_foundry },
+        { "Toolmaker",                 processing_family::metal_foundry },
+        { "Charcoal Works",            processing_family::fuel_production },
+        { "Potter's Kiln",             processing_family::construction_materials },
+        { "Stonemason",                processing_family::construction_materials },
+        { "Sawmill",                   processing_family::construction_materials },
+        { "Construction",              processing_family::construction },
+        { "Trade Goods Workshop",      processing_family::artisan_goods },
+        { "Tannery",                   processing_family::artisan_goods },
+        { "Weaver",                    processing_family::artisan_goods },
+        { "Food Processor",            processing_family::food_processing },
+        { "Hydroponics Bay",           processing_family::food_processing },
+        { "Propellant Plant",          processing_family::chemical_works },
+        { "Fuel Refinery",             processing_family::refinery },
+        { "Power Plant",               processing_family::power_generation },
+        { "Silicon Works",             processing_family::electronics },
+        { "Rare Earth Refinery",       processing_family::electronics },
+        { "Electronics Lab",           processing_family::electronics },
+        { "Machine Works",             processing_family::advanced_fabrication },
+        { "Alloy Works",               processing_family::advanced_fabrication },
+        { "Spacecraft Assembly Plant", processing_family::advanced_fabrication },
+        { "Ordnance Works",            processing_family::advanced_fabrication },
+        { "Shipwright",                processing_family::advanced_fabrication },
+        { "Water Treatment Plant",     processing_family::welfare_goods },
+        { "Consumer Goods Factory",    processing_family::welfare_goods },
+        { "Pharmaceutical Lab",        processing_family::welfare_goods },
     };
     for (const row& r : rows)
         if (g == r.name)
@@ -1785,23 +1805,31 @@ void extract_installations(const world& w, entity_id body, const recipe_registry
         std::size_t e = a;
         while (e < recs.size() && recs[e].tile == recs[a].tile)
             ++e;
-        struct stk { building_type type; resource_type target; const building_component* rep; bool all_building; };
+        struct stk { building_type type; resource_type target; const std::string* product;
+                     const building_component* rep; bool all_building; };
         std::vector<stk> stacks;
         for (std::size_t k = a; k < e; ++k)
         {
             const building_component& bc = *recs[k].b;
-            // stack_members' grouping: (type, target), target only for extraction.
+            // stack_members' grouping: (type, target), target only for extraction -
+            // and, ONE BUILDING PER PRODUCT (Ben, 2026-11-11), a processing stack is
+            // one product: a Steel Mill and a Copper Refinery on one tile stand as two
+            // structures, each its own form, never folded into the oldest one's.
             const bool ext = bc.type == building_type::extraction_site;
+            const recipe* prc = (bc.type == building_type::processing_facility && reg)
+                                    ? reg->get_recipe(bc.recipe) : nullptr;
+            const std::string* product = prc ? &prc->group : nullptr;
             bool found = false;
             for (stk& st : stacks)
-                if (st.type == bc.type && (!ext || st.target == bc.target_resource))
+                if (st.type == bc.type && (!ext || st.target == bc.target_resource)
+                    && (st.product == product || (st.product && product && *st.product == *product)))
                 {
                     st.all_building = st.all_building && bc.ticks_remaining > 0;
                     found = true;
                     break;
                 }
             if (!found)
-                stacks.push_back({ bc.type, bc.target_resource, &bc, bc.ticks_remaining > 0 });
+                stacks.push_back({ bc.type, bc.target_resource, product, &bc, bc.ticks_remaining > 0 });
         }
         tile_installation& ti = s.inst.list[slot_of(recs[a].tile)];
         ti.n_stacks = static_cast<std::uint8_t>(

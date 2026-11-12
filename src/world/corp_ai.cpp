@@ -4633,6 +4633,10 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                 // (NR-266), so this remains an over-estimate; the INPUT ACCESS
                 // gate below (BL-1187) is the guard against the worst of it.
                 //
+                // ONE BUILDING PER PRODUCT (Ben, 2026-11-11): `group` now names the
+                // product building ("Steel Mill", "Power Plant"), so "per group" is
+                // the best METHOD per PRODUCT - one candidate a product.
+                //
                 // BL-712: the best is kept PER GROUP, not once. A single argmax
                 // over net margin is a category exclusion rather than a ranking
                 // (AI_OPPONENT.md § Selection must be scale-free): margins span
@@ -4647,7 +4651,7 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                 // std::map, so the emission order below is the group's collation
                 // order rather than registry-walk order — a function of the
                 // roster, not of iteration.
-                std::map<std::string, std::pair<uint16_t, float>> group_best;
+                std::map<std::string, std::pair<uint16_t, float>> product_best;
                 for (int i = 0; i < n_recipes; ++i)
                 {
                     const recipe&  rc  = reg.play_recipe_at(building_type::processing_facility, i);
@@ -4672,6 +4676,14 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                     // The body's air (Ben, 2026-10-09): construct_building refuses
                     // a propellant route the body cannot run.
                     if (!recipe_runs_at_tile(w, *abs, tile))
+                        continue;
+                    // ONE METHOD PER STACK (Ben, 2026-11-11; PRODUCTION.md § One
+                    // building per product): where this tile already stands the
+                    // product on another method, the build door would seat the new
+                    // building on the stack's method, so this method is never what
+                    // gets built here. Only the stack's own method is priced.
+                    if (const std::uint16_t sm = product_stack_method(w, reg, tile, abs->group);
+                        sm != no_recipe && sm != rid)
                         continue;
                     // BL-1485: a generator only where its grid is short (above).
                     // Inside the argmax, as the forecast veto is (BL-1227), so a
@@ -4801,10 +4813,10 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                             continue;
                     }
                     const float n = bp.net();
-                    auto  slot = group_best.find(abs->group);
-                    if (slot == group_best.end())
+                    auto  slot = product_best.find(abs->group);
+                    if (slot == product_best.end())
                     {
-                        group_best.emplace(abs->group, std::make_pair(rid, n));
+                        product_best.emplace(abs->group, std::make_pair(rid, n));
                         continue;
                     }
                     // Same tie-break as the single argmax had, now applied
@@ -4813,7 +4825,7 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                         || (n == slot->second.second && rid < slot->second.first))
                         slot->second = std::make_pair(rid, n);
                 }
-                if (group_best.empty())
+                if (product_best.empty())
                     continue; // nothing this corp can reach, run and profit from
 
                 // ONE candidate per group, scored on the same curve as the
@@ -4824,7 +4836,7 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                 // still run AFTER the pick: a group whose winner fails either
                 // yields no candidate this evaluation, rather than falling
                 // through to its runner-up.
-                for (const auto& [grp, pick] : group_best)
+                for (const auto& [grp, pick] : product_best)
                 {
                     (void)grp; // the key is the category; the pick is what to build
                     const uint16_t best_recipe = pick.first;
@@ -5364,6 +5376,18 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
             // see NEEDS_REVIEW.json.
             const recipe* cur_rc = (b.type == building_type::processing_facility && b.recipe != no_recipe)
                                        ? reg.get_recipe(b.recipe) : nullptr;
+            // ONE METHOD PER STACK (Ben, 2026-11-11; PRODUCTION.md § One building per
+            // product): a method change is the whole stack's, so the stack proposes it
+            // once - from its OLDEST member - and its gain and its cost are the
+            // stack's, every member's at once (the seam charges per building).
+            std::size_t stack_n = 1;
+            if (cur_rc != nullptr)
+            {
+                const std::vector<entity_id> mates = product_stack_members(w, reg, b.tile, cur_rc->group);
+                if (!mates.empty() && mates.front() != bid)
+                    cur_rc = nullptr; // a later member: the oldest speaks for the stack
+                stack_n = std::max<std::size_t>(1, mates.size());
+            }
             if (cur_rc != nullptr)
             {
                 // BL-1187 (build only what runs): every margin in this chase is
@@ -5431,6 +5455,12 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                     // one, above.
                     if (rc.group != cur_rc->group)
                         continue;
+                    // ONE BUILDING PER PRODUCT (Ben, 2026-11-11): and within the
+                    // building, only a legal STEP - a variant, or the upgrade of the
+                    // running method; never the way back down an upgrade, which the
+                    // seam refuses as `one_way`.
+                    if (reg.method_step_between(b.recipe, rid) == method_step::none)
+                        continue;
                     // BL-1401: no strategic-sector limit on a nation's retool —
                     // BL-1399 retired it at the seam (Ben, 2026-10-23), so the
                     // scorer no longer predicts a refusal that cannot happen.
@@ -5457,7 +5487,9 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                     // BL-1206 review: the gain is judged at the same staffing the
                     // gate judged the inputs at (judged_batches).
                     const float batches = sw_batches;
-                    const float gain    = (best_m - cur_margin) * batches;
+                    // The whole stack moves (one method per stack), so the gain is
+                    // every member's.
+                    const float gain    = (best_m - cur_margin) * batches * static_cast<float>(stack_n);
                     if (gain > margin_gate)
                     {
                         candidate c;
@@ -5466,8 +5498,13 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                         c.cmd.recipe = best_id;
                         // BL-1296 fix round: a state retool's switch cost is
                         // the TREASURY's spend, gated against it below.
+                        // Per building of the stack: the variant's switch cost or
+                        // the upgrade's, as try_switch_recipe charges it.
                         if (dial_nation != null_entity)
-                            c.spend = reg.recipe_switch().switch_cost;
+                            c.spend = static_cast<float>(stack_n)
+                                    * (reg.method_step_between(b.recipe, best_id) == method_step::upgrade
+                                           ? reg.recipe_switch().upgrade_cost
+                                           : reg.recipe_switch().switch_cost);
                         c.score = gain * jitter;
                         c.reason = corp_decision_reason::dial_recipe;
                         c.bucket = bucket_for_reason(c.reason);

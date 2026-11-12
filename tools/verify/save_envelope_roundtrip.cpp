@@ -972,6 +972,25 @@ int main()
     }
 
     // -----------------------------------------------------------------------
+    // S9p -- BL-1641 (one building per product, world v94): the game refuses a save
+    // whose world predates the split, and says why; today's save carries no reason.
+    // The reader itself still reads the older layouts (the rows around this one).
+    // -----------------------------------------------------------------------
+    {
+        static_assert(k_world_save_version_one_product == 94 && world_save_version >= 94,
+                      "S9p pins v94 as the first world after one building per product");
+        world w = make_world();
+        const save_envelope env = make_envelope();
+        check(write_save_game_at(k_path, w, env, save_game_version_stacked)
+                  && !save_game_refusal_reason(k_path).empty(),
+              "S9p a v29 save (its world v89, before the split) carries the game's refusal reason");
+        check(write_save_game(k_path, w, env) && save_game_refusal_reason(k_path).empty(),
+              "S9p today's save carries none");
+        check(save_game_refusal_reason(std::string(k_path) + ".missing").empty(),
+              "S9p a missing file carries none (the read refuses it on its own terms)");
+    }
+
+    // -----------------------------------------------------------------------
     // S9b -- BL-1422 (save_game_version 24): a GENUINELY NARROW v23 envelope, its
     // bodies' planetology endowments and its market history 49 wide, reads whole: the
     // first 49 slots as written, the five kit goods 0 / empty, and every field after

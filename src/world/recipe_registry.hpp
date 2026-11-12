@@ -91,16 +91,27 @@ struct recipe
     /// always carries a legible label without requiring one to be authored.
     std::string display_name;
 
-    /// BL-434: which sub-facility KIND this recipe belongs to — "Metal Foundry",
-    /// "Food Processing", etc. — so the generic processing_facility building type
-    /// can be presented (Build door) and gated (recipe-switch cost) as if it were
-    /// several distinct facility kinds, without adding new building_type enum
-    /// values. Authored as `group = "..."` in recipes.lua, same optional-field
-    /// pattern as `era`/`display_name`; absent means the literal "General" — a
-    /// real, if catch-all, group name (not empty string) so every recipe always
-    /// has SOME group to compare against in the cross-group-switch cost check
-    /// (economy_system.cpp's try_switch_recipe) without a special empty-string case.
+    /// THE PRODUCT BUILDING this recipe is a method of (Ben, 2026-11-11, BL-1641;
+    /// PRODUCTION.md § One building per product): "Steel Mill", "Copper Refinery".
+    /// Every processing building makes one product, and every recipe whose primary
+    /// output is that product shares this name — the loader refuses a group whose
+    /// recipes make two different goods. It is the building's identity: the Build
+    /// door's row, the card's title, the map stamp's form, the stack key, and the
+    /// research scope `group:<name>`. A recipe is a METHOD of the building, never a
+    /// way to make something else. Authored as `group = "..."` in recipes.lua;
+    /// absent means the literal "General" (a hand-built harness registry's one
+    /// building), so every recipe always has a building to compare against.
     std::string group = "General";
+
+    /// How this method relates to the building's other methods (Ben, 2026-11-11;
+    /// PRODUCTION.md § Upgrades and variants). Authored as `upgrade_of = "<recipe>"`
+    /// or `variant_of = "<recipe>"`, naming a recipe of the same building; empty =
+    /// the building's root method. A VARIANT draws different raws at the same depth
+    /// and switches both ways at the switch cost; an UPGRADE is the deeper route
+    /// needing a good the other does not, paid in place, one way. Read through
+    /// `recipe_registry::method_step`.
+    std::string variant_of;
+    std::string upgrade_of;
 
     /// BL-615: per-recipe stratum-gate radius — this NAMED processing building
     /// must stand within this grid distance of a population centre (the heavy
@@ -112,7 +123,7 @@ struct recipe
     /// non-zero — see `placement_gate_for`.
     int centre_proximity_radius = 0;
     /// Propellant routes follow the body's air (Ben, 2026-10-09; PRODUCTION.md
-    /// § Chemical Plant, "And it runs only there"): which bodies this recipe may
+    /// § Propellant Plant, "And it runs only there"): which bodies this recipe may
     /// run on. Authored as `air = "atmosphere"` or `air = "airless"` in
     /// recipes.lua; absent means `any`. Read through `recipe_runs_on_body`, the
     /// one predicate every door asks.
@@ -157,8 +168,41 @@ struct recipe
     bool research_opened = false;
 };
 
+/// What moving a processing building between two of its methods is (Ben,
+/// 2026-11-11; PRODUCTION.md § Upgrades and variants). `recipe_registry::
+/// method_step_between` answers it.
+enum class method_step : uint8_t
+{
+    none,    ///< Not a legal step: another product, the way back down, or no change.
+    variant, ///< Different raws at the same depth: both ways, at the switch cost.
+    upgrade, ///< The deeper route needing a good the other does not: one way, paid in place.
+};
+
+/// One building per product: the processing buildings on @p tile that make the
+/// product @p group names (the building's `recipe::group`), ascending id —
+/// every stage, decommissioned and under construction included, the population
+/// the placement caps count. @p except is left out (a building asking about the
+/// stack it is joining). A building whose recipe is unset is in no product's
+/// stack. Defined in construction.cpp (a Lua-free TU).
+struct world;
+class recipe_registry;
+std::vector<entity_id> product_stack_members(const world& w, const recipe_registry& reg,
+                                             entity_id tile, const std::string& group,
+                                             entity_id except = null_entity);
+/// The method the product stack on @p tile runs — its oldest member's recipe — or
+/// `no_recipe` where no building of that product stands. Every building joining
+/// the stack takes it (one method per stack). construction.cpp.
+std::uint16_t product_stack_method(const world& w, const recipe_registry& reg,
+                                   entity_id tile, const std::string& group,
+                                   entity_id except = null_entity);
+/// Make every product stack run one method: each member takes its oldest member's
+/// recipe. Generation's last word on the rule (finish_campaign_world, after the
+/// fold), so no pass that wrote a recipe can leave a mixed stack. Returns the
+/// buildings re-set. Deterministic (ascending ids). construction.cpp.
+int unify_product_stack_methods(world& w, const recipe_registry& reg);
+
 /// THE ONE PREDICATE every door asks of a recipe's air (Ben, 2026-10-09;
-/// PRODUCTION.md § Chemical Plant, "And it runs only there"): may @p rc run on
+/// PRODUCTION.md § Propellant Plant, "And it runs only there"): may @p rc run on
 /// body @p b? `propellant_electrolysis` only where `atmosphere_is_airless`,
 /// `propellant_atmospheric` only where it is not; every other recipe anywhere.
 /// Asked by construct_building, try_switch_recipe (the set_recipe seam and the
@@ -815,6 +859,11 @@ struct recipe_switch_params
     /// through this seam. 0 = no cooldown (pre-BL-430 behaviour).
     int cooldown_ticks = 0;
 
+    /// One building per product (Ben, 2026-11-11): the credit cost, per building of
+    /// the stack, of taking an UPGRADE in place. A variant switch pays `switch_cost`
+    /// per building. 0 = free, the hand-built-registry default.
+    float upgrade_cost = 0.0f;
+
     // BL-434 added a `cross_group_multiplier` here (a steep price tier on a
     // cross-group retool) and it was removed again minutes later in the same
     // session: Ben reconsidered and cross-group switching is now REFUSED
@@ -1121,6 +1170,26 @@ public:
             if (m_recipes[i].group == group)
                 return static_cast<uint16_t>(i);
         return no_recipe;
+    }
+
+    /// One building per product (Ben, 2026-11-11; PRODUCTION.md § Upgrades and
+    /// variants): what moving a building from method @p from to method @p to is.
+    /// `upgrade` when @p to names @p from as the method it upgrades (one way);
+    /// `variant` when both are methods of the same building and neither is an
+    /// upgrade (both ways); `none` otherwise — another building's method, the step
+    /// back down from an upgrade, a retired slot, or the same method. Pure data.
+    method_step method_step_between(uint16_t from, uint16_t to) const
+    {
+        const recipe* a = get_recipe(from);
+        const recipe* b = get_recipe(to);
+        if (a == nullptr || b == nullptr || from == to || a->retired || b->retired
+            || a->group != b->group)
+            return method_step::none;
+        if (!b->upgrade_of.empty())
+            return b->upgrade_of == a->name ? method_step::upgrade : method_step::none;
+        if (!a->upgrade_of.empty())
+            return method_step::none; // an upgrade goes one way
+        return method_step::variant;
     }
 
     /// Economy constants for a building type.

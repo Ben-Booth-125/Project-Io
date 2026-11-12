@@ -204,7 +204,7 @@ void run_mechanism_checks()
     }
 
     // S7 — propellant routes follow the body's air (Ben, 2026-10-09;
-    // PRODUCTION.md § Chemical Plant). Two same-group routes, one `airless`, one
+    // PRODUCTION.md § Propellant Plant). Two same-group routes, one `airless`, one
     // `atmosphere`. On an airless body the retool onto the atmosphere route is
     // refused at the seam (`wrong_air`) and the player's set_recipe carries the
     // reason (`rejected_wrong_air`), mutating nothing; under air it applies.
@@ -237,6 +237,90 @@ void run_mechanism_checks()
         check(apply_corp_command(w, reg, cmd) == corp_command_result::applied
                   && w.buildings.at(bld7).recipe == idA,
               "S7d under air the same set_recipe applies");
+    }
+
+    // S8 — ONE BUILDING PER PRODUCT (Ben, 2026-11-11; PRODUCTION.md § One building per
+    // product). One "Test Mill" with a root, a variant of it and an upgrade of it, two
+    // buildings stacked on one tile. A variant moves the whole stack both ways at
+    // switch_cost per building; the upgrade moves it one way at upgrade_cost per
+    // building; the way back down is `one_way`; nothing moves a building onto another
+    // product; and a mixed stack is unified onto its oldest member's method.
+    {
+        recipe rr; rr.name = "mill_root";    rr.group = "Test Mill";
+        rr.outputs[static_cast<std::size_t>(resource_type::steel)] = 1.0f;
+        recipe rv; rv.name = "mill_variant"; rv.group = "Test Mill"; rv.variant_of = "mill_root";
+        rv.outputs[static_cast<std::size_t>(resource_type::steel)] = 1.0f;
+        recipe ru; ru.name = "mill_upgrade"; ru.group = "Test Mill"; ru.upgrade_of = "mill_root";
+        ru.outputs[static_cast<std::size_t>(resource_type::steel)] = 1.0f;
+        const uint16_t idR = reg.add_recipe(rr);
+        const uint16_t idV = reg.add_recipe(rv);
+        const uint16_t idU = reg.add_recipe(ru);
+
+        check(reg.method_step_between(idR, idV) == method_step::variant
+                  && reg.method_step_between(idV, idR) == method_step::variant
+                  && reg.method_step_between(idR, idU) == method_step::upgrade
+                  && reg.method_step_between(idU, idR) == method_step::none
+                  && reg.method_step_between(idV, idU) == method_step::none
+                  && reg.method_step_between(idR, idR) == method_step::none,
+              "S8a method_step_between: root<->variant both ways, root->upgrade one way, nothing out of the upgrade");
+
+        recipe_switch_params sw8 = sw;
+        sw8.upgrade_cost = 40.0f;
+        reg.set_recipe_switch(sw8);
+
+        const entity_id m1 = make_processor(w, body, idR);
+        const entity_id tile8 = w.buildings.at(m1).tile;
+        const entity_id m2 = w.create_entity();
+        { building_component b{}; b.tile = tile8; b.type = building_type::processing_facility; b.recipe = idR;
+          w.buildings[m2] = b; }
+        w.nations[corp].state_assets.push_back(m1);
+        w.nations[corp].state_assets.push_back(m2);
+        w.nations[corp].treasury = 1000.0f;
+
+        check(product_stack_members(w, reg, tile8, "Test Mill").size() == 2
+                  && product_stack_method(w, reg, tile8, "Test Mill") == idR,
+              "S8b the two mills are one product stack, on the root method");
+
+        const recipe_switch_result rv8 = try_switch_recipe(w, reg, corp, w.buildings.at(m2), idV);
+        check(rv8 == recipe_switch_result::applied && w.buildings.at(m1).recipe == idV
+                  && w.buildings.at(m2).recipe == idV,
+              "S8c a variant switch pressed on the NEWER member moves the whole stack");
+        check(w.nations[corp].treasury == 1000.0f - 2.0f * sw8.switch_cost
+                  && w.buildings.at(m1).recipe_switch_cooldown == sw8.cooldown_ticks
+                  && w.buildings.at(m2).recipe_switch_cooldown == sw8.cooldown_ticks,
+              "S8d ...charged switch_cost per building, every member on cooldown");
+
+        w.buildings.at(m1).recipe_switch_cooldown = 0; // one member still retooling
+        check(try_switch_recipe(w, reg, corp, w.buildings.at(m1), idR) == recipe_switch_result::on_cooldown
+                  && w.buildings.at(m1).recipe == idV,
+              "S8e a step while ANY member is retooling is refused, and nothing moves");
+        w.buildings.at(m2).recipe_switch_cooldown = 0;
+
+        check(try_switch_recipe(w, reg, corp, w.buildings.at(m1), idU) == recipe_switch_result::one_way
+                  && w.buildings.at(m1).recipe == idV,
+              "S8f the upgrade is reached only from the method it names (variant -> upgrade is refused)");
+
+        check(try_switch_recipe(w, reg, corp, w.buildings.at(m1), idR) == recipe_switch_result::applied,
+              "S8g the variant switches back (both ways)");
+        w.buildings.at(m1).recipe_switch_cooldown = 0;
+        w.buildings.at(m2).recipe_switch_cooldown = 0;
+        const float before_up = w.nations[corp].treasury;
+        check(try_switch_recipe(w, reg, corp, w.buildings.at(m1), idU) == recipe_switch_result::applied
+                  && w.buildings.at(m1).recipe == idU && w.buildings.at(m2).recipe == idU
+                  && w.nations[corp].treasury == before_up - 2.0f * sw8.upgrade_cost,
+              "S8h the upgrade moves the whole stack at upgrade_cost per building");
+        w.buildings.at(m1).recipe_switch_cooldown = 0;
+        w.buildings.at(m2).recipe_switch_cooldown = 0;
+        const float before_down = w.nations[corp].treasury;
+        check(try_switch_recipe(w, reg, corp, w.buildings.at(m1), idR) == recipe_switch_result::one_way
+                  && w.buildings.at(m1).recipe == idU && w.nations[corp].treasury == before_down,
+              "S8i the way back down an upgrade is one_way, and mutates nothing");
+
+        // A mixed stack (as a pre-split world could hold) is unified onto its oldest.
+        w.buildings.at(m2).recipe = idV;
+        check(unify_product_stack_methods(w, reg) >= 1 && w.buildings.at(m2).recipe == idU,
+              "S8j unify_product_stack_methods sets every member to its oldest member's method");
+        reg.set_recipe_switch(sw);
     }
 }
 

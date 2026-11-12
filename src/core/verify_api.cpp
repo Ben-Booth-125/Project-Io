@@ -7431,6 +7431,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             case recipe_switch_result::cross_group:        return "cross_group";
             case recipe_switch_result::tech_locked:        return "tech_locked";
             case recipe_switch_result::wrong_air:          return "wrong_air";
+            case recipe_switch_result::one_way:            return "one_way";
         }
         return "invalid";
     });
@@ -9167,7 +9168,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     // ordinary building_component (owned, stockpiled, in its corp's assets).
     //
     //   kind    "extraction" (detail = target resource name), "processing"
-    //           (detail = recipe GROUP, e.g. "Metal Foundry"; the first recipe
+    //           (detail = recipe GROUP - the product building, e.g. "Steel Mill"; the first recipe
     //           in that group), "port", "launchpad", "logistics_hub",
     //           "military_base", "research_institute", "schooling", "university".
     //   rival   owned by the lowest-id non-player corporation, else the player.
@@ -9642,17 +9643,17 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             { "extraction", "timber", false, false },     { "extraction", "agricultural_produce", false, false },
             { "extraction", "coffee", false, false },     { "extraction", "peat", false, false },
             { "extraction", "furs", false, false },
-            { "processing", "Metal Foundry", false, false },          { "processing", "Fuel Production", false, false },
-            { "processing", "Construction Materials", false, false }, { "processing", "Construction", false, false },
-            { "processing", "Artisan Goods", false, false },          { "processing", "Food Processing", false, false },
-            { "processing", "Chemical Works", false, false },         { "processing", "Refinery", false, false },
-            { "processing", "Power Generation", false, false },       { "processing", "Electronics", false, false },
-            { "processing", "Advanced Fabrication", false, false },   { "processing", "Welfare Goods", false, false },
+            { "processing", "Steel Mill", false, false },          { "processing", "Charcoal Works", false, false },
+            { "processing", "Sawmill", false, false }, { "processing", "Construction", false, false },
+            { "processing", "Trade Goods Workshop", false, false },          { "processing", "Food Processor", false, false },
+            { "processing", "Propellant Plant", false, false },         { "processing", "Fuel Refinery", false, false },
+            { "processing", "Power Plant", false, false },       { "processing", "Electronics Lab", false, false },
+            { "processing", "Machine Works", false, false },   { "processing", "Water Treatment Plant", false, false },
             { "launchpad", "", false, false },          { "logistics_hub", "", false, false },
             { "military_base", "", false, false },      { "research_institute", "", false, false },
             { "schooling", "", false, false },          { "university", "", false, false },
-            { "processing", "Metal Foundry", false, true },   // a construction site
-            { "processing", "Refinery", true, false },        // a rival plant
+            { "processing", "Steel Mill", false, true },   // a construction site
+            { "processing", "Fuel Refinery", true, false },        // a rival plant
         };
         int staged = 0;
         if (const cand* c = take(true))
@@ -9672,7 +9673,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         {
             staged += stage_one(c->id, "extraction", "iron_ore", false, false) != null_entity;
             staged += stage_one(c->id, "extraction", "iron_ore", false, false) != null_entity;
-            staged += stage_one(c->id, "processing", "Metal Foundry", false, false) != null_entity;
+            staged += stage_one(c->id, "processing", "Steel Mill", false, false) != null_entity;
             staged += stage_one(c->id, "logistics_hub", "", false, false) != null_entity;
             staged += stage_one(c->id, "extraction", "coal", true, false) != null_entity;
             out["stack_col"] = c->c;
