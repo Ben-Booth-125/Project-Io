@@ -6169,6 +6169,13 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     // of the chosen recipe). Keys on tile like the panel does (buildings key on their
     // own id; the panel scans for tile == selection). Returns the recipe name applied,
     // or "" if the tile has no building. Non-economic — the next econ_step honours it.
+    // ONE BUILDING PER PRODUCT (BL-1641): only the building's own methods, and only a
+    // legal step from the running one (`method_step_between`: a variant, or the
+    // running method's upgrade) - another product, the way down an upgrade or an
+    // unrelated method is REFUSED ("" back, nothing written) - and the step is written
+    // to every building of the product stack on the tile, so a fixture can never
+    // change what a building makes or leave a mixed stack. The same method is a no-op
+    // that answers its name. Free and instant, unlike the seam (no cost, no cooldown).
     v.set_function("set_building_recipe", [this](unsigned tile_u, int index) -> std::string {
         const entity_id tile = static_cast<entity_id>(tile_u);
         for (auto& [bid, b] : m_world.buildings)
@@ -6204,8 +6211,27 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
                         tile_u, i, r.name.c_str());
                 return std::string("");
             }
+            const std::uint16_t to = m_registry.recipe_id(r.name);
+            if (b.type == building_type::processing_facility && to != b.recipe)
+            {
+                const recipe* cur = m_registry.get_recipe(b.recipe);
+                if (cur != nullptr && m_registry.method_step_between(b.recipe, to) == method_step::none)
+                {
+                    SDL_Log("verify.set_building_recipe: tile=%u index=%d recipe=%s REFUSED (%s)",
+                            tile_u, i, r.name.c_str(),
+                            cur->group != r.group ? "another product" : "not a step from the running method");
+                    return std::string("");
+                }
+                if (cur != nullptr)
+                    for (const entity_id m : product_stack_members(m_world, m_registry, tile, cur->group, bid))
+                    {
+                        building_component& mb = m_world.buildings.at(m);
+                        mb.recipe              = to;
+                        mb.active_recipe_index = i;
+                    }
+            }
             b.active_recipe_index = i;
-            b.recipe              = m_registry.recipe_id(r.name);
+            b.recipe              = to;
             SDL_Log("verify.set_building_recipe: tile=%u index=%d recipe=%s",
                     tile_u, i, r.name.c_str());
             return r.name;
@@ -7558,6 +7584,14 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
                 {
                     last = "wrong_air";
                     break;
+                }
+                // ONE METHOD PER STACK (BL-1641): never stage a mixed stack - a tile
+                // standing this product on another method is passed over.
+                if (const std::uint16_t sm = product_stack_method(m_world, m_registry, tid, rc->group);
+                    sm != no_recipe && sm != rid)
+                {
+                    last = "mixed_stack";
+                    continue;
                 }
                 const entity_id bid = m_world.create_entity();
                 building_component b{};

@@ -3476,11 +3476,13 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
                             // ONE BUILDING PER PRODUCT (Ben, 2026-11-11): the rescue
                             // takes only a VARIANT of the running method - never
                             // another building's method, never an upgrade for free.
-                            // A variant makes the same product, so it can lift a
-                            // floored output only where a method's outputs differ;
-                            // with one output a method, a floored plant idles by its
-                            // loss streak instead (PRODUCTION.md § One building per
-                            // product).
+                            // THE RESCUE IS THEREFORE INERT: it switches only on an
+                            // output ratio STRICTLY greater than the incumbent's, and
+                            // a variant makes the same product, so its ratio is equal
+                            // and it never fires; a floored plant idles by its loss
+                            // streak instead. The path is kept, not redesigned: what a
+                            // failing plant should do is Ben's pending ruling (the
+                            // BL-1641 report). PRODUCTION.md § One building per product.
                             if (ratio > best_ratio
                                 && reg.method_step_between(b.recipe, reg.recipe_id(cand.name)) == method_step::variant
                                 && recipe_unlocked(w, reg, corp, reg.recipe_id(cand.name)) // this writes b.recipe past the retool door

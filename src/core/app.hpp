@@ -244,8 +244,11 @@ private:
     /// loaded.
     ///
     /// @param path Source file.
+    /// @param why  Optional: on a refusal with a reason a player can act on (today, a
+    ///             save from before one building per product - `save_game_refusal_reason`),
+    ///             that reason in words; left empty for any other failure.
     /// @return     True on success.
-    bool load_game_from(const std::string& path);
+    bool load_game_from(const std::string& path, std::string* why = nullptr);
 
     void process_events(bool& running);
 

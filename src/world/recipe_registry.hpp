@@ -1177,7 +1177,11 @@ public:
     /// `upgrade` when @p to names @p from as the method it upgrades (one way);
     /// `variant` when both are methods of the same building and neither is an
     /// upgrade (both ways); `none` otherwise — another building's method, the step
-    /// back down from an upgrade, a retired slot, or the same method. Pure data.
+    /// back down from an upgrade, a retired slot, or the same method. Two methods
+    /// neither of which tags the other and whose era bands never meet (the ancient
+    /// and industrial roots of one building: `steel_bloomery` / `steel`,
+    /// `ordnance_from_blooms` / `ordnance`) are `none` too: no campaign runs both, so
+    /// they are not a step anyone takes. Pure data.
     method_step method_step_between(uint16_t from, uint16_t to) const
     {
         const recipe* a = get_recipe(from);
@@ -1189,6 +1193,10 @@ public:
             return b->upgrade_of == a->name ? method_step::upgrade : method_step::none;
         if (!a->upgrade_of.empty())
             return method_step::none; // an upgrade goes one way
+        const bool tagged = a->variant_of == b->name || b->variant_of == a->name;
+        const bool bands_meet = a->era == era_band::any || b->era == era_band::any || a->era == b->era;
+        if (!tagged && !bands_meet)
+            return method_step::none; // roots of two eras: never the same campaign
         return method_step::variant;
     }
 

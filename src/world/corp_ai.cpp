@@ -556,6 +556,34 @@ float corp_reserve_floor(const world& w, const recipe_registry& reg,
     return std::max(p.floor_constant, p.floor_wage_mult * wage_bill);
 }
 
+product_stack_retool product_stack_retool_speaker(const world& w, const recipe_registry& reg,
+                                                  entity_id building,
+                                                  const std::set<entity_id>& actor_assets)
+{
+    product_stack_retool out;
+    const auto bit = w.buildings.find(building);
+    if (bit == w.buildings.end() || bit->second.type != building_type::processing_facility)
+        return out;
+    const recipe* rc = reg.get_recipe(bit->second.recipe);
+    if (rc == nullptr)
+        return out;
+    const std::vector<entity_id> mates = product_stack_members(w, reg, bit->second.tile, rc->group);
+    out.billed = mates.size();
+    for (const entity_id m : mates) // ascending: the first eligible is the lowest id
+    {
+        const auto it = w.buildings.find(m);
+        if (it == w.buildings.end() || actor_assets.count(m) == 0)
+            continue;
+        const building_component& mb = it->second;
+        if (mb.ticks_remaining > 0 || mb.state_idle || mb.decommissioned || mb.ai_cooldown > 0)
+            continue;
+        if (out.speaker == null_entity)
+            out.speaker = m;
+        ++out.active;
+    }
+    return out;
+}
+
 corp_priority_bucket bucket_for_reason(corp_decision_reason reason)
 {
     switch (reason)
@@ -4678,13 +4706,10 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                     if (!recipe_runs_at_tile(w, *abs, tile))
                         continue;
                     // ONE METHOD PER STACK (Ben, 2026-11-11; PRODUCTION.md § One
-                    // building per product): where this tile already stands the
-                    // product on another method, the build door would seat the new
-                    // building on the stack's method, so this method is never what
-                    // gets built here. Only the stack's own method is priced.
-                    if (const std::uint16_t sm = product_stack_method(w, reg, tile, abs->group);
-                        sm != no_recipe && sm != rid)
-                        continue;
+                    // building per product) needs no test here: a tile already
+                    // standing one of this actor's processors never reaches this
+                    // loop (`tiles_with_processor` above), so no candidate here can
+                    // join a stack - the build door's seating rule never binds.
                     // BL-1485: a generator only where its grid is short (above).
                     // Inside the argmax, as the forecast veto is (BL-1227), so a
                     // refused generator never claims its group's slot.
@@ -5146,6 +5171,9 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
         // the top of this loop; only spectate lifts it).
         const auto emit_dials = [&](const std::vector<entity_id>& dial_assets,
                                     entity_id dial_nation) {
+        // ONE METHOD PER STACK: the actor's own buildings, for the retool speaker below
+        // (product_stack_retool_speaker).
+        const std::set<entity_id> dial_set(dial_assets.begin(), dial_assets.end());
         for (const entity_id bid : dial_assets)
         {
             const auto bit = w.buildings.find(bid);
@@ -5378,15 +5406,18 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                                        ? reg.get_recipe(b.recipe) : nullptr;
             // ONE METHOD PER STACK (Ben, 2026-11-11; PRODUCTION.md § One building per
             // product): a method change is the whole stack's, so the stack proposes it
-            // once - from its OLDEST member - and its gain and its cost are the
-            // stack's, every member's at once (the seam charges per building).
-            std::size_t stack_n = 1;
+            // once - from its lowest-id member ELIGIBLE this pass (`retool_active`
+            // above) - and its gain is every ACTIVE member's. Its spend is every
+            // member's: the seam moves and bills the whole stack, idled members too.
+            std::size_t stack_active = 1; // members whose output the step changes
+            std::size_t stack_billed = 1; // members the seam charges for the step
             if (cur_rc != nullptr)
             {
-                const std::vector<entity_id> mates = product_stack_members(w, reg, b.tile, cur_rc->group);
-                if (!mates.empty() && mates.front() != bid)
-                    cur_rc = nullptr; // a later member: the oldest speaks for the stack
-                stack_n = std::max<std::size_t>(1, mates.size());
+                const product_stack_retool st = product_stack_retool_speaker(w, reg, bid, dial_set);
+                if (st.speaker != bid)
+                    cur_rc = nullptr; // another member speaks for the stack this pass
+                stack_active = std::max<std::size_t>(1, st.active);
+                stack_billed = std::max<std::size_t>(1, st.billed);
             }
             if (cur_rc != nullptr)
             {
@@ -5489,7 +5520,7 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                     const float batches = sw_batches;
                     // The whole stack moves (one method per stack), so the gain is
                     // every member's.
-                    const float gain    = (best_m - cur_margin) * batches * static_cast<float>(stack_n);
+                    const float gain    = (best_m - cur_margin) * batches * static_cast<float>(stack_active);
                     if (gain > margin_gate)
                     {
                         candidate c;
@@ -5501,7 +5532,7 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                         // Per building of the stack: the variant's switch cost or
                         // the upgrade's, as try_switch_recipe charges it.
                         if (dial_nation != null_entity)
-                            c.spend = static_cast<float>(stack_n)
+                            c.spend = static_cast<float>(stack_billed)
                                     * (reg.method_step_between(b.recipe, best_id) == method_step::upgrade
                                            ? reg.recipe_switch().upgrade_cost
                                            : reg.recipe_switch().switch_cost);

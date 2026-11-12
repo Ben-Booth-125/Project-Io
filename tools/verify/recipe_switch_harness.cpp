@@ -32,12 +32,14 @@
 
 #include "scripting/lua_state.hpp"
 #include "world/components.hpp"
+#include "world/corp_ai.hpp"
 #include "world/corp_command.hpp"
 #include "world/economy_system.hpp"
 #include "world/recipe_registry.hpp"
 #include "world/world.hpp"
 
 #include <cstdio>
+#include <set>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -320,6 +322,42 @@ void run_mechanism_checks()
         w.buildings.at(m2).recipe = idV;
         check(unify_product_stack_methods(w, reg) >= 1 && w.buildings.at(m2).recipe == idU,
               "S8j unify_product_stack_methods sets every member to its oldest member's method");
+
+        // S8k - the AI's retool speaker (corp_ai.cpp): the stack's LOWEST-ID member
+        // ELIGIBLE this pass, so an idled oldest member does not block a profitable
+        // retool; the gain counts the active members, the spend every member.
+        const std::set<entity_id> mine(w.nations[corp].state_assets.begin(),
+                                       w.nations[corp].state_assets.end());
+        const product_stack_retool both = product_stack_retool_speaker(w, reg, m2, mine);
+        check(both.speaker == m1 && both.active == 2 && both.billed == 2,
+              "S8k with both mills running, the oldest speaks for the stack (2 active, 2 billed)");
+        w.buildings.at(m1).decommissioned = true; // the oldest member idled
+        const product_stack_retool idled = product_stack_retool_speaker(w, reg, m1, mine);
+        check(idled.speaker == m2 && idled.active == 1 && idled.billed == 2,
+              "S8k an idled oldest member does not block the retool: the next member speaks (1 active, 2 billed)");
+        w.buildings.at(m2).ai_cooldown = 3; // and the other on the scorer's cooldown
+        check(product_stack_retool_speaker(w, reg, m2, mine).speaker == null_entity,
+              "S8k with no member eligible, nobody speaks this pass");
+        w.buildings.at(m1).decommissioned = false;
+        w.buildings.at(m2).ai_cooldown    = 0;
+
+        // S8l - two untagged roots of one building whose era bands never meet are no
+        // step at all (no campaign runs both); an untagged pair that shares a band, or
+        // one band-free side, is still a variant.
+        recipe ra; ra.name = "mill_ancient";    ra.group = "Era Mill"; ra.era = era_band::ancient;
+        ra.outputs[static_cast<std::size_t>(resource_type::steel)] = 1.0f;
+        recipe ri; ri.name = "mill_industrial"; ri.group = "Era Mill"; ri.era = era_band::industrial;
+        ri.outputs[static_cast<std::size_t>(resource_type::steel)] = 1.0f;
+        recipe rn; rn.name = "mill_any";        rn.group = "Era Mill";
+        rn.outputs[static_cast<std::size_t>(resource_type::steel)] = 1.0f;
+        const uint16_t idA8 = reg.add_recipe(ra);
+        const uint16_t idI8 = reg.add_recipe(ri);
+        const uint16_t idN8 = reg.add_recipe(rn);
+        check(reg.method_step_between(idA8, idI8) == method_step::none
+                  && reg.method_step_between(idI8, idA8) == method_step::none
+                  && reg.method_step_between(idA8, idN8) == method_step::variant
+                  && reg.method_step_between(idN8, idI8) == method_step::variant,
+              "S8l untagged ancient and industrial roots are no step; a band-free method is a variant of either");
         reg.set_recipe_switch(sw);
     }
 }

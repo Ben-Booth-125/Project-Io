@@ -2551,8 +2551,10 @@ bool app::save_game_to(const std::string& path)
     return ok;
 }
 
-bool app::load_game_from(const std::string& path)
+bool app::load_game_from(const std::string& path, std::string* why_out)
 {
+    if (why_out != nullptr)
+        why_out->clear();
     world         w;
     save_envelope env;
 
@@ -2578,6 +2580,8 @@ bool app::load_game_from(const std::string& path)
     {
         ui::chat_post(m_chat, static_cast<int>(m_sim_loop.day_tick()), null_entity,
                       ui::chat_state::k_field_channel, "LOAD FAILED: " + path + ": " + why);
+        if (why_out != nullptr)
+            *why_out = why; // the main menu shows it (startup_screens.cpp)
         return false;
     }
     if (!read_save_game(path, w, env, &m_registry.military(), // BL-1455: legacy step-offs read the walls

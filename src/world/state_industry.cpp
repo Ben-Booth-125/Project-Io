@@ -405,8 +405,17 @@ state_handover_report hand_over_state_industry(world& w, const recipe_registry& 
                             continue; // pass 0 founds only where its own market feeds it
                         if (pass == 1 && !feasible)
                             continue; // pass 1 founds only where the chain runs
+                        // ONE METHOD PER STACK (BL-1641): where the tile already
+                        // stands this product, the build door seats the founding on
+                        // the stack's method, so that is the method priced and
+                        // recorded - the founding is what actually stands.
+                        std::uint16_t seated = rid;
+                        if (const std::uint16_t sm = product_stack_method(w, reg, tile, rc.group);
+                            sm != no_recipe)
+                            seated = sm;
+                        const recipe& seated_rc = reg.get_recipe(seated) != nullptr ? *reg.get_recipe(seated) : rc;
                         const float price = construction_founding_capex(w, reg, tile, building_type::processing_facility,
-                                                               resource_type::iron_ore, rid);
+                                                               resource_type::iron_ore, seated);
                         entity_id built = null_entity;
                         if (construct_state_building(w, reg, nid, tile, rid, built, /*founding=*/true)
                             != construction_result::placed)
@@ -419,7 +428,7 @@ state_handover_report hand_over_state_industry(world& w, const recipe_registry& 
                         nc.treasury        -= paid;
                         b.construction_paid = paid;
                         f.building = built;
-                        f.recipe   = rid;
+                        f.recipe   = w.buildings.at(built).recipe; // the seated method (== seated)
                         f.chain_feasible = feasible;
                         f.price    = price;
                         f.paid     = paid;
@@ -432,7 +441,7 @@ state_handover_report hand_over_state_industry(world& w, const recipe_registry& 
                         e.topic     = history_topic::agency;
                         e.body      = tit->second.body;
                         e.corp      = nid; // BL-1407: the nation acts
-                        e.event     = "State charter: " + nc.name + " founds a state " + rc.display_name
+                        e.event     = "State charter: " + nc.name + " founds a state " + seated_rc.display_name
                                     + " (" + strategic_sector_name(strategic_sector_of(reg, b)) + ")"
                                     + (paid < price ? ", its treasury short of the price" : "");
                         w.history_log.push_back(std::move(e));

@@ -715,6 +715,20 @@ std::vector<int> method_grid_candidates(const world& w, const recipe_registry& r
     return candidates;
 }
 
+// One method per stack (Ben, 2026-11-11): the stack's retool lock - the longest
+// recipe-switch cooldown of any member, @p b included - since try_switch_recipe refuses
+// a step while ANY member is still retooling. Zero when none is.
+static int stack_switch_cooldown(const world& w, const recipe_registry& reg,
+                                 const building_component& b)
+{
+    int left = b.recipe_switch_cooldown;
+    if (const recipe* rc = reg.get_recipe(b.recipe); rc != nullptr)
+        for (const entity_id m : product_stack_members(w, reg, b.tile, rc->group))
+            if (const auto it = w.buildings.find(m); it != w.buildings.end())
+                left = std::max(left, it->second.recipe_switch_cooldown);
+    return left;
+}
+
 // One building per product (Ben, 2026-11-11; PRODUCTION.md § Upgrades and variants):
 // what taking method @p to on building @p id's stack is and costs, in the seam's own
 // figures (try_switch_recipe: per building of the stack, the variant's switch cost or
@@ -816,13 +830,14 @@ void draw_production_method_section(world& w, const recipe_registry& reg,
     // cooldown is running, independent of the candidate list below it, since
     // it's informative even with only one same-group method on screen.
     const int cooldown_total = std::max(1, static_cast<int>(reg.recipe_switch().cooldown_ticks));
-    if (b.recipe_switch_cooldown > 0)
+    const int stack_cooldown = stack_switch_cooldown(w, reg, b); // any member retooling locks the stack
+    if (stack_cooldown > 0)
     {
-        const float frac = 1.0f - static_cast<float>(b.recipe_switch_cooldown) /
+        const float frac = 1.0f - static_cast<float>(stack_cooldown) /
                                    static_cast<float>(cooldown_total);
         char overlay[48];
         std::snprintf(overlay, sizeof overlay, "Retooling - %d tick%s left",
-                      b.recipe_switch_cooldown, b.recipe_switch_cooldown == 1 ? "" : "s");
+                      stack_cooldown, stack_cooldown == 1 ? "" : "s");
         ImGui::ProgressBar(frac, {ImGui::GetContentRegionAvail().x, 0.0f}, overlay);
     }
 
@@ -996,7 +1011,7 @@ void draw_production_method_section(world& w, const recipe_registry& reg,
 
         if (!active)
         {
-            const bool  on_cooldown = b.recipe_switch_cooldown > 0;
+            const bool  on_cooldown = stack_cooldown > 0;
 
             // BL-692: the BL-428 chain-depth lock this row used to show ("Your
             // industry cannot make what this needs yet", drawn greyed) is gone
@@ -1012,8 +1027,8 @@ void draw_production_method_section(world& w, const recipe_registry& reg,
             char tip[160];
             const method_step_offer offer = method_step_offer_for(w, reg, id, row_id);
             if (on_cooldown)
-                std::snprintf(tip, sizeof tip, "Locked %d more tick%s", b.recipe_switch_cooldown,
-                             b.recipe_switch_cooldown == 1 ? "" : "s");
+                std::snprintf(tip, sizeof tip, "Locked %d more tick%s", stack_cooldown,
+                             stack_cooldown == 1 ? "" : "s");
             else
                 std::snprintf(tip, sizeof tip, "%s", offer.label.c_str());
 
@@ -3477,6 +3492,8 @@ void draw_card_method_steps(world& w, const recipe_registry& reg, ui_state& ui, 
         return;
     const building_component& b = bit->second;
     const std::vector<int> cands = method_grid_candidates(w, reg, b);
+    // Locked while ANY member of the stack is retooling, as the seam refuses it.
+    const bool locked = stack_switch_cooldown(w, reg, b) > 0;
     bool any = false;
     for (const int idx : cands)
     {
@@ -3489,7 +3506,6 @@ void draw_card_method_steps(world& w, const recipe_registry& reg, ui_state& ui, 
             continue;
         any = true;
         ImGui::PushID(static_cast<int>(to));
-        const bool locked = b.recipe_switch_cooldown > 0;
         ImGui::BeginDisabled(locked);
         const std::string text = offer.label;
         if (ImGui::SmallButton(text.c_str()))
