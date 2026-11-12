@@ -1027,6 +1027,7 @@ void app::poll_worldgen()
     // spent). Then the presentation half of Begin (STARTUP.md § Handoff, item
     // 2) and the seat (item 3).
     m_world                  = std::move(built->w);
+    ui::reset_site_finder(); // the last world's grid and quotes name its tiles, not these
     m_generation_report      = std::move(built->report);
     m_registry               = std::move(built->registry);
     m_landscape_winner_score = built->finish.search.winner_score;
@@ -2178,6 +2179,7 @@ void app::setup_world(world_params params)
         ensure_works_loaded(); // BL-321: an input to generation, not to the economy.
         m_world = make_hard_coded_world(params, &m_generation_report, gen_cfg,
                                         nullptr, &m_works);
+        ui::reset_site_finder(); // the last world's grid and quotes name its tiles, not these
     }
 
     // Bridge PLANETOLOGY's per-body dated history + checkpoints into the world
@@ -2597,6 +2599,7 @@ bool app::load_game_from(const std::string& path, std::string* why_out)
     m_ground_prebake_wizard = false;
     m_ground_world_live    = true;
     m_world               = std::move(w);
+    ui::reset_site_finder(); // the last world's grid and quotes name its tiles, not these
     m_generation_report   = std::move(env.report);
     m_active_world_params = env.params;
     pin_nation_colours_from_report(); // BL-1089: a load colours every nation as the wizard did
@@ -2748,6 +2751,7 @@ void app::exit_to_menu()
     m_ground_prebake_wizard = false;
     m_ground_world_live     = false;
     m_world                 = world{};
+    ui::reset_site_finder(); // the last world's grid and quotes name its tiles, not these
     m_generation_report     = {};
 
     // The load path's reset list, and the series a load would have replaced.

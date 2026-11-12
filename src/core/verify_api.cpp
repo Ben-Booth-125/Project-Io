@@ -6622,6 +6622,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             row["tile"]    = static_cast<unsigned>(r.tile);
             row["priced"]  = r.priced;
             row["profit"]  = r.profit;
+            row["earn3"]   = r.earn3; // the 3 yr column, the default sort (Ben, 2026-11-12)
             row["full"]    = r.profit_full_cover;
             row["capex"]   = r.capex;
             row["cover"]   = r.cover;
@@ -9928,6 +9929,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         }
         m_screen = app_screen::in_game;
         reset_verify_transients();
+        ui::reset_site_finder(); // the last script's grid and caches name the old world's tiles
         set_kit_research_waived_for_harness(false); // a script's waive never outlives it
         ui::clear_overflows();
 

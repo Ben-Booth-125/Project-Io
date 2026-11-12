@@ -492,7 +492,13 @@ entity_id market_for_tile(const world& w, entity_id tile)
     // which fires for things the field does not read; a cold review measured that
     // mistake as a rebuild per idling port in one tick, each a Dijkstra per centre.
     sig ^= (w.catchment_generation + 0x9E3779B97F4A7C15ull) * 1099511628211ull;
-    body_route_cache& rc = w.body_route_index[tc.body];
+    // find() first: a warm body's cache is only READ here, never inserted into, so a
+    // caller that warmed every body (the site finder's grid, before its workers fork)
+    // can read this from several threads at once. A miss inserts, as before.
+    auto rit = w.body_route_index.find(tc.body);
+    if (rit == w.body_route_index.end())
+        rit = w.body_route_index.emplace(tc.body, body_route_cache{}).first;
+    body_route_cache& rc = rit->second;
     if (rc.route.empty() || rc.sig != sig)
     {
         int gw = 0, gh = 0;
