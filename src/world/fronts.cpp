@@ -1,5 +1,6 @@
 #include "fronts.hpp"
 
+#include "artillery.hpp"     // BL-1643: artillery_range_tiles - a battery stands at its range
 #include "battle_system.hpp" // unit_in_battle
 #include "corp_command.hpp"
 #include "hex_neighbors.hpp"
@@ -522,6 +523,90 @@ std::map<entity_id, int64_t> push_strengths(const world& w, entity_id nation,
     return held;
 }
 
+/// BL-1643 (MILITARY.md § Artillery fires shells; § Fronts): THE BATTERY'S TILE. A front
+/// places its artillery "as far behind the line as its range allows while still reaching
+/// across it". From the battery's anchor - its own span tile, spaced as the line's slots are
+/// - the candidates are the tiles of the front's nation (owner or occupier, as every front
+/// reads), on land, that the unit's class may enter (@p walled false), within range - 1
+/// steps over such tiles. A candidate REACHES ACROSS when some tile of @p across (the
+/// neighbour's land with a side onto the span) lies within @p range of it. Of those, the one
+/// DEEPEST behind the line (hex steps to the nearest span tile), then nearest the anchor,
+/// then the lower id. Null for a range under 2 (it stands on the line) or no candidate.
+template <typename Walled>
+entity_id battery_tile(const world& w, raster_source& rs, const front& f, entity_id anchor, int range,
+                       const Walled& walled, const std::set<entity_id>& across)
+{
+    if (range < 2 || anchor == null_entity || across.empty())
+        return null_entity;
+    std::map<entity_id, int> steps; // ordered: the candidates are walked in ascending id
+    std::deque<entity_id> q;
+    steps[anchor] = 0;
+    q.push_back(anchor);
+    while (!q.empty())
+    {
+        const entity_id t = q.front();
+        q.pop_front();
+        const int d = steps.at(t);
+        if (d >= range - 1)
+            continue;
+        const auto tit = w.tiles.find(t);
+        if (tit == w.tiles.end())
+            continue;
+        for (int side = 0; side < 6; ++side) // a BFS over a fixed side order: deterministic
+        {
+            const entity_id n = neighbour_of(w, rs, tit->second, side);
+            if (n == null_entity || steps.count(n) != 0 || owner_of(w, n) != f.nation)
+                continue;
+            const auto nit = w.tiles.find(n);
+            if (nit == w.tiles.end() || is_water(nit->second.substrate) || walled(n))
+                continue;
+            steps[n] = d + 1;
+            q.push_back(n);
+        }
+    }
+    entity_id best = null_entity;
+    int best_depth = -1, best_near = 0;
+    for (const auto& [t, s] : steps)
+    {
+        if (walled(t))
+            continue;
+        bool reach = false;
+        for (const entity_id a : across)
+            if (hex_distance(w, t, a) <= range) { reach = true; break; }
+        if (!reach)
+            continue;
+        int depth = std::numeric_limits<int>::max();
+        for (const entity_id sp : f.span)
+            depth = std::min(depth, hex_distance(w, t, sp));
+        if (depth > best_depth || (depth == best_depth && s < best_near))
+        {
+            best = t;
+            best_depth = depth;
+            best_near = s;
+        }
+    }
+    return best;
+}
+
+/// BL-1643: does @p u stand back from the line as a battery? Artillery with a range of 2 or
+/// more; anything else holds a line slot.
+bool is_battery(const recipe_registry& reg, const unit_component& u)
+{
+    return artillery_range_tiles(reg, u) >= 2;
+}
+
+/// BL-1643: @p members split into the line (holding slots on the span) and the batteries,
+/// each ascending as @p members is.
+void split_line(const world& w, const recipe_registry& reg, const std::vector<entity_id>& members,
+                std::vector<entity_id>& line, std::vector<entity_id>& batteries)
+{
+    for (const entity_id uid : members)
+    {
+        const auto it = w.units.find(uid);
+        (it != w.units.end() && is_battery(reg, it->second) ? batteries : line).push_back(uid);
+    }
+}
+
 } // namespace
 
 // ---------------------------------------------------------------------------
@@ -780,11 +865,18 @@ std::vector<entity_id> front_push_tiles(world& w, const recipe_registry& reg, co
         return out;
     raster_source rs{ w, {} };
     const std::map<entity_id, int64_t> held = push_strengths(w, f.nation, push_candidates(w, rs, f));
-    const std::size_t n = members.size(), len = f.span.size();
-    for (std::size_t i = 0; i < n; ++i)
+    // BL-1643: a battery never pushes, and the line's slots are spaced among the line alone.
+    std::vector<entity_id> line, batteries;
+    split_line(w, reg, members, line, batteries);
+    const std::size_t n = line.size(), len = f.span.size();
+    for (std::size_t m = 0; m < members.size(); ++m)
     {
-        const unit_component& u = w.units.at(members[i]);
-        if (u.count <= 0 || u.position == null_entity || unit_refitting(u) || unit_in_battle(w, members[i]))
+        const auto li = std::find(line.begin(), line.end(), members[m]);
+        if (li == line.end())
+            continue; // a battery: no push target
+        const std::size_t i = static_cast<std::size_t>(li - line.begin());
+        const unit_component& u = w.units.at(members[m]);
+        if (u.count <= 0 || u.position == null_entity || unit_refitting(u) || unit_in_battle(w, members[m]))
             continue;
         if (owner_of(w, u.position) == f.neighbour && !at_war(w, f.nation, f.neighbour))
             continue;
@@ -797,13 +889,13 @@ std::vector<entity_id> front_push_tiles(world& w, const recipe_registry& reg, co
                 continue;
             if (u.order.dest == r.t)
             {
-                out[i] = r.t;
+                out[m] = r.t;
                 break;
             }
-            const corp_command_result res = march_check(w, f.nation, members[i], r.t, null_entity, nullptr, &reg.military());
+            const corp_command_result res = march_check(w, f.nation, members[m], r.t, null_entity, nullptr, &reg.military());
             if (res == corp_command_result::applied)
             {
-                out[i] = r.t;
+                out[m] = r.t;
                 break;
             }
             if (res != corp_command_result::rejected_terrain)
@@ -836,6 +928,42 @@ entity_id front_hold_slot(world& w, const recipe_registry& reg, const unit_compo
             return f.span[s + d];
     }
     return null_entity;
+}
+
+entity_id front_hold_slot(world& w, const recipe_registry& reg, const front& f,
+                          const std::vector<entity_id>& members, std::size_t m)
+{
+    const std::size_t len = f.span.size();
+    if (len == 0 || m >= members.size())
+        return null_entity;
+    const auto uit = w.units.find(members[m]);
+    if (uit == w.units.end())
+        return null_entity;
+    const unit_component& unit = uit->second;
+    // BL-1643: the line's slots are spaced among the line; a battery stands at its range
+    // behind its own anchor, spaced among the batteries (advance_fronts).
+    std::vector<entity_id> line, batteries;
+    split_line(w, reg, members, line, batteries);
+    const bool battery = is_battery(reg, unit);
+    const std::vector<entity_id>& group = battery ? batteries : line;
+    const std::size_t n = group.size();
+    const std::size_t i = static_cast<std::size_t>(std::find(group.begin(), group.end(), members[m]) - group.begin());
+    if (battery)
+    {
+        const std::function<bool(const tile_component&)> wall =
+            march_wall(unit.type, class_wall(reg.military(), unit.type));
+        const std::size_t s = ((2 * i + 1) * len) / (2 * n); // the battery's anchor
+        raster_source rs{ w, {} };
+        const entity_id t = battery_tile(w, rs, f, f.span[s], artillery_range_tiles(reg, unit),
+                                         [&](entity_id x) {
+                                             const auto tit = w.tiles.find(x);
+                                             return tit == w.tiles.end() || (wall && wall(tit->second));
+                                         },
+                                         push_candidates(w, rs, f));
+        if (t != null_entity)
+            return t;
+    }
+    return front_hold_slot(w, reg, unit, f, i, n); // its slot among its group, else its anchor
 }
 
 bool front_reachable(world& w, const recipe_registry& reg, entity_id unit, const front& f)
@@ -1134,10 +1262,15 @@ front_step advance_fronts(world& w, const recipe_registry& reg)
         const bool push = front_order_of(w, nk.first, nk.second) == front_order::push
                        && front_may_push(w, *f);
 
+        // BL-1643 (MILITARY.md § Artillery fires shells): the group's artillery stands back
+        // as BATTERIES; the rest hold the LINE. The line's slots are spaced among the line.
+        std::vector<entity_id> line, batteries;
+        split_line(w, reg, uids, line, batteries);
+
         // HOLD: n slots spaced evenly along the span, centred in n equal stretches;
         // unit i (ascending id) takes slot i. A unit is on its slot when it stands
         // ON the slot tile — every march ends on its tile (2026-10-27).
-        const std::size_t n = uids.size(), len = f->span.size();
+        const std::size_t n = line.size(), len = f->span.size();
         const auto slot_index = [&](std::size_t i) { return ((2 * i + 1) * len) / (2 * n); };
         const auto slot_of = [&](std::size_t i) { return f->span[slot_index(i)]; };
 
@@ -1162,13 +1295,11 @@ front_step advance_fronts(world& w, const recipe_registry& reg)
         // re-issued daily. BL-1441: a slot `march_check` refuses (unreachable, a domain
         // the unit cannot enter) is never issued - the unit stands where it is, halted,
         // and the slot is asked of `march_check` again next day.
-        const auto hold = [&](std::size_t i) {
-            const entity_id uid = uids[i];
+        const auto hold_at = [&](entity_id uid, std::size_t s) {
             const unit_component& u = w.units.at(uid);
             if (busy(uid, u))
                 return;
             const wall_fn wall = march_wall(u.type, class_wall(reg.military(), u.type));
-            const std::size_t s = slot_index(i);
             std::vector<entity_id> slots; // nearest first, ties to the lower index
             slots.reserve(len);
             for (std::size_t d = 0; d < len; ++d)
@@ -1202,6 +1333,47 @@ front_step advance_fronts(world& w, const recipe_registry& reg)
             if (u.order.dest != null_entity)
                 issue(uid, nk.first, corp_verb::halt_unit, null_entity);
         };
+        const auto hold = [&](std::size_t i) { hold_at(line[i], slot_index(i)); };
+
+        // BL-1643: THE BATTERIES. Battery j of m takes its anchor on the span as the line's
+        // slots are spaced, and stands on `battery_tile` behind it: as deep as its range
+        // allows while still reaching across. The front re-derives as the line moves, so the
+        // battery is moved with it. It never pushes. With no such tile, or a march there the
+        // game refuses, it holds its anchor as a line unit would.
+        if (!batteries.empty())
+        {
+            raster_source brs{ w, {} };
+            const std::set<entity_id> across = push_candidates(w, brs, *f);
+            const std::size_t m = batteries.size();
+            for (std::size_t j = 0; j < m; ++j)
+            {
+                const entity_id uid = batteries[j];
+                const unit_component& u = w.units.at(uid);
+                if (busy(uid, u))
+                    continue;
+                const std::size_t s = ((2 * j + 1) * len) / (2 * m);
+                const wall_fn wall = march_wall(u.type, class_wall(reg.military(), u.type));
+                const entity_id tile = battery_tile(w, brs, *f, f->span[s], artillery_range_tiles(reg, u),
+                                                    [&](entity_id t) { return walled_for(wall, t); }, across);
+                if (tile == null_entity)
+                {
+                    hold_at(uid, s);
+                    continue;
+                }
+                if (u.position == tile)
+                {
+                    if (u.order.dest != null_entity)
+                        issue(uid, nk.first, corp_verb::halt_unit, null_entity);
+                    continue;
+                }
+                if (u.order.dest == tile)
+                    continue;
+                if (would_march(uid, nk.first, tile) == corp_command_result::applied)
+                    issue(uid, nk.first, corp_verb::march_unit, tile);
+                else
+                    hold_at(uid, s);
+            }
+        }
 
         if (push)
         {
@@ -1217,7 +1389,7 @@ front_step advance_fronts(world& w, const recipe_registry& reg)
                 push_strengths(w, nk.first, push_candidates(w, rs, *f));
             for (std::size_t i = 0; i < n; ++i)
             {
-                const entity_id uid = uids[i];
+                const entity_id uid = line[i];
                 const unit_component& u = w.units.at(uid);
                 if (busy(uid, u))
                     continue;

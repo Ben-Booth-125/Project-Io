@@ -5934,6 +5934,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             else if (type == "logistics_hub") bt = building_type::inland_logistics_hub;
             else if (type == "military_base") bt = building_type::military_base; // BL-325 S1
             else if (type == "airbase")       bt = building_type::airbase;       // BL-1450
+            else if (type == "missile_silo")  bt = building_type::missile_silo;  // BL-1643
             else if (type == "marketplace") bt = building_type::planetary_marketplace; // BL-1269
             // "none" leaves placement mode, so a script that placed a building can
             // press the canvas as a player again (BL-1425's group press).
@@ -9184,6 +9185,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         else if (kind == "logistics_hub")      bc.type = building_type::inland_logistics_hub;
         else if (kind == "military_base")      bc.type = building_type::military_base;
         else if (kind == "airbase")            bc.type = building_type::airbase; // BL-1450
+        else if (kind == "missile_silo")       bc.type = building_type::missile_silo; // BL-1643
         else if (kind == "research_institute") bc.type = building_type::research_institute;
         else if (kind == "schooling")          bc.type = building_type::schooling;
         else if (kind == "university")         bc.type = building_type::university;

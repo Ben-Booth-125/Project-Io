@@ -4,6 +4,7 @@
 #include "core/battle_dispatch_text.hpp" // battle_phase_word — SHARED with BL-468's dispatches
 #include "construction_sites.hpp"
 #include "missile_panel.hpp" // BL-1431: the unit card's missile section
+#include "world/artillery.hpp" // BL-1643: artillery_range_tiles, artillery_traits
 #include "world/resource_names.hpp"
 #include "world/battle_system.hpp"      // active_battle, quote_withdrawal, read_battle_phase (BL-469)
 
@@ -1656,7 +1657,24 @@ void draw_unit_selection_body(const world& w, const recipe_registry& reg, ui_sta
                             owner_name != nullptr ? owner_name : "\xe2\x80\x94");
 
         draw_stat_grid("unit_card", unit_stat_bands(w, reg, sel), ImGui::GetContentRegionAvail().x);
-        draw_missile_section(w, reg, ui, sel); // BL-1431: artillery launches; air defence intercepts
+        // BL-1643 (MILITARY.md § Artillery fires shells): artillery's range, and what its kit
+        // adds to it - the batteries' own line, since no missile is carried any longer.
+        if (const int range = artillery_range_tiles(reg, u); range > 0)
+        {
+            const uint8_t tr = artillery_traits(u);
+            std::string line = "Range " + std::to_string(range) + (range == 1 ? " tile" : " tiles");
+            if (tr & k_art_keeps_pace)      line += " \xc2\xb7 Self-propelled";
+            if (tr & k_art_counter_battery) line += " \xc2\xb7 Counter-battery radar";
+            if (tr & k_art_precision)       line += " \xc2\xb7 Precision shells";
+            ImGui::TextUnformatted(line.c_str());
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("Each day it stands still, it shells one hostile unit within %d tiles, "
+                                  "without entering its province.%s%s%s", range,
+                                  (tr & k_art_keeps_pace) ? "\nSelf-propelled: it marches as fast as the force on its front." : "",
+                                  (tr & k_art_counter_battery) ? "\nCounter-battery radar: hostile artillery in range first." : "",
+                                  (tr & k_art_precision) ? "\nPrecision shells: more of each strike lands." : "");
+        }
+        draw_missile_section(w, reg, ui, sel); // BL-1431: air defence intercepts (BL-1643: no land unit launches)
 
         // What the grid does not hold: an older design, a refit in progress, the front.
         if (is_player_side(w, u.owner))
@@ -3151,6 +3169,8 @@ std::string building_method_line(const world& w, const recipe_registry& reg,
             return "Its owner's defenders here gain defence and hardness";
         case building_type::orbital_defence_battery: // BL-1599
             return "Fires each day at hostile ships in this body's low orbit";
+        case building_type::missile_silo: // BL-1643
+            return "Fires long-range and nuclear missiles 90 tiles";
         case building_type::research_institute:
             return "Makes research points for its nation";
         case building_type::schooling:
@@ -3673,6 +3693,10 @@ void draw_expanded_building_card(world& w, const recipe_registry& reg,
         ImGui::TextDisabled("Workforce");
         ImGui::SameLine();
         ui.tile_card.workforce = draw_workforce_bar(b);
+        // BL-1643 (MILITARY.md § Missiles): a silo is a launcher - the missile section, its
+        // magazine, targets and Fire, sits on its building card.
+        if (b.type == building_type::missile_silo)
+            draw_missile_section(w, reg, ui, bid);
     }
 }
 
@@ -5066,6 +5090,8 @@ std::string candidate_effect_line(const recipe_registry& reg, building_type type
             return "Its owner's defenders here gain defence and hardness";
         case building_type::orbital_defence_battery: // BL-1599
             return "Fires each day at hostile ships in this body's low orbit";
+        case building_type::missile_silo: // BL-1643
+            return "Fires long-range and nuclear missiles 90 tiles";
         case building_type::research_institute:
             return "Makes research points for its nation";
         case building_type::schooling:
@@ -5374,6 +5400,7 @@ void draw_construction_ledger_body(world& w, const recipe_registry& reg, ui_stat
     cands.push_back({building_type::airbase,              resource_type::iron_ore, "Airbase"});              // BL-1450: the door to every wing
     cands.push_back({building_type::bunker,               resource_type::iron_ore, "Bunker"});               // BL-1426: cover for the units on the tile
     cands.push_back({building_type::orbital_defence_battery, resource_type::iron_ore, "Orbital Defence Battery"}); // BL-1599: fire at hostile ships in low orbit
+    cands.push_back({building_type::missile_silo,         resource_type::iron_ore, "Missile Silo"});         // BL-1643: the long-range launcher
     cands.push_back({building_type::research_institute,   resource_type::iron_ore, "Research Institute"});   // BL-332
     cands.push_back({building_type::schooling,            resource_type::iron_ore, "Schooling"});            // Ben, 2026-11-07: any centre (the gate says where)
     cands.push_back({building_type::university,           resource_type::iron_ore, "University"});           // Ben, 2026-11-07: a City or above

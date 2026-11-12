@@ -1143,7 +1143,7 @@
   ],
   [
    "ledger.selection_missile_buy",
-   "The Missiles section of the player's own launcher card (artillery unit, destroyer, capital ship, submarine, multirole or bomber wing): one row per kind it carries with the magazine count and Buy."
+   "The Missiles section of the player's own launcher card (destroyer, capital ship, submarine, multirole or bomber wing, or a missile silo's building card): one row per kind it carries with the magazine count and Buy."
   ],
   [
    "ledger.selection_missile_fire",

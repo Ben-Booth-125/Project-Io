@@ -723,6 +723,12 @@ enum class building_type : uint8_t
                                   ///< `condition_permille` (space_bombard.hpp). Produces nothing, staffs
                                   ///< at zero, no supply anchor; opened by the `orbital_defence_battery`
                                   ///< mechanic.
+    missile_silo = 16, ///< BL-1643 (MILITARY.md § Missiles, Ben 2026-11-11): the long-range
+                       ///< launcher, built on the nation's own ground. Fires long-range and
+                       ///< tactical nuclear missiles from its nation's magazine at
+                       ///< `missile_params::silo_range` tiles, only while its condition stands
+                       ///< above `silo_min_condition_permille` (missiles.hpp). Produces nothing,
+                       ///< staffs at zero, no supply anchor; a strike or a bombing may name it.
 };
 
 /// One past the last building type — the wire parser's range gate (BL-396:
@@ -732,7 +738,7 @@ enum class building_type : uint8_t
 /// enum's tail, the same way resource_count derives from resource_type::count:
 /// appending a type means moving this with it.
 static constexpr uint8_t building_type_count =
-    static_cast<uint8_t>(building_type::orbital_defence_battery) + 1;
+    static_cast<uint8_t>(building_type::missile_silo) + 1;
 
 /// Infrastructure is every building that is not a producer (PRODUCTION.md §
 /// Infrastructure buildings): ports, logistics hubs, railway stations, the

@@ -509,6 +509,7 @@ bool parse_building(std::string_view s, building_type& out)
         { "bunker", building_type::bunker }, // BL-1426
         { "astronaut_training_centre", building_type::astronaut_training_centre }, // BL-1585
         { "orbital_defence_battery", building_type::orbital_defence_battery }, // BL-1599
+        { "missile_silo", building_type::missile_silo }, // BL-1643
         { "research_institute", building_type::research_institute },
         { "schooling", building_type::schooling },
         { "university", building_type::university },

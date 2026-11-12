@@ -52,6 +52,14 @@ constexpr kit_item base(const char* id, const char* name, lc c, uint8_t slot)
     return {id, name, c, slot, {}, {}, 0, nullptr};
 }
 
+/// BL-1643: an artillery item's range and traits (MILITARY.md § Artillery fires shells).
+constexpr kit_item art(kit_item it, uint8_t range, uint8_t traits)
+{
+    it.art_range  = range;
+    it.art_traits = traits;
+    return it;
+}
+
 /// A later item. Delta order is land_combat_stats': soft, hard, hardness, defence, breakthrough,
 /// recon, stealth (BL-1453: the last two are per unit; MILITARY.md § Recon).
 constexpr kit_item later(const char* id, const char* name, lc c, uint8_t slot,
@@ -124,16 +132,20 @@ constexpr kit_item k_items[] = {
 
     // --- Artillery: Gun (0) · Munitions (1) · Tow (2) ----------------------
     base ("art.gun.towed_howitzer",           "Towed howitzer",                    lc::artillery, 0),
-    later("art.gun.long_barrel",              "Long-barrel howitzer",              lc::artillery, 0, {20, 0, 0, 0, 0}, "DG-ST-FO-G1", AP(2)),
-    later("art.gun.rocket_launcher",          "Multiple rocket launcher",          lc::artillery, 0, {60, 0, 0, 0, 0}, "DG-ST-FO-G", AP(3), E(1)),
-    later("art.gun.guided_rockets",           "Guided long-range rockets",         lc::artillery, 0, {40, 20, 0, 0, 0}, "DG-ST-FO-F", AP(3), GW(2), E(2)),
+    // BL-1643: a gun's range is the tiles it adds to the class's (economy.military.artillery).
+    art(later("art.gun.long_barrel",          "Long-barrel howitzer",              lc::artillery, 0, {20, 0, 0, 0, 0}, "DG-ST-FO-G1", AP(2)), 1, 0),
+    art(later("art.gun.rocket_launcher",      "Multiple rocket launcher",          lc::artillery, 0, {60, 0, 0, 0, 0}, "DG-ST-FO-G", AP(3), E(1)), 1, 0),
+    art(later("art.gun.guided_rockets",       "Guided long-range rockets",         lc::artillery, 0, {40, 20, 0, 0, 0}, "DG-ST-FO-F", AP(3), GW(2), E(2)), 2, 0),
     base ("art.munitions.he_shells",          "High-explosive shells",             lc::artillery, 1),
-    later("art.munitions.guided_shells",      "Guided shells",                     lc::artillery, 1, {20, 20, 0, 0, 0}, "DG-ST-FO-B2", GW(1)),
+    // BL-1643: guided shells ARE the precision shells of the ruling: more of each strike lands.
+    art(later("art.munitions.guided_shells",  "Precision guided shells",           lc::artillery, 1, {20, 20, 0, 0, 0}, "DG-ST-FO-B2", GW(1)), 0, k_art_precision),
     later("art.munitions.submunitions",       "Anti-armour submunitions",          lc::artillery, 1, {0, 40, 0, 0, 0}, "DG-ST-FO-F2", GW(2), E(1)),
     later("art.munitions.loitering_drones",   "Loitering drones",                  lc::artillery, 1, {20, 40, 0, 0, 0, 25, 0}, "DG-NE-SO-F", DR(3), E(2)),
     base ("art.tow.gun_tractor",              "Gun tractor",                       lc::artillery, 2),
-    later("art.tow.self_propelled",           "Self-propelled chassis",            lc::artillery, 2, {0, 0, 300, 0, 15}, "DG-ST-FO-G2", AV(2)),
-    later("art.tow.armoured_sp",              "Armoured self-propelled chassis",   lc::artillery, 2, {0, 0, 400, 10, 15}, "DG-ST-FO-H2", AV(3), E(1)),
+    // BL-1643: a self-propelled chassis IS the self-propelled gun of the ruling: the battery
+    // marches as fast as the force it supports.
+    art(later("art.tow.self_propelled",       "Self-propelled chassis",            lc::artillery, 2, {0, 0, 300, 0, 15}, "DG-ST-FO-G2", AV(2)), 0, k_art_keeps_pace),
+    art(later("art.tow.armoured_sp",          "Armoured self-propelled chassis",   lc::artillery, 2, {0, 0, 400, 10, 15}, "DG-ST-FO-H2", AV(3), E(1)), 0, k_art_keeps_pace),
 
     // --- Air defence: Launcher (0) · Fire control (1) · Vehicle (2) --------
     // Its kit is mostly for the air theatre (BL-1429); the ground effects stay small.
@@ -158,6 +170,12 @@ constexpr kit_item k_items[] = {
     // whose weapon slot has room.
     later("mot.weapon.fpv_drones",            "FPV attack drones",                 lc::motorised, 0, {15, 20, 0, 0, 0, 10, 0}, "DG-NE-SO-F1", SA(1), DR(3), E(1)),
     later("mech.weapon.fpv_drones",           "FPV attack drones",                 lc::mechanised, 0, {15, 20, 0, 0, 0, 10, 0}, "DG-NE-SO-F1", SA(1), DR(3), E(1)),
+
+    // --- BL-1643 (MILITARY.md § Artillery fires shells, Ben 2026-11-11): COUNTER-BATTERY
+    // RADAR, the gun slot's fourth later item. APPENDED, as the drones above. A howitzer
+    // laid by a radar that tracks the shells fired at it: the long barrel's reach, and the
+    // battery answers hostile artillery in range before anything else.
+    art(later("art.gun.radar_laid",           "Radar-laid howitzer (counter-battery radar)", lc::artillery, 0, {20, 0, 0, 0, 0, 5, 0}, "DG-ST-FO-G3", AP(2), E(2)), 1, k_art_counter_battery),
 };
 
 constexpr std::size_t k_item_count = sizeof(k_items) / sizeof(k_items[0]);
@@ -254,6 +272,11 @@ constexpr const char* first_error()
         // drones and optics carry recon; better infantry armour raises stealth).
         if (it.delta.recon < 0 || it.delta.stealth < 0)
             return "a recon or stealth delta is negative";
+        // BL-1643: only a later artillery item carries a range or a trait.
+        if ((it.art_range != 0 || it.art_traits != 0) && (it.cls != lc::artillery || it.research_node == nullptr))
+            return "a range or artillery trait sits on a base item or another class's item";
+        if (it.art_traits > (k_art_keeps_pace | k_art_counter_battery | k_art_precision))
+            return "an artillery trait outside the k_art_* bits";
         if (it.research_node == nullptr)
         {
             if (!is_zero(it.delta) || it.goods_count != 0)
@@ -530,6 +553,28 @@ land_class unit_land_class(const unit_component& u)
 {
     const std::vector<roster_row>& t = unit_roster_table();
     return u.type < t.size() ? land_class_for(t[u.type]) : land_class::infantry;
+}
+
+int artillery_kit_range(land_class c, const unit_design& d)
+{
+    if (c != land_class::artillery)
+        return 0;
+    int r = 0;
+    for (int slot = 0; slot < slot_count(c); ++slot)
+        if (const uint16_t item = kit_item_at(c, slot, d.fit[static_cast<std::size_t>(slot)]); item != k_no_kit_item)
+            r += k_items[item].art_range;
+    return r;
+}
+
+uint8_t artillery_kit_traits(land_class c, const unit_design& d)
+{
+    if (c != land_class::artillery)
+        return 0;
+    uint8_t t = 0;
+    for (int slot = 0; slot < slot_count(c); ++slot)
+        if (const uint16_t item = kit_item_at(c, slot, d.fit[static_cast<std::size_t>(slot)]); item != k_no_kit_item)
+            t = static_cast<uint8_t>(t | k_items[item].art_traits);
+    return t;
 }
 
 bool unit_design_stale(const world& w, const unit_component& u)

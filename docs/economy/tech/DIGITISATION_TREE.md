@@ -12,10 +12,10 @@
 
 The Digitisation tree is the tech tree of the age the campaign opens in, 1960 onward (`../ERAS.md`
 § Era 1). Every nation starts holding none of it (`../RESEARCH.md` § Who holds technology). It is the
-first tree cut to the grammar in `../RESEARCH.md` § The shape of an age's tree: 211 nodes in three
-trees of ten branches, on four rings — 160 in the nine original branches' common shape, 33 kit nodes
+first tree cut to the grammar in `../RESEARCH.md` § The shape of an age's tree: its nodes lie in three
+trees of ten branches, on four rings — 160 in the nine original branches' common shape, the kit nodes
 that lengthen the arms of Force, Processing and Signal & Orbit (§ Kit), and 18 for State's fourth
-branch, Naval, and its joint (§ Naval).
+branch, Naval, and its joint (§ Naval). The generated table below gives the count.
 
 The store is `digitisation_tree.json`, canonical for every node; this document owns the prose and
 carries the store's tables, rendered by `node tools/session/tech_tree_store.js digitisation`, which
@@ -122,8 +122,8 @@ other six branches are reserved there. The branches, sketched by what the quests
 
 **Military kit is researched here (Ben, 2026-10-27), one node per technology (Ben, 2026-11-03).**
 A kit node opens its technology's item in every class it fits — the assault rifle for infantry,
-motorised and mechanised alike — so 39 nodes open the catalogue's 89 later items
-(`../../military/MILITARY.md` § The kit). Thirty-three are kit nodes of their own; six existing
+motorised and mechanised alike — so 40 nodes open the catalogue's 90 later items
+(`../../military/MILITARY.md` § The kit). Thirty-four are kit nodes of their own; six existing
 nodes also open kit beside their own advantage: *Armoured Carriers*, *Early Warning Radar*,
 *Mechanised Divisions*, *Precision Munitions* and *Airmobile Forces* in Force, *Numerical Control*
 in Processing.
@@ -158,6 +158,12 @@ cluster is a pair. Minors open gen-1 and gen-2 items; a cluster's surge item sit
 | Force | Travel III → *Anti-Tank Missiles* → *Fire-and-Forget Missiles* → Travel IV → *Airmobile Forces* | Travel V → *Rocket Artillery* → Travel VI → *Long-Range Precision Strike* → *Active Protection* → the espionage cluster | 32 |
 | Processing | Travel III → *Reactive Armour* → Travel IV → *Semiconductor Foundry* | Travel V → *Low-Observable Airframes* → Travel VI → *Industrial Robotics* | 23 |
 | Signal & Orbit | Travel III → *Thermal Imaging* → Travel IV → *Rocketry* | Travel V → *Integrated Air Defence* → Travel VI → *Networked Warfare* → *Loitering Munitions* → the espionage cluster | 29 |
+
+**Counter-Battery Radar stands alone (BL-1643, missile silos).** Artillery's
+three kit items are each a node: self-propelled guns are *Tracked Chassis*'s and *Armoured Self-Propelled
+Guns*' chassis, precision shells are *Precision Munitions*' guided shells, and counter-battery radar is a
+minor of its own on Force's right arm, needing *Modern Gun Barrels* and *Early Warning Radar*. It feeds
+no major: it is the one kit minor outside a cluster.
 
 Where a branch carries a placeholder arm, the longer kit runs go down it, so the arm a mastery
 needs today is the shorter: Force's mastery waits on two kit clusters, Signal & Orbit's — and
@@ -238,7 +244,7 @@ shape; `nation_tech_harness` holds the store to what the code reads.
 
 <!-- BEGIN GENERATED NODES (tools/session/tech_tree_store.js) -->
 
-**212 nodes** — 78 travel (8 joints, 10 masteries), 79 minor, 45 major, 10 quest; 12 placeholder nodes. Whole age: 1548 cost units.
+**213 nodes** — 78 travel (8 joints, 10 masteries), 80 minor, 45 major, 10 quest; 12 placeholder nodes. Whole age: 1554 cost units.
 
 ### Production — what the nation can extract and make
 
@@ -433,6 +439,7 @@ shape; `nation_tech_harness` holds the store to what the code reads.
 | `DG-ST-FO-H1` | Wheeled Carriers | minor | 4 | opens wheeled carriers (motorised vehicle, the run-flat six-wheeler) | Long-Range Precision Strike |
 | `DG-ST-FO-H2` | Armoured Self-Propelled Guns | minor | 4 | opens the armoured self-propelled chassis (artillery tow) | Long-Range Precision Strike |
 | `DG-ST-FO-H` | Active Protection | major | 4 | opens active protection (armour, the heavy fighting vehicle) | Wheeled Carriers + Armoured Self-Propelled Guns |
+| `DG-ST-FO-G3` | Counter-Battery Radar | minor | 3 | opens the radar-laid howitzer (artillery gun): counter-battery radar finds hostile artillery in range and answers it first | Modern Gun Barrels + Early Warning Radar |
 
 #### Naval (`ST-NV`)
 

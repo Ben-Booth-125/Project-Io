@@ -137,6 +137,7 @@ float construction_initial_workforce(building_type type)
             || type == building_type::airbase // BL-1449: passive, as the military base
             || type == building_type::bunker  // BL-1426: concrete, no staff
             || type == building_type::orbital_defence_battery // BL-1599: a gun emplacement, no staff
+            || type == building_type::missile_silo // BL-1643: a launcher, no staff
             || type == building_type::railway_station) ? 0.0f : 0.5f; // BL-1255: zero staff
 }
 

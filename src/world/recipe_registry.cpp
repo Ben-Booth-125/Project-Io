@@ -600,6 +600,7 @@ void recipe_registry::load_from_lua(lua_state& lua)
             { "bunker",               building_type::bunker },               // BL-1426
             { "astronaut_training_centre", building_type::astronaut_training_centre }, // BL-1585
             { "orbital_defence_battery", building_type::orbital_defence_battery }, // BL-1599
+            { "missile_silo", building_type::missile_silo }, // BL-1643
         };
         for (const named_type& nt : types)
         {
@@ -1280,6 +1281,7 @@ void recipe_registry::load_from_lua(lua_state& lua)
             { "bunker",               building_type::bunker },               // BL-1426
             { "astronaut_training_centre", building_type::astronaut_training_centre }, // BL-1585
             { "orbital_defence_battery", building_type::orbital_defence_battery }, // BL-1599
+            { "missile_silo", building_type::missile_silo }, // BL-1643
         };
         struct named_band { const char* key; era_band band; };
         const named_band bands[] = {

@@ -5,6 +5,7 @@
 #include "battle_system.hpp" // battle_dispatch (BL-467/BL-468)
 #include "air_combat.hpp"    // air_day_tick, wing_upkeep_tick (BL-1449)
 #include "sea_combat.hpp"    // sea_day_tick, ship_upkeep_tick (BL-1430)
+#include "artillery.hpp"     // artillery_day_tick (BL-1643)
 #include "supply_system.hpp" // interception_record (BL-1529)
 #include "carried_supplies.hpp" // BL-1452: carried_supplies_day, the daily stock step
 #include "nation_ai.hpp"     // nation_scorer_report (BL-542; Sprint N3 T4)
@@ -1057,6 +1058,7 @@ struct military_day_result
     int             disbanded = 0; ///< Units removed after the battles and starvation (`disband_orphaned_units`).
     unit_march_tick march;         ///< The march, including the attacks it opened.
     sea_day_tick    sea;           ///< BL-1430: the ships' day.
+    artillery_day_tick artillery;  ///< BL-1643: the day's bombardment.
 };
 
 /// THE DAILY MILITARY PASS (BL-1445, move by days; MILITARY.md § Marching and

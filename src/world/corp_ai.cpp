@@ -1713,7 +1713,7 @@ void score_nation_fronts(world& w, const recipe_registry& reg, entity_id nation,
         for (std::size_t m = 0; m < members.size(); ++m)
         {
             const unit_component& mu = w.units.at(members[m]);
-            const entity_id slot = front_hold_slot(w, reg, mu, f, m, members.size());
+            const entity_id slot = front_hold_slot(w, reg, f, members, m);
             sum += march_price_permille(w, reg, supply_memo, nation, slot != null_entity ? slot : mu.position,
                                         mu.food_permille);
         }
@@ -1735,7 +1735,7 @@ void score_nation_fronts(world& w, const recipe_registry& reg, entity_id nation,
                 continue;
             // The joiner's test: no slot of its own prices where it stands; one that cannot stand
             // fed pays only what the slot adds over that.
-            const entity_id slot = front_hold_slot(w, reg, u, fronts[i], m, members.size());
+            const entity_id slot = front_hold_slot(w, reg, fronts[i], members, m);
             const int64_t own = march_price_permille(w, reg, supply_memo, nation, slot != null_entity ? slot : u.position,
                                                      u.food_permille);
             if (own == 0
@@ -1796,7 +1796,7 @@ void score_nation_fronts(world& w, const recipe_registry& reg, entity_id nation,
                 continue;
             // No reason to go hungry there, on this unit's OWN slot (the difference in the sum is
             // zero when one more unit respaces the others) or by what it does to the others.
-            const entity_id slot = front_hold_slot(w, reg, u, fronts[i], m, joined.size());
+            const entity_id slot = front_hold_slot(w, reg, fronts[i], joined, m);
             const int64_t own = march_price_permille(w, reg, supply_memo, nation, slot != null_entity ? slot : u.position,
                                                      u.food_permille);
             if ((own > 0 || hunger[i] > 0) && std::max(own, hunger[i]) > (can_stand_fed(uid) ? 0 : here))

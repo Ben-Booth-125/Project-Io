@@ -58,6 +58,11 @@ struct missile_params
     int salvo_max      = 8;           ///< Missiles one fire verb may launch.
     int stock_per_verb = 16;          ///< Missiles or interceptors one stock verb may buy.
     int sight_tiles    = 4;           ///< A unit or ship sees provinces this near.
+    /// BL-1643 (Ben, 2026-11-11): a SILO fires long-range and tactical nuclear missiles at
+    /// this reach, whatever the kind's own range — twice a ship or bomber's long reach —
+    /// and only while its condition stands ABOVE `silo_min_condition_permille` (half).
+    int silo_range                  = 90;
+    int silo_min_condition_permille = 500;
     /// The struck nation's Alarm counts each tactical warhead this many times; every
     /// other nation once (RELATIONS.md § 6: severe, above a declaration of war).
     float nuclear_struck_magnitude = 2.0f;
