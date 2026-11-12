@@ -10,6 +10,20 @@ sessions can be scoped and paced with less waste.
 
 ---
 
+## 2026-11-12 — Four lanes merged: site finder, one building per product, the monthly tick, missile silos
+
+**Runtime:** long; Full (four worktree lanes, cold review on each, merge and gate on main).
+
+- BL-1641 (one building per product), BL-1643 (missile silos, artillery range and kit), BL-1640 (site finder parallel, ranked by 3-year earnings) and BL-1642 (monthly tick, world v95) merged onto main through `aaf5e404`. Each lane passed cold review only after fix rounds: six for the site finder, three for the monthly tick.
+- Site finder: affordability left the search and is split at draw time against the uncommitted treasury. The grid and the Build door check one stamp, the grid resets on every world replacement, and Construct re-checks the selected area.
+- Monthly tick: rates are a third, research costs ×3, and AI, fronts, space and research picks keep a quarterly cadence. Calls taken for Ben: NR-1223 (price smoothing per tick), NR-1224 (quarterly migration).
+- Gate on main: build, determinism, save round trip and the save envelope pass. Every military, space, recipe, recruits, sentiment, tax and carried-supplies harness passes, along with the construction, site grid, tile card, shell, nav rail, building element, goods, shelf and header scripts.
+- Known red, each a call or item: nation_tech R0g/R0h (research pacing re-pin, Ben's form); tech_tree_panel arrival assertion (Ben's form); construction_progress 10 rows, product names from the split outrunning the two-line budget plus the hub name wrapping.
+- Market quick: G1 82.9, G1t50 82.0, G1b 5.5, G2 102.3, G3 100. G1 and G1b stay short of target, as before the lanes; the failing-plant question on Ben's form bears on both.
+- Live clicks owed: silo card, artillery card, the card's method control, the site finder search and grid. Nothing pushed.
+
+---
+
 ## 2026-11-10 — v0.3.0 marked reached; six stale items cancelled
 
 **Runtime:** short; Light.

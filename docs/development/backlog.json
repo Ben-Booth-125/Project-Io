@@ -1364,6 +1364,31 @@
    ],
    "title": "Retire the dispatched survey probe: mapping then prospecting is the one route to a body's ground",
    "design": "Ben, 2026-11-10 (NR-1179). The probe's dispatch verb, phases and UI retire; DISCOVERY.md's survey phases are rewritten around mapping and prospecting."
+  },
+  {
+   "glyph": "○",
+   "sprint": null,
+   "version_goal": "v0.3.0",
+   "written": "2026-11-12",
+   "parked": false,
+   "blocked_on": null,
+   "requires": [],
+   "status": "proposed",
+   "author": "main session (2026-11-12)",
+   "id": "BL-1644",
+   "short_name": "LONG_PRODUCT_NAMES",
+   "title": "Long product building names outrun the two-line budget",
+   "priority": "B",
+   "difficulty": 2,
+   "category": "UI",
+   "authority_doc": "docs/ui/ledgers/README.md",
+   "files": [
+    "scripts/recipes.lua",
+    "src/ui/construction_ledger.cpp",
+    "src/ui/selection_panel.cpp",
+    "scripts/verify/construction_progress.lua"
+   ],
+   "design": "The one-building-per-product split (BL-1641) added names such as Spacecraft Assembly Plant and Orbital Defence Battery. Nine build rows now outrun the two-line budget construction_progress allows (it permits two measured names), and the tile-card stack row Inland Logistics Hub wraps rather than eliding. Either shorten the names in recipes.lua or widen the budget with a measured reason; the check is not to be loosened to pass."
   }
  ]
 }
