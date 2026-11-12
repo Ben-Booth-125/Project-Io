@@ -12,6 +12,15 @@
 #include "province.hpp"     // province_partition (BL-466 province partition, below)
 #include "sentiment.hpp"    // sentiment_table (BL-545 relational substrate, below)
 #include "space_assets.hpp" // space_asset (BL-1327: nations' space assets, below)
+#include "stations.hpp"     // space_station, station_template (BL-1583, below)
+#include "space_command.hpp" // space_order (BL-1587/BL-1588: the signal-delay queue, below)
+#include "space_units.hpp"  // space_unit, space_design (BL-1594/BL-1595, below)
+#include "space_battle.hpp" // space_battle (BL-1597, below)
+#include "space_convoy.hpp" // space_haul (BL-1596, below)
+#include "orbital_node.hpp" // orbital_node (BL-1598 space_debris, below)
+#include "space_bombard.hpp" // space_bombard_order (BL-1599, below)
+#include "offworld_base.hpp" // offworld_base (BL-1601, below)
+#include "space_firsts.hpp"  // space_first_record (BL-1606, below)
 #include "war.hpp"          // war_record, peace_offer (BL-1459/BL-1428 wars, below)
 
 #include <atomic>
@@ -184,6 +193,7 @@ enum class history_topic : uint8_t
     agency,      ///< A BL-079/BL-202 agency_event (reflex or strategic tier).
     trade_route, ///< A trade_route's FIRST establishment (not repeat traffic on an existing lane).
     war,         ///< BL-1480: a declaration or a peace - one entry per party, `corp` = that party's nation.
+    space_first, ///< BL-1606: a nation takes a first in space (ERAS.md § Firsts) - one entry, `corp` = that nation.
 };
 
 /// One entry in `world::history_log`. `timestamp`'s UNIT DEPENDS ON TOPIC —
@@ -1079,6 +1089,74 @@ struct world
     /// v51 trailing section) and folded into `state_hash` when non-empty, so a
     /// world that never launched hashes as it did before this store existed.
     std::map<entity_id, space_asset> space_assets;
+
+    /// BL-1583 — every live station, keyed by its id (== its core asset's id;
+    /// stations.hpp). A station whose core is lost is erased by the station step.
+    /// SERIALISED (world_save.cpp, v81 station section) and folded into
+    /// `state_hash` when non-empty.
+    std::map<entity_id, space_station> stations;
+
+    /// BL-1583 — each nation's named station templates, nation then name ascending.
+    /// No empty inner map is kept. SERIALISED (v81) and hashed when non-empty.
+    std::map<entity_id, std::map<std::string, station_template>> station_templates;
+
+    /// BL-1587 / BL-1588 — the PENDING near-space orders: commands to a station or a
+    /// satellite outside its nation's comms coverage, waiting one quarter for a signal
+    /// (space_command.hpp). Issue order (ids ascend); applied and removed by
+    /// `run_space_orders` in the nation step. SERIALISED (world_save.cpp, v83) and
+    /// folded into `state_hash` when non-empty.
+    std::vector<space_order> space_orders;
+    /// The next pending order's id. SERIALISED (v83); hashed when non-zero.
+    uint32_t next_space_order_id = 0;
+    /// BL-1594 / BL-1595 — every live space unit, keyed by its id (space_units.hpp;
+    /// SPACE_FLEETS.md). A lost unit is erased. SERIALISED (v84) and hashed when non-empty.
+    std::map<entity_id, space_unit> space_units;
+
+    /// BL-1594 — each nation's live space-unit design per hull (`space_hull` value),
+    /// nation then hull ascending; no empty inner map. SERIALISED (v84), hashed when non-empty.
+    std::map<entity_id, std::map<uint8_t, space_design>> space_unit_designs;
+
+    /// BL-1595 — each station's Fuel-depot propellant stock (good units), ascending
+    /// station id; only stations holding stock > 0. SERIALISED (v84), hashed when non-empty.
+    std::map<entity_id, float> station_depot_stock;
+
+    /// BL-1597 — every open space battle and the newest closed ones (the battle
+    /// reports), keyed by id (space_battle.hpp; SPACE_FLEETS.md § Battles).
+    /// SERIALISED (the trailing section after the space units); hashed when non-empty.
+    std::map<uint32_t, space_battle> space_battles;
+    /// BL-1597 — the next battle id. SERIALISED; hashed with the battles when non-zero.
+    uint32_t next_space_battle_id = 0;
+    /// BL-1600 — each nation's mapped and prospected regions of each body off the
+    /// home world, keyed (nation, body) ascending (components.hpp
+    /// `body_survey_knowledge`; survey_system.hpp § Mapping, then prospecting).
+    /// SERIALISED (world_save.cpp, the BL-1600 section) and hashed when non-empty.
+    std::map<std::pair<entity_id, entity_id>, body_survey_knowledge> survey_knowledge;
+    /// BL-1596 — the cargo aboard each space unit carrying any, and each trade
+    /// Hauler's trip, keyed by the unit's id (space_convoy.hpp; SPACE_FLEETS.md
+    /// § Space convoys). SERIALISED (world_save.hpp's BL-1596 block), hashed when non-empty.
+    std::map<entity_id, space_haul> space_hauls;
+    /// BL-1598 — the debris level at each orbital node holding any (debris.hpp;
+    /// SPACE_ASSETS.md § Debris), node order; only levels above `k_space_debris_floor`.
+    /// SERIALISED (world_save.hpp's BL-1598 block, with each asset's wear and each
+    /// open battle's quiet days); hashed when any is non-empty.
+    std::map<orbital_node, float> space_debris;
+    /// BL-1599 — each space unit's standing bombard order, keyed by the unit's id
+    /// (space_bombard.hpp; SPACE_FLEETS.md § Bombardment and fire at orbit).
+    /// SERIALISED (world_save.hpp's BL-1599 block), hashed when non-empty.
+    std::map<entity_id, space_bombard_order> space_bombard_orders;
+    /// BL-1601 — every off-world base, keyed by its population centre's id
+    /// (offworld_base.hpp; NATIONS.md § Off-world bases). The centre names its tile,
+    /// the tile its body and owner. SERIALISED (world_save.hpp's BL-1601 block),
+    /// hashed when non-empty.
+    std::map<entity_id, offworld_base> offworld_bases;
+    /// BL-1601 — the colonists aboard each space unit carrying any (thousands of
+    /// heads), keyed by the unit's id. SERIALISED with the bases (live units only),
+    /// hashed when non-empty.
+    std::map<entity_id, int32_t> space_colonists;
+    /// BL-1606 — the space firsts taken, keyed by `space_first_kind` (space_firsts.hpp;
+    /// ERAS.md § Firsts): who took each and when. A first is never taken twice.
+    /// SERIALISED (world_save.hpp's BL-1606 block), hashed when non-empty.
+    std::map<uint8_t, space_first_record> space_firsts;
 
     /// Enacted and un-enacted laws (BL-343). A world-level list rather than a
     /// per-corp one: a law is enacted over the world and charged to whoever it

@@ -84,12 +84,14 @@ owning doc(s) for a source file, ranked by how often work on it cited each — t
 | `docs/economy/POPULATION.md` | Population centres, agglomeration, habitability, labour supply and contention. |
 | `docs/economy/ERAS.md` | The era ladder and the gate into space. |
 | `docs/economy/RESEARCH.md` | **Technology**: the nation holds it, every nation starts equal, research points, the grammar of every age's tree (travel/minor/major/quest, requirement groups, pairs, quests that key the next age, placeholders), the research queue. |
-| `docs/economy/tech/DIGITISATION_TREE.md` → `digitisation_tree.json` | The first age's tree: 211 nodes in three trees of ten branches. **The store is canonical; query or check it with `node tools/session/tech_tree_store.js [--check]`, which also renders the doc's tables.** |
-| `docs/economy/SPACE_ASSETS.md` | Off-body assets (stub). |
+| `docs/economy/tech/DIGITISATION_TREE.md` → `digitisation_tree.json` | The first age's tree: 212 nodes in three trees of ten branches. **The store is canonical; query or check it with `node tools/session/tech_tree_store.js [--check]`, which also renders the doc's tables.** |
+| `docs/economy/tech/EARLY_SPACE_TREE.md` → `early_space_tree.json` | The next age's tree, first cut: far-space technology, keyed open by the Digitisation tree's quests. Checked by `node tools/session/tech_tree_store.js early_space [--check]`. |
+| `docs/economy/SPACE_ASSETS.md` | Near space: the orbital graph, slots, launching, satellites, astronauts, stations, signal delay, debris. |
 
 ### Military, politics, relations
 | Doc | Owns |
 |---|---|
+| `docs/military/SPACE_FLEETS.md` | Space units and fleets: designed hulls, the Δv budget, docking, Haulers as space convoys, battles, blockade, bombardment. |
 | `docs/military/MILITARY.md` | How force works **in the campaign** — what the player meets: `resolve_campaign_battle`, units, muster, terrain, march, battles, upkeep, one reach field. The Era −1 half is `generation/MILITARY_HISTORY.md`. |
 | `docs/politics/NATIONS.md` | The nation as actor: territory, treasury, law, lobbying, the national budget. |
 | `docs/politics/RELATIONS.md` | Sentiment (derived), stance (declared), reputation, embargo, standing — which quantity answers which question. |

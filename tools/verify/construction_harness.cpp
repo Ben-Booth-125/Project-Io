@@ -93,6 +93,11 @@ int main()
     const entity_id corp = w.create_entity();
     { nation_component cc{}; cc.treasury = 250.0f; w.nations[corp] = cc; }
     w.player_entity = corp;
+    // BL-1399 OWN GROUND (NATIONS.md § Own ground): a nation builds only on its own
+    // tiles, so every land tile this fixture builds on is the builder's. Without it
+    // every placement is refused `foreign_ground` before the gates under test run.
+    for (const entity_id t : {land, no_deposit_tile, deposit_tile, coastal_tile, inland_tile})
+        w.set_tile_nation(t, corp);
 
     std::printf("Layer 4 construction harness\n");
 
@@ -142,6 +147,7 @@ int main()
     { tile_component tc{}; tc.body = body; tc.substrate = terrain_substrate::rocky;
       tc.road_edges = road_edges_on_every_side(1); // BL-1347
       tc.resource_deposit[ri(resource_type::iron_ore)] = 2.0f; w.tiles[land2] = tc; }
+    w.set_tile_nation(land2, corp); // BL-1399: own ground, so the refusal is the funds gate
     const std::size_t n_before = w.nations[corp].state_assets.size();
     entity_id none_built = null_entity;
     auto r_broke = construct_building(w, reg, corp, land2, building_type::processing_facility,

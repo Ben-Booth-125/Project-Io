@@ -82,6 +82,15 @@ rule has a fuller authority, it is cited — this file does not redefine it.
   tiles, and nothing else: no tile position beyond what the ninth grant's rows already give. Reason:
   the finder moved to its own tab and draws its figures on the map, and a check cannot press a tab
   it cannot find, or test labels it cannot count. Verify-only, behind `--verify`.
+  **Eleventh (Ben, 2026-11-10, NR-1208 and NR-1211):** the space surfaces' reads report what the
+  canvas or card draws, screen positions included, and nothing else: `verify.circum_transits`,
+  `circum_fleets`, `solar_fleets`, `circum_fleet_hovered`, `circum_debris`, `fleet_card` (its
+  `presses` included), `space_designs`, the `storm` flag on `circum_assets` rows, `base_card` (each
+  site row's label and the grid position the label already prints) and `prospect_mask` (counts
+  only). The STAGING calls `verify.space_fleet_fixture`, `verify.base_prospect_fixture` and
+  `verify.stage_prospect(n)` may write what they name for a fixture and return its ids or counts.
+  Reason: a check cannot press a fleet mark, a base order or a site row it cannot find. Verify-only,
+  behind `--verify`.
 - Do **not** use unprotected sol2 calls where errors can occur.
 - Do **not** add SQLite — flat binary serialisation is correct for the prototype.
 - Do **not** build AI faction behaviour beyond the data-model minimum stub. A **register of

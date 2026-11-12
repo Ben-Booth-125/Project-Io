@@ -111,13 +111,28 @@ const VERBS = [
   'assign_sea_mission',                                // BL-1430 -- give ship subject mission order (0 none, 1 patrol, 2 escort, 3 raid, 4 blockade) over provinces (1-8 sea provinces; none for order 0)
   'set_ship_design',                                   // BL-1527 -- the seat's nation fits ship kit item unit_type into slot recipe (0 hull, 1 armament, 2 sensors) of ship class order
   'refit_ship',                                        // BL-1527 -- ship subject, at its home port with no mission, refits to its class's live design
+  'embark_unit',                                       // BL-1531 -- land unit subject boards transport order lying at its port's mouth
+  'land_units',                                        // BL-1531 -- transport subject lands everyone aboard beside coast tile tile; no tile recalls it home
+  'stock_missiles',                                    // BL-1431 -- buy unit_type missiles of kind order into the actor's magazine
+  'stock_interceptors',                                // BL-1431 -- buy unit_type interceptors into air defence unit subject's stock
+  'fire_missile',                                      // BL-1431 -- launcher subject fires unit_type missiles of kind order at province, or building counterparty
+  'queue_space_research', 'unqueue_space_research',    // BL-1613 -- the seat's nation's Early Space tail; order = Early Space node index
 ];
 
-// io::dg::node_count (src/world/digitisation_tree_data.hpp, generated from
-// docs/economy/tech/digitisation_tree.json): the research verbs' `order` range. Read from
-// the store, the header's own source: a second literal went stale once already.
-const RESEARCH_NODE_COUNT = JSON.parse(fs.readFileSync(
-  path.join(__dirname, '..', '..', 'docs', 'economy', 'tech', 'digitisation_tree.json'), 'utf8')).nodes.length;
+// BL-1631: each tree's `node_count`, read from its generated header at start-up so the
+// range can never drift from the store again (a literal 160 refused valid orders
+// 160..193 once the Digitisation tree grew). The header is generated from
+// docs/economy/tech/<tree>.json; an unreadable header is a start-up error, not a guess.
+function tree_node_count(header) {
+  const p = require('path').join(__dirname, '..', '..', 'src', 'world', header);
+  const m = require('fs').readFileSync(p, 'utf8').match(/inline constexpr int node_count\s*=\s*(\d+);/);
+  if (!m) throw new Error(`${header}: no node_count`);
+  return Number(m[1]);
+}
+// io::dg::node_count: the research verbs' `order` range.
+const RESEARCH_NODE_COUNT = tree_node_count('digitisation_tree_data.hpp');
+// io::es::node_count: the Early Space verbs' `order` range.
+const EARLY_SPACE_NODE_COUNT = tree_node_count('early_space_tree_data.hpp');
 
 // ---------------------------------------------------------------------------
 // The ProjectIo --serve child process
@@ -260,7 +275,7 @@ const TOOLS = [
         unit_type: { type: 'integer', description: 'hire_ship: index into the sea roster (0 submarine, 1 destroyer, 2 capital ship, 3 transport). hire_unit: index into unit_roster_table() (BL-324). set_unit_obsolete: the row to mark. refit_unit: the newer row to refit subject (a unit) to, or its own row when its design is stale (a design refit, BL-1434). set_unit_design: the kit catalogue id to fit (BL-1434).' },
         quantity: { type: 'number', description: 'set_logistics_shares: the state share of the nation Logistic Points (0..1; with the champion share, at most 1 — other firms get the rest). place_sell_order: max units offered per tick (> 0). request_quote: units sought. dispatch_convoy: units of cargo to haul (> 0, and no more than the source pool holds).' },
         floor_price: { type: 'number', description: 'place_sell_order: minimum unit price (>= 0; 0 means accept the market price). set_logistics_shares: the champion share of the nation Logistic Points (0..1).' },
-        order: { type: 'integer', description: 'assign_sea_mission: the mission (0 none, 1 patrol, 2 escort, 3 raid, 4 blockade), subject being the ship. remove_sell_order: the sell_order id to erase. accept_quote / cancel_contract: the procurement quote / contract id. hold_convoy: the convoy id to stop or release — TRANSIENT, valid only while that convoy is in flight (a handful of ticks). accept_offer / abandon_contract: the mercenary offer / contract id (BL-573). queue_research: the Digitisation node index (0..159). unqueue_research: the queued node to take off with every queued entry that needs it, or -1 / omitted for the last entry (BL-1276). set_logistics_shares: 0 sets the shares, 1 clears the rule back to the mechanical default (BL-1309). set_tax_tier: the tax tier, 1..5 (I..V) (BL-1335). set_front_order: 0 hold, 1 push (push only toward a neighbour the actor is hostile to; BL-1427). set_unit_design: the land class (0 infantry, 1 motorised, 2 mechanised, 3 armour, 4 light armour, 5 artillery, 6 air defence; BL-1434). set_embargo: 1 enacts the embargo of counterparty, 0 repeals it (BL-1418).' },
+        order: { type: 'integer', description: 'assign_sea_mission: the mission (0 none, 1 patrol, 2 escort, 3 raid, 4 blockade), subject being the ship. remove_sell_order: the sell_order id to erase. accept_quote / cancel_contract: the procurement quote / contract id. hold_convoy: the convoy id to stop or release — TRANSIENT, valid only while that convoy is in flight (a handful of ticks). accept_offer / abandon_contract: the mercenary offer / contract id (BL-573). queue_research: the Digitisation node index (0..159). unqueue_research: the queued node to take off with every queued entry that needs it, or -1 / omitted for the last entry (BL-1276). set_logistics_shares: 0 sets the shares, 1 clears the rule back to the mechanical default (BL-1309). set_tax_tier: the tax tier, 1..5 (I..V) (BL-1335). set_front_order: 0 hold, 1 push (push only toward a neighbour the actor is hostile to; BL-1427). set_unit_design: the land class (0 infantry, 1 motorised, 2 mechanised, 3 armour, 4 light armour, 5 artillery, 6 air defence; BL-1434). set_embargo: 1 enacts the embargo of counterparty, 0 repeals it (BL-1418). queue_space_research / unqueue_space_research: the Early Space node index (0..53; BL-1613).' },
         counterparty: { type: 'integer', description: 'request_quote: the supplier corporation being asked (BL-350). dispatch_convoy: the DESTINATION market entity (BL-452; `subject` is the source market). Stance verbs (declare_hostile / offer_friendship / accept_friendship / return_to_neutral): the other corporation (BL-448). withdraw_from_battle: the opposing corp, null for first-in-sorted-order (BL-467). accept_offer: the client NATION (BL-573 — the one verb whose counterparty is not a corp). set_embargo: the nation embargoed (BL-1418).' },
         province: { type: 'integer', description: 'defend_province (BL-1504): the province id subject defends; omit to clear the order. Its id is a province id, not an entity id. march_unit and withdraw_from_battle name a tile (`tile`) instead: a march naming only a province names no tile and is refused.' },
         provinces: { type: 'array', items: { type: 'integer' }, maxItems: 8, description: 'assign_sea_mission: the 1-8 sea province ids of the zone, each within the class range by water of an own port; omit for mission none. assign_air_mission (BL-1449): the 1-8 province ids the wing flies over, any order; omit for mission none (order 0). declare_war / answer_war (BL-1459): the 1-3 goal provinces. offer_peace / impose_peace (BL-1428): the 1-3 ceded provinces of a cession (none for white peace). Each must be in straight-line range of the wing\'s airbase; a strategic mission only over provinces held by a nation the actor is hostile to.' },
@@ -353,6 +368,14 @@ async function callTool(name, args) {
       else if (!Number.isInteger(o) || o < 0 || o >= RESEARCH_NODE_COUNT)
         throw new Error(`${args.verb}: order must be a node index 0..${RESEARCH_NODE_COUNT - 1}` +
                         (lastOk ? ' or -1 (the last entry)' : '') + `, got ${o}`);
+    }
+    // BL-1613: the Early Space verbs name an Early Space node by index in `order`
+    // (0..EARLY_SPACE_NODE_COUNT-1); no "last entry" form (unqueue_research's
+    // -1 already drops the last entry of the whole queue). Refused HERE, whole.
+    if (args.verb === 'queue_space_research' || args.verb === 'unqueue_space_research') {
+      const o = args.order;
+      if (!Number.isInteger(o) || o < 0 || o >= EARLY_SPACE_NODE_COUNT)
+        throw new Error(`${args.verb}: order must be an Early Space node index 0..${EARLY_SPACE_NODE_COUNT - 1}, got ${o}`);
     }
     // BL-412: a live (attached) session's clock is agent-gated and a COMMAND
     // resolves only at a tick boundary — so under --attach the command rides

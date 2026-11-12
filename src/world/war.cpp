@@ -15,6 +15,7 @@
 #include "fronts.hpp"         // reanchor_fronts (BL-1460)
 #include "economy_system.hpp" // military_quarter_day_base (BL-1460 fix round)
 #include "air_combat.hpp"     // air_tile_distance: a wing's rebase (BL-1460 fix round)
+#include "offworld_base.hpp"  // offworld_base_capital (BL-1602: a capital on each body)
 
 #include <limits>
 #include "world.hpp"
@@ -281,8 +282,14 @@ uint32_t attack_goal_province(const world& w, entity_id defender, entity_id tile
         return p;
     // The attacked stack stands on ground that is not the defender's: the goal
     // falls back to the defender's capital province (a design call — see the
-    // BL-1459 report).
-    const entity_id cap = w.nations.at(defender).capital_tile;
+    // BL-1459 report). BL-1602 (MILITARY.md § Space, "A war spans every body"): on
+    // another body than its capital's, that is the defender's capital ON THAT BODY,
+    // its base (`offworld_base_capital`), where it has one; else the capital as ever.
+    entity_id cap = w.nations.at(defender).capital_tile;
+    if (const auto tt = w.tiles.find(tile); tt != w.tiles.end())
+        if (const auto ct = w.tiles.find(cap); ct == w.tiles.end() || ct->second.body != tt->second.body)
+            if (const entity_id base = offworld_base_capital(w, defender, tt->second.body); base != null_entity)
+                cap = base;
     const uint32_t cp = cap == null_entity ? 0u : w.provinces.province_of(cap);
     if (cp != 0 && province_owner(w, cp) == defender)
         return cp;
@@ -1277,6 +1284,20 @@ entity_id capital_after_cession(const world& w, entity_id nation)
     }
     if (candidates.empty())
         return null_entity;
+    // BL-1602 (MILITARY.md § Space, "A war spans every body"): a nation holding ground
+    // on more than one body keeps its capital on the body it stood on while any land
+    // province remains there; a base elsewhere is the capital of ITS body already
+    // (NATIONS.md § Off-world bases). Only when none remains does the capital leave
+    // the body. With every candidate on one body this filters nothing.
+    if (const auto ct = w.tiles.find(nit->second.capital_tile); ct != w.tiles.end())
+    {
+        std::set<uint32_t> same_body;
+        for (const uint32_t p : candidates)
+            if (const province* pr = w.provinces.find(p); pr != nullptr && pr->body == ct->second.body)
+                same_body.insert(p);
+        if (!same_body.empty())
+            candidates = std::move(same_body);
+    }
     // Each candidate's largest centre on the nation's own ground: (population, centre
     // id, tile). Strictly larger wins; a tie keeps the lower centre id, whatever the
     // unordered store's walk order.

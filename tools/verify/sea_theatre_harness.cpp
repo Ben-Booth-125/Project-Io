@@ -49,7 +49,7 @@ namespace {
 std::size_t post_naval(const world& w)
 {
     return world_save_growth_carry_section_bytes(w) + world_save_ended_section_bytes(w)
-         + world_save_missile_section_bytes(w); // BL-1431: v89 appends the missiles last
+         + world_save_missile_section_bytes(w) + world_save_space_tail_bytes_after(80, w) /* the space merge */; // BL-1431: v89 appends the missiles last
 }
 
 int failures = 0, checks = 0;

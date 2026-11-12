@@ -765,10 +765,22 @@ planetology_state plan_body(generation_cursor& c, int proto_index, entity_id bod
     generation_report* const report = c.report;
     const body_naming&       naming = c.naming;
     const resolved_world&    rw     = c.rw;
-    body_inputs in = prototype_body(proto_index);
+    // BL-1638 (generated body mass): a non-home body's radius and density are
+    // rolled from its seed and its mass is density x volume — the same call the
+    // wizard's preview makes, so the chart and the world agree.
+    body_inputs in = generated_prototype_body(proto_index, params.seed);
     // The generated name, not the prototype's placeholder literal — the
     // chain's biography lines quote it (BL-257). `naming` outlives `in`.
     in.name = naming.bodies[static_cast<std::size_t>(proto_index)].c_str();
+    // Every reader of a body's mass — the orbital graph's climb, the low-orbit
+    // slot count — reads this one generated value. The homeworld's was written
+    // from the corridor (`home_mass`) where its component was built.
+    if (!in.is_homeworld)
+    {
+        const auto bit = c.w.bodies.find(body_id);
+        if (bit != c.w.bodies.end())
+            bit->second.mass_earths = in.mass_earths;
+    }
     if (in.is_homeworld)
         in.orbit_au = rw.home_orbit_au;
     // A moon travels with its planet. The homeworld's orbit is DERIVED from

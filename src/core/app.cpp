@@ -25,6 +25,8 @@
 #include "ui/convoys_ledger.hpp"
 #include "ui/military_ledger.hpp"
 #include "ui/diplomacy_ledger.hpp"
+#include "ui/space_ledger.hpp"
+#include "world/space_command.hpp" // apply_space_command — the Space ledger's presses
 #include "ui/unit_art.hpp"        // the unit designer's class art, loaded once
 #include "ui/unit_designer.hpp"   // the full-canvas unit designer
 #include "ui/wing_card.hpp"       // BL-1450: reset_wing_ui beside reset_unit_designer
@@ -42,6 +44,7 @@
 #include "ui/format.hpp"
 #include "ui/frame_stats.hpp" // frame-budget HUD (BL-249, v0.1.0 quality audit)
 #include "ui/alerts.hpp"
+#include "ui/pinned_panel.hpp" // the pinned-items watch list and front pins (BL-1603)
 #include "ui/header_panel.hpp"
 #include "ui/foldout_column.hpp" // shell_column_width — permanent left shell column (BL-122)
 #include "ui/shell_metrics.hpp"  // the shell's rect algebra, one owner (BL-216)
@@ -2123,6 +2126,8 @@ void app::step_economy()
         // BL-1480 (NR-1120): a declaration or peace the player is party to - the rival's
         // pass above, or the player's own press since the last step.
         session_history::post_war_dispatches(m_world, m_war_log_cursor, m_chat, day);
+        // BL-1605: a solar storm that struck the player's assets, or an Observatory's warning.
+        session_history::post_solar_storm_notices(m_world, m_last_econ_report, m_chat, day);
         // Persona counsel: ~1.05 s/tick measured 2026-08-12 (NR-210 records
         // the open in-game hitch). It was suppressed through the old validation
         // run; the settle now has no presentation half at all.
@@ -2213,6 +2218,7 @@ void app::setup_presentation(const world_params& params)
     m_chat = ui::chat_state{};
     m_war_log_cursor = m_world.history_log.size(); // BL-1480: no dispatch for what came before
     m_ui.war_notices = war_notice_state{}; // no notice for what came before
+    m_ui.pinned = pinned_items_state{};    // a new world's ids name nothing of the old one's
     ui::chat_post(m_chat, 0, null_entity, 0,
                   std::to_string(m_world.nations.size()) +
                       " nations on the public channel.");
@@ -2502,6 +2508,7 @@ bool app::save_game_to(const std::string& path)
     env.active_body       = m_ui.active_body;
     env.selected_entity   = m_ui.selected_entity;
     env.selected_province = m_ui.selected_province;
+    env.pins              = m_ui.pinned.pins; // save_game_version 28 (BL-1603)
     env.solar_zoom        = m_ui.solar_zoom;
     env.solar_pan_x       = m_ui.solar_pan_x;
     env.solar_pan_y       = m_ui.solar_pan_y;
@@ -2623,6 +2630,8 @@ bool app::load_game_from(const std::string& path)
     m_ui.active_body       = env.active_body;
     m_ui.selected_entity   = env.selected_entity;
     m_ui.selected_province = env.selected_province;
+    m_ui.pinned            = pinned_items_state{};
+    m_ui.pinned.pins       = env.pins; // save_game_version 28 (BL-1603); stale ids drop at draw
     m_ui.solar_zoom        = env.solar_zoom;
     m_ui.solar_pan_x       = env.solar_pan_x;
     m_ui.solar_pan_y       = env.solar_pan_y;
@@ -3023,6 +3032,12 @@ void app::render()
     // restores whichever tier was last active, wherever it was set.
     ui::draw_time_panel(m_ui, m_sim_loop, m_prev_speed, disp);
 
+    // Pinned items (LAYOUT.md § Pinned items — right column, middle; BL-1603): the
+    // residual middle of the right chrome column, under the time panel just drawn
+    // (whose height it reads) and above the minimap. Front pins first, then the
+    // player's own. A read of the world: it writes only its own ui_state.
+    ui::draw_pinned_panel(m_world, m_ui, disp);
+
     // Corporation profile — top-left corner, above the navigation pane.
     ui::draw_profile_panel(m_world);
 
@@ -3116,6 +3131,9 @@ void app::render()
     // while closed.
     ui::draw_diplomacy_ledger(m_world, m_registry, m_last_econ_report, m_last_corp_standings, m_ui,
                               m_ui.show_diplomacy_ledger);
+    // Space ledger — nav slot 9 (ledgers/space.md). Its presses queue on
+    // m_ui.space.pending, sent below through apply_space_command.
+    ui::draw_space_ledger(m_world, m_registry, m_ui, m_ui.show_space_ledger);
     // The unit designer (military.md § The designer): a full-canvas takeover the
     // Design tab's class rows and the unit card's type name open. Its picks draft;
     // Save queues `designer.pending`, sent below as `set_unit_design` — or, for an
@@ -3170,6 +3188,9 @@ void app::render()
         m_ui.designer.card_type_x = m_ui.designer.card_type_y = -1.0f; // the unit card republishes it
         ui::draw_selection_band(m_world, m_registry, m_last_econ_report,
                                 m_ui, band_origin, band_size);
+        // The pin toggle (LAYOUT.md § Pinned items): on the band's header row, at its
+        // top-right corner; its own window so it sits over whichever layout drew.
+        ui::draw_pin_toggle(m_world, m_ui, band_origin, band_size);
     }
 
     // The shell fold-out column is ledgers-only (BL-195), and it now really is: the
@@ -3230,7 +3251,7 @@ void app::render()
             case construction_result::insufficient_funds:
                 m_ui.construction.last_message = "Can't afford it."; break;
             case construction_result::slot_occupied:
-                m_ui.construction.last_message = "Already placed on this body."; break;
+                m_ui.construction.last_message = "Your nation already has a launchpad on this body."; break;
             case construction_result::insufficient_materials:
                 m_ui.construction.last_message = "Not enough materials."; break;
             case construction_result::tech_locked:
@@ -4035,6 +4056,19 @@ void app::render()
             m_ui.research_message = "The research queue refused that press.";
     }
     m_ui.pending_research_commands.clear(); // consume the requests
+
+    // Space presses (ledgers/space.md): every launch, station, template and
+    // satellite order through the near-space seam an agent's command takes —
+    // validated whole, queued as a pending order outside comms coverage. A
+    // spectator issues nothing. The answer is the ledger's message line.
+    for (const space_command& cmd : m_ui.space.pending)
+    {
+        if (m_ui.spectating || cmd.nation == null_entity)
+            break;
+        const space_command_outcome o = apply_space_command(m_world, m_registry, cmd);
+        m_ui.space.message = ui::space_outcome_text(cmd, o);
+    }
+    m_ui.space.pending.clear(); // consume the requests
 
     // Diplomacy presses (ledgers/diplomacy.md) — declare_war, answer_war, the peace
     // verbs, offer/accept friendship and return_to_neutral, each through the same

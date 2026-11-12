@@ -1,4 +1,8 @@
 #include "economy_system.hpp"
+#include "space_units.hpp" // BL-1595: run_space_unit_day
+#include "space_battle.hpp" // BL-1597: run_space_battle_day
+#include "debris.hpp"       // BL-1598: run_space_debris_day
+#include "space_bombard.hpp" // BL-1599: run_space_strike_day
 #include "war.hpp" // BL-1428: note_war_battles, run_war_quarter
 #include "logistic_points.hpp"
 
@@ -18,6 +22,8 @@
 #include "sentiment_emitters.hpp" // BL-1458/BL-1432: the emitters and the once-a-tick fold
 #include "stance.hpp"          // is_hostile (BL-470's NR-344 march queue; BL-617 migration gate)
 #include "nation_tech.hpp"     // recipe_unlocked, nation_scalar (BL-1273; BL-588 before it)
+#include "space_assets.hpp"    // BL-1630: space_standing_lot, the pad's standing bid
+#include "space_programme.hpp" // BL-1630: space_programme_params::standing_lots
 #include "state_industry.hpp"  // BL-1296: plan_state_funding, the state ledger
 #include "unit_roster.hpp"     // resolve_unit_upkeep (BL-454 unit pass), unit_roster_table (BL-470)
 #include "workforce.hpp"
@@ -1964,7 +1970,10 @@ recipe_switch_result try_switch_recipe(world& w, const recipe_registry& reg,
         return recipe_switch_result::tech_locked;
 
     // Propellant routes follow the body's air (Ben, 2026-10-09; PRODUCTION.md
-    // § Chemical Plant): the build door's gate, mirrored at the retool door.
+    // § Chemical Plant): the build door's gate, mirrored at the retool door - its
+    // key half first (BL-1604), as the build door asks it.
+    if (!recipe_mechanic_held_at_tile(w, *new_r, b.tile))
+        return recipe_switch_result::tech_locked;
     if (!recipe_runs_at_tile(w, *new_r, b.tile))
         return recipe_switch_result::wrong_air;
 
@@ -2081,6 +2090,53 @@ void advance_refits(world& w)
         u.refit_type = k_no_refit;
         u.refit_kit  = unit_design{};
         u.refit_days = 0;
+    }
+}
+
+// BL-1630 (SPACE_ASSETS.md § Launching, "A staffed pad bids for its launch";
+// MARKETS.md § Demand channels, property 3): a nation holding Rocketry with a
+// staffed Launchpad on its home body BIDS for its next launch's goods on its home
+// market — `standing_lots` x one satellite's lot (`space_standing_lot`), posted
+// into `report.wants` so the clear raises it into `demand` and a price answers
+// it. Before this the launch's want was off the book (an unposted bid lifts the
+// build veto and nothing more), so the goods had no price signal: no plant
+// was built for a buyer the market could not see, and the dial idled the plants
+// that were. Under the fair-price ceiling as every draw is: a good priced over
+// it does not bid; its want goes to the hauler-only register instead. Every
+// nation, the player's included: this is the pad's want on the market, not a
+// decision — nothing is bought, built or launched here. Ascending nation id;
+// nothing in the campaign settle.
+void post_space_launch_wants(const world& w, const space_asset_params& sp, float res_mult,
+                             float lots, economy_report& report)
+{
+    if (!(lots > 0.0f) || !std::isfinite(lots) || !research_age_open(w))
+        return;
+    std::vector<entity_id> ids;
+    ids.reserve(w.nations.size());
+    for (const auto& kv : w.nations)
+        ids.push_back(kv.first);
+    std::sort(ids.begin(), ids.end());
+    for (const entity_id n : ids)
+    {
+        entity_id mid = null_entity;
+        float comps = 0.0f, prop = 0.0f;
+        if (!space_standing_lot(w, sp, n, mid, comps, prop))
+            continue;
+        const market_component& m = w.markets.at(mid);
+        const std::pair<resource_type, float> lot[] = {
+            { resource_type::spacecraft_components, comps * lots },
+            { resource_type::propellant,            prop * lots },
+        };
+        for (const auto& [good, q] : lot)
+        {
+            if (!(q > 0.0f))
+                continue;
+            const std::size_t r = static_cast<std::size_t>(good);
+            auto& reg_row = shelf_admits(m, r, res_mult, /*off_buys=*/true)
+                ? report.wants[std::make_pair(n, mid)]
+                : report.hauler_wants[std::make_pair(n, mid)];
+            reg_row[r] += q;
+        }
     }
 }
 
@@ -2267,7 +2323,8 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
             pop_supply_by_body_nation[{tc_it->second.body, tn->second}] += labour_by_scale[sc];
         const entity_id body = tc_it->second.body;
         const float weight = static_cast<float>(sc);
-        hab_weighted_sum[body]  += pcc.habitability * weight;
+        // BL-1601: a fed base's life support makes up its body's shortfall.
+        hab_weighted_sum[body]  += offworld_base_habitability(w, cid, pcc.habitability) * weight;
         hab_weight_total[body]  += weight;
     }
     // Derive hab_cap_by_body: min(1, mean_hab / 0.6). Bodies with no centres get cap 1.0.
@@ -3068,7 +3125,8 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
             if (tc_it == w.tiles.end())
                 continue;
             const float w_scale = static_cast<float>(std::max(1, pcc.scale));
-            hab_sum[tc_it->second.body].first  += pcc.habitability * w_scale;
+            // BL-1601: a fed base's life support makes up its body's shortfall.
+            hab_sum[tc_it->second.body].first  += offworld_base_habitability(w, cid, pcc.habitability) * w_scale;
             hab_sum[tc_it->second.body].second += w_scale;
         }
         for (const auto& [body, acc] : hab_sum)
@@ -3573,6 +3631,10 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
     // the shelf only at the clear, so upkeep draws what earlier ticks left there.)
     run_building_upkeep(w, reg, report);
     phase_stamp(13); // building_upkeep
+
+    // BL-1630: the launch-ready pads' standing bid, posted for this tick's clear.
+    post_space_launch_wants(w, reg.space_assets(), reg.price_band().reservation_mult,
+                            reg.space_programme().standing_lots, report);
 
     // BL-1427 (fronts): re-anchor once more at the tick's end, after everything
     // that can move a border or kill a unit, so a save taken between ticks holds
@@ -4841,7 +4903,18 @@ unit_march_tick run_unit_march(world& w, const recipe_registry& reg, int day_tic
     if (w.units.empty())
         return out;
 
-    const std::vector<entity_id> ids = march_visit_order(w);
+    std::vector<entity_id> ids = march_visit_order(w);
+
+    // A DEFENDER STEPS LAST, AND AIMS WHERE THE ENEMY NOW STANDS (MILITARY.md § Defend
+    // province). Every unit on a defend order is visited after every other unit, the
+    // visit order kept within each group, and the defenders re-aim (`advance_defenders`)
+    // just before the first of them steps. A defender aimed at the tile a pushing stack
+    // stood on at dawn would otherwise walk onto the tile it just left, every day, and
+    // the two would never meet.
+    const auto first_defender = std::stable_partition(ids.begin(), ids.end(), [&](entity_id id) {
+        return w.units.at(id).defend_province == no_province;
+    });
+    const std::size_t defenders_from = static_cast<std::size_t>(first_defender - ids.begin());
 
     const military_capability_params& mil = reg.military();
 
@@ -4885,8 +4958,11 @@ unit_march_tick run_unit_march(world& w, const recipe_registry& reg, int day_tic
     std::vector<tile_attack> attacks;
     bool occupation_batch = false; // BL-1502: the fronts re-anchor once, after the pass
 
-    for (const entity_id id : ids)
+    for (std::size_t vi = 0; vi < ids.size(); ++vi)
     {
+        const entity_id id = ids[vi];
+        if (vi == defenders_from)
+            (void)advance_defenders(w, reg); // the re-aim, against where today's steps left them
         unit_component& u = w.units.at(id);
         if (u.order.dest == null_entity)
             continue; // halted / never ordered
@@ -5154,6 +5230,21 @@ military_day_result run_military_day(world& w, const recipe_registry& reg, int d
     return out;
 }
 
+namespace {
+/// One space day: the units (transit, docks, convoys), the battles, then the debris
+/// (BL-1595 / BL-1597 / BL-1598). Every step on empty stores does nothing.
+void run_space_day(world& w, const recipe_registry& reg)
+{
+    space_unit_day_report   ud;
+    space_battle_day_report bd;
+    run_space_unit_day(w, reg.space_units(), reg.stations(), &ud);
+    run_space_battle_day(w, reg.space_units(), reg.stations(), reg.space_battles(), &bd);
+    run_space_strike_day(w, reg.space_battles()); // BL-1599: standing bombard orders and battery fire
+    run_space_debris_day(w, reg.space_debris(), ud, bd);
+    run_space_firsts(w, reg.research()); // BL-1606 (ERAS.md § Firsts): the day's deeds, read last
+}
+} // namespace
+
 int advance_quarter_to(world& w, const recipe_registry& reg, int day_in_quarter,
                        int quarter_first_day_tick, std::vector<battle_dispatch>* dispatches)
 {
@@ -5166,8 +5257,22 @@ int advance_quarter_to(world& w, const recipe_registry& reg, int day_in_quarter,
     // completes on day d is under the march from that day on, on every path alike.
     for (int d = from + 1; d <= to; ++d)
     {
+        // BL-1595 (SPACE_FLEETS.md § Where a space unit is): the space units' day -
+        // transit counts down, docked units repair. Independent of the ground's day,
+        // so its place in the day is free; an empty store does nothing.
+        // BL-1597 (SPACE_FLEETS.md § Battles): then the battles at the nodes - fought
+        // after the day's arrivals, so a fleet that arrives joins the day's fire.
+        // BL-1598 (SPACE_ASSETS.md § Debris): then the debris - the battles' wrecks
+        // deposited, the units at (and passing through) a fouled node damaged.
+        run_space_day(w, reg);
         if (!military_active(w, reg, quarter_first_day_tick + d))
         {
+            // The space units walk the days the skip below jumps, one at a time.
+            // (Stations count: two hostile defended stations at one node fight.)
+            for (int k = d + 1; k <= to && (!w.space_units.empty() || !w.stations.empty()); ++k)
+            {
+                run_space_day(w, reg);
+            }
             // Nothing military left to walk: construction takes the rest in one call,
             // which walks the identical days (advance_construction_to is days-outer).
             advance_construction_to(w, reg, to);

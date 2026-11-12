@@ -27,6 +27,11 @@
 #include "placement_rules.hpp"
 #include "province.hpp"        // province_ceiling_scope (BL-1079: the muster scan's memo)
 #include "recipe_registry.hpp"
+#include "space_assets.hpp"    // BL-1615: space_home_body_of (the pad's body)
+#include "space_tech_keys.hpp" // BL-1615: the Rocketry and astronaut-training keys
+#include "offworld_base.hpp"   // BL-1608: a base province kept home (NR-1206, dial OFF)
+#include "space_battle.hpp"    // BL-1608: space_hostile (the battery's reason)
+#include "space_units.hpp"     // BL-1608: space_armed_units_at (the battery's reason)
 #include "supply_system.hpp"   // price_convoy_leg / commit_convoy (BL-600, the shared dispatch seam)
 #include "survey_system.hpp"
 #include "recruits.hpp"        // BL-1552: wing_crew
@@ -496,6 +501,9 @@ const char* corp_verb_label(corp_verb v)
         case corp_verb::set_trade:          return "trade";
         case corp_verb::clear_trade:        return "trade withdrawal";
         case corp_verb::set_trade_reserve:  return "trade reserve";
+        // BL-1613: the seat's Early Space verbs; no scorer issues them.
+        case corp_verb::queue_space_research:   return "Early Space research";
+        case corp_verb::unqueue_space_research: return "Early Space unqueue";
     }
     return "action";
 }
@@ -1609,6 +1617,26 @@ entity_id nearest_fed_ground(world& w, const recipe_registry& reg, unit_draw_mem
     return null_entity;
 }
 
+/// BL-1608 / NR-1206: does @p tile stand in the province of one of @p nation's
+/// off-world bases (a base centre whose tile it holds)? Read only when the
+/// `far_space_keep_base_home` dial is on.
+static bool base_province_of(const world& w, entity_id nation, entity_id tile)
+{
+    const uint32_t pid = w.provinces.province_of(tile);
+    if (pid == 0)
+        return false;
+    for (const auto& [cid, b] : w.offworld_bases)
+    {
+        (void)b;
+        const entity_id bt = offworld_base_tile(w, cid);
+        const auto nt = w.tile_to_nation.find(bt);
+        if (bt != null_entity && nt != w.tile_to_nation.end() && nt->second == nation
+            && w.provinces.province_of(bt) == pid)
+            return true;
+    }
+    return false;
+}
+
 void score_nation_fronts(world& w, const recipe_registry& reg, entity_id nation, int tick)
 {
     const std::vector<front> fronts = nation_fronts(w, nation); // a copy: the verbs below may re-anchor
@@ -1745,6 +1773,9 @@ void score_nation_fronts(world& w, const recipe_registry& reg, entity_id nation,
         if (u.defend_province != no_province) // BL-1504: it has its order
             continue;
         if (capital_prov != 0 && w.provinces.province_of(u.position) == capital_prov)
+            continue;
+        // BL-1608 / NR-1206 (RAISED, NOT GRANTED; dial OFF): a base province is a home kept too.
+        if (reg.nation_ai().far_space_keep_base_home != 0 && base_province_of(w, nation, u.position))
             continue;
         // BL-1441 (front edge cases): only a front the unit can REACH (`front_reachable`:
         // a march onto its lone slot the game would accept). Assigning one it cannot
@@ -3159,6 +3190,183 @@ void score_nation_bunkers(world& w, const recipe_registry& reg, entity_id nation
 }
 
 // ---------------------------------------------------------------------------
+// BL-1615 — a rival nation lays its own space groundwork (AI_OPPONENT.md § 11,
+// "Rival nations go to space as the player does", Ben 2026-11-10, which names
+// astronaut training among the verbs; "Every AI nation builds its own economy",
+// Ben 2026-10-23, which admits the build verb on its own ground; SPACE_ASSETS.md
+// § Launching, § Astronauts). The grant and nothing wider: the two ground buildings
+// a launch and a crew need, on its own ground on its home body, through the build
+// verb the player uses, paid from its treasury. Never for the player's nation,
+// never on another nation's ground, at most ONE build an evaluation, live play only.
+//
+//   PAD. Once it holds Rocketry (`space_keys::dispatch`) and has no Launchpad of its
+//   own on its home body (built or building - any not decommissioned).
+//   CENTRE. Once it holds `space_keys::astronaut_training`, has a COMPLETED pad of its
+//   own on its home body, and no Astronaut Training Centre of its own.
+//   WHERE. Its own tiles on the home body that the door admits (`can_place_in_world`
+//   with the type's placement gate), nearest its capital - where its market, its
+//   roads and its labour are thickest. Ties to the lowest tile id.
+//   WHEN PAID. Its uncommitted treasury holds twice the capex (the airbase's rule).
+// Pure arithmetic on sorted ids; no RNG.
+// ---------------------------------------------------------------------------
+
+namespace {
+
+/// The tile on @p nation's own ground on @p body nearest its capital that the door
+/// admits for @p type, or null. Squared grid distance (as the airbase's); ties keep
+/// the lowest tile id.
+entity_id nearest_own_site(world& w, const recipe_registry& reg, entity_id nation,
+                           entity_id body, building_type type)
+{
+    const nation_component& nc = w.nations.at(nation);
+    const auto cit = w.tiles.find(nc.capital_tile);
+    std::vector<std::pair<long long, entity_id>> order;
+    for (const entity_id tid : nc.tiles)
+    {
+        const auto tit = w.tiles.find(tid);
+        if (tit == w.tiles.end() || tit->second.body != body)
+            continue;
+        long long d = 0;
+        if (cit != w.tiles.end() && cit->second.body == body)
+        {
+            const long long dx = tit->second.grid_x - cit->second.grid_x;
+            const long long dy = tit->second.grid_y - cit->second.grid_y;
+            d = dx * dx + dy * dy;
+        }
+        order.emplace_back(d, tid);
+    }
+    std::sort(order.begin(), order.end());
+    order.erase(std::unique(order.begin(), order.end()), order.end());
+    if (order.empty())
+        return null_entity;
+    body_reach_field(w, body);
+    const float reach_budget = reg.construction().max_logistics_reach;
+    const placement_gate gate = reg.placement_gate_for(type, no_recipe);
+    for (const auto& [d, tid] : order)
+        if (placement_rules::can_place_in_world(w, tid, type, resource_type::iron_ore,
+                                                reach_budget, nation, gate))
+            return tid;
+    return null_entity;
+}
+
+} // namespace
+
+space_ground_pick score_nation_space_ground(world& w, const recipe_registry& reg, entity_id nation, int tick, bool apply)
+{
+    space_ground_pick pick;
+    pick.nation = nation;
+    // Never the player's nation (AI_OPPONENT.md § 11: "Not admitted: any space verb
+    // for the player's nation"), spectated or not, as run_nation_space_ai.
+    if (nation == null_entity || nation == player_nation(w) || w.nations.find(nation) == w.nations.end())
+        return pick;
+    if (tick < k_campaign_settle_ticks)
+        return pick;
+    if (!nation_has_mechanic(w, nation, space_keys::dispatch))
+    {
+        pick.block = space_ground_block::no_rocketry;
+        return pick;
+    }
+    const entity_id home = space_home_body_of(w, nation);
+    if (home == null_entity)
+    {
+        pick.block = space_ground_block::no_home;
+        return pick;
+    }
+
+    bool any_pad = false, done_pad = false, any_centre = false, any_battery = false;
+    {
+        std::vector<entity_id> own = w.nations.at(nation).state_assets;
+        std::sort(own.begin(), own.end());
+        for (const entity_id bid : own)
+        {
+            const auto bit = w.buildings.find(bid);
+            if (bit == w.buildings.end() || bit->second.decommissioned)
+                continue;
+            const building_component& b = bit->second;
+            if (b.type == building_type::astronaut_training_centre)
+                any_centre = true;
+            if (b.type == building_type::orbital_defence_battery)
+            {
+                const auto bt = w.tiles.find(b.tile);
+                if (bt != w.tiles.end() && bt->second.body == home)
+                    any_battery = true;
+                continue;
+            }
+            if (b.type != building_type::launchpad)
+                continue;
+            const auto tit = w.tiles.find(b.tile);
+            if (tit == w.tiles.end() || tit->second.body != home)
+                continue;
+            any_pad = true;
+            if (b.ticks_remaining <= 0)
+                done_pad = true;
+        }
+    }
+
+    // BL-1608 (the same grant: "space combat"; SPACE_FLEETS.md § Bombardment and fire at
+    // orbit): a BATTERY first, while an armed unit of a nation hostile to it stands in its
+    // home body's low orbit and it has no battery of its own on that body.
+    bool orbit_held = false;
+    if (!any_battery && nation_has_mechanic(w, nation, space_keys::orbital_defence_battery)
+        && reg.building_available(building_type::orbital_defence_battery))
+    {
+        std::vector<entity_id> others;
+        for (const auto& [oid, onc] : w.nations)
+            if (oid != nation)
+                others.push_back(oid);
+        std::sort(others.begin(), others.end());
+        for (const entity_id o : others)
+            if (space_hostile(w, nation, o)
+                && !space_armed_units_at(w, o, orbital_node{home, orbital_node_kind::low_orbit}).empty())
+            {
+                orbit_held = true;
+                break;
+            }
+    }
+
+    building_type type = building_type::none;
+    if (orbit_held)
+        type = building_type::orbital_defence_battery;
+    else if (!any_pad && reg.building_available(building_type::launchpad))
+        type = building_type::launchpad;
+    else if (done_pad && !any_centre && nation_has_mechanic(w, nation, space_keys::astronaut_training)
+             && reg.building_available(building_type::astronaut_training_centre))
+        type = building_type::astronaut_training_centre;
+    if (type == building_type::none)
+    {
+        pick.block = space_ground_block::nothing_wanted;
+        return pick;
+    }
+    pick.type = type;
+
+    const entity_id best = nearest_own_site(w, reg, nation, home, type);
+    if (best == null_entity)
+    {
+        pick.block = space_ground_block::no_site;
+        return pick;
+    }
+    pick.tile = best;
+    pick.cost = construction_capex(w, reg, best, type, resource_type::iron_ore);
+    if (!(state_uncommitted_treasury(w, nation) >= 2.0f * pick.cost))
+    {
+        pick.block = space_ground_block::treasury;
+        return pick;
+    }
+    if (!apply) // a preview (the spectate census): the pick, no verb
+    {
+        pick.block = space_ground_block::none;
+        return pick;
+    }
+    corp_command cmd;
+    cmd.tick = tick; cmd.corp = nation; cmd.as_nation = nation;
+    cmd.verb = corp_verb::build; cmd.tile = best; cmd.type = type;
+    pick.result = apply_corp_command(w, reg, cmd);
+    pick.block  = pick.result == corp_command_result::applied ? space_ground_block::none
+                                                                : space_ground_block::refused;
+    return pick;
+}
+
+// ---------------------------------------------------------------------------
 // BL-1461 — a rival nation wages war (AI_OPPONENT.md § 11: the stance grant,
 // BL-450, covers a rival DECLARING war, goals included (Ben, 2026-10-30); "Rival
 // nations wage war whole" grants answering, offering, accepting, refusing and
@@ -3934,6 +4142,13 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
         // and the settle itself as well.
         if (actor.is_nation)
             score_nation_bunkers(w, reg, corp, tick);
+
+        // BL-1615 (AI_OPPONENT.md § 11, "Rival nations go to space as the player does",
+        // Ben 2026-11-10): its own Launchpad, then its own Astronaut Training Centre,
+        // once the keys are held - at most one build an evaluation. Refuses the
+        // player's nation (spectated or not) and the settle itself as well.
+        if (actor.is_nation)
+            (void)score_nation_space_ground(w, reg, corp, tick);
 
         // BL-1309 grant (AI_OPPONENT.md § 11, Ben 2026-10-15): a producing build
         // beyond its host nation's Logistic Point reach is scored with the capex of

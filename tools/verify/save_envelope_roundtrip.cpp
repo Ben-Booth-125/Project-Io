@@ -463,6 +463,7 @@ save_envelope make_envelope()
     e.active_body       = 17;
     e.selected_entity   = 23;
     e.selected_province = 91;
+    e.pins              = { 23, 17, 5 }; // BL-1603: pin order is the list's order, not ascending
 
     // Nine distinct non-dyadic-ish floats: a reader that swapped pan_x and pan_y,
     // or read a zoom into a pan, cannot pass.
@@ -826,6 +827,7 @@ int main()
                   && le.selected_entity == env.selected_entity
                   && le.selected_province == env.selected_province,
               "S5 the ui_state slice's rung, lens and selection survive");
+        check(le.pins == env.pins, "S5 the player's pins survive, in pin order (v28, BL-1603)");
         check(le.solar_zoom == env.solar_zoom && le.solar_pan_x == env.solar_pan_x
                   && le.solar_pan_y == env.solar_pan_y && le.circum_zoom == env.circum_zoom
                   && le.circum_pan_x == env.circum_pan_x && le.circum_pan_y == env.circum_pan_y
@@ -1126,9 +1128,9 @@ int main()
     // S12 -- a v25 stream (no tail) still reads whole and opens with an EMPTY
     // report, as every load did before v27.
     // -----------------------------------------------------------------------
-    static_assert(save_game_version == 29 && save_game_version_econ_report == 27
+    static_assert(save_game_version == 30 && save_game_version_econ_report == 27
                       && save_game_version_pre_econ_report == 25,
-                  "S11/S12 pin v27 as the first last-report layout over a v25 prefix (v29 today)");
+                  "S11/S12 pin v27 as the first last-report layout over a v25 prefix (v30 today)");
     {
         world w = make_world();
         save_envelope env = make_envelope();
@@ -1354,18 +1356,40 @@ int main()
                   && te.last_corp_standings.size() == 2
                   && same_market_history(te.market_history, env.market_history),
               "S12 a v27 stream (55 wide, report tail) is ACCEPTED with its report");
+        // S14 (BL-1603; the space merge): the pins ride at the tail of v28 (the space
+        // branch's layout, 55 wide) and v30; v27 and v29 carry none and open with none.
+        // Every one reads its report whole.
+        static_assert(save_game_version == 30 && save_game_version_space_pins == 28
+                          && envelope_has_pins(28) && envelope_has_pins(30) && !envelope_has_pins(29)
+                          && !envelope_has_pins(27),
+                      "S14 pins v28 and v30 as the pins layouts");
+        for (const uint32_t pv : { save_game_version_econ_report, save_game_version_space_pins,
+                                   save_game_version_stacked })
+        {
+            check(write_save_game_at(k_path, w, env, pv), "S14 the verification writer wrote a v27/v28/v29 file");
+            world         pw;
+            save_envelope pe;
+            pe.pins = { 99 }; // must be replaced
+            const bool pok = read_save_game(k_path, pw, pe);
+            check(pok, "S14 a v27, v28 or v29 stream is ACCEPTED");
+            check(pok && (envelope_has_pins(pv) ? pe.pins == env.pins : pe.pins.empty()),
+                  "S14 v28 opens with its pins in pin order; v27 and v29 (no pins tail) open with none");
+            check(pok && pe.last_econ_report.buildings.size() == env.last_econ_report.buildings.size()
+                      && same_market_history(pe.market_history, env.market_history),
+                  "S14 each one's report tail and market history read whole");
+        }
         // A version no build has written is refused.
         write_save_game(k_path, w, env);
         {
             std::fstream f(k_path, std::ios::binary | std::ios::in | std::ios::out);
             f.seekp(4, std::ios::beg);
-            const uint32_t v30 = save_game_version + 1;
-            f.write(reinterpret_cast<const char*>(&v30), sizeof(v30));
+            const uint32_t v31 = save_game_version + 1;
+            f.write(reinterpret_cast<const char*>(&v31), sizeof(v31));
         }
         save_envelope be;
         be.speed = 55;
         check(!read_save_game(k_path, vw, be) && be.speed == 55,
-              "S12 a stream stamped v30 (no layout yet) is REFUSED, destination untouched");
+              "S12 a stream stamped v31 (no layout yet) is REFUSED, destination untouched");
     }
 
     // -----------------------------------------------------------------------
@@ -1374,7 +1398,7 @@ int main()
     // truncated tail are each REFUSED before anything is allocated or moved,
     // and the destination world and envelope are left exactly as they were.
     // The tail's offset is the size of the same envelope written at v26 (56 wide, no tail),
-    // plus the world sections a v88 snapshot carries and the v26 file's v81 world does not.
+    // plus the world sections a v93 snapshot carries and the v26 file's v81 world does not.
     // -----------------------------------------------------------------------
     {
         auto file_size = [](const char* p) {
@@ -1408,7 +1432,9 @@ int main()
         write_save_game_at(k_path, w, env, save_game_version_ship_hulls);
         const std::uint64_t tail = file_size(k_path) + world_save_research_books_section_bytes(w)
                                  + world_save_growth_carry_section_bytes(w)
-                                 + world_save_ended_section_bytes(w);
+                                 + world_save_ended_section_bytes(w)
+                                 + world_save_missile_section_bytes(w) // BL-1431: v89 carries the missiles
+                                 + world_save_space_tail_bytes_after(80, w); // the space merge: v30 carries v93
         write_save_game(k_path, w, env);
         const std::uint64_t full = file_size(k_path);
         check(full > tail, "S13 anchor: the v29 file is longer than its tail offset (the tail is there)");

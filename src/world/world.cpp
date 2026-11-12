@@ -1,5 +1,7 @@
 #include "world.hpp"
 
+#include "solar_storm.hpp" // BL-1605: the activity-fog twin darkens a struck Comms satellite
+
 #include <algorithm>
 #include <cmath>
 #include <cstring>
@@ -963,6 +965,27 @@ uint64_t world::state_hash(int tick) const
                 for (const uint16_t n : st.queue)
                     fnv1a_u32(h, n);
             }
+            // BL-1612: the Early Space held sets and queues, folded only for a
+            // nation that has any, behind their own tag - so a world with no
+            // Early Space progress hashes exactly as before the tree opened.
+            for (const auto& [nid, st] : nation_tech)
+            {
+                if (st.es_empty())
+                    continue;
+                fnv1a_u32(h, 0xE5A7u);
+                fnv1a_u32(h, nid);
+                for (int i = 0; i < io::es::node_count; i += 32)
+                {
+                    uint32_t word = 0;
+                    for (int b = 0; b < 32 && i + b < io::es::node_count; ++b)
+                        if (st.es_held.test(static_cast<std::size_t>(i + b)))
+                            word |= (1u << b);
+                    fnv1a_u32(h, word);
+                }
+                fnv1a_u32(h, static_cast<uint32_t>(st.es_queue.size()));
+                for (const uint16_t n : st.es_queue)
+                    fnv1a_u32(h, n);
+            }
         }
         // BL-1327: the space assets, on the nation_tech precedent — folded only
         // when the store is non-empty, so a world that never launched hashes as
@@ -984,6 +1007,334 @@ uint64_t world::state_hash(int tick) const
                 fnv1a_f32(h, a.upkeep);
                 fnv1a_i32(h, a.unpaid_quarters);
                 fnv1a_f32(h, a.launch_cost);
+                // BL-1581 / BL-1586: the node it sits at and a satellite's role.
+                fnv1a_u32(h, a.node.body);
+                fnv1a_u32(h, static_cast<uint32_t>(a.node.kind));
+                fnv1a_u32(h, static_cast<uint32_t>(a.role));
+            }
+        }
+        // BL-1587 / BL-1588: the pending near-space orders — folded only when any
+        // is held or was ever issued, so a world without them hashes as before.
+        if (!space_orders.empty() || next_space_order_id != 0)
+        {
+            fnv1a_u32(h, 0x0D3Au); // tag: cannot alias the asset run above
+            fnv1a_u32(h, next_space_order_id);
+            fnv1a_u32(h, static_cast<uint32_t>(space_orders.size()));
+            for (const space_order& o : space_orders)
+            {
+                const space_command& c = o.cmd;
+                fnv1a_u32(h, o.id);
+                fnv1a_i32(h, o.due_tick);
+                fnv1a_u32(h, c.nation);
+                fnv1a_u32(h, c.verb);
+                fnv1a_u32(h, c.cls);
+                fnv1a_u32(h, c.role);
+                fnv1a_u32(h, c.node_body);
+                fnv1a_u32(h, c.node_kind);
+                fnv1a_u32(h, c.subject);
+                fnv1a_i32(h, c.slot);
+                fnv1a_i32(h, c.slot_to);
+                fnv1a_u32(h, c.module);
+                fnv1a_u32(h, static_cast<uint32_t>(c.name.size()));
+                for (const char ch : c.name)
+                    fnv1a_u32(h, static_cast<uint8_t>(ch));
+                fnv1a_u32(h, c.layout.level);
+                fnv1a_u32(h, static_cast<uint32_t>(c.layout.kinds.size()));
+                for (const uint8_t k : c.layout.kinds)
+                    fnv1a_u32(h, k);
+            }
+        }
+        // BL-1583 / BL-1585: the stations, their templates, the station fields on
+        // the assets and the astronaut pools — folded only when any is non-empty
+        // or non-default, so a world without them hashes as it did before.
+        bool any_station_field = false;
+        for (const auto& [aid, a] : space_assets)
+            if (a.station != null_entity || a.crew != 0 || a.module != k_no_station_module
+                || a.station_slot != -1 || a.refit_done_tick != -1)
+            {
+                any_station_field = true;
+                break;
+            }
+        bool any_astronauts = false;
+        for (const auto& [nid, nc] : nations)
+            if (nc.astronauts != 0) { any_astronauts = true; break; }
+        if (any_station_field || any_astronauts || !stations.empty() || !station_templates.empty())
+        {
+            fnv1a_u32(h, 0x57A7u); // tag: cannot alias the asset run above
+            for (const auto& [aid, a] : space_assets)
+                if (a.station != null_entity || a.crew != 0 || a.module != k_no_station_module
+                    || a.station_slot != -1 || a.refit_done_tick != -1)
+                {
+                    fnv1a_u32(h, aid);
+                    fnv1a_u32(h, a.station);
+                    fnv1a_i32(h, a.station_slot);
+                    fnv1a_u32(h, a.module);
+                    fnv1a_i32(h, a.crew);
+                    fnv1a_i32(h, a.refit_done_tick);
+                }
+            fnv1a_u32(h, static_cast<uint32_t>(stations.size()));
+            for (const auto& [sid, st] : stations)
+            {
+                fnv1a_u32(h, sid);
+                fnv1a_u32(h, st.owner);
+                fnv1a_u32(h, st.core);
+                fnv1a_u32(h, st.node.body);
+                fnv1a_u32(h, static_cast<uint32_t>(st.node.kind));
+                fnv1a_u32(h, st.level);
+                for (const entity_id s : st.slots)
+                    fnv1a_u32(h, s);
+            }
+            fnv1a_u32(h, static_cast<uint32_t>(station_templates.size()));
+            for (const auto& [nid, ts] : station_templates)
+            {
+                fnv1a_u32(h, nid);
+                fnv1a_u32(h, static_cast<uint32_t>(ts.size()));
+                for (const auto& [name, t] : ts)
+                {
+                    fnv1a_u32(h, static_cast<uint32_t>(name.size()));
+                    for (const char c : name)
+                        fnv1a_u32(h, static_cast<uint8_t>(c));
+                    fnv1a_u32(h, t.level);
+                    for (const uint8_t k : t.kinds)
+                        fnv1a_u32(h, k);
+                }
+            }
+            for (const auto& [nid, nc] : nations)
+                if (nc.astronauts != 0)
+                {
+                    fnv1a_u32(h, nid);
+                    fnv1a_i32(h, nc.astronauts);
+                }
+        }
+        // BL-1594 / BL-1595: the space units, their designs and the depot stocks —
+        // folded only when any is non-empty, so a world without them hashes as before.
+        if (!space_units.empty() || !space_unit_designs.empty() || !station_depot_stock.empty())
+        {
+            fnv1a_u32(h, 0x5F17u); // tag: cannot alias the station run above
+            fnv1a_u32(h, static_cast<uint32_t>(space_unit_designs.size()));
+            for (const auto& [nid, ds] : space_unit_designs)
+            {
+                fnv1a_u32(h, nid);
+                fnv1a_u32(h, static_cast<uint32_t>(ds.size()));
+                for (const auto& [hull, d] : ds)
+                {
+                    fnv1a_u32(h, hull);
+                    for (const uint8_t it : d)
+                        fnv1a_u32(h, it);
+                }
+            }
+            fnv1a_u32(h, static_cast<uint32_t>(space_units.size()));
+            for (const auto& [uid, u] : space_units)
+            {
+                fnv1a_u32(h, uid);
+                fnv1a_u32(h, u.owner);
+                fnv1a_u32(h, static_cast<uint32_t>(u.hull));
+                for (const uint8_t it : u.design)
+                    fnv1a_u32(h, it);
+                fnv1a_u32(h, static_cast<uint32_t>(u.state));
+                fnv1a_u32(h, u.node.body);
+                fnv1a_u32(h, static_cast<uint32_t>(u.node.kind));
+                fnv1a_u32(h, u.dest.body);
+                fnv1a_u32(h, static_cast<uint32_t>(u.dest.kind));
+                fnv1a_i32(h, u.days_remaining);
+                fnv1a_u32(h, u.station);
+                fnv1a_f32(h, u.propellant);
+                fnv1a_f32(h, u.cargo);
+                fnv1a_f32(h, u.hull_points);
+                fnv1a_i32(h, u.crew);
+                fnv1a_f32(h, u.upkeep);
+                fnv1a_i32(h, u.unpaid_quarters);
+            }
+            fnv1a_u32(h, static_cast<uint32_t>(station_depot_stock.size()));
+            for (const auto& [sid, stock] : station_depot_stock)
+            {
+                fnv1a_u32(h, sid);
+                fnv1a_f32(h, stock);
+            }
+        }
+        // BL-1597: the space battles and their id counter — folded only when either
+        // is non-empty, so a world that never fought in space hashes as before.
+        if (!space_battles.empty() || next_space_battle_id != 0)
+        {
+            fnv1a_u32(h, 0xBA77u); // tag
+            fnv1a_u32(h, next_space_battle_id);
+            fnv1a_u32(h, static_cast<uint32_t>(space_battles.size()));
+            for (const auto& [bid, b] : space_battles)
+            {
+                fnv1a_u32(h, bid);
+                fnv1a_u32(h, b.node.body);
+                fnv1a_u32(h, static_cast<uint32_t>(b.node.kind));
+                fnv1a_u32(h, static_cast<uint32_t>(b.state));
+                fnv1a_i32(h, b.opened_tick);
+                fnv1a_i32(h, b.days);
+                fnv1a_f32(h, b.mass_destroyed);
+                for (const space_battle_side& s : b.sides)
+                {
+                    fnv1a_u32(h, s.nation);
+                    fnv1a_i32(h, s.units_lost);
+                    fnv1a_i32(h, s.crew_lost);
+                    fnv1a_i32(h, s.modules_lost);
+                    fnv1a_i32(h, s.stations_lost);
+                    fnv1a_f32(h, s.damage_landed);
+                    fnv1a_u32(h, static_cast<uint32_t>(s.end));
+                }
+                fnv1a_u32(h, static_cast<uint32_t>(b.withdrawing.size()));
+                for (const space_battle_withdrawal& e : b.withdrawing)
+                {
+                    fnv1a_u32(h, e.unit);
+                    fnv1a_u32(h, e.dest.body);
+                    fnv1a_u32(h, static_cast<uint32_t>(e.dest.kind));
+                }
+                fnv1a_u32(h, static_cast<uint32_t>(b.module_damage.size()));
+                for (const auto& [mid, dmg] : b.module_damage)
+                {
+                    fnv1a_u32(h, mid);
+                    fnv1a_f32(h, dmg);
+                }
+            }
+        }
+        // BL-1600: each nation's mapped and prospected regions off the home world —
+        // folded only when non-empty, so a world nobody mapped hashes as before.
+        if (!survey_knowledge.empty())
+        {
+            fnv1a_u32(h, 0x1600u); // tag
+            fnv1a_u32(h, static_cast<uint32_t>(survey_knowledge.size()));
+            for (const auto& [key, k] : survey_knowledge)
+            {
+                fnv1a_u32(h, key.first);
+                fnv1a_u32(h, key.second);
+                fnv1a_i32(h, k.regions_total);
+                fnv1a_i32(h, k.regions_mapped);
+                if (!k.prospected.empty())
+                    fnv1a_bytes(h, k.prospected.data(), k.prospected.size());
+            }
+        }
+        // BL-1596: the cargo aboard and the trade Haulers' trips — folded only when
+        // any is held, so a world without them hashes as before.
+        if (!space_hauls.empty())
+        {
+            fnv1a_u32(h, 0x5F18u); // tag
+            fnv1a_u32(h, static_cast<uint32_t>(space_hauls.size()));
+            for (const auto& [uid, sh] : space_hauls)
+            {
+                fnv1a_u32(h, uid);
+                fnv1a_u32(h, sh.owner);
+                fnv1a_u32(h, static_cast<uint32_t>(sh.phase));
+                fnv1a_u32(h, static_cast<uint32_t>(sh.cargo_res));
+                fnv1a_u32(h, sh.src_market);
+                fnv1a_u32(h, sh.convoy);
+                fnv1a_u32(h, sh.dest_market);
+                fnv1a_u32(h, sh.target.body);
+                fnv1a_u32(h, static_cast<uint32_t>(sh.target.kind));
+                fnv1a_u32(h, sh.home.body);
+                fnv1a_u32(h, static_cast<uint32_t>(sh.home.kind));
+            }
+        }
+        // BL-1598: debris per node, each asset's wear, each open battle's quiet days
+        // — folded only when any is held, so a world without debris hashes as before.
+        {
+            std::vector<std::pair<entity_id, float>> wear;
+            for (const auto& [aid, a] : space_assets)
+                if (a.wear != 0.0f)
+                    wear.emplace_back(aid, a.wear);
+            std::vector<std::pair<uint32_t, int32_t>> quiet;
+            for (const auto& [bid, b] : space_battles)
+                if (b.quiet_days != 0)
+                    quiet.emplace_back(bid, b.quiet_days);
+            if (!space_debris.empty() || !wear.empty() || !quiet.empty())
+            {
+                fnv1a_u32(h, 0x1598u); // tag
+                fnv1a_u32(h, static_cast<uint32_t>(space_debris.size()));
+                for (const auto& [node, lv] : space_debris)
+                {
+                    fnv1a_u32(h, node.body);
+                    fnv1a_u32(h, static_cast<uint32_t>(node.kind));
+                    fnv1a_f32(h, lv);
+                }
+                fnv1a_u32(h, static_cast<uint32_t>(wear.size()));
+                for (const auto& [aid, wv] : wear)
+                {
+                    fnv1a_u32(h, aid);
+                    fnv1a_f32(h, wv);
+                }
+                fnv1a_u32(h, static_cast<uint32_t>(quiet.size()));
+                for (const auto& [bid, q] : quiet)
+                {
+                    fnv1a_u32(h, bid);
+                    fnv1a_i32(h, q);
+                }
+            }
+        }
+        // BL-1599: the standing bombard orders — folded only when any is held, so a
+        // world without them hashes as before.
+        if (!space_bombard_orders.empty())
+        {
+            fnv1a_u32(h, 0x1599u); // tag
+            fnv1a_u32(h, static_cast<uint32_t>(space_bombard_orders.size()));
+            for (const auto& [uid, o] : space_bombard_orders)
+            {
+                fnv1a_u32(h, uid);
+                fnv1a_u32(h, static_cast<uint32_t>(o.kind));
+                fnv1a_u32(h, o.target);
+            }
+        }
+        // BL-1601: the off-world bases and the colonists aboard — folded only when
+        // either is held, so a world without them hashes as before. Colonists count
+        // on live units only, as the save writes them: colonists aboard a lost unit
+        // are gone with it (pruned at the quarter).
+        uint32_t live_colonists = 0;
+        for (const auto& [uid, n] : space_colonists)
+            live_colonists += space_units.count(uid) != 0 ? 1u : 0u;
+        if (!offworld_bases.empty() || live_colonists != 0)
+        {
+            fnv1a_u32(h, 0x5F19u); // tag
+            fnv1a_u32(h, static_cast<uint32_t>(offworld_bases.size()));
+            for (const auto& [cid, b] : offworld_bases)
+            {
+                fnv1a_u32(h, cid);
+                fnv1a_u32(h, static_cast<uint32_t>(b.founded_tick));
+                fnv1a_u32(h, static_cast<uint32_t>(b.unfed_quarters));
+            }
+            fnv1a_u32(h, live_colonists);
+            for (const auto& [uid, n] : space_colonists)
+                if (space_units.count(uid) != 0)
+                {
+                    fnv1a_u32(h, uid);
+                    fnv1a_u32(h, static_cast<uint32_t>(n));
+                }
+        }
+        // BL-1606: the space firsts taken — folded only when any is, so a world
+        // where none is taken hashes as before.
+        if (!space_firsts.empty())
+        {
+            fnv1a_u32(h, 0x1606u); // tag
+            fnv1a_u32(h, static_cast<uint32_t>(space_firsts.size()));
+            for (const auto& [k, f] : space_firsts) // ascending kind
+            {
+                fnv1a_u32(h, k);
+                fnv1a_u32(h, f.nation);
+                fnv1a_u32(h, static_cast<uint32_t>(f.day_tick));
+            }
+        }
+        // BL-1614: each in-transit asset's recorded origin and departure tick —
+        // folded only when any is recorded, so a world with nothing travelling
+        // (or saved before the field) hashes as before.
+        {
+            uint32_t from_n = 0;
+            for (const auto& [aid, a] : space_assets)
+                from_n += space_asset_has_transit_origin(a) ? 1u : 0u;
+            if (from_n != 0)
+            {
+                fnv1a_u32(h, 0x1614u); // tag
+                fnv1a_u32(h, from_n);
+                for (const auto& [aid, a] : space_assets)
+                    if (space_asset_has_transit_origin(a))
+                    {
+                        fnv1a_u32(h, aid);
+                        fnv1a_u32(h, a.transit_from.body);
+                        fnv1a_u32(h, static_cast<uint32_t>(a.transit_from.kind));
+                        fnv1a_i32(h, a.depart_tick);
+                    }
             }
         }
     }
@@ -1342,6 +1693,48 @@ std::pair<float, float> body_pos(const world& w, entity_id id)
 
 } // namespace
 
+namespace {
+
+/// BL-1586: the header-only twin of `space_comms_lifts_activity_fog`
+/// (space_effects.hpp) for the player's nation. world.cpp links alone in several
+/// hand-declared harness targets, so it cannot call into nation_tech.cpp or
+/// space_effects.cpp; this walks the same header data `nation_has_mechanic` does
+/// (a HELD node carrying the `space_role_comms` mechanic) and the asset store.
+/// space_effects_harness holds the two equal.
+bool player_comms_lift(const world& w)
+{
+    if (w.space_assets.empty())
+        return false;
+    const entity_id n = player_nation(w);
+    if (n == null_entity)
+        return false;
+    bool sat = false;
+    for (const auto& [id, a] : w.space_assets)
+    {
+        (void)id;
+        if (a.owner == n && a.cls == space_asset_class::satellite
+            && a.role == space_satellite_role::comms && a.state == space_asset_state::active
+            && !solar_storm_satellite_dark(w, a, w.current_econ_tick)) // BL-1605
+        {
+            sat = true;
+            break;
+        }
+    }
+    if (!sat)
+        return false;
+    const auto tit = w.nation_tech.find(n);
+    if (tit == w.nation_tech.end())
+        return false;
+    for (const io::dg::effect& e : io::dg::effects)
+        if (e.kind == io::dg::effect_kind::mechanic && std::strcmp(e.target, "space_role_comms") == 0
+            && e.node >= 0 && e.node < io::dg::node_count
+            && tit->second.held.test(static_cast<std::size_t>(e.node)))
+            return true;
+    return false;
+}
+
+} // namespace
+
 activity_vis body_activity_visibility(const world& w, entity_id body, int now_tick,
                                       int route_fresh_ticks, int glimpse_fresh_ticks)
 {
@@ -1377,6 +1770,12 @@ activity_vis body_activity_visibility(const world& w, entity_id body, int now_ti
         return activity_vis::unknown;
     }
 
+    // BL-1586 (SPACE_ASSETS.md § Satellites; DG-NE-MK-B1 Communication Satellites):
+    // with the technology and an ACTIVE Comms satellite, the activity fog lifts on
+    // every market the player trades with — a body its routes reach reads as the
+    // live feed, fresh or cold.
+    if (player_comms_lift(w))
+        return activity_vis::visible;
     return (now_tick - freshest <= route_fresh_ticks) ? activity_vis::known
                                                       : activity_vis::known_stale;
 }

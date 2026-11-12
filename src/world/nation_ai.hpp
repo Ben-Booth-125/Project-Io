@@ -3,6 +3,12 @@
 #include "entity.hpp"
 #include "nation_budget.hpp"
 #include "nation_tax.hpp" // BL-1335: tax_params, tax_ai_pick (header-only)
+#include "orbital_node.hpp"  // BL-1589: the space pick's node
+#include "space_assets.hpp"  // BL-1589: station_module_kind, k_no_station_module
+#include "space_command.hpp" // BL-1589: space_command_result
+#include "space_units.hpp"   // BL-1608: space_design (the far-space pick's design)
+
+#include <array>
 
 #include <cstddef>
 #include <cstdint>
@@ -11,6 +17,7 @@
 #include <vector>
 
 struct world;
+struct research_params; // BL-1613: research_queue_idle's gate dial (nation_tech.hpp)
 class recipe_registry;
 struct economy_report;
 
@@ -229,6 +236,65 @@ struct nation_ai_params
     /// pass (Ben, 2026-10-15: re-pick within the quarter while the pool covers
     /// the next node; a bounded loop, one node queued at a time).
     int research_repicks_per_quarter = 8;
+    /// BL-1589 (rival space AI): relief units per near-space MECHANIC key a node
+    /// carries (`space_tech_keys.hpp`'s `near_space`, Rocketry's `space_dispatch`
+    /// excepted — it already scores as the space gate, `research_unlock_relief`),
+    /// before the space_programme line's emphasis. Half an unlock: a key is a
+    /// promise of a verb, not a building. Without it a node whose only effect is
+    /// a key (Communication Satellites, every module key) weighs nothing and the
+    /// picker reaches it only on the way to something else.
+    float research_space_key_relief = 0.25f;
+
+    // --- The space pick (BL-1589; AI_OPPONENT.md § 11, Ben 2026-11-10) ------
+    /// The treasury a nation keeps after any space action: the action is taken
+    /// only when `treasury - cost >= space_reserve_share x treasury +
+    /// space_reserve_upkeep_quarters x (its space upkeep a quarter, the new
+    /// asset's included)` — one launch spends at most (1 - share) of what the
+    /// treasury holds, and leaves the upkeep of what it then owns for that many
+    /// quarters. A share, not a credit floor, because treasuries differ by orders
+    /// of magnitude between worlds and nations. A reserve rule, not a forecast.
+    float space_reserve_share           = 0.5f;
+    int   space_reserve_upkeep_quarters = 8;
+    /// The station the scorer fills, one launch at a time, in this order: the
+    /// next entry whose kind the station holds fewer of than the list has up to
+    /// that entry, whose key is held, whose crew the pool covers and which the
+    /// station's power, crew room and life support (every fitted part counted,
+    /// in transit or in place) would still cover. Fourteen entries: a 5x3 grid
+    /// less its core. `k_no_station_module` ends the list early.
+    std::array<uint8_t, 14> space_station_target{{
+        static_cast<uint8_t>(station_module_kind::power),
+        static_cast<uint8_t>(station_module_kind::research),
+        static_cast<uint8_t>(station_module_kind::habitation),
+        static_cast<uint8_t>(station_module_kind::life_support),
+        static_cast<uint8_t>(station_module_kind::power),
+        static_cast<uint8_t>(station_module_kind::research),
+        static_cast<uint8_t>(station_module_kind::observatory),
+        static_cast<uint8_t>(station_module_kind::comms_relay),
+        static_cast<uint8_t>(station_module_kind::power),
+        static_cast<uint8_t>(station_module_kind::habitation),
+        static_cast<uint8_t>(station_module_kind::life_support),
+        static_cast<uint8_t>(station_module_kind::research),
+        static_cast<uint8_t>(station_module_kind::fuel_depot),
+        static_cast<uint8_t>(station_module_kind::cargo_hold),
+    }};
+
+    // --- The far-space pick (BL-1608; AI_OPPONENT.md § 11, Ben 2026-11-10) ---
+    // Lua: economy.nation_ai (scripts/economy.lua). The reserve rule above
+    // (`space_reserve_*`) prices every far-space spend as it prices a launch.
+    /// Off-world bases a rival keeps founding toward. At the count it stops
+    /// raising Landers for a base (its prospecting and its bases go on).
+    int far_space_bases_max = 1;
+    /// Colonists (thousands) one embark boards: at least the founding minimum,
+    /// at most the Lander's free berths.
+    int far_space_colonists = 4;
+    /// Armed hulls a rival keeps per nation it is hostile to, and its ceiling in
+    /// all: a war is the reason to raise one, and the count is how many.
+    int far_space_warships_per_hostile = 2;
+    int far_space_warships_max         = 6;
+    /// NR-1206 (RAISED, NOT GRANTED): when 1, the land-front scorer keeps a
+    /// rival's off-world base province garrisoned as it keeps its capital's.
+    /// Granted (Ben, 2026-11-10, NR-1206): on by default.
+    int far_space_keep_base_home = 1;
 };
 
 /// The three terms, per nation, exactly as they were computed. Reported, never
@@ -355,6 +421,9 @@ struct research_ai_pick
     std::int64_t score_milli  = 0; ///< relief - cost.
     int          candidates   = 0; ///< Legal frontier nodes weighed.
     bool         queued       = false; ///< `enqueue_node` returned `queued`.
+    /// BL-1613: `node` is an Early Space (`io::es`) index, queued through
+    /// `enqueue_early_space_node`, rather than a Digitisation one.
+    bool         early_space  = false;
 };
 
 /// The frontier node @p nation would queue next, and why — PURE (reads @p w,
@@ -366,12 +435,21 @@ struct research_ai_pick
 /// sides are both candidates until one is held or queued; the score picks the
 /// side, and a tie between them breaks by the nation's own seed. The scoring
 /// rule is the comment over the definition (nation_ai.cpp).
+///
+/// BL-1613: once the nation meets the gate into space, the Early Space nodes it
+/// could queue alone (`preview_enqueue_early_space` plans just the node; no quest,
+/// every Early Space deed being unread) are candidates beside the Digitisation
+/// ones, scored by the same rule; a tie keeps the Digitisation node.
 research_ai_pick choose_research_node(const world& w, const recipe_registry& reg,
                                       entity_id nation, const nation_ai_params& p);
 
 /// Whether @p nation's queue holds no entry research can flow into — empty, or
-/// only quests waiting on unmet deeds. The pick runs only then.
+/// only quests waiting on unmet deeds. The pick runs only then. BL-1613: an Early
+/// Space tail entry flows while the gate is met (@p rp's dial) and it is not a
+/// quest; a tail locked by a lapsed gate leaves the queue idle, so the nation
+/// keeps picking rather than waiting on ground it has lost.
 bool research_queue_idle(const world& w, entity_id nation);
+bool research_queue_idle(const world& w, entity_id nation, const research_params& rp);
 
 /// BL-1552: each nation's land neighbours, by shared tile edges. Ascending at both levels.
 std::map<entity_id, std::set<entity_id>> nation_land_borders(const world& w);
@@ -394,6 +472,198 @@ int run_nation_research_ai(world& w, const recipe_registry& reg, bool spectating
 /// only what the queue owed. Returns how many nodes it queued.
 int run_nation_research_repick(world& w, const recipe_registry& reg, bool spectating,
                                std::vector<research_ai_pick>* out = nullptr);
+
+// ---------------------------------------------------------------------------
+// BL-1589 — THE SPACE PICK (AI_OPPONENT.md § 11, "Rival nations go to space as
+// the player does", Ben 2026-11-10; SPACE_ASSETS.md § Launching, § Satellites,
+// § Space stations). At most ONE near-space action per nation per quarter,
+// issued through the near-space command seam (`apply_space_command`) and
+// nothing else. In order, the first that is wanted, keyed and affordable:
+//
+//   1. comms_satellite  no comms satellite of its own (not lost) and it holds
+//                       `space_role_comms`: one to its home body's LOW orbit.
+//   2. station_core     no station of its own and it holds `space_station_core`:
+//                       a core at the cheapest free orbital node of its home
+//                       body (quote order low, high, L1, L2, L4, L5; ties to the
+//                       earlier), crewed from the pool.
+//   3. station_module   its lowest-id station is short of `space_station_target`:
+//                       the next entry (see the dial) into the lowest empty slot.
+//
+// AFFORDABLE is the launch quote's own answer (pad, shelf, slot, treasury) and
+// the reserve rule (`space_reserve_*`). CREW is the pool: a crewed launch the
+// pool cannot cover is not issued; the scorer issues no training (an Astronaut
+// Training Centre is a building, not a near-space verb) and reports `crew_short`.
+// A nation with a pending near-space order (signal delay) waits for it.
+//
+// NEVER the player's nation — not under spectate either (the grant: "Not
+// admitted: any space verb for the player's nation"). Not in the settle
+// (`research_age_open`). Pure choice, ascending nation id, no memory, no plan:
+// the target layout is filled one launch at a time.
+// ---------------------------------------------------------------------------
+
+enum class space_ai_action : uint8_t
+{
+    none = 0,
+    comms_satellite,
+    station_core,
+    station_module,
+};
+
+/// Why a nation took no space action this quarter (the first wall it met).
+enum class space_ai_block : uint8_t
+{
+    none = 0,         ///< It acted.
+    no_rocketry,      ///< `space_dispatch` not held.
+    no_launchpad,     ///< No staffed Launchpad on its home body.
+    pending_order,    ///< A near-space order of its own is still in the queue.
+    crew_short,       ///< The only wanted launch needs crew the pool lacks.
+    reserve,          ///< The wanted launch would breach the treasury reserve.
+    refused,          ///< The wanted launch's quote refused it (shelf, slot, treasury...).
+    nothing_wanted,   ///< Nothing keyed is wanted (or the station is full).
+};
+
+/// What the space pick did for one nation. Reported, never stored.
+struct space_ai_pick
+{
+    entity_id            nation  = null_entity;
+    space_ai_action      action  = space_ai_action::none;
+    space_ai_block       block   = space_ai_block::nothing_wanted;
+    orbital_node         node{};
+    entity_id            station = null_entity;
+    int                  slot    = -1;
+    uint8_t              module  = k_no_station_module;
+    float                cost    = 0.0f;   ///< The quote's whole cost (credits).
+    space_command_result result  = space_command_result::rejected_invalid; ///< When issued.
+    /// BL-1615: the first launch quote's own refusal met behind a wall (which
+    /// shelf, treasury or slot); `launched` when no quote refused.
+    space_launch_result  quote   = space_launch_result::launched;
+};
+
+/// The pick @p nation would make now — PURE (reads @p w, writes nothing).
+space_ai_pick choose_space_action(const world& w, const recipe_registry& reg, entity_id nation,
+                                  const nation_ai_params& p);
+
+/// The quarterly pass, inside the nation step after research and before the
+/// pending-order queue: every non-player nation, ascending id, issues its pick
+/// through `apply_space_command`. Returns how many commands applied or queued.
+int run_nation_space_ai(world& w, const recipe_registry& reg,
+                        std::vector<space_ai_pick>* out = nullptr);
+
+// ---------------------------------------------------------------------------
+// BL-1608 — THE FAR-SPACE PICK (AI_OPPONENT.md § 11, "Rival nations go to space
+// as the player does", Ben 2026-11-10; SPACE_FLEETS.md; NATIONS.md § Off-world
+// bases; DISCOVERY.md § Mapping, then prospecting). The near-space pick's sibling
+// faculty: at most ONE far-space verb per nation per quarter, the same verbs the
+// player holds (space_units.hpp, space_convoy.hpp, space_bombard.hpp, the
+// found_base / embark_colonists seam), chosen on the world as it stands. In
+// order, the first that is wanted and legal:
+//
+//   1. DESIGN    a researched hull with no live design, or whose best design
+//                (below) differs from the live one: `set_space_unit_design`.
+//                Every slot takes the best item it holds the key for (drive:
+//                exhaust; tanks: capacity; armament: firepower; armour: armour;
+//                ties to the lowest catalogue id). A Lander's bay follows the
+//                need: passenger while it has no Lander with berths and its
+//                base programme is open, else cargo. One live design per class.
+//   2. WAR       (hostile to someone, `space_hostile`):
+//      a. BOMBARD   an own missile-armed unit idle in a hostile-held body's low
+//                   orbit, with no standing order: `order_space_bombard` on the
+//                   hostile building there in best condition (ties lowest id).
+//      b. FLEET     its idle armed units at one node (lowest unit id first) to
+//                   the war's node: the low orbit of a body where its own ground
+//                   is blockaded, else of a hostile's base body, else of a
+//                   hostile's home body; `order_space_fleet`.
+//      c. RAISE     a Frigate at its home pad while it keeps fewer armed hulls
+//                   than `far_space_warships_per_hostile` x hostiles (ceiling
+//                   `far_space_warships_max`).
+//   3. BASE AND PROSPECT (a Lander design):
+//      TARGET is the body (survey knowledge applies, not home, no base of its
+//      own there) it has mapped most of, ties to the lowest id, whose surface
+//      the Lander design can reach from home low orbit on a full tank.
+//      a. FOUND     its landed Landers on the target carry the colonists and the
+//                   kit: `found_base` on the prospected, unclaimed land tile
+//                   with the most deposit (ties lowest id).
+//      b. EMBARK    a passenger Lander at home with empty berths.
+//      c. LOAD      a cargo Lander idle at home low orbit with no kit: the kit.
+//      d. MOVE      a Lander idle at home low orbit carrying colonists or the
+//                   kit (or any Lander, without the base key: to prospect) to
+//                   the target's surface; a full tank first when the move
+//                   cannot be paid (`refuel_space_unit`, a fifth action).
+//      e. RAISE     a Lander when it has none, or (base key held, under
+//                   `far_space_bases_max`) none of the bay the live design has.
+//
+// CONVOYS are the trade scorer's: a nation holding a live Hauler design ships
+// its inter-body trade as a Hauler (space_convoy.hpp), raising one at the pad
+// when none is idle, on the margin the trade scorer already prices. So the
+// Hauler's design is this pick's whole share of a convoy.
+//
+// Every spend passes the near pick's reserve rule (`space_reserve_*`) on a quote
+// of its own (the raise lot, the load lot, the refuel). The fair-price ceiling
+// is the registry's, as the launch seam copies it.
+//
+// NEVER the player's nation — not under spectate either. Not in the settle.
+// Ascending nation id, no memory, no plan: every step reads the world as it is.
+// ---------------------------------------------------------------------------
+
+enum class far_space_action : uint8_t
+{
+    none = 0,
+    design,
+    bombard,
+    fleet_move,
+    raise_warship,
+    found_base,
+    embark,
+    load_kit,
+    lander_move,
+    refuel,
+    raise_lander,
+};
+
+/// Why a nation took no far-space action this quarter (the first wall it met).
+enum class far_space_block : uint8_t
+{
+    none = 0,        ///< It acted.
+    no_rocketry,     ///< `space_dispatch` not held.
+    no_hull,         ///< No far-space hull key held.
+    no_pad,          ///< A raise, embark or load wanted a staffed home pad it lacks.
+    no_target,       ///< A Lander has no reachable mapped body to fly to.
+    no_dv,           ///< A wanted move cannot be paid and no refuel is possible.
+    reserve,         ///< The wanted spend would breach the treasury reserve.
+    shelf_short,     ///< The wanted lot is not on the shelf (or over the ceiling).
+    crew_short,      ///< The wanted raise needs crew the pool lacks.
+    blockaded,       ///< The home body is blockaded for it.
+    refused,         ///< The verb refused what the pick chose.
+    nothing_wanted,  ///< Nothing far-space is wanted now.
+};
+
+/// What the far-space pick did for one nation. Reported, never stored.
+struct far_space_pick
+{
+    entity_id        nation = null_entity;
+    far_space_action action = far_space_action::none;
+    far_space_block  block  = far_space_block::nothing_wanted;
+    uint8_t          hull   = 0xFF;        ///< space_hull, when a hull is named.
+    entity_id        unit   = null_entity; ///< The unit acted on (or raised, once applied).
+    orbital_node     from{}, to{};         ///< A move.
+    entity_id        tile   = null_entity; ///< found_base.
+    entity_id        target = null_entity; ///< bombard: the building.
+    float            cost   = 0.0f;        ///< The quote (credits), where a spend.
+    int32_t          count  = 0;           ///< embark: colonists; load: kit units; fleet_move: units.
+    bool             fleet  = false;       ///< fleet_move: the whole fleet at `from` (every unit there armed).
+    space_design     design{};             ///< design: the design set.
+    uint8_t          result = 0;           ///< The verb's own result code (space_unit_result / offworld_base_result).
+};
+
+/// The pick @p nation would make now — PURE (reads @p w, writes nothing).
+far_space_pick choose_far_space_action(const world& w, const recipe_registry& reg, entity_id nation,
+                                       const nation_ai_params& p);
+
+/// The quarterly pass, right after the near-space pick: every non-player nation,
+/// ascending id, issues its far-space pick through the verb it names. Returns
+/// how many verbs applied.
+int run_nation_far_space_ai(world& w, const recipe_registry& reg,
+                            std::vector<far_space_pick>* out = nullptr);
 
 // ---------------------------------------------------------------------------
 // BL-1335 — THE NATION'S TAX TIER (NATIONS.md § Taxes and Discontent; the

@@ -39,11 +39,14 @@ The ancient product is deliberate practice for the space game, not an abandonmen
 
 **Near space is industrial (Ben, 2026-10-15).** Inside Era 1 (1960 → about 2040), nations run
 space programmes in the industrial arc: satellites, rovers, crewed lunar missions and early orbital
-stations, with their launch and ground infrastructure (`../economy/SPACE_ASSETS.md`). What stays
-parked below is the space game proper — corporations operating across the solar system.
+stations, with their launch and ground infrastructure (`../economy/SPACE_ASSETS.md`).
+
+**Space comes into the product (Ben, 2026-11-10).** The space game is no longer parked for DLC:
+near space is v0.4.0 and far space v0.5.0 (§ The industrial arc's milestones). The paragraph below
+keeps the parked bundle's record; only the playable space game leaves it.
 
 **Space — parked for DLC.** The AI opponent, the national private militia, politics + the Era →
-Filter rename, and the playable space game are parked whole. They were numbered v0.2.0, v0.3.0,
+Filter rename, and the playable space game were parked whole. They were numbered v0.2.0, v0.3.0,
 v0.4.0 and v1.0.0 until 2026-10-22, when those numbers passed to the industrial arc (§ The
 industrial arc's milestones); the DLC is renumbered when it resumes. They are parked their designs intact, so the DLC resume is a re-triage rather than an archaeology
 dig. Do not build against them; do not delete them. Their combined bar, in one line: a player
@@ -70,6 +73,17 @@ player can feel, not a list of items.
   2026-11-10): land, air and sea forces are raised, paid, supplied and fought, and a war runs from
   declaration to a peace that can end a nation. Ben judged it reached on 2026-11-10, with the war
   at sea of sprint 64. A long playtest is not part of it.
+- **v0.4.0 — near space** (Ben, 2026-11-10). A nation reaches orbit and works the bodies near
+  its home world: orbits, prospecting, modular stations, space units and the convoys between
+  bodies and orbits (`../economy/SPACE_ASSETS.md`).
+- **v0.5.0 — far space** (Ben, 2026-11-10). The whole solar system with the next Eras'
+  technology: bases on other bodies run like the home world, and wars span every body a nation
+  holds.
+- **v0.6.0 — the polish** (Ben, 2026-11-10). A thorough playtest of what v0.4.0 and v0.5.0
+  built, and the fixes it finds.
+
+**Speed over continuity (Ben, 2026-11-10).** v0.4.0 and v0.5.0 are expected to build quickly. A
+release between them need not keep continuity with the last: v0.6.0 is where it is restored.
 
 ---
 

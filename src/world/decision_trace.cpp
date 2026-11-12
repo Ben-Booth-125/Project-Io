@@ -89,6 +89,8 @@ const char* building_label(building_type t)
         case building_type::railway_station:      return "railway_station";      // BL-1255
         case building_type::airbase:              return "airbase";              // BL-1449
         case building_type::bunker:               return "bunker";               // BL-1426
+        case building_type::astronaut_training_centre: return "astronaut_training_centre"; // BL-1585
+        case building_type::orbital_defence_battery: return "orbital_defence_battery"; // BL-1599
     }
     return "building#?";
 }

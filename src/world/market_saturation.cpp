@@ -103,9 +103,11 @@ classify_resources(const world& w, const recipe_registry& reg)
     // from the same registry dial derive_space_programme_claims gates on.
     {
         const space_programme_params& sp = reg.space_programme();
-        if (std::isfinite(sp.components_lump) && sp.components_lump > 0.0f)
+        // BL-1630: or the launch-ready pads' standing bid, which posts both goods.
+        const bool standing = std::isfinite(sp.standing_lots) && sp.standing_lots > 0.0f;
+        if (standing || (std::isfinite(sp.components_lump) && sp.components_lump > 0.0f))
             c[static_cast<std::size_t>(resource_type::spacecraft_components)].sink_state = true;
-        if (std::isfinite(sp.propellant_lump) && sp.propellant_lump > 0.0f)
+        if (standing || (std::isfinite(sp.propellant_lump) && sp.propellant_lump > 0.0f))
             c[static_cast<std::size_t>(resource_type::propellant)].sink_state = true;
     }
 

@@ -136,6 +136,7 @@ float construction_initial_workforce(building_type type)
             || type == building_type::military_base
             || type == building_type::airbase // BL-1449: passive, as the military base
             || type == building_type::bunker  // BL-1426: concrete, no staff
+            || type == building_type::orbital_defence_battery // BL-1599: a gun emplacement, no staff
             || type == building_type::railway_station) ? 0.0f : 0.5f; // BL-1255: zero staff
 }
 
@@ -188,10 +189,16 @@ construction_result construct_for(world& w, const recipe_registry& reg,
         return construction_result::tech_locked;
 
     // Propellant routes follow the body's air (Ben, 2026-10-09; PRODUCTION.md
-    // § Chemical Plant): the one predicate, asked at the build door.
+    // § Chemical Plant): the one predicate, asked at the build door. Its key half
+    // first (BL-1604, the Electrolysis Plant's research), so the refusal says so.
     if (type == building_type::processing_facility)
-        if (const ::recipe* rc = reg.get_recipe(recipe); rc != nullptr && !recipe_runs_at_tile(w, *rc, tile))
-            return construction_result::wrong_air;
+        if (const ::recipe* rc = reg.get_recipe(recipe); rc != nullptr)
+        {
+            if (!recipe_mechanic_held_at_tile(w, *rc, tile))
+                return construction_result::tech_locked;
+            if (!recipe_runs_at_tile(w, *rc, tile))
+                return construction_result::wrong_air;
+        }
 
     // Tile-level validity check (ocean / deposit / terrain).
     // BL-1522: the build door's tile check, which alone admits a rig on shelf sea.
@@ -252,8 +259,8 @@ construction_result construct_for(world& w, const recipe_registry& reg,
         // One site per tile (Ben, 2026-10-26): its own refusal, never "invalid tile".
         if (pr.reason == placement_rules::placement_reason::site_under_construction)
             return construction_result::site_busy;
-        if (type == building_type::launchpad)
-            return construction_result::slot_occupied;
+        if (pr.reason == placement_rules::placement_reason::launchpad_exists)
+            return construction_result::slot_occupied; // BL-1615: only the pad cap, not every pad refusal
         return construction_result::invalid_tile; // Port not coastal
     }
 
@@ -669,5 +676,18 @@ bool recipe_runs_at_tile(const world& w, const recipe& rc, entity_id tile)
     if (tit == w.tiles.end())
         return true;
     const auto bit = w.bodies.find(tit->second.body);
-    return bit == w.bodies.end() || recipe_runs_on_body(rc, bit->second);
+    return (bit == w.bodies.end() || recipe_runs_on_body(rc, bit->second))
+        && recipe_mechanic_held_at_tile(w, rc, tile);
+}
+
+bool recipe_mechanic_held_at_tile(const world& w, const recipe& rc, entity_id tile)
+{
+    // BL-1604 (ERAS.md § The propellant loop): a recipe naming a mechanic key runs
+    // only on the ground of a nation that holds it. An unknown tile reads true (as
+    // above); an unowned one false. A recipe naming no key - every one but the
+    // Electrolysis Plant's - is untouched.
+    if (rc.mechanic.empty() || w.tiles.count(tile) == 0)
+        return true;
+    const auto hn = w.tile_to_nation.find(tile);
+    return hn != w.tile_to_nation.end() && nation_has_mechanic(w, hn->second, rc.mechanic);
 }

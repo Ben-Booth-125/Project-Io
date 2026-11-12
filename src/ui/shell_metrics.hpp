@@ -127,4 +127,12 @@ shell_rect lens_chrome_rect(ImVec2 disp, float time_h, float want_h);
 /// @param time_h Measured height of the time panel, as passed to `time_panel_rect`.
 shell_rect pinned_panel_rect(ImVec2 disp, float time_h);
 
+/// The lens chrome region as the active lens OPENED it this frame (BL-1603). The
+/// region grows up into the pinned panel's residual (MINIMAP.md § Lens chrome), so
+/// the pinned panel stops one margin above it rather than painting over the key.
+/// `note_lens_chrome` is called by the one place that opens the region; the read
+/// answers false unless it was called on the CURRENT ImGui frame.
+void note_lens_chrome(const shell_rect& r);
+bool lens_chrome_this_frame(shell_rect& out);
+
 } // namespace ui

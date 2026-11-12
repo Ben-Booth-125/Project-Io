@@ -261,6 +261,9 @@ void recipe_registry::load_from_lua(lua_state& lua)
                                          + air + "' (any | atmosphere | airless)");
         }
 
+        // BL-1604: the mechanic key the recipe's ground must hold (absent = none).
+        r.mechanic = entry->get_or<std::string>("mechanic", "");
+
         // A retired slot (Ben, 2026-10-27, BL-1438): kept so stored recipe ids
         // never shift; it must name no inputs and no outputs — a retired row
         // that still trades is authored nonsense, refused rather than ignored.
@@ -595,6 +598,8 @@ void recipe_registry::load_from_lua(lua_state& lua)
             { "railway_station",      building_type::railway_station },      // BL-1255
             { "airbase",              building_type::airbase },              // BL-1449
             { "bunker",               building_type::bunker },               // BL-1426
+            { "astronaut_training_centre", building_type::astronaut_training_centre }, // BL-1585
+            { "orbital_defence_battery", building_type::orbital_defence_battery }, // BL-1599
         };
         for (const named_type& nt : types)
         {
@@ -1273,6 +1278,8 @@ void recipe_registry::load_from_lua(lua_state& lua)
             { "railway_station",      building_type::railway_station },      // BL-1255
             { "airbase",              building_type::airbase },              // BL-1449
             { "bunker",               building_type::bunker },               // BL-1426
+            { "astronaut_training_centre", building_type::astronaut_training_centre }, // BL-1585
+            { "orbital_defence_battery", building_type::orbital_defence_battery }, // BL-1599
         };
         struct named_band { const char* key; era_band band; };
         const named_band bands[] = {
@@ -1536,6 +1543,13 @@ void recipe_registry::load_from_lua(lua_state& lua)
         read_checked(t, "base_reserve",       np.base_reserve,       0.0, 1.0, ctx);
         read_checked(t, "calm_reserve_bonus", np.calm_reserve_bonus, 0.0, 1.0, ctx);
 
+        // BL-1608 the far-space pick's dials (nation_ai.hpp § The far-space pick).
+        read_checked(t, "far_space_bases_max",            np.far_space_bases_max,            0, 1024, ctx);
+        read_checked(t, "far_space_colonists",            np.far_space_colonists,            1, 1 << 16, ctx);
+        read_checked(t, "far_space_warships_per_hostile", np.far_space_warships_per_hostile, 0, 1024, ctx);
+        read_checked(t, "far_space_warships_max",         np.far_space_warships_max,         0, 1024, ctx);
+        read_checked(t, "far_space_keep_base_home",       np.far_space_keep_base_home,       0, 1, ctx);
+
         m_nation_ai = np;
     }
 
@@ -1554,6 +1568,7 @@ void recipe_registry::load_from_lua(lua_state& lua)
 
         read_checked(t, "components_lump", sp.components_lump, 0.0, inf, ctx);
         read_checked(t, "propellant_lump", sp.propellant_lump, 0.0, inf, ctx);
+        read_checked(t, "standing_lots",   sp.standing_lots,   0.0, 4.0, ctx); // BL-1630
 
         m_space_programme = sp;
     }
@@ -1652,6 +1667,10 @@ void recipe_registry::load_from_lua(lua_state& lua)
         // arithmetic; bounded here so a typo cannot run it away) and the economy term.
         read_checked(t, "price_growth_per_year",       rp.price_growth_per_year,       0.0,   1.0, ctx);
         read_checked(t, "rp_per_economy_unit",         rp.rp_per_economy_unit,         0.0, k_dial_max, ctx);
+        // BL-1612: the gate into space's propellant threshold (ERAS.md condition 3).
+        read_checked(t, "space_gate_min_propellant",   rp.space_gate_min_propellant,   0.0, k_dial_max, ctx);
+        // BL-1606: the space firsts' one-time research grant (ERAS.md § Firsts).
+        read_checked(t, "space_first_grant_rp",        rp.space_first_grant_rp,        0.0, k_dial_max, ctx);
 
         m_research = rp;
     }

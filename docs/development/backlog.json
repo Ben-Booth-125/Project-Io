@@ -251,6 +251,1119 @@
     "scripts/economy.lua"
    ],
    "design": "MILITARY.md § Missiles and § Artillery fires shells (Ben, 2026-11-11). A silo building fires long range and tactical nuclear at 90 tiles; launchers are silos, ships and bombers; artillery leaves the launcher table, gains a range and three kit items (self-propelled guns, counter-battery radar, precision shells); front automation holds artillery at max range behind the line. Rivals' missile grant (AI_OPPONENT.md § 11) extends to silos as launchers - raise if it reads as a new subject."
+  },
+  {
+   "status": "complete",
+   "glyph": "●",
+   "sprint": 65,
+   "version_goal": "v0.4.0",
+   "written": "2026-11-10",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-11-10, space form); filed by Claude",
+   "category": "Space",
+   "priority": "A",
+   "requires": [],
+   "difficulty": 3,
+   "id": "BL-1580",
+   "short_name": "ORBITAL_GRAPH",
+   "authority_doc": "docs/economy/SPACE_ASSETS.md",
+   "files": [
+    "src/world/orbital_graph.hpp",
+    "src/world/orbital_graph.cpp",
+    "tools/verify/orbital_graph_harness.cpp"
+   ],
+   "title": "The orbital node graph: nodes, Lagrange points, links, thrust cost, travel days",
+   "design": "SPACE_ASSETS.md § The orbital graph. Pure function of the bodies, never saved. Done when: every non-star body has surface/low/high nodes; every planet-moon and star-planet pair has L1/L2/L4/L5 with live positions; cheapest-path cost and travel days are deterministic and a harness proves a small airless body is cheaper to leave than the home world."
+  },
+  {
+   "status": "complete",
+   "glyph": "●",
+   "sprint": 65,
+   "version_goal": "v0.4.0",
+   "written": "2026-11-10",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-11-10, space form); filed by Claude",
+   "category": "Space",
+   "priority": "A",
+   "requires": [
+    "BL-1580"
+   ],
+   "difficulty": 2,
+   "id": "BL-1581",
+   "short_name": "ORBITAL_SLOTS",
+   "authority_doc": "docs/economy/SPACE_ASSETS.md",
+   "files": [
+    "src/world/space_assets.hpp",
+    "src/world/space_assets.cpp"
+   ],
+   "title": "Orbital slots: fixed capacity per node, first come first held",
+   "design": "SPACE_ASSETS.md § Orbital slots. A space asset destination becomes an orbital node; a full node refuses a launch whole; a lost asset frees its slot. Done when a harness fills a node and the next launch is refused with nothing touched."
+  },
+  {
+   "status": "complete",
+   "glyph": "●",
+   "sprint": 65,
+   "version_goal": "v0.4.0",
+   "written": "2026-11-10",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-11-10, space form); filed by Claude",
+   "category": "Space",
+   "priority": "A",
+   "requires": [
+    "BL-1581"
+   ],
+   "difficulty": 3,
+   "id": "BL-1582",
+   "short_name": "LAUNCH_GATE_AND_GOODS",
+   "authority_doc": "docs/economy/SPACE_ASSETS.md",
+   "files": [
+    "src/world/space_assets.cpp",
+    "src/world/nation_step.cpp"
+   ],
+   "title": "A launch needs a staffed pad and Rocketry, and buys its goods off the home shelf",
+   "design": "SPACE_ASSETS.md § Launching. Replaces the credits-only launch cost: spacecraft_components and propellant bought from the home market at its price, lot scaled by class and path thrust cost. Refused whole on any shortfall. Done when a harness shows the shelf drawn down and the treasury debited by the same priced lot."
+  },
+  {
+   "status": "complete",
+   "glyph": "●",
+   "sprint": 65,
+   "version_goal": "v0.4.0",
+   "written": "2026-11-10",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-11-10, space form); filed by Claude",
+   "category": "Space",
+   "priority": "A",
+   "requires": [
+    "BL-1580"
+   ],
+   "difficulty": 4,
+   "id": "BL-1583",
+   "short_name": "STATION_MODEL",
+   "authority_doc": "docs/economy/SPACE_ASSETS.md",
+   "files": [
+    "src/world/stations.hpp",
+    "src/world/stations.cpp",
+    "src/world/world_save.cpp",
+    "tools/verify/station_harness.cpp"
+   ],
+   "title": "Stations: core, 5x3 grid, modules, templates, outward upgrades, edge modules, power and crew budgets",
+   "design": "SPACE_ASSETS.md § Space stations. A station is not a body. Fit/remove/refit verbs, templates as saved layouts queuing one launch per unfilled slot, upgrades 5x3 -> 7x5 -> 9x7, Dock and Shipyard edge-only and idle when enclosed, budgets stop the newest module first, solar falloff by square of orbital radius. Saved. Done when a harness covers each rule and a save round-trips a fitted station."
+  },
+  {
+   "status": "complete",
+   "glyph": "●",
+   "sprint": 65,
+   "version_goal": "v0.4.0",
+   "written": "2026-11-10",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-11-10, space form); filed by Claude",
+   "category": "Space",
+   "priority": "A",
+   "requires": [
+    "BL-1583",
+    "BL-1587"
+   ],
+   "difficulty": 3,
+   "id": "BL-1584",
+   "short_name": "STATION_MODULE_EFFECTS",
+   "authority_doc": "docs/economy/SPACE_ASSETS.md",
+   "files": [
+    "src/world/stations.cpp",
+    "src/world/nation_step.cpp",
+    "scripts/economy.lua"
+   ],
+   "title": "What each module does each quarter: research, life support, factory, observatory, relay",
+   "design": "SPACE_ASSETS.md § Space stations, the module roster. Research points to the owner, rations bought off the home shelf, the microgravity factory turning shelf goods into an orbit-only good, the observatory shortening surveys in coverage. Defence, Dock, Fuel depot, Shipyard, Cargo hold and Market wait on v0.5.0 space units and say so on their card. Done when a harness reads each working effect over several quarters."
+  },
+  {
+   "status": "complete",
+   "glyph": "●",
+   "sprint": 65,
+   "version_goal": "v0.4.0",
+   "written": "2026-11-10",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-11-10, space form); filed by Claude",
+   "category": "Space",
+   "priority": "A",
+   "requires": [
+    "BL-1583"
+   ],
+   "difficulty": 3,
+   "id": "BL-1585",
+   "short_name": "ASTRONAUTS",
+   "authority_doc": "docs/economy/SPACE_ASSETS.md",
+   "files": [
+    "src/world/stations.cpp",
+    "scripts/economy.lua",
+    "src/world/components.hpp"
+   ],
+   "title": "Astronauts: a trained pool from a ground training centre, drawn as crew at launch",
+   "design": "SPACE_ASSETS.md § Astronauts. Astronaut Training Centre building turns staffed workforce into astronauts per quarter up to a cap; crewed launches draw crew and are refused when short; crew are lost with their asset. Done when a harness trains, launches and loses crew."
+  },
+  {
+   "status": "complete",
+   "glyph": "●",
+   "sprint": 65,
+   "version_goal": "v0.4.0",
+   "written": "2026-11-10",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-11-10, space form); filed by Claude",
+   "category": "Space",
+   "priority": "A",
+   "requires": [
+    "BL-1581",
+    "BL-1587"
+   ],
+   "difficulty": 3,
+   "id": "BL-1586",
+   "short_name": "SATELLITE_ROLES",
+   "authority_doc": "docs/economy/SPACE_ASSETS.md",
+   "files": [
+    "src/world/space_assets.cpp",
+    "src/world/logistics.cpp",
+    "src/world/survey_system.cpp"
+   ],
+   "title": "Satellite roles: comms, navigation, observation, survey, and what each does",
+   "design": "SPACE_ASSETS.md § Satellites. A role chosen at launch and saved. Comms puts its body in coverage and (with Communication Satellites) lifts activity fog on traded markets; Navigation cuts logistics cost on its body; Observation lifts vision fog there; Survey surveys its body. Done when a harness shows each effect on and off with the satellite."
+  },
+  {
+   "status": "complete",
+   "glyph": "●",
+   "sprint": 65,
+   "version_goal": "v0.4.0",
+   "written": "2026-11-10",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-11-10, space form); filed by Claude",
+   "category": "Space",
+   "priority": "A",
+   "requires": [
+    "BL-1580"
+   ],
+   "difficulty": 3,
+   "id": "BL-1587",
+   "short_name": "SIGNAL_DELAY",
+   "authority_doc": "docs/economy/SPACE_ASSETS.md",
+   "files": [
+    "src/world/space_coverage.hpp",
+    "src/world/space_coverage.cpp"
+   ],
+   "title": "Comms coverage and signal delay: orders outside coverage wait a quarter, data comes home only through it",
+   "design": "SPACE_ASSETS.md § Signal delay. Coverage set per nation from home orbits, comms satellites and relay modules; a pending-order queue for out-of-coverage space orders, saved; research, observation and survey data earned only in coverage. Done when a harness shows an order waiting one quarter outside coverage and landing at once inside it."
+  },
+  {
+   "status": "complete",
+   "glyph": "●",
+   "sprint": 65,
+   "version_goal": "v0.4.0",
+   "written": "2026-11-10",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-11-10, space form); filed by Claude",
+   "category": "Space",
+   "priority": "A",
+   "requires": [
+    "BL-1582",
+    "BL-1583",
+    "BL-1586"
+   ],
+   "difficulty": 2,
+   "id": "BL-1588",
+   "short_name": "SPACE_VERBS_SEAM",
+   "authority_doc": "docs/economy/SPACE_ASSETS.md",
+   "files": [
+    "src/world/corp_command.hpp",
+    "docs/ai/ACTIONS.json"
+   ],
+   "title": "The space verbs on the command seam and in the action dictionary",
+   "design": "Every near-space verb (launch to node, fit, remove, refit, apply template, upgrade, retask) as a legal command, validated as an untrusted input where the seam takes wire input, with an ACTIONS.json entry each."
+  },
+  {
+   "status": "complete",
+   "glyph": "●",
+   "sprint": 65,
+   "version_goal": "v0.4.0",
+   "written": "2026-11-10",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-11-10, space form); filed by Claude",
+   "category": "Space",
+   "priority": "A",
+   "requires": [
+    "BL-1588"
+   ],
+   "difficulty": 4,
+   "id": "BL-1589",
+   "short_name": "RIVAL_SPACE_AI",
+   "authority_doc": "docs/economy/SPACE_ASSETS.md",
+   "files": [
+    "src/world/nation_ai.cpp"
+   ],
+   "title": "Rival nations go to space: the scored-utility space layer",
+   "design": "AI_OPPONENT.md § 11, the 2026-11-10 grant. One space action per quarter at most, scored: a comms satellite first, then a station core at a free node, then modules toward its template, astronaut training when crew is short. Never for the player. Done when a spectated run shows rivals launching in a seeded, replayable order."
+  },
+  {
+   "status": "complete",
+   "glyph": "●",
+   "sprint": 65,
+   "version_goal": "v0.4.0",
+   "written": "2026-11-10",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-11-10, space form); filed by Claude",
+   "category": "Space",
+   "priority": "A",
+   "requires": [
+    "BL-1581",
+    "BL-1583"
+   ],
+   "difficulty": 3,
+   "id": "BL-1590",
+   "short_name": "CIRCUMPLANETARY_SPACE_DRAW",
+   "authority_doc": "docs/economy/SPACE_ASSETS.md",
+   "files": [
+    "src/ui/circumplanetary_canvas.cpp",
+    "docs/ui/CIRCUMPLANETARY.md"
+   ],
+   "title": "The Circumplanetary canvas draws nodes, Lagrange points, slots, satellites and stations",
+   "design": "CIRCUMPLANETARY.md. Low and high orbit rings, L-point markers moving with the pair, slot occupancy, owner-coloured satellites and stations, hover and select. Needs a live click. PART 1 LANDED: rings, L-point diamonds, hollow slot pips, node hover card (near_space_nodes.lua). Owed: occupancy, satellites, stations, transit. Polish: pips faint; L5 can sit under the bottom band at 1280x720."
+  },
+  {
+   "status": "complete",
+   "glyph": "●",
+   "sprint": 65,
+   "version_goal": "v0.4.0",
+   "written": "2026-11-10",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-11-10, space form); filed by Claude",
+   "category": "Space",
+   "priority": "A",
+   "requires": [
+    "BL-1588"
+   ],
+   "difficulty": 4,
+   "id": "BL-1591",
+   "short_name": "SPACE_LEDGER_AND_DESIGNER",
+   "authority_doc": "docs/economy/SPACE_ASSETS.md",
+   "files": [
+    "src/ui/space_ledger.cpp",
+    "docs/ui/ledgers/space.md"
+   ],
+   "title": "The Space ledger: launch form, asset list, astronaut pool, coverage, and the station designer",
+   "design": "A fold-out ledger. The station designer shows the grid with the core at the centre, picks a module per slot, saves and applies templates, upgrades the grid, marks edge slots and idle modules, and shows power, crew and life support budgets. Needs a live click."
+  },
+  {
+   "status": "complete",
+   "glyph": "●",
+   "sprint": 65,
+   "version_goal": "v0.4.0",
+   "written": "2026-11-10",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-11-10, space form); filed by Claude",
+   "category": "Space",
+   "priority": "A",
+   "requires": [
+    "BL-1583"
+   ],
+   "difficulty": 2,
+   "id": "BL-1592",
+   "short_name": "SPACE_UNLOCKS",
+   "authority_doc": "docs/economy/SPACE_ASSETS.md",
+   "files": [
+    "src/world/nation_tech.cpp",
+    "docs/economy/tech/digitisation_tree.json"
+   ],
+   "title": "Which technology unlocks each space class, role, module and upgrade",
+   "design": "Keyed to existing Digitisation nodes where one fits (Rocketry, Communication Satellites, Satellite Navigation, Guidance Systems); the rest are named in RESEARCH and the tree. In-band mapping, logged."
+  },
+  {
+   "status": "complete",
+   "glyph": "●",
+   "sprint": 65,
+   "version_goal": "v0.4.0",
+   "written": "2026-11-10",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-11-10, space form); filed by Claude",
+   "category": "Space",
+   "priority": "A",
+   "requires": [
+    "BL-1589",
+    "BL-1590",
+    "BL-1591"
+   ],
+   "difficulty": 2,
+   "id": "BL-1593",
+   "short_name": "SPACE_SPECTATOR_CHECK",
+   "authority_doc": "docs/economy/SPACE_ASSETS.md",
+   "files": [
+    "scripts/verify/near_space.lua"
+   ],
+   "title": "Spectate rivals going to space, and a visual check of the near-space surfaces",
+   "design": "A verify script captures the Circumplanetary canvas and the Space ledger; a spectated run is watched for how rivals approach space. The finding is Ben's first hurdle before playtesting. Finding (2026-11-10, seed 0 Release spectate to 2015): rivals research Rocketry 1976, lay pads 1977, staff 4 pads by 1995, launch 0 times; the trade wall (NR-1203) stops the launch goods. Captures: near_space_assets.lua, space_ledger.lua. Write-up in NEXT_SESSION.md section 2."
+  },
+  {
+   "status": "complete",
+   "glyph": "●",
+   "sprint": 66,
+   "version_goal": "v0.5.0",
+   "written": "2026-11-10",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-11-10, space form); filed by Claude",
+   "category": "Space",
+   "priority": "A",
+   "requires": [
+    "BL-1583",
+    "BL-1585"
+   ],
+   "difficulty": 4,
+   "id": "BL-1594",
+   "short_name": "SPACE_UNIT_DESIGNS",
+   "authority_doc": "docs/military/SPACE_FLEETS.md",
+   "files": [],
+   "title": "Space units raised to a design: hull classes, slots, kit goods, crew",
+   "design": "SPACE_FLEETS.md § A space unit is raised to a design, § Raising and launching. Hauler, Lander, Tug, Frigate, Cruiser (Shipyard only). One live design per class; kit bought off the shelf; crew drawn from astronauts. Saved."
+  },
+  {
+   "status": "complete",
+   "glyph": "●",
+   "sprint": 66,
+   "version_goal": "v0.5.0",
+   "written": "2026-11-10",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-11-10, space form); filed by Claude",
+   "category": "Space",
+   "priority": "A",
+   "requires": [
+    "BL-1594",
+    "BL-1580"
+   ],
+   "difficulty": 4,
+   "id": "BL-1595",
+   "short_name": "SPACE_UNIT_MOVEMENT",
+   "authority_doc": "docs/military/SPACE_FLEETS.md",
+   "files": [],
+   "title": "Δv budgets, moves along the graph, idle, docked, in transit, landed, refuelling",
+   "design": "SPACE_FLEETS.md § Thrust, § Where a space unit is. A move the budget cannot pay is refused; cargo adds mass; refuel at a Dock with a Fuel depot or in low orbit over an owned Launchpad; a Dock berths two. Done when a harness flies a laden hauler short of where an empty one reaches."
+  },
+  {
+   "status": "complete",
+   "glyph": "●",
+   "sprint": 66,
+   "version_goal": "v0.5.0",
+   "written": "2026-11-10",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-11-10, space form); filed by Claude",
+   "category": "Space",
+   "priority": "A",
+   "requires": [
+    "BL-1595"
+   ],
+   "difficulty": 4,
+   "id": "BL-1596",
+   "short_name": "SPACE_CONVOYS_AS_HAULERS",
+   "authority_doc": "docs/military/SPACE_FLEETS.md",
+   "files": [],
+   "title": "Inter-body trades ship as Haulers; launch cost by the body's climb; interdiction",
+   "design": "SPACE_FLEETS.md § Space convoys, § Raising and launching. Replaces the straight-line space leg in SUPPLY with a Hauler on the cheapest path; a moon launch costs a fraction of the home world's; a hostile armed fleet on the path stops it. Gives the station Market and Cargo hold their link (SPACE_ASSETS.md § Open). Measure haulage before and after (memory: goldens cannot see trade)."
+  },
+  {
+   "status": "complete",
+   "glyph": "●",
+   "sprint": 66,
+   "version_goal": "v0.5.0",
+   "written": "2026-11-10",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-11-10, space form); filed by Claude",
+   "category": "Space",
+   "priority": "A",
+   "requires": [
+    "BL-1595"
+   ],
+   "difficulty": 4,
+   "id": "BL-1597",
+   "short_name": "SPACE_BATTLES",
+   "authority_doc": "docs/military/SPACE_FLEETS.md",
+   "files": [],
+   "title": "Battles at a node: deterministic daily exchange, station Defence, withdrawal",
+   "design": "SPACE_FLEETS.md § Battles. Firepower against hull class order less armour; destroyed units leave debris; stations fight with Defence modules."
+  },
+  {
+   "status": "complete",
+   "glyph": "●",
+   "sprint": 66,
+   "version_goal": "v0.5.0",
+   "written": "2026-11-10",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-11-10, space form); filed by Claude",
+   "category": "Space",
+   "priority": "A",
+   "requires": [
+    "BL-1597"
+   ],
+   "difficulty": 3,
+   "id": "BL-1598",
+   "short_name": "DEBRIS",
+   "authority_doc": "docs/economy/SPACE_ASSETS.md",
+   "files": [],
+   "title": "Debris per node: wear, cascade, drag in low orbit, tug cleanup",
+   "design": "SPACE_ASSETS.md § Debris. Own hazard. Arithmetic, no roll. Saved."
+  },
+  {
+   "status": "complete",
+   "glyph": "●",
+   "sprint": 66,
+   "version_goal": "v0.5.0",
+   "written": "2026-11-10",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-11-10, space form); filed by Claude",
+   "category": "Space",
+   "priority": "A",
+   "requires": [
+    "BL-1597",
+    "BL-1596"
+   ],
+   "difficulty": 3,
+   "id": "BL-1599",
+   "short_name": "BLOCKADE_AND_BOMBARDMENT",
+   "authority_doc": "docs/military/SPACE_FLEETS.md",
+   "files": [],
+   "title": "Blockade of a body's orbit, bombardment, the orbital defence battery",
+   "design": "SPACE_FLEETS.md § Blockade, § Bombardment and fire at orbit. Bombardment raises Alarm as a missile strike does. Also (BL-1596 lane): an escorted Hauler meeting armed hostiles waits; with battles built, the meeting should open a battle instead."
+  },
+  {
+   "status": "complete",
+   "glyph": "●",
+   "sprint": 66,
+   "version_goal": "v0.5.0",
+   "written": "2026-11-10",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-11-10, space form); filed by Claude",
+   "category": "Space",
+   "priority": "A",
+   "requires": [
+    "BL-1586"
+   ],
+   "difficulty": 3,
+   "id": "BL-1600",
+   "short_name": "MAPPING_THEN_PROSPECTING",
+   "authority_doc": "docs/ui/DISCOVERY.md",
+   "files": [],
+   "title": "Off-world survey in two steps: mapped from orbit, then prospected on the ground",
+   "design": "DISCOVERY.md § Mapping, then prospecting. Survey satellite or Observatory maps; rover or Lander prospects mapped regions. Region masks in the Planetary canvas draw mapped-but-unprospected terrain with deposits hidden."
+  },
+  {
+   "status": "complete",
+   "glyph": "●",
+   "sprint": 66,
+   "version_goal": "v0.5.0",
+   "written": "2026-11-10",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-11-10, space form); filed by Claude",
+   "category": "Space",
+   "priority": "A",
+   "requires": [
+    "BL-1595",
+    "BL-1600"
+   ],
+   "difficulty": 5,
+   "id": "BL-1601",
+   "short_name": "OFFWORLD_BASES",
+   "authority_doc": "docs/politics/NATIONS.md",
+   "files": [],
+   "title": "Bases: colonists found a capital on another body; provinces, logistics and market work as at home",
+   "design": "NATIONS.md § Off-world bases. Found on a mapped tile with colonists and a base kit; partition the body on first landing; life-support goods off the local market."
+  },
+  {
+   "status": "complete",
+   "glyph": "●",
+   "sprint": 66,
+   "version_goal": "v0.5.0",
+   "written": "2026-11-10",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-11-10, space form); filed by Claude",
+   "category": "Space",
+   "priority": "A",
+   "requires": [
+    "BL-1601",
+    "BL-1597"
+   ],
+   "difficulty": 3,
+   "id": "BL-1602",
+   "short_name": "WAR_SPANS_BODIES",
+   "authority_doc": "docs/military/MILITARY.md",
+   "files": [],
+   "title": "A war is fought wherever its parties hold anything: fronts on every body",
+   "design": "MILITARY.md § Space, \"A war spans every body\". Fronts and garrisons work on any body a nation holds."
+  },
+  {
+   "status": "complete",
+   "glyph": "●",
+   "sprint": 66,
+   "version_goal": "v0.5.0",
+   "written": "2026-11-10",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-11-10, space form); filed by Claude",
+   "category": "Space",
+   "priority": "A",
+   "requires": [
+    "BL-1602"
+   ],
+   "difficulty": 3,
+   "id": "BL-1603",
+   "short_name": "FRONT_PINS",
+   "authority_doc": "docs/ui/LAYOUT.md",
+   "files": [],
+   "title": "Front pins in the pinned-items panel, and the panel drawn",
+   "design": "LAYOUT.md § Pinned items. The panel rect is reserved but nothing draws in it: draw the panel and its pins, then the war-placed front pins with double-click navigation. Needs a live click."
+  },
+  {
+   "status": "complete",
+   "glyph": "●",
+   "sprint": 66,
+   "version_goal": "v0.5.0",
+   "written": "2026-11-10",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-11-10, space form); filed by Claude",
+   "category": "Space",
+   "priority": "A",
+   "requires": [
+    "BL-1601"
+   ],
+   "difficulty": 3,
+   "id": "BL-1604",
+   "short_name": "PROPELLANT_LOOP",
+   "authority_doc": "docs/economy/ERAS.md",
+   "files": [],
+   "title": "Ice Extractor and Electrolysis Plant; propellant made and bought off-world",
+   "design": "ERAS.md § The propellant loop. Authored buildings and recipes; refuelling and Fuel depots read the local shelf."
+  },
+  {
+   "status": "complete",
+   "glyph": "●",
+   "sprint": 66,
+   "version_goal": "v0.5.0",
+   "written": "2026-11-10",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-11-10, space form); filed by Claude",
+   "category": "Space",
+   "priority": "A",
+   "requires": [
+    "BL-1584"
+   ],
+   "difficulty": 2,
+   "id": "BL-1605",
+   "short_name": "SOLAR_STORMS",
+   "authority_doc": "docs/EVENTS.md",
+   "files": [],
+   "title": "Solar storms: seeded, strike exposed stations and satellites for a quarter",
+   "design": "EVENTS.md, solar storms. Seeded from world seed and tick; Observatory warns a quarter ahead."
+  },
+  {
+   "status": "complete",
+   "glyph": "●",
+   "sprint": 66,
+   "version_goal": "v0.5.0",
+   "written": "2026-11-10",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-11-10, space form); filed by Claude",
+   "category": "Space",
+   "priority": "A",
+   "requires": [
+    "BL-1584",
+    "BL-1601"
+   ],
+   "difficulty": 2,
+   "id": "BL-1606",
+   "short_name": "SPACE_FIRSTS",
+   "authority_doc": "docs/economy/ERAS.md",
+   "files": [],
+   "title": "Firsts: the first nation to do each space deed gets a research grant and a public log entry",
+   "design": "ERAS.md § Firsts. Satellite, crew in orbit, station core, crew on a moon, base, space convoy."
+  },
+  {
+   "status": "complete",
+   "glyph": "●",
+   "sprint": 66,
+   "version_goal": "v0.5.0",
+   "written": "2026-11-10",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-11-10, space form); filed by Claude",
+   "category": "Space",
+   "priority": "A",
+   "requires": [
+    "BL-1592"
+   ],
+   "difficulty": 4,
+   "id": "BL-1607",
+   "short_name": "EARLY_SPACE_TREE",
+   "authority_doc": "docs/economy/RESEARCH.md",
+   "files": [],
+   "title": "The next age's tree, first cut: far-space technology",
+   "design": "ERAS.md § Far-space technology; RESEARCH.md grammar. Hulls, drives, landers, tugs, prospecting, base founding, propellant loop, orbital defence battery, the 9x7 grid upgrade; reached through the Digitisation space quests."
+  },
+  {
+   "status": "complete",
+   "glyph": "●",
+   "sprint": 66,
+   "version_goal": "v0.5.0",
+   "written": "2026-11-10",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-11-10, space form); filed by Claude",
+   "category": "Space",
+   "priority": "A",
+   "requires": [
+    "BL-1601",
+    "BL-1597",
+    "BL-1589"
+   ],
+   "difficulty": 4,
+   "id": "BL-1608",
+   "short_name": "RIVAL_FAR_SPACE_AI",
+   "authority_doc": "docs/ai/AI_OPPONENT.md",
+   "files": [],
+   "title": "Rivals design hulls, fly fleets and convoys, found bases and fight in space",
+   "design": "AI_OPPONENT.md § 11, the 2026-11-10 grant. One live design per class; one space action at a time; never a plan. Also (BL-1599 lane): rivals should issue bombard orders and build the orbital defence battery. Also (BL-1601 lane): rivals found bases (the grant names off-world bases); the verbs are found_base and embark_colonists."
+  },
+  {
+   "status": "complete",
+   "glyph": "●",
+   "sprint": 66,
+   "version_goal": "v0.5.0",
+   "written": "2026-11-10",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-11-10, space form); filed by Claude",
+   "category": "Space",
+   "priority": "A",
+   "requires": [
+    "BL-1595",
+    "BL-1598"
+   ],
+   "difficulty": 4,
+   "id": "BL-1609",
+   "short_name": "FLEET_UI",
+   "authority_doc": "docs/military/SPACE_FLEETS.md",
+   "files": [],
+   "title": "Fleets on the canvases, fleet orders, the space hull designer, debris drawn",
+   "design": "Circumplanetary and Solar draw fleets at nodes and in transit; select a fleet and order a move (showing the Δv cost against the budget), dock, refuel, bombard; the Military designer gains space hulls. Needs a live click. Also (BL-1605 lane): mark a satellite dark and a station stormed on the circumplanetary canvas during a solar storm. Also (BL-1598 lane): no surface reads debris yet; draw it per node. Also (BL-1606 lane): show a space first in the player's dispatch (history_topic::space_first; the dispatch filters only war entries). Live click owed: seven presses (fleet mark, Move with preview and confirm, re-press disarms, Dock/Undock, Refuel, Bombard and lift, Military Design Space save, Solar fleet press)."
+  },
+  {
+   "status": "complete",
+   "glyph": "●",
+   "sprint": 66,
+   "version_goal": "v0.5.0",
+   "written": "2026-11-10",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-11-10, space form); filed by Claude",
+   "category": "Space",
+   "priority": "A",
+   "requires": [
+    "BL-1601",
+    "BL-1600"
+   ],
+   "difficulty": 3,
+   "id": "BL-1610",
+   "short_name": "BASE_AND_PROSPECT_UI",
+   "authority_doc": "docs/politics/NATIONS.md",
+   "files": [],
+   "title": "Founding a base and watching prospecting",
+   "design": "A found-base flow from a landed Lander; prospecting progress and the two-step region mask on the Planetary canvas. Needs a live click. Also (BL-1600 lane): the Planetary canvas shows deposits on mapped ground; hide them until prospected, reading survey_tile_prospected for the player nation. Live click owed: found a base from a landed Lander (toggle, pick, un-pick, confirm); embark on a seed with a staffed Launchpad; the slate wash, title counts and \"Not yet prospected\" hover on a part-prospected moon."
+  },
+  {
+   "status": "designed",
+   "glyph": "○",
+   "sprint": 66,
+   "version_goal": "v0.5.0",
+   "written": "2026-11-10",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-11-10, space form); filed by Claude",
+   "category": "Space",
+   "priority": "A",
+   "requires": [
+    "BL-1608",
+    "BL-1609",
+    "BL-1610"
+   ],
+   "difficulty": 2,
+   "id": "BL-1611",
+   "short_name": "FAR_SPACE_SPECTATOR_CHECK",
+   "authority_doc": "docs/military/SPACE_FLEETS.md",
+   "files": [],
+   "title": "Spectate rivals in far space, and a visual check of the far-space surfaces",
+   "design": "A verify script and a spectated run: do rivals reach the moons, close the propellant loop, found bases?"
+  },
+  {
+   "status": "complete",
+   "glyph": "●",
+   "sprint": 66,
+   "version_goal": "v0.5.0",
+   "written": "2026-11-10",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Claude (lane C report, BL-1607)",
+   "requires": [
+    "BL-1607"
+   ],
+   "category": "Space",
+   "priority": "A",
+   "difficulty": 3,
+   "id": "BL-1612",
+   "short_name": "EARLY_SPACE_RESEARCHABLE",
+   "authority_doc": "docs/economy/RESEARCH.md",
+   "files": [
+    "src/world/nation_tech.hpp",
+    "src/world/nation_tech.cpp",
+    "src/world/world_save.cpp"
+   ],
+   "title": "A nation can research the next age's tree once it meets the Era 1 -> Era 2 gate",
+   "design": "ERAS.md § Era 1 -> Era 2 gate, § Far-space technology. A nation's tech state holds one held set and one queue sized to the Digitisation tree; add per-tree state (held set + queue for the Early Space tree) with its save leg, a pure gate query (Rocketry held, a staffed home Launchpad, propellant on the home shelf), and branch availability keyed by the Digitisation quest that keys each branch. Quest deeds are all declared unread today, so a branch key also needs its quest's deed read (or a stand-in the gate opens). Done when a harness researches an Early Space node after the gate and is refused before it."
+  },
+  {
+   "status": "complete",
+   "glyph": "●",
+   "sprint": 66,
+   "version_goal": "v0.5.0",
+   "written": "2026-11-10",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Claude (lane G report, BL-1612)",
+   "requires": [
+    "BL-1612"
+   ],
+   "category": "Space",
+   "priority": "A",
+   "difficulty": 3,
+   "id": "BL-1613",
+   "short_name": "EARLY_SPACE_RESEARCH_SURFACES",
+   "authority_doc": "docs/economy/RESEARCH.md",
+   "files": [
+    "src/world/nation_tech.cpp",
+    "src/world/nation_ai.cpp",
+    "src/ui/tech_tree_panel.cpp",
+    "docs/ai/ACTIONS.json"
+   ],
+   "title": "The Early Space tree reachable by the player and the rivals: verb, panel, AI picker, modifiers read",
+   "design": "BL-1612 made the tree researchable in the model only. Owed: a queue verb for Early Space nodes with its ACTIONS.json entry; the tech tree panel shows the second tree once the gate is met; the rival research picker weighs Early Space nodes (its scorer is Digitisation-indexed today); nation_scalar folds Early Space modifier rows; remove/clear/unqueue and arrival projection cover the Early Space queue. Live click owed: the Early Space tab and a shift-click queue in the built app."
+  },
+  {
+   "status": "complete",
+   "glyph": "●",
+   "sprint": 66,
+   "version_goal": "v0.5.0",
+   "written": "2026-11-10",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Claude (lane K report, BL-1590)",
+   "requires": [
+    "BL-1590"
+   ],
+   "category": "Space",
+   "priority": "B",
+   "difficulty": 2,
+   "id": "BL-1614",
+   "short_name": "SPACE_TRANSIT_SEGMENT",
+   "authority_doc": "docs/ui/CIRCUMPLANETARY.md",
+   "files": [
+    "src/world/space_assets.hpp",
+    "src/world/world_save.cpp",
+    "src/ui/circum_assets.cpp"
+   ],
+   "title": "A moving space asset carries its origin node and departure tick, and the canvas draws its transit segment",
+   "design": "An in-transit satellite or station records only its destination and arrival tick, so the canvas draws it dimmed at the destination. Add origin node and departure tick (a save section), then draw the dashed segment and the share of the way travelled. Space units (space_units.hpp) already carry node and dest; reuse that shape."
+  },
+  {
+   "status": "complete",
+   "glyph": "●",
+   "sprint": 65,
+   "version_goal": "v0.4.0",
+   "written": "2026-11-10",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Claude (spectator finding, BL-1589)",
+   "requires": [
+    "BL-1589"
+   ],
+   "category": "Space",
+   "priority": "A",
+   "difficulty": 3,
+   "id": "BL-1615",
+   "short_name": "RIVAL_SPACE_GROUNDWORK",
+   "authority_doc": "docs/economy/SPACE_ASSETS.md",
+   "files": [
+    "src/world/placement_rules.cpp",
+    "src/world/nation_ai.cpp",
+    "src/main.cpp"
+   ],
+   "title": "Rivals can launch: one Launchpad per nation per body, and rivals build a Launchpad and a Training Centre",
+   "design": "SPACE_ASSETS.md § Launching: a launch needs a staffed Launchpad on the nation home body. placement_rules allows one Launchpad per body world-wide; make it one per nation per body. The nation build scorer (2026-10-23 grant, own ground only) builds a Launchpad once the nation holds Rocketry and can afford it, and an Astronaut Training Centre once it holds the training key; never for the player. Done when a spectated run shows rivals launching (the spectate census reports launches). Outcome (lane Q, seed 0 to 1995): pads and centres built (first pad 1977, 4 staffed by 1995), but 0 launches: the launch lots are not on the home shelf (BL-1630, launch goods supply)."
+  },
+  {
+   "status": "designed",
+   "glyph": "○",
+   "sprint": 65,
+   "version_goal": "v0.4.0",
+   "written": "2026-11-10",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Claude (spectator finding, BL-1615)",
+   "requires": [
+    "BL-1615"
+   ],
+   "category": "Space",
+   "priority": "A",
+   "difficulty": 3,
+   "id": "BL-1630",
+   "short_name": "LAUNCH_GOODS_SUPPLY",
+   "authority_doc": "docs/economy/SPACE_ASSETS.md",
+   "files": [
+    "src/world/corp_ai.cpp",
+    "src/world/nation_ai.cpp",
+    "src/world/space_assets.cpp"
+   ],
+   "title": "Rivals with a staffed pad can buy a launch: spacecraft components and propellant reach the home shelf, and pads finish in reasonable time",
+   "design": "The BL-1615 spectate (seed 0 to 1995) ends with 4 staffed rival pads and 0 launches. Three padded nations are refused rejected_shelf: their home market holds no spacecraft_components or propellant lot (components_lump 25, propellant_lump 50), though treasuries are 50 to 88k. The plants exist (recipes spacecraft_components, spacecraft_components_heavy, propellant_atmospheric) but nothing builds them: no demand shows before a launch. Second gap: pads take 5 to 9 years, some sites at rate 0 for want of materials. Fix as an in-world force, not a term in the agent: the space programme demand must be visible to the nation build scorer (2026-10-23 grant, own ground only) so it builds the plants, or the launch buy must post a standing order the market and builders can see. Done when a spectated run shows rival launches before 2000. Ben, 2026-11-10: option D rejected (no pooling); B being measured; boost (BL-1637) built alongside."
+  },
+  {
+   "status": "complete",
+   "glyph": "●",
+   "sprint": 66,
+   "version_goal": "v0.5.0",
+   "written": "2026-11-10",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Claude (BL-1613 lane report)",
+   "requires": [],
+   "category": "AI",
+   "priority": "C",
+   "difficulty": 1,
+   "id": "BL-1631",
+   "short_name": "MCP_RESEARCH_NODE_COUNT",
+   "authority_doc": "docs/ai/AI_OPPONENT.md",
+   "files": [
+    "tools/mcp/server.js"
+   ],
+   "title": "The MCP server range-checks research orders against 160 nodes; the Digitisation tree has 194",
+   "design": "tools/mcp/server.js holds RESEARCH_NODE_COUNT = 160. Read the count from the generated tree data (or the store) instead of a literal, so valid orders 160..193 are not refused before the wire."
+  },
+  {
+   "status": "complete",
+   "glyph": "●",
+   "version_goal": "v0.5.0",
+   "written": "2026-11-10",
+   "parked": false,
+   "blocked_on": null,
+   "requires": [],
+   "sprint": 66,
+   "author": "Claude (BL-1602 lane report)",
+   "category": "Verification",
+   "priority": "B",
+   "difficulty": 2,
+   "id": "BL-1632",
+   "short_name": "STALE_TAIL_HARNESSES",
+   "authority_doc": "docs/development/DEVELOPMENT_PRACTICES.md",
+   "files": [
+    "tools/verify/war_harness.cpp",
+    "tools/verify/cession_harness.cpp",
+    "tools/verify/embargo_harness.cpp"
+   ],
+   "title": "Twelve save harnesses measure from the stream end but stop summing sections at v75-v79",
+   "design": "war_harness (R4l, RF1, RF3, RF4 fail), cession, embargo, railway, recruits, refit_units, road_edges, tax_discontent, tile_contact, carried_supplies, lp_pool and quarterly_return subtract tail sections only up to about v75 (refusals); every later section (contributors v77 onward, through the space sections to v90) is missing. Better than adding terms again: one helper world_save_tail_bytes_after(version, w) in world_save.cpp that sums every section after a version, so the next bump updates one place."
+  },
+  {
+   "status": "complete",
+   "glyph": "●",
+   "version_goal": "v0.5.0",
+   "written": "2026-11-10",
+   "parked": false,
+   "blocked_on": null,
+   "requires": [],
+   "sprint": 66,
+   "author": "Claude (BL-1602 lane report)",
+   "category": "UI",
+   "priority": "C",
+   "difficulty": 1,
+   "id": "BL-1633",
+   "short_name": "FRONT_MENU_BY_BODY",
+   "authority_doc": "docs/military/MILITARY.md",
+   "files": [
+    "src/ui/selection_panel.cpp"
+   ],
+   "title": "The unit card's Assign to front menu lists only fronts on the unit's body",
+   "design": "Assigning a unit to a front on another body is refused (MILITARY.md § Space). The menu still lists every front of the nation; filter it by the unit's body. Live click owed: Assign to front on a unit whose nation has fronts on another body lists only same-body fronts."
+  },
+  {
+   "status": "complete",
+   "glyph": "●",
+   "version_goal": "v0.5.0",
+   "written": "2026-11-10",
+   "parked": false,
+   "blocked_on": null,
+   "requires": [],
+   "sprint": 66,
+   "author": "Claude (BL-1602 lane report)",
+   "category": "Military",
+   "priority": "B",
+   "difficulty": 2,
+   "id": "BL-1634",
+   "short_name": "GARRISON_CHASE_LOOP",
+   "authority_doc": "docs/military/MILITARY.md",
+   "files": [
+    "src/world/fronts.cpp"
+   ],
+   "title": "A garrison defending its province can chase a pushing stack forever without a battle",
+   "design": "Seen on any body: the lower-id attacker steps first each day, the push prefers empty tiles, and the defender walks onto the tile the attacker just left, so they never meet. war_bodies_harness clears the defend order before its battle to avoid it. Diagnose the step order and fix so a defender closing on a pusher meets it."
+  },
+  {
+   "status": "complete",
+   "glyph": "●",
+   "version_goal": "v0.5.0",
+   "written": "2026-11-10",
+   "parked": false,
+   "blocked_on": null,
+   "requires": [],
+   "sprint": 66,
+   "author": "Claude (BL-1604 lane report)",
+   "category": "Verification",
+   "priority": "B",
+   "difficulty": 2,
+   "id": "BL-1635",
+   "short_name": "OWNERLESS_HARNESS_FAILURES",
+   "authority_doc": "docs/development/DEVELOPMENT_PRACTICES.md",
+   "files": [
+    "tools/verify/construction_harness.cpp",
+    "tools/verify/well_gate.cpp",
+    "tools/verify/nation_tech_harness.cpp",
+    "tools/verify/railway_harness.cpp",
+    "tools/verify/lp_pool_harness.cpp",
+    "tools/verify/tax_discontent_harness.cpp"
+   ],
+   "title": "Three harnesses fail with or without the space work: construction (8), well_gate (5), nation_tech pacing R0h/R0i",
+   "design": "Confirmed by rebuilding with the lane's files reverted: construction_harness C.R2/R3/R4/R8 (8 rows), well_gate E1/W5/W7 (5 rows), nation_tech_harness R0h/R0i (research pacing, median 14, p10 6). Find which commit broke each; fix or re-pin with a cause comment (pacing re-pins are Ben's). Also left by BL-1632 (not tail-offset problems): railway_harness R6 relabels a v55 body as v48 although the tile record changed at v53 (use the pre-edge writer lp_pool uses), R4 and R7/D (rail logic); lp_pool \"M seed 0: every consumer reached after seeding\" (logistics reach); tax_discontent T6 (the v51 hash compares with a hand-zeroed world that misses later state). Outcome: construction, well_gate, railway R4/R6/R7, tax_discontent T6 fixed as harness defects (9b2f436d). nation_tech R0h/R0i is a world drift left for Ben (NR-1214). lp_pool M seed 0 is a real regression, filed as BL-1636 (lp seeding coverage gap)."
+  },
+  {
+   "status": "designed",
+   "glyph": "○",
+   "version_goal": "v0.6.0",
+   "written": "2026-11-10",
+   "parked": false,
+   "blocked_on": null,
+   "requires": [],
+   "sprint": null,
+   "author": "Claude (BL-1635 lane report)",
+   "category": "Economy",
+   "priority": "B",
+   "difficulty": 2,
+   "id": "BL-1636",
+   "short_name": "LP_SEEDING_COVERAGE_GAP",
+   "authority_doc": "docs/economy/LOGISTICS.md",
+   "files": [
+    "src/world/logistic_points.cpp",
+    "src/world/opening_kit.cpp",
+    "tools/verify/lp_pool_harness.cpp"
+   ],
+   "title": "Logistic Point seeding reports every hub connected, yet a few consumers on a nation's ground stay uncovered",
+   "design": "lp_pool_harness \"M seed 0: every consumer on a nation's ground is reached after seeding\" passes at 61aaa8e7 (306 of 306) and fails from merge d9996661 BL-1473 (major opening kit): 7 of 290 uncovered then, 3 of 365 at the space branch tip, while the seeding log says \"0 no hub could connect, 0 cut off\". The retry loop (logistic_points.cpp ~2326) and the coverage read (lp_seed_read ~2555) disagree. Suspects: dcc117ee (own-market want, calibrated feed, logistics cap) and the kit logistics cap in opening_kit.cpp, which NR-1128 says keeps capital-stacked hubs out of the hub slots. Fix so seeding and coverage agree; a world-mover, so digests may move."
+  },
+  {
+   "status": "designed",
+   "glyph": "○",
+   "version_goal": "v0.5.0",
+   "written": "2026-11-10",
+   "parked": false,
+   "blocked_on": null,
+   "requires": [],
+   "sprint": 67,
+   "author": "Claude (Ben's form, 2026-11-10)",
+   "id": "BL-1637",
+   "short_name": "LAUNCH_BOOST",
+   "category": "Economy",
+   "priority": "A",
+   "difficulty": 3,
+   "authority_doc": "docs/economy/SPACE_ASSETS.md",
+   "files": [
+    "src/world/space_assets.cpp",
+    "scripts/recipes.lua",
+    "docs/politics/NATIONS.md",
+    "docs/ui/ledgers/space.md",
+    "docs/ai/ACTIONS.json"
+   ],
+   "title": "A staffed Launchpad makes boost from its market every day; a launch spends boost by distance",
+   "design": "SPACE_ASSETS.md § Boost. Replaces the whole-lot shelf buy and the quarterly standing launch-lot bid. Done when a spectated run shows rival launches without pooling markets, and the same goods per launch as before."
+  },
+  {
+   "status": "complete",
+   "glyph": "●",
+   "version_goal": "v0.5.0",
+   "written": "2026-11-10",
+   "parked": false,
+   "blocked_on": null,
+   "requires": [],
+   "sprint": 67,
+   "author": "Claude (Ben's form, 2026-11-10)",
+   "id": "BL-1638",
+   "short_name": "GENERATED_BODY_MASS",
+   "category": "Generation",
+   "priority": "B",
+   "difficulty": 2,
+   "authority_doc": "docs/generation/PLANETOLOGY.md",
+   "files": [
+    "src/world/planetology.cpp",
+    "src/world/hard_coded_world.cpp",
+    "src/world/orbital_graph.cpp"
+   ],
+   "title": "Every body other than the homeworld rolls its size and density; its mass follows and the orbital graph reads it",
+   "design": "PLANETOLOGY.md § The prototype body set. The logistics distance scale (body_km_per_tile) keeps its current read. Digests may move through the planetology chain; report, do not re-pin."
+  },
+  {
+   "status": "designed",
+   "glyph": "○",
+   "version_goal": "v0.5.0",
+   "written": "2026-11-10",
+   "parked": false,
+   "blocked_on": null,
+   "requires": [],
+   "sprint": 67,
+   "author": "Claude (Ben's form, 2026-11-10)",
+   "id": "BL-1639",
+   "short_name": "RETIRE_SURVEY_PROBE",
+   "category": "UI",
+   "priority": "B",
+   "difficulty": 2,
+   "authority_doc": "docs/ui/DISCOVERY.md",
+   "files": [
+    "src/world/survey_system.cpp",
+    "docs/ui/DISCOVERY.md",
+    "docs/ai/ACTIONS.json"
+   ],
+   "title": "Retire the dispatched survey probe: mapping then prospecting is the one route to a body's ground",
+   "design": "Ben, 2026-11-10 (NR-1179). The probe's dispatch verb, phases and UI retire; DISCOVERY.md's survey phases are rewritten around mapping and prospecting."
   }
  ]
 }

@@ -2,7 +2,8 @@
 
 > **Settles:** the nodes of the Digitisation age's tech tree — its three trees, ten branches,
 > clusters, pairs, joints, masteries, quests and placeholders · every node's advantage, ring and
-> requirements · which next-age branch each quest keys · the traps the tree carries for Era 1.
+> requirements · which next-age branch each quest keys · which node unlocks each near-space
+> thing · the traps the tree carries for Era 1.
 > **Not here:** the grammar every age's tree obeys, research points and the queue (../RESEARCH) ·
 > what Era 1 is and what opens the next (../ERAS) · what a recipe or building does once
 > unlocked (../PRODUCTION).
@@ -100,8 +101,9 @@ The tree carries Era 1's red herrings — technologies whose cost is the Alarm t
 
 ## Quests and the next age
 
-Each quest keys the same branch of the next age's tree. The next age is unnamed; its branches are
-sketched by what the quests open:
+Each quest keys the same branch of the next age's tree, the Early Space tree
+(`EARLY_SPACE_TREE.md`). It authors In-Situ Propellant, Interplanetary Convoys and Space Force; the
+other six branches are reserved there. The branches, sketched by what the quests open:
 
 | Branch | Quest | Keys |
 |---|---|---|
@@ -172,6 +174,46 @@ what the lock rule reads. `tools/session/tech_tree_store.js --check` holds the t
 1423 cost units, about 31% more, and the RP unit is not re-tuned to absorb it. Naval raises it again to
 1536, about 8%, on the same rule (Ben, 2026-11-05).
 
+## Space unlocks
+
+**Near space is researched here** (`../SPACE_ASSETS.md`): the launch, every satellite role, the
+Astronaut Training Centre, the station core, all but one of the station modules, and the first grid
+upgrade. Far space — hulls, drives, the propellant loop's buildings, the Shipyard module and the
+last grid upgrade — is the next age's (`EARLY_SPACE_TREE.md`). Each unlock is a `mechanic` effect
+whose key is a constant in `src/world/space_tech_keys.hpp`, and each key sits on one node.
+
+**No node is added for space.** Each unlock rides an existing node whose subject it shares, beside
+that node's own advantage: the role satellites on the technologies they carry, the modules on the
+industry that makes their parts.
+
+| Key | Unlocks | Node | Branch |
+|---|---|---|---|
+| `space_dispatch` | Launch; convoys to other bodies | Rocketry | Signal & Orbit |
+| `space_role_comms` | The Comms satellite | Communication Satellites | Markets |
+| `space_role_navigation` | The Navigation satellite | Satellite Navigation | Freight |
+| `space_role_observation` | The Observation satellite | Thermal Imaging | Signal & Orbit |
+| `space_role_survey` | The Survey satellite | Seismic Survey | Extraction |
+| `astronaut_training` | The Astronaut Training Centre | Mass Higher Education | Signal & Orbit |
+| `space_station_core` | The station core | Rocketry | Signal & Orbit |
+| `space_module_research` | The Research module | Research Culture | Signal & Orbit |
+| `space_module_defence` | The Defence module | Integrated Air Defence | Signal & Orbit |
+| `space_module_observatory` | The Observatory module | Scanned-Array Radar | Signal & Orbit |
+| `space_module_power` | The Power module | Photolithography | Processing |
+| `space_module_habitation` | The Habitation module | Polymer Chemistry | Processing |
+| `space_module_life_support` | The Life support module | Desalination | Extraction |
+| `space_module_fuel_depot` | The Fuel depot module | Cryogenic Storage | Energy |
+| `space_module_dock` | The Dock module | Gantry Cranes | Freight |
+| `space_module_cargo_hold` | The Cargo hold module | Container Shipping | Freight |
+| `space_module_microgravity_factory` | The Microgravity factory module | Industrial Robotics | Processing |
+| `space_module_comms_relay` | The Comms relay module | Packet Networks | Markets |
+| `space_module_market` | The Market module | Electronic Settlement | Markets |
+| `space_grid_7x5` | The 5 × 3 → 7 × 5 station upgrade | Numerical Control | Processing |
+
+**The station core sits on Signal & Orbit's mastery**, *Research Culture*, the one node past
+Rocketry that is not a quest: a core comes after the launch, and a quest's deed would hold it
+behind a deed rather than research. A launch still needs Rocketry whatever else is held
+(`../SPACE_ASSETS.md` § Launching), so a role or module held before Rocketry waits on it.
+
 ## Effects
 
 A node's **advantage** is the player-facing prose; its **effects** in the store are the same
@@ -206,7 +248,7 @@ shape; `nation_tech_harness` holds the store to what the code reads.
 |---|---|---|---|---|---|
 | `DG-PR-EX-T1` | Field Practice I | travel | 1 | +1% extraction rate at every extraction building | — (open) |
 | `DG-PR-EX-T2` | Field Practice II | travel | 1 | +1% extraction rate at every extraction building | Field Practice I |
-| `DG-PR-EX-A1` | Seismic Survey | minor | 1 | deposits in your provinces reveal 1 province further | Field Practice II |
+| `DG-PR-EX-A1` | Seismic Survey | minor | 1 | deposits in your provinces reveal 1 province further; Survey satellites may be launched | Field Practice II |
 | `DG-PR-EX-A2` | Drill-Bit Metallurgy | minor | 1 | Oil Platforms +5% extraction rate | Field Practice II |
 | `DG-PR-EX-A` | Offshore Drilling | major | 2 | Oil Platforms may be placed on shelf sea; Oil Platforms +25% extraction rate | Seismic Survey + Drill-Bit Metallurgy |
 | `DG-PR-EX-T3` | Field Practice III | travel | 2 | +1% extraction rate at every extraction building | Offshore Drilling |
@@ -217,7 +259,7 @@ shape; `nation_tech_harness` holds the store to what the code reads.
 | `DG-PR-EX-B2` | Rock Bolting | minor | 3 | Mine maintenance -10% | Field Practice IV |
 | `DG-PR-EX-B` | Deep-Shaft Mining | major | 4 | province building ceiling +1 for extraction buildings; Mines +10% extraction rate | Mine Ventilation + Rock Bolting |
 | `DG-PR-EX-C1` | Hybrid Seed | minor | 3 | Farms +5% output | Field Practice VI |
-| `DG-PR-EX-C2` | Desalination | minor | 3 | coastal Water extraction sites; Water extraction +10% | Field Practice VI |
+| `DG-PR-EX-C2` | Desalination | minor | 3 | coastal Water extraction sites; Water extraction +10%; station Life support modules may be fitted | Field Practice VI |
 | `DG-PR-EX-C` | Green Revolution | major | 4 | Farms +25% output; Chemical Plants unlock the fertiliser recipe | Hybrid Seed + Desalination |
 | `DG-PR-EX-M` | Resource Base | mastery | 4 | +3% extraction rate at every extraction building | Deep-Shaft Mining + Green Revolution |
 | `DG-PR-EX-Q` | Strategic Reserve | quest | 2 | Mines and Oil Platforms +5% extraction rate. **Deed:** your own stock of crude oil and iron ore covers 4 quarters of your demand. **Keys next age:** Asteroid Prospecting | Offshore Drilling |
@@ -229,18 +271,18 @@ shape; `nation_tech_harness` holds the store to what the code reads.
 | `DG-PR-PC-T1` | Shop-Floor Practice I | travel | 1 | +1% output per batch at every processing building | — (open) |
 | `DG-PR-PC-T2` | Shop-Floor Practice II | travel | 1 | +1% output per batch at every processing building | Shop-Floor Practice I |
 | `DG-PR-PC-A1` | Catalysts | minor | 1 | Chemical Plants +5% output per batch | Shop-Floor Practice II |
-| `DG-PR-PC-A2` | Polymer Chemistry | minor | 1 | plastics recipe inputs -10% | Shop-Floor Practice II |
+| `DG-PR-PC-A2` | Polymer Chemistry | minor | 1 | plastics recipe inputs -10%; station Habitation modules may be fitted | Shop-Floor Practice II |
 | `DG-PR-PC-A` | Bulk Petrochemicals | major | 2 | Chemical Plants unlock the plastics recipe; Refineries +20% output per batch | Catalysts + Polymer Chemistry |
 | `DG-PR-PC-T3` | Shop-Floor Practice III | travel | 2 | +1% output per batch at every processing building | Bulk Petrochemicals |
 | `DG-PR-PC-T4` | Shop-Floor Practice IV | travel | 3 | +1% output per batch at every processing building | Reactive Armour |
 | `DG-PR-PC-T5` | Shop-Floor Practice V | travel | 2 | +1% output per batch at every processing building | Bulk Petrochemicals |
 | `DG-PR-PC-T6` | Shop-Floor Practice VI | travel | 3 | +1% output per batch at every processing building | Low-Observable Airframes |
 | `DG-PR-PC-B1` | Clean Rooms | minor | 3 | microchip recipe +10% yield | Shop-Floor Practice IV |
-| `DG-PR-PC-B2` | Photolithography | minor | 3 | Electronics Labs +5% output per batch | Shop-Floor Practice IV |
+| `DG-PR-PC-B2` | Photolithography | minor | 3 | Electronics Labs +5% output per batch; station Power modules may be fitted | Shop-Floor Practice IV |
 | `DG-PR-PC-B` | Semiconductor Foundry | major | 4 | Electronics Labs unlock the microchip recipe; Electronics Labs +10% output per batch | Clean Rooms + Photolithography |
-| `DG-PR-PC-C1` | Numerical Control | minor | 3 | Fabricators +5% output per batch; opens lightweight composite tracks (armour) | Shop-Floor Practice VI |
+| `DG-PR-PC-C1` | Numerical Control | minor | 3 | Fabricators +5% output per batch; opens lightweight composite tracks (armour); station grids may be upgraded to 7 x 5 | Shop-Floor Practice VI |
 | `DG-PR-PC-C2` | Process Automation | minor | 3 | wages in processing buildings -5% | Shop-Floor Practice VI |
-| `DG-PR-PC-C` | Industrial Robotics | major | 4 | every processing building +20% output per batch and wages -10% | Numerical Control + Process Automation |
+| `DG-PR-PC-C` | Industrial Robotics | major | 4 | every processing building +20% output per batch and wages -10%; station Microgravity factory modules may be fitted | Numerical Control + Process Automation |
 | `DG-PR-PC-M` | Industrial Depth | mastery | 4 | +3% output per batch at every processing building | Semiconductor Foundry + Industrial Robotics |
 | `DG-PR-PC-Q` | Domestic Chips | quest | 4 | Electronics Labs +10% output per batch. **Deed:** your microchip output covers your own electronics demand for 4 quarters. **Keys next age:** Orbital Assembly | Semiconductor Foundry |
 | `DG-PR-PC-D1` | Composite Armour | minor | 2 | opens composite armour (armour, the light-armour applique) | Shop-Floor Practice III |
@@ -266,7 +308,7 @@ shape; `nation_tech_harness` holds the store to what the code reads.
 | `DG-PR-EN-B1` | Reactor Safety | minor | 3 | each Nuclear Plant raises rivals’ Alarm by 1 instead of 2 | Fuel Economy IV |
 | `DG-PR-EN-B2` | Uranium Enrichment | minor | 3 | Nuclear Plant output +25% | Fuel Economy IV |
 | `DG-PR-EN-B` | Civil Nuclear Power | major | 4 | unlocks the Nuclear Plant: powers 4 province buildings with no fuel draw. Trap: each one raises every rival’s Alarm toward you by 2 | Reactor Safety + Uranium Enrichment |
-| `DG-PR-EN-C1` | Cryogenic Storage | minor | 3 | propellant holding losses -50% | Fuel Economy VI |
+| `DG-PR-EN-C1` | Cryogenic Storage | minor | 3 | propellant holding losses -50%; station Fuel depot modules may be fitted | Fuel Economy VI |
 | `DG-PR-EN-C2` | Rocket-Fuel Chemistry | minor | 3 | propellant recipes +5% yield | Fuel Economy VI |
 | `DG-PR-EN-C` | Propellant Synthesis | major | 4 | propellant recipes +20% yield | Cryogenic Storage + Rocket-Fuel Chemistry |
 | `DG-PR-EN-M` | Energy Security | mastery | 4 | -3% fuel draw at every building | Civil Nuclear Power + Propellant Synthesis |
@@ -282,7 +324,7 @@ shape; `nation_tech_harness` holds the store to what the code reads.
 | `DG-NE-SO-T1` | Research Grant I | travel | 1 | +1% national research | — (open) |
 | `DG-NE-SO-T2` | Research Grant II | travel | 1 | +1% national research | Research Grant I |
 | `DG-NE-SO-A1` | Telex Network | minor | 1 | rivals’ prices and stocks seen 1 quarter fresher | Research Grant II |
-| `DG-NE-SO-A2` | Mass Higher Education | minor | 1 | universities +20% research | Research Grant II |
+| `DG-NE-SO-A2` | Mass Higher Education | minor | 1 | universities +20% research; the Astronaut Training Centre may be built | Research Grant II |
 | `DG-NE-SO-A` | Mainframe Computing | major | 2 | national research +15% | Telex Network + Mass Higher Education |
 | `DG-NE-SO-T3` | Research Grant III | travel | 2 | +1% national research | Mainframe Computing |
 | `DG-NE-SO-T4` | Research Grant IV | travel | 3 | +1% national research | Thermal Imaging |
@@ -290,18 +332,18 @@ shape; `nation_tech_harness` holds the store to what the code reads.
 | `DG-NE-SO-T6` | Research Grant VI | travel | 3 | +1% national research | Integrated Air Defence |
 | `DG-NE-SO-B1` | Pad Ground Support | minor | 3 | Launchpad build cost -25% | Research Grant IV |
 | `DG-NE-SO-B2` | Guidance Systems | minor | 3 | launch propellant -5% | Research Grant IV |
-| `DG-NE-SO-B` | Rocketry | major | 4 | the Launchpad may operate (with the staffed pad and propellant reserve); convoys may dispatch to other bodies | Pad Ground Support + Guidance Systems |
+| `DG-NE-SO-B` | Rocketry | major | 4 | the Launchpad may operate (with the staffed pad and propellant reserve); convoys may dispatch to other bodies; station cores may be launched | Pad Ground Support + Guidance Systems |
 | `DG-NE-SO-C1` | Reserved minor | minor (placeholder) | 4 | reserved for espionage: signals intelligence | Loitering Munitions |
 | `DG-NE-SO-C2` | Reserved minor | minor (placeholder) | 4 | reserved for espionage: signals intelligence | Loitering Munitions |
 | `DG-NE-SO-C` | [Espionage] | major (placeholder) | 4 | placeholder cluster: signals intelligence; effects authored when the espionage system exists | Reserved minor + Reserved minor |
-| `DG-NE-SO-M` | Research Culture | mastery | 4 | +3% national research | Rocketry |
+| `DG-NE-SO-M` | Research Culture | mastery | 4 | +3% national research; Research modules may be fitted | Rocketry |
 | `DG-NE-SO-Q` | First Cargo to Orbit | quest | 4 | launch propellant -5%. **Deed:** one convoy completed to another body. **Keys next age:** Interplanetary Convoys | Rocketry |
 | `DG-NE-SO-D1` | Airborne Radar | minor | 2 | opens airborne radar (pulse-doppler, terrain-following, side-looking) | Research Grant III |
 | `DG-NE-SO-D2` | Long-Endurance Drones | minor | 2 | opens the long-endurance drone and its satellite datalink | Research Grant III |
-| `DG-NE-SO-D` | Thermal Imaging | major | 3 | opens thermal sights (armour and light-armour armament, helicopter night vision, the targeting pod) | Airborne Radar + Long-Endurance Drones |
-| `DG-NE-SO-E1` | Scanned-Array Radar | minor | 2 | opens scanned-array radar (fighter, multirole sensor fusion, helicopter mast radar) | Research Grant V |
+| `DG-NE-SO-D` | Thermal Imaging | major | 3 | opens thermal sights (armour and light-armour armament, helicopter night vision, the targeting pod); Observation satellites may be launched | Airborne Radar + Long-Endurance Drones |
+| `DG-NE-SO-E1` | Scanned-Array Radar | minor | 2 | opens scanned-array radar (fighter, multirole sensor fusion, helicopter mast radar); station Observatory modules may be fitted | Research Grant V |
 | `DG-NE-SO-E2` | Jet Combat Drones | minor | 2 | opens the jet-powered combat drone (drone airframe) | Research Grant V |
-| `DG-NE-SO-E` | Integrated Air Defence | major | 3 | opens the integrated air-defence network and the airborne early-warning aircraft | Scanned-Array Radar + Jet Combat Drones |
+| `DG-NE-SO-E` | Integrated Air Defence | major | 3 | opens the integrated air-defence network and the airborne early-warning aircraft; station Defence modules may be fitted | Scanned-Array Radar + Jet Combat Drones |
 | `DG-NE-SO-G1` | Autonomous Targeting | minor | 3 | opens autonomous targeting (drone avionics) | Research Grant VI |
 | `DG-NE-SO-G2` | Electronic Warfare | minor | 3 | opens electronic warfare (air-defence fire control, bomber countermeasures, towed decoys, the signals-intelligence suite) | Research Grant VI |
 | `DG-NE-SO-G` | Networked Warfare | major | 4 | opens networked soldier kit and gun-launched missiles with networked fire control | Autonomous Targeting + Electronic Warfare |
@@ -317,14 +359,14 @@ shape; `nation_tech_harness` holds the store to what the code reads.
 | `DG-NE-MK-T2` | Trade Desk II | travel | 1 | +1% trade capacity at every Marketplace | Trade Desk I |
 | `DG-NE-MK-A1` | Commodity Futures | minor | 1 | trade capacity +5% at your Marketplaces | Trade Desk II |
 | `DG-NE-MK-A2` | Consumer Credit | minor | 1 | household demand in your markets +3% | Trade Desk II |
-| `DG-NE-MK-A` | Electronic Settlement | major | 2 | trades settle the tick they clear; Ports earn +25% trade points | Commodity Futures + Consumer Credit |
+| `DG-NE-MK-A` | Electronic Settlement | major | 2 | trades settle the tick they clear; Ports earn +25% trade points; station Market modules may be fitted | Commodity Futures + Consumer Credit |
 | `DG-NE-MK-T3` | Trade Desk III | travel | 2 | +1% trade capacity at every Marketplace | Electronic Settlement |
 | `DG-NE-MK-T4` | Trade Desk IV | travel | 3 | +1% trade capacity at every Marketplace | Trade Desk III |
 | `DG-NE-MK-T5` | Trade Desk V | travel | 2 | +1% trade capacity at every Marketplace | Electronic Settlement |
 | `DG-NE-MK-T6` | Trade Desk VI | travel | 3 | +1% trade capacity at every Marketplace | Trade Desk V |
-| `DG-NE-MK-B1` | Communication Satellites | minor | 3 | activity fog lifts on every market you trade with | Trade Desk IV |
+| `DG-NE-MK-B1` | Communication Satellites | minor | 3 | activity fog lifts on every market you trade with; Comms satellites may be launched | Trade Desk IV |
 | `DG-NE-MK-B2` | Just-in-Time Inventory | minor | 3 | stock holding cost and spoilage -20% | Trade Desk IV |
-| `DG-NE-MK-B` | Packet Networks | major | 4 | trade capacity +30% at every Marketplace; national research +10% | Communication Satellites + Just-in-Time Inventory |
+| `DG-NE-MK-B` | Packet Networks | major | 4 | trade capacity +30% at every Marketplace; national research +10%; station Comms relay modules may be fitted | Communication Satellites + Just-in-Time Inventory |
 | `DG-NE-MK-C1` | Reserved minor | minor (placeholder) | 3 | reserved for politics: lobbying and market regulation | Trade Desk VI |
 | `DG-NE-MK-C2` | Reserved minor | minor (placeholder) | 3 | reserved for politics: lobbying and market regulation | Trade Desk VI |
 | `DG-NE-MK-C` | [Politics] | major (placeholder) | 4 | placeholder cluster: lobbying and market regulation; effects authored when the politics system exists | Reserved minor + Reserved minor |
@@ -338,8 +380,8 @@ shape; `nation_tech_harness` holds the store to what the code reads.
 | `DG-NE-FR-T1` | Route Planning I | travel | 1 | -1% logistics cost | — (open) |
 | `DG-NE-FR-T2` | Route Planning II | travel | 1 | -1% logistics cost | Route Planning I |
 | `DG-NE-FR-A1` | Pallet Standards | minor | 1 | handling cost -5% | Route Planning II |
-| `DG-NE-FR-A2` | Gantry Cranes | minor | 1 | Port throughput +10% | Route Planning II |
-| `DG-NE-FR-A` | Container Shipping | major | 2 | convoys carry +50% cargo per dispatch; Ports upgrade to Container Ports | Pallet Standards + Gantry Cranes |
+| `DG-NE-FR-A2` | Gantry Cranes | minor | 1 | Port throughput +10%; station Dock modules may be fitted | Route Planning II |
+| `DG-NE-FR-A` | Container Shipping | major | 2 | convoys carry +50% cargo per dispatch; Ports upgrade to Container Ports; station Cargo hold modules may be fitted | Pallet Standards + Gantry Cranes |
 | `DG-NE-FR-T3` | Route Planning III | travel | 2 | -1% logistics cost | Container Shipping |
 | `DG-NE-FR-T4` | Route Planning IV | travel | 3 | -1% logistics cost | Route Planning III |
 | `DG-NE-FR-T5` | Route Planning V | travel | 2 | -1% logistics cost | Container Shipping |
@@ -348,7 +390,7 @@ shape; `nation_tech_harness` holds the store to what the code reads.
 | `DG-NE-FR-B2` | Trucking Fleets | minor | 3 | inland convoy capacity +10% | Route Planning IV |
 | `DG-NE-FR-B` | Motorway Grid | major | 4 | road-tier upgrades cost -30%; road travel time -15% | Asphalt Paving + Trucking Fleets |
 | `DG-NE-FR-C1` | Air Cargo Hubs | minor | 3 | high-value convoy capacity +10% | Route Planning VI |
-| `DG-NE-FR-C2` | Satellite Navigation | minor | 3 | travel time -5% everywhere | Route Planning VI |
+| `DG-NE-FR-C2` | Satellite Navigation | minor | 3 | travel time -5% everywhere; Navigation satellites may be launched | Route Planning VI |
 | `DG-NE-FR-C` | Jet Freight | major | 4 | perishables and electronics travel time -40% | Air Cargo Hubs + Satellite Navigation |
 | `DG-NE-FR-M` | Logistics Backbone | mastery | 4 | -3% logistics cost | Motorway Grid + Jet Freight |
 | `DG-NE-FR-Q` | Ten Lanes | quest | 4 | logistics cost -5%. **Deed:** 10 convoy routes served every quarter for 4 quarters. **Keys next age:** Orbital Port & Depots | Motorway Grid |

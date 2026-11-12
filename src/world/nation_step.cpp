@@ -14,6 +14,10 @@
 #include "province.hpp"          // BL-572: province_holder_for, province lookup
 #include "recipe_registry.hpp"
 #include "space_assets.hpp"      // BL-1327: the quarterly space-asset step
+#include "stations.hpp"          // BL-1583/BL-1585: the station step, astronaut training
+#include "space_effects.hpp"     // BL-1584/BL-1586: module and satellite effects
+#include "space_units.hpp"       // BL-1594/BL-1595: the space units' quarter
+#include "debris.hpp"            // BL-1598: the debris quarter
 #include "space_programme.hpp"   // BL-644: the space_programme line's consumer
 #include "survey_system.hpp"
 #include "unit_roster.hpp" // BL-571: resolve_unit_upkeep, unit_upkeep_params
@@ -200,11 +204,77 @@ void run_nation_step(world& w, const recipe_registry& reg, economy_report& repor
     advance_research(w, reg.research(), &report.research);
     run_nation_research_repick(w, reg, spectating, &report.research_picks);
 
+    // ---- 6a. The space pick (BL-1589, AI_OPPONENT.md § 11, Ben 2026-11-10) —
+    // every non-player nation takes at most one near-space action through the
+    // command seam, after research (so a key completed this quarter is usable)
+    // and before the order queue and the asset step (so a launch is this
+    // quarter's). Never the player's nation; nothing in the settle.
+    run_nation_space_ai(w, reg, &report.space_picks);
+    // ---- 6a'. The far-space pick (BL-1608, the same grant) — the sibling faculty:
+    // at most one far-space verb per non-player nation (designs, raises, moves,
+    // the base programme, bombard), after the near pick so a station core
+    // launched this quarter is already the world it reads. Never the player's.
+    run_nation_far_space_ai(w, reg, &report.far_space_picks);
+
+    // ---- 6b. Pending near-space orders (BL-1587, SPACE_ASSETS.md § Signal delay) —
+    // an order issued outside comms coverage last quarter reaches its station or
+    // satellite now: re-validated, then applied or dropped. Before the asset step,
+    // so a module it launches is reported as this quarter's launch. An empty
+    // queue does nothing, so a world without one ticks as before.
+    run_space_orders(w, reg, econ_tick, &report.space_orders);
+
     // ---- 7. Space assets (BL-1327, SPACE_ASSETS.md) — arrivals, then each
     // placed asset's quarterly upkeep paid whole from its owner's treasury or
     // counted unpaid (decaying, then lost). Ascending asset id; an empty store
     // does nothing, so a world that never launched ticks as before.
+    // BL-1598 (SPACE_ASSETS.md § Debris): what stands in orbit before the space
+    // steps, so step 7e can leave debris for whatever they lose.
+    const space_loss_watch debris_watch = watch_space_losses(w);
     run_space_asset_step(w, reg.space_assets(), econ_tick, &report.space_assets);
+
+    // ---- 7b. Stations and astronauts (BL-1583 / BL-1585, SPACE_ASSETS.md) —
+    // after the asset step, so a part lost there is swept here: training centres
+    // fill the astronaut pools, a lost core loses its station, a lost module frees
+    // its slot, refits complete, and the budgets are counted. No station and no
+    // centre does nothing, so a world without them ticks as before.
+    run_station_step(w, reg.stations(), econ_tick, &report.stations);
+
+    // ---- 7c. Space effects (BL-1584 / BL-1586, SPACE_ASSETS.md) — right after
+    // the station step, so the budgets it counted are the ones the modules work
+    // by: life support buys its rations, Research modules in coverage earn RP,
+    // factories trade a lot, Survey satellites and Observatories map regions.
+    // No asset and no station does nothing, so such a world ticks as before.
+    run_space_effects(w, space_effects_params{}, reg.stations(), reg.price_band().reservation_mult,
+                      econ_tick, &report.space_effects);
+    // ---- 7c'. Solar storms (BL-1605, EVENTS.md § Solar storms) — a READ of the
+    // quarter's storm, derived from seed and tick: who it struck (the effects
+    // above already ran dark) and whom an Observatory warns of the next. Nothing
+    // in space reports nothing.
+    run_solar_storm_report(w, reg.stations(), econ_tick, &report.solar_storms);
+    // ---- 7d. Space units (BL-1594 / BL-1595, SPACE_FLEETS.md) — after the station
+    // step, so a lost station's depot stock is dropped: each unit's upkeep (unpaid
+    // counts, lost at the dial), then each station's Fuel-depot fill off its owner's
+    // home shelf. Empty stores do nothing, so a world without them ticks as before.
+    run_space_unit_quarter(w, reg.space_units(), reg.stations(), econ_tick);
+
+    // ---- 7e. Debris (BL-1598, SPACE_ASSETS.md § Debris) — after every space step,
+    // so the quarter's losses (upkeep, a fallen station's sweep) leave their debris:
+    // then wear on the satellites and station cores (the worn-out add theirs — the
+    // cascade), the idle Tugs clear, and drag thins low orbit. An empty store with
+    // nothing lost does nothing, so a world without debris ticks as before.
+    run_space_debris_quarter(w, reg.space_debris(), debris_watch);
+    // ---- 7f. Off-world bases (BL-1601, NATIONS.md § Off-world bases) — after the
+    // unit step, so colonists aboard a unit lost there are dropped: each base buys
+    // its life support off its own market, or shrinks. No base and no colonist does
+    // nothing, so a world without them ticks as before.
+    {
+        offworld_base_params bp;
+        bp.reservation_mult = reg.price_band().reservation_mult;
+        run_offworld_base_quarter(w, bp);
+    }
+    // ---- 7g. Space firsts (BL-1606, ERAS.md § Firsts) — after every space step, so
+    // a satellite arriving this quarter is read the quarter it arrives.
+    run_space_firsts(w, reg.research());
 
     // ---- 8. The tax tier (BL-1335) — LAST, so the scorer reads this quarter's
     // whole budget (rationed lines, the research line) and the Discontent the

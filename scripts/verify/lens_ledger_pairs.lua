@@ -94,9 +94,9 @@ pair(6, "convoys ledger", "supply_routes", "lenspair_convoys", true)
 -- on Story. Three properties are checked, and the third is the one that makes
 -- "on entering" mean something.
 local function tectonics_pair()
-    local x, y = verify.nav_slot(9)
+    local x, y = verify.nav_slot(10)
     if x == nil then
-        print("FAIL history: rail slot 9 has no centre"); fails = fails + 1; return
+        print("FAIL history: rail slot 10 has no centre"); fails = fails + 1; return
     end
 
     -- 1. Opening History on a NON-Tectonics view must arm nothing.

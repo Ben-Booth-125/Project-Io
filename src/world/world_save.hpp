@@ -765,7 +765,46 @@ inline constexpr uint32_t k_world_save_version_pre_recruits = 71;
 /// owner is a nation and whose class is air defence. Refused whole otherwise. v88 is a
 /// STRICT PREFIX of v89 and is read too (`k_world_save_version_pre_missiles`), as a world
 /// with no magazine and no interceptor.
-inline constexpr uint32_t world_save_version = 89;
+///
+/// **THE SPACE-MECHANICS LINE (v81..v92, written on claude/space-mechanics-design off v80;
+/// see the paragraphs below).** That branch numbered its own sections v81..v92 beside the
+/// naval and missile line above, 55 wide, with v80's research books and none of v81's
+/// naval sections, v82's carry, v83's ended nations or v89's missiles. Its v81, v82, v83,
+/// v88 and v89 COLLIDE with the numbers above and are read as THIS line's streams, so a
+/// space-line stream of those five versions can no longer be read (none left the branch
+/// as a shipped save). Its v84..v87 and v90..v92 are unambiguous and ARE read, each section
+/// a stream lacks reading as empty (`world_stream_is_space_line`).
+///
+/// **93 (the space-mechanics merge) — EVERYTHING STACKED.** Every per-resource array 56
+/// wide; after v79's sections: v80's research books, v81's naval sections, v82's growth
+/// carry, v83's ended nations, v89's missiles, THEN the space line's sections in the
+/// space line's order - the stations (its v81), the Early Space tree (82), the space
+/// nodes and pending orders (83), the space units (84), the space battles (85), survey
+/// knowledge (86), the space convoys (87), debris (88), the bombard orders (89), the
+/// off-world bases (90), the firsts (91) and the transit origins (92). The reader takes
+/// every version listed above and the readable space-line versions; the section
+/// predicates (`world_stream_has_*`) say which stream holds what.
+inline constexpr uint32_t world_save_version = 93;
+
+/// The space-mechanics merge: the first version stacking the naval/missile line and the
+/// space line.
+inline constexpr uint32_t k_world_save_version_space_merge = 93;
+
+/// Is @p version one of the space-mechanics line's own streams this build still reads?
+/// v84..v87 and v90..v92 (its v81..v83, v88 and v89 collide with this line's).
+inline constexpr bool world_stream_is_space_line(uint32_t version)
+{
+    return (version >= 84 && version <= 87) || (version >= 90 && version <= 92);
+}
+
+/// Does a world stream of @p version carry the space-line section the space line
+/// introduced at its version @p first? Every v93-on stream; a readable space-line stream
+/// from @p first on.
+inline constexpr bool world_stream_has_space_section(uint32_t version, uint32_t first)
+{
+    return version >= k_world_save_version_space_merge
+        || (world_stream_is_space_line(version) && version >= first);
+}
 
 /// BL-1431: the first version carrying the missile section.
 inline constexpr uint32_t k_world_save_version_missiles = 89;
@@ -773,10 +812,14 @@ inline constexpr uint32_t k_world_save_version_missiles = 89;
 /// BL-1431: v88, a strict prefix of v89.
 inline constexpr uint32_t k_world_save_version_pre_missiles = 88;
 
-/// Does a world stream of @p version carry the v89 missile section? v89 on.
+/// The space merge: v89, this line's last stream before the space sections joined it.
+inline constexpr uint32_t k_world_save_version_pre_space_merge = 89;
+
+/// Does a world stream of @p version carry the v89 missile section? v89 on (not the
+/// space line).
 inline constexpr bool world_stream_has_missiles(uint32_t version)
 {
-    return version >= k_world_save_version_missiles;
+    return version >= k_world_save_version_missiles && !world_stream_is_space_line(version);
 }
 
 /// BL-1431: how many sentiment factor kinds a stream of @p version can name. v89 added
@@ -800,6 +843,299 @@ inline constexpr uint32_t k_world_save_version_ended = 83;
 
 /// BL-1562: v82, a strict prefix of v83.
 inline constexpr uint32_t k_world_save_version_pre_ended = k_world_save_version_growth_carry;
+
+/// ---- THE SPACE-MECHANICS LINE, as that branch wrote it (its own numbering; see v93) ----
+/// **81 (BL-1583 station model, BL-1585 astronauts; SPACE_ASSETS.md § Space stations,
+/// § Astronauts) — THE STATIONS.** `space_asset_class` gains `station_core` (4), read in
+/// the v51 asset section from v81 only; `building_type` gains `astronaut_training_centre`
+/// (14). Appended last, each after a u32 count: (1) every station ascending id, as (id,
+/// owner, core, node body, u8 node kind, u8 level, u32 n = width x height, n x slot id);
+/// (2) every asset whose station fields differ from the defaults, ascending id, as (id,
+/// station, i32 slot, u8 module, i32 crew, i32 refit_done_tick); (3) every nation holding
+/// templates, ascending, as (id, u32 m, m x (str name, u8 level, u32 n, n x u8 kind)),
+/// names strictly ascending; (4) every nation with astronauts, ascending, as (id, i32
+/// count in [1, k_astronaut_pool_max]). Cross-checked whole: a station's core is its own
+/// station_core asset at its node, centred; each slot names a live module of the station
+/// at that index; a live module or truss names a live station; refused whole otherwise.
+/// v80 is a STRICT PREFIX of v81 and is read too (`k_world_save_version_pre_stations`),
+/// as a world with no station, no template and empty pools.
+///
+/// **82 (BL-1612, RESEARCH.md / ERAS.md § Far-space technology) — THE EARLY SPACE
+/// TREE.** Appended last, after a u32 count: every nation whose tech state holds an
+/// Early Space node or queues one, ascending id, as (id, u32 node count, ceil(count /
+/// 32) x u32 held words, u32 n, n x u16 queued node). Each names a nation with a
+/// nation_tech entry; count <= this build's `io::es::node_count`, no bit past it,
+/// every queued node in the tree, queued once and not held, the record not empty.
+/// Refused whole otherwise. v81 is a STRICT PREFIX of v82 and is read too
+/// (`k_world_save_version_pre_early_space`), as a world with no Early Space progress.
+///
+/// MERGE NOTE (BL-1612): this lane's bump is the ONE block here - the doc paragraph
+/// above, `world_save_version`, the two `k_world_save_version_*early_space` constants
+/// below, the one accepted-version line in `read_world_snapshot`, and the one section
+/// at the end of the writer and of the reader. A parallel bump renumbers these only.
+/// **83 (BL-1581 orbital slots, BL-1586 satellite roles, BL-1587 signal delay;
+/// SPACE_ASSETS.md § The orbital graph, § Satellites, § Signal delay) — THE SPACE NODES
+/// AND THE PENDING ORDERS.** Appended last: (1) after a u32 count equal to the asset
+/// store's size, every asset ascending id as (id, node body, u8 node kind, u8 role); (2)
+/// u32 `next_space_order_id`, then after a u32 count every pending order in queue order as
+/// (u32 id, i32 due tick, nation, u8 verb, u8 cls, u8 role, node body, u8 node kind,
+/// subject, i32 slot, i32 slot_to, u8 module, str name, u8 layout level, u32 n, n x u8
+/// layout kind). Cross-checked whole: a node names the asset's own body and agrees with
+/// its legacy slot (surface node <-> surface slot); a live station part sits at its
+/// station's node; a role is in range and `none` for every non-satellite; an order's ids
+/// strictly ascend below `next_space_order_id`, its nation is a nation, its verb one the
+/// signal delays, every enum in range, its name at most 64 bytes, its layout at most a
+/// 9x7 grid, its due tick non-negative, at most `k_space_orders_max` orders. Refused whole
+/// otherwise. v82 is a STRICT PREFIX of v83 and is read too, as is v81
+/// (`k_world_save_version_pre_space_nodes`), its nodes DERIVED (a station part at its
+/// station's node, a surface asset at its body's surface, any other at its body's low
+/// orbit), every role `none` and the queue empty.
+///
+/// ---- MERGE NOTE (sprint 65): the version number, its constants and the reader's
+/// accepted-version list are kept together here and in ONE comment-marked spot of
+/// world_save.cpp (`k_world_save_version_pre_space_nodes`). A parallel bump (BL-1612)
+/// renumbers by appending after this one.
+///
+/// ===== BEGIN BL-1594 / BL-1595 VERSION BUMP (space units) — ONE BLOCK ===========
+/// **84 (BL-1594 designs, BL-1595 movement; SPACE_FLEETS.md) — THE SPACE UNITS.**
+/// Appended last, each after a u32 count: (1) every nation holding a space-unit design,
+/// ascending id, as (id, u32 m, m x (u8 hull, 6 x u8 item))), hulls strictly ascending;
+/// (2) every space unit ascending id, as (id, owner, u8 hull, 6 x u8 item, u8 state,
+/// node body, u8 node kind, dest body, u8 dest kind, i32 days_remaining, station, f32
+/// propellant, f32 cargo, f32 hull_points, i32 crew, f32 upkeep, i32 unpaid_quarters);
+/// (3) every station with Fuel-depot stock, ascending id, as (id, f32 stock). Each
+/// design is a well-formed design of its hull (`evaluate_space_design(...).valid`); a
+/// unit names a nation, a node of a non-star body, its state consistent (in transit:
+/// days >= 1 and a valid dest unlike its node; otherwise days 0 and dest == node;
+/// docked: a station of its owner at its node; otherwise no station; landed: a Lander
+/// at a surface; idle: an orbital node), propellant in [0, tank], cargo in [0, cap],
+/// hull points in (0, max], crew in [0, pool max], upkeep finite >= 0, unpaid in
+/// [0, k_space_quarters_to_loss_ceiling); a stock names a live station, finite, in
+/// (0, k_space_depot_stock_max]. Refused whole otherwise. v83 is a STRICT PREFIX of
+/// v84 and is read too (`k_world_save_version_pre_space_units`), as a world with no
+/// designs, no units and empty depots. MERGE NOTE: a parallel lane's bump renumbers
+/// this block (the paragraph, the two constants below, the accepted-version line in
+/// `read_world_snapshot`, and the one section at the end of the writer and reader).
+
+/// BL-1594: the first version carrying the space-unit section (see above).
+inline constexpr uint32_t k_world_save_version_space_units = 84;
+
+/// BL-1594: v83, a strict prefix of v84.
+inline constexpr uint32_t k_world_save_version_pre_space_units = k_world_save_version_space_units - 1;
+/// ===== END BL-1594 / BL-1595 VERSION BUMP ======================================
+
+/// ===== BEGIN BL-1597 VERSION BUMP (space battles) — ONE BLOCK ===================
+/// **85 (BL-1597; SPACE_FLEETS.md § Battles) — THE SPACE BATTLES.** Appended last,
+/// after the space units: u32 `next_space_battle_id`, then after a u32 count every
+/// battle ascending id as (u32 id, node body, u8 node kind, u8 state, i32 opened_tick,
+/// i32 days, f32 mass_destroyed, 2 x side (nation, i32 units_lost, i32 crew_lost, i32
+/// modules_lost, i32 stations_lost, f32 damage_landed, u8 end), u32 n, n x withdrawal
+/// (unit, dest body, u8 dest kind), u32 m, m x (module, f32 damage)). Cross-checked
+/// whole: ids strictly ascend below `next_space_battle_id`, at most
+/// `k_space_battles_max`; the node a non-star body's, every enum in range; the two
+/// nations distinct, ascending, both nations; every tally >= 0, every float finite
+/// >= 0; an OPEN battle has both ends `holding` and is the only open one for its
+/// (node, pair); a DECIDED one has at least one end not `holding`; a PEACE one both
+/// `holding`; only an open battle carries withdrawals or module damage; a withdrawal
+/// names a unit, ascending, its dest a valid node unlike the battle's, and the unit,
+/// when it still exists (upkeep may have lost it), is one side's, at the node, not in
+/// transit (a surface dest for a Lander only); a damage row names a module, ascending,
+/// its damage in (0, 1e9], and the module, when it still exists and is not lost, is a
+/// Defence module of a station of one side at the node. Refused whole otherwise. v84 is a STRICT PREFIX of v85 and is read too
+/// (`k_world_save_version_pre_space_battles`), as a world with no battles. MERGE NOTE:
+/// a parallel lane's bump renumbers this block (the paragraph, the version, the two
+/// constants below, the accepted-version line in `read_world_snapshot`, and the one
+/// section at the end of the writer and reader).
+
+/// BL-1597: the first version carrying the space-battle section (see above).
+inline constexpr uint32_t k_world_save_version_space_battles = 85;
+
+/// BL-1597: v84, a strict prefix of v85.
+inline constexpr uint32_t k_world_save_version_pre_space_battles = k_world_save_version_space_battles - 1;
+/// ===== END BL-1597 VERSION BUMP ================================================
+/// ===== BEGIN BL-1600 VERSION BUMP (mapping then prospecting) — ONE BLOCK ========
+/// **86 (BL-1600; DISCOVERY.md § Mapping, then prospecting) — SURVEY KNOWLEDGE.**
+/// Appended last, after a u32 count: every (nation, body) record of
+/// `world::survey_knowledge`, keys strictly ascending, as (nation, body, i32
+/// regions_total, i32 regions_mapped, regions_total x u8 prospected). Each names a
+/// nation and a body survey knowledge applies to (`survey_knowledge_applies`: not the
+/// star, not the home world, a grid); regions_total equals the body's
+/// `survey_region_count`; regions_mapped in [1, regions_total]; each prospected byte
+/// 0 or 1, and 1 only below regions_mapped. Refused whole otherwise. v85 is a STRICT
+/// PREFIX of v86 and is read too (`k_world_save_version_pre_prospecting`), as a world
+/// nobody has mapped off the home world. MERGE NOTE: a parallel lane's bump renumbers
+/// this block (this paragraph, `world_save_version`, the two constants below, the
+/// accepted-version line in `read_world_snapshot`, and the one section at the end of
+/// the writer and reader).
+inline constexpr uint32_t k_world_save_version_prospecting = 86;
+
+/// BL-1600: v85, a strict prefix of v86.
+inline constexpr uint32_t k_world_save_version_pre_prospecting = k_world_save_version_prospecting - 1;
+/// ===== END BL-1600 VERSION BUMP ================================================
+/// ===== BEGIN BL-1596 VERSION BUMP (space convoys) — ONE BLOCK ===================
+/// **87 (BL-1596; SPACE_FLEETS.md § Space convoys) — THE CARGO ABOARD.** Appended
+/// last, after a u32 count: every `space_haul` ascending unit id, as (unit id, owner,
+/// u8 phase, u8 cargo good, src_market, u32 convoy, dest_market, target body, u8
+/// target kind, home body, u8 home kind) — 32 bytes. Each names a live space unit of
+/// its owner (a nation); a carrier (Hauler or Lander); a good in range; a live source
+/// market; nodes of non-star bodies. HELD: cargo aboard > 0, convoy 0, no destination.
+/// OUTBOUND: a Hauler with cargo > 0, a live destination market, its convoy a live,
+/// unarrived SPACE convoy of the owner at speed 0 carrying exactly the cargo aboard to
+/// that market and named by no other record, target and home both low orbits.
+/// RETURNING: a Hauler with no cargo, convoy 0, a live destination market, target ==
+/// home, a low orbit. Refused whole otherwise. (Cargo with no record is inert mass, as
+/// a v86 stream's staged cargo reads.) v86 is a STRICT PREFIX of v87 and is read too
+/// (`k_world_save_version_pre_space_convoys`), as a world with nothing aboard.
+/// MERGE NOTE: a parallel lane's bump renumbers this block (this paragraph, the three
+/// constants below, the accepted-version line in `read_world_snapshot`, and the one
+/// section at the end of the writer and reader).
+
+/// BL-1596: the first version carrying the space-convoy section (see above).
+inline constexpr uint32_t k_world_save_version_space_convoys = 87;
+
+/// BL-1596: v86, a strict prefix of v87.
+inline constexpr uint32_t k_world_save_version_pre_space_convoys = k_world_save_version_space_convoys - 1;
+/// ===== END BL-1596 VERSION BUMP =================================================
+/// ===== BEGIN BL-1598 VERSION BUMP (debris) — ONE BLOCK ===========================
+/// **88 (BL-1598; SPACE_ASSETS.md § Debris, SPACE_FLEETS.md § Battles) — DEBRIS AND
+/// THE STALL.** Appended last, three lists each after a u32 count: (1) every debris
+/// level ascending node, as (body, u8 kind, f32 level) — 9 bytes; (2) every space
+/// asset with wear above zero ascending id, as (id, f32 wear) — 8 bytes; (3) every
+/// battle with quiet days above zero ascending id, as (u32 id, i32 quiet_days) — 8
+/// bytes. A level names an orbital node (not a surface) of a non-star body, nodes
+/// strictly ascending, at most `k_space_debris_nodes_max`, finite in
+/// (`k_space_debris_floor`, `k_space_debris_max`]; a wear names a satellite or
+/// station core, ids strictly ascending, finite in (0, 1); a quiet count names an
+/// OPEN battle, ids strictly ascending, in [1, `k_space_battle_stall_max`]. The
+/// space-battle section accepts the `standoff` state (3) from this version on (both
+/// ends holding, nothing withdrawing, no module damage). Refused whole otherwise. v87
+/// is a STRICT PREFIX of v88 and is read too (`k_world_save_version_pre_debris`), as a
+/// world with no debris, no wear and no quiet days. MERGE NOTE: a parallel lane's bump
+/// renumbers this block (this paragraph, `world_save_version`, the two constants
+/// below, the accepted-version line in `read_world_snapshot`, and the one section at
+/// the end of the writer and reader).
+
+/// BL-1598: the first version carrying the debris section (see above).
+inline constexpr uint32_t k_world_save_version_debris = 88;
+
+/// BL-1598: v87, a strict prefix of v88.
+inline constexpr uint32_t k_world_save_version_pre_debris = k_world_save_version_debris - 1;
+/// ===== END BL-1598 VERSION BUMP =================================================
+/// ===== BEGIN BL-1599 VERSION BUMP (blockade and bombardment) — ONE BLOCK ========
+/// **89 (BL-1599; SPACE_FLEETS.md § Bombardment and fire at orbit) — THE STANDING
+/// BOMBARD ORDERS.** Appended last, after a u32 count: every `space_bombard_order`
+/// ascending unit id, as (unit id, u8 kind, u32 target) — 9 bytes. Each names a live
+/// space unit whose owner is a nation; the kind in range; the target non-zero. (The
+/// target's existence and hostility are re-read each day, which drops an order whose
+/// target is gone, so the stream does not require them.) Blockade is derived and the
+/// battery is a building in the building store: neither adds bytes. Refused whole
+/// otherwise. v88 is a STRICT PREFIX of v89 and is read too
+/// (`k_world_save_version_pre_space_bombard`), as a world with no orders. The
+/// building-type gate now admits `orbital_defence_battery` (no older writer can name
+/// it; the BL-1426 precedent). MERGE NOTE: a parallel lane's bump renumbers this block (this
+/// paragraph, the three constants below, the accepted-version line in
+/// `read_world_snapshot`, and the one section at the end of the writer and reader).
+
+/// BL-1599: the first version carrying the bombard-order section (see above).
+inline constexpr uint32_t k_world_save_version_space_bombard = 89;
+
+/// BL-1599: v88, a strict prefix of v89.
+inline constexpr uint32_t k_world_save_version_pre_space_bombard = k_world_save_version_space_bombard - 1;
+/// ===== END BL-1599 VERSION BUMP =================================================
+/// ===== BEGIN BL-1601 VERSION BUMP (off-world bases) — ONE BLOCK =================
+/// **90 (BL-1601; NATIONS.md § Off-world bases) — BASES AND COLONISTS.** Appended
+/// last: a u32 count, then every `world::offworld_bases` record ascending centre id
+/// as (centre, i32 founded_tick, i32 unfed_quarters) — 12 bytes; then a u32 count,
+/// then every `world::space_colonists` entry of a LIVE unit ascending unit id as
+/// (unit, i32 colonists) — 8 bytes. A base names a live population centre on a
+/// tile of a non-star body other than the home world; founded_tick >= 0;
+/// unfed_quarters in [0, k_offworld_unfed_max]. A colonist entry names a live
+/// Lander, carrying 1 .. its design's passenger berths. Refused whole otherwise.
+/// Everything else a base is — its ground, its centre, its market, its provinces —
+/// rides the stores that already carry them. v89 is a STRICT PREFIX of v90 and is
+/// read too (`k_world_save_version_pre_offworld_bases`), as a world with no base and
+/// nobody aboard. MERGE NOTE: a parallel lane's bump renumbers this block (this
+/// paragraph, the three constants below, the accepted-version line in
+/// `read_world_snapshot`, and the one section at the end of the writer and reader).
+
+/// BL-1601: the first version carrying the off-world base section (see above).
+inline constexpr uint32_t k_world_save_version_offworld_bases = 90;
+
+/// BL-1601: v89, a strict prefix of v90.
+inline constexpr uint32_t k_world_save_version_pre_offworld_bases = k_world_save_version_offworld_bases - 1;
+/// ===== END BL-1601 VERSION BUMP =================================================
+/// ===== BEGIN BL-1606 VERSION BUMP (space firsts) — ONE BLOCK ====================
+/// **91 (BL-1606; ERAS.md § Firsts) — THE FIRSTS TAKEN.** Appended last, after a u32
+/// count: every `world::space_firsts` record ascending kind, as (u8 kind, nation,
+/// i32 day_tick) — 9 bytes. At most `space_first_kind_count` records; kinds strictly
+/// ascending and in range; each names a nation in the stream's nation store; the
+/// day tick >= 0. Refused whole otherwise. The grant rides the research pool and the
+/// entry the history log, both already saved. v90 is a STRICT PREFIX of v91 and is
+/// read too (`k_world_save_version_pre_space_firsts`), as a world where no first is
+/// taken. MERGE NOTE: a parallel lane's bump renumbers this block (this paragraph,
+/// `world_save_version`, the two constants below, the accepted-version line in
+/// `read_world_snapshot`, and the one section at the end of the writer and reader).
+
+/// BL-1606: the first version carrying the space-firsts section (see above).
+inline constexpr uint32_t k_world_save_version_space_firsts = 91;
+
+/// BL-1606: v90, a strict prefix of v91.
+inline constexpr uint32_t k_world_save_version_pre_space_firsts = k_world_save_version_space_firsts - 1;
+/// ===== END BL-1606 VERSION BUMP =================================================
+/// ===== BEGIN BL-1614 VERSION BUMP (space transit segment) — ONE BLOCK ===========
+/// **92 (BL-1614; CIRCUMPLANETARY.md, the transit segment) — WHERE A TRANSIT LEFT
+/// FROM.** Appended last, after a u32 count: every space asset with a recorded
+/// transit origin ascending id, as (id, origin body, u8 origin kind, i32 depart
+/// tick) — 13 bytes. Each names an asset IN TRANSIT; ids strictly ascending; the
+/// origin body a non-star body and its kind in range; the origin not the asset's
+/// own node; the depart tick in [launch_tick, arrival_tick]. Refused whole
+/// otherwise. v91 is a STRICT PREFIX of v92 and is read too
+/// (`k_world_save_version_pre_transit_origin`), as a world with no origins recorded
+/// (the canvas then draws a travelling asset dimmed at its destination, as before).
+/// MERGE NOTE: a parallel lane's bump renumbers this block (this paragraph, the
+/// three constants below, the accepted-version line in `read_world_snapshot`, and
+/// the one section at the end of the writer and reader).
+
+/// BL-1614: the first version carrying the transit-origin section (see above).
+inline constexpr uint32_t k_world_save_version_transit_origin = 92;
+
+/// BL-1614: v91, a strict prefix of v92.
+inline constexpr uint32_t k_world_save_version_pre_transit_origin = k_world_save_version_transit_origin - 1;
+/// ===== END BL-1614 VERSION BUMP =================================================
+
+/// BL-1612: the first version carrying the Early Space tree section (see above).
+inline constexpr uint32_t k_world_save_version_early_space = 82;
+
+/// BL-1612: v81, a strict prefix of v82.
+inline constexpr uint32_t k_world_save_version_pre_early_space = k_world_save_version_early_space - 1;
+
+/// BL-1581: the first version carrying the space-node / pending-order section (written after the Early Space section).
+inline constexpr uint32_t k_world_save_version_space_nodes = 83;
+
+/// BL-1581: v82, a strict prefix of v83.
+inline constexpr uint32_t k_world_save_version_pre_space_nodes = k_world_save_version_space_nodes - 1;
+
+/// BL-1583: the first version carrying the station section (see above).
+inline constexpr uint32_t k_world_save_version_stations = 81;
+
+/// BL-1583: v80, a strict prefix of v81.
+inline constexpr uint32_t k_world_save_version_pre_stations = k_world_save_version_stations - 1;
+
+/// The space merge: which stream carries which space-line section (each keyed by the
+/// space-line version that introduced it). Every v93-on stream carries them all; a
+/// readable space-line stream (v84..v87, v90..v92) carries those up to its own version.
+inline constexpr bool world_stream_has_stations(uint32_t v) { return world_stream_has_space_section(v, k_world_save_version_stations); }
+inline constexpr bool world_stream_has_early_space(uint32_t v) { return world_stream_has_space_section(v, k_world_save_version_early_space); }
+inline constexpr bool world_stream_has_space_nodes(uint32_t v) { return world_stream_has_space_section(v, k_world_save_version_space_nodes); }
+inline constexpr bool world_stream_has_space_units(uint32_t v) { return world_stream_has_space_section(v, k_world_save_version_space_units); }
+inline constexpr bool world_stream_has_space_battles(uint32_t v) { return world_stream_has_space_section(v, k_world_save_version_space_battles); }
+inline constexpr bool world_stream_has_prospecting(uint32_t v) { return world_stream_has_space_section(v, k_world_save_version_prospecting); }
+inline constexpr bool world_stream_has_space_convoys(uint32_t v) { return world_stream_has_space_section(v, k_world_save_version_space_convoys); }
+inline constexpr bool world_stream_has_debris(uint32_t v) { return world_stream_has_space_section(v, k_world_save_version_debris); }
+inline constexpr bool world_stream_has_space_bombard(uint32_t v) { return world_stream_has_space_section(v, k_world_save_version_space_bombard); }
+inline constexpr bool world_stream_has_offworld_bases(uint32_t v) { return world_stream_has_space_section(v, k_world_save_version_offworld_bases); }
+inline constexpr bool world_stream_has_space_firsts(uint32_t v) { return world_stream_has_space_section(v, k_world_save_version_space_firsts); }
+inline constexpr bool world_stream_has_transit_origin(uint32_t v) { return world_stream_has_space_section(v, k_world_save_version_transit_origin); }
 
 /// BL-1539: the first version carrying the research-books section (see above).
 inline constexpr uint32_t k_world_save_version_research_books = 80;
@@ -828,22 +1164,26 @@ inline constexpr bool world_stream_has_research_books(uint32_t version)
 }
 
 /// Does a world stream of @p version carry the naval sections (ships, designs, closed ports,
-/// surf, sightings) and ship hulls' column? v81 and v88 on; v82 and v83 do not.
+/// surf, sightings) and ship hulls' column? v81 and v88 on; v82 and v83 do not, nor the
+/// space line (55 wide, no naval section).
 inline constexpr bool world_stream_has_naval(uint32_t version)
 {
-    return version == k_world_save_version_ship_kit || version >= k_world_save_version_stacked;
+    return (version == k_world_save_version_ship_kit || version >= k_world_save_version_stacked)
+        && !world_stream_is_space_line(version);
 }
 
-/// Does a world stream of @p version carry the v82 growth carry? v82 on (v81 is below it).
+/// Does a world stream of @p version carry the v82 growth carry? v82 on (v81 is below it;
+/// not the space line).
 inline constexpr bool world_stream_has_growth_carry(uint32_t version)
 {
-    return version >= k_world_save_version_growth_carry;
+    return version >= k_world_save_version_growth_carry && !world_stream_is_space_line(version);
 }
 
-/// Does a world stream of @p version carry the v83 ended nations? v83 on.
+/// Does a world stream of @p version carry the v83 ended nations? v83 on (not the space
+/// line).
 inline constexpr bool world_stream_has_ended(uint32_t version)
 {
-    return version >= k_world_save_version_ended;
+    return version >= k_world_save_version_ended && !world_stream_is_space_line(version);
 }
 
 /// BL-1504: the first version carrying the defend-order section.
@@ -1069,6 +1409,109 @@ std::size_t world_save_research_books_section_bytes(const world& w);
 /// 4, plus 8 for each centre with a non-zero carry.
 std::size_t world_save_growth_carry_section_bytes(const world& w);
 
+/// BL-1583: the byte length of the v81 station section `w` writes. The last section
+/// of a v81 stream (v82's space-node section follows it).
+std::size_t world_save_station_section_bytes(const world& w);
+
+/// BL-1612: the byte length of the v82 Early Space section `w` writes - 4, plus, per
+/// nation with progress, 4 + 4 + 4 x ceil(node_count / 32) + 4 + 2 per queued node.
+/// The last section of a v82 stream (v83 appends the space-node section).
+std::size_t world_save_early_space_section_bytes(const world& w);
+/// BL-1581: the byte length of the v83 space-node / pending-order section `w` writes.
+/// The last section of a v83 stream (v84 appends the space-unit section).
+std::size_t world_save_space_node_section_bytes(const world& w);
+
+/// BL-1594: the byte length of the v84 space-unit section `w` writes - 4 + per design
+/// nation (8 + 7 per design), 4 + 58 per unit, 4 + 8 per stocked station. The last
+/// section of a v84 stream (v85 appends the space-convoy section).
+std::size_t world_save_space_unit_section_bytes(const world& w);
+
+/// BL-1600: the byte size of the v86 survey-knowledge section (v87 appends the space convoys).
+std::size_t world_save_prospecting_section_bytes(const world& w);
+/// BL-1596: the byte length of the v87 space-convoy section `w` writes - 4 + 32 per
+/// record. The LAST section of a v87 stream.
+std::size_t world_save_space_convoy_section_bytes(const world& w);
+/// BL-1601: the byte length of the v88 off-world base section `w` writes - 4 + 12 per
+/// base, 4 + 8 per colonist entry of a live unit. The LAST section of a v88 stream.
+std::size_t world_save_offworld_base_section_bytes(const world& w);
+/// BL-1606: VERIFICATION ONLY - the v90 stream shape (no space-firsts section).
+void write_world_snapshot_pre_space_firsts(const world& w, std::ostream& out);
+/// BL-1606: the byte length of the v91 space-firsts section `w` writes - 4 + 9 per
+/// first taken. The LAST section of a v91 stream.
+std::size_t world_save_space_firsts_section_bytes(const world& w);
+
+/// BL-1599: VERIFICATION ONLY - the v87 stream shape (no bombard-order section).
+void write_world_snapshot_pre_space_bombard(const world& w, std::ostream& out);
+/// BL-1599: the byte length of the v88 bombard-order section `w` writes - 4 + 9 per
+/// order. The LAST section of a v88 stream.
+std::size_t world_save_space_bombard_section_bytes(const world& w);
+
+/// BL-1614: VERIFICATION ONLY - the v89 stream shape (no transit-origin section).
+void write_world_snapshot_pre_transit_origin(const world& w, std::ostream& out);
+/// BL-1614: the byte length of the v90 transit-origin section `w` writes - 4 + 13 per
+/// asset with a recorded origin. The LAST section of a v90 stream.
+std::size_t world_save_transit_origin_section_bytes(const world& w);
+
+/// BL-1632: the byte lengths of the v57..v66 trailing sections `w` writes, each
+/// mirroring its writer block field for field - the construction days (v57), the unit
+/// combat state (v58), the muster queue (v59), the obsolete-row flips (v60), the refits
+/// (v61), the fronts (v62), the attacking stacks (v63), the designs (v64), the air (v65,
+/// pruned exactly as written) and the carried supplies (v66). VERIFICATION ONLY.
+std::size_t world_save_days_section_bytes(const world& w);
+std::size_t world_save_combat_section_bytes(const world& w);
+std::size_t world_save_muster_section_bytes(const world& w);
+std::size_t world_save_obsolete_section_bytes(const world& w);
+std::size_t world_save_refit_section_bytes(const world& w);
+std::size_t world_save_fronts_section_bytes(const world& w);
+std::size_t world_save_stacks_section_bytes(const world& w);
+std::size_t world_save_designs_section_bytes(const world& w);
+std::size_t world_save_air_section_bytes(const world& w);
+std::size_t world_save_supplies_section_bytes(const world& w);
+
+/// BL-1632 (stale tail harnesses): the total bytes of every section today's writer
+/// (`write_world_snapshot`) appends AFTER the section introduced at @p version, in
+/// writer order - so the section introduced at version v starts at
+/// `stream.size() - world_save_tail_bytes_after(v - 1, w)`. Summed from the per-section
+/// `world_save_*_section_bytes` functions (never measured off a written stream, so a
+/// harness comparing an older writer's stream against it is not tautological). Covers
+/// every trailing section from the v52 tax rows to the newest (v92 transit origins); a
+/// version that introduced no trailing section (v53, v54, v74, v76) adds nothing.
+/// @p version must be at least 51 (`k_world_save_version_pre_tax`); a new trailing
+/// section must be added to its table, or every tail-addressing harness drifts again.
+/// VERIFICATION ONLY.
+///
+/// The space merge: @p version is in THIS line's numbering (v80 research books, v81 the
+/// naval sections, v82 carry, v83 ended, v89 missiles), and every space-line section
+/// follows them in today's writer, so it is counted after any of them. A space-line
+/// section's tail is `world_save_space_tail_bytes_after`.
+std::size_t world_save_tail_bytes_after(int version, const world& w);
+
+/// The space merge: the bytes today's writer appends AFTER the space-line section the
+/// space line introduced at its version @p space_version (81 stations .. 92 transit
+/// origins; 80 counts every space section). The space line's own numbering, which
+/// collides with this line's at 81..83, 88 and 89. VERIFICATION ONLY.
+std::size_t world_save_space_tail_bytes_after(int space_version, const world& w);
+
+/// VERIFICATION ONLY (the space merge): the v89 stream shape - every naval and missile
+/// section, no space-line section.
+void write_world_snapshot_pre_space_merge(const world& w, std::ostream& out);
+
+/// VERIFICATION ONLY (the space merge): the bytes today's stream carries that a readable
+/// space-line stream (v84..v87, v90..v92) of the same world does not - ship hulls' column
+/// and the naval, growth-carry, ended-nation and missile sections. A harness comparing a
+/// space-line stream's length against today's adds it.
+std::size_t world_save_space_line_gap_bytes(const world& w);
+
+/// THE SPACE MERGE: `write_world_snapshot_pre_early_space`, `_pre_space_nodes`,
+/// `_pre_space_units`, `_pre_space_bombard` and `_pre_offworld_bases` name space-line shapes
+/// (v81, v82, v83, v88, v89) whose numbers collide with this line's; each now writes v89
+/// (`write_world_snapshot_pre_space_merge`), the nearest readable stream without its section.
+
+/// VERIFICATION ONLY (the space merge): the space line's v92 stream shape - 55 wide, the
+/// research books then every space-line section, none of the naval, carry, ended or
+/// missile sections.
+void write_world_snapshot_space_v92(const world& w, std::ostream& out);
+
 /// BL-1422, widened by BL-1436: the bytes ALL SEVEN kit goods' extra elements add to
 /// every per-resource array of the stream `w` writes - the widening from 49 to today's
 /// width: (the v74 stream less the v73 stream, the five goods) plus
@@ -1234,6 +1677,34 @@ void write_world_snapshot_pre_stacked(const world& w, std::ostream& out);
 /// BL-1527: the bytes ship hulls' one extra element adds to every per-resource array of the
 /// stream `w` writes. A harness comparing a pre-v81 stream's length against today's adds it.
 std::size_t world_save_ship_hulls_bytes(const world& w);
+/// VERIFICATION ONLY (BL-1583): the v80 stream shape - no station section.
+void write_world_snapshot_pre_stations(const world& w, std::ostream& out);
+
+/// VERIFICATION ONLY (BL-1612): the v81 stream shape - no Early Space section.
+void write_world_snapshot_pre_early_space(const world& w, std::ostream& out);
+/// VERIFICATION ONLY (BL-1581): the v82 stream shape - no space-node section.
+void write_world_snapshot_pre_space_nodes(const world& w, std::ostream& out);
+
+/// VERIFICATION ONLY (BL-1594): the v83 stream shape - no space-unit section.
+void write_world_snapshot_pre_space_units(const world& w, std::ostream& out);
+
+/// VERIFICATION ONLY (BL-1597): the v84 stream shape - no space-battle section.
+void write_world_snapshot_pre_space_battles(const world& w, std::ostream& out);
+
+/// BL-1597: the byte length of the v85 space-battle section `w` writes - 8, plus per
+/// battle 80 + 9 per withdrawal + 8 per damaged module. The last section of a v85 stream (v86 appends survey knowledge).
+std::size_t world_save_space_battle_section_bytes(const world& w);
+/// VERIFICATION ONLY (BL-1600): write the v85 shape - no survey-knowledge section.
+void write_world_snapshot_pre_prospecting(const world& w, std::ostream& out);
+/// VERIFICATION ONLY (BL-1596): the v86 stream shape - no space-convoy section.
+void write_world_snapshot_pre_space_convoys(const world& w, std::ostream& out);
+/// VERIFICATION ONLY (BL-1598): the v87 stream shape - no debris section.
+void write_world_snapshot_pre_debris(const world& w, std::ostream& out);
+/// BL-1598: the byte length of the v88 debris section `w` writes - 12, plus 9 per
+/// debris node, 8 per worn asset, 8 per battle with quiet days. The last section.
+std::size_t world_save_debris_section_bytes(const world& w);
+/// VERIFICATION ONLY (BL-1601): the v89 stream shape - no off-world base section.
+void write_world_snapshot_pre_offworld_bases(const world& w, std::ostream& out);
 
 /// BL-1453: the recon stock a battle loaded from a pre-v67 stream is given — enough to
 /// see every defending unit in full (twice the stealthiest defender's kit stealth, in

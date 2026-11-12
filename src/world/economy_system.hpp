@@ -11,6 +11,8 @@
 #include "nation_budget.hpp" // budget_claim, national_budget_tick (BL-537; Sprint N3 T4)
 #include "nation_step.hpp"   // earmark_result (Sprint N3 T6)
 #include "space_programme.hpp" // space_purchase (BL-644)
+#include "space_effects.hpp"   // space_effects_report (BL-1584 / BL-1586)
+#include "solar_storm.hpp"     // solar_storm_report (BL-1605)
 #include "network_upkeep.hpp"  // network_purchase (BL-643)
 #include "corp_command.hpp"    // firm_exit_record (BL-743)
 #include "logistic_points.hpp" // BL-1309: lp_tick
@@ -569,12 +571,37 @@ struct economy_report
     /// BL-1275: what the nation research AI weighed this tick — one row per
     /// nation whose queue was idle and that it may act for, ascending.
     std::vector<research_ai_pick> research_picks;
+    /// BL-1589: the quarter's space picks, one per non-player nation, ascending id.
+    std::vector<space_ai_pick> space_picks;
+    /// BL-1608: the quarter's far-space picks, one per non-player nation, ascending id.
+    std::vector<far_space_pick> far_space_picks;
 
     /// What the space-asset step did this quarter (BL-1327; space_assets.hpp):
     /// launches and their cost (the launch debit), arrivals, and the upkeep
     /// paid or unpaid. Both debits are direct treasury expenditures, credited
     /// to nobody; this is the treasury ledger's line for them.
     space_asset_step_report space_assets;
+
+    /// What the station step did this quarter (BL-1583 / BL-1585; stations.hpp):
+    /// astronauts trained, stations and modules lost with their crew, refits
+    /// completed, and the modules working or stopped by a budget shortfall.
+    station_step_report stations;
+
+    /// BL-1587 / BL-1588 (space_command.hpp): the pending near-space orders this
+    /// quarter's signal reached — applied, or dropped as no longer legal (each
+    /// dropped order's id and why).
+    space_orders_report space_orders;
+
+    /// What the space-effects step did this quarter (BL-1584 / BL-1586;
+    /// space_effects.hpp): rations bought or a station starved, RP earned in
+    /// coverage, factory lots, regions mapped from orbit.
+    space_effects_report space_effects;
+
+    /// BL-1605 (solar_storm.hpp; EVENTS.md § Solar storms): whether this quarter
+    /// carries a solar storm, whom it struck (satellites dark, station modules
+    /// stopped), and which nations a working Observatory warned of next
+    /// quarter's. Report-only: the storm is derived from seed and tick.
+    solar_storm_report solar_storms;
 
     /// BL-1335 (NATIONS.md § Taxes and Discontent): each nation's tax quarter —
     /// tier, credits taken, Discontent before and after. Ascending nation id.
@@ -619,6 +646,17 @@ void advance_musters(world& w);
 /// type, keeping its men, establishment, readiness and morale. Called beside
 /// advance_musters; exposed so a harness can step it alone.
 void advance_refits(world& w);
+
+/// BL-1630 (SPACE_ASSETS.md § Launching, "A staffed pad bids for its launch"):
+/// every nation holding Rocketry with a staffed Launchpad on its home body posts
+/// @p standing_lots x its standing lot (`space_standing_lot`) as a want on its
+/// home market — `report.wants` (so the clear raises it into `demand`), or
+/// `report.hauler_wants` for a good priced over the fair-price ceiling
+/// (@p reservation_mult; it does not bid). Ascending nation id; inert at
+/// `standing_lots <= 0` and before the research age opens. Called by
+/// run_economy_step after building upkeep; exposed so a harness can run it alone.
+void post_space_launch_wants(const world& w, const space_asset_params& sp, float reservation_mult,
+                             float standing_lots, economy_report& report);
 
 economy_report run_economy_step(world& w, const recipe_registry& reg,
                                 bool spectating = false);

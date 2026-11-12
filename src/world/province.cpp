@@ -1461,6 +1461,56 @@ void build_province_partition(world& w, uint32_t seed, province_absorption_stats
         *stats = tally;
 }
 
+bool partition_body_if_unpartitioned(world& w, entity_id body)
+{
+    const auto bit = w.bodies.find(body);
+    if (bit == w.bodies.end() || bit->second.type == body_type::star
+        || bit->second.grid_width <= 0 || bit->second.grid_height <= 0)
+        return false;
+    for (const province& p : w.provinces.provinces)
+        if (p.body == body)
+            return false;
+
+    // The scratch world: the body, its tiles and their owners, nothing else — no
+    // centre, so the body partitions as a body no centre stands on.
+    world sc;
+    sc.bodies.emplace(body, bit->second);
+    std::vector<entity_id> ids;
+    for (const auto& [tid, tc] : w.tiles)
+        if (tc.body == body)
+            ids.push_back(tid);
+    if (ids.empty())
+        return false;
+    std::sort(ids.begin(), ids.end()); // inserted in id order: no layout reaches the scratch
+    for (const entity_id tid : ids)
+    {
+        sc.tiles.emplace(tid, w.tiles.at(tid));
+        if (const auto it = w.tile_to_nation.find(tid); it != w.tile_to_nation.end())
+            sc.tile_to_nation.emplace(tid, it->second);
+    }
+    build_province_partition(sc, w.provinces.seed);
+    if (sc.provinces.provinces.empty())
+        return false;
+
+    // The splice: the old holders by id, then every province in ascending id.
+    std::map<uint32_t, entity_id> holder;
+    for (std::size_t i = 0; i < w.provinces.provinces.size(); ++i)
+        holder[w.provinces.provinces[i].id] = i < w.province_holder.size() ? w.province_holder[i] : null_entity;
+    for (province& p : sc.provinces.provinces)
+    {
+        for (const entity_id t : p.tiles)
+            w.provinces.tile_province[t] = p.id;
+        w.provinces.provinces.push_back(std::move(p));
+    }
+    std::sort(w.provinces.provinces.begin(), w.provinces.provinces.end(),
+              [](const province& a, const province& b) { return a.id < b.id; });
+    w.province_holder.assign(w.provinces.provinces.size(), null_entity);
+    for (std::size_t i = 0; i < w.provinces.provinces.size(); ++i)
+        if (const auto it = holder.find(w.provinces.provinces[i].id); it != holder.end())
+            w.province_holder[i] = it->second;
+    return true;
+}
+
 // ---------------------------------------------------------------------------
 // Serialisation
 // ---------------------------------------------------------------------------
@@ -1748,20 +1798,36 @@ province_sustain measure_province_sustain(const world& w, const province& pr)
 
     int pop_scale_total = 0;
 
+    // BL-1601 (NATIONS.md § Off-world bases): a province a FED base stands in reads
+    // its ground at full habitability — life support makes up what the body lacks,
+    // the same reading the economy's habitability aggregates take
+    // (`offworld_base_habitability`). No base, no change.
+    bool fed_base_here = false;
+    for (const auto& [cid, b] : w.offworld_bases) // empty on every world without a base
+    {
+        const entity_id bt = offworld_base_tile(w, cid);
+        if (bt != null_entity && w.provinces.province_of(bt) == pr.id && offworld_base_fed(w, cid))
+        {
+            fed_base_here = true;
+            break;
+        }
+    }
+
     for (const entity_id tile_id : pr.tiles) // ascending, by the partition contract
     {
         const auto tit = w.tiles.find(tile_id);
         if (tit == w.tiles.end())
             continue;
         const tile_component& tc = tit->second;
+        const float hab = fed_base_here ? 1.0f : tc.habitability;
 
         ++s.land_tiles;                         // AREA
-        s.habitability_area += tc.habitability;  // HABITABILITY
+        s.habitability_area += hab;              // HABITABILITY
         // BL-1340: a road is an edge, so the tile's INFRASTRUCTURE reading is the best
         // tier on any of its sides — the development the ground carries, which is what
         // this term always meant. A planner/summary read, never a traversal cost.
         s.infrastructure_gain +=                 // INFRASTRUCTURE
-            tc.habitability * (static_cast<float>(max_road_tier(tc)) / k_road_ladder_max);
+            hab * (static_cast<float>(max_road_tier(tc)) / k_road_ladder_max);
 
         const auto pit = pop_by_tile.find(tile_id);
         if (pit != pop_by_tile.end())

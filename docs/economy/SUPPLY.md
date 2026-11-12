@@ -158,7 +158,10 @@ without reaching a shelf.
    ceiling sells the trade nothing.
 2. **On a space leg, it buys the launch.** The trader must hold a Launchpad on the source body, and
    buys the launch's propellant off the same shelf (`PRODUCTION.md` § Launchpad). A cargo of
-   propellant cannot burn itself: the launch's own draw comes off the shelf first.
+   propellant cannot burn itself: the launch's own draw comes off the shelf first. A nation
+   holding a Hauler design ships the leg as a **Hauler** instead — the hull, the lift and the
+   descent bought as they happen, the cargo capped by what the Hauler can fly there and back
+   (`../military/SPACE_FLEETS.md` § Space convoys).
 3. **It is capped by the place.** On an overland or sea leg the cargo draws **Logistic Points**
    by its base value ([LOGISTICS.md](LOGISTICS.md) § A shipment draws points again), at its anchor — the source market's centre — from what the march and production
    left in the pool of the nation whose ground that is ([LOGISTICS.md](LOGISTICS.md) § How a

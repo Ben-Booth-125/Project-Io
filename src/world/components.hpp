@@ -714,6 +714,15 @@ enum class building_type : uint8_t
                  ///< its tile gain defence and hardness, scaled by its `condition_permille`;
                  ///< artillery in a battle there and strategic bombing degrade it, and the
                  ///< one repair pass mends it. One to a tile.
+    astronaut_training_centre = 14, ///< BL-1585 (SPACE_ASSETS.md § Astronauts): turns its staffed
+                                    ///< workforce into astronauts each quarter, into its owner's
+                                    ///< pool up to a cap (stations.hpp, run_astronaut_training).
+                                    ///< Produces no good; staffed at construction like the institute.
+    orbital_defence_battery = 15, ///< BL-1599 (SPACE_FLEETS.md § Bombardment and fire at orbit): fires
+                                  ///< each day at hostile units in its body's low orbit, scaled by its
+                                  ///< `condition_permille` (space_bombard.hpp). Produces nothing, staffs
+                                  ///< at zero, no supply anchor; opened by the `orbital_defence_battery`
+                                  ///< mechanic.
 };
 
 /// One past the last building type — the wire parser's range gate (BL-396:
@@ -723,7 +732,7 @@ enum class building_type : uint8_t
 /// enum's tail, the same way resource_count derives from resource_type::count:
 /// appending a type means moving this with it.
 static constexpr uint8_t building_type_count =
-    static_cast<uint8_t>(building_type::bunker) + 1;
+    static_cast<uint8_t>(building_type::orbital_defence_battery) + 1;
 
 /// Infrastructure is every building that is not a producer (PRODUCTION.md §
 /// Infrastructure buildings): ports, logistics hubs, railway stations, the
@@ -988,6 +997,21 @@ struct survey_state
     int          regions_total   = 0;  ///< Computed at dispatch from the grid + super-cell size.
     int          regions_done    = 0;  ///< Regions revealed so far, in raster order.
     int          ticks_remaining = 0;  ///< Days until the next phase / region boundary.
+};
+
+/// BL-1600 — ONE NATION'S KNOWLEDGE OF ONE BODY off the home world
+/// (DISCOVERY.md § Mapping, then prospecting). Keyed (nation, body) in
+/// `world::survey_knowledge`; a record exists once the nation has mapped at least
+/// one region. Regions are the survey partition (survey_system.hpp): mapping
+/// runs in raster order, so the mapped regions are always the prefix
+/// [0, regions_mapped); prospecting runs only inside it, nearest the landing
+/// first, so the prospected regions are a set, one byte each.
+/// SERIALISED (world_save.cpp, the BL-1600 section) and hashed when non-empty.
+struct body_survey_knowledge
+{
+    int32_t              regions_total  = 0; ///< survey_region_count of the body's grid.
+    int32_t              regions_mapped = 0; ///< Mapped regions: the raster prefix [0, n).
+    std::vector<uint8_t> prospected;          ///< regions_total entries, 0 or 1; 1 only below regions_mapped.
 };
 
 /// A celestial body — the primary unit of territorial control and the location
@@ -2826,6 +2850,11 @@ struct nation_component
     /// (world_save_version 81; an older stream reads every nation as not ended) and
     /// hashed only when set.
     bool ended = false;
+    /// BL-1585 (SPACE_ASSETS.md § Astronauts): the trained astronaut pool, a count, not
+    /// people. Filled by Astronaut Training Centres (`run_astronaut_training`), spent by a
+    /// crewed station launch (stations.hpp). In [0, k_astronaut_pool_max]. Saved
+    /// (world_save_version 81) and hashed only when non-zero.
+    int32_t astronauts    = 0;
 };
 
 /// BL-1460 fix round: the capital a nation's generated identity reads —

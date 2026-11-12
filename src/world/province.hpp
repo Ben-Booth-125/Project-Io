@@ -701,6 +701,20 @@ province_kind province_kind_of(const world& w, uint32_t id);
 void build_province_partition(world& w, uint32_t seed, province_absorption_stats* stats = nullptr,
                               bool normalise = true);
 
+/// BL-1601 (NATIONS.md § Off-world bases: "a body with no provinces is partitioned
+/// when the first base lands on it, by the same rules the home world's provinces
+/// were"). When no province of @p w names @p body, partition that body ALONE by
+/// `build_province_partition` — run over a scratch world holding only the body,
+/// its tiles and their owners, with the stored partition seed — and splice its
+/// provinces into `w.provinces` in ascending id, re-aligning `province_holder`
+/// (every existing province keeps its holder; the new ones are held by nobody).
+/// No centre is a seed: the body is partitioned as generation partitions a body
+/// no centre stands on (its hinterland band), so the result is exactly the one
+/// the whole-world call would draw for it. Every other body is untouched.
+/// Returns true when it partitioned. A body with provinces, the star, no grid or
+/// no tiles: false, nothing written.
+bool partition_body_if_unpartitioned(world& w, entity_id body);
+
 /// The cost of stepping between two hex-adjacent LAND tiles, exposed so the
 /// harness can measure the cost model rather than re-implement it (a border
 /// check that re-derives its own costs proves nothing about the partition).

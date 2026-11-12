@@ -474,12 +474,69 @@ struct planetology_params
 };
 
 
-/// The authored physical facts about a body — the inputs the chain consumes.
-/// These stay hand-written per body (mass and orbit are what a prototype body
-/// set IS); everything downstream of them is derived.
+/// Which size-and-density band a non-home body rolls from (BL-1638, generated
+/// body mass; PLANETOLOGY.md § The prototype body set). The homeworld rolls from
+/// none of them: its mass is the player's corridor (`home_mass`).
+enum class body_mass_kind : uint8_t
+{
+    planet,        ///< A small rocky planet (Mercury scale).
+    moon,          ///< A rocky-to-icy satellite.
+    asteroid,      ///< An undifferentiated or porous minor body.
+    core_fragment, ///< A differentiated body stripped to its metal (Pallas).
+};
+
+/// One kind's band: the radius it rolls, and the two numbers its bulk density
+/// follows from — the core mass fraction and the mantle's density. Density is
+/// the two-layer mix 1 / (cmf / rho_core + (1 - cmf) / rho_mantle): the S1
+/// implementation trap's rule ("constant density from core mass fraction below
+/// ~0.05 M_E"). Every band sits at Mercury scale or below, where
+/// self-compression is a few percent, so the one rule covers every kind.
+struct body_mass_band
+{
+    float radius_min_earths;
+    float radius_max_earths;
+    float cmf_min;
+    float cmf_max;
+    float mantle_min_gcc;
+    float mantle_max_gcc;
+};
+
+/// The band table. PLANETOLOGY.md § The prototype body set owns it as data; this
+/// is that table, named beside the chain's other generation ranges rather than
+/// written as literals at the call site.
+struct body_mass_bands
+{
+    float earth_density_gcc = 5.514f; ///< Earth's mean density: M (M_E) = (rho / 5.514) R^3.
+    float core_density_gcc  = 7.9f;   ///< Uncompressed Fe-Ni (the iron meteorites' ~7.8-7.9).
+    body_mass_band planet        { 0.30f,  0.50f,  0.30f, 0.65f, 3.30f, 3.50f };
+    body_mass_band moon          { 0.20f,  0.34f,  0.00f, 0.20f, 2.70f, 3.40f };
+    body_mass_band asteroid      { 0.010f, 0.075f, 0.00f, 0.10f, 1.30f, 3.30f };
+    body_mass_band core_fragment { 0.015f, 0.045f, 0.65f, 1.00f, 3.00f, 3.40f };
+
+    constexpr const body_mass_band& of(body_mass_kind k) const
+    {
+        switch (k)
+        {
+        case body_mass_kind::planet:        return planet;
+        case body_mass_kind::moon:          return moon;
+        case body_mass_kind::asteroid:      return asteroid;
+        case body_mass_kind::core_fragment: return core_fragment;
+        }
+        return planet;
+    }
+};
+
+inline constexpr body_mass_bands k_body_mass_bands{};
+
+/// The physical facts about a body — the inputs the chain consumes. Orbits are
+/// authored (orbit is what a prototype body set IS); a non-home body's radius,
+/// density and mass are GENERATED from its seed (`generated_prototype_body`),
+/// and everything downstream of them is derived.
 struct body_inputs
 {
     const char* name                = "";
+    /// Earth masses. On a prototype body the table's value is a placeholder until
+    /// `generated_prototype_body` writes the generated mass (density x volume).
     float       mass_earths         = 1.0f;
     float       orbit_au            = 1.0f;   ///< Semi-major axis from the star.
     float       parent_mass_earths  = 0.0f;   ///< Non-zero for moons — drives tidal heating.
@@ -488,6 +545,14 @@ struct body_inputs
     bool        is_homeworld        = false;  ///< Runs the constrained-input corridor.
     bool        core_fragment       = false;  ///< Differentiated then stripped (Pallas).
     float       ice_shell_hint      = 0.0f;   ///< >0 marks a candidate subsurface-ocean body.
+    /// The band a non-home body's physique rolls from.
+    body_mass_kind mass_kind        = body_mass_kind::planet;
+    /// Earth radii. 0 = derive it from mass (S1's rocky relation, or constant
+    /// density below 0.05 M_E) — the homeworld and hand-built harness bodies.
+    /// Set by `generate_body_physique`, and then the chain reads it as given.
+    float       radius_earths       = 0.0f;
+    float       density_gcc         = 0.0f;   ///< Bulk density, g/cm^3 (0 = not generated).
+    float       core_mass_fraction  = 0.0f;   ///< The rolled cmf density follows from (0 = not generated).
 };
 
 // ---------------------------------------------------------------------------
@@ -501,6 +566,19 @@ struct body_inputs
 int              prototype_body_count();
 const body_inputs& prototype_body(int index);
 uint32_t         prototype_body_seed(int index); ///< Pre-XOR per-body seed literal.
+
+/// Roll a body's radius, core mass fraction and mantle density inside its
+/// kind's band from `body_seed` (the world seed XOR the body's seed literal —
+/// the seed the chain itself runs on, on a stage tag of its own), and set its
+/// mass to density x volume. The homeworld comes back untouched: its mass is
+/// the corridor's `home_mass`. Pure: same seed, same body.
+body_inputs generate_body_physique(const body_inputs& in, uint32_t body_seed,
+                                   const body_mass_bands& bands = k_body_mass_bands);
+
+/// `prototype_body(index)` with its generated physique for `world_seed`. Every
+/// reader of a prototype body's size or mass — the world build, the wizard's
+/// preview — goes through this one call, so they cannot disagree.
+body_inputs generated_prototype_body(int index, uint32_t world_seed);
 
 /// One endemic trade good a body's biosphere evolved — the C -> D stage.
 ///

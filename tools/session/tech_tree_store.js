@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // tech_tree_store.js — check an age's tech-tree store and render its node tables into the tree's doc.
 //
-//   node tools/session/tech_tree_store.js [age] [--check]     (age defaults to digitisation)
+//   node tools/session/tech_tree_store.js [age] [--check]     (age defaults to digitisation;
+//                                                            early_space is the next age's tree)
 //
 // The store (docs/economy/tech/<age>_tree.json) is canonical for every node; the doc
 // (docs/economy/tech/<AGE>_TREE.md) owns the prose and carries the generated tables between the
@@ -183,6 +184,77 @@ if (age === 'digitisation') {
     err(`${node}: unlock_kit lists ${it}, which the catalogue ${itemNode.has(it) ? 'puts on ' + itemNode.get(it) : 'does not hold'}`);
 }
 
+// ---- the keying (RESEARCH.md § Quests key the next age; BL-1607) ---------------------------
+// A tree keyed by an earlier age's tree: every branch names the quest that keys it (keyed_by), and
+// its name is that quest's keys_next_branch. The authored branches plus reserved_branches are
+// exactly the earlier tree's keys_next_branch names, each once.
+const loadStore = a => JSON.parse(fs.readFileSync(path.join(dir, `${a}_tree.json`), 'utf8'));
+let prior = null;
+if (store.keyed_by_tree) {
+  prior = loadStore(store.keyed_by_tree);
+  const pq = new Map(prior.nodes.filter(n => n.tier === 'quest').map(n => [n.id, n]));
+  const keyed = new Set([...pq.values()].map(n => n.keys_next_branch));
+  const seen = new Map();
+  for (const t of store.trees) for (const b of t.branches) {
+    const q = pq.get(b.keyed_by);
+    if (!q) err(`${b.key}: keyed_by ${b.keyed_by} is not a quest of ${store.keyed_by_tree}`);
+    else if (q.keys_next_branch !== b.name) err(`${b.key}: named "${b.name}" but ${b.keyed_by} keys "${q.keys_next_branch}"`);
+    if (seen.has(b.name)) err(`${b.key}: branch name "${b.name}" used twice`);
+    seen.set(b.name, b.key);
+  }
+  for (const r of store.reserved_branches || []) {
+    if (seen.has(r)) err(`reserved branch "${r}" is also authored`);
+    seen.set(r, 'reserved');
+  }
+  for (const k of keyed) if (!seen.has(k)) err(`${store.keyed_by_tree} keys "${k}", which is neither authored nor reserved`);
+  for (const k of seen.keys()) if (!keyed.has(k)) err(`branch "${k}" is keyed by no ${store.keyed_by_tree} quest`);
+} else if (store.trees.some(t => t.branches.some(b => b.keyed_by))) err('a branch names keyed_by but the store has no keyed_by_tree');
+
+// ---- the space keys (BL-1592, BL-1607) -------------------------------------------------------
+// src/world/space_tech_keys.hpp names every space mechanic key as a constant. Its near_space list
+// is exactly the Digitisation tree's mechanic keys, its far_space list exactly the Early Space
+// tree's, and every key sits on exactly one node across the two stores.
+{
+  const hdrPath = path.join(root, 'src', 'world', 'space_tech_keys.hpp');
+  const hdr = fs.readFileSync(hdrPath, 'utf8');
+  const consts = new Map();
+  for (const m of hdr.matchAll(/inline constexpr std::string_view (\w+)\s*=\s*"([a-z0-9_]+)";/g)) {
+    if (consts.has(m[1])) err(`space_tech_keys.hpp: constant ${m[1]} defined twice`);
+    consts.set(m[1], m[2]);
+  }
+  const list = name => {
+    const m = hdr.match(new RegExp(`std::string_view ${name}\\[\\]\\s*=\\s*\\{([^}]*)\\}`));
+    if (!m) { err(`space_tech_keys.hpp: no ${name}[] list`); return []; }
+    return m[1].split(',').map(s => s.trim()).filter(Boolean).map(c => {
+      if (!consts.has(c)) err(`space_tech_keys.hpp: ${name}[] names unknown constant ${c}`);
+      return consts.get(c);
+    });
+  };
+  const lists = { digitisation: list('near_space'), early_space: list('far_space') };
+  // Mechanic keys that are read but are not space keys: nation_tech.cpp's
+  // k_read_other_mechanics (BL-1522 offshore drilling). Exempt from the lists both ways.
+  const ntSrc = fs.readFileSync(path.join(root, 'src', 'world', 'nation_tech.cpp'), 'utf8');
+  const om = ntSrc.match(/k_read_other_mechanics\[\]\s*=\s*\{([^}]*)\}/);
+  const otherKeys = new Set(om ? [...om[1].matchAll(/"([a-z0-9_]+)"/g)].map(m => m[1]) : []);
+  const trees = { [age]: store };
+  for (const a of Object.keys(lists)) if (!trees[a] && fs.existsSync(path.join(dir, `${a}_tree.json`))) trees[a] = loadStore(a);
+  const carriers = new Map();
+  for (const [a, s] of Object.entries(trees)) {
+    const keys = new Set();
+    for (const n of s.nodes) for (const e of n.effects || []) if (e.kind === 'mechanic') {
+      if (otherKeys.has(e.key)) continue;
+      keys.add(e.key);
+      carriers.set(e.key, [...(carriers.get(e.key) || []), n.id]);
+    }
+    const want = new Set(lists[a] || []);
+    if (want.size !== (lists[a] || []).length) err(`space_tech_keys.hpp: a ${a} key is listed twice`);
+    for (const k of keys) if (!want.has(k)) err(`${a}: mechanic key ${k} is not in space_tech_keys.hpp's ${a === 'digitisation' ? 'near_space' : 'far_space'} list`);
+    for (const k of want) if (!keys.has(k)) err(`space_tech_keys.hpp: ${k} is carried by no ${a} node`);
+  }
+  for (const [k, ids] of carriers) if (ids.length !== 1) err(`mechanic key ${k} sits on ${ids.length} nodes (${ids.join(', ')}); one node each`);
+  for (const v of consts.values()) if (!carriers.has(v)) err(`space_tech_keys.hpp: ${v} is carried by no node`);
+}
+
 // Reachability from the roots (placeholders count as reachable; they can be researched).
 const held = new Set(nodes.filter(n => !n.requires.length).map(n => n.id));
 for (let changed = true; changed;) {
@@ -201,7 +273,9 @@ out += `**${nodes.length} nodes** — ${count('travel')} travel (${nodes.filter(
 for (const t of store.trees) {
   out += `### ${t.name} — ${t.thesis}\n\n`;
   for (const b of t.branches) {
-    out += `#### ${b.name} (\`${b.key}\`)\n\n| Id | Node | Tier | Ring | Advantage | Requires |\n|---|---|---|---|---|---|\n`;
+    const keyedBy = b.keyed_by && prior
+      ? ` — keyed by *${(prior.nodes.find(n => n.id === b.keyed_by) || {}).name}* (\`${b.keyed_by}\`)` : '';
+    out += `#### ${b.name} (\`${b.key}\`)${keyedBy}\n\n| Id | Node | Tier | Ring | Advantage | Requires |\n|---|---|---|---|---|---|\n`;
     for (const n of nodes.filter(x => x.branch === b.key)) {
       const adv = n.tier === 'quest' ? `${n.advantage}. **Deed:** ${n.deed}. **Keys next age:** ${n.keys_next_branch}` : n.advantage;
       out += `| \`${n.id}\` | ${esc(n.name)} | ${kind(n)} | ${n.ring} | ${esc(adv)} | ${esc(reqText(n))} |\n`;
@@ -209,7 +283,7 @@ for (const t of store.trees) {
     out += '\n';
   }
 }
-out += `### Joints\n\n| Id | Node | Ring | Advantage | Requires |\n|---|---|---|---|---|\n`;
+if (nodes.some(x => x.joint)) out += `### Joints\n\n| Id | Node | Ring | Advantage | Requires |\n|---|---|---|---|---|\n`;
 for (const n of nodes.filter(x => x.joint)) out += `| \`${n.id}\` | ${esc(n.name)} | ${n.ring} | ${esc(n.advantage)} | ${esc(reqText(n))} |\n`;
 
 const BEGIN = '<!-- BEGIN GENERATED NODES (tools/session/tech_tree_store.js) -->';

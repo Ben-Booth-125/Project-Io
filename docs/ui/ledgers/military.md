@@ -87,6 +87,13 @@ under Sea, and a row raises at a base of its own theatre only. Design lists the 
 beside the land ones; each opens the same full-canvas designer with its own slots (airframe, armament,
 avionics; hull, armament, sensors).
 
+**Design has a Space tab** (`../../military/SPACE_FLEETS.md` § A space unit is raised to a design): a
+row per space hull, each a toggle that expands in place to the hull's slots, one module list per slot
+(a module whose research is missing is greyed with the node that opens it), and a **Save design**
+press. It expands in place rather than taking the canvas because a hull has at most six slots and no
+art yet. Space units are raised and ordered elsewhere — at a pad or a shipyard, and from the
+space-unit card (`../SELECTION.md` § The space-unit element) — so Recruit has no Space tab.
+
 **A wing is ordered from the canvas.** With a wing selected, right-clicking a province assigns the
 wing there on its current mission; a province out of range is refused with its distance and the
 wing's range. The wing card on the Selection band sets the mission and lists the provinces assigned.
