@@ -499,6 +499,7 @@ int main(int argc, char** argv)
             // ticks, plus the treasury movement no return carries (FINANCE.md § What a return
             // does not carry). Report-only: the FLOWS line, one per major.
             std::map<entity_id, std::array<double, 11>> flow_sum;
+            std::map<entity_id, std::array<double, 7>> rs_sum; // rp, line_spend, sqrt(spend), uni, inst, economy, mult
             std::map<entity_id, double> flow_prev;
             for (const entity_id nid : majors)
                 if (const auto it = w.nations.find(nid); it != w.nations.end()) flow_prev[nid] = it->second.treasury;
@@ -523,7 +524,7 @@ int main(int argc, char** argv)
                         for (const auto& [nid, nc] : cw.nations) (*m)[nid] = nc.treasury;
                     };
                 }
-                (void)run_settle_tick(w, seed_reg, k_campaign_settle_ticks + (k - 1), day, /*spectating=*/true,
+                const settle_tick_result str = run_settle_tick(w, seed_reg, k_campaign_settle_ticks + (k - 1), day, /*spectating=*/true,
                                       k == 1 ? &grant_hooks : nullptr);
                 for (const entity_id nid : majors)
                 {
@@ -546,6 +547,16 @@ int main(int argc, char** argv)
                         g_val[g] += static_cast<double>(mk.price[g]) * std::min(mk.supply[g], mk.demand[g]);
                         g_price[g] += mk.price[g] / mk.base_price[g]; ++g_n[g];
                     }
+                for (const research_accrual& ra : str.report.research)
+                {
+                    if (std::find(majors.begin(), majors.end(), ra.nation) == majors.end()) continue;
+                    std::array<double, 7>& rs = rs_sum[ra.nation];
+                    rs[0] += static_cast<double>(ra.rp_milli) / 1000.0;
+                    rs[1] += ra.line_spend;
+                    rs[2] += std::sqrt(std::max(0.0, static_cast<double>(ra.line_spend)));
+                    rs[3] += ra.universities; rs[4] += ra.institutes;
+                    rs[5] += ra.economy; rs[6] += ra.multiplier;
+                }
                 // Cold review (2026-11-08): the grant drops the settle's last unbooked debits,
                 // so the first play return's net is its treasury less the granted figure, on
                 // a major that researched or paid garrison wage on the settle's last tick.
@@ -589,6 +600,15 @@ int main(int argc, char** argv)
                     std::printf("GOOD seed=%d good=%s ticks=%d supply=%.2f demand=%.2f value=%.2f price_x_base=%.4f\n",
                                 seed, resource_names::name_of(static_cast<resource_type>(g)).c_str(), quarters,
                                 g_sup[g] / quarters, g_dem[g] / quarters, g_val[g] / quarters, g_price[g] / g_n[g]);
+            for (const entity_id nid : majors)
+            {
+                const std::array<double, 7>& rs = rs_sum[nid];
+                const double n = quarters > 0 ? static_cast<double>(quarters) : 1.0;
+                std::printf("RESEARCH seed=%d nation=%llu rp=%.2f line_spend=%.2f sqrt_spend=%.3f universities=%.2f"
+                            " institutes=%.2f economy=%.1f multiplier=%.3f\n",
+                            seed, static_cast<unsigned long long>(nid), rs[0] / n, rs[1] / n, rs[2] / n, rs[3] / n,
+                            rs[4] / n, rs[5] / n, rs[6] / n);
+            }
             force = force_by_owner(w);
 
             std::printf("seed %d %d:%d  nations %zu (majors %zu, minors %zu)  majors touching %d pair(s)\n",

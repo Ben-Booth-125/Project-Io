@@ -728,7 +728,7 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 
 **Expected output.** The nation's research queue is emptied - the Early Space tail with it (BL-1613: one queue). RP in hand stay and keep accruing; with nothing queued the research line spends nothing.
 
-**Reason to select.** Start the plan over, or stop the research line spending the treasury.
+**Reason to select.** Start the plan over.
 
 ### `gameplay.set_unit_obsolete` — The Military ledger's Design tab (nav rail slot 7), 'Unit types': one checkbox per roster row. Also a corp_verb (corp_verb::set_unit_obsolete, 39) on the command seam.
 

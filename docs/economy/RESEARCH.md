@@ -6,13 +6,13 @@
 > queue, and how an AI nation fills it · how an effect no system reads yet is carried.
 > **Not here:** the nodes of one age's tree (tech/DIGITISATION_TREE) · what an Era is and what
 > opens the next (ERAS) · what a recipe or building does once unlocked (PRODUCTION) · which centre
-> may host a university (POPULATION) · the national budget the research line sits in
-> (../politics/NATIONS).
+> may host a university (POPULATION) · the national budget (../politics/NATIONS), which buys no
+> research.
 > **Confused with:** ERAS.md, tech/DIGITISATION_TREE.md, ../generation/trees/TREES.md (retired).
 
-Research is the loop that turns a nation's investment in learning into **technology**: research
-points (RP) accrue to a nation and buy nodes of the age's tech tree, one at a time, in the order the
-nation's research queue names.
+Research is the loop that turns a nation's learning into **technology**: research points (RP)
+accrue to a nation and buy nodes of the age's tech tree, one at a time, in the order the nation's
+research queue names.
 
 ---
 
@@ -34,23 +34,25 @@ and every nation opens on the industrial recipe band (`ERAS.md` § Where the lad
 
 ## Research points
 
-**RP accrue to the nation each month and are spent only on nodes.** Five sources; the rates are
-dials:
+**RP accrue to the nation each month and are spent only on nodes. Research is free; a research
+building is what it costs (Ben, 2026-11-13).** Three sources, and no credit buys RP:
 
 | Source | What it is |
 |---|---|
-| **A base** | Every nation earns a fixed RP a month whatever its treasury, so every nation reaches its power surges |
-| **The research budget line** | The national budget's academic-research priority (`../politics/NATIONS.md`): RP grow with the **square root** of what the line spends, so wealth buys a lead with diminishing returns. The line pays only what the queue still owes; an empty queue spends nothing |
-| **Research institutes** | Each staffed research institute adds RP a month to its owner's nation |
-| **The economy** | RP a month in proportion to the income its monthly return filed the month before (Ben, 2026-10-15; re-subjected from its home corporations, Ben, 2026-10-23). A growing economy buys research; this is what lets RP keep pace with rising prices (§ Cost) |
-| **Universities** | Each staffed University in the nation adds RP per month. A University may stand only in a City (4)+ centre (`POPULATION.md` § Strata gate buildings), and it also raises the nation's qualification fraction |
+| **A base** | Every nation earns **100 RP a month**, whatever its treasury or size. Every nation starts equal (§ Who holds technology) and reaches its power surges on its own |
+| **Research institutes** | Each research institute the nation runs adds **5% of the base**, 5 RP a month |
+| **Universities** | Each University the nation runs adds **10% of the base**, 10 RP a month. A University may stand only in a City (4)+ centre (`POPULATION.md` § Strata gate buildings), and it also raises the nation's qualification fraction |
 
-**Why a base and a square root (Ben, 2026-10-10).** National treasuries span orders of magnitude.
-Research linear in spending let the richest nation buy the whole tree in a few years while half the
-field never reached its first major; a base with a concave line keeps every nation on the surge
-cadence and lets spending separate nations by a factor of about three, not a hundred thousand. The economy
-source widens that with growth: the nation whose buildings earn most researches several times faster
-than the median, and only by earning it.
+A building adds its share only while it runs: staffed, not idled, its maintenance and wages paid.
+**That upkeep is the price of research.** A building's share is small against its running bill, so
+research stays expensive at the margin while the base keeps every nation on the tree.
+
+**Why free, and why no economy source (Ben, 2026-11-13; superseding the 2026-10-10 square-root line
+and the 2026-10-15 economy source).** RP bought with treasury drained majors that earned less than
+their research line asked, so a nation ran its savings down on learning it could not afford. A free
+base cannot drain a treasury. Wealth no longer buys a research lead at all: nations separate by the
+research buildings they choose to keep, and by the techs that raise national research. The economy
+source is dropped with the line, so a growing economy does not research faster (§ Cost).
 
 A held node's research modifier (*+N% national research*) scales the total. RP never trade between
 nations.
@@ -149,7 +151,7 @@ and a quarter (Ben, 2026-11-10: re-pinned from five years once nations owned the
 
 **Research costs three times the 2026-10-10 price (Ben, 2026-11-11: *"the game's pacing is far too fast"*).** The RP unit is tripled in the same change that makes the tick a month; RP accrual keeps its per-year value. The age's length and the first-major interval are re-measured against the new price, and the figures in this section are the measured ones.
 
-**Measured at the tripled price (2026-11-12, the sixteen library seeds, 577 nations with a source, 240 live months):** the median nation reaches its first ring-2 major in about **ten years** (124 months), its fastest tenth in about **four** (50 months), and about a quarter of nations (159 of 577) do not reach one inside twenty years. The four-year median and year-and-a-quarter floor above are the quarter tick's pins at the old price; they are not re-pinned here, because what the new pacing should be is Ben's to rule.
+**Measured at the tripled price, with credits still buying RP (2026-11-12, the sixteen library seeds, 577 nations with a source, 240 live months):** the median nation reaches its first ring-2 major in about **ten years** (124 months), its fastest tenth in about **four** (50 months), and about a quarter of nations (159 of 577) do not reach one inside twenty years. The four-year median and year-and-a-quarter floor above are the quarter tick's pins at the old price; they are not re-pinned here, because what the new pacing should be is Ben's to rule.
 
 **A node costs its tier's base × its ring × the RP unit.** The unit is a dial, set so that a nation
 spending a typical research share reaches a power surge — a major — at steady intervals through the
@@ -158,13 +160,12 @@ age. That pacing is the property the price is tuned to and the sweep measures (B
 to meet it. **Kit makes an age slower, and is not priced away (Ben, 2026-11-03):** the RP unit is
 not re-tuned to absorb the cost the kit clusters add.
 
-**Prices rise through the age; research points rise to meet them (Ben, 2026-10-15).** A node's
-cost climbs with its date in the age, not only its ring. A nation's RP grows with its economy, so
-an average nation's unlock cadence stays roughly level from 1960 to the age's close. A nation whose
-economy outgrows the average overtakes the price curve and unlocks faster; one that stagnates falls
-behind. The speed-up is earned by growth, never handed out by the calendar: *"we don't really want
-unlocks to speed up for average games."* The sweep measures the median nation's interval between
-majors as flat, and the spread between richest and median as growth-driven.
+**Prices rise through the age, and research points do not rise to meet them (Ben, 2026-11-13;
+superseding the 2026-10-15 economy source).** A node's cost climbs with its date in the age, not
+only its ring, while the base is fixed. So unlocks slow as the age runs on, for every nation alike,
+and a nation keeps pace only by adding research buildings or the techs that raise national research.
+Unlocks still never speed up by the calendar alone: *"we don't really want unlocks to speed up for
+average games"* (Ben, 2026-10-15).
 
 ### What technology is for
 
@@ -222,6 +223,5 @@ for one. Placeholders are the deliberate case of the same rule.
 
 ## What is open
 
-- The research line's conversion rate, the University's RP per month, and the RP unit — dials for
-  the sweep, set against the pacing rule.
-- The goods basket research draws, and whether it sits on the University or the budget line.
+- The RP unit — a dial for the sweep, set against the pacing rule under the free base.
+- The goods basket research draws, and which research building draws it.

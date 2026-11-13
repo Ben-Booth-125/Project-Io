@@ -596,8 +596,8 @@ gameplay that good produces.
   `spacecraft_components` and `propellant` for government satellite launches: the first buyer for
   space goods that is not a militia contract, and thematically the gate into space. Lumpy,
   political, set by a national budget — see property 3.
-- **Research** (BL-645, research consumes goods). `academic_research` and `military_research` are
-  budget lines that spend credits; research that also consumes **goods** makes the tech ladder an
+- **Research** (BL-645, research consumes goods). `military_research` is a budget line that spends
+  credits, and academic research is free (`RESEARCH.md` § Research points); research that consumes **goods** makes the tech ladder an
   economic decision rather than a free accumulator, and gives the top of the chain a buyer. Folds
   into the RESEARCH.md design session (BL-619) rather than pre-empting it.
 - **Conflict** (BL-646, battles burn ordnance). Ordnance is priced at the top of the ancient roster

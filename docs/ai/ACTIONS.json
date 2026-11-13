@@ -2739,7 +2739,7 @@
     "The queue - Digitisation entries or the Early Space tail - is not empty (rejected_state; the button is disabled)."
    ],
    "expected_output": "The nation's research queue is emptied - the Early Space tail with it (BL-1613: one queue). RP in hand stay and keep accruing; with nothing queued the research line spends nothing.",
-   "reason_to_select": "Start the plan over, or stop the research line spending the treasury."
+   "reason_to_select": "Start the plan over."
   },
   {
    "id": "chrome.quick_save_key",

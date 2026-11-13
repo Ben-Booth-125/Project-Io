@@ -244,8 +244,8 @@ treasury grows. All weights default to zero: a nation with no authored budget sp
 **A tick spends a month's share of the treasury.** The spendable is `treasury × (1 −
 reserve_fraction) × ⅓`: the tick is a month, and a month may spend a third of what a quarter
 could. A share of a treasury is a share of a stock, so unlike a per-tick flow it does not shrink
-with the tick by itself. Without the third, a lump bill that is owed whole (the research queue's
-remaining cost, a space programme's lump) could take a quarter's spendable three times in every
+with the tick by itself. Without the third, a lump bill that is owed whole (a space programme's
+lump) could take a quarter's spendable three times in every
 quarter. A per-tick flow bill is already a third, so it meets the same share it met before
 (Ben, 2026-11-11: every per-tick figure is a third of the quarter's).
 
@@ -257,7 +257,7 @@ indexed by them):
 | `logistics_maintenance` | keeping the road/hub network standing (LOGISTICS.md) |
 | `schooling` | population capability |
 | `military_research` | force-side research; a force's wages are a flat bill and no line's share (MILITARY.md § What a force costs) |
-| `academic_research` | the civil tech ladder — treasury the line spends converts to the nation's research points (`../economy/RESEARCH.md` § Research points) |
+| `academic_research` | nothing: research is free and no credit buys RP (Ben, 2026-11-13; `../economy/RESEARCH.md` § Research points). The line keeps its slot in the enum, carries no weight and spends nothing |
 | `public_exploration` | state-funded survey — DISCOVERY.md's geographic fog |
 | `contracted_force` | buying force the nation does not raise — BL-572 (contract offers) derives an offer from this line's spendable share; the contract form itself carries no sell side to buy through (CONTRACTS.md § Explicitly out of scope) |
 | `strategic_reserve` | buying goods to **hold**, off a market's shelf. Distinct from `reserve_fraction`, which withholds credits; this line spends them |
@@ -465,8 +465,7 @@ somebody else's machinery:
    treasury — a nation does not pay for a survey that did not start.
 
 **Research is the step's last move.** `advance_research` (`src/world/nation_tech.hpp`) runs after
-every other move in the step: the academic-research line pays what the queue still
-owes, and the pool flows down the queue (`docs/economy/RESEARCH.md` § Research points).
+every other move in the step: the month's free RP accrue and the pool flows down the queue (`docs/economy/RESEARCH.md` § Research points).
 
 The cadence key is `world::current_econ_tick` — the month counter, never the day tick.
 
@@ -519,8 +518,8 @@ Three rules keep the budget honest, each a requirement row in `nation_budget_har
    flagged `rationed`. Unearmarked claims keep rule 3's partial fill.
 
 A paid claim is read on its `budget_line_result`, and an earmark also lives on `report.earmarks`.
-The monthly return books the academic-research line, garrison pay and space upkeep (Ben, 2026-11-05:
-research counts inside net; Ben, 2026-11-07: space upkeep too); the other lines debit the treasury outside it (`../economy/FINANCE.md` § What a
+The monthly return books garrison pay and space upkeep (Ben, 2026-11-07); research is free and
+books nothing (Ben, 2026-11-13); the other lines debit the treasury outside it (`../economy/FINANCE.md` § What a
 return does not carry).
 
 **Determinism.** Once per economy tick, over nations in ascending id, over lines in the fixed enum

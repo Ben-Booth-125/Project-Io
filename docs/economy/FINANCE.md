@@ -295,7 +295,7 @@ profitability, updated each month with company balance sheets."*
 | `maintenance` / `wages` | the budget breakdown — summed `compute_building_opex` |
 | `upkeep` | the standing costs: the garrison's pay and each space asset's monthly upkeep since the last return, booked on the next one (Ben, 2026-11-07). A debit paid in the nation step after the return is written, booked as `research` is |
 | `taxes` | the tier's share of the month's wages, returned to the treasury (`NATIONS.md` § Taxes and Discontent) |
-| `research` | Credits the nation's research line spent since its last return, booked on the next one. A debit: research is paid in the nation step, after the return is written (Ben, 2026-11-05: research counts inside net) |
+| `research` | Credits spent buying research since the last return. Research is free (Ben, 2026-11-13; `RESEARCH.md` § Research points), so the field is zero; it keeps its slot in the saved record |
 | `refunds` | Credits refunded to the nation since its last return, booked on the next one — a cancelled construction. A credit: `net` = the flows **+ refunds**, and the return's opening is taken from before the refund so it still telescopes |
 | `net` | The difference of two consecutive treasuries across the money loop, research included — see below. Construction, hiring, retooling and the other movers listed below debit the treasury outside it, so a nation at +100 net can still lose treasury. The header's NET reads after research. The opening's construction price is the one figure set against net before research (`PRODUCTION.md` § What construction costs at the opening) |
 | `treasury` | the closing `nation_component::treasury` |
@@ -353,9 +353,8 @@ since the last return. Every other debit or credit lands elsewhere in the tick a
   clear and *is* in `expenditure`), and the **import tariff** a nation's goods pay on entering a
   foreign nation's market, credited to that market's nation (`NATIONS.md` § The import tariff).
 - **The national budget** — what `run_nation_step` spends on the nation's priority lines, after
-  `apply_budget` (`NATIONS.md` § 3). The academic-research line, garrison pay and space upkeep are
-  the three it books, as above (Ben, 2026-11-05: research counts inside net; Ben, 2026-11-07: space
-  upkeep too).
+  `apply_budget` (`NATIONS.md` § 3). Garrison pay and space upkeep are the two it books, as above
+  (Ben, 2026-11-07); research is free and books nothing (Ben, 2026-11-13).
 
 So a return explains the money loop's movement exactly and the **month's** only partly. That is
 right for reading the profitability of a nation's industry.
