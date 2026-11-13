@@ -147,12 +147,13 @@ whose branch carries a placeholder needs only the branch's real rim major until 
 
 **An age lasts about eighty years (Ben, 2026-10-10)**, and the tree is priced to it: the richest
 nation, researching without pause, completes the whole tree inside the age, and the median nation
-reaches its first ring-2 major in about four years, its fastest tenth in no less than about a year
-and a quarter (Ben, 2026-11-10: re-pinned from five years once nations owned their ground).
+reaches its first ring-2 major in about nine years (112 months), inside a band of eight to ten and a
+half, with its fastest tenth no sooner than a year and a quarter (Ben, 2026-11-13: re-pinned to the
+free base's measured pacing).
 
 **Research costs three times the 2026-10-10 price (Ben, 2026-11-11: *"the game's pacing is far too fast"*).** The RP unit is tripled in the same change that makes the tick a month; RP accrual keeps its per-year value. The age's length and the first-major interval are re-measured against the new price, and the figures in this section are the measured ones.
 
-**Measured at the tripled price, with credits still buying RP (2026-11-12, the sixteen library seeds, 577 nations with a source, 240 live months):** the median nation reaches its first ring-2 major in about **ten years** (124 months), its fastest tenth in about **four** (50 months), and about a quarter of nations (159 of 577) do not reach one inside twenty years. The four-year median and year-and-a-quarter floor above are the quarter tick's pins at the old price; they are not re-pinned here, because what the new pacing should be is Ben's to rule.
+**Measured under the free base (2026-11-13, the sixteen library seeds, 240 live months):** the median nation reaches its first ring-2 major in **112 months**, its fastest tenth in 102, and every nation reaches one inside twenty years. Nations bunch because wealth no longer buys RP: they separate only by the research buildings they run. The credit line had read 124 months, 50 for the fastest tenth, and a quarter of nations never reaching one.
 
 **A node costs its tier's base × its ring × the RP unit.** The unit is a dial, set so that a nation
 spending a typical research share reaches a power surge — a major — at steady intervals through the

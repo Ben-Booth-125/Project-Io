@@ -2413,6 +2413,9 @@ void rows_r0(const std::vector<std::uint32_t>& seeds, int quarters, bool twice, 
     // owning their ground (the 2026-10-24 wave, chiefly the fold, f1d05dfc) brought the first major
     // forward; pooled over the 16 library seeds the median read 15-19 and p10 5-7 at scale 2 from
     // 2026-10-25 on, against the old 16-24 and 8.
+    // RE-PINNED (Ben, 2026-11-13, BL-1650 free research): median 16-21 x scale (96-126 months at
+    // scale 6). Cause: the free 100 RP base replaced the credit line; pooled over the 16 library
+    // seeds the median read 112 months and p10 102, every nation reaching it, against 124 and 50.
     const double sc = used.rp_per_cost_unit / 100.0;
     double tree_units = 0.0;
     for (int n = 0; n < io::dg::node_count; ++n) tree_units += io::dg::nodes[static_cast<std::size_t>(n)].cost_units;
@@ -2421,10 +2424,10 @@ void rows_r0(const std::vector<std::uint32_t>& seeds, int quarters, bool twice, 
                 "  the whole tree (%.0f units, %.0f RP at the opening price; R4 runs the rising one) in %.0f quarters (%.1f years).\n",
                 best_full, tree_units, tree_units * used.rp_per_cost_unit, tree_q, tree_q / static_cast<double>(k_econ_ticks_per_year));
     std::printf("  thresholds: >= %.0f%% reach it in %d; median in [%.0f, %.0f]; p10 >= %.0f\n",
-                100.0 * k_min_reach, static_cast<int>(16 * sc), 6 * sc, 10 * sc, 2.5 * sc);
+                100.0 * k_min_reach, static_cast<int>(16 * sc), 16 * sc, 21 * sc, 2.5 * sc);
     check(quarters >= static_cast<int>(16 * sc) && frac >= k_min_reach,
           "R0g PACING: >= 90% of nations with a source reach their first ring-2 major in 16 x scale quarters");
-    check(med_q >= 6.0 * sc && med_q <= 10.0 * sc, "R0h PACING: the median nation reaches it in 6-10 x scale quarters");
+    check(med_q >= 16.0 * sc && med_q <= 21.0 * sc, "R0h PACING: the median nation reaches it in 16-21 x scale quarters");
     check(fast_q >= 2.5 * sc, "R0i PACING: the fastest decile takes no fewer than ~2.5 x scale quarters");
 }
 
