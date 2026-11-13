@@ -1415,14 +1415,14 @@
    "design": "GENERATION_STRATEGY.md § The world budget (Ben, 2026-11-12). Measured 2026-11-12 on main: seed 28 about 37 s, seed 0 about 2.5-3 min (search 78 s, the Finishing step 25-50 s, the three spans about 22 s, settle 4 s). First split the Finishing step (label 12: market carve and gravity fold, market roads, other bodies, provinces, garrisons) into its own measured costs in gen_step_costs, then cut the largest until every curated seed opens in under 60 s. Read on the largest curated worlds. Depends on BL-1646 (search placement only) for the search share."
   },
   {
-   "glyph": "○",
+   "glyph": "●",
    "sprint": null,
    "version_goal": "v0.6.0",
    "written": "2026-11-12",
    "parked": false,
    "blocked_on": null,
    "requires": [],
-   "status": "proposed",
+   "status": "complete",
    "author": "main session (Ben, 2026-11-12)",
    "id": "BL-1646",
    "short_name": "SEARCH_PLACEMENT_ONLY",
