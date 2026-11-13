@@ -824,7 +824,67 @@ struct scoped_ns
                      prof_clock::now() - t0).count();
     }
 };
+
+// BL-1645: the lap split's sections, in the order the year loop meets them.
+enum hs_lap : int
+{
+    lap_setup, lap_year_top, lap_founding, lap_demo_kinds, lap_army_eats, lap_centre_rise,
+    lap_coast, lap_upkeep, lap_ind_points, lap_urban, lap_roads, lap_rail, lap_treaty,
+    lap_treaty_break, lap_late_backstop, lap_subjection, lap_tribute, lap_grudge,
+    lap_pol_top, lap_assim, lap_civmix, lap_fall, lap_works, lap_army_reach, lap_materials,
+    lap_sea_legs, lap_water_gate, lap_candidates, lap_execute, lap_furnace, lap_secede,
+    lap_creed, lap_record, lap_rise_fall, lap_diffusion, lap_world_war, lap_revolution,
+    lap_close, lap_closing_rounds, lap_fold, lap_camp_hub, lap_camp_gate, lap_camp_fleet,
+    lap_camp_score, lap_camp_supply, lap_camp_tail, lap_settle, lap_invest, lap_consolidate,
+    lap_organise, lap_build_work, lap_upgrade_supply, lap_count
+};
+const char* const hs_lap_names[lap_count] = {
+    "setup", "year_top", "founding", "demo_kinds", "army_eats", "centre_rise",
+    "coast", "upkeep", "ind_points", "urban", "roads", "rail", "treaty",
+    "treaty_break", "late_backstop", "subjection", "tribute", "grudge",
+    "pol_top", "assim", "civmix", "fall", "works", "army_reach", "materials",
+    "sea_legs", "water_gate", "candidates", "execute", "furnace", "secede",
+    "creed", "record", "rise_fall", "diffusion", "world_war", "revolution",
+    "close", "closing_rounds", "fold", "camp_hub", "camp_gate", "camp_fleet",
+    "camp_score", "camp_supply", "camp_tail", "settle", "invest", "consolidate",
+    "organise", "build_work", "upgrade_supply"};
+static_assert(lap_count <= history_sim_profile::lap_max, "lap table overflow");
+
+/// Closes the clock on the running lap and opens the next. Report-only: it
+/// writes the profile and nothing the sim reads.
+struct hs_lapper
+{
+    history_sim_profile*   prof;
+    int                    cur = -1;
+    prof_clock::time_point t;
+    explicit hs_lapper(history_sim_profile& p) : prof(&p), t(prof_clock::now()) {}
+    void mark(int k)
+    {
+        const prof_clock::time_point now = prof_clock::now();
+        if (cur >= 0)
+            prof->ns_lap[cur] += std::chrono::duration_cast<std::chrono::nanoseconds>(now - t).count();
+        cur = k;
+        if (k >= 0) ++prof->n_lap[k];
+        t = now;
+    }
+    ~hs_lapper()
+    {
+        mark(-1);
+        history_sim_profile_log().push_back(*prof);
+    }
+};
 } // namespace
+
+const char* history_sim_lap_name(int lap)
+{
+    return (lap >= 0 && lap < lap_count) ? hs_lap_names[lap] : nullptr;
+}
+
+std::vector<history_sim_profile>& history_sim_profile_log()
+{
+    static std::vector<history_sim_profile> log;
+    return log;
+}
 
 // ---------------------------------------------------------------------------
 // BL-931 — objects with a term, and the (still empty) upkeep step
@@ -2687,6 +2747,61 @@ std::vector<trade_flow> compute_trade_flows(const trade_context&             ctx
     return flows;
 }
 
+namespace
+{
+// BL-1645 -- THE MUTUAL-DEFENCE DETERRENCE A CAMPAIGN TARGET CARRIES, the
+// strongest cohesion among the living polities bound to `realm` by a
+// mutual-defence clause, the attacker and the realm itself excluded.
+//
+// THE REFERENCE is the loop the scorer ran: every polity, asked of
+// `has_treaty_clause` in turn -- polities x objects per target, and the whole
+// cost of the exploration and Industrialisation spans' campaign scoring.
+// The fast path walks the objects ONCE and resolves each partner by index.
+// It returns the reference's answer exactly whenever polity ids are their
+// indices (every id is minted as `out.polities.size()`) and fit the clause's
+// uint16 reading; otherwise it runs the reference. A max is order-free, so
+// the walk order cannot move the answer.
+int mutual_defence_deterrence_reference_q(const history_sim_state& out, int realm, int attacker)
+{
+    int best = 0;
+    for (const polity& ally : out.polities)
+    {
+        if (!ally.alive || ally.id == realm || ally.id == attacker) continue;
+        if (!has_treaty_clause(out, realm, ally.id, treaty_clause::mutual_defence))
+            continue;
+        best = std::max(best, clampi(ally.cohesion_q, 0, 1000));
+    }
+    return best;
+}
+
+int mutual_defence_deterrence_q(const history_sim_state& out, int realm, int attacker)
+{
+    const std::size_t np = out.polities.size();
+    bool ids_are_indices = realm >= 0 && np <= 0x10000u;
+    for (std::size_t i = 0; ids_are_indices && i < np; ++i)
+        ids_are_indices = out.polities[i].id == static_cast<int>(i);
+    if (!ids_are_indices)
+        return mutual_defence_deterrence_reference_q(out, realm, attacker);
+
+    const int32_t k  = static_cast<int32_t>(static_cast<uint8_t>(treaty_clause::mutual_defence));
+    const int32_t ru = static_cast<int32_t>(static_cast<uint16_t>(realm));
+    int best = 0;
+    for (const dated_object& o : out.dated_objects)
+    {
+        if (o.kind != k) continue;
+        int32_t other;
+        if (o.a == ru)      other = o.b;
+        else if (o.b == ru) other = o.a;
+        else continue;
+        if (other < 0 || static_cast<std::size_t>(other) >= np) continue;
+        const polity& ally = out.polities[static_cast<std::size_t>(other)];
+        if (!ally.alive || ally.id == realm || ally.id == attacker) continue;
+        best = std::max(best, clampi(ally.cohesion_q, 0, 1000));
+    }
+    return best;
+}
+} // namespace
+
 history_sim_state run_history_sim(settlement_state&         ss,
                                   const creed_state*        cs,
                                   const sim_terrain_view&   terrain,
@@ -2700,6 +2815,10 @@ history_sim_state run_history_sim(settlement_state&         ss,
 {
     history_sim_profile& prof = history_sim_last_profile();
     prof = history_sim_profile{}; // this run's split, never the last one's.
+    prof.start_year = params.start_year; // BL-1645, report-only
+    prof.stop_year  = params.stop_year;
+    hs_lapper lap(prof);
+    lap.mark(lap_setup);
 
     history_sim_state out;
     if (ss.regions.empty() || params.stop_year <= params.start_year)
@@ -3374,6 +3493,8 @@ history_sim_state run_history_sim(settlement_state&         ss,
     };
 
     const auto hold_to_ground = [&](bool only_after_founding) {
+        const scoped_ns prof_hold(prof.ns_hold_to_ground); // BL-1645, report-only
+        ++prof.hold_to_ground_calls;
         if (terrain.substrate == nullptr) return;
         if (only_after_founding && ss.regions.size() == urban_ground.measured) return;
         if (!update_urban_ground(ss, urban_ground, *terrain.substrate, terrain.standable, gw, gh))
@@ -5562,6 +5683,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
 
     for (int64_t y = params.start_year; y < params.stop_year; ++y)
     {
+        lap.mark(lap_year_top); // BL-1645, report-only
         event_year = y; // BL-916: the recorder's clock, read by `note_event` alone.
         if (y == params.capture_year) capture_state(y); // BL-1036: read-only.
 
@@ -5592,6 +5714,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
         const std::size_t century =
             static_cast<std::size_t>((y - params.start_year) / 100);
 
+        lap.mark(lap_founding); // BL-1645, report-only
         // ---- The founding schedule (BL-846) ------------------------------
         //
         // COLONISATION HAPPENS HERE, INSIDE THE SPAN, and that is the whole
@@ -5754,6 +5877,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
         {
         const scoped_ns prof_demo(prof.ns_demography); // BL-825, report-only
 
+        lap.mark(lap_demo_kinds); // BL-1645, report-only
         // ---- BL-1021: THE KINDS OF GROUND EACH REALM REACHES, THIS YEAR ----
         //
         // Computed whether or not trade pays, so a zero-income control run
@@ -5994,6 +6118,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
             }
         }
 
+        lap.mark(lap_army_eats); // BL-1645, report-only
         // ---- BL-895 sink 1: THE STANDING ARMY EATS, EVERY YEAR -----------
         //
         // A SECOND PASS, deliberately. The loop above credits industry and
@@ -6064,6 +6189,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
             out.peak_year       = y;
         }
 
+        lap.mark(lap_centre_rise); // BL-1645, report-only
         // ---- BL-920: A CENTRE THAT CROSSES THE THRESHOLD RISES ------------
         //
         // CIVILISATION.md sec "A CITY STATE SPAWNS WHERE A REGION'S
@@ -6129,6 +6255,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
         step_years    = step_for_year(params, y);
         next_decision = y + step_years;
 
+        lap.mark(lap_coast); // BL-1645, report-only
         // ---- BL-1147: THE COASTAL PROVINCES HELD, per year held -----------
         // Every region whose CELL TOUCHES THE SEA (`coast_cells`, the terrain
         // -- never `port_q`, which a settled daughter inherits at 70% wherever
@@ -6154,6 +6281,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
         if (params.naval_points_accrue)
             apply_coastal_naval_ramp(out.polities, ss.regions, params, y);
 
+        lap.mark(lap_upkeep); // BL-1645, report-only
         // ---- BL-931: OBJECTS WITH A TERM, AND THE UPKEEP STEP -------------
         //
         // Both run once per decision round, ahead of grudge decay and every
@@ -6179,6 +6307,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
             ++out.mutual_defence_rounds_trace;
         }
 
+        lap.mark(lap_ind_points); // BL-1645, report-only
         // ---- BL-1041: INDUSTRY POINTS, THE SCALE ACCRUAL ------------------
         //
         // INDUSTRIALISATION.md sec Beat 1. Every region with centres is credited on
@@ -6297,6 +6426,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     }
                 }
 
+                lap.mark(lap_urban); // BL-1645, report-only
                 // ---- BL-1137: THE URBANISATION STREAM -----------------------
                 //
                 // INDUSTRIALISATION.md sec Beat 2 (SET, Ben 2026-09-25: this span
@@ -6434,6 +6564,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 out.navy_lapsed[lapsed] = 1;
             }
 
+            lap.mark(lap_roads); // BL-1645, report-only
             // ---- BL-940: THE ROAD LADDER'S THIRD RUNG, BOUGHT WITH CAPITAL.
             //
             // A polity holding EX-WY-1a (Post Roads) may promote AT MOST ONE
@@ -6488,6 +6619,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 }
             }
 
+            lap.mark(lap_rail); // BL-1645, report-only
             // ---- BL-1255: RAIL, THE SPAN'S FIRST SINK (INDUSTRIALISATION.md
             // sec Who lays rail, Ben 2026-10-13). A realm that leans into works
             // -- crossed its industrial moment -- lays AT MOST ONE link per round
@@ -6575,6 +6707,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 }
             }
 
+            lap.mark(lap_treaty); // BL-1645, report-only
             // ---- BL-933: TREATY FORMATION, "nobody negotiates" ------------
             //
             // Walk `out.contacts` in its own sorted (from, to) order, taking
@@ -6810,6 +6943,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 }
             }
 
+            lap.mark(lap_treaty_break); // BL-1645, report-only
             // ---- BL-933: BREAKING A TREATY, "legal and costly" ------------
             //
             // Re-scored every round against the SAME `treaty_value_q`
@@ -6891,6 +7025,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
             // pruning is order-preserving: the vector stays sorted.
             prune_flows_without_trade_access(out.trade_flows, out.dated_objects);
 
+            lap.mark(lap_late_backstop); // BL-1645, report-only
             // ---- BL-1288: THE LATE CULTURE'S BACKSTOP, EXPLORATION ----------
             //
             // It must be colonised by a polity of another people, through the
@@ -6981,6 +7116,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 }
             }
 
+            lap.mark(lap_subjection); // BL-1645, report-only
             // ---- BL-934: SUBJECTION -- trade provinces and subjected polities
             //
             // Snapshot the count: a polity subjected THIS round is not itself
@@ -7195,6 +7331,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 }
             }
 
+            lap.mark(lap_tribute); // BL-1645, report-only
             // ---- BL-934: TRIBUTE REMITTANCE AND REFUSED RENEWAL -----------
             //
             // Reads the SAME quantities the Empire phase's own secession
@@ -7306,6 +7443,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
             }
         }
 
+        lap.mark(lap_grudge); // BL-1645, report-only
         // ---- GRUDGE DECAY (BL-827) ---------------------------------------
         //
         // A RATE, so it is multiplied by the step exactly like tech progress,
@@ -7327,6 +7465,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
         ++prof.decision_rounds;
         for (polity& q : out.polities)
         {
+            lap.mark(lap_pol_top); // BL-1645, report-only
             // BL-1130 (review fix): an earlier polity's Settle this round cut
             // its neighbours' cells; measure before this turn reads them.
             hold_to_ground(/*only_after_founding=*/true);
@@ -7371,6 +7510,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                         ss.regions[static_cast<std::size_t>(h)].seat_region = q.capital;
             }
 
+            lap.mark(lap_assim); // BL-1645, report-only
             // ---- ASSIMILATION (BL-826) --------------------------------
             //
             // HOLDING GROUND DIGESTS IT, SLOWLY. This is the whole anti-hegemony
@@ -7394,6 +7534,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     ss.regions[static_cast<std::size_t>(hi)].culture.shift_toward(q.culture, shift_q);
             }
 
+            lap.mark(lap_civmix); // BL-1645, report-only
             // ---- CIVILISATIONS FROM MIXING (BL-869) -----------------------
             //
             // CIVILISATION.md § A civilisation is what mixing makes: "a region
@@ -7485,6 +7626,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
             const region& cap = ss.regions[static_cast<std::size_t>(q.capital)];
             const uint32_t  qs  = salt(seed, static_cast<uint32_t>(q.id));
 
+            lap.mark(lap_fall); // BL-1645, report-only
             // ---- BL-1287: THE FALL ACTS ON THE MAP (Ben, 2026-10-12) --------
             //
             // The overextended realm pays no private price: what presses its
@@ -7654,6 +7796,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 return (op * std::max(0, 1000 - rf_rise_level * clampi(params.rise_kin_step_q, 0, 1000))) / 1000;
             };
 
+            lap.mark(lap_works); // BL-1645, report-only
             // ---- What this polity's WORKS are worth it (BL-321) -----------
             //
             // One pass over `held`, producing the three aggregates the round
@@ -7681,6 +7824,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
             const int mean_reach_q       = static_cast<int>(works_reach_sum / n_held);
             const int mean_industrial_q  = static_cast<int>(works_ind_sum / n_held);
 
+            lap.mark(lap_army_reach); // BL-1645, report-only
             // ---- BL-837 — AN ARMY BEYOND SUSTAINABLE REACH CANNOT BE
             // MAINTAINED. The campaign gate below stops a polity PROJECTING
             // force past its roads; this is that rule's standing-army twin,
@@ -7747,6 +7891,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 supply_read_year.resize(static_cast<std::size_t>(q.id) + 1, INT64_MIN);
             supply_read_year[static_cast<std::size_t>(q.id)] = y;
 
+            lap.mark(lap_materials); // BL-1645, report-only
             // ---- THE MATERIALS BAND, DERIVED ONCE (BL-748) ----------------
             //
             // Keyed off MATERIALS, not military. The unit roster reads the
@@ -7864,6 +8009,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                             0, 1000));
             };
 
+            lap.mark(lap_sea_legs); // BL-1645, report-only
             // ---- BL-899: sea legs — the ration a crossing lands on ---------
             //
             // A REDUCED RATION, SCALED BY HOW SEAFARING THE STAGING REGION'S
@@ -7919,6 +8065,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 return clampi((base_ration * port_bonus_q) / 1000, 0, 2000);
             };
 
+            lap.mark(lap_water_gate); // BL-1645, report-only
             // ---- BL-778 / BL-779: the water gate on a campaign edge -------
             //
             // TWO QUESTIONS, ASKED OF ONE EDGE, and they are deliberately
@@ -8116,6 +8263,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                                          params.neighbour_radius);
             };
 
+            lap.mark(lap_candidates); // BL-1645, report-only
             // ---- Build the bounded candidate set -------------------------
             //
             // Four verbs. The set is bounded by construction: neighbours only,
@@ -8273,6 +8421,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 return c;
             };
 
+            lap.mark(lap_camp_hub); // BL-1645, report-only
             // -- Campaign --------------------------------------------------
             for (int hi : held)
             {
@@ -8287,6 +8436,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
 
                 for (int tn : neighbours[static_cast<std::size_t>(hi)])
                 {
+                    lap.mark(lap_camp_gate); // BL-1645, report-only
                     const std::size_t ti = static_cast<std::size_t>(tn);
                     const int to = owner[ti];
                     if (to == q.id || to < 0) continue;
@@ -8344,6 +8494,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
 
                     // BL-1152 / NR-965 -- THE FLEET GATE (the lambda above): a
                     // crossing the fleet rule would refuse is not a candidate.
+                    lap.mark(lap_camp_fleet); // BL-1645, report-only
                     if (!dry && fleet_rule_on)
                     {
                         ++out.fleet.read;
@@ -8377,6 +8528,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                         }
                     }
 
+                    lap.mark(lap_camp_score); // BL-1645, report-only
                     const region& tgt = ss.regions[ti];
                     const int cap_dist = region_distance(cap, tgt, gw);
 
@@ -8457,15 +8609,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     // calculation below reads for the primary combatants).
                     int ally_discount_trace = 0; // BL-1019 trace only
                     {
-                        int ally_deterrence_q = 0;
-                        for (const polity& ally : out.polities)
-                        {
-                            if (!ally.alive || ally.id == to || ally.id == q.id) continue;
-                            if (!has_treaty_clause(out, to, ally.id, treaty_clause::mutual_defence))
-                                continue;
-                            ally_deterrence_q = std::max(ally_deterrence_q,
-                                                          clampi(ally.cohesion_q, 0, 1000));
-                        }
+                        const int ally_deterrence_q = mutual_defence_deterrence_q(out, to, q.id);
                         if (ally_deterrence_q > 0)
                             value -= (value * ally_deterrence_q) / 2000; // up to -50% at full cohesion
                         ally_discount_trace = ally_deterrence_q;
@@ -8487,6 +8631,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     // BL-899 — and a crossing that cannot forage may still land
                     // on the reduced ration its people's creed earned. Same
                     // `campaign_supply`, scaled; never a bonus added on top.
+                    lap.mark(lap_camp_supply); // BL-1645, report-only
                     const int sl_ration = forages ? 0 : sea_legs_ration(hi);
                     // BL-1120: a wet hop is priced with its current, hub to
                     // target -- the same leg execute prices below. (A starved
@@ -8573,6 +8718,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     // at any map size instead of vetoing war on large ones.
                     value = (value * clampi(1000 - params.w_dist * cap_dist / 100, 200, 1000)) / 1000;
                     value -= (1000 - supply_here) * params.campaign_supply_cost_q / 1000;
+                    lap.mark(lap_camp_tail); // BL-1645, report-only
                     const int value_costed_trace = value; // BL-1019 trace: after odds, distance and supply cost
                     int cult_keep_trace = 1000;           // BL-1019 trace: the share foreignness leaves
                     // FOREIGN GROUND IS WORTH LESS, PROPORTIONALLY — not a flat
@@ -8863,6 +9009,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 }
             }
 
+            lap.mark(lap_settle); // BL-1645, report-only
             // -- Settle ----------------------------------------------------
             //
             // The growth-without-war axis. `run_settlement` founds every
@@ -8946,6 +9093,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 }
             }
 
+            lap.mark(lap_invest); // BL-1645, report-only
             // -- Invest ----------------------------------------------------
             {
                 // ONE DOMAIN, CHOSEN BY ARREARS AND BY GROUND (BL-767).
@@ -9043,6 +9191,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 }
             }
 
+            lap.mark(lap_consolidate); // BL-1645, report-only
             // -- Consolidate -----------------------------------------------
             //
             // A scored candidate, not merely the fallback. It is worth more to a
@@ -9063,6 +9212,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     best_target = -1; best_winter = false;
                 }
             }
+            lap.mark(lap_organise); // BL-1645, report-only
             // -- Organise (BL-920) ------------------------------------------
             //
             // Growth over UNORGANISED culture ground the polity's network
@@ -9122,6 +9272,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 }
             }
 
+            lap.mark(lap_build_work); // BL-1645, report-only
             // -- Build a work (BL-321) -------------------------------------
             //
             // Scored LAST, and that ordering carries a small contract: because
@@ -9176,6 +9327,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 }
             }
 
+            lap.mark(lap_upgrade_supply); // BL-1645, report-only
             // -- Upgrade supply site (BL-929) -------------------------------
             //
             // SCORED LAST, after `build_work`, for the same reason build_work
@@ -9327,6 +9479,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
 
             if (best_verb == sim_verb::none) best_verb = sim_verb::consolidate;
 
+            lap.mark(lap_execute); // BL-1645, report-only
             // ---- Execute -------------------------------------------------
             switch (best_verb)
             {
@@ -10444,6 +10597,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 break;
             }
 
+            lap.mark(lap_furnace); // BL-1645, report-only
             // ---- THE FURNACE (BL-748) ------------------------------------
             //
             // Stage 4's date used to be `run_settlement`'s, fixed before this
@@ -10508,6 +10662,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
             }
         }
 
+        lap.mark(lap_secede); // BL-1645, report-only
         // ---- BL-896/BL-923 - GROUND THE REALM CANNOT REACH SECEDES --------
         //
         // Ben's ruling, 2026-09-11: collapse is NETWORK FAILURE. Succession,
@@ -10754,6 +10909,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
             }
         }
 
+        lap.mark(lap_creed); // BL-1645, report-only
         // ---- BL-897 - A CREED THAT SPANS CULTURES -------------------------
         //
         // ../../docs/lore/CREEDS.md sec The four calls, settled (Ben,
@@ -11190,6 +11346,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
         // record is taken and before next year reads it.
         hold_to_ground(/*only_after_founding=*/true);
 
+        lap.mark(lap_record); // BL-1645, report-only
         // ---- THE RECORDED STEP (BL-817) ----------------------------------
         //
         // Reached only on a decision round — the gate above `continue`s past it
@@ -11203,6 +11360,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
             && (last_record_year == INT64_MIN || y - last_record_year >= record_interval))
             record_step(y);
 
+        lap.mark(lap_rise_fall); // BL-1645, report-only
         // ---- BL-1287: THE RISE AND FALL, READ AND PRESSED ------------------
         //
         // Off the same counts a step samples: every region a living realm
@@ -11434,6 +11592,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
             }
         }
 
+        lap.mark(lap_diffusion); // BL-1645, report-only
         // ---- BL-1288: DIFFUSION BY CONTACT, AND THE LATE CULTURE'S READ ----
         //
         // On its own read clock at the recorded steps' cadence (so a run
@@ -11643,6 +11802,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
             }
         }
 
+        lap.mark(lap_world_war); // BL-1645, report-only
         // ---- BL-1289: THE WORLD WAR (INDUSTRIALISATION.md sec A world war in ----
         // every world, sec War kills people; GENERATION_STRATEGY.md sec History
         // patterns; Ben 2026-09-15, 2026-10-10/11/12).
@@ -12193,6 +12353,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
             }
         }
 
+        lap.mark(lap_revolution); // BL-1645, report-only
         // ---- BL-1294 (revolution lean): THE PRESSURE, AND THE TAKEOVER -------
         //
         // INDUSTRIALISATION.md sec Revolution. Each decision round, every realm
@@ -12335,6 +12496,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
         out.world_war_missed = !out.world_war_why.empty();
     }
 
+    lap.mark(lap_close); // BL-1645, report-only
     // BL-1130 (review fix): the span closes on a measured record.
     hold_to_ground(/*only_after_founding=*/true);
 
@@ -12347,6 +12509,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
     // stands. A sack's points stay on the ruin (NR-901).
     rehome_stranded_at_close(ss.regions, owner, settlement_ended_by_sack, gw);
 
+    lap.mark(lap_closing_rounds); // BL-1645, report-only
     // ---- BL-1278: THE CLOSING ROUNDS (NATION_GENERATION.md sec Pass 2c, ----
     // sec The nation count is a target; Ben, 2026-10-11). The size floor is an
     // event of the span now, not a post-pass over the carve: a realm (or ground
@@ -12712,6 +12875,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
     out.years           = years;
     out.start_year      = params.start_year;
 
+    lap.mark(lap_fold); // BL-1645, report-only
     // --- The ancient road record, folded (BL-768) -------------------------
     //
     // Sort by (a, b) — a total order over two plain integers — then run-length

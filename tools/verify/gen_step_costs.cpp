@@ -54,6 +54,7 @@
 #include "harness_params.hpp"
 #include "world/era_minus_one.hpp"
 #include "world/finish_campaign_world.hpp"
+#include "world/history_sim.hpp" // BL-1645: the per-span lap split
 #include "world/hard_coded_world.hpp"
 #include "world/logistics.hpp" // invalidate_logistics_caches
 #include "world/recipe_registry.hpp"
@@ -529,6 +530,7 @@ int main(int argc, char** argv)
 
         era_minus_one_fixture fx;
         generation_report rep;
+        history_sim_profile_log().clear(); // BL-1645
         const clk::time_point t0 = clk::now();
         world w = make_hard_coded_world(params, &rep, cfg, prog.get(), &works, &fx);
         const double total_s = secs_between(t0, clk::now());
@@ -560,6 +562,20 @@ int main(int argc, char** argv)
                     longest_still, still_since_s, longest_at * 100.0f,
                     longest_label >= 0 && longest_label < generation_stage_label_count
                         ? generation_stage_labels[longest_label] : "?");
+        // BL-1645: each history span's lap split (report-only), laps over 1% of the span.
+        for (const history_sim_profile& hp : history_sim_profile_log())
+        {
+            int64_t tot = 0;
+            for (int k = 0; history_sim_lap_name(k) != nullptr; ++k) tot += hp.ns_lap[k];
+            std::printf("  [hist span] %lld->%lld: %.0f ms (decisions %.0f, battles %.0f, reach %.0f in %lld, hold %.0f in %lld, demography %.0f)\n",
+                        (long long)hp.start_year, (long long)hp.stop_year, tot / 1e6, hp.ns_decisions / 1e6,
+                        hp.ns_battles / 1e6, hp.ns_reach / 1e6, (long long)hp.reach_rebuilds,
+                        hp.ns_hold_to_ground / 1e6, (long long)hp.hold_to_ground_calls, hp.ns_demography / 1e6);
+            for (int k = 0; history_sim_lap_name(k) != nullptr; ++k)
+                if (tot > 0 && hp.ns_lap[k] * 100 >= tot)
+                    std::printf("  [hist lap]   %-16s %8.0f ms  %5.1f%%  x%lld\n", history_sim_lap_name(k),
+                                hp.ns_lap[k] / 1e6, 100.0 * hp.ns_lap[k] / tot, (long long)hp.n_lap[k]);
+        }
         std::printf("  nations %zu, corps %zu\n", w.nations.size(), w.nations.size());
         std::fflush(stdout);
         // BL-1119 D1: after the watcher has stopped, so the replays cannot read as a

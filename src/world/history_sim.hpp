@@ -5394,10 +5394,25 @@ struct history_sim_profile
     /// of `ns_decisions`). The treasury conversion is a few integer ops per
     /// polity inside the upkeep and is not split out.
     int64_t ns_industry_points = 0;
+    /// BL-1645: the LAP split. A mark at the head of each section of the year
+    /// loop closes the clock on the section before it, so every nanosecond of
+    /// the run lands in exactly one named lap (`history_sim_lap_name`).
+    /// Report-only, on the same footing as the four above.
+    static constexpr int lap_max = 64;
+    int64_t ns_lap[lap_max] = {};
+    int64_t n_lap[lap_max]  = {};
+    int64_t ns_hold_to_ground = 0; ///< `hold_to_ground`, wherever it is called.
+    int64_t hold_to_ground_calls = 0;
+    int64_t start_year = 0, stop_year = 0;
 };
 
 /// The accumulators above, for the run that just finished.
 history_sim_profile& history_sim_last_profile();
+/// BL-1645: a lap's name, or null past the last one.
+const char* history_sim_lap_name(int lap);
+/// BL-1645: every run's profile since the caller last cleared it, in run
+/// order. Report-only; a measurement harness clears it and reads it back.
+std::vector<history_sim_profile>& history_sim_profile_log();
 
 history_sim_state run_history_sim(settlement_state&         ss,
                                   const creed_state*        cs,
