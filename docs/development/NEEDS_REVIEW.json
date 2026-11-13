@@ -1839,6 +1839,27 @@
     "src/world/economy_system.cpp",
     "tools/verify/recruits_harness.cpp"
    ]
+  },
+  {
+   "raised": "2026-11-13",
+   "status": "open",
+   "resolution": null,
+   "source": "BL-1646 (search placement only) lane and cold review",
+   "id": "NR-1225",
+   "title": "Search placement-only: re-pin the shipped digests; rounds = 2 keeps 61% of the gain",
+   "kind": "decision-taken",
+   "what": "The search now walks placement alone over 2 rounds (1 seed + 2 evaluations), term 5 kept. Every row of player_seed_sweep k_shipped_digest_pins moves (D_search, D_land, D_settle, D_seat, 16 of 16): the path, the evaluation count and the winners change. Rounds = 2 was picked as the smallest count keeping >= 60% of the 6-round composite gain pooled over the 16 curated seeds (61.2%; k=1 53%, k=3 72%). world_determinism is unmoved (generation never calls the search).",
+   "why_it_matters": "The digest gate fails 16/16 until re-pinned, and the pin rule needs your go. Two rounds is a cost-for-quality trade inside the 60 s world budget.",
+   "options": [
+    "Re-pin the digests at the merged tree (after BL-1645 lands)",
+    "Hold the re-pin for the v0.6.0 re-bless",
+    "Take rounds = 3 (72% of the gain, about 3 s more on seed 0 with the fast field: 3.0-3.2 s an evaluation)"
+   ],
+   "recommendation": "Re-pin once BL-1645 (world under 60 s) lands, at one re-bless for both; keep rounds = 2.",
+   "files": [
+    "src/world/finish_campaign_world.cpp",
+    "tools/verify/player_seed_sweep.cpp"
+   ]
   }
  ]
 }
