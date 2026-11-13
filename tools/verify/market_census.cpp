@@ -129,8 +129,8 @@
 //
 // SEARCH VALIDATION (M2). The search's own invariants, as landscape_search_
 // harness states them for its R1 block, taken on THIS world's walk instead of
-// that harness's no-prehistory world, and adjusted for a budget world (which
-// skips the roster axis):
+// that harness's no-prehistory world. Live axes: placement alone on a budget
+// world, none off one (the search runs zero rounds there, BL-1646):
 //   V1 evaluations == 1 + rounds x live axes (fixed rounds, no convergence exit)
 //   V2 the path holds every proposal of every round
 //   V3 the winner never scores below the seed candidate
@@ -452,8 +452,10 @@ bool same_score(const landscape_score& a, const landscape_score& b)
         && a.mean_actual          == b.mean_actual
         && a.mean_completeness    == b.mean_completeness
         && a.mean_balance         == b.mean_balance
+        && a.mean_reach           == b.mean_reach
         && a.completeness_spread  == b.completeness_spread
         && a.balance_spread       == b.balance_spread
+        && a.reach_spread         == b.reach_spread
         && a.spread               == b.spread
         && a.market_count         == b.market_count
         && a.markets.size()       == b.markets.size();
@@ -477,7 +479,9 @@ search_validation validate_walk(const app_start_world& out, const landscape_sear
     const landscape_search_result& r = out.land.search;
     v.budget_world = out.land.stockpile_path && !out.land.stockpile.budget.empty()
                   && !r.charter_refused && !r.charter_fell_back;
-    v.live_axes   = landscape_live_axis_count;   // placement alone, on every world (BL-1646)
+    // Placement alone on a budget world; none off one, where the search runs
+    // zero rounds (BL-1646: placement moves nothing on a world that charters nothing).
+    v.live_axes   = v.budget_world ? landscape_live_axis_count : 0;
     v.rounds      = sp.rounds;
     v.evaluations = r.evaluations;
     v.path        = static_cast<int>(r.path.size());

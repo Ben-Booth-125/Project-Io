@@ -147,14 +147,16 @@ landscape_search_params campaign_search_params(std::uint32_t world_seed, int cor
     // BL-1646 (Ben, 2026-11-12; GENERATION_STRATEGY.md § "The search walks
     // placement alone, over fewer rounds"): one placement proposal per round,
     // and the count cut to what the placement curve earns inside the world
-    // budget. MEASURED 2026-11-12 (`landscape_search_harness --curve --rounds 6`
-    // over the 16 curated seeds): the share of the six-round composite gain,
-    // pooled, that k rounds keep is 56 / 65 / 76 / 78 / 91 / 100% at k = 1..6 --
-    // no knee, because a placement proposal is a redraw and each round is one
-    // more sample. THE RULE: the smallest k whose pooled share is a clear
-    // majority (>= 60%) while seed 0's walk stays well under 20 s. At ~4.5 s
-    // an evaluation on seed 0 (serial, quiet machine) that is k = 2: three
-    // evaluations, ~14 s, against 13 evaluations and ~60 s before.
+    // budget. MEASURED 2026-11-13 with all five terms scored
+    // (`landscape_search_harness --curve --rounds 6` over the 16 curated
+    // seeds): the share of the six-round composite gain, pooled, that k rounds
+    // keep is 53 / 61 / 72 / 80 / 92 / 100% at k = 1..6 -- no knee, because a
+    // placement proposal is a redraw and each round is one more sample. THE
+    // RULE: the smallest k whose pooled share is a clear majority (>= 60%),
+    // with seed 0's walk under 20 s. That is k = 2: three evaluations at
+    // ~6.2 s each on seed 0 (serial, quiet machine; term 5 is ~1.7 s of it),
+    // ~18.7 s, against 13 evaluations and ~60 s before. Inside 20 s, not WELL
+    // inside it; k = 1 (~12.4 s) keeps 53%.
     sp.rounds                  = 2;
     // BL-1136 (Ben, 2026-09-26): the threads a round's proposals are scored
     // on. With placement alone a round holds ONE proposal, so one worker runs
@@ -224,9 +226,11 @@ finish_campaign_result finish_campaign_world(world& w, generation_report& report
     // 4. PHASE 6 -- the landscape is SEARCHED, not simply generated (BL-770).
     //    Static scores over candidate landscapes -- no clock, no ticks -- and
     //    the winner applied by a deterministic argmax (GENERATION_STRATEGY.md
-    //    § The eight phases). ALL THREE AXES ARE LIVE (BL-977): every candidate
-    //    REPLACES the world-gen specialists and lays its background firms; the
-    //    winner is applied the same way. The seat is drawn AFTER this from the
+    //    § The eight phases). ONE AXIS, PLACEMENT (Ben, 2026-11-12, BL-1646):
+    //    every candidate REPLACES the world-gen specialists and charters its
+    //    web from the budget, staked from its placement seed; the winner is
+    //    applied the same way. A world with no budget runs no rounds (it
+    //    charters nothing, so placement cannot move it). The seat is drawn AFTER this from the
     //    surviving specialists, so replacing the roster here orphans nothing.
     //
     //    THE CHARTER BUDGET (BL-1042): the world's own industry-point

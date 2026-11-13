@@ -18,10 +18,18 @@
 // road tier — and two retired: a charter budget sets the roster on every
 // shipped world, so that axis had nothing to choose, and the road tier rarely
 // won a round while costing a third of each. A candidate's `corporation_count`
-// and `road_tier` stay at the seed candidate's values for the whole walk.
-// Because roads no longer vary between candidates, the objective's fifth term
-// (reach quality) read the same for every candidate and is no longer scored
-// (landscape_score.hpp).
+// and `road_tier` stay at the seed candidate's values for the whole walk. The
+// objective is unchanged, all five terms: the fifth (reach quality) still
+// separates placement-only candidates, because the ports and inland hubs a
+// candidate's charter web lays from its placement seed are supply anchors that
+// reach cost runs to (landscape_score.hpp).
+//
+// A WORLD WITH NO CHARTER BUDGET RUNS ZERO ROUNDS. No budget, a refused spend
+// and a budget that opens no specialist are all laid by the no-budget branch,
+// which charters nothing and reads no placement seed (BL-1404), so every
+// proposal would score exactly as the seed candidate and could never be taken.
+// The search scores the seed candidate alone there: the same winner, score and
+// world the full walk would return, without the evaluations that cannot move it.
 //
 // THE DRAW TAGS DID NOT MOVE. `landscape_axis` keeps its three slots and
 // `landscape_axis_count` its value of 3, because the perturbation stream is
@@ -179,15 +187,15 @@ struct landscape_search_params
     /// on a world the span did not run on — the pre-budget search.
     ///
     /// Null or EMPTY (an all-zero budget is the same state — charter_budget
-    /// drops entries <= 0) is the no-budget search: the same placement walk,
-    /// every candidate laid by the no-budget branch, which charters nothing
-    /// (BL-1404).
+    /// drops entries <= 0) is the no-budget search: the seed candidate alone,
+    /// laid by the no-budget branch, which charters nothing and reads no
+    /// placement seed (BL-1404) — so no round is run (see the header).
     ///
     /// NON-EMPTY makes this a BUDGET WORLD: each candidate's corporations are
     /// chartered from the budget (`apply_landscape_candidate`'s budget
     /// overload), so the budget decides the roster (GENERATION_STRATEGY.md
     /// phase 6 point 3) and the placement seed decides where it is staked.
-    /// The walk is the same on either kind of world. A non-empty budget whose spend params
+    /// Only a budget world walks. A non-empty budget whose spend params
     /// are refused (`charter_spend_refusal`) is NOT a budget world: the refusal
     /// is checked before anything else, the search runs exactly as with no
     /// budget, prints REFUSED with the reason, and sets

@@ -150,6 +150,7 @@ int compare_landscape(const landscape_score& a, const landscape_score& b)
     c = cmp_double(a.mean_actual, b.mean_actual);           if (c) return c;
     c = cmp_double(a.mean_completeness, b.mean_completeness); if (c) return c;
     c = cmp_double(a.spread, b.spread);                     if (c) return c;
+    c = cmp_double(a.reach_spread, b.reach_spread);         if (c) return c;
     c = cmp_double(a.mean_balance, b.mean_balance);         if (c) return c;
     // Market count last: a landscape scoring identically over more markets is
     // the better-founded reading of the same number.
@@ -368,7 +369,7 @@ landscape_search_result search_landscape(const world& base, const recipe_registr
     // whose spend params are refused (a price <= 0 — the prices have no shipped
     // default) is NOT a budget world: the search below runs on a copy of the
     // params with the budget removed, which is exactly the no-budget search
-    // (the same placement walk, every score real), and the result says it was refused.
+    // (the seed candidate alone, its score real), and the result says it was refused.
     // `p` is that copy on a refusal and `p_in` itself otherwise.
     // BL-1060: then the refusal only the world can decide, on the base world
     // every candidate is applied to (`charter_spend_world_refusal`).
@@ -411,8 +412,8 @@ landscape_search_result search_landscape(const world& base, const recipe_registr
     const landscape_search_params& p = (refusal != nullptr || fell_back) ? refused_params : p_in;
 
     // BL-1032. On a BUDGET WORLD the budget decides the roster; a null, empty
-    // or refused budget is not a budget world. The walk is the same placement
-    // walk on both (2026-11-12): only what an evaluation charters differs.
+    // or refused budget is not a budget world, and only a budget world walks
+    // (below: placement moves nothing on a world that charters nothing).
     const bool budget_world = bw.budget_world();
     if (budget_world && p.print_rounds)
         std::printf("[landscape_search] charter budget: %zu centres, %lld points; the budget "
@@ -420,10 +421,22 @@ landscape_search_result search_landscape(const world& base, const recipe_registr
                     p.budget->points().size(),
                     static_cast<long long>(p.budget->total()));
 
+    // NO BUDGET, NO WALK (BL-1646 review). Off a budget world every candidate
+    // is laid by `lay_unchartered_world`, which charters nothing and never
+    // reads `placement_seed`, so a placement proposal scores bit-identically to
+    // the incumbent and the strict-improvement rule can never take it. The walk
+    // would be `p.rounds` wasted evaluations returning the seed candidate; it is
+    // skipped, and the result is exactly what those rounds would have returned
+    // (winner = seed candidate) minus the path steps that never moved.
+    const int rounds = budget_world ? std::max(0, p.rounds) : 0;
+    if (!budget_world && p.rounds > 0 && p.print_rounds)
+        std::printf("[landscape_search] no charter budget: the seed candidate alone (placement "
+                    "moves nothing on a world that charters nothing)\n");
+
     // BL-1085: the inner bar -- evaluations done over evaluations planned (the
     // seed, then one placement proposal per round). A write-only tap;
     // `out.evaluations` is the count the walk keeps anyway.
-    const int planned_evaluations = 1 + std::max(0, p.rounds) * landscape_live_axis_count;
+    const int planned_evaluations = 1 + rounds * landscape_live_axis_count;
     const auto report_progress = [&](int done) {
         if (p.progress != nullptr)
             p.progress->report_sub(done, planned_evaluations);
@@ -456,7 +469,6 @@ landscape_search_result search_landscape(const world& base, const recipe_registr
     }
 
     const int threads = std::max(1, p.thread_count);
-    const int rounds  = std::max(0, p.rounds);
 
     for (int r = 0; r < rounds; ++r)
     {

@@ -236,39 +236,60 @@ landscape_score score_landscape(world& w, const recipe_registry& reg,
         }
     }
 
-    // --- NO TERM 5 (Ben, 2026-11-12) ----------------------------------------
-    // Reach quality — the per-market mean reach cost whose spread once joined
-    // term 3 — is no longer scored. It existed to see the ROAD TIER axis, and
-    // the search no longer varies roads (landscape_search.hpp), so it read the
-    // same for every candidate the search compares. `measure_market_reach`
-    // stays in market_saturation for the instruments that read reach directly.
+    // --- term 5: reach quality, per market (BL-977) --------------------------
+    //
+    // Terms 1, 2 and 4 read reach only as "inside the budget or not", and that
+    // boolean saturates (NR-793). This reads the cost itself, per market, and
+    // hands ONLY ITS SPREAD to term 3 below — the level is recorded and
+    // deliberately never scored. It was added for the road-tier axis, which is
+    // retired (2026-11-12); it stays because PLACEMENT moves it too: the cost
+    // runs to the nearest supply anchor, and the ports and inland hubs a
+    // candidate's charter web lays from its placement seed are anchors.
+    // Why the cost and not the in-reach count: market_score::reach.
+    {
+        const std::vector<market_reach> reach = measure_market_reach(w, reg);
+        for (const market_reach& r : reach)
+        {
+            const auto it = slot.find(r.market);
+            if (it == slot.end())
+                continue;
+            out.markets[it->second].reach = r.mean_cost;
+        }
+    }
 
     // --- the levels, and term 3's spreads -----------------------------------
-    std::vector<double> comps, bals, acts;
+    std::vector<double> comps, bals, acts, reaches;
     comps.reserve(out.markets.size());
     bals.reserve(out.markets.size());
     acts.reserve(out.markets.size());
+    reaches.reserve(out.markets.size());
     for (const market_score& m : out.markets)
     {
         comps.push_back(m.completeness);
         bals.push_back(m.balance);
         acts.push_back(m.actual);
+        reaches.push_back(m.reach);
     }
     out.market_count = static_cast<int>(out.markets.size());
     if (!comps.empty())
     {
-        double cs = 0.0, bs = 0.0, as_ = 0.0;
+        double cs = 0.0, bs = 0.0, as_ = 0.0, rs = 0.0;
         for (std::size_t i = 0; i < comps.size(); ++i)
-        { cs += comps[i]; bs += bals[i]; as_ += acts[i]; }
+        { cs += comps[i]; bs += bals[i]; as_ += acts[i]; rs += reaches[i]; }
         out.mean_completeness = cs / static_cast<double>(comps.size());
         out.mean_balance      = bs / static_cast<double>(bals.size());
         out.mean_actual       = as_ / static_cast<double>(acts.size());
+        out.mean_reach        = rs / static_cast<double>(reaches.size());
     }
     out.completeness_spread = coeff_of_variation(comps);
     out.balance_spread      = coeff_of_variation(bals);
-    // Two spreads, equal weight: terms 1 and 2 (the reach spread that was a
-    // third retired with term 5, 2026-11-12).
-    out.spread = (out.completeness_spread + out.balance_spread) / 2.0;
+    out.reach_spread        = coeff_of_variation(reaches);
+    // Three spreads, equal weight. Reach joins as a THIRD SPREAD and nothing
+    // else: a well-served core beside an expensive frontier scores above a map
+    // that is uniformly cheap to cross at the same mean, which is the reading
+    // GENERATION_STRATEGY.md's fifth term demands and the one a flat bonus
+    // would invert.
+    out.spread = (out.completeness_spread + out.balance_spread + out.reach_spread) / 3.0;
 
     // VIABILITY x UNEVENNESS, and the shape matters. Unevenness is a MULTIPLIER
     // on viability, never an addend: a landscape where nothing works is not

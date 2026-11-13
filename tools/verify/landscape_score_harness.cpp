@@ -15,11 +15,13 @@
 // the same five candidates now spread 3.2e-01 on the composite. The harness did
 // not change its question between the two; only the answer moved.
 //
-// BL-977 ASKED THE SAME QUESTION OF THE ROAD AXIS and answered it with a fifth
-// term, reach quality; a Section C here scored candidates differing only in
-// road tier against it. Both retired together (Ben, 2026-11-12, BL-1646): the
-// search no longer varies roads, so the term is not scored and Section C (R5.1,
-// R5.2) is removed with it. Section A lays each roster through
+// BL-977 ASKED THE SAME QUESTION OF THE ROAD AXIS. NR-793 measured three road
+// tiers scoring bit-identically on every term, because every term read reach as
+// a coverage boolean that had saturated; the fifth term, reach quality, was the
+// answer, and the mean reach cost was chosen over the in-reach count here by
+// measurement (2026-09-15). The road-tier axis is retired (Ben, 2026-11-12), so
+// Section C now asks the question the search needs answered: does term 5 see
+// PLACEMENT, the one axis left? Section A now lays each roster through
 // `apply_landscape_candidate`, the live seam's own path, so it also proves the
 // world-gen roster is REPLACED rather than appended to.
 //
@@ -44,12 +46,14 @@
 #include "world/corporation_generation.hpp"
 #include "world/hard_coded_world.hpp"
 #include "world/landscape_score.hpp"
+#include "world/logistics.hpp"        // is_supply_anchor (Section C's fixture control)
 #include "world/landscape_search.hpp" // apply_landscape_candidate — the live seam's path
 #include "world/market_saturation.hpp"
 #include "world/recipe_registry.hpp"
 #include "world/world.hpp"
 #include "world/world_gen_config.hpp"
 
+#include <algorithm>
 #include <cstdio>
 #include <string>
 #include <vector>
@@ -101,9 +105,9 @@ void print_row(const candidate& c)
 {
     const landscape_score& s = c.score;
     std::printf("  %-26s  potential=%.5f  ACTUAL=%.5f  realised=%.3f  balance=%.5f  "
-                "spread=%.5f  composite=%.6f  (%d mkts, %d corps/%d spec, %d bldgs)\n",
+                "reach=%.4f  spread=%.5f  composite=%.6f  (%d mkts, %d corps/%d spec, %d bldgs)\n",
                 c.label.c_str(), s.mean_completeness, s.mean_actual, s.realisation,
-                s.mean_balance, s.spread, s.composite, s.market_count,
+                s.mean_balance, s.mean_reach, s.spread, s.composite, s.market_count,
                 c.corps, c.specialists, c.buildings);
 }
 
@@ -147,6 +151,8 @@ void report_discrimination(const char* what, const std::vector<candidate>& cs)
         { "ACTUAL completeness", &landscape_score::mean_actual },
         { "realisation", &landscape_score::realisation },
         { "supply:demand balance", &landscape_score::mean_balance },
+        { "reach level (unscored)", &landscape_score::mean_reach },
+        { "reach spread (term 5)", &landscape_score::reach_spread },
         { "spread (unevenness)", &landscape_score::spread },
         { "composite", &landscape_score::composite },
     };
@@ -284,8 +290,60 @@ int main()
     }
     report_discrimination("DIFFERENT WORLDS (the control)", worlds);
 
-    // C (the road axis against term 5, R5.1 and R5.2) is REMOVED: both the
-    // road-tier axis and the reach term it measured retired (Ben, 2026-11-12).
+    // ------------------------------------------------------------------
+    // C. TERM 5 UNDER PLACEMENT (BL-1646 review). The road-tier axis this
+    //    section once scored is retired (Ben, 2026-11-12), and with it the
+    //    old R5.1/R5.2 (three tiers pairwise different, reach falling with the
+    //    tier). What the search now asks of term 5 is different: does it see
+    //    PLACEMENT? It should — reach cost runs to the nearest supply anchor,
+    //    and a candidate's charter web lays ports and inland hubs (anchors)
+    //    from its placement seed. So candidates differing ONLY in placement,
+    //    each chartered from the harness's SYNTHETIC budget exactly as the
+    //    search's budget branch lays them, must not all read the same reach.
+    //    If they did, term 5 would be a constant over every candidate the
+    //    search compares, and scoring it would be dead weight.
+    // ------------------------------------------------------------------
+    std::printf("\nC. PLACEMENT on one budget world, roster and tier held - does term 5 see it?\n");
+    {
+        const charter_budget       synth = synthetic_charter_budget(base, wp.seed, 60, 1.0);
+        const charter_spend_params spend = synthetic_charter_spend();
+        std::vector<candidate> places;
+        int anchors_lo = 1 << 30, anchors_hi = -1;
+        for (const std::uint32_t s : { 0xC0FFEEu, 0x1111u, 0x2222u, 0x3333u })
+        {
+            world w = base;
+            charter_spend_report rep;
+            apply_landscape_candidate(w, reg, landscape_candidate{ 8, s, 1 },
+                                      /*regenerate_specialists=*/true, &synth, spend, &rep);
+            char lbl[48];
+            std::snprintf(lbl, sizeof lbl, "budget placement=%08X", s);
+            candidate c{ lbl, score_landscape(w, reg) };
+            note_fixture(c, w);
+            int anchors = 0;   // the fixture control: what placement could move reach through
+            for (const auto& kv : w.tiles)
+                if (is_supply_anchor(w, kv.first))
+                    ++anchors;
+            anchors_lo = std::min(anchors_lo, anchors);
+            anchors_hi = std::max(anchors_hi, anchors);
+            places.push_back(c);
+            std::printf("    %-26s  reach level=%.6f  reach spread=%.6f  spread=%.6f  "
+                        "composite=%.9f  anchors=%d  (%d bldgs)\n",
+                        c.label.c_str(), c.score.mean_reach, c.score.reach_spread,
+                        c.score.spread, c.score.composite, anchors, c.buildings);
+        }
+        std::printf("    supply anchors %d..%d; reach level relative range %.3e, reach spread %.3e\n",
+                    anchors_lo, anchors_hi,
+                    relative_range(places, &landscape_score::mean_reach),
+                    relative_range(places, &landscape_score::reach_spread));
+        bool any_differs = false;
+        for (const candidate& c : places)
+            if (c.score.mean_reach != places[0].score.mean_reach
+                || c.score.reach_spread != places[0].score.reach_spread)
+                any_differs = true;
+        check(any_differs, "R5.1",
+              "candidates differing ONLY in placement read DIFFERENT reach - term 5 is not a "
+              "constant over the placement-only candidates the search compares");
+    }
 
     // ------------------------------------------------------------------
     // R3 — purity and determinism. Asserted from the first slice, because it
@@ -303,6 +361,7 @@ int main()
         const bool same = a.composite == b.composite && b.composite == c.composite
                        && a.mean_completeness == b.mean_completeness
                        && a.mean_balance == b.mean_balance
+                       && a.reach_spread == b.reach_spread
                        && a.spread == b.spread;
         check(same, "R3.1", "scoring the same world three times is bit-identical");
         check(a.market_count > 0, "R3.2", "the scorer found markets to score at all");

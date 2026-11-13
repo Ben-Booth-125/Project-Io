@@ -19,7 +19,8 @@
 // with no budget every candidate charters nothing (BL-1404), so placement moves
 // nothing there and R1.4 could not be met by any search. The retired roster and
 // road-tier axes took their assertions with them (R5, the per-axis
-// discrimination block, is removed: it measured the road-tier axis).
+// discrimination block, is removed: it measured the road-tier axis). R7 keeps
+// the no-budget path R2 used to cover: there the search runs zero rounds.
 //
 // Build:  bash tools/verify/build_lua_harness.sh landscape_search_harness
 //
@@ -334,7 +335,7 @@ std::vector<std::uint32_t> parse_seed_list(const std::string& s)
 
 /// market_census's V5 comparison: every scored term bit-identical, and the
 /// per-market record the same length. Wider than the R-block's `same_score`,
-/// which reads the summary terms only.
+/// which predates the reach term.
 bool same_full_score(const landscape_score& a, const landscape_score& b)
 {
     return a.composite           == b.composite
@@ -342,8 +343,10 @@ bool same_full_score(const landscape_score& a, const landscape_score& b)
         && a.mean_actual         == b.mean_actual
         && a.mean_completeness   == b.mean_completeness
         && a.mean_balance        == b.mean_balance
+        && a.mean_reach          == b.mean_reach
         && a.completeness_spread == b.completeness_spread
         && a.balance_spread      == b.balance_spread
+        && a.reach_spread        == b.reach_spread
         && a.spread              == b.spread
         && a.market_count        == b.market_count
         && a.markets.size()      == b.markets.size();
@@ -549,7 +552,9 @@ seed_curve run_seed(lua_state& lua, std::uint32_t seed, int rounds, int check_k,
     sc.refused      = walk.charter_refused;
     sc.fell_back    = walk.charter_fell_back;
     sc.budget_world = !sb.budget.empty() && !walk.charter_refused && !walk.charter_fell_back;
-    sc.live_axes    = landscape_live_axis_count;   // placement alone, on every world (BL-1646)
+    // Placement alone on a budget world; NONE off one, where the search runs
+    // zero rounds (placement moves nothing on a world that charters nothing).
+    sc.live_axes    = sc.budget_world ? landscape_live_axis_count : 0;
     sc.markets      = walk.seed_score.market_count;
     sc.ms_eval_walk  = ms_walk / std::max(1, walk.evaluations);
     sc.cpu_eval_walk = cpu_walk / std::max(1, walk.evaluations);
@@ -1219,6 +1224,56 @@ int main(int argc, char** argv)
                       && r.evaluations == b1.evaluations,
                   id, std::string("on a budget world, ") + std::to_string(threads)
                           + " threads give the serial walk's winner, scores and whole path");
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // R7 — THE NO-BUDGET WORLD (BL-1646 review). Off a budget world every
+    //      candidate charters nothing and reads no placement seed, so the
+    //      search runs ZERO rounds: the seed candidate alone. Asserted: the
+    //      result IS the seed candidate (one evaluation, no path, nothing
+    //      accepted) at the R-block's round count, and it is the same at 1, 2
+    //      and 4 threads. R7.2 is the reason the rounds could be dropped: a
+    //      proposal laid on this world scores bit-identically to the seed.
+    // ------------------------------------------------------------------
+    std::printf("\nR7. the NO-BUDGET world: the seed candidate alone\n");
+    {
+        landscape_search_params np = sp;
+        np.budget       = nullptr;
+        np.print_rounds = true;
+        np.thread_count = 1;
+        const landscape_search_result n1 = search_landscape(base, reg, np);
+        print_result("no budget", n1, 0.0);
+        check(n1.evaluations == 1 && n1.path.empty() && n1.accepted == 0
+                  && same_candidate(n1.winner, np.start)
+                  && same_score(n1.winner_score, n1.seed_score),
+              "R7.1", "with no charter budget the search returns the SEED CANDIDATE after one "
+                      "evaluation, at a round count of " + std::to_string(np.rounds));
+        {
+            // A real placement proposal, laid and scored as an evaluation would be.
+            landscape_candidate moved = np.start;
+            moved.placement_seed ^= 0x5A5A5A5Au;
+            world w = base;
+            apply_landscape_candidate(w, reg, moved, /*regenerate_specialists=*/true,
+                                      nullptr, spend, nullptr);
+            const landscape_score s = score_landscape(w, reg, np.score);
+            check(curve::same_full_score(s, n1.seed_score), "R7.2",
+                  "on the no-budget world a different placement scores BIT-IDENTICALLY to the "
+                  "seed - the skipped rounds could never have moved the walk");
+        }
+        for (const int threads : { 2, 4 })
+        {
+            landscape_search_params tp = np;
+            tp.thread_count = threads;
+            tp.print_rounds = false;
+            const landscape_search_result r = search_landscape(base, reg, tp);
+            char id[16];
+            std::snprintf(id, sizeof id, "R7.t%d", threads);
+            check(same_candidate(r.winner, n1.winner)
+                      && curve::same_full_score(r.winner_score, n1.winner_score)
+                      && r.evaluations == n1.evaluations && r.path.empty(),
+                  id, std::string("the no-budget search at ") + std::to_string(threads)
+                          + " threads is the serial one");
         }
     }
 

@@ -479,13 +479,16 @@ void hash_score(fnv1a64& f, const landscape_score& s)
         f.scalar(m.starved);
         f.scalar(m.rated);
         f.scalar(m.balance);
+        f.scalar(m.reach);
     }
     f.scalar(s.mean_completeness);
     f.scalar(s.mean_actual);
     f.scalar(s.mean_balance);
+    f.scalar(s.mean_reach);
     f.scalar(s.realisation);
     f.scalar(s.completeness_spread);
     f.scalar(s.balance_spread);
+    f.scalar(s.reach_spread);
     f.scalar(s.spread);
     f.scalar(s.composite);
     f.scalar(s.market_count);
@@ -1543,7 +1546,7 @@ void print_charter_report(const world& w, charter_mode mode, const charter_budge
     std::printf("      search: %s%s%s (%d evaluations, %zu path steps)\n",
                 search.charter_refused     ? "REFUSED — "
                 : search.charter_fell_back ? "NO SPECIALIST affordable (NR-910)"
-                                           : "budget world, roster axis skipped",
+                                           : "budget world, placement walk",
                 search.charter_refused ? search.charter_refusal.c_str() : "",
                 (search.charter_refused || search.charter_fell_back) ? "; the no-budget search ran" : "",
                 search.evaluations, search.path.size());
