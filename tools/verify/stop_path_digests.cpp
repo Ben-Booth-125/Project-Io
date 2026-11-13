@@ -16,17 +16,26 @@
 // the report fields a stopped build publishes — the four span records, the settlement the
 // body entry carries, and every per-span counter.
 //
-// Run:  stop_path_digests [seed ...]        (default seeds: 0 28 46)
+// Run:  stop_path_digests [--shipped] [seed ...]        (default seeds: 0 28 46)
 // Use:  build and run at the base commit and at HEAD; `diff` the two outputs.
+//
+// --shipped (BL-1645): build on the SHIPPED inputs -- the config scripts/world_gen.lua
+// sets and the works table scripts/works.lua loads, as the app and gen_step_costs build
+// -- rather than the default config and no works table. They are different worlds: the
+// history spans' Industry beats read the works table, so a change exact on the default
+// path proves nothing about the shipped one. Run from the repo root.
 
+#include "harness_params.hpp" // lua_state (--shipped)
 #include "world/hard_coded_world.hpp"
 #include "world/era_minus_one.hpp"
 #include "world/world_gen_config.hpp"
+#include "world/works_roster.hpp"
 #include "world_deep_digest.hpp"
 
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
+#include <string>
 #include <vector>
 
 namespace
@@ -89,14 +98,14 @@ uint64_t report_digest(const generation_report& r)
 
 struct stop_point { const char* name; world_gen_config cfg; };
 
-std::vector<stop_point> stop_points()
+std::vector<stop_point> stop_points(const world_gen_config& base)
 {
     std::vector<stop_point> v;
-    v.push_back({"migration", {}});         v.back().cfg.stop_after_migration = true;
-    v.push_back({"ancient_era", {}});       v.back().cfg.stop_after_ancient_era = true;
-    v.push_back({"exploration", {}});       v.back().cfg.stop_after_exploration = true;
-    v.push_back({"industrialisation", {}}); v.back().cfg.stop_after_industrialisation = true;
-    v.push_back({"full", {}});
+    v.push_back({"migration", base});         v.back().cfg.stop_after_migration = true;
+    v.push_back({"ancient_era", base});       v.back().cfg.stop_after_ancient_era = true;
+    v.push_back({"exploration", base});       v.back().cfg.stop_after_exploration = true;
+    v.push_back({"industrialisation", base}); v.back().cfg.stop_after_industrialisation = true;
+    v.push_back({"full", base});
     return v;
 }
 
@@ -105,19 +114,35 @@ std::vector<stop_point> stop_points()
 int main(int argc, char** argv)
 {
     std::vector<uint32_t> seeds;
+    bool shipped = false;
     for (int i = 1; i < argc; ++i)
+    {
+        if (std::string(argv[i]) == "--shipped") { shipped = true; continue; }
         seeds.push_back(static_cast<uint32_t>(std::strtoul(argv[i], nullptr, 10)));
+    }
     if (seeds.empty()) seeds = {0u, 28u, 46u};
+
+    world_gen_config base{};
+    works_registry   works;
+    if (shipped)
+    {
+        lua_state lua;
+        lua.load("scripts/world_gen.lua");
+        base.load_from_lua(lua);
+        lua.load("scripts/works.lua");
+        works.load_from_lua(lua);
+    }
 
     for (const uint32_t seed : seeds)
     {
-        for (const stop_point& sp : stop_points())
+        for (const stop_point& sp : stop_points(base))
         {
             world_params p{};
             p.seed = seed;
             generation_report     rep{};
             era_minus_one_fixture fx;
-            const world w = make_hard_coded_world(p, &rep, sp.cfg, nullptr, nullptr, &fx);
+            const world w = make_hard_coded_world(p, &rep, sp.cfg, nullptr,
+                                                  shipped ? &works : nullptr, &fx);
             std::printf("seed %u  stop %-17s  world %016llX  report %016llX  tiles %zu  bodies %zu\n",
                         seed, sp.name,
                         static_cast<unsigned long long>(deep_digest(w, fx)),
