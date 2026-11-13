@@ -735,10 +735,10 @@ loss-making. The cheap proxy is a per-resource supply-to-demand **ratio** per ma
 static, and it is what drives a price to the ceiling in the first place. The validation run is what
 confirms the proxy was good enough.
 
-**What the objective is made of (Ben, 2026-09-06; the fifth term, Ben, 2026-09-08; term 5 unscored,
-Ben, 2026-11-12).** **Five terms, four scored:** term 5 reads a road tier, and since candidates no
-longer differ in road tier it reads the same for every candidate and is not scored (§ How a
-candidate is PRODUCED). The record of why it existed stands below. The third is what makes it an *asymmetry* objective rather than a coverage one, and the
+**What the objective is made of (Ben, 2026-09-06; the fifth term, Ben, 2026-09-08).** **Five
+terms.** Term 5 stays scored under the placement-only search: a placement lays its own ports,
+hubs and site roads, so the reach a market's catchment is crossed at still differs between
+candidates. The third is what makes it an *asymmetry* objective rather than a coverage one, and the
 fourth and fifth are the ones that can see a candidate at all:
 
 1. **Chain completeness** — terminals closed over terminals total, per market. Does a chain reach a
@@ -833,10 +833,11 @@ makes the search a pure function of (world, seed, round count) with a cost known
 list above and the six rounds below).** The roster axis already has nothing to choose where a
 charter budget sets the roster, and the road-tier axis rarely wins a round while costing a third of
 each one. So a candidate differs from the incumbent by its **placement** only, and the round count
-is cut to what the placement curve earns within the world budget (§ The world budget). Because
-roads no longer vary between candidates, term 5 (reach quality) reads the same for every candidate
-and is not scored; terms 1–4 and the spread of 1 and 2 remain. The determinism clauses below are
-unchanged.
+is cut to what the placement curve earns within the world budget (§ The world budget). All five
+terms stay scored: the generation road tier no longer varies, but each placement lays its own
+ports, hubs and site roads, so reach still differs between candidates. A world with no charter
+budget places nothing a placement can move, so its search is the seed candidate alone. The
+determinism clauses below are unchanged.
 
 **The round count is kept at six, and a round's proposals are scored in parallel (Ben,
 2026-09-26; BL-1136; its count superseded 2026-11-12, above).** The measured curve had no knee — every count below six gave up real gain —
