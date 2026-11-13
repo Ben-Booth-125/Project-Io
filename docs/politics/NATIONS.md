@@ -257,7 +257,7 @@ indexed by them):
 | `logistics_maintenance` | keeping the road/hub network standing (LOGISTICS.md) |
 | `schooling` | population capability |
 | `military_research` | force-side research; a force's wages are a flat bill and no line's share (MILITARY.md § What a force costs) |
-| `academic_research` | nothing: research is free and no credit buys RP (Ben, 2026-11-13; `../economy/RESEARCH.md` § Research points). The line keeps its slot in the enum, carries no weight and spends nothing |
+| `academic_research` | nothing: research is free and no credit buys RP (Ben, 2026-11-13; `../economy/RESEARCH.md` § Research points). The line keeps its slot and its weight, which reads only as the nation's appetite for research buildings; it spends nothing |
 | `public_exploration` | state-funded survey — DISCOVERY.md's geographic fog |
 | `contracted_force` | buying force the nation does not raise — BL-572 (contract offers) derives an offer from this line's spendable share; the contract form itself carries no sell side to buy through (CONTRACTS.md § Explicitly out of scope) |
 | `strategic_reserve` | buying goods to **hold**, off a market's shelf. Distinct from `reserve_fraction`, which withholds credits; this line spends them |

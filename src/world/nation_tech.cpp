@@ -1337,7 +1337,9 @@ research_buildings count_research_buildings(const world& w)
             // so `workforce_assigned` is the staffing the building was given:
             // construction staffs both at 0.5 (construction_initial_workforce;
             // Ben, 2026-10-10), so a completed one counts unless unstaffed.
-            if (b.ticks_remaining > 0 || b.decommissioned || !(b.workforce_assigned > 0.0f))
+            // BL-1650 (RESEARCH.md § Research points): a building adds its share only
+            // while it runs, so an idled one (state_idle) counts nothing either.
+            if (b.ticks_remaining > 0 || b.decommissioned || b.state_idle || !(b.workforce_assigned > 0.0f))
                 continue;
             // MILITARY.md § Occupation: an occupied tile's output is denied to its owner.
             if (w.tile_occupied(b.tile))
@@ -1437,7 +1439,12 @@ research_accrual compute_accrual(const world& w, entity_id nid, const research_b
     // the queue owes) — the garrison's min(share, bill) — as a direct
     // expenditure, credited to nobody. An empty queue owes nothing and
     // spends nothing.
-    if (treasury > 0.0f)
+    // BL-1650 (Ben, 2026-11-13: research is free): a line that converts no credit
+    // to RP has no share and spends nothing - without this guard its bill reads as
+    // infinite and it would pay its whole share for no RP. The academic weight stays
+    // on the budget as the nation's research appetite (line_emphasis), unspent.
+    const bool line_converts = p.rp_per_research_credit > 0.0f || p.rp_per_research_credit_sqrt > 0.0f;
+    if (line_converts && treasury > 0.0f)
     {
         const auto bit = w.nation_budgets.find(nid);
         if (bit != w.nation_budgets.end())

@@ -43,7 +43,8 @@ building is what it costs (Ben, 2026-11-13).** Three sources, and no credit buys
 | **Research institutes** | Each research institute the nation runs adds **5% of the base**, 5 RP a month |
 | **Universities** | Each University the nation runs adds **10% of the base**, 10 RP a month. A University may stand only in a City (4)+ centre (`POPULATION.md` § Strata gate buildings), and it also raises the nation's qualification fraction |
 
-A building adds its share only while it runs: staffed, not idled, its maintenance and wages paid.
+A building adds its share only while it runs: staffed and not idled, paying its maintenance and wages as
+any building does.
 **That upkeep is the price of research.** A building's share is small against its running bill, so
 research stays expensive at the margin while the base keeps every nation on the tree.
 

@@ -1490,16 +1490,21 @@ economy = {
     -- BL-1642 (Ben, 2026-11-11): the tick is a month, so every RP rate is a third of its
     -- per-quarter figure (sqrt term: 10 / sqrt(3), because the spend it reads is a third
     -- too) and the RP unit triples - research costs three times the 2026-10-10 price.
+    -- BL-1650 (Ben, 2026-11-13; RESEARCH.md § Research points): RESEARCH IS FREE. Every
+    -- nation earns a 100 RP base a month; a running institute adds 5% of it and a
+    -- University 10%; no credit buys RP (both line terms 0, so the line spends nothing)
+    -- and the economy source is retired (rp_per_economy_unit 0). The comments below
+    -- record the superseded dials.
     research = {
-        base_rp_per_nation          = 40.0, -- a month (a quarter 120)
+        base_rp_per_nation          = 100.0, -- a month (Ben, 2026-11-13; was 40)
         rp_per_research_credit      = 0.0,
         -- BL-1305 (sprint 53): 20 -> 10. Real treasuries (BL-1298) made the
         -- concave term outrun the band (median 14 quarters, p10 7); re-fit in band
         -- (nation_tech_harness R0, 16 seeds, 32 q): sqrt 20: p10 7 p50 14 p90 25 |
         -- 12: 11/18/27 | 10: 12/20/28 | 8: 14/22/28. Base 120 kept (Ben's).
-        rp_per_research_credit_sqrt = 5.7735027, -- a month: 10 / sqrt(3) (a quarter 10)
-        rp_per_university           = 33.333333, -- a month (a quarter 100); unmeasured: no University stands on any curated seed
-        rp_per_institute            = 16.666667, -- a month (a quarter 50); unmeasured: likewise
+        rp_per_research_credit_sqrt = 0.0, -- retired (Ben, 2026-11-13; was 10 / sqrt(3) a month)
+        rp_per_university           = 10.0, -- 10% of the base a month (Ben, 2026-11-13)
+        rp_per_institute            = 5.0,  -- 5% of the base a month (Ben, 2026-11-13)
         rp_per_cost_unit            = 600.0, -- x3 (Ben, 2026-11-11: research costs triple; was 200)
         -- BL-1324 (rising tech prices; RESEARCH.md § Cost, Ben 2026-10-15): node
         -- prices rise through the age and RP grow with the economy. The price is
@@ -1507,7 +1512,7 @@ economy = {
         -- R4, 16 seeds): the median nation has no firms of its own, so it grows only
         -- through the research line, ~0.5% a year from 1970. Faster prices slow it.
         price_growth_per_year       = 0.005, -- nominal, compounded monthly: 1.49 by 2040
-        rp_per_economy_unit         = 0.03,  -- RP a tick per credit of home firms' previous tick's filed income (both a month: unchanged)
+        rp_per_economy_unit         = 0.0,   -- retired (Ben, 2026-11-13; was 0.03 RP a tick per credit of filed income)
         -- BL-1612 (ERAS.md § Era 1 -> Era 2 gate, condition 3): the propellant a
         -- market on the home body must hold on its shelf before the Early Space
         -- tree opens to a nation. 1.0 = one launch's draw (launch_draw_per_convoy).

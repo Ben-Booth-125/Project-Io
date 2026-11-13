@@ -592,7 +592,7 @@ void rows_r1()
     p.rp_per_institute = 50.0f;
     p.rp_per_cost_unit = 100.0f;
 
-    fixture f = make_fixture();
+    fixture f = make_fixture(30000.0f);  // BL-1647: a tick spends a third; 30000 keeps the 1000 share
     const entity_id home_tile  = add_tile(f.w, f.body, f.nation);
     const entity_id other_tile = add_tile(f.w, f.body, f.other);
     // A completed University on the nation's ground, owned by the OTHER
@@ -618,7 +618,7 @@ void rows_r1()
     check(a != nullptr && b != nullptr && rows.size() == 2, "R1a one row per nation");
     if (a == nullptr || b == nullptr) return;
     check(a->line_share > 999.0f && a->line_spend == 0.0f
-              && f.w.nations.at(f.nation).treasury == 10000.0f,
+              && f.w.nations.at(f.nation).treasury == 30000.0f,
           "R1b an EMPTY queue owes nothing: the line spends nothing, the treasury keeps its share");
     check(a->universities == 1 && a->institutes == 1 && b->universities == 0 && b->institutes == 1,
           "R1c STAFFED Universities count where they stand, institutes by owner's nation; building, torn-down or unstaffed count nothing");
@@ -637,7 +637,7 @@ void rows_r1()
                 a->line_share, static_cast<long long>(a->owed_milli), a->line_spend,
                 static_cast<long long>(a->rp_milli), a->completed);
     check(std::fabs(a->line_spend - 125.0f) < 1e-3f
-              && std::fabs(f.w.nations.at(f.nation).treasury - 9875.0f) < 1e-2f,
+              && std::fabs(f.w.nations.at(f.nation).treasury - 29875.0f) < 1e-2f,
           "R1e the line pays min(share, what the queue owes): 125 of a 1000 share");
     check(a->completed == 5 && f.w.nation_tech.at(f.nation).pool_milli == 0
               && f.w.nation_tech.at(f.nation).held.test(static_cast<std::size_t>(node("DG-PR-EX-A"))),
@@ -645,13 +645,13 @@ void rows_r1()
 
     // A long queue on a poor nation: the share caps the spend.
     {
-        fixture g = make_fixture(100.0f);
+        fixture g = make_fixture(300.0f);  // a third of it: the 10-credit share
         enqueue_node(g.w, g.nation, node("DG-PR-EX-M"));
         std::vector<research_accrual> r2;
         advance_research(g.w, p, &r2);
         const research_accrual* ga = row_for(r2, g.nation);
         check(ga != nullptr && std::fabs(ga->line_spend - 10.0f) < 1e-4f
-                  && ga->rp_milli == milli(120.0) && std::fabs(g.w.nations.at(g.nation).treasury - 90.0f) < 1e-4f,
+                  && ga->rp_milli == milli(120.0) && std::fabs(g.w.nations.at(g.nation).treasury - 290.0f) < 1e-4f,
               "R1g ...and a share smaller than the bill is spent whole (10 credits -> 120 RP)");
     }
 
