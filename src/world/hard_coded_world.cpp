@@ -3138,6 +3138,24 @@ void run_tail(generation_cursor& c)
     // garrisons -- rather than being published after the last of it ran.
     bump(c, 12);
 
+    // BL-1645 (world under 60 s): the Finishing step split into its passes,
+    // REPORTED ONLY, on the step clocks' footing above -- the marks land in one
+    // fprintf at the end and never in a branch, a seed, a hash or a field.
+    struct finish_marks
+    {
+        gen_clock::time_point t = gen_clock::now();
+        std::string           line;
+        void mark(const char* name)
+        {
+            const gen_clock::time_point now = gen_clock::now();
+            line += ' ';
+            line += name;
+            line += ':';
+            line += std::to_string(ms_between(t, now));
+            t = now;
+        }
+    } fmarks;
+
     // Kepler markets — population-anchored but RESOURCE-CARVED (BL-096). Markets
     // still anchor to population-centre tiles (catchment routing via market_for_tile
     // partitions the map), but how finely a nation's territory is split into markets
@@ -3502,7 +3520,9 @@ void run_tail(generation_cursor& c)
         {
             const std::set<entity_id> shells(capital_market_shells.begin(),
                                              capital_market_shells.end());
+            fmarks.mark("carve");
             const market_fold_tally twins = fold_twin_markets(w, kepler);
+            fmarks.mark("twins");
             if (report != nullptr)
             {
                 report->markets_folded_twins     = twins.folds;
@@ -3548,9 +3568,11 @@ void run_tail(generation_cursor& c)
             }
             if (report != nullptr)
                 report->ported_market_centres.assign(port_centres.begin(), port_centres.end());
+            fmarks.mark("fold_prep");
             const market_fold_tally gravity =
                 fold_markets_by_gravity(w, kepler, gen_cfg.market_carving.gravity_reach,
                                         &port_centres);
+            fmarks.mark("gravity");
             if (report != nullptr)
             {
                 report->markets_folded_gravity  = gravity.folds;
@@ -3575,9 +3597,11 @@ void run_tail(generation_cursor& c)
         // markets). The fold above priced its reach on the network as it stood
         // before this pass and has decided; catchments are grid-nearest, never
         // traversal cost, so nothing this pass lays moves a catchment or a fold.
+        fmarks.mark("pre_mroads");
         lay_market_roads(w, kepler,
                          report != nullptr ? &report->market_roads : nullptr,
                          report != nullptr ? &report->market_road_links : nullptr);
+        fmarks.mark("market_roads");
 
         // ------------------------------------------------------------------
         // C -> D: endemic goods are priced BY DISTANCE FROM WHERE THEY GROW
@@ -3642,6 +3666,7 @@ void run_tail(generation_cursor& c)
         }
     }
 
+    fmarks.mark("carve_tail");
     // --- Capital markets are priced, at a premium (Ben, 2026-09-23) ---------
     //
     // The BL-910 capital markets stand at every living polity's capital from
@@ -3679,6 +3704,7 @@ void run_tail(generation_cursor& c)
         }
     }
 
+    fmarks.mark("capitals");
     // -----------------------------------------------------------------------
     // BL-1347 — A CROSSING TO EVERY SITE THIS STAGE STAMPED (PRODUCTION.md § A
     // building needs a road; LOGISTICS.md § 4, "Generation roads every building site").
@@ -3721,6 +3747,7 @@ void run_tail(generation_cursor& c)
     // exactly what every rival is handed, which is what a level opening means.
     // Nothing else referenced `kepler_unit`.
 
+    fmarks.mark("site_roads");
     // -----------------------------------------------------------------------
     // Selene — Kepler's moon (Luna analogue)
     // 90×42 tile grid (the planet ratio at half scale). Airless regolith surface,
@@ -3751,6 +3778,7 @@ void run_tail(generation_cursor& c)
         gen_cfg.lake_size_cap);
     record_tile_inputs(c, selene, selene_tile_seed, 90, 42, /*used_convergent=*/false);
 
+    fmarks.mark("selene");
     // -----------------------------------------------------------------------
     // Asteroid belt — a band beyond Kepler. The belt itself is not a body; it
     // is system-level data the Solar canvas renders as a textured ring. One
@@ -3895,7 +3923,9 @@ void run_tail(generation_cursor& c)
     // same province. On every other body the partition runs here for the first
     // and only time. Same XOR offset — it IS the same partition; no RNG stream
     // is consumed, so this call perturbs nothing above it. See province.hpp.
+    fmarks.mark("asteroids_report");
     build_province_partition(w, params.seed ^ 0x50524F56u);
+    fmarks.mark("provinces");
 
     // BL-569: seed the province holder — since BL-611 from each land
     // province's ANCHOR centre's nation (plurality is the no-centre
@@ -3909,6 +3939,9 @@ void run_tail(generation_cursor& c)
     // both `w.provinces` (just built) and `province_holder_for` (just
     // seeded) for the border-province test. See nation_generation.hpp.
     seed_nation_garrisons(w);
+    fmarks.mark("holders_garrisons");
+    std::printf("[finish passes] ms:%s\n", fmarks.line.c_str());
+    std::fflush(stdout);
 
     // BL-1053: the count a whole build reports is the count its bumps made.
     // BL-1084: against the WHOLE build's count, not the cursor's config: a

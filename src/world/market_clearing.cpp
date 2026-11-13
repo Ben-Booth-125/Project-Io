@@ -5,6 +5,7 @@
 #include "nation_tech.hpp"      // BL-1346: nation_scalar — the centre's pull, as a modifier
 
 #include <queue>
+#include <thread>
 
 #include <algorithm>
 #include <array>
@@ -330,8 +331,12 @@ float centre_pull(const world& w, entity_id centre_tile)
 /// mapped through a fold, so a folded market's catchment passes to its absorber whole.
 /// Pure in the body's standing state and never saved: the raster below caches it, and
 /// market_for_tile_scan rebuilds it to check that cache.
-std::vector<entity_id> attraction_field(const world& w, entity_id body,
-                                        const std::vector<entity_id>& ms, int& gw, int& gh)
+///
+/// BL-1645 (world under 60 s): this serial form is now the REFERENCE, read only by
+/// market_for_tile_scan, the verification path; the cache fills from the fast form
+/// below, which must agree with it cell for cell.
+std::vector<entity_id> attraction_field_reference(const world& w, entity_id body,
+                                                  const std::vector<entity_id>& ms, int& gw, int& gh)
 {
     gw = gh = 0;
     const auto bit = w.bodies.find(body);
@@ -413,6 +418,233 @@ std::vector<entity_id> attraction_field(const world& w, entity_id body,
     return out;
 }
 
+/// BL-1645 (world under 60 s): THE FIELD, FAST. The same rule and the same floats as
+/// `attraction_field_reference`, built two ways cheaper.
+///
+/// 1. ONE STEP TABLE. A step's price depends on the two cells and the side between
+///    them, never on the centre, so each cell's four steps are priced once per field
+///    (with the same calls the reference makes), and every flood reads arrays instead
+///    of two hash lookups a neighbour.
+/// 2. THE FLOODS SPREAD OVER THREADS. Each centre's flood is independent, and a cell's
+///    winner is the lexicographic minimum of (attraction, market id) over centres - a
+///    total order, so the minimum is the same whichever thread found it and in
+///    whichever order the partial fields are merged. Centres go to threads by index,
+///    each thread keeps its own best/out, and the merge runs in thread order. The
+///    result never varies with the thread count (the landscape search's own clause).
+///
+/// Each flood replays the reference Dijkstra exactly: the queue orders on (cost,
+/// tile id, cell), a step is skipped where the reference skips it, and the cost
+/// accumulates in the same float order, so the costs, and the field, are identical.
+std::vector<entity_id> attraction_field(const world& w, entity_id body,
+                                        const std::vector<entity_id>& ms, int& gw, int& gh)
+{
+    gw = gh = 0;
+    const auto bit = w.bodies.find(body);
+    if (bit == w.bodies.end())
+        return {};
+    gw = bit->second.grid_width;
+    gh = bit->second.grid_height;
+    const std::size_t n = static_cast<std::size_t>(std::max(0, gw)) * static_cast<std::size_t>(std::max(0, gh));
+    std::vector<entity_id> out(n, null_entity);
+    if (n == 0)
+        return out;
+    const std::vector<entity_id>& raster = body_tile_grid(const_cast<world&>(w), body);
+    if (raster.size() < n)
+        return out;
+
+    // The step table: a cell's price into each cardinal neighbour, or a negative where
+    // the reference would skip the step (off the grid, an empty cell, a missing tile, a
+    // non-positive price). A cell whose own tile is missing expands nowhere.
+    constexpr float k_no_step = -1.0f;
+    std::vector<std::array<float, 4>> steps(n, std::array<float, 4>{ k_no_step, k_no_step, k_no_step, k_no_step });
+    std::vector<std::array<int, 4>>   to_cell(n, std::array<int, 4>{ -1, -1, -1, -1 });
+    std::vector<int>                  cell_nation_idx(n, -1);
+    std::map<entity_id, int>          nation_index; // ascending nation id -> dense index
+    for (std::size_t cell = 0; cell < n; ++cell)
+    {
+        const entity_id from_id = raster[cell];
+        if (from_id == null_entity)
+            continue;
+        const auto fit = w.tiles.find(from_id);
+        if (fit == w.tiles.end())
+            continue;
+        const auto tnit = w.tile_to_nation.find(from_id);
+        if (tnit != w.tile_to_nation.end())
+            cell_nation_idx[cell] = nation_index.emplace(tnit->second, static_cast<int>(nation_index.size())).first->second;
+        const tile_component& from = fit->second;
+        for (int k = 0; k < 4; ++k)
+        {
+            int dc = 0, dr = 0;
+            const int nb = cell_step(gw, gh, static_cast<int>(cell), k, dc, dr);
+            if (nb < 0 || static_cast<std::size_t>(nb) >= n)
+                continue;
+            const std::size_t ni = static_cast<std::size_t>(nb);
+            if (ni >= raster.size())
+                continue;
+            const entity_id to_id = raster[ni];
+            if (to_id == null_entity)
+                continue;
+            const auto tit = w.tiles.find(to_id);
+            if (tit == w.tiles.end())
+                continue;
+            const int side = hex_side_for_offset(dc, dr, (from.grid_y & 1) != 0);
+            float step;
+            if (side >= 0 && road_tier_on_side(from, side) != 0)
+                step = edge_traversal_cost(from, tit->second, side, /*read_river=*/false);
+            else
+                step = k_offroad_leg_per_tile * tile_traversal_cost(tit->second);
+            if (!(step > 0.0f))
+                continue;
+            steps[cell][static_cast<std::size_t>(k)]   = step;
+            to_cell[cell][static_cast<std::size_t>(k)] = nb;
+        }
+    }
+
+    // Every centre, in the reference's walk order: the standing markets ascending, then
+    // the folded ones ascending. Pull and nation are read here, on the calling thread.
+    struct centre_job
+    {
+        entity_id centre_tile;
+        int       start_cell;
+        float     pull;
+        int       nation_idx; // -1: no nation, or a nation holding no cell of this body
+        entity_id wins_for;
+    };
+    std::vector<centre_job> jobs;
+    const auto fit = w.body_folded_index.find(body);
+    static const std::vector<entity_id> k_none;
+    const std::vector<entity_id>& folded = (fit != w.body_folded_index.end()) ? fit->second : k_none;
+    const auto add_job = [&](entity_id centre, entity_id wins_for) {
+        const auto cit = w.tiles.find(centre);
+        if (cit == w.tiles.end())
+            return; // unanchored: no centre to be attracted to
+        int start = -1;
+        const int cx = cit->second.grid_x, cy = cit->second.grid_y;
+        if (cx >= 0 && cx < gw && cy >= 0 && cy < gh)
+        {
+            const std::size_t s = static_cast<std::size_t>(cy) * static_cast<std::size_t>(gw)
+                                + static_cast<std::size_t>(cx);
+            if (s < n)
+                start = static_cast<int>(s);
+        }
+        int nidx = -1;
+        const auto cnit = w.tile_to_nation.find(centre);
+        if (cnit != w.tile_to_nation.end())
+        {
+            const auto ni = nation_index.find(cnit->second);
+            // A nation holding no cell here pulls no cell harder; -1 then matches nothing.
+            nidx = (ni != nation_index.end()) ? ni->second : -2;
+        }
+        jobs.push_back(centre_job{ centre, start, centre_pull(w, centre), nidx, wins_for });
+    };
+    for (const entity_id mid : ms)
+        add_job(w.markets.at(mid).centre_tile, mid);
+    for (const entity_id fid : folded)
+    {
+        const folded_market& fm = w.folded_markets.at(fid);
+        add_job(fm.centre_tile, fm.into); // a fold's catchment passes to its absorber
+    }
+
+    // One partial field per thread; centres dealt by index.
+    const std::size_t hw = std::max<std::size_t>(1, std::thread::hardware_concurrency());
+    const std::size_t threads = std::max<std::size_t>(1, std::min<std::size_t>(hw, jobs.size()));
+    std::vector<std::vector<float>>     part_best(threads, std::vector<float>(n, std::numeric_limits<float>::infinity()));
+    std::vector<std::vector<entity_id>> part_out(threads, std::vector<entity_id>(n, null_entity));
+
+    const auto run = [&](std::size_t t) {
+        std::vector<float>& best = part_best[t];
+        std::vector<entity_id>& pout = part_out[t];
+        std::vector<float> cost(n);
+        using entry = std::tuple<float, entity_id, int>; // cost, tile id (the tie), cell
+        for (std::size_t j = t; j < jobs.size(); j += threads)
+        {
+            const centre_job& job = jobs[j];
+            std::fill(cost.begin(), cost.end(), std::numeric_limits<float>::infinity());
+            if (job.start_cell >= 0)
+            {
+                cost[static_cast<std::size_t>(job.start_cell)] = 0.0f;
+                std::priority_queue<entry, std::vector<entry>, std::greater<entry>> pq;
+                pq.emplace(0.0f, job.centre_tile, job.start_cell);
+                while (!pq.empty())
+                {
+                    const entry top = pq.top();
+                    pq.pop();
+                    const float d    = std::get<0>(top);
+                    const int   cell = std::get<2>(top);
+                    if (d > cost[static_cast<std::size_t>(cell)])
+                        continue;
+                    const std::array<float, 4>& st = steps[static_cast<std::size_t>(cell)];
+                    const std::array<int, 4>&   tc = to_cell[static_cast<std::size_t>(cell)];
+                    for (int k = 0; k < 4; ++k)
+                    {
+                        const float step = st[static_cast<std::size_t>(k)];
+                        if (!(step > 0.0f))
+                            continue;
+                        const std::size_t ni = static_cast<std::size_t>(tc[static_cast<std::size_t>(k)]);
+                        const float nd = d + step;
+                        if (nd < cost[ni])
+                        {
+                            cost[ni] = nd;
+                            pq.emplace(nd, raster[ni], static_cast<int>(ni));
+                        }
+                    }
+                }
+            }
+            for (std::size_t i = 0; i < n; ++i)
+            {
+                if (raster[i] == null_entity)
+                    continue;
+                const float c = cost[i];
+                if (!std::isfinite(c))
+                    continue;
+                float pull_here = job.pull;
+                if (job.nation_idx != -1 && cell_nation_idx[i] == job.nation_idx)
+                    pull_here *= k_home_nation_pull;
+                const float attraction = c / pull_here;
+                if (attraction < best[i] || (attraction == best[i] && job.wins_for < pout[i]))
+                {
+                    best[i] = attraction;
+                    pout[i] = job.wins_for;
+                }
+            }
+        }
+    };
+    if (threads == 1)
+        run(0);
+    else
+    {
+        std::vector<std::thread> pool;
+        pool.reserve(threads - 1);
+        for (std::size_t t = 1; t < threads; ++t)
+            pool.emplace_back(run, t);
+        run(0);
+        for (std::thread& th : pool)
+            th.join();
+    }
+
+    // The merge: the lexicographic minimum of the partials, cell by cell.
+    std::vector<float> best(n, std::numeric_limits<float>::infinity());
+    for (std::size_t t = 0; t < threads; ++t)
+        for (std::size_t i = 0; i < n; ++i)
+        {
+            const entity_id o = part_out[t][i];
+            if (o == null_entity)
+                continue;
+            const float a = part_best[t][i];
+            if (a < best[i] || (a == best[i] && o < out[i]))
+            {
+                best[i] = a;
+                out[i]  = o;
+            }
+        }
+
+    if (!ms.empty())
+        for (std::size_t i = 0; i < n; ++i)
+            if (out[i] == null_entity && raster[i] != null_entity)
+                out[i] = ms.front();
+    return out;
+}
+
 // RETIRED (BL-1346): `nearest_market`, the straight-line rule. A tile went to the
 // nearest ORIGINAL centre by squared grid distance on the cylinder, which is a rule
 // that cannot see a road, a technology or a building - so no market's reach ever
@@ -437,7 +669,8 @@ entity_id market_for_tile_scan(const world& w, entity_id tile)
     // field. Verification only, and a caller comparing many tiles should build the
     // field ONCE (market_census, market_fold_fixture) rather than call this per tile.
     int gw = 0, gh = 0;
-    const std::vector<entity_id> field = attraction_field(w, tit->second.body, it->second, gw, gh);
+    // BL-1645: the REFERENCE field, so this check stays independent of the fast one.
+    const std::vector<entity_id> field = attraction_field_reference(w, tit->second.body, it->second, gw, gh);
     const int x = tit->second.grid_x, y = tit->second.grid_y;
     if (x >= 0 && x < gw && y >= 0 && y < gh)
     {
