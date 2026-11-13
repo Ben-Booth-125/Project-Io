@@ -192,7 +192,11 @@ fraction_in_band(world& w, const recipe_registry& reg, double ratio);
 // once a catchment covers every resource it will ever cover, cheaper ground
 // moves nothing, which is why every road tier scored bit-identically (NR-793).
 // This reading is the CONTINUOUS quantity the tier actually moves: the reach
-// cost itself, averaged over the catchment.
+// cost itself, averaged over the catchment. `score_landscape` scores its spread
+// as term 5. The road-tier search axis it was built for is retired (Ben,
+// 2026-11-12), and the reading still discriminates the placement-only
+// candidates: built ports and inland hubs are supply anchors, and a candidate's
+// charter web lays them from its placement seed.
 //
 // TWO CANDIDATE READINGS answered the axis (the doc left the choice to
 // measurement): the MEAN REACH COST over the catchment, and the in-reach tile

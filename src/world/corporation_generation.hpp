@@ -591,7 +591,7 @@ int province_firm_cap_of(const std::map<std::uint32_t, int>& rungs, std::uint32_
 /// @p w, with @p budget charged at @p spend, a world whose whole web is chartered
 /// from the budget? Asked in three places that must agree — generation's bump 11
 /// (whether to lay a roster, and what the carve counts), `search_landscape`
-/// (whether the roster axis is skipped) and `apply_landscape_candidate`'s budget
+/// (whether the placement walk runs at all) and `apply_landscape_candidate`'s budget
 /// overload (which branch lays the candidate) — so it is written once, here, in
 /// the order all three always read it:
 ///

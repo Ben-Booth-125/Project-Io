@@ -95,11 +95,11 @@ inline world_gen_config parsed_gen_config(lua_state& lua)
 // ---------------------------------------------------------------------------
 // app::start_new_game_prelude does not spawn the background economy with a bare
 // generate_background_firms call any more. Since BL-770 phase 6 it SEARCHES:
-// setup_world + load_economy, then `search_landscape` over all three axes —
-// roster, placement and road tier, every candidate REPLACING the world-gen
-// specialists (BL-977: `remove_specialist_roster` then `generate_corporations`
-// from `world::gen_settlement`) — then `apply_landscape_candidate(winner)`,
-// then a second assign_default_recipes.
+// setup_world + load_economy, then `search_landscape` over PLACEMENT alone
+// (Ben, 2026-11-12, BL-1646; the roster and road-tier axes are retired), every
+// candidate REPLACING the world-gen specialists and chartering its web from the
+// budget — then `apply_landscape_candidate(winner)`, then a second
+// assign_default_recipes.
 //
 // Nine instruments kept the bare call after the search landed, so every one of
 // them measured the SEED CANDIDATE — the walk's starting point — rather than

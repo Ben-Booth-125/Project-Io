@@ -32,16 +32,20 @@
 //      crossed (`measure_market_reach`, market_saturation.hpp), read per market
 //      with its SPREAD scored like terms 1 and 2 and NEVER entered as a level.
 //      Terms 1 and 4 read reach as a coverage boolean, so without it the
-//      objective ranked every road tier identically (NR-793) — the axis the
-//      search chooses along and could not see. A flat "cheaper everywhere"
-//      bonus would reward exactly the evenness term 3 exists to prevent, so the
-//      level is on the record and only its unevenness reaches the composite.
+//      objective ranked every road tier identically (NR-793). The road-tier
+//      AXIS is retired (Ben, 2026-11-12), but the term is NOT constant across
+//      the placement-only candidates the search now compares: reach cost runs
+//      to the nearest supply anchor, built ports and inland hubs are anchors
+//      (`is_supply_anchor`), and a candidate's charter web lays those — and its
+//      site roads — from its placement seed. So placement moves reach, and the
+//      term stays scored. A flat "cheaper everywhere" bonus would reward
+//      exactly the evenness term 3 exists to prevent, so the level is on the
+//      record and only its unevenness reaches the composite.
 //
 // RECIPE MARGIN IS DELIBERATELY NOT A TERM. It exists (evaluate_margin, in
 // market_saturation.hpp) and it stays the AUTHORING GATE that every recipe can
 // pay — a precondition of the search, not an axis it trades against. It is
-// near-constant across candidates that differ only in roster, placement and road
-// tier, so scoring it would add a constant to every candidate and pull the
+// near-constant across candidates that differ only in placement, so scoring it would add a constant to every candidate and pull the
 // objective back toward "most profitable", which is the reading Ben's point 4
 // rejected.
 //

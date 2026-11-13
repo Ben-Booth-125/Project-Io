@@ -578,7 +578,12 @@ int64_t generation_step_cost_ms(int label_index, const world_params& params)
         // carve to the budget's planned firms (BL-1086): the search 8,208 /
         // 4,007 ms on seeds 0 / 28 (20000 before, measured serially), so the bar
         // no longer spends a third of itself on eight seconds of work.
-        6000,  // 16 Searching the landscape (build_stockpile_budget .. apply)
+        // RE-MEASURED 2026-11-13 (BL-1646, the search walks placement alone over
+        // two rounds: 1 + 2 evaluations; Release, quiet machine): the step
+        // 34,480 / 10,654 ms on seeds 0 / 28 by `gen_step_costs --finish 0 28`
+        // (the walk ~18.7 / ~6.0 s of it; 79,735 / 28,523 ms before at 13
+        // evaluations). The weight is their mean.
+        22500, // 16 Searching the landscape (build_stockpile_budget .. apply)
         18000, // 17 Proving the field (run_settle, twelve ticks; 90000 before BL-1117)
     };
     if (label_index < 0 || label_index >= generation_stage_label_count) return 0;

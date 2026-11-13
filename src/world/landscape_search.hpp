@@ -8,19 +8,35 @@
 //
 // THE SHAPE (Ben, 2026-09-06; GENERATION_STRATEGY.md § How a candidate is
 // PRODUCED — greedy refinement). Start from one seed candidate, score it,
-// perturb the incumbent along one axis, re-score, keep the better — for a FIXED
-// NUMBER OF ROUNDS, never until convergence. A round proposes one perturbation
-// per axis, scores the proposals independently, and the argmax over
-// {incumbent, proposals} becomes the next incumbent.
+// perturb the incumbent, re-score, keep the better — for a FIXED NUMBER OF
+// ROUNDS, never until convergence. A round proposes one perturbation, scores
+// it, and the argmax over {incumbent, proposal} becomes the next incumbent.
 //
-// THREE AXES AND NO OTHERS, in this fixed order:
-//   0. ROSTER      — how many corporations the landscape carries.
-//   1. PLACEMENT   — the seed their holdings are staked from.
-//   2. ROAD TIER   — how far the existing network is developed (1 Track,
-//                    2 Road, 3 Highway). Live rather than decorative: the tier
-//                    moves `body_reach_field`, which moves every market's reach
-//                    COST — term 5, the only term that reads it (NR-793 showed
-//                    the coverage booleans in terms 1, 2 and 4 never flip).
+// ONE AXIS: PLACEMENT, the seed the candidate's holdings are staked from (Ben,
+// 2026-11-12; GENERATION_STRATEGY.md § "The search walks placement alone, over
+// fewer rounds"). The walk once proposed along three — roster, placement and
+// road tier — and two retired: a charter budget sets the roster on every
+// shipped world, so that axis had nothing to choose, and the road tier rarely
+// won a round while costing a third of each. A candidate's `corporation_count`
+// and `road_tier` stay at the seed candidate's values for the whole walk. The
+// objective is unchanged, all five terms: the fifth (reach quality) still
+// separates placement-only candidates, because the ports and inland hubs a
+// candidate's charter web lays from its placement seed are supply anchors that
+// reach cost runs to (landscape_score.hpp).
+//
+// A WORLD WITH NO CHARTER BUDGET RUNS ZERO ROUNDS. No budget, a refused spend
+// and a budget that opens no specialist are all laid by the no-budget branch,
+// which charters nothing and reads no placement seed (BL-1404), so every
+// proposal would score exactly as the seed candidate and could never be taken.
+// The search scores the seed candidate alone there: the same winner, score and
+// world the full walk would return, without the evaluations that cannot move it.
+//
+// THE DRAW TAGS DID NOT MOVE. `landscape_axis` keeps its three slots and
+// `landscape_axis_count` its value of 3, because the perturbation stream is
+// keyed by (round, axis) as `round * 3 + axis`: holding the stride holds the
+// placement draw, so a placement proposal is exactly the one the three-axis
+// walk drew in the same round from the same incumbent. Roster and road tier
+// are slots in that tag space, never proposed.
 //
 // FIXED ROUNDS IS A DETERMINISM REQUIREMENT, NOT A BUDGET ONE. A convergence
 // test makes the amount of work depend on the landscape, so two worlds run the
@@ -54,13 +70,12 @@
 // proposed, what it scored and whether it was taken, so a landscape is
 // inspectable rather than being one draw among hundreds.
 //
-// PARALLELISM IS AN OPTIMISATION. The static ruling deleted the budget argument
-// that once made it load-bearing; what survives is the constraint it imposed —
-// the winner never varies with `thread_count`, which the harness PROVES. The
-// campaign scores a round's proposals on two threads (BL-1136, Ben 2026-09-26:
-// round 6's tail wait), so the constraint is exercised on every new game, not
-// only in a harness. Each thread holds its own copy of the base world while it
-// scores, so peak memory grows by one world per thread.
+// PARALLELISM IS AN OPTIMISATION, and with one live axis it has nothing to
+// spread: a round holds one proposal, so at most one scoring thread runs
+// whatever `thread_count` says. The constraint it imposed stays — the winner
+// never varies with `thread_count`, which the harness PROVES — and the threaded
+// path is kept, generic over a round's proposals, so a round with more than one
+// inherits it. Each scoring thread holds its own copy of the base world.
 //
 // NOTHING HERE IS PERSISTENT. The search runs at generation time and its output
 // is a world, not a field — so it adds nothing to the flat-binary save path.
@@ -76,29 +91,38 @@
 class recipe_registry;
 struct generation_progress; // hard_coded_world.hpp; the search only writes its inner bar
 
-/// The three axes, in the fixed order a round proposes them.
+/// The axis SLOTS of the (round, axis) draw tag. Only PLACEMENT is proposed
+/// (Ben, 2026-11-12); roster and road tier are retired axes whose slots are
+/// kept so the tag stride, and with it every placement draw, did not move.
 enum class landscape_axis : int
 {
-    roster    = 0,
-    placement = 1,
-    road_tier = 2,
+    roster    = 0,   ///< retired: never proposed
+    placement = 1,   ///< the one live axis
+    road_tier = 2,   ///< retired: never proposed
 };
+/// The TAG STRIDE (slots per round), not the number of axes a round proposes.
 constexpr int landscape_axis_count = 3;
+/// Proposals per round: placement alone.
+constexpr int landscape_live_axis_count = 1;
 
 const char* landscape_axis_name(landscape_axis a);
 
-/// One candidate landscape: the parameters phase 6 varies, and nothing else.
-/// Ben's point 3 — generation runs ONCE and only these repeat.
+/// One candidate landscape. Ben's point 3 — generation runs ONCE and only
+/// candidates repeat. The search varies `placement_seed` alone; the other two
+/// fields are held at the seed candidate's values through the whole walk, and
+/// are kept because `apply_landscape_candidate` still reads them.
 struct landscape_candidate
 {
-    /// ROSTER axis. Corporations layered onto the base world for this candidate.
+    /// Corporations a LEGACY apply (the 4-argument overload) lays. Not a search
+    /// axis (retired 2026-11-12): a budget world's roster is the budget's, and a
+    /// no-budget world charters nothing (BL-1404).
     int corporation_count = 8;
-    /// PLACEMENT axis. Seed their holdings (and the background firms) are staked from.
+    /// PLACEMENT, the one search axis: the seed the holdings are staked from.
     std::uint32_t placement_seed = 0xC0FFEEu;
-    /// ROAD TIER axis. Every tile that already carries a road is developed to at
-    /// least this tier. 1 = Track, 2 = Road, 3 = Highway. Purely additive: a
-    /// tile already at a higher tier is never downgraded, which mirrors
-    /// `stamp_history_roads` and keeps the axis monotone in infrastructure.
+    /// Every tile that already carries a road is developed to at least this
+    /// tier (1 = Track, 2 = Road, 3 = Highway; purely additive, never a
+    /// downgrade). Not a search axis (retired 2026-11-12): every candidate keeps
+    /// the seed's tier, and the campaign's seed tier is 1, a no-op on the field.
     std::uint8_t road_tier = 1;
 };
 
@@ -109,7 +133,8 @@ bool candidate_key_less(const landscape_candidate& a, const landscape_candidate&
 
 struct landscape_search_params
 {
-    /// FIXED. Not a convergence budget — see the header.
+    /// FIXED. Not a convergence budget — see the header. The campaign's count
+    /// is set in `campaign_search_params`, read off the placement curve.
     int rounds = 6;
 
     /// Seeds the perturbation stream. The search is a pure function of
@@ -119,10 +144,6 @@ struct landscape_search_params
     /// The seed candidate the walk starts from.
     landscape_candidate start{};
 
-    // --- axis bounds. A perturbation is clamped into these; a clamped-to-
-    //     identical proposal is a legal no-op that simply loses its round.
-    int          min_corporations = 4;
-    int          max_corporations = 24;
     /// Whether applying a candidate REPLACES the specialist roster — strips the
     /// one world-gen laid (`remove_specialist_roster`) and lays the candidate's
     /// own (`generate_corporations`, from `world::gen_settlement`) — as well as
@@ -133,7 +154,7 @@ struct landscape_search_params
     /// `make_hard_coded_world`, which made the roster axis a no-op that still
     /// cost a third of every round. The removal is the inverse that makes the
     /// axis real. False is kept for an instrument that wants to hold the
-    /// world-gen roster fixed and vary only placement and tier.
+    /// world-gen roster fixed.
     bool regenerate_specialists = true;
 
     /// Print one line per round — which axis the round's best proposal came
@@ -151,9 +172,6 @@ struct landscape_search_params
     /// unwatched one.
     generation_progress* progress = nullptr;
 
-    std::uint8_t min_road_tier    = 1;
-    std::uint8_t max_road_tier    = 3;
-
     /// Threads used to score one round's proposals. 1 = serial (the default
     /// here); the campaign passes `k_campaign_search_threads` (2, BL-1136). The
     /// result must not depend on this value; that is the property the harness
@@ -169,17 +187,15 @@ struct landscape_search_params
     /// on a world the span did not run on — the pre-budget search.
     ///
     /// Null or EMPTY (an all-zero budget is the same state — charter_budget
-    /// drops entries <= 0) is today's search, byte for byte: every axis
-    /// proposed and scored, every candidate applied by the legacy calls.
+    /// drops entries <= 0) is the no-budget search: the seed candidate alone,
+    /// laid by the no-budget branch, which charters nothing and reads no
+    /// placement seed (BL-1404) — so no round is run (see the header).
     ///
-    /// NON-EMPTY makes this a BUDGET WORLD, and two things change and nothing
-    /// else does: each candidate's corporations are chartered from the budget
-    /// (`apply_landscape_candidate`'s budget overload), and the ROSTER axis is
-    /// SKIPPED — neither proposed nor scored, because the budget decides the
-    /// roster (GENERATION_STRATEGY.md phase 6 point 3). It is skipped, never
-    /// re-keyed: `landscape_axis_count`, the (round, axis) tag and every other
-    /// axis's draw are unchanged, so placement and road tier propose exactly
-    /// what they would on a legacy world. A non-empty budget whose spend params
+    /// NON-EMPTY makes this a BUDGET WORLD: each candidate's corporations are
+    /// chartered from the budget (`apply_landscape_candidate`'s budget
+    /// overload), so the budget decides the roster (GENERATION_STRATEGY.md
+    /// phase 6 point 3) and the placement seed decides where it is staked.
+    /// Only a budget world walks. A non-empty budget whose spend params
     /// are refused (`charter_spend_refusal`) is NOT a budget world: the refusal
     /// is checked before anything else, the search runs exactly as with no
     /// budget, prints REFUSED with the reason, and sets
@@ -219,9 +235,9 @@ struct landscape_search_result
     int evaluations = 0;      ///< score_landscape calls, seed included
     int accepted    = 0;      ///< rounds that produced a strict improvement
 
-    /// Accepted steps per axis, indexed by `landscape_axis` — which axes the
-    /// walk actually moved along. An axis that never wins over a whole sweep
-    /// is the measurement that says it should not cost a third of each round.
+    /// Accepted steps per axis slot, indexed by `landscape_axis`. Only the
+    /// placement slot can be non-zero since the walk went placement-only
+    /// (2026-11-12); the array keeps its shape for the readers that print it.
     int accepted_by_axis[landscape_axis_count] = { 0, 0, 0 };
 
     /// Wall time per round, milliseconds, DIAGNOSTIC ONLY (see `print_rounds`).
@@ -230,8 +246,8 @@ struct landscape_search_result
 
     /// BL-1032. Set when a NON-EMPTY charter budget arrived with spend params
     /// `charter_spend_refusal` refused; `charter_refusal` says why. Such a search
-    /// is exactly the no-budget search — every axis, every score — so every
-    /// field above is what it is on a world with no budget.
+    /// is exactly the no-budget search, so every field above is what it is on a
+    /// world with no budget.
     bool        charter_refused = false;
     std::string charter_refusal;
 

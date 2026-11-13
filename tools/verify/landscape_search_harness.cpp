@@ -14,6 +14,14 @@
 // candidate would be trivially thread-invariant and would prove nothing, so R1
 // requires the walk to actually go somewhere before R2's result is read.
 //
+// THE WALK IS PLACEMENT-ONLY (Ben, 2026-11-12, BL-1646): one proposal per round.
+// The R-block therefore runs on a SYNTHETIC CHARTER BUDGET world — on a world
+// with no budget every candidate charters nothing (BL-1404), so placement moves
+// nothing there and R1.4 could not be met by any search. The retired roster and
+// road-tier axes took their assertions with them (R5, the per-axis
+// discrimination block, is removed: it measured the road-tier axis). R7 keeps
+// the no-budget path R2 used to cover: there the search runs zero rounds.
+//
 // Build:  bash tools/verify/build_lua_harness.sh landscape_search_harness
 //
 // --curve (BL-1136, fewer search evaluations) — THE CONVERGENCE CURVE, a
@@ -24,9 +32,11 @@
 //   --check-threads N scores P1's genuine walk on N threads: P1 is then also
 //   thread invariance on the shipped budget world, and its wall time is what
 //   that thread count saves.
-//   THE CAMPAIGN'S PROOF IS `--curve --check-k 6 --check-threads 2`: the whole
-//   six-round walk on the campaign's two threads. --check-k defaults to 3,
-//   which compares only the first half of the walk. P1's two negative controls
+//   THE CAMPAIGN'S PROOF IS `--curve --check-k 2 --check-threads 2` (or any
+//   --check-k at or above the campaign's `rounds`, 2 since BL-1646): the whole
+//   campaign walk on the campaign's two threads. --check-k defaults to 3.
+//   --rounds 6 still reads the curve the campaign's count was chosen from
+//   (finish_campaign_world.cpp, `campaign_search_params`). P1's two negative controls
 //   (one proposal's composite +1 ulp, one proposal's placement seed ^1) run
 //   wherever P1 does and must each be reported.
 //   Run from the repo root (it loads scripts/*.lua and the library by path).
@@ -542,7 +552,9 @@ seed_curve run_seed(lua_state& lua, std::uint32_t seed, int rounds, int check_k,
     sc.refused      = walk.charter_refused;
     sc.fell_back    = walk.charter_fell_back;
     sc.budget_world = !sb.budget.empty() && !walk.charter_refused && !walk.charter_fell_back;
-    sc.live_axes    = sc.budget_world ? landscape_axis_count - 1 : landscape_axis_count;
+    // Placement alone on a budget world; NONE off one, where the search runs
+    // zero rounds (placement moves nothing on a world that charters nothing).
+    sc.live_axes    = sc.budget_world ? landscape_live_axis_count : 0;
     sc.markets      = walk.seed_score.market_count;
     sc.ms_eval_walk  = ms_walk / std::max(1, walk.evaluations);
     sc.cpu_eval_walk = cpu_walk / std::max(1, walk.evaluations);
@@ -773,7 +785,7 @@ seed_curve run_seed(lua_state& lua, std::uint32_t seed, int rounds, int check_k,
 
     // --- the seed's table ---------------------------------------------------
     std::printf("  %s, %d live axes, %d markets; generation %.1f s\n",
-                sc.budget_world ? "BUDGET WORLD (roster axis skipped)"
+                sc.budget_world ? "BUDGET WORLD"
                 : sc.refused    ? "budget REFUSED (the no-budget search)"
                 : sc.fell_back  ? "budget opens no specialist (the no-budget search, NR-910)"
                                 : "no budget (the no-budget search)",
@@ -1006,16 +1018,27 @@ int main(int argc, char** argv)
         return 2;
     }
 
-    // ONE base world, generated ONCE. Ben's point 3: candidates vary rosters,
-    // placements and road tiers — never worlds — which is the whole reason the
+    // ONE base world, generated ONCE. Ben's point 3: candidates vary — now by
+    // placement alone (2026-11-12) — never worlds, which is the whole reason the
     // search is affordable and the reason `search_landscape` takes a const base.
     const world_params wp = no_prehistory();
     const world base = make_hard_coded_world(wp, nullptr, gen_cfg);
+
+    // THE R-BLOCK RUNS ON A BUDGET WORLD (BL-1646). The harness's SYNTHETIC
+    // charter budget (harness_params.hpp: seeded draws, never a density claim)
+    // is what makes placement matter: each candidate charters its web from it,
+    // staked from the candidate's placement seed. With no budget a candidate
+    // charters nothing (BL-1404), every proposal scores alike, and the walk
+    // could never move — R1.4 would fail for every possible search.
+    const charter_budget       synth = synthetic_charter_budget(base, wp.seed, 60, 1.0);
+    const charter_spend_params spend = synthetic_charter_spend();
 
     landscape_search_params sp;
     sp.rounds = 4;
     sp.seed   = 0x5EA12C00u;
     sp.start  = landscape_candidate{ 8, 0xC0FFEEu, 1 };
+    sp.budget = &synth;
+    sp.spend  = spend;
 
     // ------------------------------------------------------------------
     // R1 — the search runs, and it MOVES. A search that never left its seed
@@ -1032,11 +1055,22 @@ int main(int argc, char** argv)
         print_result("serial", serial, ms);
     }
 
-    check(serial.evaluations == 1 + landscape_axis_count * sp.rounds, "R1.1",
-          "FIXED ROUNDS - evaluations are exactly 1 + 3 x rounds, so the work does "
-          "not depend on the landscape (no convergence exit, no hidden threshold)");
-    check(static_cast<int>(serial.path.size()) == landscape_axis_count * sp.rounds, "R1.2",
-          "every round proposed on all three axes and the whole path was recorded");
+    check(serial.evaluations == 1 + landscape_live_axis_count * sp.rounds, "R1.1",
+          "FIXED ROUNDS - evaluations are exactly 1 + rounds (one placement proposal "
+          "per round), so the work does not depend on the landscape (no convergence "
+          "exit, no hidden threshold)");
+    {
+        bool placement_only = static_cast<int>(serial.path.size())
+                              == landscape_live_axis_count * sp.rounds;
+        for (const landscape_search_step& s : serial.path)
+            if (s.axis != landscape_axis::placement
+                || s.proposal.corporation_count != sp.start.corporation_count
+                || s.proposal.road_tier != sp.start.road_tier)
+                placement_only = false;
+        check(placement_only, "R1.2",
+              "every round proposed ONE placement candidate, the whole path was recorded, "
+              "and no proposal moved the roster count or the road tier off the seed's");
+    }
     check(compare_landscape(serial.winner_score, serial.seed_score) >= 0, "R1.3",
           "the winner is never WORSE than the seed candidate (strict-improvement-only "
           "acceptance cannot regress)");
@@ -1067,6 +1101,9 @@ int main(int argc, char** argv)
 
     // ------------------------------------------------------------------
     // R2 — THE BINDING ASSERTION. Same seed, different thread counts.
+    //      A placement-only round holds one proposal, so the threaded path
+    //      runs one worker; the assertion stays because thread count must
+    //      never reach the result, whatever a round holds.
     // ------------------------------------------------------------------
     std::printf("\nR2. THREAD-COUNT INVARIANCE (the binding constraint)\n");
     for (const int threads : { 2, 3, 4, 8 })
@@ -1134,156 +1171,23 @@ int main(int argc, char** argv)
               "moves the walk, never the starting point");
     }
 
-    // ------------------------------------------------------------------
-    // R5 — PER-AXIS DISCRIMINATION. Slice 1's question, asked once per axis
-    //      instead of once per candidate: does the objective SEE this axis?
-    //      An axis it cannot see still costs a third of every round's work and
-    //      contributes nothing, so this is a measurement the search's caller
-    //      needs, not a nicety.
-    //
-    //      IT REPORTS RATHER THAN FAILS, deliberately, exactly as slice 1's
-    //      harness did: a blind axis is a finding about the OBJECTIVE, not a
-    //      defect in the search, and a permanently-red suite is how a real
-    //      regression gets missed. What DOES fail here is the control — if the
-    //      fixture never moved, nothing below is readable.
-    // ------------------------------------------------------------------
-    std::printf("\nR5. per-axis discrimination\n");
-    {
-        int base_hist[4] = { 0, 0, 0, 0 };
-        for (const auto& kv : base.tiles)
-            if (max_road_tier(kv.second) > 0) // BL-1340: the tile's best crossing
-                ++base_hist[max_road_tier(kv.second)];
-        std::printf("    base road field: tier1=%d tier2=%d tier3=%d\n",
-                    base_hist[1], base_hist[2], base_hist[3]);
-
-        landscape_score at[4];
-        int at_top[4] = { 0, 0, 0, 0 };   // tiles at tier 3 AFTER the candidate applied
-        for (std::uint8_t t = 1; t <= 3; ++t)
-        {
-            world w = base;
-            apply_landscape_candidate(w, reg, landscape_candidate{ 8, 0xC0FFEEu, t });
-            for (const auto& kv : w.tiles)
-                if (max_road_tier(kv.second) >= 3)
-                    ++at_top[t];
-            at[t] = score_landscape(w, reg);
-            std::printf("    road_tier=%u  highway tiles=%-5d  potential=%.5f  "
-                        "ACTUAL=%.5f  composite=%.9f\n",
-                        static_cast<unsigned>(t), at_top[t], at[t].mean_completeness,
-                        at[t].mean_actual, at[t].composite);
-        }
-
-        // THE CONTROL, and it compares the SAME quantity across candidates — the
-        // first cut counted "tiles at or above tier t", which is trivially equal
-        // for every t once the uplift has run and therefore controlled nothing.
-        check(at_top[3] > at_top[1], "R5.0",
-              "the tier axis was actually APPLIED - the highway count moves between "
-              "tier 1 and tier 3, so a flat score is about the objective, not a no-op");
-
-        // NR-793, THE DECISIVE MEASUREMENT (Ben, 2026-09-07: "run it").
-        //
-        // A flat score has two possible causes and they call for opposite
-        // fixes. Either (a) the tier moves the REACH FIELD and the objective
-        // then fails to read the difference — a blind objective, fixed by a new
-        // term; or (b) the tier does not move the reach field AT ALL, because
-        // roads sit where the economy already is and the 24.0 budget's frontier
-        // is out where there are no roads to upgrade — in which case no term
-        // could see it and the axis itself is the wrong one.
-        //
-        // `in_reach_tiles` is the boolean the objective actually consumes:
-        // tiles inside `max_logistics_reach` of their market. Summing it either
-        // side of the uplift separates (a) from (b) in one number.
-        for (std::uint8_t t = 1; t <= 3; t += 2)
-        {
-            world w = base;
-            apply_landscape_candidate(w, reg, landscape_candidate{ 8, 0xC0FFEEu, t });
-            const auto rows = measure_market_completeness(w, reg, classify_resources(w, reg));
-            long long catch_sum = 0, reach_sum = 0, raws_sum = 0;
-            for (const auto& r : rows)
-            {
-                catch_sum += r.catchment_tiles;
-                reach_sum += r.in_reach_tiles;
-                raws_sum  += r.raws_in_reach;
-            }
-            std::printf("    road_tier=%u  catchment=%lld  IN_REACH=%lld  raws_in_reach=%lld\n",
-                        static_cast<unsigned>(t), catch_sum, reach_sum, raws_sum);
-        }
-
-        // NR-793 PART 2 (Ben, 2026-09-07): re-run the axis on a LIVE world.
-        //
-        // Everything above runs on the default-seed fixture, which carries TWO
-        // markets, a balance term of exactly 0 and therefore a composite of
-        // exactly 0 for every candidate. A conclusion about what the objective
-        // can SEE cannot rest on a world where the objective evaluates to zero
-        // for every input. Seed ABCDEF01 carries ten markets and a live
-        // composite, and it is one of the same control worlds the score
-        // harness already uses — same construction, so nothing new is invented
-        // here to make the number come out.
-        std::printf("\n    -- the same axis on a TEN-MARKET world (seed ABCDEF01) --\n");
-        {
-            landscape_score live[4];
-            for (std::uint8_t t = 1; t <= 3; t += 2)
-            {
-                world_params lp = wp;
-                lp.seed = 0xABCDEF01u;
-                world w = make_hard_coded_world(lp, nullptr, gen_cfg);
-                assign_default_recipes(w, reg);
-                corporation_params cp;
-                cp.corporation_count = 8;
-                generate_corporations(w, cp, 0xC0FFEEu);
-                generate_background_firms(w, reg, 0xC0FFEEu);
-
-                apply_landscape_candidate(w, reg, landscape_candidate{ 8, 0xC0FFEEu, t });
-                const auto rows = measure_market_completeness(w, reg, classify_resources(w, reg));
-                long long reach_sum = 0, raws_sum = 0;
-                for (const auto& r : rows)
-                {
-                    reach_sum += r.in_reach_tiles;
-                    raws_sum  += r.raws_in_reach;
-                }
-                live[t] = score_landscape(w, reg);
-                std::printf("    tier=%u  mkts=%d  IN_REACH=%lld  raws=%lld  potential=%.5f  "
-                            "ACTUAL=%.5f  balance=%.5f  spread=%.5f  composite=%.9f\n",
-                            static_cast<unsigned>(t), live[t].market_count, reach_sum, raws_sum,
-                            live[t].mean_completeness, live[t].mean_actual,
-                            live[t].mean_balance, live[t].spread, live[t].composite);
-            }
-            std::printf("    VERDICT ON A LIVE OBJECTIVE: the road axis is %s\n",
-                        same_score(live[1], live[3])
-                            ? "STILL INVISIBLE - the fixture was not what hid it"
-                            : "SEEN - the earlier finding was an artefact of a degenerate fixture");
-        }
-
-        const bool road_seen = !same_score(at[1], at[3]);
-        std::printf("    FINDING: the road/infrastructure axis is %s\n",
-                    road_seen ? "SEEN by the objective"
-                              : "INVISIBLE to the objective - every term is bit-identical "
-                                "across tier 1, 2 and 3");
-        if (!road_seen)
-            std::printf("      Raising all %d road tiles from Track to Highway moves no\n"
-                        "      term. The tier scales traversal COST (x0.67/x0.50/x0.40);\n"
-                        "      the objective reads catchment MEMBERSHIP and terminal\n"
-                        "      closure, both of which are booleans this world's reach\n"
-                        "      field does not flip. One of the two has to change before\n"
-                        "      this axis earns its third of every round.\n",
-                        base_hist[1] + base_hist[2] + base_hist[3]);
-    }
+    // R5 (per-axis discrimination) is REMOVED with the axes it measured: it
+    // asked whether the objective could see the ROAD TIER, an axis the search no
+    // longer walks (Ben, 2026-11-12). Placement being seen is R1.4.
 
     // ------------------------------------------------------------------
     // R6 — THREAD-COUNT INVARIANCE ON A BUDGET WORLD (the BL-1136 review).
-    //      R2 runs on a world with no budget, so it never reaches the path the
-    //      campaign actually threads: `apply_landscape_candidate`'s budget
+    //      The path the campaign threads: `apply_landscape_candidate`'s budget
     //      overload, `remove_specialist_roster` and `charter_web_from_budget`.
-    //      Here the same base carries the harness's SYNTHETIC charter budget
-    //      (harness_params.hpp: seeded draws, never a density claim), so every
-    //      evaluation charters its web from a budget, serial against 2 and 4
-    //      threads. Non-vacuity: the budget branch ran (no refusal, no
-    //      fallback, the roster axis skipped) and the winner's apply chartered
-    //      a web (points spent, specialists and firms laid).
+    //      R2 now runs on the same synthetic budget (BL-1646); R6 keeps the
+    //      NON-VACUITY rows R2 lacks — the budget branch ran (no refusal, no
+    //      fallback, one placement proposal a round) and the winner's apply
+    //      chartered a web (points spent, specialists and firms laid) — and
+    //      compares the WHOLE PATH on every scored term, serial against 2 and
+    //      4 threads.
     // ------------------------------------------------------------------
     std::printf("\nR6. thread-count invariance on a BUDGET world (charter_web_from_budget)\n");
     {
-        const charter_budget       synth = synthetic_charter_budget(base, wp.seed, 60, 1.0);
-        const charter_spend_params spend = synthetic_charter_spend();
         landscape_search_params bp = sp;
         bp.rounds       = 2;
         bp.budget       = &synth;
@@ -1294,10 +1198,10 @@ int main(int argc, char** argv)
         print_result("budget serial", b1, 0.0);
 
         const bool budget_branch = !synth.empty() && !b1.charter_refused && !b1.charter_fell_back
-                                && b1.evaluations == 1 + bp.rounds * (landscape_axis_count - 1);
+                                && b1.evaluations == 1 + bp.rounds * landscape_live_axis_count;
         check(budget_branch, "R6.0",
-              "the search took the BUDGET branch - not refused, not fallen back, the roster "
-              "axis skipped (1 + 2 x rounds evaluations)");
+              "the search took the BUDGET branch - not refused, not fallen back, one "
+              "placement proposal a round (1 + rounds evaluations)");
         {
             world laid = base;
             charter_spend_report rep;
@@ -1323,17 +1227,66 @@ int main(int argc, char** argv)
         }
     }
 
+    // ------------------------------------------------------------------
+    // R7 — THE NO-BUDGET WORLD (BL-1646 review). Off a budget world every
+    //      candidate charters nothing and reads no placement seed, so the
+    //      search runs ZERO rounds: the seed candidate alone. Asserted: the
+    //      result IS the seed candidate (one evaluation, no path, nothing
+    //      accepted) at the R-block's round count, and it is the same at 1, 2
+    //      and 4 threads. R7.2 is the reason the rounds could be dropped: a
+    //      proposal laid on this world scores bit-identically to the seed.
+    // ------------------------------------------------------------------
+    std::printf("\nR7. the NO-BUDGET world: the seed candidate alone\n");
+    {
+        landscape_search_params np = sp;
+        np.budget       = nullptr;
+        np.print_rounds = true;
+        np.thread_count = 1;
+        const landscape_search_result n1 = search_landscape(base, reg, np);
+        print_result("no budget", n1, 0.0);
+        check(n1.evaluations == 1 && n1.path.empty() && n1.accepted == 0
+                  && same_candidate(n1.winner, np.start)
+                  && same_score(n1.winner_score, n1.seed_score),
+              "R7.1", "with no charter budget the search returns the SEED CANDIDATE after one "
+                      "evaluation, at a round count of " + std::to_string(np.rounds));
+        {
+            // A real placement proposal, laid and scored as an evaluation would be.
+            landscape_candidate moved = np.start;
+            moved.placement_seed ^= 0x5A5A5A5Au;
+            world w = base;
+            apply_landscape_candidate(w, reg, moved, /*regenerate_specialists=*/true,
+                                      nullptr, spend, nullptr);
+            const landscape_score s = score_landscape(w, reg, np.score);
+            check(curve::same_full_score(s, n1.seed_score), "R7.2",
+                  "on the no-budget world a different placement scores BIT-IDENTICALLY to the "
+                  "seed - the skipped rounds could never have moved the walk");
+        }
+        for (const int threads : { 2, 4 })
+        {
+            landscape_search_params tp = np;
+            tp.thread_count = threads;
+            tp.print_rounds = false;
+            const landscape_search_result r = search_landscape(base, reg, tp);
+            char id[16];
+            std::snprintf(id, sizeof id, "R7.t%d", threads);
+            check(same_candidate(r.winner, n1.winner)
+                      && curve::same_full_score(r.winner_score, n1.winner_score)
+                      && r.evaluations == n1.evaluations && r.path.empty(),
+                  id, std::string("the no-budget search at ") + std::to_string(threads)
+                          + " threads is the serial one");
+        }
+    }
+
     print_path(serial);
 
     std::printf("\n--- THE SLICE'S QUESTION ---\n"
                 "  The search exists and it is DETERMINISTIC: one seed, five thread\n"
                 "  counts, one winner, bit-identical on every scored term. The walk\n"
                 "  improved the seed candidate's composite %.6f -> %.6f (+%.1f%%);\n"
-                "  accepted by axis: roster %d, placement %d, road_tier %d.\n",
+                "  placement accepted in %d of %d rounds.\n",
                 serial.seed_score.composite, serial.winner_score.composite,
                 100.0 * (serial.winner_score.composite / serial.seed_score.composite - 1.0),
-                serial.accepted_by_axis[0], serial.accepted_by_axis[1],
-                serial.accepted_by_axis[2]);
+                serial.accepted, sp.rounds);
 
     // ------------------------------------------------------------------
     // The caveat slice 1 printed, carried forward unchanged. It bears on this

@@ -238,11 +238,13 @@ landscape_score score_landscape(world& w, const recipe_registry& reg,
 
     // --- term 5: reach quality, per market (BL-977) --------------------------
     //
-    // THE CURRENCY THE ROAD AXIS MOVES IN. A tier scales traversal cost; terms 1,
-    // 2 and 4 read reach only as "inside the budget or not", and that boolean had
-    // saturated on every measured world, so three tiers scored to the same bit
-    // (NR-793). This reads the cost itself, per market, and hands ONLY ITS SPREAD
-    // to term 3 below — the level is recorded and deliberately never scored.
+    // Terms 1, 2 and 4 read reach only as "inside the budget or not", and that
+    // boolean saturates (NR-793). This reads the cost itself, per market, and
+    // hands ONLY ITS SPREAD to term 3 below — the level is recorded and
+    // deliberately never scored. It was added for the road-tier axis, which is
+    // retired (2026-11-12); it stays because PLACEMENT moves it too: the cost
+    // runs to the nearest supply anchor, and the ports and inland hubs a
+    // candidate's charter web lays from its placement seed are anchors.
     // Why the cost and not the in-reach count: market_score::reach.
     {
         const std::vector<market_reach> reach = measure_market_reach(w, reg);

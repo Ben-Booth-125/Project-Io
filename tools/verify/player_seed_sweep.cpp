@@ -1546,7 +1546,7 @@ void print_charter_report(const world& w, charter_mode mode, const charter_budge
     std::printf("      search: %s%s%s (%d evaluations, %zu path steps)\n",
                 search.charter_refused     ? "REFUSED — "
                 : search.charter_fell_back ? "NO SPECIALIST affordable (NR-910)"
-                                           : "budget world, roster axis skipped",
+                                           : "budget world, placement walk",
                 search.charter_refused ? search.charter_refusal.c_str() : "",
                 (search.charter_refused || search.charter_fell_back) ? "; the no-budget search ran" : "",
                 search.evaluations, search.path.size());

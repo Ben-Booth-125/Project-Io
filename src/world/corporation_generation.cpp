@@ -67,8 +67,9 @@ namespace corpgen {
 // crosses) — plus, off the road, a Track step over the nation's own dry ground,
 // the crossing the site-road join will lay to the building (LOGISTICS.md § 4,
 // "Generation roads every building site"). Roads do not move during a walk
-// (the road-tier axis is applied before it, the site roads after), so a
-// nation's field is read once per walk.
+// (the candidate's road-tier raise is applied before it — a no-op at the tier 1
+// every search candidate holds — and the site roads after), so a nation's field
+// is read once per walk.
 // ---------------------------------------------------------------------------
 
 /// Four-cardinal network walk over @p body from @p seeds, as lp_distance_field
