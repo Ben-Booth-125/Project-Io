@@ -6,6 +6,8 @@
 
 #include <queue>
 #include <thread>
+#include <atomic>
+#include <exception>
 
 #include <algorithm>
 #include <array>
@@ -469,7 +471,8 @@ std::vector<entity_id> attraction_field(const world& w, entity_id body,
         if (fit == w.tiles.end())
             continue;
         const auto tnit = w.tile_to_nation.find(from_id);
-        if (tnit != w.tile_to_nation.end())
+        // A null nation is no nation (the reference never boosts a null-nation centre).
+        if (tnit != w.tile_to_nation.end() && tnit->second != null_entity)
             cell_nation_idx[cell] = nation_index.emplace(tnit->second, static_cast<int>(nation_index.size())).first->second;
         const tile_component& from = fit->second;
         for (int k = 0; k < 4; ++k)
@@ -529,7 +532,7 @@ std::vector<entity_id> attraction_field(const world& w, entity_id body,
         }
         int nidx = -1;
         const auto cnit = w.tile_to_nation.find(centre);
-        if (cnit != w.tile_to_nation.end())
+        if (cnit != w.tile_to_nation.end() && cnit->second != null_entity)
         {
             const auto ni = nation_index.find(cnit->second);
             // A nation holding no cell here pulls no cell harder; -1 then matches nothing.
@@ -545,9 +548,21 @@ std::vector<entity_id> attraction_field(const world& w, entity_id body,
         add_job(fm.centre_tile, fm.into); // a fold's catchment passes to its absorber
     }
 
-    // One partial field per thread; centres dealt by index.
-    const std::size_t hw = std::max<std::size_t>(1, std::thread::hardware_concurrency());
-    const std::size_t threads = std::max<std::size_t>(1, std::min<std::size_t>(hw, jobs.size()));
+    // One partial field per thread; centres dealt by index. THE THREAD BUDGET: fields
+    // built at once (the landscape search's scoring workers each build one) share the
+    // machine's cores rather than each taking all of them. The count only moves wall
+    // time; the field is the same at any count (the merge below).
+    static std::atomic<std::size_t> s_field_threads_busy{ 0 };
+    const std::size_t hw   = std::max<std::size_t>(1, std::thread::hardware_concurrency());
+    const std::size_t busy = s_field_threads_busy.load(std::memory_order_relaxed);
+    const std::size_t room = hw > busy ? hw - busy : 1;
+    const std::size_t threads = std::max<std::size_t>(1, std::min<std::size_t>(room, jobs.size()));
+    s_field_threads_busy.fetch_add(threads, std::memory_order_relaxed);
+    struct busy_release
+    {
+        std::size_t k;
+        ~busy_release() { s_field_threads_busy.fetch_sub(k, std::memory_order_relaxed); }
+    } const release_on_exit{ threads };
     std::vector<std::vector<float>>     part_best(threads, std::vector<float>(n, std::numeric_limits<float>::infinity()));
     std::vector<std::vector<entity_id>> part_out(threads, std::vector<entity_id>(n, null_entity));
 
@@ -609,18 +624,36 @@ std::vector<entity_id> attraction_field(const world& w, entity_id body,
             }
         }
     };
+    // Exceptions: each part catches its own, every spawned thread is joined on every
+    // path, and the first failure (in part order) is rethrown here, so a caller sees
+    // what the serial form would have thrown rather than std::terminate.
+    std::vector<std::exception_ptr> failed(threads);
+    const auto run_guarded = [&](std::size_t t) {
+        try { run(t); }
+        catch (...) { failed[t] = std::current_exception(); }
+    };
     if (threads == 1)
-        run(0);
+        run_guarded(0);
     else
     {
         std::vector<std::thread> pool;
         pool.reserve(threads - 1);
-        for (std::size_t t = 1; t < threads; ++t)
-            pool.emplace_back(run, t);
-        run(0);
+        std::size_t spawned = 1; // parts [spawned, threads) run inline if a spawn fails
+        try
+        {
+            for (std::size_t t = 1; t < threads; ++t, ++spawned)
+                pool.emplace_back(run_guarded, t);
+        }
+        catch (...) { /* std::system_error: the remaining parts run on this thread */ }
+        run_guarded(0);
+        for (std::size_t t = spawned; t < threads; ++t)
+            run_guarded(t);
         for (std::thread& th : pool)
             th.join();
     }
+    for (const std::exception_ptr& e : failed)
+        if (e)
+            std::rethrow_exception(e);
 
     // The merge: the lexicographic minimum of the partials, cell by cell.
     std::vector<float> best(n, std::numeric_limits<float>::infinity());
@@ -692,6 +725,18 @@ std::vector<entity_id> market_catchment_field(const world& w, entity_id body, in
         return {};
     }
     return attraction_field(w, body, it->second, gw, gh);
+}
+
+std::vector<entity_id> market_catchment_field_reference(const world& w, entity_id body, int& gw, int& gh)
+{
+    const auto& by_body = markets_by_body(w);
+    const auto it = by_body.find(body);
+    if (it == by_body.end())
+    {
+        gw = gh = 0;
+        return {};
+    }
+    return attraction_field_reference(w, body, it->second, gw, gh);
 }
 
 entity_id market_for_tile(const world& w, entity_id tile)

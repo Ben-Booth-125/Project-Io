@@ -314,6 +314,20 @@ void g1_generated(lua_state& lua, std::uint32_t seed)
     check(tiles > 0 && unrouted == 0, "every tile of the home body belongs to a market");
     check(mismatched == 0, "the cached raster equals a freshly built field on every tile");
 
+    // BL-1645: the cache and `market_catchment_field` both fill from the FAST field, so
+    // the check above is fast against fast. This one is fast against the serial
+    // REFERENCE, on a generated world with its folds, nations and off-grid cases.
+    {
+        int rw = 0, rh = 0;
+        const std::vector<entity_id> ref = market_catchment_field_reference(w, body, rw, rh);
+        int differ = 0;
+        check(rw == gw && rh == gh && ref.size() == field.size(), "the reference field has the fast field's shape");
+        for (std::size_t i = 0; i < std::min(ref.size(), field.size()); ++i)
+            if (ref[i] != field[i]) ++differ;
+        std::printf("    %d cell(s) where the fast field differs from the reference\n", differ);
+        check(differ == 0, "the fast field equals the serial reference on every cell");
+    }
+
     // THE BONUS CENSUS (Ben asked for this number, not for an assumption): how many
     // tiles the same-nation fifth actually moves. Counted by comparing the field with
     // one built as if every tile were foreign ground - which is what dropping the

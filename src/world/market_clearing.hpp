@@ -437,3 +437,9 @@ entity_id market_for_tile_scan(const world& w, entity_id tile);
 /// depends on the body's roads, so `market_for_tile_scan` costs a field per call and a
 /// caller comparing many tiles should take this once instead.
 std::vector<entity_id> market_catchment_field(const world& w, entity_id body, int& gw, int& gh);
+
+/// BL-1645: the same field built by the serial REFERENCE (`attraction_field_reference`)
+/// rather than the fast form the cache and `market_catchment_field` use. VERIFICATION
+/// ONLY: a harness compares the two on every tile, which is what keeps the fast form
+/// honest. Costs a full serial field.
+std::vector<entity_id> market_catchment_field_reference(const world& w, entity_id body, int& gw, int& gh);

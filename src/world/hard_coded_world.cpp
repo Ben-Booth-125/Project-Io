@@ -3140,7 +3140,8 @@ void run_tail(generation_cursor& c)
 
     // BL-1645 (world under 60 s): the Finishing step split into its passes,
     // REPORTED ONLY, on the step clocks' footing above -- the marks land in one
-    // fprintf at the end and never in a branch, a seed, a hash or a field.
+    // fprintf to stderr at the end, gated on the fixture as the step clocks are,
+    // and never in a branch, a seed, a hash or a field.
     struct finish_marks
     {
         gen_clock::time_point t = gen_clock::now();
@@ -3940,8 +3941,9 @@ void run_tail(generation_cursor& c)
     // seeded) for the border-province test. See nation_generation.hpp.
     seed_nation_garrisons(w);
     fmarks.mark("holders_garrisons");
-    std::printf("[finish passes] ms:%s\n", fmarks.line.c_str());
-    std::fflush(stdout);
+    // The step clocks' convention: stderr, gated on the fixture (see the budget block).
+    if (fixture != nullptr)
+        std::fprintf(stderr, "[finish passes] ms:%s\n", fmarks.line.c_str());
 
     // BL-1053: the count a whole build reports is the count its bumps made.
     // BL-1084: against the WHOLE build's count, not the cursor's config: a
