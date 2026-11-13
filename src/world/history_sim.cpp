@@ -872,7 +872,12 @@ struct hs_lapper
     ~hs_lapper()
     {
         mark(-1);
-        history_sim_profile_log().push_back(*prof);
+        // Bounded: in-process sweeps run thousands of spans, and only gen_step_costs reads the
+        // log (it clears it per world, four spans each). Not thread-safe, like
+        // history_sim_last_profile(): world builds in one process are serialised today.
+        std::vector<history_sim_profile>& log = history_sim_profile_log();
+        if (log.size() >= 32) log.erase(log.begin());
+        log.push_back(*prof);
     }
 };
 } // namespace
