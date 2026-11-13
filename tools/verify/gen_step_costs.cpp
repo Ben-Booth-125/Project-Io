@@ -575,6 +575,10 @@ int main(int argc, char** argv)
                 if (tot > 0 && hp.ns_lap[k] * 100 >= tot)
                     std::printf("  [hist lap]   %-16s %8.0f ms  %5.1f%%  x%lld\n", history_sim_lap_name(k),
                                 hp.ns_lap[k] / 1e6, 100.0 * hp.ns_lap[k] / tot, (long long)hp.n_lap[k]);
+            for (int k = 0; k < 8; ++k)
+                if (hp.n_x[k] > 0 && history_sim_probe_name(k) != nullptr)
+                    std::printf("  [hist call]  %-16s %8.0f ms  x%lld\n", history_sim_probe_name(k),
+                                hp.ns_x[k] / 1e6, (long long)hp.n_x[k]);
         }
         std::printf("  nations %zu, corps %zu\n", w.nations.size(), w.nations.size());
         std::fflush(stdout);

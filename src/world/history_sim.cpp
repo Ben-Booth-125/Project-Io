@@ -836,7 +836,8 @@ enum hs_lap : int
     lap_creed, lap_record, lap_rise_fall, lap_diffusion, lap_world_war, lap_revolution,
     lap_close, lap_closing_rounds, lap_fold, lap_camp_hub, lap_camp_gate, lap_camp_fleet,
     lap_camp_score, lap_camp_supply, lap_camp_tail, lap_settle, lap_invest, lap_consolidate,
-    lap_organise, lap_build_work, lap_upgrade_supply, lap_count
+    lap_organise, lap_build_work, lap_upgrade_supply, lap_camp_treaty, lap_camp_water,
+    lap_settle_site, lap_count
 };
 const char* const hs_lap_names[lap_count] = {
     "setup", "year_top", "founding", "demo_kinds", "army_eats", "centre_rise",
@@ -847,7 +848,8 @@ const char* const hs_lap_names[lap_count] = {
     "creed", "record", "rise_fall", "diffusion", "world_war", "revolution",
     "close", "closing_rounds", "fold", "camp_hub", "camp_gate", "camp_fleet",
     "camp_score", "camp_supply", "camp_tail", "settle", "invest", "consolidate",
-    "organise", "build_work", "upgrade_supply"};
+    "organise", "build_work", "upgrade_supply", "camp_treaty", "camp_water",
+    "settle_site"};
 static_assert(lap_count <= history_sim_profile::lap_max, "lap table overflow");
 
 /// Closes the clock on the running lap and opens the next. Report-only: it
@@ -878,6 +880,14 @@ struct hs_lapper
 const char* history_sim_lap_name(int lap)
 {
     return (lap >= 0 && lap < lap_count) ? hs_lap_names[lap] : nullptr;
+}
+
+const char* history_sim_probe_name(int k)
+{
+    static const char* const names[8] = {
+        "settle_gather", "settle_probes", "fleet_coasts", "crossing_defenders",
+        "judge_crossing", "treaty_trade_ctx", "far_pairs_meet", nullptr};
+    return (k >= 0 && k < 8) ? names[k] : nullptr;
 }
 
 std::vector<history_sim_profile>& history_sim_profile_log()
@@ -4384,6 +4394,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
     // list or the schedule, so the site the scorer saw is the site the verb
     // founds on.
     std::vector<std::pair<int, int>> settle_near; // the near list's one buffer
+    std::vector<uint8_t>             settle_mask; // BL-1645: the near list as a probe-window mask
     const auto find_settle_site = [&](const region& src, uint32_t qs, int64_t y,
                                       int& nc, int& nr) {
         const int spacing    = std::max(1, params.settle_min_spacing_tiles);
@@ -4398,6 +4409,8 @@ history_sim_state run_history_sim(settlement_state&         ss,
             return dc > dr ? dc : dr;
         };
         const int near_radius = ring_last + spacing - 1;
+        {
+        const scoped_ns px0(prof.ns_x[0]); ++prof.n_x[0];
         settle_near.clear();
         for (const region& e : ss.regions)
             if (tile_gap(e.col, e.row, src.col, src.row) <= near_radius)
@@ -4405,6 +4418,39 @@ history_sim_state run_history_sim(settlement_state&         ss,
         for (const region& e : ss.pending_foundings)
             if (tile_gap(e.col, e.row, src.col, src.row) <= near_radius)
                 settle_near.emplace_back(e.col, e.row);
+        }
+        const scoped_ns px1(prof.ns_x[1]); ++prof.n_x[1];
+
+        // BL-1645 -- THE NEAR LIST AS A MASK over the probe window, so a
+        // probe asks one cell rather than walking the list. `taken` is "some
+        // near entry within spacing", a Chebyshev test with the column wrap,
+        // so it is exactly "the cell at the probe's offset from the source is
+        // inside some entry's (2*spacing-1)^2 square" -- provided every offset
+        // is a plain integer difference, which holds when every column is on
+        // the grid and the widest offset difference (ring_last + near_radius)
+        // is within half the wrap. Otherwise the list is walked, as before.
+        const int win = 2 * ring_last + 1;
+        bool use_mask = gw > 0 && gh > 0 && ring_last + near_radius <= gw / 2
+                     && src.col >= 0 && src.col < gw && src.row >= 0 && src.row < gh;
+        for (std::size_t i = 0; use_mask && i < settle_near.size(); ++i)
+            use_mask = settle_near[i].first >= 0 && settle_near[i].first < gw;
+        if (use_mask)
+        {
+            settle_mask.assign(static_cast<std::size_t>(win) * static_cast<std::size_t>(win), 0);
+            for (const std::pair<int, int>& e : settle_near)
+            {
+                int oc = e.first - src.col; // the entry's offset, wrapped to the nearest copy
+                if (oc > gw / 2) oc -= gw;
+                else if (oc < -(gw / 2)) oc += gw;
+                const int orow = e.second - src.row;
+                const int c0 = std::max(oc - spacing + 1, -ring_last), c1 = std::min(oc + spacing - 1, ring_last);
+                const int r0 = std::max(orow - spacing + 1, -ring_last), r1 = std::min(orow + spacing - 1, ring_last);
+                for (int j = r0; j <= r1; ++j)
+                    for (int i = c0; i <= c1; ++i)
+                        settle_mask[static_cast<std::size_t>(j + ring_last) * static_cast<std::size_t>(win)
+                                    + static_cast<std::size_t>(i + ring_last)] = 1;
+            }
+        }
 
         nc = -1; nr = -1;
         for (int ring = ring_first; ring <= ring_last && nc < 0; ++ring)
@@ -4452,8 +4498,12 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 // square without walking the list.
                 if (tile_gap(cc, rr, src.col, src.row) < spacing) continue;
                 bool taken = false;
-                for (const std::pair<int, int>& e : settle_near)
-                    if (tile_gap(cc, rr, e.first, e.second) < spacing) { taken = true; break; }
+                if (use_mask)
+                    taken = settle_mask[static_cast<std::size_t>(rr - src.row + ring_last) * static_cast<std::size_t>(win)
+                                        + static_cast<std::size_t>(dc + ring_last)] != 0;
+                else
+                    for (const std::pair<int, int>& e : settle_near)
+                        if (tile_gap(cc, rr, e.first, e.second) < spacing) { taken = true; break; }
                 if (!taken) { nc = cc; nr = rr; break; }
             }
         }
@@ -6727,6 +6777,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
             // BL-1140: priced with the same current the round's flows were,
             // so a binding is worth what its trade would actually carry.
             const trade_context treaty_trade_ctx = [&]() {
+                const scoped_ns px5(prof.ns_x[5]); ++prof.n_x[5];
                 trade_context t = build_trade_context(ss.regions, out.polities, out.supply_corridors);
                 if (currents_on)
                 {
@@ -6819,6 +6870,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
             // which is what keeps the walk small.
             if (params.far_pairs_meet_by_sea && !landmass.empty())
             {
+                const scoped_ns px6(prof.ns_x[6]); ++prof.n_x[6];
                 const std::size_t pc = out.polities.size();
                 for (std::size_t ai = 0; ai < pc; ++ai)
                 {
@@ -8391,10 +8443,15 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     c.refusal = 1;
                     return c;
                 }
+                int hub_tile = -1, landing = -1;
+                bool coasts;
+                {
+                    const scoped_ns px2(prof.ns_x[2]); ++prof.n_x[2];
                 const std::vector<int>& hub_ring = fleet_ring_of(static_cast<std::size_t>(hub));
                 const std::vector<int>& tgt_ring = fleet_ring_of(ti);
-                int hub_tile = -1, landing = -1;
-                if (!fleet_coasts(fleet_comp, hub_ring, tgt_ring, &hub_tile, &landing)) { c.refusal = 3; return c; }
+                coasts = fleet_coasts(fleet_comp, hub_ring, tgt_ring, &hub_tile, &landing);
+                }
+                if (!coasts) { c.refusal = 3; return c; }
                 if (params.fleet_power_halving_tiles > 0)
                 {
                     const int realm = owner[ti];
@@ -8405,6 +8462,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                         defenders_entry e;
                         e.realm = realm;
                         e.abstained = 0;
+                        const scoped_ns px3(prof.ns_x[3]); ++prof.n_x[3];
                         e.d = crossing_defenders(out, ss.regions, realm, q.id, fleet_sea, gw, gh,
                                                  kFleetCoastRadius, &e.abstained);
                         fleet_defenders_turn.push_back(std::move(e));
@@ -8412,6 +8470,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     }
                     c.abstained = de->abstained;
                     for (const fleet_defender& d : de->d) if (d.seat_coast) ++c.seat_coast;
+                    const scoped_ns px4(prof.ns_x[4]); ++prof.n_x[4];
                     c.v = judge_crossing(fleet_sea, gw, gh, currents_on ? &currents : nullptr,
                                          params.sea_current_weight_q, params.fleet_power_halving_tiles,
                                          hub_tile, landing, q.navy_stock, de->d, &fleet_fields);
@@ -8423,6 +8482,31 @@ history_sim_state run_history_sim(settlement_state&         ss,
 
             lap.mark(lap_camp_hub); // BL-1645, report-only
             // -- Campaign --------------------------------------------------
+            //
+            // BL-1645 -- WHO THIS POLITY IS BOUND TO BY NON-AGGRESSION, read
+            // once for the loop rather than walking every treaty per target.
+            // `has_treaty_clause(out, q.id, to, non_aggression)` is true
+            // exactly when some such object has q at one end and `to` at the
+            // other, so the partners at the far end of q's objects, sorted, are
+            // the same answer by binary search. Nothing in this loop writes
+            // `out.dated_objects` (treaties form, break and expire above it).
+            std::vector<int32_t> na_bound;
+            {
+                const int32_t k  = static_cast<int32_t>(static_cast<uint8_t>(treaty_clause::non_aggression));
+                const int32_t qu = static_cast<int32_t>(static_cast<uint16_t>(q.id));
+                for (const dated_object& o : out.dated_objects)
+                {
+                    if (o.kind != k) continue;
+                    if (o.a == qu) na_bound.push_back(o.b);
+                    if (o.b == qu) na_bound.push_back(o.a);
+                }
+                std::sort(na_bound.begin(), na_bound.end());
+            }
+            const auto bound_by_non_aggression = [&](int to) -> bool {
+                if (q.id < 0 || to < 0) return false; // has_treaty_clause's own guard
+                return std::binary_search(na_bound.begin(), na_bound.end(),
+                                          static_cast<int32_t>(static_cast<uint16_t>(to)));
+            };
             for (int hi : held)
             {
                 // BL-835 — A HUB WITH NO ARMY STAGES NOTHING. Hoisted above the
@@ -8457,7 +8541,8 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     // treaty is: "neither party campaigns against the other
                     // while the term runs"). This is the direct, countable
                     // cause of the displacement reading's neighbour-war half.
-                    if (has_treaty_clause(out, q.id, to, treaty_clause::non_aggression))
+                    lap.mark(lap_camp_treaty); // BL-1645, report-only
+                    if (bound_by_non_aggression(to))
                     {
                         ++out.treaty_blocked_campaigns;
                         if (params.trace_battles) ++out.campaign_class_trace[dclass][1];
@@ -8468,6 +8553,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     // THE WATER GATE, applied before anything is scored — an
                     // illegal campaign is not a bad candidate, it is not a
                     // candidate. See the two lambdas above for the rule.
+                    lap.mark(lap_camp_water); // BL-1645, report-only
                     const bool dry   = dry_contact(hi, ti);
                     const bool shore = dry ? true : owns_shore_at(ti);
                     // BL-893: THE FOURTH ESCAPE -- weight of the land behind
@@ -9030,6 +9116,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 for (int hi : held)
                 {
                     if (!may_settle) break;
+                    lap.mark(lap_settle); // BL-1645, report-only
                     const region& p = ss.regions[static_cast<std::size_t>(hi)];
                     // The works-aware ceiling (BL-321), matching what
                     // `advance_region_demography` actually grows toward. The
@@ -9074,8 +9161,10 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     // needs no site.
                     if (pressure < params.settle_pressure_q) continue;
                     int site_c = -1, site_r = -1;
+                    lap.mark(lap_settle_site); // BL-1645, report-only
                     find_settle_site(p, qs, y, site_c, site_r);
                     if (site_c < 0) continue;
+                    lap.mark(lap_settle); // BL-1645, report-only
                     pressure_best = pressure; pressure_src = hi;
                 }
                 if (may_settle && pressure_src >= 0 && pressure_best >= params.settle_pressure_q)

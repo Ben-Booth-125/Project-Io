@@ -5402,6 +5402,11 @@ struct history_sim_profile
     int64_t ns_lap[lap_max] = {};
     int64_t n_lap[lap_max]  = {};
     int64_t ns_hold_to_ground = 0; ///< `hold_to_ground`, wherever it is called.
+    /// BL-1645: call-level accumulators inside the laps, named by
+    /// `history_sim_probe_name` (the settle search's two halves, the fleet
+    /// gate's three reads, the treaty walk's context and far-pair meeting).
+    int64_t ns_x[8] = {};
+    int64_t n_x[8]  = {};
     int64_t hold_to_ground_calls = 0;
     int64_t start_year = 0, stop_year = 0;
 };
@@ -5410,6 +5415,8 @@ struct history_sim_profile
 history_sim_profile& history_sim_last_profile();
 /// BL-1645: a lap's name, or null past the last one.
 const char* history_sim_lap_name(int lap);
+/// BL-1645: what `ns_x[k]` times, or null for an unused slot.
+const char* history_sim_probe_name(int k);
 /// BL-1645: every run's profile since the caller last cleared it, in run
 /// order. Report-only; a measurement harness clears it and reads it back.
 std::vector<history_sim_profile>& history_sim_profile_log();
