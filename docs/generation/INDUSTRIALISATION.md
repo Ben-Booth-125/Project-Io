@@ -887,9 +887,9 @@ prices. Every property in Part I needs a stated rule for crossing that gap.
 
 **SETTLED (Ben, 2026-09-15, elicitation): Industrialisation decides HOW MUCH and WHERE; the landscape
 search decides WHICH.** `GENERATION_STRATEGY.md` § The eight phases gives phase 6 — a static search
-over rosters, placements and road tiers — the industrial landscape; Ben's 2026-09-11 line gives it
+over placements (Ben, 2026-11-12) — the industrial landscape; Ben's 2026-09-11 line gives it
 to this phase. Both hold. Industrialisation produces a charter budget per centre, a demand weight per
-market and a price field; the search picks the roster and placement that spends each budget
+market and a price field; the search picks the placement that spends each budget
 viably, on its existing terms.
 
 **So the search is Industrialisation's last act, not a phase after it — and it runs inside the

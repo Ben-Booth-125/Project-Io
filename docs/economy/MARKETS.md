@@ -664,7 +664,7 @@ validation run of the winner — thirty-six monthly econ ticks, `k_campaign_sett
 measured on the per-tick convoy dispatch count rather than chosen (`../economy/ERAS.md` § The
 opening position; BL-978, warm start retired, owns the work). There is no other pre-game tick
 loop: the prices play opens on are the ones those twelve clearings leave. Generation scores candidate landscapes
-— rosters, placements and road tiers — statically against the finished world, and the winning
+— by where their buildings stand (Ben, 2026-11-12) — statically against the finished world, and the winning
 candidate's buildings *are* the background economy: real buildings, on real tiles, each owned by
 the nation whose ground it stands on (Ben, 2026-10-23). Placement mechanics are
 `docs/generation/CORPORATION_GENERATION.md` § Pass 6; what is placed is decided by the search

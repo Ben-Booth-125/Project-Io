@@ -685,7 +685,8 @@ decision and you set the quiet precedent this project files items to avoid):
    keeping its goal: centres are still history's consequence, but now because history *grew and
    sacked them* rather than because they were placed afterwards. It also stops the sim running
    over a world with no cities in it.
-3. **The candidate search varies rosters, placements and road tiers — not worlds.** So generation
+3. **The candidate search varies placements — not worlds** (narrowed from rosters, placements and
+   road tiers, Ben, 2026-11-12: § How a candidate is PRODUCED). So generation
    runs once and only the economic sim repeats, which is the whole reason the budget closes.
    PROPOSED (listed to Ben 2026-09-17, not overturned): where a charter budget sets the roster
    (`INDUSTRIALISATION.md` § 1), the roster axis has nothing to choose and is skipped rather than scored;
@@ -734,8 +735,10 @@ loss-making. The cheap proxy is a per-resource supply-to-demand **ratio** per ma
 static, and it is what drives a price to the ceiling in the first place. The validation run is what
 confirms the proxy was good enough.
 
-**What the objective is made of (Ben, 2026-09-06; the fifth term, Ben, 2026-09-08).** **Five
-terms.** The third is what makes it an *asymmetry* objective rather than a coverage one, and the
+**What the objective is made of (Ben, 2026-09-06; the fifth term, Ben, 2026-09-08; term 5 unscored,
+Ben, 2026-11-12).** **Five terms, four scored:** term 5 reads a road tier, and since candidates no
+longer differ in road tier it reads the same for every candidate and is not scored (§ How a
+candidate is PRODUCED). The record of why it existed stands below. The third is what makes it an *asymmetry* objective rather than a coverage one, and the
 fourth and fifth are the ones that can see a candidate at all:
 
 1. **Chain completeness** — terminals closed over terminals total, per market. Does a chain reach a
@@ -817,9 +820,9 @@ rank a landscape; this says where landscapes come from, and it was the half noth
 
 The search **starts from one seed candidate, scores it, perturbs the winner along one axis,
 re-scores, and keeps the better** — for a **fixed number of rounds**, never until convergence. The
-three axes are the ones point 3 above names and no others: charter **rosters**, starting
-**placements**, and **road/infrastructure tiers**. A round proposes a perturbation on each axis,
-scores the proposals, and the argmax over {incumbent, proposals} becomes the next incumbent.
+one axis is starting **placement** (Ben, 2026-11-12, below; charter rosters and road tiers were axes
+until then). A round proposes a perturbation, scores it, and the argmax over {incumbent, proposal}
+becomes the next incumbent.
 
 **Fixed rounds, not convergence, and that is a determinism requirement rather than a budget one.**
 A convergence test makes the amount of work depend on the landscape, so two worlds do the same
