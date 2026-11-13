@@ -1461,7 +1461,7 @@
     "scripts/economy.lua",
     "tools/verify/opening_parity.cpp"
    ],
-   "design": "NATION_GENERATION.md § Pass 7: the kit's own income carries its running bill from the first tick. The opening-parity census (30:4, 16 seeds, five years) read majors losing money on average 10/64 before the monthly tick and 42/64 after it, with 3/64 ending under 100 credits and the median end treasury 6,441 -> 1,769. Ben ruled the regression folds into this item (2026-11-12). First find which per-tick flow the monthly tick (BL-1642) left at its quarterly rate, then re-read the census; any remaining loss is the kit's balance. Read by the opening-parity skill at --quarters 60."
+   "design": "NATION_GENERATION.md § Pass 7: the kit's own income carries its running bill from the first tick. The opening-parity census (30:4, 16 seeds, five years) read majors losing money on average 10/64 before the monthly tick and 42/64 after it, with 3/64 ending under 100 credits and the median end treasury 6,441 -> 1,769. Ben ruled the regression folds into this item (2026-11-12). First find which per-tick flow the monthly tick (BL-1642) left at its quarterly rate, then re-read the census; any remaining loss is the kit's balance. Read by the opening-parity skill at --quarters 60. FOUND 2026-11-13: the national budget's per-tick spendable is a share of the treasury (a stock) and stayed the quarter's, so the research line's lump bill took it three times a quarter (research +37% a month). Fixed: k_budget_tick_share = 1/3 (NATIONS.md § 3). Census 30:4, 16 seeds, 60 months after the fix: losing 26/64, median end treasury 3,776, 1 under 100. Left: income 18% under the quarter's monthly rate - lumpier monthly trade, and alloys/machinery not made. That remainder is the kit's balance; opening_parity now prints FLOWS and GOOD lines to read it."
   },
   {
    "glyph": "○",
@@ -1485,6 +1485,29 @@
     "src/world/history_sim.cpp"
    ],
    "design": "NATION_GENERATION.md § Pass 7, The cut is the exception (Ben, 2026-11-12). Seed 0 on main: the cut opened 22 of 41 nations smaller (40 state buildings unbuilt, 22 bases); seed 28: 10 of 21. The lever is the earning lever (realms bank more across the spans), never a mint. Note the doc still says sixteen ticks for the cut window while the code reads 48 (the monthly tick); reconcile the wording. Read with treasury_census and opening_parity's minor medians."
+  },
+  {
+   "glyph": "○",
+   "sprint": null,
+   "version_goal": "v0.6.0",
+   "written": "2026-11-13",
+   "parked": false,
+   "blocked_on": null,
+   "requires": [],
+   "status": "proposed",
+   "author": "main session (2026-11-13)",
+   "id": "BL-1649",
+   "short_name": "NETWORK_UPKEEP_FIXTURE",
+   "title": "nation_budget_harness R9 (network upkeep) fails on main: the fixture predates the edge-counted road bill",
+   "priority": "B",
+   "difficulty": 2,
+   "category": "Verification",
+   "authority_doc": "docs/economy/LOGISTICS.md",
+   "files": [
+    "tools/verify/nation_budget_harness.cpp",
+    "src/world/network_upkeep.cpp"
+   ],
+   "design": "Eight checks (R9a, b, c, h, j, k, l, m) fail on main at 6655ad6d, before any BL-1647 change: the derived bill is 38 stone / 19 timber, not the fixture's 16 / 8, and the roaded tile on unowned ground bills the nation holding the other end. Likely cause: the edge-counted road bill (count_road_edges_by_nation, BL-1340) replaced the per-tile count the fixture was written for. Read network_upkeep.cpp against LOGISTICS.md and decide which is right: re-derive the fixture's expected bill from the edge rule, or fix the bill. Never loosen a check to pass."
   }
  ]
 }

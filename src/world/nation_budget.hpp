@@ -176,6 +176,24 @@ struct nation_budget
     float reserve_fraction = 0.0f;
 };
 
+/// BL-1647 (majors open profitable): the share of the unreserved treasury ONE tick
+/// may spend. The tick is a month (BL-1642), and the spendable is a fraction of a
+/// STOCK, so unlike a per-tick flow it did not shrink with the tick: a lump bill (the
+/// research queue's whole owed cost, a space programme's lump) could take the quarter's
+/// spendable three times a quarter. A month spends a third of the quarter's, so a
+/// year's spending power is unchanged; a per-tick flow bill, already a third, binds
+/// against it exactly as it did.
+inline constexpr float k_budget_tick_share = 1.0f / 3.0f;
+
+/// The tick's spendable: treasury x (1 - reserve) x k_budget_tick_share. EVERY site
+/// that derives a line's share reads this one expression, so a claim gated as
+/// affordable at one site is bit for bit the claim the pass then pays.
+/// `reserve` is the clamped `reserve_fraction`.
+inline float budget_tick_spendable(float treasury, float reserve)
+{
+    return treasury * (1.0f - reserve) * k_budget_tick_share;
+}
+
 /// One claim on one nation's budget line: a NAMED corporation asking a NAMED
 /// nation for credits, on one line, this tick.
 ///

@@ -1444,7 +1444,7 @@ research_accrual compute_accrual(const world& w, entity_id nid, const research_b
         {
             const nation_budget& bud = bit->second;
             const float reserve   = std::clamp(bud.reserve_fraction, 0.0f, 1.0f);
-            const float spendable = treasury * (1.0f - reserve);
+            const float spendable = budget_tick_spendable(treasury, reserve);
             float weight_total = 0.0f;
             for (std::size_t i = 0; i < priority_count; ++i)
                 if (std::isfinite(bud.weights[i]) && bud.weights[i] > 0.0f)

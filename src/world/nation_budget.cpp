@@ -181,7 +181,7 @@ void run_national_budget(world& w,
         // rather than rejected, because an out-of-range authored dial should
         // read as "save everything" / "save nothing" and not as a hole.
         const float reserve = std::clamp(budget.reserve_fraction, 0.0f, 1.0f);
-        res.spendable = res.treasury * (1.0f - reserve);
+        res.spendable = budget_tick_spendable(res.treasury, reserve);
 
         // Weights are read as fractions of the spendable total, so the sum is
         // needed before any share is. Summed in the fixed enum order — the same

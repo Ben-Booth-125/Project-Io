@@ -114,7 +114,7 @@ std::vector<space_purchase> derive_space_programme_claims(const world& w,
         // differently; they can, because no claim of theirs ever re-enters the
         // pass to be compared against the pass's own share.)
         const float reserve   = std::clamp(bud.reserve_fraction, 0.0f, 1.0f);
-        const float spendable = nit->second.treasury * (1.0f - reserve);
+        const float spendable = budget_tick_spendable(nit->second.treasury, reserve);
         if (!(spendable > 0.0f))
             continue;
 

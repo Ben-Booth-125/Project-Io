@@ -178,7 +178,8 @@ entity_id add_corp(world& w, const char* name, float balance)
     return c;
 }
 
-/// The reference fixture. Treasury 1000, reserve 1/4 -> spendable 750.
+/// The reference fixture. Treasury 3000, reserve 1/4, a tick spends a third
+/// (k_budget_tick_share) -> spendable 3000 x 3/4 x 1/3 = 750.
 /// Weights 1/2, 1/4, 1/4 -> shares 375, 187.5, 187.5.
 ///   logistics   : corp_1 200 + corp_2 100 = 300 demand <= 375 share -> paid in full
 ///   schooling   : corp_1 100 + corp_2 150 = 250 demand >  187.5      -> rationed x 0.75
@@ -188,8 +189,8 @@ entity_id add_corp(world& w, const char* name, float balance)
 fixture make_fixture()
 {
     fixture f;
-    f.nation_a = add_nation(f.w, "Authoria",  1000.0f);
-    f.nation_b = add_nation(f.w, "Elsewhere", 1000.0f);
+    f.nation_a = add_nation(f.w, "Authoria",  3000.0f);
+    f.nation_b = add_nation(f.w, "Elsewhere", 3000.0f);
     f.corp_1   = add_corp(f.w, "Payee One", 0.0f);
     f.corp_2   = add_corp(f.w, "Payee Two", 0.0f);
 
@@ -262,7 +263,7 @@ double world_credit_exact(const world& w)
 fixture make_awkward_fixture()
 {
     fixture f;
-    f.nation_a = add_nation(f.w, "Awkwardia", 1234.56f);
+    f.nation_a = add_nation(f.w, "Awkwardia", 3703.68f);
     f.nation_b = add_nation(f.w, "Elsewhere",  777.77f);
     f.corp_1   = add_corp(f.w, "Payee One",   0.0f);
     f.corp_2   = add_corp(f.w, "Payee Two",   0.0f);
@@ -382,15 +383,15 @@ int main()
 
         check(a != nullptr &&
               same(a->paid, k_paid_per_tick) &&
-              same(f.w.nations.at(f.nation_a).treasury, 1000.0f - k_paid_per_tick),
+              same(f.w.nations.at(f.nation_a).treasury, 3000.0f - k_paid_per_tick),
               "R1c the treasury is debited exactly what the corps were credited "
-              "(487.5 out, 512.5 kept)");
+              "(487.5 out, 2512.5 kept)");
 
         check(same(world_credit(f.w), credit_before),
               "R1d world credit is unchanged, bit-exactly - nothing minted, "
               "nothing destroyed");
 
-        check(same(f.w.nations.at(f.nation_b).treasury, 1000.0f),
+        check(same(f.w.nations.at(f.nation_b).treasury, 3000.0f),
               "R1e a nation that authors no budget is untouched");
     }
 
@@ -404,7 +405,7 @@ int main()
         bool per_tick_ok = true, conserved = true;
         for (int i = 0; i < k_span; ++i)
         {
-            f.w.nations[f.nation_a].treasury = 1000.0f; // this tick's income
+            f.w.nations[f.nation_a].treasury = 3000.0f; // this tick's income
             const float credit_before = world_credit(f.w);
             const auto  t = run(f);
             const auto* a = result_for(t, f.nation_a);
@@ -484,8 +485,13 @@ int main()
         // accumulate until a credit is below half a ULP of them, the other sweeps
         // the balances each tick so every credit lands exactly.
         //
-        // The swept span must be EXACTLY zero. If it is not, the pass itself is
-        // losing credit and this row is the one that says so.
+        // The swept span is bounded by the SOURCE's debit rounding and nothing
+        // else (Ben, 2026-11-13, BL-1647): the tick spends a third of the spendable
+        // (`k_budget_tick_share`), so a debit is under half the treasury and
+        // `treasury -= paid` rounds - half a ULP of the paying treasury, once per
+        // debit. It read EXACTLY zero only while a debit was at least half the
+        // treasury, where float subtraction is exact (Sterbenz). Anything beyond
+        // that bound is the pass itself losing credit, and this row says so.
         auto span = [](bool sweep, int ticks, double& cum, double& moved,
                        int& credits, float& peak_balance)
         {
@@ -496,7 +502,7 @@ int main()
                 if (sweep)
                     for (auto& [id, cc] : f.w.nations)
                         cc.treasury = 0.0f;
-                f.w.nations[f.nation_a].treasury = 1234.56f; // this tick's income
+                f.w.nations[f.nation_a].treasury = 3703.68f; // this tick's income
                 const double c0 = world_credit_exact(f.w);
                 const auto   t  = run(f);
                 cum   += world_credit_exact(f.w) - c0;
@@ -514,9 +520,13 @@ int main()
         span(true,  k_ticks, cum_swept, moved_swept, cred_s, peak_s);
         span(false, k_ticks, cum_accum, moved_accum, cred_a, peak_a);
 
-        check(cum_swept == 0.0,
+        const float  src_t     = 3703.68f; // the paying treasury each tick
+        const float  src_ulp   = std::nextafter(src_t, 2.0f * src_t) - src_t;
+        const double debit_rnd = 0.5 * static_cast<double>(k_ticks) * static_cast<double>(src_ulp);
+        check(std::fabs(cum_swept) <= debit_rnd,
               "R1o 64 ticks at ordinary weights, destinations able to hold each "
-              "credit exactly: world credit moves by EXACTLY zero - the pass "
+              "credit exactly: world credit moves by no more than the paying "
+              "treasury's own debit rounding (half a ULP per debit) - the pass "
               "itself neither mints nor destroys");
 
         // The accumulating span WILL drift, and that is not a defect: adding ~540
@@ -536,9 +546,10 @@ int main()
         // transferred the identical total, bit for bit - the pass did the same
         // work in each - and only the one whose balances had outgrown their
         // credits lost anything at all.
-        check(moved_swept == moved_accum && cum_swept == 0.0 && cum_accum != 0.0,
-              "R1q ...and it is the destination's rounding and not the pass's: "
-              "two spans move the identical total, one loses exactly zero");
+        check(moved_swept == moved_accum && std::fabs(cum_swept) <= debit_rnd && cum_accum != 0.0,
+              "R1q ...and the residual is rounding and not the pass's: two spans "
+              "move the identical total, and the swept one stays inside the debit's "
+              "rounding bound");
     }
 
     // --- R2: inertness ------------------------------------------------------
@@ -586,7 +597,7 @@ int main()
         // under the share. Only what is PAID leaves, so the treasury keeps the
         // remainder and next tick's spendable is larger.
         fixture g;
-        g.nation_a = add_nation(g.w, "Thrifty", 1000.0f);
+        g.nation_a = add_nation(g.w, "Thrifty", 3000.0f);
         g.corp_1   = add_corp(g.w, "Payee One", 0.0f);
         nation_budget nb{};
         nb.reserve_fraction     = 0.25f;
@@ -599,15 +610,15 @@ int main()
         check(r1 != nullptr && same(r1->spendable, 750.0f) &&
               same(r1->lines[k_logistics].share, 750.0f) &&
               same(r1->lines[k_logistics].paid,  100.0f) &&
-              same(g.w.nations.at(g.nation_a).treasury, 900.0f),
-              "R3b the reserve is withheld (750 of 1000 spendable), and only "
+              same(g.w.nations.at(g.nation_a).treasury, 2900.0f),
+              "R3b the reserve is withheld (750 of 3000 spendable, the tick's third), and only "
               "the 100 actually paid leaves - the unspent 650 stays put");
 
         const auto t2 = run(g);
         const auto* r2 = result_for(t2, g.nation_a);
-        check(r2 != nullptr && same(r2->spendable, 675.0f) &&
+        check(r2 != nullptr && same(r2->spendable, 725.0f) &&
               same(r2->lines[k_logistics].paid, 100.0f) &&
-              same(g.w.nations.at(g.nation_a).treasury, 800.0f),
+              same(g.w.nations.at(g.nation_a).treasury, 2800.0f),
               "R3c ...and next tick spends from the accumulated balance, not "
               "from a line bucket that evaporated");
 
@@ -631,15 +642,15 @@ int main()
         // remainder it replaced stalls once a pay falls below half a ULP of it
         // (Sprint N1 defect 2), and a stalled bound is an unbounded overdraw.
         fixture n;
-        n.nation_a = add_nation(n.w, "Besieged", 1000.0f);
+        n.nation_a = add_nation(n.w, "Besieged", 3000.0f);
         nation_budget sb{};
-        sb.reserve_fraction     = 0.4f;   // floor at 400
+        sb.reserve_fraction     = 0.4f;   // floor at 1200
         sb.weights[k_logistics] = 1.0f;
         n.budgets[n.nation_a]   = sb;
         for (int i = 0; i < 50; ++i)
         {
             const entity_id c = add_corp(n.w, "Claimant", 0.0f);
-            n.claims.push_back({n.nation_a, c, budget_priority::logistics_maintenance, 1000.0f});
+            n.claims.push_back({n.nation_a, c, budget_priority::logistics_maintenance, 3000.0f});
         }
         //
         // The floor is stated in the pass's own terms - `treasury - spendable`,
@@ -668,7 +679,7 @@ int main()
         // and the treasury must fall by exactly their sum. A decremented
         // remainder would still pay them - and would not notice it had.
         fixture q;
-        q.nation_a = add_nation(q.w, "Granular", 1000.0f);
+        q.nation_a = add_nation(q.w, "Granular", 3000.0f);
         nation_budget qb{};
         qb.reserve_fraction     = 0.25f;
         qb.weights[k_logistics] = 1.0f;
@@ -685,7 +696,7 @@ int main()
                  q.w.nations.begin(), q.w.nations.end()))
             if (id != q.nation_a && id != q.nation_b) credited += cc.treasury; // the claimants only
         check(qr != nullptr && qr->paid > 0.0f &&
-              same(q.w.nations.at(q.nation_a).treasury, 1000.0f - qr->paid) &&
+              same(q.w.nations.at(q.nation_a).treasury, 3000.0f - qr->paid) &&
               std::fabs(credited - qr->paid) <= 1e-6f,
               "R3f 256 claims of 0.001 are each paid and the treasury falls by "
               "exactly their sum - small transfers are summed among themselves "
@@ -719,7 +730,7 @@ int main()
         const auto* hr = result_for(ht, h.nation_a);
         check(hr != nullptr && same(hr->lines[k_charters].demand, 0.0f) &&
               same(hr->paid, k_paid_per_tick) &&
-              same(h.w.nations.at(h.nation_a).treasury, 1000.0f - k_paid_per_tick),
+              same(h.w.nations.at(h.nation_a).treasury, 3000.0f - k_paid_per_tick),
               "R4c a claim naming no real corporation is dropped at gather time "
               "- no phantom demand, no phantom debit");
 
@@ -751,7 +762,7 @@ int main()
         const auto* pr = result_for(pt, p.nation_a);
         check(pr != nullptr && same(pr->paid, k_paid_per_tick) &&
               same(p.w.nations.at(p.corp_1).treasury, k_corp1_per_tick) &&
-              same(p.w.nations.at(p.nation_a).treasury, 1000.0f - k_paid_per_tick),
+              same(p.w.nations.at(p.nation_a).treasury, 3000.0f - k_paid_per_tick),
               "R4f a claim naming a line outside the enum is dropped at gather "
               "time - the tick is bit-identical to the one without it");
 
@@ -888,7 +899,7 @@ int main()
         fixture m = make_fixture();
         m.claims.push_back({m.nation_b, m.corp_1, budget_priority::charters, 400.0f});
         run(m);
-        check(same(m.w.nations.at(m.nation_b).treasury, 1000.0f) &&
+        check(same(m.w.nations.at(m.nation_b).treasury, 3000.0f) &&
               same(m.w.nations.at(m.corp_1).treasury, k_corp1_per_tick),
               "R4e a claim on a nation with no authored budget pays nothing");
     }
@@ -996,7 +1007,7 @@ int main()
                   "demand, no debit, no record; the tick is bit-identical");
         }
 
-        // RULE 3a, both ways. Treasury 1000, reserve 1/4 -> spendable 750;
+        // RULE 3a, both ways. Treasury 3000, reserve 1/4, a third a tick -> spendable 750;
         // exploration and schooling weighted 1/4 each (shares 187.5), logistics
         // 1/2 with no claim. The SAME two amounts, 100 and 150, on each line:
         //   exploration (earmarked)  : corp_1 100 <= 187.5 -> paid WHOLE;
@@ -1006,7 +1017,7 @@ int main()
         // claim would have taken is still in it.
         {
             fixture m;
-            m.nation_a = add_nation(m.w, "Earmarker", 1000.0f);
+            m.nation_a = add_nation(m.w, "Earmarker", 3000.0f);
             m.corp_1   = add_corp(m.w, "Payee One", 0.0f);
             m.corp_2   = add_corp(m.w, "Payee Two", 0.0f);
             const entity_id body_a = add_body(m.w, "Near");
@@ -1037,7 +1048,7 @@ int main()
                   "than 87.5; the line says so (skipped 1, rationed, fill 0.4)");
             check(same(m.w.nations.at(m.corp_2).treasury, 112.5f) &&
                   same(m.w.nations.at(m.corp_1).treasury, 175.0f) &&
-                  same(m.w.nations.at(m.nation_a).treasury, 1000.0f - 287.5f) &&
+                  same(m.w.nations.at(m.nation_a).treasury, 3000.0f - 287.5f) &&
                   same(mr->paid, 287.5f),
                   "R6g ...the treasury is untouched by the skipped claim (pays "
                   "287.5, keeps the 87.5), and the skipped corp receives nothing "
@@ -1068,7 +1079,7 @@ int main()
             // identical list, field for field. A fresh world built in the same
             // order, so the ids agree.
             fixture p;
-            p.nation_a = add_nation(p.w, "Earmarker", 1000.0f);
+            p.nation_a = add_nation(p.w, "Earmarker", 3000.0f);
             p.corp_1   = add_corp(p.w, "Payee One", 0.0f);
             p.corp_2   = add_corp(p.w, "Payee Two", 0.0f);
             const entity_id pa = add_body(p.w, "Near");
@@ -1098,8 +1109,9 @@ int main()
 
     // --- R7: the space programme (BL-644) -----------------------------------
     // The tenth line's consumer: derive -> spend -> settle. Every number below
-    // is dyadic (prices 2.0 / 0.5, lumps 8 / 16, treasury 1024, reserve 1/4,
-    // weights quarters and halves), so the assertions are bit equality.
+    // is dyadic (prices 2.0 / 0.5, lumps 8 / 16, treasury 3072, reserve 1/4,
+    // a third a tick, weights quarters and halves), so the assertions are bit
+    // equality.
     //
     // BL-1265 (MARKETS.md § The shelf economy): corporations hold no stock, so
     // the state buys its lumps OFF A MARKET'S SHELF — the BL-742 path, now the
@@ -1122,8 +1134,8 @@ int main()
             return m;
         };
 
-        // The reference space fixture. Treasury 1024, reserve 1/4 -> spendable
-        // 768; weights space 1/4, logistics 1/2, schooling 1/4 -> space share
+        // The reference space fixture. Treasury 3072, reserve 1/4, a third a tick
+        // -> spendable 768; weights space 1/4, logistics 1/2, schooling 1/4 -> space share
         // 192. The market's SHELF on body_a: components and propellant, posted
         // (and based) at 2.0 and 0.5; lumps 8 and 16 -> 16.0 and 8.0 credits.
         struct space_fixture
@@ -1135,7 +1147,7 @@ int main()
         };
         auto make_space_fixture = [&](float components_stock, float propellant_stock) {
             space_fixture s;
-            s.f.nation_a = add_nation(s.f.w, "Spacefaria", 1024.0f);
+            s.f.nation_a = add_nation(s.f.w, "Spacefaria", 3072.0f);
             s.f.corp_1   = add_corp(s.f.w, "Bystander One", 0.0f);
             s.f.corp_2   = add_corp(s.f.w, "Bystander Two", 0.0f);
             s.body_a     = add_body(s.f.w, "Padworld");
@@ -1190,11 +1202,11 @@ int main()
             check(same(shelf[k_comp], 92.0f) && same(shelf[k_prop], 84.0f),
                   "R7b ...and the goods are CONSUMED: exactly one lump of each "
                   "leaves the shelf and lands nowhere - the satellite launched");
-            check(same(s.f.w.nations.at(s.f.nation_a).treasury, 1000.0f) &&
+            check(same(s.f.w.nations.at(s.f.nation_a).treasury, 3048.0f) &&
                   s.f.claims.empty() && t.transfers.empty() &&
                   same(s.f.w.nations.at(s.f.corp_1).treasury, 0.0f) &&
                   world_credit_exact(s.f.w) == credit_before - 24.0,
-                  "R7c ...the treasury pays the 24.0 directly (1024 -> 1000): no "
+                  "R7c ...the treasury pays the 24.0 directly (3072 -> 3048): no "
                   "claim, no transfer, no corporation paid - the money leaves "
                   "the world as every market purchase does, exactly 24.0");
         }
@@ -1215,26 +1227,27 @@ int main()
         // R7e: the LUMP property. A share below the lump's cost buys nothing
         // and the treasury banks it; grown past the cost, the lump fires
         // WHOLE. Components only (propellant lump zeroed): share = treasury x
-        // 3/4 x 1/4 = treasury x 3/16; cost 16.0 -> fires at treasury > 85.33.
+        // 3/4 x 1/3 (a tick's third) x 1/4 = treasury / 16; cost 16.0 -> fires at
+        // treasury >= 256.
         {
             space_fixture s = make_space_fixture(100.0f, 100.0f);
             s.params.propellant_lump = 0.0f;
-            s.f.w.nations.at(s.f.nation_a).treasury = 64.0f; // share 12 < 16
+            s.f.w.nations.at(s.f.nation_a).treasury = 192.0f; // share 12 < 16
             {
                 auto [intents, t] = run_space(s);
                 check(intents.empty() && t.transfers.empty() &&
-                      same(s.f.w.nations.at(s.f.nation_a).treasury, 64.0f),
+                      same(s.f.w.nations.at(s.f.nation_a).treasury, 192.0f),
                       "R7e a share below the lump buys NOTHING - no partial "
                       "purchase, the treasury banks the share (state demand "
                       "arrives in lumps)");
             }
             s.f.claims.clear();
-            s.f.w.nations.at(s.f.nation_a).treasury = 128.0f; // share 24 >= 16
+            s.f.w.nations.at(s.f.nation_a).treasury = 384.0f; // share 24 >= 16
             {
                 auto [intents, t] = run_space(s);
                 check(intents.size() == 1 && intents[0].funded && intents[0].completed &&
                       same(intents[0].credits, 16.0f) &&
-                      same(s.f.w.nations.at(s.f.nation_a).treasury, 112.0f) &&
+                      same(s.f.w.nations.at(s.f.nation_a).treasury, 368.0f) &&
                       same(s.f.w.markets.at(s.market).inventory[k_comp], 92.0f),
                       "R7f ...and once the accumulated share covers it the lump "
                       "fires whole - 16.0 paid, 8 units consumed, nothing "
@@ -1248,14 +1261,14 @@ int main()
         {
             space_fixture s = make_space_fixture(10.0f, 0.0f);
             s.params.propellant_lump = 0.0f;
-            const entity_id nation_b = add_nation(s.f.w, "Latecomia", 1024.0f);
+            const entity_id nation_b = add_nation(s.f.w, "Latecomia", 3072.0f);
             s.f.budgets[nation_b] = s.f.budgets.at(s.f.nation_a);
             auto [intents, t] = run_space(s);
             (void)t;
             check(intents.size() == 1 && intents[0].nation == s.f.nation_a &&
                   intents[0].funded && intents[0].completed &&
                   same(s.f.w.markets.at(s.market).inventory[k_comp], 2.0f) &&
-                  same(s.f.w.nations.at(nation_b).treasury, 1024.0f),
+                  same(s.f.w.nations.at(nation_b).treasury, 3072.0f),
                   "R7g shelf stock a purchase names is RESERVED: with one lump on "
                   "hand two nations do not both buy it - the ascending-id walk "
                   "takes it and the second treasury is untouched");
@@ -1277,7 +1290,7 @@ int main()
             settle_space_purchases(s.f.w, intents, t);
             check(intents.size() == 1 && !intents[0].completed &&
                   same(s.f.w.markets.at(s.market).inventory[k_comp], 4.0f) &&
-                  same(s.f.w.nations.at(s.f.nation_a).treasury, 1024.0f) &&
+                  same(s.f.w.nations.at(s.f.nation_a).treasury, 3072.0f) &&
                   world_credit_exact(s.f.w) == credit_before,
                   "R7i a lump the shelf can no longer cover at settle is NOT "
                   "launched: the shelf and the treasury both untouched, credit "
@@ -1352,7 +1365,7 @@ int main()
             run_national_budget(s.f.w, s.f.budgets, s.f.claims, &t);
             settle_space_purchases(s.f.w, intents, t);
             check(same(s.f.w.nations.at(s.f.corp_2).treasury, 0.0f) &&
-                  same(s.f.w.nations.at(s.f.nation_a).treasury, 1000.0f) &&
+                  same(s.f.w.nations.at(s.f.nation_a).treasury, 3048.0f) &&
                   intents.size() == 2 && intents[0].completed && intents[1].completed &&
                   world_credit_exact(s.f.w) == credit_before - 24.0,
                   "R7l a paid space transfer with NO intent behind it is clawed "
@@ -1379,7 +1392,7 @@ int main()
                   rep.space_purchases[0].completed && rep.space_purchases[1].completed &&
                   same(shelf[k_comp], 92.0f) &&
                   same(shelf[k_prop], 84.0f) &&
-                  same(s.f.w.nations.at(s.f.nation_a).treasury, 1000.0f) &&
+                  same(s.f.w.nations.at(s.f.nation_a).treasury, 3048.0f) &&
                   world_credit_exact(s.f.w) == credit_before - 24.0,
                   "R8 run_nation_step end to end: derive -> spend -> settle -> "
                   "fold - the shelf drawn, the treasury debited 24.0 directly, "
@@ -1405,7 +1418,7 @@ int main()
                 intents.size() == 1 && intents[0].supplier == null_entity &&
                 intents[0].market == s.market && intents[0].completed &&
                 same(mc.inventory[k_comp], 92.0f) &&
-                same(s.f.w.nations.at(s.f.nation_a).treasury, 1024.0f - 16.0f) &&
+                same(s.f.w.nations.at(s.f.nation_a).treasury, 3072.0f - 16.0f) &&
                 s.f.claims.empty();
 
             space_fixture q = make_space_fixture(0.0f, 0.0f);
@@ -1447,7 +1460,7 @@ int main()
                 bought += static_cast<int>(intents.size());
             }
             const bool refused = bought == 0 && same(mc.inventory[k_comp], 100.0f) &&
-                                 same(s.f.w.nations.at(s.f.nation_a).treasury, 1024.0f);
+                                 same(s.f.w.nations.at(s.f.nation_a).treasury, 3072.0f);
             mc.price[k_comp] = 2.0f;
             s.f.claims.clear();
             std::vector<space_purchase> intents = derive_space_programme_claims(
@@ -1457,7 +1470,7 @@ int main()
             settle_space_purchases(s.f.w, intents, t);
             check(refused && intents.size() == 1 && intents[0].completed &&
                   same(intents[0].credits, 16.0f) && same(mc.inventory[k_comp], 92.0f) &&
-                  same(s.f.w.nations.at(s.f.nation_a).treasury, 1024.0f - 16.0f),
+                  same(s.f.w.nations.at(s.f.nation_a).treasury, 3072.0f - 16.0f),
                   "R7n (BL-1172) over the ceiling, eight ticks of the space "
                   "programme buy nothing off the shelf; at it, the lump is bought "
                   "at the posted price");
@@ -1466,7 +1479,8 @@ int main()
     // --- R9: network upkeep (BL-643) ----------------------------------------
     // The logistics_maintenance line's consumer: derive -> spend -> settle.
     // Every number is dyadic (rates 1/2/4 and 0.5/1/2, hub 8/4, prices 2.0 and
-    // 4.0, treasury 1024 or 128, reserve 1/4), so assertions are bit equality.
+    // 4.0, treasury 3072 or 384, reserve 1/4, a third a tick), so assertions
+    // are bit equality.
     // Network: 4 Track + 1 Highway + 1 active port -> stone bill
     // 4x1 + 1x4 + 8 = 16, timber bill 4x0.5 + 1x2 + 4 = 8; at prices 2.0/4.0
     // both purchases are 32.0 credits.
@@ -1524,11 +1538,11 @@ int main()
             network_upkeep_params params;
         };
         // The reference network fixture. Weights logistics 1/2, schooling 1/4,
-        // exploration 1/4; treasury 1024, reserve 1/4 -> spendable 768,
+        // exploration 1/4; treasury 3072, reserve 1/4, a third a tick -> spendable 768,
         // logistics share 384 >= the 64.0 bill -> bought in full.
         auto make_net_fixture = [&](float stone_stock, float timber_stock) {
             net_fixture s;
-            s.f.nation_a = add_nation(s.f.w, "Roadsteadia", 1024.0f);
+            s.f.nation_a = add_nation(s.f.w, "Roadsteadia", 3072.0f);
             s.f.corp_1   = add_corp(s.f.w, "Bystander One", 0.0f);
             s.f.corp_2   = add_corp(s.f.w, "Bystander Two", 0.0f);
             s.body_a     = add_body(s.f.w, "Gridworld");
@@ -1614,12 +1628,12 @@ int main()
                   same(intents[0].drawn, 16.0f) && same(intents[1].drawn, 8.0f),
                   "R9b ...and the goods are CONSUMED: the full bill leaves the "
                   "shelf and lands nowhere - the repairs went into the roadbed");
-            check(same(s.f.w.nations.at(s.f.nation_a).treasury, 960.0f) &&
+            check(same(s.f.w.nations.at(s.f.nation_a).treasury, 3008.0f) &&
                   s.f.claims.empty() && t.transfers.empty() &&
                   same(intents[0].paid, 32.0f) && same(intents[1].paid, 32.0f) &&
                   same(s.f.w.nations.at(s.f.corp_1).treasury, 0.0f) &&
                   world_credit_exact(s.f.w) == credit_before - 64.0,
-                  "R9c ...the treasury pays the 64.0 directly (1024 -> 960): no "
+                  "R9c ...the treasury pays the 64.0 directly (3072 -> 3008): no "
                   "claim, no transfer, no corporation paid - exactly 64.0 leaves "
                   "the world");
         }
@@ -1637,7 +1651,7 @@ int main()
                   intents[0].funded && intents[0].completed &&
                   same(intents[0].drawn, 6.0f) &&
                   same(s.f.w.markets.at(s.market).inventory[k_stone], 0.0f) &&
-                  same(s.f.w.nations.at(s.f.nation_a).treasury, 1012.0f),
+                  same(s.f.w.nations.at(s.f.nation_a).treasury, 3060.0f),
                   "R9e a shelf short of the bill still supplies: the 16-unit "
                   "stone bill caps to the 6 on hand (12.0 paid), and an empty "
                   "timber shelf derives no purchase at all");
@@ -1679,7 +1693,7 @@ int main()
             const bool drained_ok =
                 intents.size() == 1 && !intents[0].completed &&
                 same(intents[0].drawn, 0.0f) &&
-                same(s.f.w.nations.at(s.f.nation_a).treasury, 1024.0f) &&
+                same(s.f.w.nations.at(s.f.nation_a).treasury, 3072.0f) &&
                 world_credit_exact(s.f.w) == credit_before;
 
             net_fixture r = make_net_fixture(100.0f, 100.0f);
@@ -1697,7 +1711,7 @@ int main()
             settle_network_purchases(r.f.w, r_intents, rt);
             check(drained_ok &&
                   same(r.f.w.nations.at(r.f.corp_2).treasury, 0.0f) &&
-                  same(r.f.w.nations.at(r.f.nation_a).treasury, 960.0f) &&
+                  same(r.f.w.nations.at(r.f.nation_a).treasury, 3008.0f) &&
                   r_intents.size() == 2 && r_intents[0].completed && r_intents[1].completed &&
                   world_credit_exact(r.f.w) == r_credit_before - 64.0,
                   "R9h a purchase the shelf can no longer cover at settle draws "
@@ -1744,7 +1758,7 @@ int main()
                   rep.network_purchases[0].completed && rep.network_purchases[1].completed &&
                   same(shelf[k_stone], 84.0f) &&
                   same(shelf[k_timber], 92.0f) &&
-                  same(s.f.w.nations.at(s.f.nation_a).treasury, 960.0f) &&
+                  same(s.f.w.nations.at(s.f.nation_a).treasury, 3008.0f) &&
                   world_credit_exact(s.f.w) == credit_before - 64.0,
                   "R9j run_nation_step end to end: derive -> spend -> settle -> "
                   "fold - the shelf drawn, the treasury debited 64.0 directly, "
@@ -1771,7 +1785,7 @@ int main()
                   same(intents[0].drawn, 16.0f) && same(intents[1].drawn, 8.0f) &&
                   same(mc.inventory[k_stone], 84.0f) &&
                   same(mc.inventory[k_timber], 92.0f) &&
-                  same(s.f.w.nations.at(s.f.nation_a).treasury, 1024.0f - 64.0f) &&
+                  same(s.f.w.nations.at(s.f.nation_a).treasury, 3072.0f - 64.0f) &&
                   same(s.f.w.nations.at(s.f.corp_1).treasury, 0.0f) &&
                   s.f.claims.empty(),
                   "R9k (BL-742) a stocked shelf: the purchase comes off market "
@@ -1781,12 +1795,13 @@ int main()
 
         // R9l (BL-742): the purchase caps ITSELF at the line share — a poor
         // nation's shelf purchase is capped against the share, not the
-        // treasury. Treasury 128, reserve 1/4 -> spendable 96, logistics 1/2
+        // treasury. Treasury 384, reserve 1/4, a third a tick -> spendable 96,
+        // logistics 1/2
         // -> share 48 against a 64.0 bill: 32 stone-credits fit whole, timber
         // gets the remaining 16 of its 32 (half its bill -> 4 of 8 units).
         {
             net_fixture s = make_net_fixture(0.0f, 0.0f);
-            s.f.w.nations.at(s.f.nation_a).treasury = 128.0f;
+            s.f.w.nations.at(s.f.nation_a).treasury = 384.0f;
             auto& mc = s.f.w.markets.at(s.market);
             mc.base_price[k_stone]  = 1.0f;
             mc.base_price[k_timber] = 1.0f;
@@ -1797,7 +1812,7 @@ int main()
             check(intents.size() == 2 &&
                   same(intents[0].drawn, 16.0f) &&
                   same(intents[1].quantity, 4.0f) && same(intents[1].drawn, 4.0f) &&
-                  same(s.f.w.nations.at(s.f.nation_a).treasury, 128.0f - 48.0f),
+                  same(s.f.w.nations.at(s.f.nation_a).treasury, 384.0f - 48.0f),
                   "R9l (BL-742) the shelf purchase caps itself at the line "
                   "share - 48 of the 64.0 bill, never the treasury");
         }
@@ -1829,7 +1844,7 @@ int main()
             }
             check(every_tick && same(mc.inventory[k_timber], 1000.0f) &&
                   same(mc.inventory[k_stone], 1000.0f - 8.0f * 16.0f) &&
-                  same(s.f.w.nations.at(s.f.nation_a).treasury, 1024.0f - 8.0f * 32.0f),
+                  same(s.f.w.nations.at(s.f.nation_a).treasury, 3072.0f - 8.0f * 32.0f),
                   "R9m (BL-1172) over eight ticks the network buys stone at its "
                   "posted 2.0 (at the ceiling) and never the timber posted over it");
         }

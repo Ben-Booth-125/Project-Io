@@ -241,6 +241,14 @@ it holds** (Ben, 2026-08-22) — so a poor nation and a rich one of the same cha
 recognisably alike, differing in scale and not in kind, and no authored number is re-tuned when a
 treasury grows. All weights default to zero: a nation with no authored budget spends nothing.
 
+**A tick spends a month's share of the treasury.** The spendable is `treasury × (1 −
+reserve_fraction) × ⅓`: the tick is a month, and a month may spend a third of what a quarter
+could. A share of a treasury is a share of a stock, so unlike a per-tick flow it does not shrink
+with the tick by itself. Without the third, a lump bill that is owed whole (the research queue's
+remaining cost, a space programme's lump) could take a quarter's spendable three times in every
+quarter. A per-tick flow bill is already a third, so it meets the same share it met before
+(Ben, 2026-11-11: every per-tick figure is a third of the quarter's).
+
 The ten lines, in their authored enum order (append-only once serialised — a weight vector is
 indexed by them):
 

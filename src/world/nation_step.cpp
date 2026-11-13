@@ -592,7 +592,7 @@ float contracted_force_share(const world& w, entity_id nid)
 
     const nation_budget& bud     = bit->second;
     const float          reserve = std::clamp(bud.reserve_fraction, 0.0f, 1.0f);
-    const float          spendable = ncit->second.treasury * (1.0f - reserve);
+    const float          spendable = budget_tick_spendable(ncit->second.treasury, reserve);
     if (!(spendable > 0.0f))
         return 0.0f;
 

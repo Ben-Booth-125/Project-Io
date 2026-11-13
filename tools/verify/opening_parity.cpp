@@ -25,7 +25,11 @@
 //     conservative stand-in for hex adjacency that may count a corner touch);
 //   * the minors in one line: count, median treasury, median buildings, median men.
 // Machine-readable lines start "ROW" (one per major) and "SEED" (one per world),
-// so a par_seeds sweep can be pooled from its shards.
+// so a par_seeds sweep can be pooled from its shards. BL-1647 (majors open
+// profitable) adds two report-only lines: "FLOWS" (one per major: every filed
+// flow's mean per play tick, plus `outside`, the treasury movement no return
+// carries) and "GOOD" (one per good per world: listed supply, demand, a traded-
+// value proxy and the mean price over base, summed over all markets per tick).
 //
 // Usage: build_gen/verify/opening_parity.exe [--seeds a,b] [--pairs 20:4,30:4] [--quarters N]
 //                                            [--kit <name>|none]
@@ -489,6 +493,15 @@ int main(int argc, char** argv)
             // Play: N quarters, nobody seated (every nation's scorer acts).
             constexpr int k_econ_tick_days = ::k_econ_tick_days; // BL-1642: 30, a month;
             std::map<entity_id, std::vector<double>> nets;
+            std::array<double, resource_count> g_sup{}, g_dem{}, g_val{}, g_price{};
+            std::array<int, resource_count> g_n{};
+            // BL-1647 (majors open profitable): every filed flow summed per major over the play
+            // ticks, plus the treasury movement no return carries (FINANCE.md § What a return
+            // does not carry). Report-only: the FLOWS line, one per major.
+            std::map<entity_id, std::array<double, 11>> flow_sum;
+            std::map<entity_id, double> flow_prev;
+            for (const entity_id nid : majors)
+                if (const auto it = w.nations.find(nid); it != w.nations.end()) flow_prev[nid] = it->second.treasury;
             for (int k = 1; k <= quarters; ++k)
             {
                 const int day = k * k_econ_tick_days;
@@ -517,7 +530,22 @@ int main(int argc, char** argv)
                     const auto it = w.nations.find(nid);
                     if (it == w.nations.end() || it->second.returns.empty()) continue;
                     nets[nid].push_back(it->second.returns.back().net);
+                    const quarterly_return& fr = it->second.returns.back();
+                    std::array<double, 11>& fs = flow_sum[nid];
+                    const double fv[10] = {fr.income, fr.expenditure, fr.maintenance, fr.wages, fr.interest,
+                                           fr.levies, fr.upkeep, fr.taxes, fr.research, fr.refunds};
+                    for (int f = 0; f < 10; ++f) fs[f] += fv[f];
+                    fs[10] += (static_cast<double>(it->second.treasury) - flow_prev[nid]) - fr.net;
+                    flow_prev[nid] = it->second.treasury;
                 }
+                for (const auto& [mid, mk] : w.markets)
+                    for (std::size_t g = 0; g < resource_count; ++g)
+                    {
+                        if (mk.base_price[g] <= 0.0f) continue;
+                        g_sup[g] += mk.supply[g]; g_dem[g] += mk.demand[g];
+                        g_val[g] += static_cast<double>(mk.price[g]) * std::min(mk.supply[g], mk.demand[g]);
+                        g_price[g] += mk.price[g] / mk.base_price[g]; ++g_n[g];
+                    }
                 // Cold review (2026-11-08): the grant drops the settle's last unbooked debits,
                 // so the first play return's net is its treasury less the granted figure, on
                 // a major that researched or paid garrison wage on the settle's last tick.
@@ -547,6 +575,20 @@ int main(int argc, char** argv)
                         }
                     }
             }
+            for (const entity_id nid : majors)
+            {
+                const std::array<double, 11>& fs = flow_sum[nid];
+                const double n = quarters > 0 ? static_cast<double>(quarters) : 1.0;
+                std::printf("FLOWS seed=%d pair=%d:%d nation=%llu ticks=%d income=%.2f expenditure=%.2f maintenance=%.2f"
+                            " wages=%.2f interest=%.2f levies=%.2f upkeep=%.2f taxes=%.2f research=%.2f refunds=%.2f outside=%.2f\n",
+                            seed, tt, mt, static_cast<unsigned long long>(nid), quarters, fs[0] / n, fs[1] / n, fs[2] / n,
+                            fs[3] / n, fs[4] / n, fs[5] / n, fs[6] / n, fs[7] / n, fs[8] / n, fs[9] / n, fs[10] / n);
+            }
+            for (std::size_t g = 0; g < resource_count; ++g)
+                if (g_n[g] > 0)
+                    std::printf("GOOD seed=%d good=%s ticks=%d supply=%.2f demand=%.2f value=%.2f price_x_base=%.4f\n",
+                                seed, resource_names::name_of(static_cast<resource_type>(g)).c_str(), quarters,
+                                g_sup[g] / quarters, g_dem[g] / quarters, g_val[g] / quarters, g_price[g] / g_n[g]);
             force = force_by_owner(w);
 
             std::printf("seed %d %d:%d  nations %zu (majors %zu, minors %zu)  majors touching %d pair(s)\n",
