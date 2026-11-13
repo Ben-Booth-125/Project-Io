@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*104 entries — 52 open, 52 resolved.*
+*104 entries — 51 open, 53 resolved.*
 
 ---
 
@@ -556,21 +556,6 @@ Migration moves three months of its rate on the first month of each quarter, so 
 > **Recommendation:** Keep it; heads are conserved and the calendar rate holds.
 
 *Files: `src/world/economy_system.cpp`, `tools/verify/recruits_harness.cpp`*
-
-### NR-1225 — Search placement-only: re-pin the shipped digests; rounds = 2 keeps 61% of the gain
-*decision taken on your behalf · raised 2026-11-13 · from BL-1646 (search placement only) lane and cold review*
-
-The search now walks placement alone over 2 rounds (1 seed + 2 evaluations), term 5 kept. Every row of player_seed_sweep k_shipped_digest_pins moves (D_search, D_land, D_settle, D_seat, 16 of 16): the path, the evaluation count and the winners change. Rounds = 2 was picked as the smallest count keeping >= 60% of the 6-round composite gain pooled over the 16 curated seeds (61.2%; k=1 53%, k=3 72%). world_determinism is unmoved (generation never calls the search).
-
-**Why it matters.** The digest gate fails 16/16 until re-pinned, and the pin rule needs your go. Two rounds is a cost-for-quality trade inside the 60 s world budget.
-
-- Re-pin the digests at the merged tree (after BL-1645 lands)
-- Hold the re-pin for the v0.6.0 re-bless
-- Take rounds = 3 (72% of the gain, about 3 s more on seed 0 with the fast field: 3.0-3.2 s an evaluation)
-
-> **Recommendation:** Re-pin once BL-1645 (world under 60 s) lands, at one re-bless for both; keep rounds = 2.
-
-*Files: `src/world/finish_campaign_world.cpp`, `tools/verify/player_seed_sweep.cpp`*
 
 ---
 
@@ -1365,4 +1350,21 @@ nation_tech_harness R0h pins median quarters-to-first-research in [16,24]; R0i p
 > **RESOLVED.** Ben, 2026-11-10: re-pin the pacing band to the post-fold reading.
 
 *Files: `tools/verify/nation_tech_harness.cpp`, `src/world/state_industry.cpp`*
+
+### NR-1225 — Search placement-only: re-pin the shipped digests; rounds = 2 keeps 61% of the gain
+*decision taken on your behalf · raised 2026-11-13 · from BL-1646 (search placement only) lane and cold review*
+
+The search now walks placement alone over 2 rounds (1 seed + 2 evaluations), term 5 kept. Every row of player_seed_sweep k_shipped_digest_pins moves (D_search, D_land, D_settle, D_seat, 16 of 16): the path, the evaluation count and the winners change. Rounds = 2 was picked as the smallest count keeping >= 60% of the 6-round composite gain pooled over the 16 curated seeds (61.2%; k=1 53%, k=3 72%). world_determinism is unmoved (generation never calls the search).
+
+**Why it matters.** The digest gate fails 16/16 until re-pinned, and the pin rule needs your go. Two rounds is a cost-for-quality trade inside the 60 s world budget.
+
+- Re-pin the digests at the merged tree (after BL-1645 lands)
+- Hold the re-pin for the v0.6.0 re-bless
+- Take rounds = 3 (72% of the gain, about 3 s more on seed 0 with the fast field: 3.0-3.2 s an evaluation)
+
+> **Recommendation:** Re-pin once BL-1645 (world under 60 s) lands, at one re-bless for both; keep rounds = 2.
+
+> **RESOLVED.** Ben, 2026-11-13: option C. Rounds = 3 (72% of the six-round gain); slowest curated world 35.1 s against the 60 s budget. Digests re-pinned the same day after BL-1645 landed; the shape summary is in the pin comment (player_seed_sweep.cpp).
+
+*Files: `src/world/finish_campaign_world.cpp`, `tools/verify/player_seed_sweep.cpp`*
 

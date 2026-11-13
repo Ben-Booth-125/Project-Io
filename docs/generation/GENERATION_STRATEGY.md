@@ -837,7 +837,9 @@ is cut to what the placement curve earns within the world budget (§ The world b
 terms stay scored: the generation road tier no longer varies, but each placement lays its own
 ports, hubs and site roads, so reach still differs between candidates. A world with no charter
 budget places nothing a placement can move, so its search is the seed candidate alone. The
-determinism clauses below are unchanged.
+determinism clauses below are unchanged. **The count is three rounds (Ben, 2026-11-13):** the
+placement curve has no knee (each round is one more redraw), and three rounds keep about
+seven-tenths of the six-round gain while the slowest curated world stays well inside the budget.
 
 **The round count is kept at six, and a round's proposals are scored in parallel (Ben,
 2026-09-26; BL-1136; its count superseded 2026-11-12, above).** The measured curve had no knee — every count below six gave up real gain —

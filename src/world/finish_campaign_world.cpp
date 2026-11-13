@@ -157,7 +157,10 @@ landscape_search_params campaign_search_params(std::uint32_t world_seed, int cor
     // ~6.2 s each on seed 0 (serial, quiet machine; term 5 is ~1.7 s of it),
     // ~18.7 s, against 13 evaluations and ~60 s before. Inside 20 s, not WELL
     // inside it; k = 1 (~12.4 s) keeps 53%.
-    sp.rounds                  = 2;
+    // RAISED TO k = 3 (Ben, 2026-11-13, NR-1225): with the fast market field
+    // and the history-span cuts (BL-1645) every curated seed reached play in
+    // under 33 s, so the 72% share is bought for one more evaluation.
+    sp.rounds                  = 3;
     // BL-1136 (Ben, 2026-09-26): the threads a round's proposals are scored
     // on. With placement alone a round holds ONE proposal, so one worker runs
     // whatever this says; it is kept so a wider round inherits it. The winner,

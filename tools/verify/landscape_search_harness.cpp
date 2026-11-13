@@ -33,7 +33,7 @@
 //   thread invariance on the shipped budget world, and its wall time is what
 //   that thread count saves.
 //   THE CAMPAIGN'S PROOF IS `--curve --check-k 2 --check-threads 2` (or any
-//   --check-k at or above the campaign's `rounds`, 2 since BL-1646): the whole
+//   --check-k at or above the campaign's `rounds`, 3 since NR-1225): the whole
 //   campaign walk on the campaign's two threads. --check-k defaults to 3.
 //   --rounds 6 still reads the curve the campaign's count was chosen from
 //   (finish_campaign_world.cpp, `campaign_search_params`). P1's two negative controls

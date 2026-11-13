@@ -1842,8 +1842,8 @@
   },
   {
    "raised": "2026-11-13",
-   "status": "open",
-   "resolution": null,
+   "status": "resolved",
+   "resolution": "Ben, 2026-11-13: option C. Rounds = 3 (72% of the six-round gain); slowest curated world 35.1 s against the 60 s budget. Digests re-pinned the same day after BL-1645 landed; the shape summary is in the pin comment (player_seed_sweep.cpp).",
    "source": "BL-1646 (search placement only) lane and cold review",
    "id": "NR-1225",
    "title": "Search placement-only: re-pin the shipped digests; rounds = 2 keeps 61% of the gain",
