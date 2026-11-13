@@ -1391,14 +1391,14 @@
    "design": "The one-building-per-product split (BL-1641) added names such as Spacecraft Assembly Plant and Orbital Defence Battery. Nine build rows now outrun the two-line budget construction_progress allows (it permits two measured names), and the tile-card stack row Inland Logistics Hub wraps rather than eliding. Either shorten the names in recipes.lua or widen the budget with a measured reason; the check is not to be loosened to pass."
   },
   {
-   "glyph": "○",
+   "glyph": "●",
    "sprint": null,
    "version_goal": "v0.6.0",
    "written": "2026-11-12",
    "parked": false,
    "blocked_on": null,
    "requires": [],
-   "status": "proposed",
+   "status": "complete",
    "author": "main session (Ben, 2026-11-12)",
    "id": "BL-1645",
    "short_name": "WORLD_UNDER_60S",
