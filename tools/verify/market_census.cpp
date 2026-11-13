@@ -452,10 +452,8 @@ bool same_score(const landscape_score& a, const landscape_score& b)
         && a.mean_actual          == b.mean_actual
         && a.mean_completeness    == b.mean_completeness
         && a.mean_balance         == b.mean_balance
-        && a.mean_reach           == b.mean_reach
         && a.completeness_spread  == b.completeness_spread
         && a.balance_spread       == b.balance_spread
-        && a.reach_spread         == b.reach_spread
         && a.spread               == b.spread
         && a.market_count         == b.market_count
         && a.markets.size()       == b.markets.size();
@@ -479,7 +477,7 @@ search_validation validate_walk(const app_start_world& out, const landscape_sear
     const landscape_search_result& r = out.land.search;
     v.budget_world = out.land.stockpile_path && !out.land.stockpile.budget.empty()
                   && !r.charter_refused && !r.charter_fell_back;
-    v.live_axes   = v.budget_world ? landscape_axis_count - 1 : landscape_axis_count;
+    v.live_axes   = landscape_live_axis_count;   // placement alone, on every world (BL-1646)
     v.rounds      = sp.rounds;
     v.evaluations = r.evaluations;
     v.path        = static_cast<int>(r.path.size());

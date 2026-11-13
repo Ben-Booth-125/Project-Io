@@ -479,16 +479,13 @@ void hash_score(fnv1a64& f, const landscape_score& s)
         f.scalar(m.starved);
         f.scalar(m.rated);
         f.scalar(m.balance);
-        f.scalar(m.reach);
     }
     f.scalar(s.mean_completeness);
     f.scalar(s.mean_actual);
     f.scalar(s.mean_balance);
-    f.scalar(s.mean_reach);
     f.scalar(s.realisation);
     f.scalar(s.completeness_spread);
     f.scalar(s.balance_spread);
-    f.scalar(s.reach_spread);
     f.scalar(s.spread);
     f.scalar(s.composite);
     f.scalar(s.market_count);

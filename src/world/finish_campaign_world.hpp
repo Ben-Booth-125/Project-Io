@@ -76,7 +76,9 @@ struct world_params;
 era_band campaign_band_from_world(const world& w);
 
 /// BL-1136 (Ben, 2026-09-26): the threads a round's proposals are scored on.
-/// Two, because a budget world proposes two per round. The result does not
+/// Two, set when a budget world proposed two per round; since the walk went
+/// placement-only (2026-11-12) a round holds one proposal and one worker runs,
+/// so this caps nothing today. The result does not
 /// depend on it (landscape_search.hpp § what keeps it deterministic); only the
 /// wall time and the peak memory do — one world copy per thread is held at once.
 inline constexpr int k_campaign_search_threads = 2;

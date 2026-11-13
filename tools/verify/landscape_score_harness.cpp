@@ -15,12 +15,11 @@
 // the same five candidates now spread 3.2e-01 on the composite. The harness did
 // not change its question between the two; only the answer moved.
 //
-// BL-977 ASKED THE SAME QUESTION OF THE ROAD AXIS. NR-793 measured three road
-// tiers scoring bit-identically on every term, because every term read reach as
-// a coverage boolean that had saturated. Section C scores candidates differing
-// ONLY in road tier under each of the two readings GENERATION_STRATEGY.md left
-// open for the fifth term — mean reach cost, in-reach tile count — and reports
-// which discriminates and by how much. Section A now lays each roster through
+// BL-977 ASKED THE SAME QUESTION OF THE ROAD AXIS and answered it with a fifth
+// term, reach quality; a Section C here scored candidates differing only in
+// road tier against it. Both retired together (Ben, 2026-11-12, BL-1646): the
+// search no longer varies roads, so the term is not scored and Section C (R5.1,
+// R5.2) is removed with it. Section A lays each roster through
 // `apply_landscape_candidate`, the live seam's own path, so it also proves the
 // world-gen roster is REPLACED rather than appended to.
 //
@@ -102,9 +101,9 @@ void print_row(const candidate& c)
 {
     const landscape_score& s = c.score;
     std::printf("  %-26s  potential=%.5f  ACTUAL=%.5f  realised=%.3f  balance=%.5f  "
-                "reach=%.4f  spread=%.5f  composite=%.6f  (%d mkts, %d corps/%d spec, %d bldgs)\n",
+                "spread=%.5f  composite=%.6f  (%d mkts, %d corps/%d spec, %d bldgs)\n",
                 c.label.c_str(), s.mean_completeness, s.mean_actual, s.realisation,
-                s.mean_balance, s.mean_reach, s.spread, s.composite, s.market_count,
+                s.mean_balance, s.spread, s.composite, s.market_count,
                 c.corps, c.specialists, c.buildings);
 }
 
@@ -148,8 +147,6 @@ void report_discrimination(const char* what, const std::vector<candidate>& cs)
         { "ACTUAL completeness", &landscape_score::mean_actual },
         { "realisation", &landscape_score::realisation },
         { "supply:demand balance", &landscape_score::mean_balance },
-        { "reach level (unscored)", &landscape_score::mean_reach },
-        { "reach spread (term 5)", &landscape_score::reach_spread },
         { "spread (unevenness)", &landscape_score::spread },
         { "composite", &landscape_score::composite },
     };
@@ -189,7 +186,7 @@ int main()
 
     // ------------------------------------------------------------------
     // A. CANDIDATE ROSTERS on ONE fixed world — what phase 6 actually varies.
-    //    Ben's point 3: candidates vary rosters, placements and road tiers,
+    //    Ben's point 3: candidates vary — the search now by placement alone —
     //    NOT whole upstream worlds, so generation runs once and only the
     //    economic layer repeats.
     // ------------------------------------------------------------------
@@ -287,67 +284,8 @@ int main()
     }
     report_discrimination("DIFFERENT WORLDS (the control)", worlds);
 
-    // ------------------------------------------------------------------
-    // C. THE ROAD AXIS (BL-977). Candidates that differ ONLY in road tier.
-    //    This is the doc's own test: "score candidates that differ only in
-    //    road tier and ask whether the chosen reading discriminates between
-    //    them at all."
-    //
-    //    THE READING WAS CHOSEN HERE, BY MEASUREMENT (2026-09-15). Both of
-    //    the doc's candidates ran side by side on this fixture: MEAN REACH
-    //    COST moved the composite 8.747e-4 across the three tiers,
-    //    monotonically (0.010502348 / 0.010507931 / 0.010511542); the
-    //    IN-REACH TILE COUNT moved it 6.217e-4, NON-monotonically, and left
-    //    tiers 2 and 3 five parts in a billion apart (0.010129051 /
-    //    0.010129101) — a reach budget saturates a count as surely as it
-    //    saturates a boolean. Cost is kept; the count reading is deleted,
-    //    and this section now scores the survivor alone.
-    // ------------------------------------------------------------------
-    std::printf("\nC. ROAD TIER on one world, roster held - does term 5 see the axis?\n");
-    std::vector<candidate> tiers;
-    for (std::uint8_t t = 1; t <= 3; ++t)
-    {
-        world w = base;
-        apply_landscape_candidate(w, reg, landscape_candidate{ 8, 0xC0FFEEu, t }, true);
-        char lbl[32];
-        std::snprintf(lbl, sizeof lbl, "road_tier=%u", static_cast<unsigned>(t));
-        candidate c{ lbl, score_landscape(w, reg) };
-        note_fixture(c, w);
-        tiers.push_back(c);
-
-        // The per-market readings themselves, so the movement can be seen at
-        // the grain it is scored at rather than only in the summary. The
-        // in-reach fraction is printed beside the cost as the boolean grain
-        // the other terms consume — context, not a term.
-        const std::vector<market_reach> rows = measure_market_reach(w, reg);
-        std::printf("  %-12s", lbl);
-        for (const market_reach& r : rows)
-            std::printf("  [cost %.3f  in-reach %.4f]", r.mean_cost,
-                        r.catchment_tiles > 0
-                            ? static_cast<double>(r.in_reach_tiles) / r.catchment_tiles : 0.0);
-        std::printf("\n");
-    }
-    std::printf("\n");
-    for (const candidate& c : tiers)
-        std::printf("    %-12s  reach level=%.5f  reach spread=%.6f  spread=%.6f  composite=%.9f\n",
-                    c.label.c_str(), c.score.mean_reach, c.score.reach_spread,
-                    c.score.spread, c.score.composite);
-    std::printf("    reach level relative range %.3e, reach spread %.3e, composite %.3e\n",
-                relative_range(tiers, &landscape_score::mean_reach),
-                relative_range(tiers, &landscape_score::reach_spread),
-                relative_range(tiers, &landscape_score::composite));
-    {
-        const bool distinct = tiers[0].score.composite != tiers[1].score.composite
-                           && tiers[1].score.composite != tiers[2].score.composite
-                           && tiers[0].score.composite != tiers[2].score.composite;
-        check(distinct, "R5.1",
-              "three road tiers score PAIRWISE DIFFERENTLY - the road axis is visible "
-              "to the objective");
-        check(tiers[0].score.mean_reach > tiers[1].score.mean_reach
-              && tiers[1].score.mean_reach > tiers[2].score.mean_reach, "R5.2",
-              "the reach LEVEL falls monotonically with the tier - the reading moves in "
-              "the currency the axis moves in");
-    }
+    // C (the road axis against term 5, R5.1 and R5.2) is REMOVED: both the
+    // road-tier axis and the reach term it measured retired (Ben, 2026-11-12).
 
     // ------------------------------------------------------------------
     // R3 — purity and determinism. Asserted from the first slice, because it
@@ -365,7 +303,6 @@ int main()
         const bool same = a.composite == b.composite && b.composite == c.composite
                        && a.mean_completeness == b.mean_completeness
                        && a.mean_balance == b.mean_balance
-                       && a.reach_spread == b.reach_spread
                        && a.spread == b.spread;
         check(same, "R3.1", "scoring the same world three times is bit-identical");
         check(a.market_count > 0, "R3.2", "the scorer found markets to score at all");

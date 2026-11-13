@@ -144,15 +144,25 @@ landscape_search_params campaign_search_params(std::uint32_t world_seed, int cor
     sp.seed                    = world_seed ^ 0x8A21F00Du;
     sp.start.placement_seed    = sp.seed;
     sp.start.corporation_count = corporation_count;
-    // BL-1136 (Ben, 2026-09-26; GENERATION_STRATEGY.md § Phase 6, "The round
-    // count is kept at six"): a round's proposals are scored on two threads.
-    // A budget world proposes two per round (placement and road tier), so two
-    // threads halve the search's wall time; the winner, every scored term and
-    // the whole path are the serial walk's, bit for bit (the determinism
-    // clauses in landscape_search.hpp; `landscape_search_harness --curve
-    // --check-k 6 --check-threads 2` proves it on the curated seeds, all six
-    // rounds -- --check-k defaults to 3, which compares only half the walk --
-    // and the harness's default run holds a threaded budget-world row, R6).
+    // BL-1646 (Ben, 2026-11-12; GENERATION_STRATEGY.md § "The search walks
+    // placement alone, over fewer rounds"): one placement proposal per round,
+    // and the count cut to what the placement curve earns inside the world
+    // budget. MEASURED 2026-11-12 (`landscape_search_harness --curve --rounds 6`
+    // over the 16 curated seeds): the share of the six-round composite gain,
+    // pooled, that k rounds keep is 56 / 65 / 76 / 78 / 91 / 100% at k = 1..6 --
+    // no knee, because a placement proposal is a redraw and each round is one
+    // more sample. THE RULE: the smallest k whose pooled share is a clear
+    // majority (>= 60%) while seed 0's walk stays well under 20 s. At ~4.5 s
+    // an evaluation on seed 0 (serial, quiet machine) that is k = 2: three
+    // evaluations, ~14 s, against 13 evaluations and ~60 s before.
+    sp.rounds                  = 2;
+    // BL-1136 (Ben, 2026-09-26): the threads a round's proposals are scored
+    // on. With placement alone a round holds ONE proposal, so one worker runs
+    // whatever this says; it is kept so a wider round inherits it. The winner,
+    // every scored term and the whole path are the serial walk's, bit for bit
+    // (the determinism clauses in landscape_search.hpp; `landscape_search_harness
+    // --curve --check-k <rounds> --check-threads 2` proves it on the curated
+    // seeds, and the harness's default run holds a threaded budget-world row).
     sp.thread_count            = k_campaign_search_threads;
     return sp;
 }
@@ -387,11 +397,10 @@ finish_campaign_result finish_campaign_world(world& w, generation_report& report
                                             : "");
     }
     std::printf("[landscape_search] winner corps=%d placement=%08X tier=%u  "
-                "accepted roster=%d placement=%d road_tier=%d of %d rounds\n",
+                "accepted placement=%d of %d rounds\n",
                 out.search.winner.corporation_count, out.search.winner.placement_seed,
                 static_cast<unsigned>(out.search.winner.road_tier),
-                out.search.accepted_by_axis[0], out.search.accepted_by_axis[1],
-                out.search.accepted_by_axis[2], sp.rounds);
+                out.search.accepted, sp.rounds);
     std::fflush(stdout);
 
     // 5. AGAIN, and this one is not belt-and-braces (2026-08-17): the pass

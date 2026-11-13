@@ -18,11 +18,12 @@ namespace
 /// Deterministic sub-stream for one (round, axis) pair.
 ///
 /// KEYED, NOT SEQUENCED, and that is the whole reason a round's proposals can be
-/// scored in any order. A sequential stream would make the placement axis's draw
-/// depend on whether the roster axis drew first, so a reordering (or a thread)
-/// would silently change WHICH candidates exist rather than merely when they are
-/// scored. The stage tag folds both coordinates so no two (round, axis) pairs
-/// collide within a search.
+/// scored in any order. A sequential stream would make one axis's draw depend on
+/// whether another drew first, so a reordering (or a thread) would silently
+/// change WHICH candidates exist rather than merely when they are scored. The
+/// stage tag folds both coordinates so no two (round, axis) pairs collide within
+/// a search. The stride stays `landscape_axis_count` (3) with placement alone
+/// live, so every placement draw is the one the three-axis walk made.
 checkpoint_rng axis_rng(std::uint32_t seed, int round, landscape_axis axis)
 {
     const std::uint32_t tag =
@@ -41,46 +42,21 @@ int cmp_double(double a, double b)
     return 0;
 }
 
-/// Perturb the incumbent along one axis. Pure in (incumbent, params, rng).
-landscape_candidate perturb(const landscape_candidate& in, landscape_axis axis,
-                            const landscape_search_params& p, checkpoint_rng& rng)
+/// Perturb the incumbent's PLACEMENT, the one live axis (Ben, 2026-11-12).
+/// Pure in (incumbent, rng); every other field is carried unchanged, so the
+/// roster count and road tier stay at the seed candidate's for the whole walk.
+///
+/// Placement has no neighbourhood — a seed one apart stakes a wholly different
+/// set of holdings — so the proposal is a redraw by construction, not by
+/// choice. Folded from the incumbent's own seed so the walk's history is
+/// carried rather than discarded. The arithmetic and the draw are the
+/// three-axis walk's placement case, unchanged, so with the tag stride held
+/// (`axis_rng`) a proposal here is the one that walk drew.
+landscape_candidate perturb_placement(const landscape_candidate& in, checkpoint_rng& rng)
 {
     landscape_candidate out = in;
-    switch (axis)
-    {
-    case landscape_axis::roster:
-    {
-        // A ladder of signed steps rather than a uniform redraw: greedy
-        // refinement wants a NEIGHBOURHOOD of the incumbent, and a redraw over
-        // the whole range would make each round an independent sample and throw
-        // away the walk. The wide steps are kept so the walk can still cross a
-        // flat stretch.
-        static const int steps[] = { -4, -2, -1, 1, 2, 4 };
-        const int d = steps[rng.index(static_cast<int>(sizeof steps / sizeof steps[0]))];
-        out.corporation_count = std::clamp(in.corporation_count + d,
-                                           p.min_corporations, p.max_corporations);
-        break;
-    }
-    case landscape_axis::placement:
-    {
-        // Placement has no neighbourhood — a seed one apart stakes a wholly
-        // different set of holdings — so this axis is a redraw by construction,
-        // not by choice. Folded from the incumbent's own seed so the walk's
-        // history is carried rather than discarded.
-        const std::uint32_t draw = static_cast<std::uint32_t>(rng.index(1 << 30));
-        out.placement_seed = in.placement_seed * 1664525u + 1013904223u + draw;
-        break;
-    }
-    case landscape_axis::road_tier:
-    {
-        const int d = (rng.index(2) == 0) ? -1 : 1;
-        const int t = std::clamp(static_cast<int>(in.road_tier) + d,
-                                 static_cast<int>(p.min_road_tier),
-                                 static_cast<int>(p.max_road_tier));
-        out.road_tier = static_cast<std::uint8_t>(t);
-        break;
-    }
-    }
+    const std::uint32_t draw = static_cast<std::uint32_t>(rng.index(1 << 30));
+    out.placement_seed = in.placement_seed * 1664525u + 1013904223u + draw;
     return out;
 }
 
@@ -112,7 +88,8 @@ void score_one(const world& base, const recipe_registry& reg,
 /// tier axis and the default recipes, as every apply does; the roster removed
 /// when the caller regenerates it; no specialist, no firm, nobody seated. An
 /// empty economy is the honest result of a world whose history left no
-/// industry to charter with. Pure and draw-free.
+/// industry to charter with. Pure and draw-free. (The road-tier raise below
+/// reads the candidate's tier, which the search no longer varies.)
 void lay_unchartered_world(world& w, const recipe_registry& reg,
                            const landscape_candidate& c, bool regenerate_specialists)
 {
@@ -173,7 +150,6 @@ int compare_landscape(const landscape_score& a, const landscape_score& b)
     c = cmp_double(a.mean_actual, b.mean_actual);           if (c) return c;
     c = cmp_double(a.mean_completeness, b.mean_completeness); if (c) return c;
     c = cmp_double(a.spread, b.spread);                     if (c) return c;
-    c = cmp_double(a.reach_spread, b.reach_spread);         if (c) return c;
     c = cmp_double(a.mean_balance, b.mean_balance);         if (c) return c;
     // Market count last: a landscape scoring identically over more markets is
     // the better-founded reading of the same number.
@@ -192,11 +168,11 @@ void apply_landscape_candidate(world& w, const recipe_registry& reg,
                                const landscape_candidate& c,
                                bool regenerate_specialists)
 {
-    // --- ROAD TIER axis -----------------------------------------------------
-    // Purely additive and idempotent: a road already at a higher tier is never
-    // downgraded, and a tile with no road never gains one. So the walk cannot
-    // demolish infrastructure by proposing a lower tier — it can only decline to
-    // develop it, which is what "infrastructure tier" means as an axis.
+    // --- the candidate's ROAD TIER (a retired search axis, 2026-11-12) -------
+    // The search holds every candidate at the seed's tier, so this raise is the
+    // same for every candidate (a no-op at tier 1). Purely additive and
+    // idempotent: a road already at a higher tier is never downgraded, and a
+    // tile with no road never gains one.
     //
     // The walk is over an unordered_map and that is safe HERE, unlike a sum:
     // every write is `max` on an integer field of the tile it is keyed by, so
@@ -227,7 +203,7 @@ void apply_landscape_candidate(world& w, const recipe_registry& reg,
         invalidate_logistics_caches(w);
     }
 
-    // --- ROSTER and PLACEMENT axes ------------------------------------------
+    // --- the roster (count held) and its PLACEMENT ---------------------------
     // The same two calls, in the same order, that the slice-1/2 harness measured
     // discrimination on — so the search walks the fixture the objective was shown
     // to be able to see, not a second one invented here.
@@ -245,9 +221,8 @@ void apply_landscape_candidate(world& w, const recipe_registry& reg,
         // The seed is the candidate's placement seed, exactly as the background
         // pass below takes it: the two passes already draw from distinct
         // xor-offset streams of one seed, and that seed is itself drawn from the
-        // search's (round, axis)-keyed stream on the placement axis. The roster
-        // axis moves the COUNT on a held seed, so its proposal is a neighbour of
-        // the incumbent — the same firms plus or minus a few — not a redraw.
+        // search's (round, axis)-keyed stream on the placement axis. The count
+        // is the candidate's, which the search holds at the seed's.
         remove_specialist_roster(w);
         corporation_params cp;
         cp.corporation_count = c.corporation_count;
@@ -393,7 +368,7 @@ landscape_search_result search_landscape(const world& base, const recipe_registr
     // whose spend params are refused (a price <= 0 — the prices have no shipped
     // default) is NOT a budget world: the search below runs on a copy of the
     // params with the budget removed, which is exactly the no-budget search
-    // (all three axes, every score real), and the result says it was refused.
+    // (the same placement walk, every score real), and the result says it was refused.
     // `p` is that copy on a refusal and `p_in` itself otherwise.
     // BL-1060: then the refusal only the world can decide, on the base world
     // every candidate is applied to (`charter_spend_world_refusal`).
@@ -435,21 +410,20 @@ landscape_search_result search_landscape(const world& base, const recipe_registr
     }
     const landscape_search_params& p = (refusal != nullptr || fell_back) ? refused_params : p_in;
 
-    // BL-1032. A BUDGET WORLD skips the roster axis (the budget decides the
-    // roster). A null, empty or refused budget is not a budget world, and
-    // everything below runs exactly as it did before the seam.
+    // BL-1032. On a BUDGET WORLD the budget decides the roster; a null, empty
+    // or refused budget is not a budget world. The walk is the same placement
+    // walk on both (2026-11-12): only what an evaluation charters differs.
     const bool budget_world = bw.budget_world();
     if (budget_world && p.print_rounds)
-        std::printf("[landscape_search] charter budget: %zu centres, %lld points; roster axis "
-                    "SKIPPED (the budget decides the roster)\n",
+        std::printf("[landscape_search] charter budget: %zu centres, %lld points; the budget "
+                    "decides the roster, the walk varies placement\n",
                     p.budget->points().size(),
                     static_cast<long long>(p.budget->total()));
 
     // BL-1085: the inner bar -- evaluations done over evaluations planned (the
-    // seed, then per round one proposal per live axis). A write-only tap;
+    // seed, then one placement proposal per round). A write-only tap;
     // `out.evaluations` is the count the walk keeps anyway.
-    const int planned_evaluations =
-        1 + std::max(0, p.rounds) * (budget_world ? landscape_axis_count - 1 : landscape_axis_count);
+    const int planned_evaluations = 1 + std::max(0, p.rounds) * landscape_live_axis_count;
     const auto report_progress = [&](int done) {
         if (p.progress != nullptr)
             p.progress->report_sub(done, planned_evaluations);
@@ -487,32 +461,27 @@ landscape_search_result search_landscape(const world& base, const recipe_registr
     for (int r = 0; r < rounds; ++r)
     {
         const auto round_t0 = clock::now();
-        // --- propose, one per axis, in the fixed axis order ------------------
-        // `live` holds the axes this round proposes, ascending. On every world
-        // but a budget world that is all of them, {0, 1, 2}, and each loop below
-        // walks it in exactly the order it walked the axes before BL-1032.
-        //
-        // A BUDGET WORLD SKIPS ROSTER: no draw, no proposal, no score, no path
-        // step. SKIPPED, NEVER RE-KEYED — the draws are keyed by (round, axis),
-        // so not drawing roster leaves the placement and road-tier proposals
-        // exactly what they are on a legacy world, and the axis count and the
-        // tag formula do not move.
+        // --- propose: PLACEMENT alone (Ben, 2026-11-12) ---------------------
+        // `props` is indexed by axis SLOT and `live` holds the slots this round
+        // proposes, which is the placement slot alone. Roster and road tier are
+        // retired: no draw, no proposal, no score, no path step. NEVER RE-KEYED
+        // — the draw is keyed by (round, axis slot) at the unchanged stride, so
+        // the placement proposal is exactly the three-axis walk's.
         std::vector<scored> props(landscape_axis_count);
         std::vector<std::size_t> live;
-        live.reserve(landscape_axis_count);
-        for (int a = 0; a < landscape_axis_count; ++a)
+        live.reserve(landscape_live_axis_count);
         {
-            const landscape_axis axis = static_cast<landscape_axis>(a);
-            if (budget_world && axis == landscape_axis::roster)
-                continue;
+            const landscape_axis axis = landscape_axis::placement;
             checkpoint_rng rng = axis_rng(p.seed, r, axis);
-            props[static_cast<std::size_t>(a)].cand = perturb(out.winner, axis, p, rng);
-            live.push_back(static_cast<std::size_t>(a));
+            const std::size_t slot = static_cast<std::size_t>(static_cast<int>(axis));
+            props[slot].cand = perturb_placement(out.winner, rng);
+            live.push_back(slot);
         }
 
         // --- score them INDEPENDENTLY ---------------------------------------
-        // Results land at their own index, so nothing downstream can observe
-        // which finished first. Each worker copies `base` itself: score_landscape
+        // One proposal today, so the threaded branch runs one worker; it stays
+        // generic over `live`. Results land at their own index, so nothing
+        // downstream can observe which finished first. Each worker copies `base` itself: score_landscape
         // memoises into the world it scores, so a shared world would be both a
         // race and an ordering hazard (landscape_score.hpp § the consequence).
         if (threads <= 1)
@@ -545,7 +514,8 @@ landscape_search_result search_landscape(const world& base, const recipe_registr
         report_progress(out.evaluations); // the threaded path reports per round
 
         // --- argmax over the proposals, by the TOTAL order -------------------
-        // Proposal-vs-proposal ties are broken by `candidate_key_less`, so an
+        // A single proposal is its own argmax; the loop stays so the order is
+        // the one any wider round would use. Proposal-vs-proposal ties are broken by `candidate_key_less`, so an
         // exact tie between two proposals resolves identically everywhere. This
         // key is deliberately NOT consulted against the incumbent below.
         std::size_t best = live.front();
