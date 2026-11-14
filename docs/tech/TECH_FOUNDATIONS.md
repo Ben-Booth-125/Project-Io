@@ -75,6 +75,16 @@ The platform layer is **SDL3**, providing windowing, input, audio, and 2D render
 
 SDL3 was chosen over SFML and raylib for three reasons. First, it sits at exactly the right level of abstraction for a custom engine: it handles platform-specific concerns without imposing any opinions about game structure, leaving the simulation layer, scripting boundary, and view systems entirely under our control. Second, SDL3's new GPU API is available for future use on the solar system view without requiring a platform layer change. Third, SDL2 is in maintenance mode; starting a new project on SDL3 gives access to active development, a fully revised API reference, and a larger community knowledge base.
 
+**SDL 3.4, and fragment shaders on the 2D renderer (Ben, 2026-11-14).** The pinned SDL release is
+3.4. Its 2D renderer may run **custom fragment shaders** through `SDL_GPURenderState` on the
+GPU-backed renderer, so a per-pixel pass (a lens lookup, a distance-field border, a detail layer, a
+live grade, water) can run at draw time instead of being baked. This is still the 2D renderer:
+textured quads and ImGui draw lists, no depth, no 3D terrain (§ Rendering dimension). ImGui and
+its SDLRenderer3 backend stay. Every shader pass has a **no-shader path** — what it draws when the
+renderer cannot take a GPU render state — so the app runs on any renderer, and nothing in `world/*`
+reads a shader's output. Which renderer `--verify` captures with, once a shader pass exists, is
+an open question owned by BL-1655 (shader seam), not settled here.
+
 SFML was ruled out due to slower evolution and a C++ OOP API that works against a data-oriented simulation model. Raylib was ruled out because its built-in main loop and camera abstractions create friction when building a custom engine with a separate simulation tick and multiple distinct view systems.
 
 **Authored images load through one in-tree PNG decoder (Ben, 2026-10-28, NR-1095).** SDL3 loads BMP only and ImGui bundles no image loader, so `src/ui/png_decode.cpp` is the one image path: zlib inflate plus 8-bit grey, grey+alpha, RGB, RGBA and palette PNGs, non-interlaced, with any other file refused with a reason. Every authored image (unit art, emblems, icons as files) loads through it; a vendored image library is not added beside it. It caps its output size, because a file is input it did not write.

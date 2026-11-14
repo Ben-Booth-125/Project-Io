@@ -653,6 +653,15 @@ zoom we currently have (2.5D)"*): the player's wheel and keyboard move through a
 (`planetary_zoom_stepped`; verify's `set_zoom` stays free-form so scripted framings
 are unaffected). The upper canvas rungs keep continuous zoom.
 
+**A step glides** (Ben, 2026-11-14, BL-1653 (animated zoom step)). The ladder is the
+state — the saved zoom and every reader of it see the rung — but the zoom DRAWN moves to
+the new rung over **0.18 s**, eased out, geometric in zoom, holding fixed the point under
+the cursor (the wheel) or the view's centre (the keyboard). In between, the level drawn
+follows the drawn radius by the rule below (minified at most 2:1), so a glide asks for no
+level the ladder's two ends do not. A step taken mid-glide starts from the zoom drawn. A
+middle-button pan ends the glide at its rung. Under `--verify` (the fixed frame clock) a
+step is instant, so a capture never lands mid-glide.
+
 **Zooming does not add detail** (Ben, 2026-10-09, after walking the sprint 51 build:
 *"the current lag is very off putting… zooming doesn't add more detail, arguably the
 biggest fix even if we keep a high resolution"*). This supersedes the per-rung bake
@@ -668,7 +677,13 @@ been a fresh, expensive bake, and that bake was the lag.
   — is box-downsampled from the master, chunk by chunk, in milliseconds. A rung
   draws the level at or above its drawn radius, minified by at most 2:1, so no step
   shimmers (`SDL_Renderer` has no mipmaps; the chain is ours). Detail never changes
-  with zoom; only scale does.
+  with zoom; only scale does. **The downsample averages in linear light** (Ben,
+  2026-11-14, BL-1652 (gamma-correct mips)): each sRGB byte is decoded through a fixed
+  table, the four samples averaged by alpha weight, and the mean re-encoded through the
+  inverse table. An sRGB-byte mean darkens fine contrast — a lit crown beside its
+  shadow averages to a darker grey than the eye sees — so each level would read
+  muddier than the master it came from. Integer tables, so the chain stays
+  deterministic; a flat run stays exact.
 - **The master is held in RAM; the GPU holds what is on screen.** The master and its
   chain live in system memory (about 2.9 GB for an Earth-sized body, opaque chunks as RGB); each frame uploads
   the visible chunks of the level in use, within a per-frame upload budget so a pan

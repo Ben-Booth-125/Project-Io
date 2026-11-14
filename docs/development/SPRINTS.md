@@ -121,6 +121,24 @@ and/or a version goal (v0.1.1 etc.).
 - BL-1630 (LAUNCH_GOODS_SUPPLY)
 - BL-1611 (FAR_SPACE_SPECTATOR_CHECK)
 
+### Sprint 68 — Map fidelity
+*Open · opened 2026-11-14 · Claude (Ben, 2026-11-14: "try implementing the easier changes first")*
+
+**Goal.** The Planetary map holds more detail at every rung: correct mips and a smooth zoom first, then SDL 3.4 and a shader seam that moves lenses, borders, grade and water off the bake.
+
+**Planned.**
+- BL-1652 (GAMMA_CORRECT_MIPS)
+- BL-1653 (ANIMATED_ZOOM_STEP)
+- BL-1654 (SDL_3_4_UPGRADE)
+- BL-1655 (SHADER_SEAM)
+- BL-1656 (LENS_ID_LOOKUP)
+- BL-1657 (SDF_NATIONAL_BORDERS)
+- BL-1658 (CLOSE_ZOOM_DETAIL_LAYER)
+- BL-1659 (LIVE_GRADE_SHADER)
+- BL-1660 (SHADER_WATER)
+- BL-1661 (FAR_ZOOM_CARTOGRAPHIC_MAP)
+- BL-1662 (COMPRESSED_GROUND_TEXTURES)
+
 ## Where things stand
 
 | Sprint | Theme | State |
@@ -211,9 +229,10 @@ and/or a version goal (v0.1.1 etc.).
 | 65 | Near space (v0.4.0) | gated on NR-1203 (trade wall): every item built except BL-1630 (launch goods supply); spectate shows 0 rival launches (BL-1593, NEXT_SESSION.md) |
 | 66 | Far space (v0.5.0) | open: every item built except BL-1611 (far-space spectator check), gated on NR-1203; four live clicks owed (NEXT_SESSION.md) |
 | 67 | Launch fix and space calls | open: boost (BL-1637), generated body mass (BL-1638), probe retirement (BL-1639) in lanes; B measured for NR-1203 |
+| 68 | Map fidelity | open: gamma-correct mips (BL-1652) and animated zoom step (BL-1653) first; SDL 3.4 (BL-1654) next |
 
 **Next up.** SPRINT 61 CLOSED 2026-11-05 (no version cut). v0.3.0 needs the naval system and a playtest with a few wars. BL-1470 (sentiment contributors) passed its live click 2026-11-05; BL-1490 (province resource clip) waits on BL-1495 (UI scale down); BL-1494 (new-library tick-50 stall) leads the economy work. SPRINT 63 (UI, QOL and the opening) OPEN 2026-11-05: Ben's playtest list is filed; the payback census has read: research is the missing money and the door quotes mirages on scarce goods.
 
 **The standing debt out of P1**, worth repeating here because it spans four items: nothing built in that sprint was ever *rendered*. The session ran in a container that cannot build the GUI, so every UI half is compile-clean and arithmetically checked and visually unseen, and no golden was blessed. For a sprint whose own method note is *build it, look at it, then rule*, that is the thing to fix first.
 
-*83 sprints archived cold; 3 open/gated in the hot store.*
+*83 sprints archived cold; 4 open/gated in the hot store.*

@@ -1562,6 +1562,275 @@
         "docs/military/MILITARY.md"
       ],
       "design": "NATIONS.md § 3 (the national budget). READ 2026-11-14 after BL-1650 (free research rate), opening_parity 30:4, 16 seeds, 60 months: median major end treasury 15,447 (was 3,776 with the credit line), 61 of 64 winners averaging +230 a month total. The academic weight still takes its slot in the split but spends nothing, so its share stays in the treasury. WORK: measure where the unspent surplus sits (academic slot vs other lines under-spending vs reserve), then decide whether a rich nation should build more (research buildings, processors), whether the split should redistribute an unspent line, or whether this level is fine. Ben's call which; a brake must be an in-world force, not an agent handicap. Do not clamp the treasury. RULED (Ben, 2026-11-14): \"rich nations build more, be it economy or military\" - NATIONS.md § 3, \"A rich nation builds more; wealth is spent, not held\". Rival nations only; the player's nation is untouched. WORK: (1) measure why a rival holding 15k does not build now (the scorer's solvency gate, reserve, candidate supply or emphasis); (2) let the surplus raise its build and hire appetite through the existing scored-utility verbs; (3) re-read opening_parity: end treasury and buildings per major. GRANTED (Ben, 2026-11-14): the force target may read the nation's OWN treasury surplus - AI_OPPONENT.md § 11, MILITARY.md § Force sizing \"A surplus raises the target\"; how far is a dial (in-band, mine)."
+    },
+    {
+      "glyph": "✓",
+      "sprint": 68,
+      "version_goal": null,
+      "written": "2026-11-14",
+      "parked": false,
+      "blocked_on": null,
+      "requires": [],
+      "author": "Claude (Ben, 2026-11-14: \"try implementing the easier changes first\")",
+      "category": "UI",
+      "authority_doc": "docs/ui/RENDERING.md",
+      "id": "BL-1652",
+      "short_name": "GAMMA_CORRECT_MIPS",
+      "status": "designed",
+      "priority": "B",
+      "difficulty": 1,
+      "title": "The ground mip chain averages in linear light, not sRGB",
+      "files": [
+        "src/ui/ground_bake.cpp",
+        "tools/verify/ground_bake_check.cpp"
+      ],
+      "design": "RENDERING.md § Level of detail, \"Every other zoom is a downsample\". downsample_half averaged four sRGB bytes, which darkens fine contrast (a lit crown beside its shadow) at every level below the master, so the mid rungs read muddier than the master. WORK: decode through a 256-entry sRGB-to-linear table, average alpha-weighted in linear light, re-encode through a fixed inverse table; flat runs stay exact. Deterministic integer tables. A ground_bake_check case pins it. Every non-master level moves, so captures that read those levels re-bless."
+    },
+    {
+      "glyph": "✓",
+      "sprint": 68,
+      "version_goal": null,
+      "written": "2026-11-14",
+      "parked": false,
+      "blocked_on": null,
+      "requires": [],
+      "author": "Claude (Ben, 2026-11-14: \"try implementing the easier changes first\")",
+      "category": "UI",
+      "authority_doc": "docs/ui/RENDERING.md",
+      "id": "BL-1653",
+      "short_name": "ANIMATED_ZOOM_STEP",
+      "status": "designed",
+      "priority": "B",
+      "difficulty": 2,
+      "title": "A Planetary zoom step glides over a fifth of a second instead of jumping",
+      "files": [
+        "src/ui/body_surface_canvas.cpp",
+        "src/ui/ui_state.hpp"
+      ],
+      "design": "RENDERING.md § Level of detail, \"Planetary zoom is STEPPED\". The ladder and its rungs are unchanged; only the drawn zoom moves to the new rung over ~0.18 s, eased, geometric in zoom, holding the cursor point (wheel) or the view centre (keyboard) fixed. The drawn level follows the drawn radius by the existing rule (minified at most 2:1), so no new level or bake. Under --verify (fixed frame clock) the step is instant, so every script is unchanged. Render-side only; the saved zoom is the rung."
+    },
+    {
+      "glyph": "✓",
+      "sprint": 68,
+      "version_goal": null,
+      "written": "2026-11-14",
+      "parked": false,
+      "blocked_on": null,
+      "requires": [],
+      "author": "Claude (Ben, 2026-11-14: \"try implementing the easier changes first\")",
+      "category": "UI",
+      "authority_doc": "docs/tech/TECH_FOUNDATIONS.md",
+      "id": "BL-1654",
+      "short_name": "SDL_3_4_UPGRADE",
+      "status": "designed",
+      "priority": "B",
+      "difficulty": 3,
+      "title": "Move the SDL pin from 3.2.0 to 3.4",
+      "files": [
+        "CMakeLists.txt",
+        "src/core/app.cpp",
+        "src/ui/body_surface_canvas.cpp"
+      ],
+      "design": "TECH_FOUNDATIONS.md § Framework, \"SDL 3.4, and fragment shaders on the 2D renderer\" (Ben, 2026-11-14). WORK: bump the FetchContent URL to the latest 3.4.x release, fix API drift, rebuild, run the visual suite and the ground bench. Check whether the BL-1387 wide-blit clip workaround is still needed (keep it: it is harmless). No shader yet; the renderer is still created as today."
+    },
+    {
+      "glyph": "~",
+      "sprint": 68,
+      "version_goal": null,
+      "written": "2026-11-14",
+      "parked": false,
+      "blocked_on": null,
+      "requires": [
+        "BL-1654"
+      ],
+      "author": "Claude (Ben, 2026-11-14: \"try implementing the easier changes first\")",
+      "category": "UI",
+      "authority_doc": "docs/tech/TECH_FOUNDATIONS.md",
+      "id": "BL-1655",
+      "short_name": "SHADER_SEAM",
+      "status": "design-owed",
+      "priority": "B",
+      "difficulty": 4,
+      "title": "One fragment-shader seam on the 2D renderer, with a no-shader path",
+      "files": [
+        "CMakeLists.txt",
+        "src/core/app.cpp",
+        "src/core/ground_layer.cpp",
+        "src/ui/body_surface_canvas.cpp"
+      ],
+      "design": "TECH_FOUNDATIONS.md § Framework (Ben, 2026-11-14). WORK: create the renderer GPU-backed (SDL_CreateGPURenderer), add a shader build step (prebuilt SPIR-V/DXIL, or SDL_shadercross at build time), one SDL_GPURenderState wrapper the canvas can set around a draw-list callback, and a no-shader path when the renderer cannot take one. First pass: a trivial tint over the ground, to prove the seam. OPEN (Ben's call): --verify forces the software renderer, which runs no shader. Options: (A) captures keep the software path and verify only the no-shader fallback, with shader passes checked by a live look; (B) captures move to the GPU renderer and accept per-driver pixel drift; (C) a CPU reference implementation of each shader pass for captures."
+    },
+    {
+      "glyph": "✓",
+      "sprint": 68,
+      "version_goal": null,
+      "written": "2026-11-14",
+      "parked": false,
+      "blocked_on": null,
+      "requires": [
+        "BL-1655"
+      ],
+      "author": "Claude (Ben, 2026-11-14: \"try implementing the easier changes first\")",
+      "category": "UI",
+      "authority_doc": "docs/ui/LENSES.md",
+      "id": "BL-1656",
+      "short_name": "LENS_ID_LOOKUP",
+      "status": "designed",
+      "priority": "B",
+      "difficulty": 3,
+      "title": "A lens washes the ground from a tile-id texture and a colour table, with soft edges",
+      "files": [
+        "src/ui/body_surface_canvas.cpp",
+        "src/core/ground_layer.cpp"
+      ],
+      "design": "LENSES.md § A lens washes the rendered ground. Today a wash is hex polygons per tile, so its edges are a hex staircase and cost vertices per tile. WORK: a tile-id texture per body (baked once with the ground geometry) and a per-lens colour table (one entry per tile, re-uploaded when the lens answer changes); a shader looks up the colour and blends it at the family strength, softened across the 0.13 edge band. The no-shader path is a low-resolution baked wash image (about 12 px a hex, soft edge band) drawn bilinear, which also retires the per-tile wash vertices. The ruled strengths (0.46 categorical, 0.54 sequential) are unchanged."
+    },
+    {
+      "glyph": "✓",
+      "sprint": 68,
+      "version_goal": null,
+      "written": "2026-11-14",
+      "parked": false,
+      "blocked_on": null,
+      "requires": [
+        "BL-1656"
+      ],
+      "author": "Claude (Ben, 2026-11-14: \"try implementing the easier changes first\")",
+      "category": "UI",
+      "authority_doc": "docs/ui/PLANETARY.md",
+      "id": "BL-1657",
+      "short_name": "SDF_NATIONAL_BORDERS",
+      "status": "designed",
+      "priority": "C",
+      "difficulty": 3,
+      "title": "The national border band draws from a distance field, smooth and width-stable at every zoom",
+      "files": [
+        "src/ui/body_surface_canvas.cpp"
+      ],
+      "design": "PLANETARY.md § The national border band. Paradox-style: a distance field to the nearest owner boundary, derived on the CPU from the tile-id texture when ownership changes (an event, never a tick), thresholded and anti-aliased in the shader. The band's rules (which edges draw, never a third blended colour, clicking the border selects the nation) are unchanged; only how it is drawn moves. No-shader path: today's vector band."
+    },
+    {
+      "glyph": "~",
+      "sprint": 68,
+      "version_goal": null,
+      "written": "2026-11-14",
+      "parked": false,
+      "blocked_on": null,
+      "requires": [
+        "BL-1656"
+      ],
+      "author": "Claude (Ben, 2026-11-14: \"try implementing the easier changes first\")",
+      "category": "UI",
+      "authority_doc": "docs/ui/RENDERING.md",
+      "id": "BL-1658",
+      "short_name": "CLOSE_ZOOM_DETAIL_LAYER",
+      "status": "design-owed",
+      "priority": "C",
+      "difficulty": 4,
+      "title": "A tiling detail texture per terrain family sharpens the two closest rungs",
+      "files": [
+        "src/core/ground_layer.cpp",
+        "src/ui/ground_bake.cpp",
+        "assets/brushes/"
+      ],
+      "design": "RENDERING.md § Level of detail. Paradox, Total War and Civ tile a high-frequency detail texture over base colour, so close zoom stays crisp past the base resolution; it also answers the ~2x magnification of the top rung at 4K height. OPEN (Ben's call): this overturns \"zooming does not add detail\" (Ben, 2026-10-09). That ruling was about the lag of a fresh bake per rung; a draw-time detail layer adds no bake. A family mask comes from the tile-id texture."
+    },
+    {
+      "glyph": "✓",
+      "sprint": 68,
+      "version_goal": null,
+      "written": "2026-11-14",
+      "parked": false,
+      "blocked_on": null,
+      "requires": [
+        "BL-1655"
+      ],
+      "author": "Claude (Ben, 2026-11-14: \"try implementing the easier changes first\")",
+      "category": "UI",
+      "authority_doc": "docs/ui/RENDERING.md",
+      "id": "BL-1659",
+      "short_name": "LIVE_GRADE_SHADER",
+      "status": "designed",
+      "priority": "C",
+      "difficulty": 2,
+      "title": "The near-future grade and the land lift run at draw time, so retuning them needs no re-bake",
+      "files": [
+        "src/ui/ground_bake.cpp",
+        "src/core/ground_layer.cpp"
+      ],
+      "design": "RENDERING.md § Art direction and palette: the grade is already \"a separable final pass\", and the land lift re-bakes the land on every change. WORK: bake without the grade and lift (keeping a land weight), apply both in the shader. No-shader path: bake them as today. A level change becomes instant."
+    },
+    {
+      "glyph": "✓",
+      "sprint": 68,
+      "version_goal": null,
+      "written": "2026-11-14",
+      "parked": false,
+      "blocked_on": null,
+      "requires": [
+        "BL-1655"
+      ],
+      "author": "Claude (Ben, 2026-11-14: \"try implementing the easier changes first\")",
+      "category": "UI",
+      "authority_doc": "docs/ui/RENDERING.md",
+      "id": "BL-1660",
+      "short_name": "SHADER_WATER",
+      "status": "designed",
+      "priority": "C",
+      "difficulty": 3,
+      "title": "Water moves: a scrolling normal shimmer, glints and shore foam drawn by a shader",
+      "files": [
+        "src/core/ground_layer.cpp",
+        "src/ui/body_surface_canvas.cpp"
+      ],
+      "design": "RENDERING.md § Ambient animation (overlay, never baked; render-side clock; pinned to phase 0 under --verify). The shader replaces the flipbook overlay design for water: a water mask from the bake, two scrolling normal fields lit by the NW sun, foam where the shore shelf sits. No-shader path: the static bake."
+    },
+    {
+      "glyph": "~",
+      "sprint": 68,
+      "version_goal": null,
+      "written": "2026-11-14",
+      "parked": false,
+      "blocked_on": null,
+      "requires": [],
+      "author": "Claude (Ben, 2026-11-14: \"try implementing the easier changes first\")",
+      "category": "UI",
+      "authority_doc": "docs/ui/RENDERING.md",
+      "id": "BL-1661",
+      "short_name": "FAR_ZOOM_CARTOGRAPHIC_MAP",
+      "status": "design-owed",
+      "priority": "C",
+      "difficulty": 3,
+      "title": "At the whole-grid rung the ground gives way to a stylised map",
+      "files": [
+        "src/core/ground_layer.cpp",
+        "src/ui/body_surface_canvas.cpp"
+      ],
+      "design": "RENDERING.md § Level of detail, the 6 px level. CK3 and Victoria 3 cross-fade to a flat paper map at far zoom, and Civ VI has a hand-drawn strategic view; at 6 px a hex the painted ground reads as noise. OPEN (Ben's call, a feel question for CONCEPT/RENDERING): whether the far rung changes style, and what it shows (terrain families flat, national colour, coasts inked)."
+    },
+    {
+      "glyph": "~",
+      "sprint": 68,
+      "version_goal": null,
+      "written": "2026-11-14",
+      "parked": false,
+      "blocked_on": null,
+      "requires": [
+        "BL-1655"
+      ],
+      "author": "Claude (Ben, 2026-11-14: \"try implementing the easier changes first\")",
+      "category": "UI",
+      "authority_doc": "docs/ui/RENDERING.md",
+      "id": "BL-1662",
+      "short_name": "COMPRESSED_GROUND_TEXTURES",
+      "status": "design-owed",
+      "priority": "F",
+      "difficulty": 4,
+      "title": "Spike: can the ground hold GPU-compressed chunks, for a finer master in the same RAM",
+      "files": [
+        "src/core/ground_layer.cpp"
+      ],
+      "design": "RENDERING.md § Resident set. Every AAA reference stores terrain BC1/BC7-compressed: four to eight times less memory per pixel, so a 192 px master would fit today's budget. UNKNOWN: whether an SDL_Renderer texture can be uploaded compressed (likely not; the GPU API can). WORK: a spike that answers that and measures encode cost per chunk; lossy, so the 6 GB ceiling and capture determinism are both on the table."
     }
   ]
 }
