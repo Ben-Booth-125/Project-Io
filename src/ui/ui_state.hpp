@@ -1391,6 +1391,22 @@ struct ui_state
     /// trackpads deliver fractional deltas per event, and each must NOT fire a
     /// full x2 rung — deltas accumulate here and a step fires per whole notch.
     float planetary_wheel_accum = 0.0f;
+    /// BL-1653 (animated zoom step), RENDERING.md § Level of detail, "A step glides".
+    /// `planetary_zoom` / `planetary_pan_*` stay the STATE (the rung, what is saved and
+    /// what every reader sees); this is only the zoom DRAWN on the way to it. View
+    /// state, render-side real time, never serialised; inert under `fixed_frame_clock`.
+    struct planetary_glide_t
+    {
+        bool  active   = false;
+        float z0 = 1.0f, z1 = 1.0f; ///< drawn zoom at the step, and the rung it goes to
+        float t        = 0.0f;      ///< seconds into the glide
+        bool  anchored = false;     ///< a wheel step: hold the world point under the cursor
+        float wx = 0.0f, wy = 0.0f; ///< that world point (local, unzoomed)
+        float ax = 0.0f, agy = 0.0f;///< where it stays: screen x, and ground-space y
+        bool  seen = false;         ///< last frame's values below are valid
+        float last_zoom = 0.0f, last_pan_x = 0.0f, last_pan_y = 0.0f; ///< state at last frame's end
+        float last_drawn = 0.0f;    ///< the zoom drawn last frame
+    } planetary_glide;
 
     entity_id    active_body   = null_entity;         ///< Navigation anchor: drives the lower rungs (circumplanetary anchor and surface). Changed by *navigation* (double-click / focus), not by selection. null_entity = no anchor.
     entity_id    selected_entity = null_entity;       ///< The entity the player single-clicked to inspect — drives the Selection info element. Distinct from the active_* anchors: selecting never moves the canvas. null_entity = nothing selected. See SELECTION.md, ui/selection.hpp.

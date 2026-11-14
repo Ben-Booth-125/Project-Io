@@ -212,6 +212,10 @@ constexpr float kMinZoom         = kMaxZoom / 16.0f; // 1.06875
 /// in 5 steps.
 constexpr int k_zoom_rungs = 5;
 
+/// BL-1653 (animated zoom step): how long the drawn zoom takes to reach a new rung
+/// (RENDERING.md § Level of detail, "A step glides").
+constexpr float k_glide_seconds = 0.18f;
+
 // terrain_colour, hex_vertices, and hex_local_centre now live in ui/hex_render.hpp
 // (shared with the Selection band's zoomed tile-neighbourhood view, BL-194) so both
 // surfaces draw from one terrain palette and one hex geometry rather than diverging.
@@ -3015,7 +3019,42 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
 
     // --- View transform (pan/zoom) ---
     // The surface canvas is always primary, so pan and zoom always apply.
-    const float  zoom        = std::clamp(state.planetary_zoom, kMinZoom, kMaxZoom);
+    // `target_zoom` is the STATE (the rung); `zoom` is what this frame DRAWS, which a
+    // glide (BL-1653, RENDERING.md § Level of detail, "A step glides") moves toward
+    // the rung over k_glide_seconds. Everything below draws and hit-tests at `zoom`.
+    const float target_zoom = std::clamp(state.planetary_zoom, kMinZoom, kMaxZoom);
+    auto& glide = state.planetary_glide;
+    {
+        if (state.fixed_frame_clock)
+            glide.active = false; // --verify: every step is instant
+        else if (glide.seen && target_zoom != glide.last_zoom)
+        {
+            // The rung moved since last frame without the wheel (which starts its own,
+            // anchored glide below): the keyboard, a camera jump, a load. Glide about
+            // the view centre only when the pan is untouched — that is exactly the
+            // keyboard step's own fixed point — and snap otherwise.
+            const bool pan_held = state.planetary_pan_x == glide.last_pan_x
+                               && state.planetary_pan_y == glide.last_pan_y;
+            glide.active   = pan_held && glide.last_drawn > 0.0f;
+            glide.anchored = false;
+            glide.z0 = glide.last_drawn;
+            glide.z1 = target_zoom;
+            glide.t  = 0.0f;
+        }
+        if (glide.active)
+        {
+            glide.t += std::min(ImGui::GetIO().DeltaTime, 0.05f);
+            if (glide.z1 != target_zoom || glide.t >= k_glide_seconds)
+                glide.active = false;
+        }
+    }
+    const float zoom = [&] {
+        if (!glide.active)
+            return target_zoom;
+        const float u = glide.t / k_glide_seconds;
+        const float e = 1.0f - (1.0f - u) * (1.0f - u) * (1.0f - u); // ease out
+        return std::clamp(glide.z0 * std::pow(glide.z1 / glide.z0, e), kMinZoom, kMaxZoom);
+    }();
 
     // Pending centre request (verify.center_tile): now that the exact grid
     // transform is in hand, set the pan that places the requested tile's local
@@ -3025,9 +3064,10 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     {
         const ImVec2 lc = hex_local_centre(state.planetary_center_col,
                                            state.planetary_center_row, hex_size);
-        state.planetary_pan_x = (grid_cx - lc.x) * zoom;
-        state.planetary_pan_y = (grid_cy - lc.y) * zoom;
+        state.planetary_pan_x = (grid_cx - lc.x) * target_zoom;
+        state.planetary_pan_y = (grid_cy - lc.y) * target_zoom;
         state.planetary_center_pending = false;
+        glide.active = false; // a camera jump lands at once
         // Publish where that tile just landed on screen (BL-521). The transform is
         // only fully known here, so this is the one honest source for "the screen
         // point that is tile (col,row)" — the verify harness's click injection
@@ -3035,8 +3075,17 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         state.planetary_center_screen = canvas_centre;
     }
 
-    const ImVec2 view_origin = ImVec2{ canvas_centre.x + state.planetary_pan_x,
-                                       canvas_centre.y + state.planetary_pan_y };
+    // The pan DRAWN: the state's pan, or — mid-way through a wheel glide — the pan that
+    // keeps the anchored world point under the cursor at the zoom drawn (the wheel
+    // step's own formula, so it meets the state's pan as the glide ends).
+    float drawn_pan_x = state.planetary_pan_x, drawn_pan_y = state.planetary_pan_y;
+    if (glide.active && glide.anchored)
+    {
+        drawn_pan_x = glide.ax  - (glide.wx - grid_cx) * zoom - canvas_centre.x;
+        drawn_pan_y = glide.agy - (glide.wy - grid_cy) * zoom - canvas_centre.y;
+    }
+    const ImVec2 view_origin = ImVec2{ canvas_centre.x + drawn_pan_x,
+                                       canvas_centre.y + drawn_pan_y };
 
     // Local world space → screen space.
     auto to_screen = [&](ImVec2 lp) -> ImVec2 {
@@ -9386,14 +9435,21 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
 
         if (ImGui::IsMouseDown(ImGuiMouseButton_Middle))
         {
+            // A pan ends a glide at its rung (BL-1653): the drag moves the state's
+            // pan, and the view must follow the hand, not an anchor.
+            if (glide.active && (io.MouseDelta.x != 0.0f || io.MouseDelta.y != 0.0f))
+                glide.active = false;
             state.planetary_pan_x += io.MouseDelta.x;
             state.planetary_pan_y += io.MouseDelta.y;
         }
 
         // Keep horizontal pan bounded to one grid period. The grid wraps, so
         // this is visually identical but stops pan_x growing without limit.
-        if (period_px > 0.0f)
-            state.planetary_pan_x = std::fmod(state.planetary_pan_x, period_px);
+        // The state's pan is at the RUNG's zoom, so it wraps by the rung's period,
+        // not the period drawn mid-glide (BL-1653).
+        const float target_period_px = (zoom > 0.0f) ? period_px * (target_zoom / zoom) : 0.0f;
+        if (target_period_px > 0.0f)
+            state.planetary_pan_x = std::fmod(state.planetary_pan_x, target_period_px);
 
         if (io.MouseWheel != 0.0f)
             state.planetary_wheel_accum += io.MouseWheel;
@@ -9409,7 +9465,10 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         {
             const int dir = state.planetary_wheel_accum > 0.0f ? +1 : -1;
             state.planetary_wheel_accum = 0.0f;
-            const float new_zoom = planetary_zoom_stepped(zoom, dir);
+            // Step from the RUNG, not the zoom drawn, so a notch mid-glide goes one
+            // rung past the glide's target (BL-1653). The world point is read at
+            // what is drawn — what is actually under the cursor.
+            const float new_zoom = planetary_zoom_stepped(target_zoom, dir);
             // World point under the cursor, kept fixed across the zoom change —
             // read through the tilt's inverse, re-projected through it (one
             // angle now, so both are the same squash — BL-737, BL-1246).
@@ -9420,8 +9479,26 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             state.planetary_pan_x = mouse.x - (wp.x - grid_cx) * new_zoom - canvas_centre.x;
             state.planetary_pan_y = target_gy - (wp.y - grid_cy) * new_zoom - canvas_centre.y;
             state.planetary_zoom  = new_zoom;
+            if (!state.fixed_frame_clock && new_zoom != zoom)
+            {
+                glide.active   = true;
+                glide.anchored = true;
+                glide.z0  = zoom;
+                glide.z1  = new_zoom;
+                glide.t   = 0.0f;
+                glide.wx  = wp.x;
+                glide.wy  = wp.y;
+                glide.ax  = mouse.x;
+                glide.agy = target_gy;
+            }
         }
     }
+    // What the next frame compares against to see a rung change it did not start.
+    glide.seen       = true;
+    glide.last_zoom  = std::clamp(state.planetary_zoom, kMinZoom, kMaxZoom);
+    glide.last_pan_x = state.planetary_pan_x;
+    glide.last_pan_y = state.planetary_pan_y;
+    glide.last_drawn = zoom;
 }
 
 float planetary_zoom_stepped(float current, int direction)
