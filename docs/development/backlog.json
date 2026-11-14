@@ -1439,14 +1439,14 @@
    "design": "GENERATION_STRATEGY.md § How a candidate is PRODUCED, the 2026-11-12 ruling. Drop the road-tier axis (the roster axis is already skipped under a charter budget); stop scoring term 5 (reach quality), which no longer varies; choose the round count from the placement curve on the 16 curated seeds so the search fits the world budget. Determinism clauses unchanged; world_determinism and the digests will move (re-bless is Ben's call)."
   },
   {
-   "glyph": "○",
+   "glyph": "●",
    "sprint": null,
    "version_goal": "v0.6.0",
    "written": "2026-11-12",
    "parked": false,
    "blocked_on": null,
    "requires": [],
-   "status": "proposed",
+   "status": "complete",
    "author": "main session (Ben, 2026-11-12)",
    "id": "BL-1647",
    "short_name": "MAJORS_OPEN_PROFITABLE",
@@ -1461,7 +1461,7 @@
     "scripts/economy.lua",
     "tools/verify/opening_parity.cpp"
    ],
-   "design": "NATION_GENERATION.md § Pass 7: the kit's own income carries its running bill from the first tick. The opening-parity census (30:4, 16 seeds, five years) read majors losing money on average 10/64 before the monthly tick and 42/64 after it, with 3/64 ending under 100 credits and the median end treasury 6,441 -> 1,769. Ben ruled the regression folds into this item (2026-11-12). First find which per-tick flow the monthly tick (BL-1642) left at its quarterly rate, then re-read the census; any remaining loss is the kit's balance. Read by the opening-parity skill at --quarters 60. FOUND 2026-11-13: the national budget's per-tick spendable is a share of the treasury (a stock) and stayed the quarter's, so the research line's lump bill took it three times a quarter (research +37% a month). Fixed: k_budget_tick_share = 1/3 (NATIONS.md § 3). Census 30:4, 16 seeds, 60 months after the fix: losing 26/64, median end treasury 3,776, 1 under 100. Left: income 18% under the quarter's monthly rate - lumpier monthly trade, and alloys/machinery not made. That remainder is the kit's balance; opening_parity now prints FLOWS and GOOD lines to read it. READ 2026-11-13: the kit's running result is positive for 62/64 majors (its rule holds); the losers run down on research bought with credits (131 a month against a 114 running surplus). Ben ruled research free (BL-1650, free research rate), which is this item's lever: re-read the census once it lands."
+   "design": "NATION_GENERATION.md § Pass 7: the kit's own income carries its running bill from the first tick. The opening-parity census (30:4, 16 seeds, five years) read majors losing money on average 10/64 before the monthly tick and 42/64 after it, with 3/64 ending under 100 credits and the median end treasury 6,441 -> 1,769. Ben ruled the regression folds into this item (2026-11-12). First find which per-tick flow the monthly tick (BL-1642) left at its quarterly rate, then re-read the census; any remaining loss is the kit's balance. Read by the opening-parity skill at --quarters 60. FOUND 2026-11-13: the national budget's per-tick spendable is a share of the treasury (a stock) and stayed the quarter's, so the research line's lump bill took it three times a quarter (research +37% a month). Fixed: k_budget_tick_share = 1/3 (NATIONS.md § 3). Census 30:4, 16 seeds, 60 months after the fix: losing 26/64, median end treasury 3,776, 1 under 100. Left: income 18% under the quarter's monthly rate - lumpier monthly trade, and alloys/machinery not made. That remainder is the kit's balance; opening_parity now prints FLOWS and GOOD lines to read it. READ 2026-11-13: the kit's running result is positive for 62/64 majors (its rule holds); the losers run down on research bought with credits (131 a month against a 114 running surplus). Ben ruled research free (BL-1650, free research rate), which is this item's lever: re-read the census once it lands. CLOSED (Ben, 2026-11-14): 0b8126ff (a tick spends a month's share) took losing majors 42 -> 26 of 64; 86ba9815 (BL-1650, free research) took them to 3 of 64, median end treasury 15,447, none under 100 (opening_parity 30:4, 16 seeds, 60 months)."
   },
   {
    "glyph": "○",
@@ -1510,14 +1510,14 @@
    "design": "Eight checks (R9a, b, c, h, j, k, l, m) fail on main at 6655ad6d, before any BL-1647 change: the derived bill is 38 stone / 19 timber, not the fixture's 16 / 8, and the roaded tile on unowned ground bills the nation holding the other end. Likely cause: the edge-counted road bill (count_road_edges_by_nation, BL-1340) replaced the per-tile count the fixture was written for. Read network_upkeep.cpp against LOGISTICS.md and decide which is right: re-derive the fixture's expected bill from the edge rule, or fix the bill. Never loosen a check to pass."
   },
   {
-   "glyph": "○",
+   "glyph": "●",
    "sprint": null,
    "version_goal": "v0.6.0",
    "written": "2026-11-13",
    "parked": false,
    "blocked_on": null,
    "requires": [],
-   "status": "proposed",
+   "status": "complete",
    "author": "main session (Ben, 2026-11-13)",
    "id": "BL-1650",
    "short_name": "FREE_RESEARCH_RATE",
@@ -1534,7 +1534,7 @@
     "src/ui/tech_tree_panel.cpp",
     "tools/verify/nation_tech_harness.cpp"
    ],
-   "design": "RESEARCH.md § Research points (Ben, 2026-11-13). base_rp_per_nation 40 -> 100 a month; an institute adds 5% of the base, a University 10%, only while running (staffed, not idled, upkeep paid). Retire the credit line: the academic_research weight goes to zero and advance_research spends nothing (the enum slot and the return's research field stay for the save format). Drop rp_per_economy_unit. The nation research AI, the tech panel's RP estimate (estimate_rp_per_quarter_milli) and every player string that offers to spend on research follow. Measured before (opening_parity RESEARCH lines, 30:4, 16 seeds, 60 months): median major 163 RP a month = base 40 + line 72 (about 180 credits) + two institutes 33 + economy 16; at the ruling a major with two institutes earns 110. Re-measure: the opening-parity census (BL-1647, majors losing money) and the RESEARCH.md § Cost pacing sweep (first ring-2 major, median and fastest tenth), and report both to Ben; the pacing re-pin is his."
+   "design": "RESEARCH.md § Research points (Ben, 2026-11-13). base_rp_per_nation 40 -> 100 a month; an institute adds 5% of the base, a University 10%, only while running (staffed, not idled, upkeep paid). Retire the credit line: the academic_research weight goes to zero and advance_research spends nothing (the enum slot and the return's research field stay for the save format). Drop rp_per_economy_unit. The nation research AI, the tech panel's RP estimate (estimate_rp_per_quarter_milli) and every player string that offers to spend on research follow. Measured before (opening_parity RESEARCH lines, 30:4, 16 seeds, 60 months): median major 163 RP a month = base 40 + line 72 (about 180 credits) + two institutes 33 + economy 16; at the ruling a major with two institutes earns 110. Re-measure: the opening-parity census (BL-1647, majors losing money) and the RESEARCH.md § Cost pacing sweep (first ring-2 major, median and fastest tenth), and report both to Ben; the pacing re-pin is his. CLOSED (Ben, 2026-11-14): 86ba9815. Digests 16/16 unmoved; every major 112 RP a month; first ring-2 major median 112 months, p10 102, all reach it - re-pinned by Ben (6f433135)."
   }
  ]
 }
