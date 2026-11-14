@@ -445,6 +445,30 @@ void master_row(const bake_source& src, const body_component& hb, int land_i, co
         check(half == std::vector<std::uint32_t>(4, 0xFF204060u), "P22",
               "a flat run (lock fill, open sea) downsamples byte-exact");
     }
+    {
+        // BL-1652 (gamma-correct mips): a black/white checker halves to the sRGB byte of
+        // HALF the light (188), not the byte mean (128); one lit pixel in three dark ones
+        // to a quarter of the light (137); greys a step apart stay ordered and exact.
+        auto px = [](int v) { return ui::palette::col32(v, v, v, 255); };
+        auto half_of = [](std::vector<std::uint32_t> q) {
+            std::vector<std::uint32_t> h(1);
+            downsample_half(q.data(), 2, 2, h.data());
+            return ui::palette::col_r(h[0]);
+        };
+        const int checker = half_of({ px(0), px(255), px(255), px(0) });
+        const int one_lit = half_of({ px(255), px(0), px(0), px(0) });
+        const int grey    = half_of({ px(100), px(100), px(101), px(101) });
+        std::printf("P36: checker %d, one lit of four %d, 100/101 greys %d\n", checker, one_lit, grey);
+        check(checker == 188, "P36", "a black/white checker halves to half the LIGHT (sRGB 188), not the byte mean");
+        check(one_lit == 137, "P36", "one lit pixel of four halves to a quarter of the light (sRGB 137)");
+        check(grey == 100 || grey == 101, "P36", "two adjacent greys halve to one of them");
+        // Transparent samples carry no colour: an opaque white beside three clear pixels
+        // stays white at a quarter coverage.
+        std::vector<std::uint32_t> q{ px(255), 0u, 0u, 0u }, h(1);
+        downsample_half(q.data(), 2, 2, h.data());
+        check(ui::palette::col_r(h[0]) == 255 && ui::palette::col_a(h[0]) == 64, "P36",
+              "alpha weights the colour and averages as coverage");
+    }
 
     // The chooser. Rung radii at 1720x1080 (drawn: 5.91 / 11.83 / 23.66 /
     // 47.31 / 94.61) and 3840x2160 (11.94 ... 191.0). The 96 px ladder

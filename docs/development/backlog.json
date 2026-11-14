@@ -1564,7 +1564,7 @@
       "design": "NATIONS.md § 3 (the national budget). READ 2026-11-14 after BL-1650 (free research rate), opening_parity 30:4, 16 seeds, 60 months: median major end treasury 15,447 (was 3,776 with the credit line), 61 of 64 winners averaging +230 a month total. The academic weight still takes its slot in the split but spends nothing, so its share stays in the treasury. WORK: measure where the unspent surplus sits (academic slot vs other lines under-spending vs reserve), then decide whether a rich nation should build more (research buildings, processors), whether the split should redistribute an unspent line, or whether this level is fine. Ben's call which; a brake must be an in-world force, not an agent handicap. Do not clamp the treasury. RULED (Ben, 2026-11-14): \"rich nations build more, be it economy or military\" - NATIONS.md § 3, \"A rich nation builds more; wealth is spent, not held\". Rival nations only; the player's nation is untouched. WORK: (1) measure why a rival holding 15k does not build now (the scorer's solvency gate, reserve, candidate supply or emphasis); (2) let the surplus raise its build and hire appetite through the existing scored-utility verbs; (3) re-read opening_parity: end treasury and buildings per major. GRANTED (Ben, 2026-11-14): the force target may read the nation's OWN treasury surplus - AI_OPPONENT.md § 11, MILITARY.md § Force sizing \"A surplus raises the target\"; how far is a dial (in-band, mine)."
     },
     {
-      "glyph": "✓",
+      "glyph": "●",
       "sprint": 68,
       "version_goal": null,
       "written": "2026-11-14",
@@ -1576,7 +1576,7 @@
       "authority_doc": "docs/ui/RENDERING.md",
       "id": "BL-1652",
       "short_name": "GAMMA_CORRECT_MIPS",
-      "status": "designed",
+      "status": "complete",
       "priority": "B",
       "difficulty": 1,
       "title": "The ground mip chain averages in linear light, not sRGB",
@@ -1584,7 +1584,7 @@
         "src/ui/ground_bake.cpp",
         "tools/verify/ground_bake_check.cpp"
       ],
-      "design": "RENDERING.md § Level of detail, \"Every other zoom is a downsample\". downsample_half averaged four sRGB bytes, which darkens fine contrast (a lit crown beside its shadow) at every level below the master, so the mid rungs read muddier than the master. WORK: decode through a 256-entry sRGB-to-linear table, average alpha-weighted in linear light, re-encode through a fixed inverse table; flat runs stay exact. Deterministic integer tables. A ground_bake_check case pins it. Every non-master level moves, so captures that read those levels re-bless."
+      "design": "RENDERING.md § Level of detail, \"Every other zoom is a downsample\". downsample_half averaged four sRGB bytes, which darkens fine contrast (a lit crown beside its shadow) at every level below the master, so the mid rungs read muddier than the master. WORK: decode through a 256-entry sRGB-to-linear table, average alpha-weighted in linear light, re-encode through a fixed inverse table; flat runs stay exact. Deterministic integer tables. A ground_bake_check case pins it. Every non-master level moves, so captures that read those levels re-bless. DELIVERED 2026-11-14: ground_bake_check P36 pins the linear-light mean (checker 188, one lit of four 137, alpha as coverage); P22 still holds the chunk-wise chain equal to the whole image's. The full run reads 155 pass, 8 fail - all 8 in P28/P29/P33/P34 (road painting), and the same 8 fail with the old downsample, so they predate this item."
     },
     {
       "glyph": "✓",
