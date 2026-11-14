@@ -128,3 +128,4 @@
 {"id":"BL-1660","name":"SHADER_WATER","ts":"2026-11-14T20:34:23.089Z","branch":"claude/rendering-sprint"}
 {"id":"BL-1661","name":"FAR_ZOOM_CARTOGRAPHIC_MAP","ts":"2026-11-14T20:34:23.089Z","branch":"claude/rendering-sprint"}
 {"id":"BL-1662","name":"COMPRESSED_GROUND_TEXTURES","ts":"2026-11-14T20:34:23.089Z","branch":"claude/rendering-sprint"}
+{"id":"BL-1663","name":"ROAD_PAINT_CHECKS_FAIL","ts":"2026-11-14T21:31:03.192Z","branch":"claude/rendering-sprint"}

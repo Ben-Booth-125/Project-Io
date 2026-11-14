@@ -1587,7 +1587,7 @@
       "design": "RENDERING.md § Level of detail, \"Every other zoom is a downsample\". downsample_half averaged four sRGB bytes, which darkens fine contrast (a lit crown beside its shadow) at every level below the master, so the mid rungs read muddier than the master. WORK: decode through a 256-entry sRGB-to-linear table, average alpha-weighted in linear light, re-encode through a fixed inverse table; flat runs stay exact. Deterministic integer tables. A ground_bake_check case pins it. Every non-master level moves, so captures that read those levels re-bless. DELIVERED 2026-11-14: ground_bake_check P36 pins the linear-light mean (checker 188, one lit of four 137, alpha as coverage); P22 still holds the chunk-wise chain equal to the whole image's. The full run reads 155 pass, 8 fail - all 8 in P28/P29/P33/P34 (road painting), and the same 8 fail with the old downsample, so they predate this item."
     },
     {
-      "glyph": "✓",
+      "glyph": "●",
       "sprint": 68,
       "version_goal": null,
       "written": "2026-11-14",
@@ -1599,7 +1599,7 @@
       "authority_doc": "docs/ui/RENDERING.md",
       "id": "BL-1653",
       "short_name": "ANIMATED_ZOOM_STEP",
-      "status": "designed",
+      "status": "complete",
       "priority": "B",
       "difficulty": 2,
       "title": "A Planetary zoom step glides over a fifth of a second instead of jumping",
@@ -1607,7 +1607,7 @@
         "src/ui/body_surface_canvas.cpp",
         "src/ui/ui_state.hpp"
       ],
-      "design": "RENDERING.md § Level of detail, \"Planetary zoom is STEPPED\". The ladder and its rungs are unchanged; only the drawn zoom moves to the new rung over ~0.18 s, eased, geometric in zoom, holding the cursor point (wheel) or the view centre (keyboard) fixed. The drawn level follows the drawn radius by the existing rule (minified at most 2:1), so no new level or bake. Under --verify (fixed frame clock) the step is instant, so every script is unchanged. Render-side only; the saved zoom is the rung."
+      "design": "RENDERING.md § Level of detail, \"Planetary zoom is STEPPED\". The ladder and its rungs are unchanged; only the drawn zoom moves to the new rung over ~0.18 s, eased, geometric in zoom, holding the cursor point (wheel) or the view centre (keyboard) fixed. The drawn level follows the drawn radius by the existing rule (minified at most 2:1), so no new level or bake. Under --verify (fixed frame clock) the step is instant, so every script is unchanged. Render-side only; the saved zoom is the rung. DELIVERED 2026-11-14 (6c941da8): live, the point under the cursor held across a wheel step in and out. The glide's in-between frames are too fast to screenshot; Ben's eye is the check for its feel."
     },
     {
       "glyph": "✓",
@@ -1831,6 +1831,31 @@
         "src/core/ground_layer.cpp"
       ],
       "design": "RENDERING.md § Resident set. Every AAA reference stores terrain BC1/BC7-compressed: four to eight times less memory per pixel, so a 192 px master would fit today's budget. UNKNOWN: whether an SDL_Renderer texture can be uploaded compressed (likely not; the GPU API can). WORK: a spike that answers that and measures encode cost per chunk; lossy, so the 6 GB ceiling and capture determinism are both on the table."
+    },
+    {
+      "glyph": "✓",
+      "sprint": 68,
+      "version_goal": null,
+      "written": "2026-11-14",
+      "parked": false,
+      "blocked_on": null,
+      "requires": [],
+      "status": "designed",
+      "author": "Claude (Ben, 2026-11-14: \"Yes, file it\")",
+      "id": "BL-1663",
+      "short_name": "ROAD_PAINT_CHECKS_FAIL",
+      "title": "ground_bake_check's road-painting rows fail on main: 8 assertions in P28, P29, P33 and P34",
+      "priority": "B",
+      "difficulty": 2,
+      "category": "Verification",
+      "authority_doc": "docs/ui/RENDERING.md",
+      "files": [
+        "tools/verify/ground_bake_check.cpp",
+        "src/ui/route_paint.cpp",
+        "src/ui/ground_bake.cpp",
+        "src/ui/structure_stamps.cpp"
+      ],
+      "design": "RENDERING.md § Roads and sea lanes. FOUND 2026-11-14 while delivering BL-1652 (gamma-correct mips): ground_bake_check --routes fails 8 assertions with main's ground_bake.cpp (224020d6) and identically with the new downsample. Failing: P28 the highway (93 px moved), track (46 px), town, works and forecourt surfaces (0 px moved) draw; P29 a works tile a road meets takes its roaded variant; P33 no staged road comes within a roaded cluster's disc plus its half-width; P34 every road set draws. WORK: find which change broke them (git bisect over the route pass and the structure plan), then decide per row whether the bake or the check is wrong. Do not weaken a row to pass: a check that no longer matches a ruled design is re-derived from the doc, never loosened."
     }
   ]
 }

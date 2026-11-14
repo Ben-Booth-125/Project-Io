@@ -154,7 +154,7 @@
    "id": 68,
    "theme": "Map fidelity",
    "state": "open",
-   "status_line": "open: gamma-correct mips (BL-1652) and animated zoom step (BL-1653) first; SDL 3.4 (BL-1654) next",
+   "status_line": "open: BL-1652 (gamma-correct mips) and BL-1653 (animated zoom step) delivered; SDL 3.4 (BL-1654) next",
    "opened_date": "2026-11-14",
    "closed_date": null,
    "author": "Claude (Ben, 2026-11-14: \"try implementing the easier changes first\")",
@@ -170,7 +170,8 @@
     "BL-1659 (LIVE_GRADE_SHADER)",
     "BL-1660 (SHADER_WATER)",
     "BL-1661 (FAR_ZOOM_CARTOGRAPHIC_MAP)",
-    "BL-1662 (COMPRESSED_GROUND_TEXTURES)"
+    "BL-1662 (COMPRESSED_GROUND_TEXTURES)",
+    "BL-1663 (ROAD_PAINT_CHECKS_FAIL)"
    ],
    "notes": []
   }
