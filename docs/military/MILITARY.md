@@ -1883,6 +1883,10 @@ income**. The player's nation is never sized; the player reads the same numbers 
   needs a standing airbase of its own. Land takes the rest. A theatre under its part hires first.
 - **The goods door binds.** A nation that cannot equip a hire does not make it, however far below
   target it stands (`../ai/AI_OPPONENT.md` § 11).
+- **A surplus raises the target (Ben, 2026-11-14).** A rival nation whose treasury outgrows what its
+  budget lines and running bills draw (`../politics/NATIONS.md` § 3, "A rich nation builds more")
+  sizes its forces above what its income alone carries. Its own treasury is the only new reading;
+  how far a surplus lifts the target is a dial.
 
 ---
 

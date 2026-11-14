@@ -2454,6 +2454,13 @@ boilerplate: pure, seeded, deterministic, replayable, legal verbs only, never a 
   borders it or is hostile to it), through fog, with no position, type or count. **Not admitted:** any
   other read of another nation's force; disbanding to meet the target; sizing the player's nation;
   a plan beyond the next hire. Pure, seeded, deterministic, replayable, legal verbs only, never a planner.
+  **A rival's force target may read its own treasury surplus — granted (Ben, 2026-11-14;
+  `../military/MILITARY.md` § Force sizing, `../politics/NATIONS.md` § 3).** A widening of the
+  2026-11-08 sizing grant, raised because it adds a reading: the target, set as a share of income,
+  may also rise with the nation's OWN treasury above what its budget lines and running bills draw,
+  so a rich nation spends its surplus on force as well as on buildings. **Not admitted:** reading
+  another nation's treasury; sizing the player's nation; disbanding; a plan beyond the next hire.
+  Pure, seeded, deterministic, replayable, legal verbs only, never a planner.
   **Rival nations fire missiles — granted (Ben, 2026-11-10; `../military/MILITARY.md` § Missiles).**
   A new subject: a rival nation's scorer may buy missiles and interceptors onto its OWN shelves, fire
   a missile from one of its OWN launchers at a province or building of a nation it is already hostile
