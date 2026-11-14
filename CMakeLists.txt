@@ -128,6 +128,8 @@ endif()
 # A bare directory test would accept a half-extracted cache.
 set(IO_DEPS_SEEDED "")
 set(IO_DEPS_COLD "")
+# The pinned SDL release (TECH_FOUNDATIONS.md § Framework: SDL 3.4, Ben 2026-11-14).
+set(IO_SDL_TAG "release-3.4.18")
 foreach(dep_spec IN ITEMS
         "sdl3|CMakeLists.txt"
         "lua_src|lua.h"
@@ -151,6 +153,16 @@ foreach(dep_spec IN ITEMS
     # and no one configured cold. It surfaced only when sub-agent worktrees
     # started each trying to download ~120 MB.
     set(dep_cached_src "${IO_DEPS_CACHE}/${dep_name}")
+    # SDL's cache entry is keyed by its release (BL-1654): the pin moves, and an
+    # unversioned `sdl3` checkout would silently hand a new pin the old source.
+    # A tree seeded from the old unversioned entry drops that seed here.
+    if(dep_name STREQUAL "sdl3")
+        set(dep_cached_src "${IO_DEPS_CACHE}/sdl3-${IO_SDL_TAG}")
+        if("${${dep_var}}" MATCHES "/sdl3$")
+            unset(${dep_var} CACHE)
+            unset(${dep_var})
+        endif()
+    endif()
 
     if(NOT "${${dep_var}}" STREQUAL "")
         # Explicitly pointed somewhere by the caller — never second-guess it.
@@ -183,7 +195,7 @@ include(FetchContent)
 # ---------------------------------------------------------------------------
 FetchContent_Declare(
     SDL3
-    URL https://codeload.github.com/libsdl-org/SDL/tar.gz/refs/tags/release-3.2.0
+    URL https://codeload.github.com/libsdl-org/SDL/tar.gz/refs/tags/${IO_SDL_TAG}
 )
 set(SDL_TEST OFF CACHE BOOL "" FORCE)
 set(SDL_TESTS OFF CACHE BOOL "" FORCE)

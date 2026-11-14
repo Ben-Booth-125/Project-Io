@@ -1622,7 +1622,7 @@
       "authority_doc": "docs/tech/TECH_FOUNDATIONS.md",
       "id": "BL-1654",
       "short_name": "SDL_3_4_UPGRADE",
-      "status": "designed",
+      "status": "complete",
       "priority": "B",
       "difficulty": 3,
       "title": "Move the SDL pin from 3.2.0 to 3.4",
@@ -1631,7 +1631,7 @@
         "src/core/app.cpp",
         "src/ui/body_surface_canvas.cpp"
       ],
-      "design": "TECH_FOUNDATIONS.md § Framework, \"SDL 3.4, and fragment shaders on the 2D renderer\" (Ben, 2026-11-14). WORK: bump the FetchContent URL to the latest 3.4.x release, fix API drift, rebuild, run the visual suite and the ground bench. Check whether the BL-1387 wide-blit clip workaround is still needed (keep it: it is harmless). No shader yet; the renderer is still created as today."
+      "design": "TECH_FOUNDATIONS.md § Framework, \"SDL 3.4, and fragment shaders on the 2D renderer\" (Ben, 2026-11-14). WORK: bump the FetchContent URL to the latest 3.4.x release, fix API drift, rebuild, run the visual suite and the ground bench. Check whether the BL-1387 wide-blit clip workaround is still needed (keep it: it is harmless). No shader yet; the renderer is still created as today. DELIVERED 2026-11-14: pinned release-3.4.18; the deps cache keys SDL by tag (sdl3-<tag>). Built clean on MSVC 14.44 with no API drift; the GPU renderer creates and draws, and --verify runs the software renderer as before."
     },
     {
       "glyph": "~",
