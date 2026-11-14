@@ -1544,22 +1544,23 @@
       "parked": false,
       "blocked_on": null,
       "requires": [],
-      "status": "proposed",
+      "status": "designed",
       "author": "main session (Ben, 2026-11-14)",
       "id": "BL-1651",
       "short_name": "MAJORS_HOARD_TREASURY",
-      "title": "Majors pile up treasury once research is free: find where the surplus should go",
+      "title": "A rich rival nation spends its surplus on buildings, economy or military",
       "priority": "B",
       "difficulty": 3,
       "category": "Economy",
       "authority_doc": "docs/politics/NATIONS.md",
       "files": [
-        "src/world/nation_budget.cpp",
         "src/world/nation_ai.cpp",
+        "src/world/nation_budget.cpp",
         "scripts/economy.lua",
-        "tools/verify/opening_parity.cpp"
+        "tools/verify/opening_parity.cpp",
+        "tools/verify/nation_scorer_harness.cpp"
       ],
-      "design": "NATIONS.md § 3 (the national budget). READ 2026-11-14 after BL-1650 (free research rate), opening_parity 30:4, 16 seeds, 60 months: median major end treasury 15,447 (was 3,776 with the credit line), 61 of 64 winners averaging +230 a month total. The academic weight still takes its slot in the split but spends nothing, so its share stays in the treasury. WORK: measure where the unspent surplus sits (academic slot vs other lines under-spending vs reserve), then decide whether a rich nation should build more (research buildings, processors), whether the split should redistribute an unspent line, or whether this level is fine. Ben's call which; a brake must be an in-world force, not an agent handicap. Do not clamp the treasury."
+      "design": "NATIONS.md § 3 (the national budget). READ 2026-11-14 after BL-1650 (free research rate), opening_parity 30:4, 16 seeds, 60 months: median major end treasury 15,447 (was 3,776 with the credit line), 61 of 64 winners averaging +230 a month total. The academic weight still takes its slot in the split but spends nothing, so its share stays in the treasury. WORK: measure where the unspent surplus sits (academic slot vs other lines under-spending vs reserve), then decide whether a rich nation should build more (research buildings, processors), whether the split should redistribute an unspent line, or whether this level is fine. Ben's call which; a brake must be an in-world force, not an agent handicap. Do not clamp the treasury. RULED (Ben, 2026-11-14): \"rich nations build more, be it economy or military\" - NATIONS.md § 3, \"A rich nation builds more; wealth is spent, not held\". Rival nations only; the player's nation is untouched. WORK: (1) measure why a rival holding 15k does not build now (the scorer's solvency gate, reserve, candidate supply or emphasis); (2) let the surplus raise its build and hire appetite through the existing scored-utility verbs; (3) re-read opening_parity: end treasury and buildings per major. OPEN GRANT: force sizing (AI_OPPONENT.md § 11, 2026-11-08) targets a share of INCOME; letting the military target also read the treasury surplus is a widening to raise with Ben, not assume."
     }
   ]
 }

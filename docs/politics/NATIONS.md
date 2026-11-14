@@ -249,6 +249,13 @@ lump) could take a quarter's spendable three times in every
 quarter. A per-tick flow bill is already a third, so it meets the same share it met before
 (Ben, 2026-11-11: every per-tick figure is a third of the quarter's).
 
+**A rich nation builds more; wealth is spent, not held (Ben, 2026-11-14).** A rival nation whose
+treasury outgrows what its lines spend turns the surplus into buildings — economy or military —
+rather than banking it. The surplus is the treasury above what its budget and running bills draw;
+the nation's own scorer chooses what it buys, over the same legal build and hire verbs, so the
+brake on a hoard is construction a player can see, never a clamp on the balance. It follows from
+§ 5: a nation does not want to be rich. The player's own surplus is the player's to spend.
+
 The ten lines, in their authored enum order (append-only once serialised — a weight vector is
 indexed by them):
 
