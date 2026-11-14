@@ -1648,7 +1648,7 @@
       "authority_doc": "docs/tech/TECH_FOUNDATIONS.md",
       "id": "BL-1655",
       "short_name": "SHADER_SEAM",
-      "status": "design-owed",
+      "status": "complete",
       "priority": "B",
       "difficulty": 4,
       "title": "One fragment-shader seam on the 2D renderer, with a no-shader path",
@@ -1658,7 +1658,7 @@
         "src/core/ground_layer.cpp",
         "src/ui/body_surface_canvas.cpp"
       ],
-      "design": "TECH_FOUNDATIONS.md § Framework (Ben, 2026-11-14). WORK: create the renderer GPU-backed (SDL_CreateGPURenderer), add a shader build step (prebuilt SPIR-V/DXIL, or SDL_shadercross at build time), one SDL_GPURenderState wrapper the canvas can set around a draw-list callback, and a no-shader path when the renderer cannot take one. First pass: a trivial tint over the ground, to prove the seam. OPEN (Ben's call): --verify forces the software renderer, which runs no shader. Options: (A) captures keep the software path and verify only the no-shader fallback, with shader passes checked by a live look; (B) captures move to the GPU renderer and accept per-driver pixel drift; (C) a CPU reference implementation of each shader pass for captures."
+      "design": "TECH_FOUNDATIONS.md § Framework (Ben, 2026-11-14). WORK: create the renderer GPU-backed (SDL_CreateGPURenderer), add a shader build step (prebuilt SPIR-V/DXIL, or SDL_shadercross at build time), one SDL_GPURenderState wrapper the canvas can set around a draw-list callback, and a no-shader path when the renderer cannot take one. First pass: a trivial tint over the ground, to prove the seam. OPEN (Ben's call): --verify forces the software renderer, which runs no shader. Options: (A) captures keep the software path and verify only the no-shader fallback, with shader passes checked by a live look; (B) captures move to the GPU renderer and accept per-driver pixel drift; (C) a CPU reference implementation of each shader pass for captures. DELIVERED 2026-11-14: the app makes SDL's GPU renderer (DXIL) unless a driver is forced; gpu_effects owns the render states, compiled from src/shaders/*.frag.hlsl by DXC at build (no DXC: every pass runs its no-shader path). Captures stay on the software renderer (NR-1228). IO_NO_GPU_EFFECTS=1 and IO_NO_GPU_RENDERER=1 are the A/B levers. Live-checked: the ground draws through the identity pass."
     },
     {
       "glyph": "✓",
@@ -1675,7 +1675,7 @@
       "authority_doc": "docs/ui/LENSES.md",
       "id": "BL-1656",
       "short_name": "LENS_ID_LOOKUP",
-      "status": "designed",
+      "status": "complete",
       "priority": "B",
       "difficulty": 3,
       "title": "A lens washes the ground from a tile-id texture and a colour table, with soft edges",
@@ -1683,7 +1683,7 @@
         "src/ui/body_surface_canvas.cpp",
         "src/core/ground_layer.cpp"
       ],
-      "design": "LENSES.md § A lens washes the rendered ground. Today a wash is hex polygons per tile, so its edges are a hex staircase and cost vertices per tile. WORK: a tile-id texture per body (baked once with the ground geometry) and a per-lens colour table (one entry per tile, re-uploaded when the lens answer changes); a shader looks up the colour and blends it at the family strength, softened across the 0.13 edge band. The no-shader path is a low-resolution baked wash image (about 12 px a hex, soft edge band) drawn bilinear, which also retires the per-tile wash vertices. The ruled strengths (0.46 categorical, 0.54 sequential) are unchanged."
+      "design": "LENSES.md § A lens washes the rendered ground. Today a wash is hex polygons per tile, so its edges are a hex staircase and cost vertices per tile. WORK: a tile-id texture per body (baked once with the ground geometry) and a per-lens colour table (one entry per tile, re-uploaded when the lens answer changes); a shader looks up the colour and blends it at the family strength, softened across the 0.13 edge band. The no-shader path is a low-resolution baked wash image (about 12 px a hex, soft edge band) drawn bilinear, which also retires the per-tile wash vertices. The ruled strengths (0.46 categorical, 0.54 sequential) are unchanged. DELIVERED 2026-11-14: on the GPU path the lens wash is one table texture (a texel per tile) drawn by lens_wash.frag with a soft band across each side whose neighbour differs; the per-tile wedge list is the no-shader path. Live-checked on the Market and Workforce lenses."
     },
     {
       "glyph": "✓",
@@ -1700,14 +1700,14 @@
       "authority_doc": "docs/ui/PLANETARY.md",
       "id": "BL-1657",
       "short_name": "SDF_NATIONAL_BORDERS",
-      "status": "designed",
+      "status": "complete",
       "priority": "C",
       "difficulty": 3,
       "title": "The national border band draws from a distance field, smooth and width-stable at every zoom",
       "files": [
         "src/ui/body_surface_canvas.cpp"
       ],
-      "design": "PLANETARY.md § The national border band. Paradox-style: a distance field to the nearest owner boundary, derived on the CPU from the tile-id texture when ownership changes (an event, never a tick), thresholded and anti-aliased in the shader. The band's rules (which edges draw, never a third blended colour, clicking the border selects the nation) are unchanged; only how it is drawn moves. No-shader path: today's vector band."
+      "design": "PLANETARY.md § The national border band. Paradox-style: a distance field to the nearest owner boundary, derived on the CPU from the tile-id texture when ownership changes (an event, never a tick), thresholded and anti-aliased in the shader. The band's rules (which edges draw, never a third blended colour, clicking the border selects the nation) are unchanged; only how it is drawn moves. No-shader path: today's vector band. DELIVERED 2026-11-14: border_band.frag reads an owner table and measures each differing side analytically (NR-1229 records the choice over a stored field); the rule is a fixed screen width at every zoom. The vector AddLine rule is the no-shader path. Live-checked across the zoom rungs."
     },
     {
       "glyph": "~",
@@ -1758,7 +1758,7 @@
         "src/ui/ground_bake.cpp",
         "src/core/ground_layer.cpp"
       ],
-      "design": "RENDERING.md § Art direction and palette: the grade is already \"a separable final pass\", and the land lift re-bakes the land on every change. WORK: bake without the grade and lift (keeping a land weight), apply both in the shader. No-shader path: bake them as today. A level change becomes instant."
+      "design": "RENDERING.md § Art direction and palette: the grade is already \"a separable final pass\", and the land lift re-bakes the land on every change. WORK: bake without the grade and lift (keeping a land weight), apply both in the shader. No-shader path: bake them as today. A level change becomes instant. SPIKE 2026-11-14: blocked on a per-pixel land weight the RGB chunks no longer hold; NR-1226 holds the call."
     },
     {
       "glyph": "✓",
@@ -1775,7 +1775,7 @@
       "authority_doc": "docs/ui/RENDERING.md",
       "id": "BL-1660",
       "short_name": "SHADER_WATER",
-      "status": "designed",
+      "status": "complete",
       "priority": "C",
       "difficulty": 3,
       "title": "Water moves: a scrolling normal shimmer, glints and shore foam drawn by a shader",
@@ -1783,7 +1783,7 @@
         "src/core/ground_layer.cpp",
         "src/ui/body_surface_canvas.cpp"
       ],
-      "design": "RENDERING.md § Ambient animation (overlay, never baked; render-side clock; pinned to phase 0 under --verify). The shader replaces the flipbook overlay design for water: a water mask from the bake, two scrolling normal fields lit by the NW sun, foam where the shore shelf sits. No-shader path: the static bake."
+      "design": "RENDERING.md § Ambient animation (overlay, never baked; render-side clock; pinned to phase 0 under --verify). The shader replaces the flipbook overlay design for water: a water mask from the bake, two scrolling normal fields lit by the NW sun, foam where the shore shelf sits. No-shader path: the static bake. DELIVERED 2026-11-14: water_glint.frag draws a moving specular glint over a water table, faded toward the shore and in from 16-40 px hexes; no foam. Live-checked at close zoom: the glints move between frames."
     },
     {
       "glyph": "~",
@@ -1830,7 +1830,7 @@
       "files": [
         "src/core/ground_layer.cpp"
       ],
-      "design": "RENDERING.md § Resident set. Every AAA reference stores terrain BC1/BC7-compressed: four to eight times less memory per pixel, so a 192 px master would fit today's budget. UNKNOWN: whether an SDL_Renderer texture can be uploaded compressed (likely not; the GPU API can). WORK: a spike that answers that and measures encode cost per chunk; lossy, so the 6 GB ceiling and capture determinism are both on the table."
+      "design": "RENDERING.md § Resident set. Every AAA reference stores terrain BC1/BC7-compressed: four to eight times less memory per pixel, so a 192 px master would fit today's budget. UNKNOWN: whether an SDL_Renderer texture can be uploaded compressed (likely not; the GPU API can). WORK: a spike that answers that and measures encode cost per chunk; lossy, so the 6 GB ceiling and capture determinism are both on the table. SPIKE 2026-11-14: SDL 3.4's GPU renderer wraps an external SDL_GPUTexture (SDL_PROP_TEXTURE_CREATE_GPU_TEXTURE_POINTER), so a BC1/BC7 chunk can draw on the GPU path, never in software captures. Measuring encode cost needs a vendored encoder; NR-1227 holds the call."
     },
     {
       "glyph": "✓",

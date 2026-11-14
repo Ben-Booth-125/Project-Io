@@ -1860,6 +1860,88 @@
     "src/world/finish_campaign_world.cpp",
     "tools/verify/player_seed_sweep.cpp"
    ]
+  },
+  {
+   "id": "NR-1226",
+   "title": "Live grade shader: a draw-time grade needs a per-pixel land weight the chunks no longer hold",
+   "raised": "2026-11-14",
+   "kind": "question",
+   "status": "open",
+   "source": "BL-1659 (live grade shader), sprint 68",
+   "what": "The baked grade lifts land and leaves water, so a draw-time grade must know, per pixel, how much of it is land. The opaque master chunks are held as RGB since BL-1311 (master chunk RAM), so alpha cannot carry that weight. The baked grade also runs before the unsharp pass and the shadows; a draw-time grade after them is close, not exact.",
+   "why_it_matters": "Without a land weight the live grade lifts the sea too. Each way of carrying the weight costs ground memory that BL-1311 just won back.",
+   "options": [
+    "A) Hold opaque chunks as RGBA again: +33% master memory, exact weight",
+    "B) A half-resolution one-byte land mask per chunk, sampled with filtering: about +8% of master memory, one extra texture bind, a softer shore in the grade",
+    "C) Keep the grade baked; the live lever stays a re-bake, and the item closes unbuilt"
+   ],
+   "recommendation": "B. It keeps most of BL-1311's saving (a full-resolution byte would cost the same as RGBA), and the mask is reusable (shore fade, water glint). Accept that the grade then sits after unsharp, a visible but small change, with one re-bless.",
+   "files": [
+    "src/ui/body_surface_canvas.cpp",
+    "docs/ui/RENDERING.md"
+   ],
+   "resolution": null
+  },
+  {
+   "id": "NR-1227",
+   "title": "Compressed ground textures: the GPU path can draw them, but measuring needs a vendored encoder",
+   "raised": "2026-11-14",
+   "kind": "question",
+   "status": "open",
+   "source": "BL-1662 (compressed ground textures) spike, sprint 68",
+   "what": "SDL 3.4's GPU renderer wraps an external SDL_GPUTexture (SDL_PROP_TEXTURE_CREATE_GPU_TEXTURE_POINTER), so a BC1 or BC7 chunk can be drawn on the GPU path. The software renderer (every --verify capture) cannot, so captures would keep the RGB chunk. The open cost is encode time per 512 px chunk at bake, which needs an encoder in the tree.",
+   "why_it_matters": "BC1 is 6:1 against RGB (BC7 3:1), the largest memory lever left for the ground. It adds a third-party dependency and a second chunk format beside the capture path.",
+   "options": [
+    "A) Vendor a single-file BC1 encoder (stb_dxt, public domain) and measure encode ms per chunk",
+    "B) Vendor a BC7 encoder (bc7enc, MIT) for quality, slower to encode",
+    "C) Defer: close the item unbuilt until ground memory binds again"
+   ],
+   "recommendation": "A for the measurement only; decide the format from the numbers.",
+   "files": [
+    "src/core/gpu_effects.cpp",
+    "docs/ui/RENDERING.md"
+   ],
+   "resolution": null
+  },
+  {
+   "id": "NR-1228",
+   "title": "Shader seam: --verify captures stay on the software renderer, so they never show a shader pass",
+   "raised": "2026-11-14",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "BL-1655 (shader seam), sprint 68",
+   "what": "--verify forces the software renderer, and every shader pass (lens wash, border band, water glint) has a no-shader path that is what captures draw. The shader passes were checked by a live look in the GPU app, not a capture. IO_NO_GPU_EFFECTS=1 turns every pass off in the GPU app, for an A/B.",
+   "why_it_matters": "A green visual run proves the no-shader path, not the shader. A shader regression would pass every capture.",
+   "options": [
+    "Keep it: captures prove the fallback, live looks prove the shader",
+    "File a GPU capture mode (read back the GPU target) as its own item"
+   ],
+   "recommendation": "Keep it for this sprint; file the GPU capture mode if a shader pass regresses unseen.",
+   "files": [
+    "src/core/gpu_effects.cpp",
+    "src/core/app.cpp"
+   ],
+   "resolution": null
+  },
+  {
+   "id": "NR-1229",
+   "title": "Borders: the shader measures the hex side analytically, with no distance field stored",
+   "raised": "2026-11-14",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "BL-1657 (SDF national borders), sprint 68",
+   "what": "The item named a signed distance field. The pass instead reads a one-texel-per-tile owner table and, per pixel, measures the distance to each of the six sides whose neighbour has a different owner. That is exact for a hex grid and needs no baked field or extra memory. The rule's width is set in screen pixels, so it holds across zoom.",
+   "why_it_matters": "It is cheaper and exact on hexes, but it cannot draw a border off the hex edges (a smoothed or river-following line would need a real field).",
+   "options": [
+    "Keep the analytic pass",
+    "Bake a true distance field later if borders should leave the hex edges"
+   ],
+   "recommendation": "Keep it; the border rule follows hex edges by design (PLANETARY.md).",
+   "files": [
+    "src/shaders/border_band.frag.hlsl",
+    "docs/ui/PLANETARY.md"
+   ],
+   "resolution": null
   }
  ]
 }

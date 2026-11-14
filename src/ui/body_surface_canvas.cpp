@@ -2,6 +2,7 @@
 #include "ui_scale.hpp" // BL-1495: px, px_const
 #include "diplomacy_ledger.hpp" // open_declaration — the right-click declare-and-attack
 #include "text_fit.hpp"
+#include "core/gpu_effects.hpp" // BL-1655: the ground draws through the shader seam
 
 #include "construction_panel.hpp" // the build-progress circle and its site card (Ben, 2026-10-26)
 #include "construction_sites.hpp" // site_press_refusal: why a press with a building chosen placed nothing
@@ -358,6 +359,13 @@ inline ImU32 washed_resource_ground(ImU32 c, bool water)
 //   its value (Scarcity), the value scales this alpha the same way.
 constexpr float k_lens_wash_categorical = 0.46f;
 constexpr float k_lens_wash_sequential  = 0.54f;
+/// BL-1656 (lens lookup): the soft edge of a lens wash drawn by the lens_wash shader,
+/// in canonical units (the hex circumradius is 1). Two washes meet half and half on
+/// the shared side and reach their own colour this far inside; a wash's rim fades
+/// over the same band. The no-shader path keeps hard hex edges.
+constexpr float k_lens_edge_band = 0.13f;
+/// BL-1660 (shader water): the open-water glint's peak alpha over the baked water.
+constexpr float k_water_glint_strength = 0.55f;
 /// The Resource lens's no-deposit ground: its ruled white wash (Ben, 2026-10-04,
 /// "the white wash should still exist") over the bake, paler than the fill path's
 /// 72% so the ground's forms survive under it while the deposits stay the only
@@ -4091,6 +4099,25 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     struct ground_wedges { ImVec2 c; float r; ImU32 cols[ui_state::k_lens_resource_cap]; int n; };
     static std::vector<ground_wedges> lens_wedges;
     lens_wedges.clear();
+    // BL-1656 (lens lookup): where the renderer runs Io's shaders, the lens answer is
+    // a TABLE - one colour per tile, written by the tile loop where it would have
+    // pushed a wash - drawn as one quad by the lens_wash shader, which finds each
+    // pixel's tile and softens its edges. The split tiles' wedges stay polygons.
+    // A table that cannot be made falls back to the polygon washes for good.
+    static bool lens_table_failed = false;
+    const bool lens_gpu = state.overlay != overlay_mode::none && ground_on && !lens_table_failed
+                       && gfx::available(gfx::effect::lens_wash) && gw > 0 && gh > 0;
+    static std::vector<std::uint32_t> lens_table;
+    // BL-1657 (SDF borders): set where the band is decided, read by emit_ground.
+    static bool border_table_failed = false;
+    bool border_gpu = false;
+    static std::vector<std::uint32_t> border_table;
+    // BL-1660 (shader water): the open-water glint's table, likewise.
+    static bool water_table_failed = false;
+    bool water_gpu = false;
+    static std::vector<std::uint32_t> water_table;
+    if (lens_gpu)
+        lens_table.assign(static_cast<std::size_t>(gw) * static_cast<std::size_t>(gh), 0u);
     // The close-zoom seam (BL-1251 part 5): one segment per shared tile edge.
     static std::vector<ImVec2> seam_segs;
     seam_segs.clear();
@@ -4099,6 +4126,32 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         if (!ground_on)
             return;
         dl->ChannelsSetCurrent(1);
+        // BL-1660 (shader water): light moving on open water, over the ground and
+        // under the seam and every wash, so the fog dims it as it dims the ground.
+        if (water_gpu)
+        {
+            SDL_Texture* const wtex = gfx::table_texture(2, gw, gh, water_table.data());
+            if (!wtex)
+                water_table_failed = true;
+            else
+            {
+                const float params[4] = { static_cast<float>(ImGui::GetTime()), hex_size * zoom,
+                                          k_water_glint_strength, 0.0f };
+                gfx::set_uniforms(gfx::effect::water_glint, params, sizeof params);
+                const float y0c = -1.0f, y1c = 1.5f * static_cast<float>(gh - 1) + 1.0f;
+                const auto canon_x = [&](float sx) {
+                    return ((sx - view_origin.x) / zoom + grid_cx) / hex_size;
+                };
+                const float span_x = kSqrt3 * static_cast<float>(gw);
+                const float span_y = 1.5f * static_cast<float>(gh);
+                const ImVec2 q0 = canon_to_screen(0.0f, y0c), q1 = canon_to_screen(0.0f, y1c);
+                gfx::begin(dl, gfx::effect::water_glint);
+                dl->AddImage((ImTextureID)(intptr_t)wtex, { visible_left, q0.y }, { visible_right, q1.y },
+                             { canon_x(visible_left) / span_x, y0c / span_y },
+                             { canon_x(visible_right) / span_x, y1c / span_y });
+                gfx::end(dl);
+            }
+        }
         // The seam first: over the ground, under every wash and stroke. Thin
         // anti-aliased lines — the texture-AA path, a few vertices a segment.
         for (std::size_t si = 0; si + 1 < seam_segs.size(); si += 2)
@@ -4166,10 +4219,64 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 i = j;
             }
         };
-        emit_list(lens_washes);
+        SDL_Texture* const lens_tex = lens_gpu
+            ? gfx::table_texture(0, gw, gh, lens_table.data()) : nullptr;
+        if (lens_gpu && !lens_tex)
+            lens_table_failed = true; // this frame draws no lens wash; the next, polygons
+        if (lens_tex)
+        {
+            // One quad over the visible width and the grid's rows; its UVs carry
+            // canonical position (u * sqrt(3) * gw, v * 1.5 * gh) and the shader
+            // wraps the columns, so no wrap copy is needed. Affine, so the tilt's
+            // squash moves its vertices and the lookup follows.
+            const float params[4] = { k_lens_edge_band, 0.0f, 0.0f, 0.0f };
+            gfx::set_uniforms(gfx::effect::lens_wash, params, sizeof params);
+            const float y0c = -1.0f, y1c = 1.5f * static_cast<float>(gh - 1) + 1.0f;
+            const auto canon_x = [&](float sx) {
+                return ((sx - view_origin.x) / zoom + grid_cx) / hex_size;
+            };
+            const float span_x = kSqrt3 * static_cast<float>(gw);
+            const float span_y = 1.5f * static_cast<float>(gh);
+            const ImVec2 q0 = canon_to_screen(0.0f, y0c), q1 = canon_to_screen(0.0f, y1c);
+            gfx::begin(dl, gfx::effect::lens_wash);
+            dl->AddImage((ImTextureID)(intptr_t)lens_tex, { visible_left, q0.y }, { visible_right, q1.y },
+                         { canon_x(visible_left) / span_x, y0c / span_y },
+                         { canon_x(visible_right) / span_x, y1c / span_y });
+            gfx::end(dl);
+        }
+        else
+            emit_list(lens_washes);
         for (const ground_wedges& wg : lens_wedges)
             draw_lens_wedges(dl, wg.c, wg.r, wg.cols, wg.n);
         emit_list(washes);
+        // BL-1657: the border rule, over the stroke layer as the vector rule drew
+        // after each tile's network. One quad over the view, as the lens table's.
+        if (border_gpu)
+        {
+            SDL_Texture* const btex = gfx::table_texture(1, gw, gh, border_table.data());
+            if (!btex)
+                border_table_failed = true; // the next frame draws the vector rule
+            else
+            {
+                const float params[4] = { hex_size * zoom, k_border_stroke_px,
+                                          k_border_stroke_inset, k_border_unclaimed_scale };
+                gfx::set_uniforms(gfx::effect::border_band, params, sizeof params);
+                const float y0c = -1.0f, y1c = 1.5f * static_cast<float>(gh - 1) + 1.0f;
+                const auto canon_x = [&](float sx) {
+                    return ((sx - view_origin.x) / zoom + grid_cx) / hex_size;
+                };
+                const float span_x = kSqrt3 * static_cast<float>(gw);
+                const float span_y = 1.5f * static_cast<float>(gh);
+                const ImVec2 q0 = canon_to_screen(0.0f, y0c), q1 = canon_to_screen(0.0f, y1c);
+                dl->ChannelsSetCurrent(2);
+                gfx::begin(dl, gfx::effect::border_band);
+                dl->AddImage((ImTextureID)(intptr_t)btex, { visible_left, q0.y }, { visible_right, q1.y },
+                             { canon_x(visible_left) / span_x, y0c / span_y },
+                             { canon_x(visible_right) / span_x, y1c / span_y });
+                gfx::end(dl);
+                dl->ChannelsSetCurrent(1);
+            }
+        }
         dl->Flags = saved;
         pm.mark(canvas_pass_meter::fill, dl);
         dl->ChannelsSetCurrent(0);
@@ -4183,9 +4290,15 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         }
         // The far page carries only a body whose master has not yet covered
         // the view (BL-1246): every other frame the level's chunks cover it.
+        // BL-1655 (shader seam): the ground images draw through Io's own fragment
+        // shader where the renderer can take one. `identity` draws exactly what SDL's
+        // shader does - the seam's standing self-check until a ground pass replaces it.
+        // Unavailable (the --verify software path), begin/end record nothing.
+        gfx::begin(dl, gfx::effect::identity);
         draw_ground_rect(gview.far);
         for (const ground_chunk_view& cv : gview.chunks)
             draw_ground_rect(cv);
+        gfx::end(dl);
         dl->ChannelsMerge();
     };
     // Every map vertex emitted so far, minus the legend's: called once, at
@@ -4747,6 +4860,53 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     // the rule's own neighbour test (emit_routes) is the frontier test.
     const bool draw_border_band = (state.overlay == overlay_mode::none)
                                && !state.dbg_hide_border_band;
+    // BL-1657 (SDF borders): where the renderer runs Io's shaders, the rule is drawn
+    // per pixel by border_band from an OWNER TABLE, at the stroke's width in screen
+    // pixels at every zoom; the vector pass below then registers the click corridors
+    // and draws no line. The table holds the rows on screen and one past each edge.
+    // Byte layout: rgb the muted colour; alpha bit 7 "draws", bits 0-6 the owner key
+    // (0 unclaimed, 127 no tile, 1-126 a nation). A table that cannot be made falls
+    // back to the vector rule for good.
+    // BL-1660 (shader water): which visible tiles are water, for the glint shader.
+    water_gpu = ground_on && raster_ok && !water_table_failed && !state.fixed_frame_clock
+             && gfx::available(gfx::effect::water_glint) && gw > 0 && gh > 0;
+    if (water_gpu)
+    {
+        water_table.assign(static_cast<std::size_t>(gw) * static_cast<std::size_t>(gh), 0u);
+        for (int r = std::max(0, row_lo - 1); r <= std::min(gh - 1, row_hi + 1); ++r)
+            for (int c = 0; c < gw; ++c)
+            {
+                const std::size_t ci = static_cast<std::size_t>(r) * gw + c;
+                if (raster[ci] == null_entity || !survey_tile_visible(body.survey, gw, gh, c, r))
+                    continue;
+                const tile_component* t = tile_rc(c, r);
+                if (t && placement_rules::is_water_tile(t->substrate))
+                    water_table[ci] = IM_COL32(255, 0, 0, 255);
+            }
+    }
+    border_gpu = draw_border_band && ground_on && raster_ok && !border_table_failed
+              && gfx::available(gfx::effect::border_band) && gw > 0 && gh > 0;
+    if (border_gpu)
+    {
+        border_table.assign(static_cast<std::size_t>(gw) * static_cast<std::size_t>(gh), 0u);
+        for (int r = std::max(0, row_lo - 1); r <= std::min(gh - 1, row_hi + 1); ++r)
+            for (int c = 0; c < gw; ++c)
+            {
+                const std::size_t ci = static_cast<std::size_t>(r) * gw + c;
+                if (raster[ci] == null_entity)
+                {
+                    border_table[ci] = IM_COL32(0, 0, 0, 127);
+                    continue;
+                }
+                const entity_id nat = nation_rc(c, r);
+                if (nat == null_entity)
+                    continue; // unclaimed: key 0, draws nothing
+                const ImU32 mc = muted_nation_colour(palette::nation_colour(nat));
+                const unsigned key  = 1u + static_cast<unsigned>(nat % 126u);
+                const unsigned draw = survey_tile_visible(body.survey, gw, gh, c, r) ? 128u : 0u;
+                border_table[ci] = (mc & ~IM_COL32_A_MASK) | ((key | draw) << IM_COL32_A_SHIFT);
+            }
+    }
     // ---- The static stroke layer of one tile copy ---------------------------
     // Two pieces, each drawn into @p out at the tile centre (cx, cy): the drawn
     // road/lane network (the Throughput lens's) with the border rule, and the
@@ -5388,8 +5548,9 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                                              (border_col >> IM_COL32_G_SHIFT) & 0xFFu,
                                              (border_col >> IM_COL32_B_SHIFT) & 0xFFu,
                                              static_cast<int>(255.0f * k_border_unclaimed_scale));
-                    out->AddLine(e0, e1, edge_col,
-                                 std::max(1.0f, k_border_stroke_px * edge_scale));
+                    if (!border_gpu) // BL-1657: the shader draws the rule
+                        out->AddLine(e0, e1, edge_col,
+                                     std::max(1.0f, k_border_stroke_px * edge_scale));
 
                     // The hit corridor (BL-601, and the general structure-grain
                     // case BL-603 builds on). Registered per DRAWN segment, so
@@ -5642,6 +5803,8 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             // recoloured network simply never appeared: the colours were changed in
             // the emitter and the cache kept handing back the old vertices.
             h = mix(h, static_cast<std::uint64_t>(state.overlay) + 1ull);
+            // BL-1657: a bucket built with the vector rule is not one built without it.
+            h = mix(h, border_gpu ? 0xB0D3ull : 0x0ull);
             for (int rr = r - 2; rr <= r + 2; ++rr)
                 h = mix(h, (rr < 0 || rr >= gh)
                                ? 0xEDull
@@ -6024,6 +6187,10 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                                     lens_wc = lens_wash_of(id, tile_of()));
                              (lc & IM_COL32_A_MASK) != 0u)
                     {
+                        if (lens_gpu)
+                            lens_table[static_cast<std::size_t>(t_row) * gw + t_col] = lc;
+                        else
+                        {
                         // The run is per wrap COPY: with two copies on screen the
                         // list's back is the other copy's rect, never a neighbour.
                         int& run = lens_run[static_cast<unsigned>(k) & 3u];
@@ -6041,6 +6208,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                         }
                         else
                             lens_washes.push_back({ { cx, cy }, step, {}, {}, lc, true });
+                        }
                     }
                 }
                 // The close-zoom seam: sides 0-2 (E, NE, NW) of every tile on

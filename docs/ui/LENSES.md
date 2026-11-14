@@ -172,6 +172,17 @@ whose buildings they could not see.
   (SELECTION.md § A lens collapses selection to ONE TIER).
 - **Before a body's ground exists** (the far page not yet baked) a lens falls back to the
   vector fill, as the plain canvas does.
+- **The wash is a lookup, with soft edges (BL-1656, lens lookup).** Where the renderer runs
+  Io's fragment shaders ([TECH_FOUNDATIONS.md](../tech/TECH_FOUNDATIONS.md) § Framework), the
+  lens's answer is a **colour table** — one entry per tile, its colour with the family
+  strength in alpha, no entry where the lens has no answer — and one quad over the view draws
+  it: each pixel finds its tile and the neighbour across its nearest side, and within an
+  **edge band of 0.13 hex radius** blends toward that neighbour, half and half on the side
+  itself. Two answers meet in a soft seam and a wash fades out at its rim, never a hex
+  staircase; the strengths above are unchanged, and the blend is premultiplied, so an
+  unwashed neighbour fades the strength, not the hue. The table is re-uploaded only when the
+  answer changes. A Resource-lens split tile keeps its wedges. **No-shader path:** the
+  per-tile washes in hard hex edges, as above — what `--verify` captures.
 
 ### Legend placement — one chrome home
 

@@ -85,6 +85,18 @@ renderer cannot take a GPU render state — so the app runs on any renderer, and
 reads a shader's output. Which renderer `--verify` captures with, once a shader pass exists, is
 an open question owned by BL-1655 (shader seam), not settled here.
 
+**The seam (BL-1655, shader seam).** The app asks SDL for its `gpu` renderer with DXIL shaders
+(`IO_NO_GPU_RENDERER` or an explicit `SDL_RENDER_DRIVER` keeps the default one); `--verify` sets
+the software driver, so captures draw every no-shader path. Shaders are HLSL in `src/shaders/`,
+compiled at build time by the Windows SDK's DXC into C headers; a build without DXC has no
+shaders and runs its no-shader paths. `core/gpu_effects` holds one `SDL_GPURenderState` per
+**effect**: a canvas brackets the draws an effect covers with `gfx::begin` / `gfx::end`, which
+record ImGui draw-list callbacks, so the switch lands exactly between the draws it brackets.
+An effect reads the draw's own texture at slot 0, may bind extra textures, takes one uniform
+block, and may read a small **table texture** (one texel per tile) re-uploaded only when it
+changes. `identity` — the texture times the vertex colour, exactly SDL's own shader — brackets
+the ground images as the seam's standing self-check.
+
 SFML was ruled out due to slower evolution and a C++ OOP API that works against a data-oriented simulation model. Raylib was ruled out because its built-in main loop and camera abstractions create friction when building a custom engine with a separate simulation tick and multiple distinct view systems.
 
 **Authored images load through one in-tree PNG decoder (Ben, 2026-10-28, NR-1095).** SDL3 loads BMP only and ImGui bundles no image loader, so `src/ui/png_decode.cpp` is the one image path: zlib inflate plus 8-bit grey, grey+alpha, RGB, RGBA and palette PNGs, non-interlaced, with any other file refused with a reason. Every authored image (unit art, emblems, icons as files) loads through it; a vendored image library is not added beside it. It caps its output size, because a file is input it did not write.

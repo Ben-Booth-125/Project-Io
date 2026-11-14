@@ -355,6 +355,46 @@ if(GIT_EXECUTABLE)
 endif()
 
 # ---------------------------------------------------------------------------
+# Fragment shaders for the 2D renderer (BL-1655 (shader seam); TECH_FOUNDATIONS.md
+# § Framework, "SDL 3.4, and fragment shaders on the 2D renderer").
+# ---------------------------------------------------------------------------
+# Each src/shaders/<name>.frag.hlsl compiles with DXC to DXIL, emitted as a C
+# header (`-Fh`) holding the byte array `g_<name>_dxil`; src/core/gpu_effects.cpp
+# includes them. No DXC (a non-Windows host, or an SDK without it) means no
+# headers (gpu_effects.cpp tests __has_include): the app then runs every pass's no-shader
+# path, which is a supported configuration, never an error.
+file(GLOB IO_SHADER_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/shaders/*.frag.hlsl")
+file(GLOB IO_SHADER_INCLUDES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/shaders/*.hlsli")
+set(IO_DXC_HINTS "")
+if(WIN32)
+    file(GLOB IO_DXC_HINTS "C:/Program Files (x86)/Windows Kits/10/bin/10.*/x64")
+    list(SORT IO_DXC_HINTS ORDER DESCENDING) # the newest SDK first
+endif()
+find_program(IO_DXC NAMES dxc HINTS ${IO_DXC_HINTS})
+if(IO_DXC AND IO_SHADER_SOURCES)
+    set(IO_SHADER_HEADERS "")
+    foreach(src IN LISTS IO_SHADER_SOURCES)
+        get_filename_component(fname "${src}" NAME)          # ground_lens.frag.hlsl
+        string(REPLACE ".frag.hlsl" "" sname "${fname}")     # ground_lens
+        set(out "${CMAKE_BINARY_DIR}/generated/shaders/${sname}.dxil.h")
+        add_custom_command(
+            OUTPUT "${out}"
+            COMMAND "${CMAKE_COMMAND}" -E make_directory "${CMAKE_BINARY_DIR}/generated/shaders"
+            COMMAND "${IO_DXC}" -nologo -T ps_6_0 -E main -O3 -Fh "${out}" -Vn "g_${sname}_dxil" "${src}"
+            DEPENDS "${src}" ${IO_SHADER_INCLUDES}
+            COMMENT "DXC ${fname}"
+            VERBATIM)
+        list(APPEND IO_SHADER_HEADERS "${out}")
+    endforeach()
+    add_custom_target(io_shaders DEPENDS ${IO_SHADER_HEADERS})
+    add_dependencies(ProjectIo io_shaders)
+    target_include_directories(ProjectIo PRIVATE "${CMAKE_BINARY_DIR}/generated")
+    message(STATUS "Shaders: DXC at ${IO_DXC}")
+else()
+    message(STATUS "Shaders: no DXC - every shader pass runs its no-shader path")
+endif()
+
+# ---------------------------------------------------------------------------
 # Compiler warnings (BL-101) — advisory diagnostics on OWNED targets only
 # ---------------------------------------------------------------------------
 # -Wall/-Wextra (GNU/Clang) or /W4 (MSVC), applied to ProjectIo and the

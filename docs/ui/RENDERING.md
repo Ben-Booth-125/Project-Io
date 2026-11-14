@@ -634,8 +634,19 @@ both draw by one rule:
 
 ### Ambient animation
 
-Motion is **overlay flipbook, not baked**: the ground bake is static, and animated
-passes (water shimmer) draw as looping frame overlays on top of the baked chunks. No
+Motion is **an overlay, not baked**: the ground bake is static, and animated
+passes draw over the baked chunks.
+
+**Water moves by shader (BL-1660, shader water).** Where the renderer runs Io's fragment
+shaders ([TECH_FOUNDATIONS.md](../tech/TECH_FOUNDATIONS.md) § Framework), open water carries a
+**glint**: two crossing height fields, three and five waves a hex, scrolling slowly and lit by
+the bake's low NW sun, add a small specular highlight over the baked water — the bake stays the
+water's colour, the shader only adds light. It reads one table, which tiles are visible water,
+and fades to nothing within half a hex of any side facing a non-water tile, so the painted
+coastline, the shore shelf and a river mouth never move; and below ~24 px a hex, where a wave
+would be under a pixel. Shore foam is not part of it: foam must follow the painted coast,
+which a per-tile table cannot place. **No-shader path:** the static bake. The flipbook
+overlay this replaces is retired for water. No
 animation keys on an installation's state — the art is static (§ Installations). The animation clock is **render-side real time** — never sim
 state — so ambience continues while paused; under `--verify` the clock is **pinned to
 phase 0** and a check advances it explicitly. The near-future grade applies over

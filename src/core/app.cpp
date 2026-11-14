@@ -1,6 +1,7 @@
 #include "app.hpp"
 
 #include "png_writer.hpp"
+#include "gpu_effects.hpp" // BL-1655: the fragment-shader seam
 #include <cstdlib> // std::_Exit: quitting mid-build
 #include "save_game.hpp" // BL-536 quick save / quick load
 #include "session_history.hpp" // step_economy's post-step presentation (BL-361)
@@ -251,8 +252,31 @@ app::app()
         SDL_free(displays);
     }
 
-    m_renderer = SDL_CreateRenderer(m_window, nullptr);
+    // BL-1655 (shader seam): SDL's GPU renderer, which can run Io's fragment shaders
+    // (gpu_effects), unless a driver is forced - `--verify` and its goldens force the
+    // software renderer through SDL_RENDER_DRIVER, and that path must stay exactly as
+    // it was - or IO_NO_GPU_RENDERER is set. A GPU renderer that cannot be made falls
+    // back to SDL's default choice, and every shader pass then draws its no-shader path.
+    {
+        const char* forced = SDL_GetHint(SDL_HINT_RENDER_DRIVER);
+        const char* no_gpu = SDL_getenv("IO_NO_GPU_RENDERER");
+        if ((!forced || !*forced) && !(no_gpu && *no_gpu && *no_gpu != '0'))
+        {
+            const SDL_PropertiesID props = SDL_CreateProperties();
+            SDL_SetPointerProperty(props, SDL_PROP_RENDERER_CREATE_WINDOW_POINTER, m_window);
+            SDL_SetStringProperty(props, SDL_PROP_RENDERER_CREATE_NAME_STRING, "gpu");
+            SDL_SetBooleanProperty(props, SDL_PROP_RENDERER_CREATE_GPU_SHADERS_DXIL_BOOLEAN, true);
+            m_renderer = SDL_CreateRendererWithProperties(props);
+            SDL_DestroyProperties(props);
+            if (!m_renderer)
+                SDL_Log("GPU renderer unavailable (%s) - using SDL's default", SDL_GetError());
+        }
+        if (!m_renderer)
+            m_renderer = SDL_CreateRenderer(m_window, nullptr);
+        SDL_Log("Renderer: %s", SDL_GetRendererName(m_renderer));
+    }
     SDL_SetRenderVSync(m_renderer, 1);
+    gfx::init(m_renderer);
 
     // Record the display environment on startup so the runtime resolution is on the
     // log. Verify captures render at the fixed verify_w×verify_h (run_verify resizes
@@ -345,6 +369,7 @@ app::~app()
     ImGui_ImplSDLRenderer3_Shutdown();
     ImGui_ImplSDL3_Shutdown();
     ImGui::DestroyContext();
+    gfx::shutdown(); // render states die before their renderer
     SDL_DestroyRenderer(m_renderer);
     SDL_DestroyWindow(m_window);
     SDL_Quit();
