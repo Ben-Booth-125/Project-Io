@@ -154,7 +154,7 @@
    "id": 68,
    "theme": "Map fidelity",
    "state": "open",
-   "status_line": "open: BL-1652 (gamma-correct mips) and BL-1653 (animated zoom step) delivered; SDL 3.4 (BL-1654) next",
+   "status_line": "open: eight of twelve delivered (mips, zoom step, SDL 3.4, shader seam, lens lookup, SDF borders, shader water, road paint checks); BL-1659 (live grade) and BL-1662 (compressed ground) wait on NR-1226/NR-1227; BL-1658 (close-zoom detail) and BL-1661 (far-zoom map) wait on Ben's design answers",
    "opened_date": "2026-11-14",
    "closed_date": null,
    "author": "Claude (Ben, 2026-11-14: \"try implementing the easier changes first\")",

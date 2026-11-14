@@ -1840,7 +1840,7 @@
       "parked": false,
       "blocked_on": null,
       "requires": [],
-      "status": "designed",
+      "status": "complete",
       "author": "Claude (Ben, 2026-11-14: \"Yes, file it\")",
       "id": "BL-1663",
       "short_name": "ROAD_PAINT_CHECKS_FAIL",
@@ -1855,7 +1855,7 @@
         "src/ui/ground_bake.cpp",
         "src/ui/structure_stamps.cpp"
       ],
-      "design": "RENDERING.md § Roads and sea lanes. FOUND 2026-11-14 while delivering BL-1652 (gamma-correct mips): ground_bake_check --routes fails 8 assertions with main's ground_bake.cpp (224020d6) and identically with the new downsample. Failing: P28 the highway (93 px moved), track (46 px), town, works and forecourt surfaces (0 px moved) draw; P29 a works tile a road meets takes its roaded variant; P33 no staged road comes within a roaded cluster's disc plus its half-width; P34 every road set draws. WORK: find which change broke them (git bisect over the route pass and the structure plan), then decide per row whether the bake or the check is wrong. Do not weaken a row to pass: a check that no longer matches a ruled design is re-derived from the doc, never loosened."
+      "design": "RENDERING.md § Roads and sea lanes. FOUND 2026-11-14 while delivering BL-1652 (gamma-correct mips): ground_bake_check --routes fails 8 assertions with main's ground_bake.cpp (224020d6) and identically with the new downsample. Failing: P28 the highway (93 px moved), track (46 px), town, works and forecourt surfaces (0 px moved) draw; P29 a works tile a road meets takes its roaded variant; P33 no staged road comes within a roaded cluster's disc plus its half-width; P34 every road set draws. WORK: find which change broke them (git bisect over the route pass and the structure plan), then decide per row whether the bake or the check is wrong. Do not weaken a row to pass: a check that no longer matches a ruled design is re-derived from the doc, never loosened. DELIVERED 2026-11-14: the check now stages road_sides from the staged tiers before each rederive; P30's upgrade raises one whole crossing. ground_bake_check 163 PASS, 0 failures."
     }
   ]
 }
