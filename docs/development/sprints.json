@@ -154,7 +154,7 @@
    "id": 68,
    "theme": "Map fidelity",
    "state": "open",
-   "status_line": "open: eight of twelve delivered (mips, zoom step, SDL 3.4, shader seam, lens lookup, SDF borders, shader water, road paint checks); BL-1659 (live grade) and BL-1662 (compressed ground) wait on NR-1226/NR-1227; BL-1658 (close-zoom detail) and BL-1661 (far-zoom map) wait on Ben's design answers",
+   "status_line": "open: nine of twelve delivered (mips, zoom step, SDL 3.4, shader seam, lens lookup, SDF borders, live land lift, shader water, road paint checks); BL-1662 (compressed ground) waits on NR-1227; BL-1658 (close-zoom detail) and BL-1661 (far-zoom map) wait on Ben's design answers",
    "opened_date": "2026-11-14",
    "closed_date": null,
    "author": "Claude (Ben, 2026-11-14: \"try implementing the easier changes first\")",

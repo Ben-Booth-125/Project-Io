@@ -230,7 +230,7 @@ and/or a version goal (v0.1.1 etc.).
 | 65 | Near space (v0.4.0) | gated on NR-1203 (trade wall): every item built except BL-1630 (launch goods supply); spectate shows 0 rival launches (BL-1593, NEXT_SESSION.md) |
 | 66 | Far space (v0.5.0) | open: every item built except BL-1611 (far-space spectator check), gated on NR-1203; four live clicks owed (NEXT_SESSION.md) |
 | 67 | Launch fix and space calls | open: boost (BL-1637), generated body mass (BL-1638), probe retirement (BL-1639) in lanes; B measured for NR-1203 |
-| 68 | Map fidelity | open: eight of twelve delivered (mips, zoom step, SDL 3.4, shader seam, lens lookup, SDF borders, shader water, road paint checks); BL-1659 (live grade) and BL-1662 (compressed ground) wait on NR-1226/NR-1227; BL-1658 (close-zoom detail) and BL-1661 (far-zoom map) wait on Ben's design answers |
+| 68 | Map fidelity | open: nine of twelve delivered (mips, zoom step, SDL 3.4, shader seam, lens lookup, SDF borders, live land lift, shader water, road paint checks); BL-1662 (compressed ground) waits on NR-1227; BL-1658 (close-zoom detail) and BL-1661 (far-zoom map) wait on Ben's design answers |
 
 **Next up.** SPRINT 61 CLOSED 2026-11-05 (no version cut). v0.3.0 needs the naval system and a playtest with a few wars. BL-1470 (sentiment contributors) passed its live click 2026-11-05; BL-1490 (province resource clip) waits on BL-1495 (UI scale down); BL-1494 (new-library tick-50 stall) leads the economy work. SPRINT 63 (UI, QOL and the opening) OPEN 2026-11-05: Ben's playtest list is filed; the payback census has read: research is the missing money and the door quotes mirages on scarce goods.
 
