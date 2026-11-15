@@ -770,6 +770,7 @@ void ground_layer::make_room(long long need, entity_id keep_a, entity_id keep_b)
         if (!victim)
             return;
         const long long before = victim->ram;
+        victim->budget_spilled = true; // no background refill until a visit
         if (m_cache_live)
             cache_init();
         if (cache_live())
@@ -1749,7 +1750,12 @@ void ground_layer::feed(bool verify)
                 continue;
             b->background = true;
         }
-        else if (!pinned(c.id) && total - b->ram + master_bytes(*b) > others_budget())
+        else if (b->budget_spilled)
+            continue; // the budget could not hold it: it comes back on a visit
+        // Its far page stays counted: b->ram holds it, master_bytes does not.
+        else if (!pinned(c.id)
+                 && total - b->ram + static_cast<long long>(b->far_px.size()) * 4 + master_bytes(*b)
+                        > others_budget())
             continue;
         housekeep(*b);
         fill_body(*b, k_prio_background, b->lv[0].cw * 0.5, b->lv[0].ch * 0.5);
@@ -2042,6 +2048,7 @@ void ground_layer::tick(SDL_Renderer* r, const world& w, ui_state& ui, bool bake
         {
             ++nb->visits;
             nb->background = false;
+            nb->budget_spilled = false; // a visit may hold it again
             if (nb->src_age > 0)
                 refresh_source(*nb, w); // a visit re-takes the snapshot
             if (fill_log_on())

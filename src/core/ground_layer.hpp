@@ -434,6 +434,11 @@ private:
         std::uint64_t last_visit = 0;
         int           visits = 0;
         bool          background = false;      ///< Baked speculatively (not visited, not pre-baked).
+        /// The RAM budget spilled (or dropped) this master: no background bake
+        /// refills it until it is visited. Without the latch a body the budget
+        /// could not hold was re-admitted, streamed back whole and spilled
+        /// again, once every second or two for the whole session.
+        bool          budget_spilled = false;
         long long     ram = 0;
     };
 
