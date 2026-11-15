@@ -2318,7 +2318,8 @@ int main()
         // and v88 is read as its strict prefix; every PG size below adds that section.
         // The space merge: today is v93 (every space section after the missiles); v89 is read
         // as its prefix less the space sections.
-        static_assert(world_save_version == k_world_save_version_monthly && k_world_save_version_monthly == 95
+        static_assert(world_save_version == k_world_save_version_launch_boost && k_world_save_version_launch_boost == 96 // BL-1637: the pad-boost tail
+                          && k_world_save_version_monthly == 95
                           && k_world_save_version_one_product == 94
                           && k_world_save_version_space_merge == 93 && k_world_save_version_stacked == 88
                           && k_world_save_version_ship_kit == 81 && k_world_save_version_ended == 83
@@ -2414,13 +2415,13 @@ int main()
 
         // The space merge gave v84..v87 and v90..v92 the space line's layouts, so no version
         // in 81..93 is unclaimed any more; a stream stamped past today is refused.
-        for (const uint32_t v : {96u, 97u}) // BL-1642: v95 is today (the monthly tick)
+        for (const uint32_t v : {97u, 98u}) // BL-1637: v96 is today (the pad's boost)
         {
             std::string other = b88;
             std::memcpy(&other[4], &v, sizeof v);
             world sentinel;
             check(!from_bytes(other, sentinel) && sentinel.tiles.empty(),
-                  "PG a stream stamped past today (v96, v97) is REFUSED");
+                  "PG a stream stamped past today (v97, v98) is REFUSED");
         }
     }
 
@@ -2433,7 +2434,7 @@ int main()
     {
         // BL-1641: v94 (one building per product) adds no section, nor does v95 (BL-1642, the
         // monthly tick), so today's stream is v93's layout.
-        static_assert(world_save_version == 95 && k_world_save_version_space_merge == 93
+        static_assert(world_save_version == 96 /* BL-1637: v96 appends the pad-boost tail */ && k_world_save_version_space_merge == 93
                           && k_world_save_version_pre_space_merge == 89,
                       "PH pins v93 as the space merge over main's v89");
         static_assert(world_stream_is_space_line(84) && world_stream_is_space_line(87)
@@ -2463,7 +2464,7 @@ int main()
         world w92;
         const bool ok92 = s92 == 92 && from_bytes(b92, w92) && !w92.nations.at(gone).ended
             && w92.ships.empty() && w92.missile_magazines.empty()
-            && b93.size() - b92.size() == world_save_space_line_gap_bytes(k);
+            && b93.size() - b92.size() == world_save_space_line_gap_bytes(k) + world_save_launch_boost_section_bytes(k); // BL-1637 (v96)
         check(ok92, "PH a space-line v92 stream loads: 55 wide, no naval, carry, ended or missile section; v93 is v92 plus those");
         world again92;
         check(ok92 && from_bytes(to_bytes(w92), again92) && to_bytes(again92) == to_bytes(w92),

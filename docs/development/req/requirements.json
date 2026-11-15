@@ -8614,6 +8614,65 @@
      "evidence": ""
     }
    ]
+  },
+  {
+   "brief": "launch-boost",
+   "title": "BL-1637 - Launch boost (SPACE_ASSETS.md § Boost)",
+   "difficulty": 3,
+   "importance": "A",
+   "evaluated_difficulty": 3,
+   "status": "open",
+   "written": "2026-11-14",
+   "requirements": [
+    {
+     "id": "R1",
+     "text": "A staffed Launchpad of a nation holding Rocketry draws spacecraft_components and propellant off its own market's shelf each tick, in the recipe ratio, posts the full intake as a want, is billed at the posted price, and banks boost up to its cap; a full pad draws nothing.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "space_ai_harness B1-B7 (63/63): intake in ratio off the pad market, posted and billed, banked to the cap; a full pad draws nothing; short shelf, ceiling, walls; the treasury bound sees the tick's other draws (B7, after cold review). unposted_bid U4: the want is posted on an empty shelf.",
+     "verified": "2026-11-14"
+    },
+    {
+     "id": "R2",
+     "text": "Every climb through a pad spends boost and buys no space goods off a shelf: an asset launch (class lot + propellant x path dv), a satellite move, a unit raised at a pad (the climb; kit and tank still bought), a Hauler's cargo lift, and the straight-line lane's launch. A descent burns the Hauler's tank. Each refuses whole when boost is short.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "space_assets A2/A11/A12 (120/120), space_units U3/U4 (26/26), space_convoy C2-C9 (20/20), unposted_bid U4d/U7. Amended on build: a satellite MOVE climbs through no pad and keeps its home-shelf propellant buy (NR-1226); a descent burns the tank (C9c).",
+     "verified": "2026-11-14"
+    },
+    {
+     "id": "R3",
+     "text": "The standing launch-lot bid is retired; the boost a pad holds round-trips through the save (v96) and a v95 stream loads with no boost.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "save_roundtrip OK; space_assets A16a (v95 stream loads every pad empty, equal hash to the drained world) and A16b (tampered section refused whole: count, ghost pad, NaN, inf, zero, negative, over max). Removed symbols have no callers (cold review).",
+     "verified": "2026-11-14"
+    },
+    {
+     "id": "R4",
+     "text": "The same goods per launch as before: a satellite to home low orbit spends 25 components and 50 propellant worth of boost.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "space_ai B2: a satellite to home low orbit spends 75 boost = 25 components + 50 propellant at the intake ratio.",
+     "verified": "2026-11-14"
+    },
+    {
+     "id": "R5",
+     "text": "A spectated run shows rival launches without pooling markets.",
+     "kind": "headless",
+     "status": "failed",
+     "evidence": "space_launch_census (new): shipped seeds 0/28/11 to 2015 - no nation reaches Rocketry, no pad built. Staged (--stage-space) to 2010: pads staffed, 0 boost banked, 0 rival launches - no pad market ever holds spacecraft_components. NR-1229.",
+     "verified": "2026-11-14"
+    },
+    {
+     "id": "R6",
+     "text": "The Space ledger shows the pad's boost and a launch's need; the launch press works in the live app.",
+     "kind": "visual",
+     "status": "pending",
+     "evidence": "GUI builds (build_app.bat BUILD_OK). Live click on the Space ledger quote owed: a seat without Rocketry shows only the tech refusal, so the boost line needs a staged world.",
+     "verified": "2026-11-14"
+    }
+   ]
   }
  ]
 }

@@ -1,5 +1,20 @@
 # REFINED — active worklist
 
+## Sprint 67 — far space, the launch (opened 2026-11-14)
+
+### BL-1637 (launch boost)
+
+Scope calls (Ben, 2026-11-14): every climb through a pad spends boost, a Hauler's lift and the
+straight-line lane included; a descent burns the Hauler's own tank.
+
+- [x] Boost on the pad: `building_component::boost`, the v96 save section, the dials.
+- [x] The pad's intake in the economy step; the standing launch-lot bid retired.
+- [x] Launches spend boost, not a shelf lot; a satellite move keeps its home-shelf propellant (NR-1226).
+- [x] Unit raises at a pad, Hauler lifts and the straight-line lane spend boost; descents burn the tank.
+- [x] The rival AI's own quotes read boost.
+- [x] Space ledger, ACTIONS.json, the docs.
+- [ ] Harnesses updated; save round trip; spectated run; cold review.
+
 ## Sprint 64 — the war at sea (opened 2026-11-06)
 
 Runs beside sprint 63. The core has no money dependency; the sea trade reading and the tuning wait on

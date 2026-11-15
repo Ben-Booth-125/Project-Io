@@ -33,8 +33,8 @@ and buyer at a market is a nation's building (Ben, 2026-10-23: there are no corp
   the posted price, under the fair-price ceiling. Procurement is a shelf purchase like any other:
   the named-supplier contract retired with the corporations (Ben, 2026-10-23; `CONTRACTS.md`).
 - **Everyone buys from the shelf.** A processor's inputs, a construction site's materials,
-  building upkeep, procurement, the space programme and a launch's propellant are all bought on
-  the shelf at the posted price, under the fair-price ceiling. A build's cost therefore depends
+  building upkeep, procurement, a Launchpad's intake of launch goods and a space unit's kit,
+  tank and refuels are all bought on the shelf at the posted price, under the fair-price ceiling. A build's cost therefore depends
   on market prices: its flat credits are paid at placement, its materials bought here as it draws
   them (Ben, 2026-10-26: costs depend on market prices). A nation buys even its own
   buildings' output back: vertical integration is a location, not a free transfer.
@@ -592,10 +592,11 @@ gameplay that good produces.
   network a running cost that makes reach a decision rather than a ratchet.
 - **State** (BL-644, the space programme line). Nations already hold a weighted budget over nine
   priority lines, and one of them — `strategic_reserve`, "buying goods to hold" — is a goods-buying
-  channel **already designed and not yet claimed on**. A tenth line, a *space programme*, buys
-  `spacecraft_components` and `propellant` for government satellite launches: the first buyer for
-  space goods that is not a militia contract, and thematically the gate into space. Lumpy,
-  political, set by a national budget — see property 3.
+  channel **already designed and not yet claimed on**. The space goods' buyer is not a budget
+  line but every staffed **Launchpad's intake**: it draws `spacecraft_components` and
+  `propellant` off its own market a little each tick and banks them as boost
+  (`SPACE_ASSETS.md` § Boost) — a standing, steady want rather than a lump, so it prices and
+  calls forth supply as property 3 asks.
 - **Research** (BL-645, research consumes goods). `military_research` is a budget line that spends
   credits, and academic research is free (`RESEARCH.md` § Research points); research that consumes **goods** makes the tech ladder an
   economic decision rather than a free accumulator, and gives the top of the chain a buyer. Folds
@@ -769,9 +770,9 @@ from **prior ticks'** landings:
   shared pro-rata (§ Price resolution).
 - **Upkeep** — building and unit upkeep in goods, bought off the shelf at the posted price under
   the ceiling (`FINANCE.md` § Standing-force upkeep).
-- **Trade** — a trade buys its cargo off its source market's shelf, and on a space leg the
-  launch's propellant with it (`TRADE.md` § A trade). It is the only way stock leaves for another
-  market.
+- **Trade** — a trade buys its cargo off its source market's shelf (`TRADE.md` § A trade); a
+  space leg's launch spends its pad's boost, not the shelf (`SPACE_ASSETS.md` § Boost). It is the
+  only way stock leaves for another market.
 
 Because every consumer draws from the SAME live inventory value in a fixed, deterministic order
 (the tick order), and a processor's `run` fraction is bounded by the coverage-min across every
@@ -1189,7 +1190,7 @@ row. Sea legs and auto trade's ranking are each judged against this reading.
 **The band does not create inter-market trade; a trade does** (`TRADE.md`). A dispatch count is
 not trade: the figure that means what it says is delivered volume sold at the destination.
 **Inter-body** trade is gated separately: a trade between bodies needs the trader's Launchpad on
-the source body and the launch's propellant on the source shelf before any price is consulted.
+the source body, staffed and holding a launch's boost, before any price is consulted.
 `trade_routes` (BL-088, persistent trade routes) is a body-level record, so it is structurally
 blind to intra-body trade (NR-289).
 

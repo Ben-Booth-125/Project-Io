@@ -129,8 +129,9 @@ const char* launch_refusal(space_launch_result r)
         case space_launch_result::rejected_no_launchpad:          return "No staffed Launchpad on your home body.";
         case space_launch_result::rejected_no_slot:               return "Every slot at that node is held.";
         case space_launch_result::rejected_no_route:              return "No path reaches that node from your home surface.";
-        case space_launch_result::rejected_shelf:                 return "The home market's shelf cannot fill the goods.";
+        case space_launch_result::rejected_shelf:                 return "The home market's shelf cannot fill the propellant.";
         case space_launch_result::rejected_blockaded:             return "Your home body is blockaded: no launch reaches orbit.";
+        case space_launch_result::rejected_boost:                 return "Your launchpad has not banked enough boost for this launch yet.";
     }
     return "Refused.";
 }
@@ -400,7 +401,7 @@ void draw_launch(const world& w, const recipe_registry& reg, entity_id nation, s
     ImGui::SameLine();
     const bool priced = m.launch_node_set
         && (q.result == space_launch_result::launched || q.result == space_launch_result::rejected_insufficient_treasury
-            || q.result == space_launch_result::rejected_shelf || q.cost > 0.0f);
+            || q.result == space_launch_result::rejected_boost || q.cost > 0.0f);
     if (!m.launch_node_set)
         ImGui::TextDisabled("Choose a destination.");
     else if (priced)
@@ -418,16 +419,16 @@ void draw_launch(const world& w, const recipe_registry& reg, entity_id nation, s
     }
     if (priced)
     {
-        // The quote's parts, wrapped to the column: goods off the home shelf, the
-        // launch and thrust credits, the travel time and the crew drawn.
+        // The quote's parts, wrapped to the column: the boost it spends against what
+        // the pad holds (BL-1637), the launch and thrust credits, the travel time and
+        // the crew drawn.
         ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
         char crew_part[48] = "";
         if (crew > 0)
             std::snprintf(crew_part, sizeof(crew_part), ", %d astronaut%s aboard", crew, crew == 1 ? "" : "s");
-        ImGui::TextWrapped("Goods %s (%.0f components, %.0f propellant); launch and thrust %s; %d mo (%.0f days)%s.",
-                           fmt::credits(q.goods_value).c_str(), static_cast<double>(q.components),
-                           static_cast<double>(q.propellant), fmt::credits(q.credits).c_str(), q.travel_quarters,
-                           q.days, crew_part);
+        ImGui::TextWrapped("Boost %.0f of %.0f banked; launch and thrust %s; %d mo (%.0f days)%s.",
+                           static_cast<double>(q.boost), static_cast<double>(q.boost_held),
+                           fmt::credits(q.credits).c_str(), q.travel_quarters, q.days, crew_part);
         ImGui::PopStyleColor();
     }
 

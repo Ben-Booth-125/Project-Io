@@ -156,11 +156,11 @@ without reaching a shelf.
    price, under the fair-price ceiling ([MARKETS.md](MARKETS.md) § Settled: every draw BUYS),
    and the purchase is posted as want at the source like any bid. A shelf priced over the
    ceiling sells the trade nothing.
-2. **On a space leg, it buys the launch.** The trader must hold a Launchpad on the source body, and
-   buys the launch's propellant off the same shelf (`PRODUCTION.md` § Launchpad). A cargo of
-   propellant cannot burn itself: the launch's own draw comes off the shelf first. A nation
-   holding a Hauler design ships the leg as a **Hauler** instead — the hull, the lift and the
-   descent bought as they happen, the cargo capped by what the Hauler can fly there and back
+2. **On a space leg, it spends the launch.** The trader must hold a staffed Launchpad on the source
+   body, and the launch spends that pad's boost (`SPACE_ASSETS.md` § Boost); nothing more is
+   bought off the shelf for it. A nation holding a Hauler design ships the leg as a **Hauler**
+   instead — the hull readied off the shelf, the lift spent from the pad's boost and the descent
+   burned from the tank, the cargo capped by what the Hauler can fly there and back
    (`../military/SPACE_FLEETS.md` § Space convoys).
 3. **It is capped by the place.** On an overland or sea leg the cargo draws **Logistic Points**
    by its base value ([LOGISTICS.md](LOGISTICS.md) § A shipment draws points again), at its anchor — the source market's centre — from what the march and production

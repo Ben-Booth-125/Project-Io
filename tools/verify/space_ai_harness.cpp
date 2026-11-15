@@ -41,15 +41,14 @@
 //       each builds nothing and leaves the hash alone.
 //   G7  DETERMINISM: two groundwork runs end byte-identical.
 //
-// BL-1630 (launch goods supply), on the first fixture (post_space_launch_wants):
-//   B1  LOT: a keyed nation with a staffed pad has a standing lot - one satellite's
-//       components and its propellant to home low orbit - at its home market.
-//   B2  POSTED: every padded nation posts that lot into report.wants; the world
-//       is not touched.
-//   B3  LOTS: standing_lots 2 bids two lots.
-//   B4  CEILING: a good over the fair-price ceiling does not bid; its want goes
-//       to report.hauler_wants.
-//   B5  WALLS: no Rocketry, an unstaffed pad, the settle, standing_lots 0 - no bid.
+// BL-1637 (launch boost), on the first fixture (run_pad_intake):
+//   B1  INTAKE: every keyed nation's staffed pad, the player's included, posts and
+//       draws a tick's intake off its own market in the recipe ratio and banks it.
+//   B2  SAME GOODS: a satellite to home low orbit spends the old lot's goods.
+//   B3  FULL: a pad at its cap posts and draws nothing.
+//   B4  SHORT: a short shelf is drawn as far as it goes, in ratio; the want is whole.
+//   B5  CEILING: a good over the fair-price ceiling does not bid or draw.
+//   B6  WALLS: no Rocketry, an unstaffed pad, the settle; an empty treasury.
 //
 // BL-1608 (rival far-space AI), on a third fixture: a gridded home planet and an
 // airless moon, three nations holding every near and far key (choose_far_space_action):
@@ -194,10 +193,16 @@ int assets_of_nation(const world& w, entity_id n)
     return c;
 }
 
-/// One quarter, in the nation step's order: the pick, the queue, the assets, the stations.
+/// One quarter, in the nation step's order: the pad's intake (BL-1637, as the economy
+/// step runs it before the nations act; the clear that bills it is not run here), the
+/// pick, the queue, the assets, the stations.
 std::vector<space_ai_pick> quarter(world& w, const recipe_registry& reg, int tick)
 {
     w.current_econ_tick = tick;
+    {
+        economy_report intake;
+        run_pad_intake(w, reg.space_assets(), reg.price_band().reservation_mult, intake);
+    }
     std::vector<space_ai_pick> picks;
     run_nation_space_ai(w, reg, &picks);
     run_space_orders(w, reg, tick);
@@ -1176,81 +1181,146 @@ int main()
                         g1.w.buildings.size()));
     }
 
-    // ---- B1..B5 BL-1630 the standing bid: a staffed pad bids for its launch -----------------
+    // ---- B1..B6 BL-1637 the pad's intake: a staffed pad banks boost (SPACE_ASSETS.md § Boost) --
     {
         const space_asset_params& sp = reg.space_assets();
         const float res_mult = 2.0f; // the authored fair-price ceiling (economy.lua price_band)
         const std::size_t ci = static_cast<std::size_t>(resource_type::spacecraft_components);
         const std::size_t pi = static_cast<std::size_t>(resource_type::propellant);
-        const auto want_of = [](const std::map<std::pair<entity_id, entity_id>, std::array<float, resource_count>>& m,
-                                entity_id n, entity_id mid, std::size_t r) {
+        const auto row_of = [](const std::map<std::pair<entity_id, entity_id>, std::array<float, resource_count>>& m,
+                               entity_id n, entity_id mid, std::size_t r) {
             const auto it = m.find(std::make_pair(n, mid));
             return it == m.end() ? 0.0f : it->second[r];
         };
+        const auto pad_of = [](const world& w, entity_id n) {
+            for (const entity_id bid : w.nations.at(n).state_assets)
+                if (w.buildings.count(bid) != 0 && w.buildings.at(bid).type == building_type::launchpad)
+                    return bid;
+            return null_entity;
+        };
+        const auto empty_pads = [](world& w) {
+            for (auto& [bid, b] : w.buildings)
+                if (b.type == building_type::launchpad)
+                    b.boost = 0.0f;
+        };
+        const float intake = sp.boost_per_day * static_cast<float>(k_econ_tick_days);
+        const float want_c = intake * sp.boost_components_share;
+        const float want_p = intake - want_c;
 
         fixture f;
         build(f);
         world& w = f.w;
-        const orbital_path_result path = orbital_path(w, orbital_graph_params{},
-                                                      orbital_node{f.home, orbital_node_kind::surface},
-                                                      orbital_node{f.home, orbital_node_kind::low_orbit});
-        const float want_c = sp.components_lot[0];
-        const float want_p = sp.propellant_per_dv[0] * static_cast<float>(path.dv);
-        entity_id mid = null_entity;
-        float lc = 0.0f, lp = 0.0f;
-        const bool has_lot = space_standing_lot(w, sp, f.a, mid, lc, lp);
-        check(has_lot && mid == f.market && lc == want_c && lp == want_p && lp > 0.0f, "B1",
-              fmt("a padded, keyed nation's standing lot: %.1f components + %.1f propellant at its home market",
-                  lc, lp));
-
-        const unsigned long long h0 = w.state_hash(0);
+        empty_pads(w);
+        const float c0 = w.markets.at(f.market).inventory[ci], p0 = w.markets.at(f.market).inventory[pi];
         economy_report rep;
-        post_space_launch_wants(w, sp, res_mult, 1.0f, rep);
+        run_pad_intake(w, sp, res_mult, rep);
         bool all = true;
         for (const entity_id n : {f.a, f.b, f.player})
-            all = all && want_of(rep.wants, n, f.market, ci) == want_c && want_of(rep.wants, n, f.market, pi) == want_p;
-        check(all && rep.hauler_wants.empty() && w.state_hash(0) == h0, "B2",
-              "every padded nation posts its lot as a want on its home market; the world is not touched");
+            all = all && std::fabs(row_of(rep.wants, n, f.market, ci) - want_c) < 1.0e-3f
+                && std::fabs(row_of(rep.wants, n, f.market, pi) - want_p) < 1.0e-3f
+                && std::fabs(row_of(rep.purchases, n, f.market, ci) - want_c) < 1.0e-3f
+                && std::fabs(row_of(rep.purchases, n, f.market, pi) - want_p) < 1.0e-3f
+                && std::fabs(w.buildings.at(pad_of(w, n)).boost - intake) < 1.0e-3f;
+        check(all && rep.hauler_wants.empty()
+                  && std::fabs((c0 - w.markets.at(f.market).inventory[ci]) - 3.0f * want_c) < 1.0e-2f
+                  && std::fabs((p0 - w.markets.at(f.market).inventory[pi]) - 3.0f * want_p) < 1.0e-2f,
+              "B1", fmt("every padded nation, the player's included, posts and draws %.1f components + %.1f propellant "
+                        "off its own market and banks %.1f boost", want_c, want_p, intake));
 
-        economy_report rep2;
-        post_space_launch_wants(w, sp, res_mult, 2.0f, rep2);
-        check(want_of(rep2.wants, f.a, f.market, ci) == 2.0f * want_c
-                  && want_of(rep2.wants, f.a, f.market, pi) == 2.0f * want_p,
-              "B3", "standing_lots 2 bids two lots");
+        // R4: the same goods per launch - a satellite to home low orbit spends the
+        // lot it used to buy, and the intake buys it in that ratio.
+        const space_launch_quote sat = quote_space_launch(w, sp, f.a, space_asset_class::satellite,
+                                                          orbital_node{f.home, orbital_node_kind::low_orbit},
+                                                          space_satellite_role::comms);
+        const float sat_c = sat.boost * sp.boost_components_share;
+        check(std::fabs(sat_c - sp.components_lot[0]) < 0.5f && std::fabs((sat.boost - sat_c)
+                  - sp.propellant_per_dv[0] * static_cast<float>(sat.dv)) < 0.5f,
+              "B2", fmt("a satellite to home low orbit spends %.1f boost: %.1f components + %.1f propellant at the intake's "
+                        "ratio, the old lot's %.0f + %.1f", sat.boost, sat_c, sat.boost - sat_c,
+                        sp.components_lot[0], sp.propellant_per_dv[0] * static_cast<float>(sat.dv)));
 
-        // Over the fair-price ceiling the components do not bid; their want is silenced.
+        // A full pad stops drawing: no want, no draw.
+        for (auto& [bid, b] : w.buildings)
+            if (b.type == building_type::launchpad)
+                b.boost = sp.boost_cap;
+        const unsigned long long h_full = w.state_hash(0);
+        economy_report rf;
+        run_pad_intake(w, sp, res_mult, rf);
+        check(rf.wants.empty() && rf.purchases.empty() && w.state_hash(0) == h_full, "B3",
+              "a full pad posts nothing and draws nothing; the world is not touched");
+
+        // A short shelf: drawn as far as it goes, in ratio; the want stays whole.
+        empty_pads(w);
+        w.markets.at(f.market).inventory[ci] = want_c * 0.5f; // half a pad's components, shared by three
+        economy_report rs;
+        run_pad_intake(w, sp, res_mult, rs);
+        const entity_id pa = pad_of(w, f.a);
+        const float da_c = row_of(rs.purchases, f.a, f.market, ci), da_p = row_of(rs.purchases, f.a, f.market, pi);
+        check(std::fabs(row_of(rs.wants, f.a, f.market, ci) - want_c) < 1.0e-3f && da_c > 0.0f && da_c < want_c
+                  && std::fabs(da_p / da_c - want_p / want_c) < 1.0e-3f
+                  && std::fabs(w.buildings.at(pa).boost - (da_c + da_p)) < 1.0e-3f
+                  && w.markets.at(f.market).inventory[ci] >= 0.0f,
+              "B4", fmt("a short shelf is drawn as far as it goes, the goods in ratio (%.2f + %.2f); the want stays whole",
+                        da_c, da_p));
+        w.markets.at(f.market).inventory[ci] = c0;
+
+        // Over the fair-price ceiling the components neither bid nor draw, so nothing is banked.
+        empty_pads(w);
         w.markets.at(f.market).price[ci] = space_fixture::k_components_price * 2.5f;
-        economy_report rep3;
-        post_space_launch_wants(w, sp, res_mult, 1.0f, rep3);
-        check(want_of(rep3.wants, f.a, f.market, ci) == 0.0f
-                  && want_of(rep3.hauler_wants, f.a, f.market, ci) == want_c
-                  && want_of(rep3.wants, f.a, f.market, pi) == want_p,
-              "B4", "a good over the ceiling does not bid: its want goes to the hauler-only register");
+        economy_report rc;
+        run_pad_intake(w, sp, res_mult, rc);
+        check(row_of(rc.wants, f.a, f.market, ci) == 0.0f && std::fabs(row_of(rc.hauler_wants, f.a, f.market, ci) - want_c) < 1.0e-3f
+                  && row_of(rc.purchases, f.a, f.market, pi) == 0.0f && w.buildings.at(pa).boost == 0.0f,
+              "B5", "a good over the ceiling does not bid (its want goes to the hauler-only register), and the pad banks nothing");
         w.markets.at(f.market).price[ci] = space_fixture::k_components_price;
 
-        // Walls: no keys, an unstaffed pad, the settle, the dial off.
+        // Walls: no keys, an unstaffed pad, the settle - no want, no draw. A bare treasury draws nothing.
         fixture nk;
         build(nk, /*keys=*/false);
+        empty_pads(nk.w);
         economy_report r_nk;
-        post_space_launch_wants(nk.w, sp, res_mult, 1.0f, r_nk);
+        run_pad_intake(nk.w, sp, res_mult, r_nk);
         fixture us;
         build(us);
+        empty_pads(us.w);
         for (auto& [bid, b] : us.w.buildings)
             if (b.type == building_type::launchpad)
                 b.workforce_assigned = 0.0f;
         economy_report r_us;
-        post_space_launch_wants(us.w, sp, res_mult, 1.0f, r_us);
+        run_pad_intake(us.w, sp, res_mult, r_us);
         fixture st;
         build(st);
+        empty_pads(st.w);
         st.w.current_econ_tick = k_campaign_settle_ticks - 1;
         economy_report r_st;
-        post_space_launch_wants(st.w, sp, res_mult, 1.0f, r_st);
-        economy_report r_off;
-        post_space_launch_wants(w, sp, res_mult, 0.0f, r_off);
-        check(r_nk.wants.empty() && r_us.wants.empty() && r_st.wants.empty() && r_off.wants.empty()
-                  && r_nk.hauler_wants.empty() && r_us.hauler_wants.empty() && r_st.hauler_wants.empty()
-                  && r_off.hauler_wants.empty() && reg.space_programme().standing_lots == 0.0f,
-              "B5", "no Rocketry, an unstaffed pad, the settle, standing_lots 0 (the C++ default): no bid");
+        run_pad_intake(st.w, sp, res_mult, r_st);
+        fixture po;
+        build(po);
+        empty_pads(po.w);
+        po.w.nations.at(po.a).treasury = 0.0f;
+        economy_report r_po;
+        run_pad_intake(po.w, sp, res_mult, r_po);
+        check(r_nk.wants.empty() && r_us.wants.empty() && r_st.wants.empty()
+                  && r_nk.purchases.empty() && r_us.purchases.empty() && r_st.purchases.empty()
+                  && std::fabs(row_of(r_po.wants, po.a, po.market, ci) - want_c) < 1.0e-3f && row_of(r_po.purchases, po.a, po.market, ci) == 0.0f
+                  && po.w.buildings.at(pad_of(po.w, po.a)).boost == 0.0f,
+              "B6", "no Rocketry, an unstaffed pad, the settle: no want, no draw; an empty treasury posts its want and draws nothing");
+
+        // The treasury bound sees the tick's other draws (cold review): a nation whose
+        // construction already booked most of its treasury banks only what is left.
+        fixture tb;
+        build(tb);
+        empty_pads(tb.w);
+        const market_component& tm = tb.w.markets.at(tb.market);
+        const float bill = want_c * posted_price(tm, ci) + want_p * posted_price(tm, pi);
+        tb.w.nations.at(tb.a).treasury = 1.5f * bill;
+        economy_report r_tb;
+        r_tb.purchases[std::make_pair(tb.a, tb.market)][ci] = bill / posted_price(tm, ci); // a bill's worth booked
+        run_pad_intake(tb.w, sp, res_mult, r_tb);
+        const float banked = tb.w.buildings.at(pad_of(tb.w, tb.a)).boost;
+        check(std::fabs(banked - 0.5f * intake) < 1.0e-2f, "B7",
+              fmt("a treasury of 1.5 bills with one bill already booked this tick banks half an intake (%.2f of %.1f)",
+                  banked, intake));
     }
 
     rows_far_space(reg); // BL-1608

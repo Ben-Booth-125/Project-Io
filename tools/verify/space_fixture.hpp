@@ -67,8 +67,14 @@ inline entity_id add_tile(world& w, entity_id body)
     return id;
 }
 
-/// A completed Launchpad of @p nation on @p tile, staffed by @p workforce.
-inline entity_id add_pad(world& w, entity_id nation, entity_id tile, float workforce)
+/// BL-1637: the boost a fixture pad banks unless told otherwise — far above any
+/// launch, so a launch-gate check is not also a boost check.
+inline constexpr float k_pad_boost = 100000.0f;
+
+/// A completed Launchpad of @p nation on @p tile, staffed by @p workforce, holding
+/// @p boost (BL-1637).
+inline entity_id add_pad(world& w, entity_id nation, entity_id tile, float workforce,
+                         float boost = k_pad_boost)
 {
     const entity_id bid = w.create_entity();
     building_component b{};
@@ -76,6 +82,7 @@ inline entity_id add_pad(world& w, entity_id nation, entity_id tile, float workf
     b.type = building_type::launchpad;
     b.workforce_assigned = workforce;
     b.ticks_remaining = 0;
+    b.boost = boost;
     w.buildings.emplace(bid, b);
     w.nations.at(nation).state_assets.push_back(bid);
     return bid;

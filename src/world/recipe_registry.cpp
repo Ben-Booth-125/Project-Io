@@ -1639,7 +1639,6 @@ void recipe_registry::load_from_lua(lua_state& lua)
 
         read_checked(t, "components_lump", sp.components_lump, 0.0, inf, ctx);
         read_checked(t, "propellant_lump", sp.propellant_lump, 0.0, inf, ctx);
-        read_checked(t, "standing_lots",   sp.standing_lots,   0.0, 4.0, ctx); // BL-1630
 
         m_space_programme = sp;
     }

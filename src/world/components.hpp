@@ -1162,6 +1162,12 @@ struct building_component
     /// Stays at its final figure once the build completes. world_save_version 37.
     float construction_paid = 0.0f;
 
+    /// BL-1637 (SPACE_ASSETS.md § Boost): a Launchpad's banked launch capacity —
+    /// the goods of its launches, already bought and readied by its daily intake
+    /// (`run_pad_intake`), spent by every climb through it. Never traded. 0 on every
+    /// other building type. world_save_version 96 (its own trailing section).
+    float boost = 0.0f;
+
     // --- Construction is measured in DAYS (Ben, 2026-10-24; PRODUCTION.md
     // § Construction is measured in days). A building can finish between quarters.
     // `ticks_remaining` stays the "still building" gate every pass reads, kept equal

@@ -812,7 +812,23 @@ inline constexpr uint32_t k_world_save_version_one_product = 94;
 /// still DECODES v94, v93 and the legacy streams, because the layout harness rows
 /// (save_roundtrip) exercise the section readers through them; it is the game's door
 /// that refuses them.
-inline constexpr uint32_t world_save_version = 95;
+///
+/// **96 (BL-1637; SPACE_ASSETS.md § Boost) - A PAD'S BANKED BOOST.** Appended last,
+/// after a u32 count: every building with non-zero `boost`, ascending id, as (id, f32
+/// boost) - 8 bytes. Each names a LAUNCHPAD; ids strictly ascending; the boost finite,
+/// positive and at most `k_pad_boost_max`. Refused whole otherwise. v95 is a STRICT
+/// PREFIX of v96 and is read too (`k_world_save_version_pre_launch_boost`), as a world
+/// whose pads hold no boost (a game save of v95 opens; its pads bank from empty).
+/// MERGE NOTE: a parallel lane's bump renumbers this block (this paragraph, the
+/// constants below, the accepted-version line in `read_world_snapshot`, the tail table
+/// and the one section at the end of the writer and reader).
+inline constexpr uint32_t world_save_version = 96;
+
+/// BL-1637: the first version carrying the pad-boost section (see above).
+inline constexpr uint32_t k_world_save_version_launch_boost = 96;
+
+/// BL-1637: v95, a strict prefix of v96.
+inline constexpr uint32_t k_world_save_version_pre_launch_boost = k_world_save_version_launch_boost - 1;
 
 /// BL-1642: the first stream whose econ ticks are months. Every game save below it is
 /// refused (`read_save_game`).
@@ -1171,6 +1187,8 @@ inline constexpr bool world_stream_has_offworld_bases(uint32_t v) { return world
 inline constexpr bool world_stream_has_offworld_loss_carry(uint32_t v) { return v >= k_world_save_version_monthly && !world_stream_is_space_line(v); }
 inline constexpr bool world_stream_has_space_firsts(uint32_t v) { return world_stream_has_space_section(v, k_world_save_version_space_firsts); }
 inline constexpr bool world_stream_has_transit_origin(uint32_t v) { return world_stream_has_space_section(v, k_world_save_version_transit_origin); }
+/// BL-1637: from v96 the stream ends with the pad-boost section.
+inline constexpr bool world_stream_has_launch_boost(uint32_t v) { return v >= k_world_save_version_launch_boost && !world_stream_is_space_line(v); }
 
 /// BL-1539: the first version carrying the research-books section (see above).
 inline constexpr uint32_t k_world_save_version_research_books = 80;
@@ -1488,6 +1506,12 @@ void write_world_snapshot_pre_transit_origin(const world& w, std::ostream& out);
 /// BL-1614: the byte length of the v90 transit-origin section `w` writes - 4 + 13 per
 /// asset with a recorded origin. The LAST section of a v90 stream.
 std::size_t world_save_transit_origin_section_bytes(const world& w);
+
+/// BL-1637, VERIFICATION ONLY: the v95 stream shape - no pad-boost section.
+void write_world_snapshot_pre_launch_boost(const world& w, std::ostream& out);
+
+/// BL-1637: the v96 section's bytes (4 + 8 per pad holding boost).
+std::size_t world_save_launch_boost_section_bytes(const world& w);
 
 /// BL-1632: the byte lengths of the v57..v66 trailing sections `w` writes, each
 /// mirroring its writer block field for field - the construction days (v57), the unit

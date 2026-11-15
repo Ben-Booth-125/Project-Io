@@ -155,6 +155,14 @@ uint64_t world::state_hash(int tick) const
                 fnv1a_u32(h, id);
                 fnv1a_f32(h, b.construction_paid);
             }
+            // BL-1637: a pad's banked boost, sparse on the same argument (0 on every
+            // building that is not a drawing pad).
+            if (b.boost != 0.0f)
+            {
+                fnv1a_u32(h, 0xB0057u);
+                fnv1a_u32(h, id);
+                fnv1a_f32(h, b.boost);
+            }
             // BL-1296: a state building the treasury could not pay for —
             // sparse, so a world with no idled state building hashes as before.
             if (b.state_idle)

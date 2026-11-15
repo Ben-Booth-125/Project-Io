@@ -17,10 +17,11 @@
 //   C3  CLIMB: the lift off the moon costs a fraction (< 1/4) of the lift off home,
 //       per unit of cargo and in the raise's climb.
 //   C4  DISPATCH: commit_trade_shipment raises a Hauler at the home pad and loads the
-//       cargo: the home shelf loses the cargo, the kit, the tank, the climb and the
-//       lift; the treasury pays the space side; the convoy rides aboard at speed 0.
+//       cargo: the home shelf loses the cargo, the kit and the tank; the home pad's
+//       boost pays the climb and the lift (BL-1637); the treasury pays the space side;
+//       the convoy rides aboard at speed 0.
 //   C5  FLIGHT: the Hauler flies hop by hop, standing at every node of the cheapest
-//       path; unloads at the moon's low orbit (descent propellant off the moon shelf);
+//       path; unloads at the moon's low orbit (descent propellant off the tank, BL-1637);
 //       the convoy lands and the landing equals the cargo bought (conserved); it flies
 //       home empty and the trip ends.
 //   C6  REUSE: a second trade reuses the idle Hauler (no raise), refuelled over the pad.
@@ -169,6 +170,7 @@ entity_id add_pad(world& w, entity_id nation, entity_id tile, float staffed)
     b.type = building_type::launchpad;
     b.workforce_assigned = staffed;
     b.ticks_remaining = 0;
+    b.boost = 100000.0f; // BL-1637: banked, so a trip check is not also a boost check
     w.buildings.emplace(bid, b);
     w.nations.at(nation).state_assets.push_back(bid);
     return bid;
@@ -409,14 +411,16 @@ int main()
         q0 = quote_space_haul(w, p, f.a, f.home_mkt, f.moon_mkt);
         const orbital_path_result out  = orbital_path(w, orbital_graph_params{}, home_low, moon_low);
         const orbital_path_result back = orbital_path(w, orbital_graph_params{}, moon_low, home_low);
-        // Independently: the largest cargo c with burn_out(c) <= (P - R) x 0.999.
+        // Independently: the largest cargo c with burn_out(c) + descent(c) <= (P - R) x 0.999
+        // (BL-1637: the descent burns the tank).
         const double ve = hs.exhaust, dry = hs.dry_mass, P = hs.tank;
         const double R = dry * (std::exp(back.dv / ve) - 1.0);
+        const double d = orbital_climb_dv(w, orbital_graph_params{}, f.moon) * p.launch_propellant_per_dv;
         double lo = 0.0, hi = hs.cargo;
         for (int i = 0; i < 80; ++i)
         {
             const double mid = 0.5 * (lo + hi);
-            const double burn = (dry + mid + P) * (1.0 - std::exp(-out.dv / ve));
+            const double burn = (dry + mid + P) * (1.0 - std::exp(-out.dv / ve)) + d * mid;
             (burn <= (P - R) * 0.999 ? lo : hi) = mid;
         }
         logistics_nodes nodes;
@@ -426,7 +430,7 @@ int main()
                     out.dv, out.nodes.size(), back.dv, R, q0.cap, lo, q0.days, leg.cost, leg.travel_ticks);
         check(q0.viable && q0.unit == null_entity && std::fabs(q0.cap - lo) < 1.0e-3 && q0.cap > 0.0f
                   && q0.cap <= hs.cargo && leg.viable && leg.hauler && leg.mode == convoy_mode::space,
-              "C2", fmt("Hauler leg: cap %.3f matches the rocket equation (%.3f); raise quoted (no idle hull)",
+              "C2", fmt("Hauler leg: cap %.3f matches the rocket equation with the descent aboard (%.3f); raise quoted (no idle hull)",
                         q0.cap, lo));
         // A far planet with no pad: no descent, no trip.
         const space_haul_quote qf = quote_space_haul(w, p, f.a, f.home_mkt, f.far_mkt);
@@ -439,12 +443,13 @@ int main()
         const space_haul_quote qm = quote_space_haul(w, p, f.a, f.moon_mkt, f.home_mkt);
         const float home_climb = static_cast<float>(orbital_climb_dv(w, orbital_graph_params{}, f.home));
         const float moon_climb = static_cast<float>(orbital_climb_dv(w, orbital_graph_params{}, f.moon));
-        std::printf("  climb dv home %.3f moon %.3f; lift/unit home %.4f moon %.4f; raise propellant home %.2f moon %.2f\n",
-                    home_climb, moon_climb, q0.lift_per_unit, qm.lift_per_unit, q0.fixed[PR], qm.fixed[PR]);
-        check(qm.viable && qm.lift_per_unit < 0.25f * q0.lift_per_unit && qm.fixed[PR] < q0.fixed[PR]
+        std::printf("  climb dv home %.3f moon %.3f; lift/unit home %.4f moon %.4f; raise climb boost home %.2f moon %.2f\n",
+                    home_climb, moon_climb, q0.lift_per_unit, qm.lift_per_unit, q0.fixed_boost, qm.fixed_boost);
+        check(qm.viable && qm.lift_per_unit < 0.25f * q0.lift_per_unit && qm.fixed_boost < q0.fixed_boost
+                  && q0.fixed[PR] == hs.tank && qm.fixed[PR] == hs.tank
                   && std::fabs(q0.lift_per_unit - home_climb * p.launch_propellant_per_dv) < 1.0e-4f
                   && std::fabs(q0.drop_per_unit - moon_climb * p.launch_propellant_per_dv) < 1.0e-4f,
-              "C3", fmt("a moon launch lifts a unit for %.4f propellant, home %.4f (ratio %.3f); the raise's climb too",
+              "C3", fmt("a moon launch lifts a unit for %.4f boost, home %.4f (ratio %.3f); the raise's climb too; the shelf sells only the tank",
                         qm.lift_per_unit, q0.lift_per_unit, qm.lift_per_unit / q0.lift_per_unit));
     }
 
@@ -458,13 +463,16 @@ int main()
         const snap s0 = take(f);
         home_ore0 = s0.ho;
         const float sc0 = w.markets.at(f.home_mkt).inventory[SC];
+        const float boost0 = space_pad_boost(w, f.home_pad);
         sent = ship(f, reg, 1000.0f);
         for (const auto& [id, h] : w.space_hauls)
             hauler = id, cid = h.convoy;
         const convoy_component* c = convoy_of(w, cid);
         const space_unit* u = hauler != null_entity ? &w.space_units.at(hauler) : nullptr;
         const float prop_drawn = s0.hp - w.markets.at(f.home_mkt).inventory[PR];
-        const float expect_prop = hs.tank + q0.lift_per_unit * (hs.dry_mass + hs.tank) + q0.lift_per_unit * sent;
+        const float expect_prop = hs.tank; // BL-1637: the climb and the lift are the pad's boost
+        const float boost_spent = boost0 - space_pad_boost(w, f.home_pad);
+        const float expect_boost = q0.lift_per_unit * (hs.dry_mass + hs.tank) + q0.lift_per_unit * sent;
         const float spent = s0.ta - w.nations.at(f.a).treasury;
         std::printf("  sent %.3f (cap %.3f); ore off the shelf %.3f; propellant drawn %.3f (expect %.3f); "
                     "components %.1f; treasury -%.1f, convoy cost_paid %.1f\n",
@@ -474,10 +482,11 @@ int main()
                   && u->node == home_low && u->cargo == sent && c != nullptr && c->speed == 0.0f && !c->arrived
                   && c->mode == convoy_mode::space && c->cargo_qty == sent
                   && std::fabs((s0.ho - w.markets.at(f.home_mkt).inventory[ORE]) - sent) < 1.0e-3f
-                  && std::fabs(prop_drawn - expect_prop) < 1.0e-2f && std::fabs(spent - c->cost_paid) < 0.5f
+                  && std::fabs(prop_drawn - expect_prop) < 1.0e-2f && std::fabs(boost_spent - expect_boost) < 1.0e-2f
+                  && std::fabs(spent - c->cost_paid) < 0.5f
                   && w.space_hauls.at(hauler).phase == space_haul_phase::outbound,
-              "C4", "a Hauler raised at the home pad and laden to its cap; the home shelf paid cargo, kit, tank, "
-                    "climb and lift; the treasury the space side; the convoy rides aboard at speed 0");
+              "C4", "a Hauler raised at the home pad and laden to its cap; the home shelf paid cargo, kit and tank; "
+                    "the pad's boost the climb and the lift; the treasury the space side; the convoy rides aboard at speed 0");
     }
 
     // ---- C5 flight ----------------------------------------------------------
@@ -504,8 +513,8 @@ int main()
             path_walked = stood[i] == out.nodes[i];
         const convoy_component* c = convoy_of(w, cid);
         const float drop = moon_prop0 - w.markets.at(f.moon_mkt).inventory[PR];
-        // The moon shelf pays the descent and then the top-up over A's moon pad: the
-        // outbound burn, laden, refilled.
+        // BL-1637: the descent burns the tank; the top-up over A's moon pad then refills
+        // the outbound burn, laden, and the descent - all off the moon shelf.
         const float burn_out = static_cast<float>((hs.dry_mass + sent + hs.tank) * (1.0 - std::exp(-out.dv / hs.exhaust)));
         const float expect_drop = q0.drop_per_unit * sent + burn_out;
         std::printf("  unloaded on day %d (quoted %.1f); stood at %zu nodes (path %zu); hops %d; moon shelf propellant %.4f (descent %.4f + top-up %.4f)\n",
@@ -515,7 +524,7 @@ int main()
                   && day <= static_cast<int>(q0.days) + 1
                   && w.space_hauls.at(hauler).phase == space_haul_phase::returning,
               "C5a", "hop by hop along the cheapest path, standing at every node; unloaded at the moon's low orbit, "
-                     "descent off the moon shelf, then a top-up over the moon pad; the convoy released arrived");
+                     "descent off the tank, then a top-up over the moon pad; the convoy released arrived");
         credit_arrived_convoys(w, 1);
         const float landed = w.landed(f.a, f.moon_mkt, ORE);
         check(std::fabs(landed - sent) < 1.0e-4f && std::fabs((home_ore0 - w.markets.at(f.home_mkt).inventory[ORE]) - landed) < 1.0e-3f
@@ -537,11 +546,13 @@ int main()
         const float prop_before = w.space_units.at(hauler).propellant;
         const float home_prop0 = w.markets.at(f.home_mkt).inventory[PR];
         const space_haul_quote q = quote_space_haul(w, p, f.a, f.home_mkt, f.moon_mkt);
+        const float b0 = space_pad_boost(w, f.home_pad);
         const float s = ship(f, reg, 5.0f);
         const float drawn = home_prop0 - w.markets.at(f.home_mkt).inventory[PR];
-        const float expect = (hs.tank - prop_before) + q.lift_per_unit * s;
+        const float expect = hs.tank - prop_before; // BL-1637: the lift is boost
+        const bool boost_ok = std::fabs((b0 - space_pad_boost(w, f.home_pad)) - q.lift_per_unit * s) < 1.0e-3f;
         check(q.unit == hauler && s == 5.0f && w.space_units.size() == units0 && w.space_hauls.count(hauler) == 1
-                  && w.space_units.at(hauler).propellant == hs.tank && std::fabs(drawn - expect) < 1.0e-2f,
+                  && w.space_units.at(hauler).propellant == hs.tank && std::fabs(drawn - expect) < 1.0e-2f && boost_ok,
               "C6", fmt("the idle Hauler reused (no raise), refuelled over the pad: %.3f propellant (expect %.3f)", drawn, expect));
         days(w, p, 60);
         credit_arrived_convoys(w, 2);
@@ -608,15 +619,17 @@ int main()
         const space_unit_op raised = raise_space_unit_at_pad(w, p, f.a, space_hull::hauler, f.home);
         hand = raised.unit;
         const snap s0 = take(f);
+        const float lb0 = space_pad_boost(w, f.home_pad);
         const space_unit_op ld = load_space_cargo(w, p, f.a, hand, ORE, 12.0f);
         const float lift = static_cast<float>(orbital_climb_dv(w, orbital_graph_params{}, f.home)) * p.launch_propellant_per_dv * 12.0f;
         const float paid = s0.ta - w.nations.at(f.a).treasury;
         check(ld.result == space_unit_result::ok && w.space_units.at(hand).cargo == 12.0f
                   && std::fabs((s0.ho - w.markets.at(f.home_mkt).inventory[ORE]) - 12.0f) < 1.0e-4f
-                  && std::fabs((s0.hp - w.markets.at(f.home_mkt).inventory[PR]) - lift) < 1.0e-4f
-                  && std::fabs(paid - (12.0f * 50.0f + lift * 64.0f)) < 0.05f
+                  && s0.hp == w.markets.at(f.home_mkt).inventory[PR]
+                  && std::fabs((lb0 - space_pad_boost(w, f.home_pad)) - lift) < 1.0e-3f && ld.climb_boost == lift
+                  && std::fabs(paid - 12.0f * 50.0f) < 0.05f
                   && w.space_hauls.at(hand).phase == space_haul_phase::held,
-              "C9a", fmt("load: 12 ore and %.2f lift propellant off the home shelf for %.1f", lift, paid));
+              "C9a", fmt("load: 12 ore off the home shelf for %.1f; the %.2f lift off the pad's boost", paid, lift));
 
         // Refusals, each mutating nothing.
         bool all = true;
@@ -647,6 +660,10 @@ int main()
             w.nations.at(f.a).treasury = 10.0f;
             refuse("treasury", space_unit_result::rejected_insufficient_treasury, [&] { return load_space_cargo(w, p, f.a, hand, ORE, 5.0f); });
             w.nations.at(f.a).treasury = t;
+            const float bk = w.buildings.at(f.home_pad).boost;
+            w.buildings.at(f.home_pad).boost = 0.0f;
+            refuse("boost", space_unit_result::rejected_boost_short, [&] { return load_space_cargo(w, p, f.a, hand, ORE, 5.0f); });
+            w.buildings.at(f.home_pad).boost = bk;
             w.buildings.at(f.home_pad).workforce_assigned = 0.0f;
             refuse("no-pad", space_unit_result::rejected_no_pad, [&] { return load_space_cargo(w, p, f.a, hand, ORE, 5.0f); });
             w.buildings.at(f.home_pad).workforce_assigned = 1.0f;
@@ -660,22 +677,25 @@ int main()
         refuse("nothing-aboard", space_unit_result::rejected_cargo, [&] { return unload_space_cargo(w, p, f.a, frig); });
         w.space_units.erase(frig);
         check(all, "C9b", "load/unload refusals (bay, good, carrier, unknown, owner, nan, range, negative, shelf, "
-                          "treasury, pad, hostile x2, nothing aboard) mutate nothing" + (why.empty() ? std::string() : " — FAILED:" + why));
+                          "treasury, boost, pad, hostile x2, nothing aboard) mutate nothing" + (why.empty() ? std::string() : " — FAILED:" + why));
 
         // Fly it to the moon by order and set it down there.
         const space_unit_op mv = order_space_unit(w, p, f.a, hand, moon_low);
         days(w, p, 20);
         const snap s1 = take(f);
+        const float tank0 = w.space_units.at(hand).propellant;
         const space_unit_op ul = unload_space_cargo(w, p, f.a, hand);
         const float drop = static_cast<float>(orbital_climb_dv(w, orbital_graph_params{}, f.moon)) * p.launch_propellant_per_dv * 12.0f;
+        const float burned = tank0 - w.space_units.at(hand).propellant;
         credit_arrived_convoys(w, 5);
         std::printf("  move %d unload %d cargo %.2f record %zu moon propellant -%.4f landed %.3f\n",
                     static_cast<int>(mv.result), static_cast<int>(ul.result), w.space_units.at(hand).cargo,
                     w.space_hauls.count(hand), s1.mp - w.markets.at(f.moon_mkt).inventory[PR], w.landed(f.a, f.moon_mkt, ORE));
         check(mv.result == space_unit_result::ok && ul.result == space_unit_result::ok && w.space_units.at(hand).cargo == 0.0f
-                  && w.space_hauls.count(hand) == 0 && std::fabs((s1.mp - w.markets.at(f.moon_mkt).inventory[PR]) - drop) < 1.0e-3f
+                  && w.space_hauls.count(hand) == 0 && s1.mp == w.markets.at(f.moon_mkt).inventory[PR]
+                  && std::fabs(burned - drop) < 1.0e-3f && ul.credits == 0.0f
                   && std::fabs(w.landed(f.a, f.moon_mkt, ORE) - 12.0f) < 1.0e-4f,
-              "C9c", fmt("unload at the moon: %.4f descent propellant off the moon shelf; 12 ore landed (conserved)", drop));
+              "C9c", fmt("unload at the moon: %.4f descent propellant off the tank, the moon shelf untouched; 12 ore landed (conserved)", drop));
         w.landed_this_tick.clear();
         // Setting down where no pad stands below: the far planet's low orbit (staged there).
         load_space_cargo(w, p, f.a, hand, ORE, 2.0f);
@@ -707,10 +727,12 @@ int main()
         const std::size_t sec = world_save_space_convoy_section_bytes(x);
         std::ostringstream o84(std::ios::binary);
         write_world_snapshot_pre_space_convoys(x, o84);
-        check(o84.str().size() + world_save_space_line_gap_bytes(x) /* the space merge: main's naval..missile sections */ + sec + (world_save_debris_section_bytes(x) + (world_save_space_bombard_section_bytes(x) + (world_save_offworld_base_section_bytes(x) + (world_save_space_firsts_section_bytes(x) + world_save_transit_origin_section_bytes(x))))) == b.size() && sec == 4 + 32 * x.space_hauls.size(), "C10b", // BL-1598 (v88) follows
+        check(o84.str().size() + world_save_space_line_gap_bytes(x) /* the space merge: main's naval..missile sections */ + sec + (world_save_debris_section_bytes(x) + (world_save_space_bombard_section_bytes(x) + (world_save_offworld_base_section_bytes(x) + (world_save_space_firsts_section_bytes(x) + world_save_transit_origin_section_bytes(x) + world_save_launch_boost_section_bytes(x))))) == b.size() && sec == 4 + 32 * x.space_hauls.size(), "C10b", // BL-1598 (v88) follows
               fmt("section %zu bytes; v84 prefix %zu + %zu == %zu", sec, o84.str().size(), sec, b.size()));
         fixture e;
         build(e);
+        for (auto& [bid, bb] : e.w.buildings) // BL-1637: a v84 stream predates the boost
+            bb.boost = 0.0f;
         std::ostringstream oe(std::ios::binary);
         write_world_snapshot_pre_space_convoys(e.w, oe);
         world we;
@@ -718,7 +740,7 @@ int main()
                   && world_save_space_convoy_section_bytes(e.w) == 4,
               "C10c", "a hauler-free world's v84 prefix reads with nothing aboard; equal hash");
 
-        const std::size_t s0 = b.size() - sec - (world_save_debris_section_bytes(x) + (world_save_space_bombard_section_bytes(x) + (world_save_offworld_base_section_bytes(x) + (world_save_space_firsts_section_bytes(x) + world_save_transit_origin_section_bytes(x))))) + 4; // the first record (BL-1598's v88 section follows)
+        const std::size_t s0 = b.size() - sec - (world_save_debris_section_bytes(x) + (world_save_space_bombard_section_bytes(x) + (world_save_offworld_base_section_bytes(x) + (world_save_space_firsts_section_bytes(x) + world_save_transit_origin_section_bytes(x) + world_save_launch_boost_section_bytes(x))))) + 4; // the first record (BL-1598's v88 section follows)
         const auto refused = [&](std::string bad) {
             world t;
             t.nations.emplace(999, nation_component{});

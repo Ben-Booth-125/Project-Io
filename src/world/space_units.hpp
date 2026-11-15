@@ -268,6 +268,8 @@ enum class space_unit_result : uint8_t
     rejected_blockaded,         ///< The body is blockaded (space_bombard.hpp): no launch, load or unload there.
     rejected_not_armed,         ///< Bombard: the unit carries no orbital-missile armament.
     rejected_target,            ///< Bombard: nothing there the nation may strike (none, or none hostile).
+    // BL-1637 (launch boost), appended:
+    rejected_boost_short,       ///< The pad holds too little boost for the climb.
 };
 
 /// What a raise, a move or a refuel did.
@@ -277,7 +279,8 @@ struct space_unit_op
     entity_id unit    = null_entity;           ///< The unit raised (or the first unit ordered).
     float     credits = 0.0f;                  ///< Debited from the treasury.
     float     propellant = 0.0f;               ///< Propellant bought / drawn / burned.
-    float     climb_propellant = 0.0f;         ///< Raise at a pad: the climb's share of `propellant`.
+    float     climb_boost = 0.0f;              ///< BL-1637: a climb through a pad - the boost it spent.
+    entity_id pad     = null_entity;           ///< BL-1637: the pad the climb's boost came off.
     float     dv      = 0.0f;                  ///< A move: the path's Δv.
     int32_t   days    = 0;                     ///< A move: transit days.
     entity_id market  = null_entity;           ///< The shelf bought from.
@@ -295,8 +298,15 @@ space_unit_result set_space_unit_design(world& w, entity_id nation, space_hull h
 /// The nation's live design for @p h, or nullptr.
 const space_design* space_unit_design_of(const world& w, entity_id nation, space_hull h);
 
-/// The nation's completed, standing, staffed Launchpad on @p body (lowest id), or null.
+/// The nation's completed, standing, staffed Launchpad on @p body (lowest id), or null:
+/// `space_launch_pad_of` (BL-1637), so not idled and not on an occupied tile.
 entity_id space_staffed_pad_on(const world& w, entity_id nation, entity_id body);
+
+/// BL-1637 (SPACE_ASSETS.md § Boost): the boost a climb of @p mass off @p body's
+/// surface to its low orbit spends - climb Δv x `launch_propellant_per_dv` x mass,
+/// the propellant the climb burned when it was bought off the shelf. +infinity for a
+/// non-finite result, 0 for a non-positive mass. Pure.
+float space_climb_boost(const world& w, const space_unit_params& p, entity_id body, float mass);
 
 /// THE RAISE VERBS. Rejected WHOLE — nothing written, not even the allocator.
 space_unit_op raise_space_unit_at_pad(world& w, const space_unit_params& p, entity_id nation,

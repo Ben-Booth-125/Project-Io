@@ -22,8 +22,8 @@
 #include "sentiment_emitters.hpp" // BL-1458/BL-1432: the emitters and the once-a-tick fold
 #include "stance.hpp"          // is_hostile (BL-470's NR-344 march queue; BL-617 migration gate)
 #include "nation_tech.hpp"     // recipe_unlocked, nation_scalar (BL-1273; BL-588 before it)
-#include "space_assets.hpp"    // BL-1630: space_standing_lot, the pad's standing bid
-#include "space_programme.hpp" // BL-1630: space_programme_params::standing_lots
+#include "space_assets.hpp"    // BL-1637: space_asset_params, the pad's boost dials
+#include "space_tech_keys.hpp" // BL-1637: space_keys::dispatch, the intake's gate
 #include "state_industry.hpp"  // BL-1296: plan_state_funding, the state ledger
 #include "unit_roster.hpp"     // resolve_unit_upkeep (BL-454 unit pass), unit_roster_table (BL-470)
 #include "workforce.hpp"
@@ -2104,24 +2104,36 @@ void advance_refits(world& w)
     }
 }
 
-// BL-1630 (SPACE_ASSETS.md § Launching, "A staffed pad bids for its launch";
-// MARKETS.md § Demand channels, property 3): a nation holding Rocketry with a
-// staffed Launchpad on its home body BIDS for its next launch's goods on its home
-// market — `standing_lots` x one satellite's lot (`space_standing_lot`), posted
-// into `report.wants` so the clear raises it into `demand` and a price answers
-// it. Before this the launch's want was off the book (an unposted bid lifts the
-// build veto and nothing more), so the goods had no price signal: no plant
-// was built for a buyer the market could not see, and the dial idled the plants
-// that were. Under the fair-price ceiling as every draw is: a good priced over
-// it does not bid; its want goes to the hauler-only register instead. Every
-// nation, the player's included: this is the pad's want on the market, not a
-// decision — nothing is bought, built or launched here. Ascending nation id;
-// nothing in the campaign settle.
-void post_space_launch_wants(const world& w, const space_asset_params& sp, float res_mult,
-                             float lots, economy_report& report)
+// BL-1637 (SPACE_ASSETS.md § Boost; MARKETS.md § Demand channels, property 3):
+// THE PAD'S INTAKE. Every staffed Launchpad of a nation holding Rocketry is a
+// processor: each tick it takes `boost_per_day` x the tick's days (no more than
+// the room under `boost_cap`) of launch goods off ITS OWN market's shelf, in the
+// recipe ratio (`boost_components_share` components, the rest propellant), and
+// banks them as boost. The full intake is posted as a want (`report.wants`, so the
+// clear prices it and plants are called forth), or to the hauler-only register for
+// a good over the fair-price ceiling, which is not drawn. The draw is the
+// processor's run: the share of the intake the scarcer good covers, so the two
+// goods leave in ratio; no more than the treasury can pay at the posted price,
+// which the clear bills (`report.purchases`). A full pad posts and draws nothing.
+// Every nation, the player's included: it is a building's input, not a decision.
+// Ascending nation id, each nation's pads ascending id.
+std::array<float, resource_count> pad_intake_basket(const space_asset_params& sp)
 {
-    if (!(lots > 0.0f) || !std::isfinite(lots) || !research_age_open(w))
+    std::array<float, resource_count> basket{};
+    const float share = std::isfinite(sp.boost_components_share)
+        ? std::clamp(sp.boost_components_share, 0.0f, 1.0f) : 0.0f;
+    basket[static_cast<std::size_t>(resource_type::spacecraft_components)] = share;
+    basket[static_cast<std::size_t>(resource_type::propellant)]            = 1.0f - share;
+    return basket;
+}
+
+void run_pad_intake(world& w, const space_asset_params& sp, float res_mult, economy_report& report)
+{
+    const float per_day = std::isfinite(sp.boost_per_day) ? std::max(0.0f, sp.boost_per_day) : 0.0f;
+    const float cap     = std::isfinite(sp.boost_cap) ? std::max(0.0f, sp.boost_cap) : 0.0f;
+    if (!(per_day > 0.0f) || !(cap > 0.0f) || !research_age_open(w))
         return;
+    const std::array<float, resource_count> basket = pad_intake_basket(sp);
     std::vector<entity_id> ids;
     ids.reserve(w.nations.size());
     for (const auto& kv : w.nations)
@@ -2129,24 +2141,78 @@ void post_space_launch_wants(const world& w, const space_asset_params& sp, float
     std::sort(ids.begin(), ids.end());
     for (const entity_id n : ids)
     {
-        entity_id mid = null_entity;
-        float comps = 0.0f, prop = 0.0f;
-        if (!space_standing_lot(w, sp, n, mid, comps, prop))
+        if (!nation_has_mechanic(w, n, space_keys::dispatch))
             continue;
-        const market_component& m = w.markets.at(mid);
-        const std::pair<resource_type, float> lot[] = {
-            { resource_type::spacecraft_components, comps * lots },
-            { resource_type::propellant,            prop * lots },
-        };
-        for (const auto& [good, q] : lot)
+        const nation_component& nc = w.nations.at(n);
+        // What the clear will already bill this nation: every draw booked so far this
+        // tick (processor inputs, construction, upkeep) at the posted price, then the
+        // intake's own bills as they are drawn. The intake spends only what is left.
+        float committed = 0.0f;
+        for (auto it = report.purchases.lower_bound(std::make_pair(n, entity_id{0}));
+             it != report.purchases.end() && it->first.first == n; ++it)
         {
-            if (!(q > 0.0f))
+            const auto pm = w.markets.find(it->first.second);
+            if (pm == w.markets.end())
                 continue;
-            const std::size_t r = static_cast<std::size_t>(good);
-            auto& reg_row = shelf_admits(m, r, res_mult, /*off_buys=*/true)
-                ? report.wants[std::make_pair(n, mid)]
-                : report.hauler_wants[std::make_pair(n, mid)];
-            reg_row[r] += q;
+            for (std::size_t r = 0; r < resource_count; ++r)
+                if (it->second[r] > 0.0f)
+                    committed += it->second[r] * posted_price(pm->second, r);
+        }
+        std::vector<entity_id> pads(nc.state_assets.begin(), nc.state_assets.end());
+        std::sort(pads.begin(), pads.end());
+        for (const entity_id bid : pads)
+        {
+            const auto bit = w.buildings.find(bid);
+            if (bit == w.buildings.end())
+                continue;
+            building_component& b = bit->second;
+            if (b.type != building_type::launchpad || b.ticks_remaining > 0 || b.decommissioned
+                || b.state_idle || !(b.workforce_assigned > 0.0f) || w.tile_occupied(b.tile))
+                continue;
+            const float room = cap - b.boost;
+            if (!(room > 0.0f))
+                continue; // a full pad stops drawing
+            const entity_id mid = market_for_tile(w, b.tile);
+            const auto mit = w.markets.find(mid);
+            if (mit == w.markets.end())
+                continue;
+            market_component& m = mit->second;
+            const float intake = std::min(per_day * static_cast<float>(k_econ_tick_days), room);
+            std::vector<std::pair<std::size_t, float>> need;
+            for (std::size_t r = 0; r < resource_count; ++r)
+                if (basket[r] > 0.0f)
+                    need.emplace_back(r, intake * basket[r]);
+
+            // The want, at the full intake: the number a price answers.
+            float run = 1.0f;
+            for (const auto& [r, q] : need)
+            {
+                if (!(q > 0.0f))
+                    continue;
+                const bool admitted = shelf_admits(m, r, res_mult, /*off_buys=*/true);
+                (admitted ? report.wants : report.hauler_wants)[std::make_pair(n, mid)][r] += q;
+                run = std::min(run, admitted ? std::max(0.0f, m.inventory[r]) / q : 0.0f);
+            }
+            // What the treasury can pay at the posted price.
+            float bill = 0.0f;
+            for (const auto& [r, q] : need)
+                if (q > 0.0f)
+                    bill += q * posted_price(m, r);
+            if (bill > 0.0f && std::isfinite(bill))
+                run = std::min(run, std::max(0.0f, nc.treasury - committed) / bill);
+            if (!(run > 1.0e-6f) || !std::isfinite(run))
+                continue;
+            auto& bought = report.purchases[std::make_pair(n, mid)];
+            for (const auto& [r, q] : need)
+            {
+                const float drawn = std::min(q * run, std::max(0.0f, m.inventory[r]));
+                if (!(drawn > 0.0f))
+                    continue;
+                m.inventory[r] -= drawn;
+                bought[r] += drawn;
+            }
+            committed += bill * run;
+            b.boost = std::min(cap, b.boost + intake * run);
         }
     }
 }
@@ -3668,9 +3734,8 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
     run_building_upkeep(w, reg, report);
     phase_stamp(13); // building_upkeep
 
-    // BL-1630: the launch-ready pads' standing bid, posted for this tick's clear.
-    post_space_launch_wants(w, reg.space_assets(), reg.price_band().reservation_mult,
-                            reg.space_programme().standing_lots, report);
+    // BL-1637: the staffed pads' intake - drawn now, billed at this tick's clear.
+    run_pad_intake(w, reg.space_assets(), reg.price_band().reservation_mult, report);
 
     // BL-1427 (fronts): re-anchor once more at the tick's end, after everything
     // that can move a border or kill a unit, so a save taken between ticks holds

@@ -15,9 +15,10 @@
 //   U2  STATS: the design's mass, tank, Δv (rocket equation), cargo, crew,
 //       firepower, armour, hull points — printed, and Δv recomputed independently.
 //   U3  PAD RAISE (home): the unit appears idle at the home low orbit with a full
-//       tank; the HOME shelf loses the kit goods, the tank and the climb's propellant;
-//       the moon shelf is untouched; the treasury pays the quote; crew drawn.
-//   U4  PAD RAISE (moon): the same off the MOON shelf; the climb's propellant is a
+//       tank; the HOME shelf loses the kit goods and the tank, and the climb spends
+//       the home pad's boost (BL-1637); the moon shelf is untouched; the treasury
+//       pays the quote; crew drawn. A pad short of the climb's boost refuses whole.
+//   U4  PAD RAISE (moon): the same off the MOON shelf; the climb's boost is a
 //       fraction of the home launch's.
 //   U5  REFUSED WHOLE: no pad on the body, an unstaffed pad, a short shelf, a short
 //       treasury, no crew, a Cruiser at a pad, no design — hash, allocator, stores,
@@ -172,6 +173,7 @@ entity_id add_pad(world& w, entity_id nation, entity_id tile, float staffed)
     b.type = building_type::launchpad;
     b.workforce_assigned = staffed;
     b.ticks_remaining = 0;
+    b.boost = 100000.0f; // BL-1637: banked, so a raise check is not also a boost check
     w.buildings.emplace(bid, b);
     w.nations.at(nation).state_assets.push_back(bid);
     return bid;
@@ -457,9 +459,11 @@ int main()
         const space_design_stats st = evaluate_space_design(space_hull::hauler, k_hauler);
         const snap s0 = take(f);
         const float mp0 = w.markets.at(f.moon_mkt).inventory[PR];
+        const entity_id home_pad = space_staffed_pad_on(w, f.a, f.home);
+        const float boost0 = space_pad_boost(w, home_pad);
         const space_unit_op op = raise_space_unit_at_pad(w, p, f.a, space_hull::hauler, f.home);
         h1 = op.unit;
-        home_climb_prop = op.climb_propellant;
+        home_climb_prop = op.climb_boost;
         const float expect_climb = static_cast<float>(home_climb * p.launch_propellant_per_dv * (st.dry_mass + st.tank));
         const space_unit* u = w.space_units.count(h1) ? &w.space_units.at(h1) : nullptr;
         const float drawn_p = s0.hp - w.markets.at(f.home_mkt).inventory[PR];
@@ -468,21 +472,34 @@ int main()
         for (std::size_t r = 0; r < resource_count; ++r)
         {
             float q = st.goods[r];
-            if (r == PR) q += st.tank + expect_climb;
+            if (r == PR) q += st.tank; // BL-1637: the climb is the pad's boost
             expect_credits += q * w.markets.at(f.home_mkt).base_price[r];
         }
         std::printf("  op %d credits %.1f (expect %.1f) prop %.2f climb %.2f (expect %.2f) sc drawn %.1f\n",
-                    (int)op.result, op.credits, expect_credits, op.propellant, op.climb_propellant, expect_climb, drawn_sc);
+                    (int)op.result, op.credits, expect_credits, op.propellant, op.climb_boost, expect_climb, drawn_sc);
         check(op.result == space_unit_result::ok && u != nullptr && u->state == space_unit_state::idle
                   && u->node == orbital_node{f.home, orbital_node_kind::low_orbit} && u->propellant == st.tank
                   && u->hull_points == st.hull_points && u->crew == 1 && u->design == k_hauler
-                  && std::fabs(op.climb_propellant - expect_climb) < 1e-3f
-                  && std::fabs(drawn_p - (st.tank + expect_climb)) < 1e-2f && drawn_sc == st.goods[SC]
+                  && std::fabs(op.climb_boost - expect_climb) < 1e-3f && op.pad == home_pad
+                  && std::fabs((boost0 - space_pad_boost(w, home_pad)) - expect_climb) < 1e-2f
+                  && std::fabs(drawn_p - st.tank) < 1e-2f && drawn_sc == st.goods[SC]
                   && w.markets.at(f.moon_mkt).inventory[PR] == mp0 && op.market == f.home_mkt
                   && std::fabs((s0.ta - w.nations.at(f.a).treasury) - op.credits) < 1.0f
                   && std::fabs(op.credits - static_cast<float>(expect_credits)) < 1.0f
                   && w.nations.at(f.a).astronauts == s0.pa - 1,
-              "U3", "idle at home low orbit, full tank; home shelf drawn kit + tank + climb; moon shelf untouched; treasury paid; crew drawn");
+              "U3", "idle at home low orbit, full tank; home shelf drawn kit + tank; the climb off the pad's boost; moon shelf untouched; treasury paid; crew drawn");
+    }
+    {
+        // BL-1637: a pad holding less boost than the climb refuses the raise whole.
+        const entity_id home_pad = space_staffed_pad_on(w, f.a, f.home);
+        const float keep = w.buildings.at(home_pad).boost;
+        w.buildings.at(home_pad).boost = 0.5f * home_climb_prop;
+        const uint64_t h0 = w.state_hash(0);
+        const std::uint32_t cur = w.next_entity_id();
+        const space_unit_op op = raise_space_unit_at_pad(w, p, f.a, space_hull::hauler, f.home);
+        check(op.result == space_unit_result::rejected_boost_short && w.state_hash(0) == h0 && w.next_entity_id() == cur,
+              "U3", "a pad short of the climb's boost refuses the raise whole, nothing written");
+        w.buildings.at(home_pad).boost = keep;
     }
 
     // ---- U4 pad raise (moon) ------------------------------------------------
@@ -493,12 +510,12 @@ int main()
         const float drawn_moon = s0.mp - w.markets.at(f.moon_mkt).inventory[PR];
         const space_unit* u = w.space_units.count(op.unit) ? &w.space_units.at(op.unit) : nullptr;
         std::printf("  climb propellant: home %.2f  moon %.2f  (ratio %.3f)\n", home_climb_prop,
-                    op.climb_propellant, op.climb_propellant / home_climb_prop);
+                    op.climb_boost, op.climb_boost / home_climb_prop);
         check(op.result == space_unit_result::ok && u != nullptr
                   && u->node == orbital_node{f.moon, orbital_node_kind::low_orbit} && op.market == f.moon_mkt
                   && w.markets.at(f.home_mkt).inventory[PR] == s0.hp && drawn_moon > 0.0f
-                  && op.climb_propellant < 0.25f * home_climb_prop,
-              "U4", "moon launch off the moon shelf; its climb propellant a fraction (< 1/4) of the home launch's");
+                  && op.climb_boost < 0.25f * home_climb_prop,
+              "U4", "moon launch off the moon shelf; its climb's boost a fraction (< 1/4) of the home launch's");
     }
 
     // ---- U5 refused whole ---------------------------------------------------
@@ -690,7 +707,7 @@ int main()
         check(pad == space_unit_result::rejected_not_launchable && op.result == space_unit_result::ok && u != nullptr
                   && u->state == space_unit_state::docked && u->station == st_a && u->node == home_low
                   && u->crew == st.crew && pool_after == s0.pa - st.crew
-                  && drawn_sc == st.goods[SC] && std::fabs(drawn_p - st.tank) < 1e-3f && op.climb_propellant == 0.0f
+                  && drawn_sc == st.goods[SC] && std::fabs(drawn_p - st.tank) < 1e-3f && op.climb_boost == 0.0f
                   && noyard == space_unit_result::rejected_no_shipyard,
               "U11", fmt("cruiser: pad refused (%d); yard raised docked, crew %d, %.0f components + %.0f propellant off the home shelf; no yard refused",
                          (int)pad, st.crew, drawn_sc, drawn_p));
@@ -802,7 +819,7 @@ int main()
                           w2.space_units.size(), w2.space_unit_designs.size(), w2.station_depot_stock.size()));
 
         const std::size_t sec = world_save_space_unit_section_bytes(w);
-        const std::size_t tail = (world_save_space_battle_section_bytes(w) + (world_save_prospecting_section_bytes(w) + (world_save_space_convoy_section_bytes(w) + (world_save_debris_section_bytes(w) + (world_save_space_bombard_section_bytes(w) + (world_save_offworld_base_section_bytes(w) + (world_save_space_firsts_section_bytes(w) + world_save_transit_origin_section_bytes(w)))))))); // BL-1597 (v85) follows
+        const std::size_t tail = (world_save_space_battle_section_bytes(w) + (world_save_prospecting_section_bytes(w) + (world_save_space_convoy_section_bytes(w) + (world_save_debris_section_bytes(w) + (world_save_space_bombard_section_bytes(w) + (world_save_offworld_base_section_bytes(w) + (world_save_space_firsts_section_bytes(w) + world_save_transit_origin_section_bytes(w) + world_save_launch_boost_section_bytes(w)))))))); // BL-1597 (v85) follows
         std::ostringstream os82(std::ios::binary);
         write_world_snapshot_pre_space_units(w, os82);
         const std::string b82 = os82.str();

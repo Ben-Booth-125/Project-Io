@@ -234,8 +234,8 @@ struct convoy_leg
 /// port handling never. Between bodies (TRADE.md § A trade, "Between
 /// bodies"): the space lane, viable only when @p corp_id holds a Launchpad on
 /// the source body, its home nation holds Rocketry's `space_dispatch` mechanic
-/// (Ben, 2026-10-10), AND the source shelf holds the launch's propellant
-/// (`launch_draw_per_convoy`) under the fair-price ceiling; its whole cost is
+/// (Ben, 2026-10-10), AND the trader's staffed pad there holds the launch's boost
+/// (`lane_launch_boost`, BL-1637); its whole cost is
 /// haul and takes the same modifiers. Never viable for a
 /// grid good (BL-708), a market to itself, an unknown market or corp, or a
 /// non-finite / non-positive @p qty.
@@ -270,7 +270,9 @@ bool owner_has_launchpad_on(const world& w, entity_id owner, entity_id body);
 
 /// The goods ONE space-lane launch burns (BL-308) — per LAUNCH, not per tonne and
 /// not per AU: the pad is the thing being fuelled, so a launch costs the same
-/// whatever it carries. BL-1265: the trader BUYS it off the source shelf.
+/// whatever it carries. BL-1637 (SPACE_ASSETS.md § Boost): the launch SPENDS it off
+/// the trader's own staffed pad's boost (`lane_launch_boost`, the sum), which the
+/// pad's intake bought; nothing is bought off a shelf at the launch.
 ///
 /// EXPORTED, AND AS A VECTOR, because of BL-648: `tools/verify/chain_depth.cpp`
 /// R1 resolves each consumer exemption against a registry of the passes that
@@ -278,6 +280,10 @@ bool owner_has_launchpad_on(const world& w, entity_id owner, entity_id body);
 /// and `commit_trade_shipment` buys it, so the draw and the thing the registry
 /// reads are one object.
 const std::array<float, resource_count>& launch_draw_per_convoy();
+
+/// BL-1637: the boost a straight-line space lane's launch spends - the sum of
+/// `launch_draw_per_convoy()`.
+float lane_launch_boost();
 
 struct economy_report; // economy_system.hpp: the tick's want and fill registers
 struct lp_tick;        // logistic_points.hpp: this tick's resolved pools (BL-1361)
