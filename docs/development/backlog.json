@@ -1758,7 +1758,7 @@
         "src/ui/ground_bake.cpp",
         "src/core/ground_layer.cpp"
       ],
-      "design": "RENDERING.md § Art direction and palette: the grade is already \"a separable final pass\", and the land lift re-bakes the land on every change. WORK: bake without the grade and lift (keeping a land weight), apply both in the shader. No-shader path: bake them as today. A level change becomes instant. SPIKE 2026-11-14: blocked on a per-pixel land weight the RGB chunks no longer hold; NR-1226 holds the call."
+      "design": "RENDERING.md § Art direction and palette: the grade is already \"a separable final pass\", and the land lift re-bakes the land on every change. WORK: bake without the grade and lift (keeping a land weight), apply both in the shader. No-shader path: bake them as today. A level change becomes instant. SPIKE 2026-11-14: blocked on a per-pixel land weight the RGB chunks no longer hold; NR-1226 holds the call. BUILT 2026-11-15 (NR-1226 option D, Ben): the land lift runs at draw time in the ground_lift shader from a per-tile land table; a Brightness change is instant on the GPU renderer. Open: Ben's eye on the hex-side shore at play zooms (fallback B, a half-resolution land mask). The near-future grade stays baked: it needs no land weight, but moving it after the shadows and sharpening changes the look on the GPU path only."
     },
     {
       "glyph": "✓",

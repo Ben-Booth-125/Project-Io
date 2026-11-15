@@ -1866,7 +1866,7 @@
    "title": "Live grade shader: a draw-time grade needs a per-pixel land weight the chunks no longer hold",
    "raised": "2026-11-14",
    "kind": "question",
-   "status": "open",
+   "status": "resolved",
    "source": "BL-1659 (live grade shader), sprint 68",
    "what": "The baked grade lifts land and leaves water, so a draw-time grade must know, per pixel, how much of it is land. The opaque master chunks are held as RGB since BL-1311 (master chunk RAM), so alpha cannot carry that weight. The baked grade also runs before the unsharp pass and the shadows; a draw-time grade after them is close, not exact.",
    "why_it_matters": "Without a land weight the live grade lifts the sea too. Each way of carrying the weight costs ground memory that BL-1311 just won back.",
@@ -1880,7 +1880,7 @@
     "src/ui/body_surface_canvas.cpp",
     "docs/ui/RENDERING.md"
    ],
-   "resolution": null
+   "resolution": "Ben, 2026-11-15: try D (a per-tile land table, no stored weight), fall back to B (a half-resolution land mask) if the hex-side shore shows. D built: RENDERING.md § Art direction and palette, 'The lift at draw time'. Only the land lift moved to draw time; the near-future grade stays baked."
   },
   {
    "id": "NR-1227",

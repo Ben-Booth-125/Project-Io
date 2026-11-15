@@ -805,7 +805,20 @@ Judged against `docs/ui/design/renders/map/`. What it asks of the bake, procedur
   ground holding no land (open sea, the survey lock fill) is not re-baked. The default is the
   **middle level (+30%)** until Ben picks. The percentiles each level gives are
   `ground_bake_check` P35's reading (`--lift`), which also holds the water byte-identical to the
-  lift off.
+  lift off. The player sees the setting as **Brightness** (Ben, 2026-11-15); "land lift" stays
+  the design's name for the pass.
+- **The lift at draw time (BL-1659, live grade shader; NR-1226 option D, Ben 2026-11-15).**
+  Where the renderer runs Io's fragment shaders, the canvas's ground bakes **without** the lift
+  and the `ground_lift` shader applies the same curve as it draws, so a change of level is
+  instant and re-bakes nothing. The land weight there is **per tile**, not per pixel: a table of
+  one texel per tile (land = seen and not ocean, coast or lake, the bake's own class), looked up
+  from each pixel's screen position through the inverse camera. So the lifted shore is the
+  **hex side**, softened over a short band, not the painted coast, and a river's water on a land
+  tile lifts with its tile. The opaque chunks stay RGB (§ Resident set): no per-pixel weight is
+  stored. The Selection band's neighbourhood page, which no shader draws, still bakes the lift.
+  The software renderer (every `--verify` capture) bakes the lift as before, so captures do not
+  move. If the hex-side shore shows at play zooms, the fallback is a half-resolution land mask
+  per chunk (NR-1226 option B).
 - **Palette and value.** Base hues take **it1's colour** — warm olive and khaki, rich green
   forest, white peaks, blue-green sea — not C-F's grey (the grade's desaturation eases to
   match); from it3 the value structure stays:

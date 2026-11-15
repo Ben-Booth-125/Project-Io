@@ -16,6 +16,7 @@
 #include "shaders/lens_wash.dxil.h"
 #include "shaders/border_band.dxil.h"
 #include "shaders/water_glint.dxil.h"
+#include "shaders/ground_lift.dxil.h"
 #endif
 
 namespace gfx {
@@ -41,6 +42,7 @@ const std::array<effect_def, static_cast<std::size_t>(effect::count)> k_defs = {
     { "lens_wash", IO_DXIL(lens_wash), 0, 1 },
     { "border_band", IO_DXIL(border_band), 0, 1 },
     { "water_glint", IO_DXIL(water_glint), 0, 1 },
+    { "ground_lift", IO_DXIL(ground_lift), 1, 1 },
 }};
 
 struct effect_slot
@@ -184,6 +186,8 @@ void shutdown()
 bool gpu_renderer() { return g_device != nullptr; }
 
 bool available(effect e) { return g_device && slot(e).ok && slot(e).state; }
+
+bool loaded(effect e) { return g_device && slot(e).shader; }
 
 void begin(ImDrawList* dl, effect e)
 {

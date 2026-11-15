@@ -181,6 +181,13 @@ public:
     /// set - the lever a capture of each level is taken with.
     void set_land_lift(int level);
     int  land_lift() const { return m_land_lift; }
+    /// BL-1659 (live grade shader): true when the canvas applies the land lift at
+    /// draw time (the ground_lift shader), so the canvas's chunks and far page bake
+    /// WITHOUT it and a change of level re-bakes nothing but the small neighbourhood
+    /// page (which no shader draws, so it still bakes the lift). Set once, after the
+    /// renderer exists; false on the software renderer, where the bake lifts as ever.
+    void set_lift_at_draw(bool on);
+    bool lift_at_draw() const { return m_lift_at_draw; }
 
     /// BL-1247 (the ground benchmark, `--bench-ground`): false holds back the
     /// speculative background bakes of other bodies, so the bench can time a
@@ -412,6 +419,11 @@ private:
         bool master_alloc = false;             ///< Level buffers are live (false after a RAM drop).
         std::shared_ptr<const ui::ground::bake_source> src;
         std::uint32_t src_epoch = 0;
+        /// BL-1659: src stamped with the lift, for the neighbourhood page while the
+        /// canvas lifts at draw - copied only when a neighbourhood job needs it.
+        std::shared_ptr<const ui::ground::bake_source> lifted_src;
+        std::uint32_t lifted_epoch = ~0u;
+        int           lifted_level = -1;
         std::uint32_t hashes_epoch = ~0u;
         std::uint64_t src_digest = 0;          ///< Whole-body region hash of src (the far page's).
         std::uint64_t swept_digest = 0;        ///< Digest the last sweep ran against.
@@ -619,6 +631,10 @@ private:
     /// (ui::ground::strip_painted_routes; ground_request::hide_routes).
     bool          m_hide_routes = false;
     int           m_land_lift = initial_land_lift(); ///< BL-1537; see set_land_lift.
+    bool          m_lift_at_draw = false;            ///< BL-1659; see set_lift_at_draw.
+    /// The lift level every held source is stamped with: 0 when the canvas lifts.
+    std::uint8_t  baked_lift() const
+    { return m_lift_at_draw ? std::uint8_t{0} : static_cast<std::uint8_t>(m_land_lift); }
     static int    initial_land_lift();
     /// The coarsest drawn level (0 = the master, 96 px a hex; 2 = 24 px) at which the
     /// Logistics lens's unpainted ground is re-baked under the view. Coarser than this a

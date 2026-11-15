@@ -1967,7 +1967,7 @@
     "App is in game.",
     "Not while an ImGui widget owns the keyboard."
    ],
-   "expected_output": "Toggles the Options window: a Display section (Resolution preset combo, Fullscreen, VSync), an Accessibility section (UI Scale), a Map section (Ground lightness), a live window-size readout, and Close. Every change applies live to the SDL window and persists to options.cfg immediately.",
+   "expected_output": "Toggles the Options window: a Display section (Resolution preset combo, Fullscreen, VSync), an Accessibility section (UI Scale), a Map section (Brightness), a live window-size readout, and Close. Every change applies live to the SDL window and persists to options.cfg immediately.",
    "reason_to_select": "To adjust display and UI-scale settings mid-session."
   },
   {
@@ -2162,7 +2162,7 @@
   {
    "id": "chrome.options_set_ground_lightness",
    "family": "chrome",
-   "surface": "Options window, Map section, Ground lightness combo",
+   "surface": "Options window, Map section, Brightness combo",
    "press": "Open the combo and click a level.",
    "args": [
     {
@@ -2174,8 +2174,8 @@
    "preconditions": [
     "Options window open."
    ],
-   "expected_output": "The planetary map's land re-bakes at the chosen lightness over the next moments (the view first); water - sea, lakes and rivers - keeps its colour. Persists to options.cfg immediately. Sim, view and selection untouched.",
-   "reason_to_select": "To make the map's land read lighter or darker on this display."
+   "expected_output": "The planetary map's land takes the chosen brightness: at once on the GPU renderer (drawn by the ground_lift shader, per tile, so a river's water on a land tile lifts with it), or re-baked over the next moments (the view first) on the software renderer, where water - sea, lakes and rivers - keeps its colour. Persists to options.cfg immediately. Sim, view and selection untouched.",
+   "reason_to_select": "To make the map's land read brighter or darker on this display."
   },
   {
    "id": "chrome.options_vsync",

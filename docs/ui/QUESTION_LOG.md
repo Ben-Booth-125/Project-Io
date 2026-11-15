@@ -386,11 +386,11 @@ THE SEAM'S ANSWER IS SHOWN, because set_trade validates what the form cannot (bo
 
 *Demanded by BL-022, BL-027, BL-028 · `src/ui/nav_pane.cpp` · id `nav_pane`*
 
-### Options window - Map section, Ground lightness combo (Off, +15%, +30%, +45%)
+### Options window - Map section, Brightness combo (Off, +15%, +30%, +45%)
 
 **Answers:** How light should the map's land read on this display?
 
-**Because:** Ben, 2026-11-10 (RENDERING.md § Art direction and palette, 'The land lift'): the lighter tileset is a grade pass on land only with three trial levels, chosen live rather than tuned blind, and the choice must survive a restart. One combo in the window that already holds the display settings; it re-bakes the land and leaves water as it is, so the player sees the effect on the map behind the window.
+**Because:** Ben, 2026-11-10 (RENDERING.md § Art direction and palette, 'The land lift'): the lighter tileset is a grade pass on land only with three trial levels, chosen live rather than tuned blind, and the choice must survive a restart. One combo in the window that already holds the display settings; it brightens the land and leaves water as it is - at draw time where the renderer runs Io's shaders (BL-1659), by a re-bake otherwise - so the player sees the effect on the map behind the window. Named Brightness (Ben, 2026-11-15).
 
 *Demanded by BL-1537 · `src/core/app.cpp`, `src/core/ground_layer.cpp`, `src/ui/ground_bake.cpp` · id `options_ground_lightness`*
 

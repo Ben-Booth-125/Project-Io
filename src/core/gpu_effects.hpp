@@ -27,6 +27,7 @@ enum class effect : int
     lens_wash,    ///< a lens wash from a per-tile colour table (BL-1656; uniforms: float4, x = edge band)
     border_band,  ///< the national border rule from an owner table (BL-1657; uniforms: float4)
     water_glint,  ///< moving light on open water from a water table (BL-1660; uniforms: float4)
+    ground_lift,  ///< the ground images with the land lift at draw time (BL-1659; a land table at slot 1; uniforms: float4 x2)
     count
 };
 
@@ -40,6 +41,8 @@ void shutdown();
 bool gpu_renderer();
 /// True when effect `e` loaded and may be used this frame.
 bool available(effect e);
+/// True when effect `e`'s shader loaded, though it may still wait on bind_textures.
+bool loaded(effect e);
 
 /// Record on `dl`: the draws after this use effect `e` until end(). No-op if
 /// unavailable (the caller should have drawn its fallback instead).

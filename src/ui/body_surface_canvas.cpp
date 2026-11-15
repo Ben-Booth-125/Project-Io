@@ -366,6 +366,10 @@ constexpr float k_lens_wash_sequential  = 0.54f;
 constexpr float k_lens_edge_band = 0.13f;
 /// BL-1660 (shader water): the open-water glint's peak alpha over the baked water.
 constexpr float k_water_glint_strength = 0.55f;
+/// BL-1659 (live grade shader): the band, in canonical units, over which the
+/// draw-time land lift fades across a land/water hex side (NR-1226 option D: the
+/// land weight is per tile, so the lift's shore is the hex side, softened).
+constexpr float k_lift_edge_band = 0.10f;
 /// The Resource lens's no-deposit ground: its ruled white wash (Ben, 2026-10-04,
 /// "the white wash should still exist") over the bake, paler than the fill path's
 /// 72% so the ground's forms survive under it while the deposits stay the only
@@ -4116,6 +4120,12 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     static bool water_table_failed = false;
     bool water_gpu = false;
     static std::vector<std::uint32_t> water_table;
+    // BL-1659 (live grade shader): which tiles the bake draws as land, for the
+    // ground_lift shader that applies the land lift at draw.
+    static bool lift_table_failed = false;
+    static SDL_Texture* lift_bound = nullptr; // the table the effect's state holds
+    bool lift_gpu = false;
+    static std::vector<std::uint32_t> lift_table;
     if (lens_gpu)
         lens_table.assign(static_cast<std::size_t>(gw) * static_cast<std::size_t>(gh), 0u);
     // The close-zoom seam (BL-1251 part 5): one segment per shared tile edge.
@@ -4294,7 +4304,38 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         // shader where the renderer can take one. `identity` draws exactly what SDL's
         // shader does - the seam's standing self-check until a ground pass replaces it.
         // Unavailable (the --verify software path), begin/end record nothing.
-        gfx::begin(dl, gfx::effect::identity);
+        // BL-1659 (live grade shader): with a land-lift level the bake did not
+        // carry, the images draw through ground_lift instead, which finds each
+        // pixel's tile from its screen position - the inverse of this frame's
+        // camera, squash included - and lifts it by its tile's land weight.
+        gfx::effect ground_fx = gfx::effect::identity;
+        if (lift_gpu)
+        {
+            SDL_Texture* const ltex = gfx::table_texture(3, gw, gh, lift_table.data());
+            if (ltex && ltex != lift_bound)
+                lift_bound = gfx::bind_textures(gfx::effect::ground_lift, &ltex, 1, false) ? ltex : nullptr;
+            if (!ltex || !lift_bound)
+            {
+                lift_table_failed = true; // this frame and every later one: unlifted
+                std::fprintf(stderr, "canvas: ground_lift table unavailable - the land lift is off\n");
+            }
+            else
+            {
+                const ImVec2 fb = ImGui::GetIO().DisplayFramebufferScale;
+                const float sy  = tilt_sy < 1.0f ? tilt_sy : 1.0f;
+                const float a0  = canon_to_screen(0.0f, 0.0f).y;
+                const float a1  = canon_to_screen(0.0f, 1.0f).y;
+                const float params[8] = {
+                    1.0f / (zoom * hex_size * fb.x),
+                    (grid_cx - view_origin.x / zoom) / hex_size,
+                    1.0f / (sy * fb.y * (a1 - a0)),
+                    (tilt_pivot * (1.0f - 1.0f / sy) - a0) / (a1 - a0),
+                    ui::ground::land_lift_gamma(gview.draw_lift), k_lift_edge_band, 0.0f, 0.0f };
+                gfx::set_uniforms(gfx::effect::ground_lift, params, sizeof params);
+                ground_fx = gfx::effect::ground_lift;
+            }
+        }
+        gfx::begin(dl, ground_fx);
         draw_ground_rect(gview.far);
         for (const ground_chunk_view& cv : gview.chunks)
             draw_ground_rect(cv);
@@ -4882,6 +4923,25 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 const tile_component* t = tile_rc(c, r);
                 if (t && placement_rules::is_water_tile(t->substrate))
                     water_table[ci] = IM_COL32(255, 0, 0, 255);
+            }
+    }
+    // BL-1659 (live grade shader): the land table - a tile the bake draws as land
+    // (seen, and not ocean, coast or lake: prepare_source's class), r = 255.
+    lift_gpu = ground_on && raster_ok && gview.draw_lift > 0 && !lift_table_failed
+            && gfx::loaded(gfx::effect::ground_lift) && gw > 0 && gh > 0;
+    if (lift_gpu)
+    {
+        lift_table.assign(static_cast<std::size_t>(gw) * static_cast<std::size_t>(gh), 0u);
+        for (int r = std::max(0, row_lo - 2); r <= std::min(gh - 1, row_hi + 2); ++r)
+            for (int c = 0; c < gw; ++c)
+            {
+                const std::size_t ci = static_cast<std::size_t>(r) * gw + c;
+                if (raster[ci] == null_entity || !survey_tile_visible(body.survey, gw, gh, c, r))
+                    continue;
+                const tile_component* t = tile_rc(c, r);
+                if (t && t->substrate != terrain_substrate::ocean && t->substrate != terrain_substrate::coast
+                      && t->substrate != terrain_substrate::lake)
+                    lift_table[ci] = IM_COL32(255, 0, 0, 255);
             }
     }
     border_gpu = draw_border_band && ground_on && raster_ok && !border_table_failed

@@ -3975,7 +3975,7 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 - App is in game.
 - Not while an ImGui widget owns the keyboard.
 
-**Expected output.** Toggles the Options window: a Display section (Resolution preset combo, Fullscreen, VSync), an Accessibility section (UI Scale), a Map section (Ground lightness), a live window-size readout, and Close. Every change applies live to the SDL window and persists to options.cfg immediately.
+**Expected output.** Toggles the Options window: a Display section (Resolution preset combo, Fullscreen, VSync), an Accessibility section (UI Scale), a Map section (Brightness), a live window-size readout, and Close. Every change applies live to the SDL window and persists to options.cfg immediately.
 
 **Reason to select.** To adjust display and UI-scale settings mid-session.
 
@@ -4122,7 +4122,7 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 
 **Reason to select.** To fit the window to the display or to a capture-friendly size.
 
-### `chrome.options_set_ground_lightness` — Options window, Map section, Ground lightness combo
+### `chrome.options_set_ground_lightness` — Options window, Map section, Brightness combo
 
 **Press.** Open the combo and click a level.
 
@@ -4133,9 +4133,9 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 **Valid when:**
 - Options window open.
 
-**Expected output.** The planetary map's land re-bakes at the chosen lightness over the next moments (the view first); water - sea, lakes and rivers - keeps its colour. Persists to options.cfg immediately. Sim, view and selection untouched.
+**Expected output.** The planetary map's land takes the chosen brightness: at once on the GPU renderer (drawn by the ground_lift shader, per tile, so a river's water on a land tile lifts with it), or re-baked over the next moments (the view first) on the software renderer, where water - sea, lakes and rivers - keeps its colour. Persists to options.cfg immediately. Sim, view and selection untouched.
 
-**Reason to select.** To make the map's land read lighter or darker on this display.
+**Reason to select.** To make the map's land read brighter or darker on this display.
 
 ### `chrome.options_vsync` — Options window, Display section
 

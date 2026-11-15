@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*108 entries — 55 open, 53 resolved.*
+*108 entries — 54 open, 54 resolved.*
 
 ---
 
@@ -556,21 +556,6 @@ Migration moves three months of its rate on the first month of each quarter, so 
 > **Recommendation:** Keep it; heads are conserved and the calendar rate holds.
 
 *Files: `src/world/economy_system.cpp`, `tools/verify/recruits_harness.cpp`*
-
-### NR-1226 — Live grade shader: a draw-time grade needs a per-pixel land weight the chunks no longer hold
-*question · raised 2026-11-14 · from BL-1659 (live grade shader), sprint 68*
-
-The baked grade lifts land and leaves water, so a draw-time grade must know, per pixel, how much of it is land. The opaque master chunks are held as RGB since BL-1311 (master chunk RAM), so alpha cannot carry that weight. The baked grade also runs before the unsharp pass and the shadows; a draw-time grade after them is close, not exact.
-
-**Why it matters.** Without a land weight the live grade lifts the sea too. Each way of carrying the weight costs ground memory that BL-1311 just won back.
-
-- A) Hold opaque chunks as RGBA again: +33% master memory, exact weight
-- B) A half-resolution one-byte land mask per chunk, sampled with filtering: about +8% of master memory, one extra texture bind, a softer shore in the grade
-- C) Keep the grade baked; the live lever stays a re-bake, and the item closes unbuilt
-
-> **Recommendation:** B. It keeps most of BL-1311's saving (a full-resolution byte would cost the same as RGBA), and the mask is reusable (shore fade, water glint). Accept that the grade then sits after unsharp, a visible but small change, with one re-bless.
-
-*Files: `src/ui/body_surface_canvas.cpp`, `docs/ui/RENDERING.md`*
 
 ### NR-1227 — Compressed ground textures: the GPU path can draw them, but measuring needs a vendored encoder
 *question · raised 2026-11-14 · from BL-1662 (compressed ground textures) spike, sprint 68*
@@ -1425,4 +1410,21 @@ The search now walks placement alone over 2 rounds (1 seed + 2 evaluations), ter
 > **RESOLVED.** Ben, 2026-11-13: option C. Rounds = 3 (72% of the six-round gain); slowest curated world 35.1 s against the 60 s budget. Digests re-pinned the same day after BL-1645 landed; the shape summary is in the pin comment (player_seed_sweep.cpp).
 
 *Files: `src/world/finish_campaign_world.cpp`, `tools/verify/player_seed_sweep.cpp`*
+
+### NR-1226 — Live grade shader: a draw-time grade needs a per-pixel land weight the chunks no longer hold
+*question · raised 2026-11-14 · from BL-1659 (live grade shader), sprint 68*
+
+The baked grade lifts land and leaves water, so a draw-time grade must know, per pixel, how much of it is land. The opaque master chunks are held as RGB since BL-1311 (master chunk RAM), so alpha cannot carry that weight. The baked grade also runs before the unsharp pass and the shadows; a draw-time grade after them is close, not exact.
+
+**Why it matters.** Without a land weight the live grade lifts the sea too. Each way of carrying the weight costs ground memory that BL-1311 just won back.
+
+- A) Hold opaque chunks as RGBA again: +33% master memory, exact weight
+- B) A half-resolution one-byte land mask per chunk, sampled with filtering: about +8% of master memory, one extra texture bind, a softer shore in the grade
+- C) Keep the grade baked; the live lever stays a re-bake, and the item closes unbuilt
+
+> **Recommendation:** B. It keeps most of BL-1311's saving (a full-resolution byte would cost the same as RGBA), and the mask is reusable (shore fade, water glint). Accept that the grade then sits after unsharp, a visible but small change, with one re-bless.
+
+> **RESOLVED.** Ben, 2026-11-15: try D (a per-tile land table, no stored weight), fall back to B (a half-resolution land mask) if the hex-side shore shows. D built: RENDERING.md § Art direction and palette, 'The lift at draw time'. Only the land lift moved to draw time; the near-future grade stays baked.
+
+*Files: `src/ui/body_surface_canvas.cpp`, `docs/ui/RENDERING.md`*
 

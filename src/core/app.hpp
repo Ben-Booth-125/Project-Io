@@ -551,7 +551,7 @@ private:
         int  window_h   = 1080;
         bool fullscreen = false;  ///< Borderless-desktop fullscreen.
         bool vsync      = true;
-        int  land_lift = ui::ground::k_land_lift_default; ///< BL-1537 ground lightness: 0 = off, 1-3.
+        int  land_lift = ui::ground::k_land_lift_default; ///< BL-1537 the Brightness setting (the land lift): 0 = off, 1-3.
     };
 
     /// Read options.cfg into m_settings; a missing/partial file leaves defaults.
