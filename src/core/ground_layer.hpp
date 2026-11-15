@@ -182,7 +182,7 @@ public:
     void set_land_lift(int level);
     int  land_lift() const { return m_land_lift; }
     /// BL-1659 (live grade shader): true when the canvas applies the land lift at
-    /// draw time (the ground_lift shader), so the canvas's chunks and far page bake
+    /// draw time (the ground shader), so the canvas's chunks and far page bake
     /// WITHOUT it and a change of level re-bakes nothing but the small neighbourhood
     /// page (which no shader draws, so it still bakes the lift). Set once, after the
     /// renderer exists; false on the software renderer, where the bake lifts as ever.

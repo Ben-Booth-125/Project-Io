@@ -443,9 +443,9 @@ int app::run(autostart_mode autostart)
     load_settings();
     apply_display_settings();
     m_ground.set_land_lift(m_settings.land_lift); // BL-1537: interactive only, like the rest
-    // BL-1659 (live grade shader): where the ground_lift shader loaded, the canvas
+    // BL-1659 (live grade shader): where the ground shader loaded, the canvas
     // lifts the land at draw and the bake stops carrying it.
-    m_ground.set_lift_at_draw(gfx::loaded(gfx::effect::ground_lift));
+    m_ground.set_lift_at_draw(gfx::loaded(gfx::effect::ground));
     apply_ui_scale();
 
     m_lua.load("scripts/init.lua");

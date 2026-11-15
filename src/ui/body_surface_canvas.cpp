@@ -370,6 +370,33 @@ constexpr float k_water_glint_strength = 0.55f;
 /// draw-time land lift fades across a land/water hex side (NR-1226 option D: the
 /// land weight is per tile, so the lift's shore is the hex side, softened).
 constexpr float k_lift_edge_band = 0.10f;
+/// BL-1658 (close-zoom detail layer; RENDERING.md § Level of detail): the detail
+/// texture's luminance swing at its extremes, its repeat in canonical units, and the
+/// drawn hex radii (px) it fades in over - none at the 24 px rung, full from 48 px.
+constexpr float k_detail_strength = 0.09f;
+constexpr float k_detail_period   = 2.0f;
+constexpr float k_detail_r_none   = 24.0f;
+constexpr float k_detail_r_full   = 48.0f;
+
+/// BL-1658: a tile's detail family (the channel of the detail texture): 0 vegetation,
+/// 1 forest, 2 arid, 3 rock - its cover first, its substrate when bare.
+int detail_family(const tile_component& t)
+{
+    switch (t.cover)
+    {
+    case terrain_cover::grass: case terrain_cover::scrub: case terrain_cover::marsh: return 0;
+    case terrain_cover::forest: return 1;
+    case terrain_cover::dunes: case terrain_cover::ash: case terrain_cover::salt: return 2;
+    case terrain_cover::snow: case terrain_cover::urban: return 3;
+    case terrain_cover::none: break;
+    }
+    switch (t.substrate)
+    {
+    case terrain_substrate::sedimentary: return 0;
+    case terrain_substrate::barren: return 2;
+    default: return 3;
+    }
+}
 /// The Resource lens's no-deposit ground: its ruled white wash (Ben, 2026-10-04,
 /// "the white wash should still exist") over the bake, paler than the fill path's
 /// 72% so the ground's forms survive under it while the deposits stay the only
@@ -4120,11 +4147,13 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     static bool water_table_failed = false;
     bool water_gpu = false;
     static std::vector<std::uint32_t> water_table;
-    // BL-1659 (live grade shader): which tiles the bake draws as land, for the
-    // ground_lift shader that applies the land lift at draw.
+    // BL-1659 (live grade shader) and BL-1658 (close-zoom detail layer): which tiles
+    // the bake draws as land, and each one's detail family, for the ground shader that
+    // applies the land lift and the detail at draw.
     static bool lift_table_failed = false;
     static SDL_Texture* lift_bound = nullptr; // the table the effect's state holds
     bool lift_gpu = false;
+    float detail_s = 0.0f;
     static std::vector<std::uint32_t> lift_table;
     if (lens_gpu)
         lens_table.assign(static_cast<std::size_t>(gw) * static_cast<std::size_t>(gh), 0u);
@@ -4304,20 +4333,25 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         // shader where the renderer can take one. `identity` draws exactly what SDL's
         // shader does - the seam's standing self-check until a ground pass replaces it.
         // Unavailable (the --verify software path), begin/end record nothing.
-        // BL-1659 (live grade shader): with a land-lift level the bake did not
-        // carry, the images draw through ground_lift instead, which finds each
-        // pixel's tile from its screen position - the inverse of this frame's
-        // camera, squash included - and lifts it by its tile's land weight.
+        // BL-1659 (live grade shader), BL-1658 (close-zoom detail layer): with a
+        // land-lift level the bake did not carry, or a close rung's detail, the
+        // images draw through the ground shader instead, which finds each pixel's
+        // tile from its screen position - the inverse of this frame's camera, squash
+        // included - and modulates and lifts it by its tile's land weight.
         gfx::effect ground_fx = gfx::effect::identity;
         if (lift_gpu)
         {
             SDL_Texture* const ltex = gfx::table_texture(3, gw, gh, lift_table.data());
-            if (ltex && ltex != lift_bound)
-                lift_bound = gfx::bind_textures(gfx::effect::ground_lift, &ltex, 1, false) ? ltex : nullptr;
-            if (!ltex || !lift_bound)
+            SDL_Texture* const dtex = gfx::detail_texture();
+            if (ltex && dtex && ltex != lift_bound)
             {
-                lift_table_failed = true; // this frame and every later one: unlifted
-                std::fprintf(stderr, "canvas: ground_lift table unavailable - the land lift is off\n");
+                SDL_Texture* const both[2] = { ltex, dtex };
+                lift_bound = gfx::bind_textures(gfx::effect::ground, both, 2, true) ? ltex : nullptr;
+            }
+            if (!ltex || !dtex || !lift_bound)
+            {
+                lift_table_failed = true; // this frame and every later one: no lift, no detail
+                std::fprintf(stderr, "canvas: ground shader tables unavailable - no draw-time lift or detail\n");
             }
             else
             {
@@ -4330,9 +4364,10 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                     (grid_cx - view_origin.x / zoom) / hex_size,
                     1.0f / (sy * fb.y * (a1 - a0)),
                     (tilt_pivot * (1.0f - 1.0f / sy) - a0) / (a1 - a0),
-                    ui::ground::land_lift_gamma(gview.draw_lift), k_lift_edge_band, 0.0f, 0.0f };
-                gfx::set_uniforms(gfx::effect::ground_lift, params, sizeof params);
-                ground_fx = gfx::effect::ground_lift;
+                    ui::ground::land_lift_gamma(gview.draw_lift), k_lift_edge_band,
+                    detail_s, k_detail_period };
+                gfx::set_uniforms(gfx::effect::ground, params, sizeof params);
+                ground_fx = gfx::effect::ground;
             }
         }
         gfx::begin(dl, ground_fx);
@@ -4926,9 +4961,16 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             }
     }
     // BL-1659 (live grade shader): the land table - a tile the bake draws as land
-    // (seen, and not ocean, coast or lake: prepare_source's class), r = 255.
-    lift_gpu = ground_on && raster_ok && gview.draw_lift > 0 && !lift_table_failed
-            && gfx::loaded(gfx::effect::ground_lift) && gw > 0 && gh > 0;
+    // (seen, and not ocean, coast or lake: prepare_source's class), r = 255; and
+    // BL-1658 (close-zoom detail layer): g = its detail family. The detail fades in
+    // from the 24 px rung to the 48 px rung, so a zoom glide brings it in smoothly.
+    {
+        const float r_px = hex_size * zoom;
+        const float k = std::clamp((r_px - k_detail_r_none) / (k_detail_r_full - k_detail_r_none), 0.0f, 1.0f);
+        detail_s = k_detail_strength * k * k * (3.0f - 2.0f * k);
+    }
+    lift_gpu = ground_on && raster_ok && (gview.draw_lift > 0 || detail_s > 0.0f) && !lift_table_failed
+            && gfx::loaded(gfx::effect::ground) && gw > 0 && gh > 0;
     if (lift_gpu)
     {
         lift_table.assign(static_cast<std::size_t>(gw) * static_cast<std::size_t>(gh), 0u);
@@ -4941,7 +4983,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 const tile_component* t = tile_rc(c, r);
                 if (t && t->substrate != terrain_substrate::ocean && t->substrate != terrain_substrate::coast
                       && t->substrate != terrain_substrate::lake)
-                    lift_table[ci] = IM_COL32(255, 0, 0, 255);
+                    lift_table[ci] = IM_COL32(255, detail_family(*t), 0, 255);
             }
     }
     border_gpu = draw_border_band && ground_on && raster_ok && !border_table_failed

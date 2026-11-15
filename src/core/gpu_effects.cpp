@@ -3,7 +3,12 @@
 #include <SDL3/SDL.h>
 #include <imgui.h>
 
+#include "ui/png_decode.hpp"
+
 #include <array>
+#include <fstream>
+#include <iterator>
+#include <string>
 #include <cstdint>
 #include <cstring>
 #include <vector>
@@ -16,7 +21,7 @@
 #include "shaders/lens_wash.dxil.h"
 #include "shaders/border_band.dxil.h"
 #include "shaders/water_glint.dxil.h"
-#include "shaders/ground_lift.dxil.h"
+#include "shaders/ground.dxil.h"
 #endif
 
 namespace gfx {
@@ -42,7 +47,7 @@ const std::array<effect_def, static_cast<std::size_t>(effect::count)> k_defs = {
     { "lens_wash", IO_DXIL(lens_wash), 0, 1 },
     { "border_band", IO_DXIL(border_band), 0, 1 },
     { "water_glint", IO_DXIL(water_glint), 0, 1 },
-    { "ground_lift", IO_DXIL(ground_lift), 1, 1 },
+    { "ground", IO_DXIL(ground), 2, 1 },
 }};
 
 struct effect_slot
@@ -61,6 +66,9 @@ struct table_slot
     std::vector<std::uint32_t> last; ///< what was last uploaded (skip an equal upload)
 };
 std::array<table_slot, 4> g_tables;
+
+SDL_Texture* g_detail = nullptr;
+bool         g_detail_tried = false;
 
 SDL_Renderer*  g_renderer = nullptr;
 SDL_GPUDevice* g_device   = nullptr;
@@ -179,6 +187,9 @@ void shutdown()
         if (t.tex) SDL_DestroyTexture(t.tex);
         t = table_slot{};
     }
+    if (g_detail) SDL_DestroyTexture(g_detail);
+    g_detail = nullptr;
+    g_detail_tried = false;
     g_renderer = nullptr;
     g_device   = nullptr;
 }
@@ -285,6 +296,56 @@ SDL_Texture* table_texture(int slot_i, int w, int h, const std::uint32_t* px)
         t.last.assign(px, px + n);
     }
     return t.tex;
+}
+
+SDL_Texture* detail_texture()
+{
+    if (g_detail || g_detail_tried || !g_device)
+        return g_detail;
+    g_detail_tried = true;
+    static const char* const k_files[4] = { "vegetation", "forest", "arid", "rock" };
+    int w = 0, h = 0;
+    std::vector<std::uint8_t> packed;
+    for (int ch = 0; ch < 4; ++ch)
+    {
+        const std::string path = std::string("assets/detail/") + k_files[ch] + ".png";
+        std::ifstream f(path, std::ios::binary);
+        if (!f)
+        {
+            SDL_Log("gpu_effects: no detail texture at %s - no close-zoom detail", path.c_str());
+            return nullptr;
+        }
+        const std::vector<std::uint8_t> bytes{std::istreambuf_iterator<char>(f),
+                                              std::istreambuf_iterator<char>()};
+        int fw = 0, fh = 0;
+        std::vector<std::uint8_t> rgba;
+        std::string err;
+        if (!ui::png_decode_rgba(bytes, fw, fh, rgba, err) || (ch > 0 && (fw != w || fh != h)))
+        {
+            SDL_Log("gpu_effects: %s not used: %s", path.c_str(),
+                    err.empty() ? "its size differs from the others" : err.c_str());
+            return nullptr;
+        }
+        if (ch == 0)
+        {
+            w = fw;
+            h = fh;
+            packed.assign(static_cast<std::size_t>(w) * h * 4u, 0u);
+        }
+        for (std::size_t i = 0; i < static_cast<std::size_t>(w) * h; ++i)
+            packed[i * 4u + static_cast<std::size_t>(ch)] = rgba[i * 4u]; // grey: r = g = b
+    }
+    SDL_Texture* t = SDL_CreateTexture(g_renderer, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STATIC, w, h);
+    if (!t)
+    {
+        SDL_Log("gpu_effects: detail texture (%dx%d) failed: %s", w, h, SDL_GetError());
+        return nullptr;
+    }
+    SDL_SetTextureScaleMode(t, SDL_SCALEMODE_LINEAR);
+    SDL_SetTextureBlendMode(t, SDL_BLENDMODE_NONE);
+    SDL_UpdateTexture(t, nullptr, packed.data(), w * 4);
+    g_detail = t;
+    return g_detail;
 }
 
 } // namespace gfx

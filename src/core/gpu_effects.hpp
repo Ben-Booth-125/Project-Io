@@ -27,7 +27,8 @@ enum class effect : int
     lens_wash,    ///< a lens wash from a per-tile colour table (BL-1656; uniforms: float4, x = edge band)
     border_band,  ///< the national border rule from an owner table (BL-1657; uniforms: float4)
     water_glint,  ///< moving light on open water from a water table (BL-1660; uniforms: float4)
-    ground_lift,  ///< the ground images with the land lift at draw time (BL-1659; a land table at slot 1; uniforms: float4 x2)
+    ground,       ///< the ground images with the land lift (BL-1659) and close-zoom detail (BL-1658) at draw
+                  ///< time; a tile table at slot 1, the detail texture at slot 2; uniforms: float4 x2
     count
 };
 
@@ -64,5 +65,11 @@ bool bind_textures(effect e, SDL_Texture* const* textures, int n, bool linear);
 /// re-uploaded only when `px` differs from the last upload, so a table that does not
 /// change costs one compare a frame. Null without the GPU renderer.
 SDL_Texture* table_texture(int slot, int w, int h, const std::uint32_t* px);
+
+/// BL-1658 (close-zoom detail layer): the four detail textures (assets/detail/
+/// vegetation, forest, arid, rock .png, greyscale, all one size) packed into the r, g,
+/// b, a channels of one linear, repeating texture. Loaded on first call; null without
+/// the GPU renderer or when a file is missing or malformed (logged once).
+SDL_Texture* detail_texture();
 
 } // namespace gfx

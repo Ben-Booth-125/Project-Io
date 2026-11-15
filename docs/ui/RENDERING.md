@@ -47,10 +47,11 @@ dramatic landforms and rivers leave the canvas's vector layer for the bake too; 
 is **never magnified** at any rung (§ Level of detail).
 
 Ruled by Ben, 2026-10-09, after walking the sprint 51 build: the ground is viewed at **one
-angle** (22.5°) at every rung, and **zooming does not add detail** — one 96 px/hex master
+angle** (22.5°) at every rung, and **zooming bakes no new detail** — one 96 px/hex master
 per body, pre-baked during generation and held in RAM, with every other zoom a downsample
 of it (§ Level of detail; § One angle). This supersedes the never-magnify tier ladder and
-the stepped tilt.
+the stepped tilt. The two closest rungs add a draw-time detail texture over it (Ben,
+2026-11-15, § Level of detail).
 
 ---
 
@@ -677,7 +678,8 @@ step is instant, so a capture never lands mid-glide.
 *"the current lag is very off putting… zooming doesn't add more detail, arguably the
 biggest fix even if we keep a high resolution"*). This supersedes the per-rung bake
 tiers of 2026-09-01 and the never-magnify tier chooser of 2026-10-08: a zoom step had
-been a fresh, expensive bake, and that bake was the lag.
+been a fresh, expensive bake, and that bake was the lag. The BAKE still adds nothing with
+zoom; the two closest rungs add a draw-time detail texture (Ben, 2026-11-15, below).
 
 - **One master per body.** The ground is baked ONCE per body, at **96 px per hex** (Ben, 2026-11-05, overturning 128 px, Ben,
   2026-10-10: "simply up the resolution in each tile"), its levels halving from there, at
@@ -687,7 +689,7 @@ been a fresh, expensive bake, and that bake was the lag.
 - **Every other zoom is a downsample.** A **mip chain** — 48, 24, 12 and 6 px per hex
   — is box-downsampled from the master, chunk by chunk, in milliseconds. A rung
   draws the level at or above its drawn radius, minified by at most 2:1, so no step
-  shimmers (`SDL_Renderer` has no mipmaps; the chain is ours). Detail never changes
+  shimmers (`SDL_Renderer` has no mipmaps; the chain is ours). The baked detail never changes
   with zoom; only scale does. **The downsample averages in linear light** (Ben,
   2026-11-14, BL-1652 (gamma-correct mips)): each sRGB byte is decoded through a fixed
   table, the four samples averaged by alpha weight, and the mean re-encoded through the
@@ -719,6 +721,30 @@ been a fresh, expensive bake, and that bake was the lag.
   — the one rung that reads the master near 1:1 — would gain from a 2× bake, at four
   times the bake cost. A 2× master is taken only if the pool's measured pre-bake still
   fits the target in TECH_FOUNDATIONS.md § Target hardware.
+- **The two closest rungs add detail at draw time (Ben, 2026-11-15, BL-1658 (close-zoom
+  detail layer); overturning "zooming does not add detail" for these two rungs, whose
+  ground for that ruling was the lag of a fresh bake per rung).** Where the renderer runs
+  Io's fragment shaders, the ground shader modulates the land's **luminance only**, by a
+  tiling **detail texture** chosen per terrain family, so close zoom stays crisp past the
+  master's 96 px per hex (and past the ~2x magnification of a 4K-height window). Nothing is
+  baked: the bake and its chain are unchanged, and the software renderer (every `--verify`
+  capture) draws no detail.
+  - **Four families**, one greyscale texture each, packed into the four channels of one
+    texture: **vegetation** (grass, scrub, marsh; bare sedimentary ground), **forest**,
+    **arid** (dunes, ash, salt; bare barren ground) and **rock** (snow, urban; bare rocky,
+    volcanic, metallic, regolith and icy ground). A tile's family is its cover first, its substrate
+    when bare. Water and the survey lock fill take none.
+  - **The textures are generated files**, `assets/detail/<family>.png`, 256 px square,
+    seamless, written by `tools/art/gen_detail_textures.py` from a fixed seed. They are
+    ordinary art files: repainting one by hand replaces the generator's output for it.
+  - **Strength: ±9% of luminance** at its extremes (each texture is normalised so its
+    99th-percentile deviation is the full swing), at the **48 and 96 px rungs**, fading
+    to none from 48 down to 24 px drawn radius, so a zoom glide brings it in smoothly.
+  - **World-locked:** the texture repeats every 2 canonical units (one hex circumradius
+    is 1), anchored to the ground through the same inverse camera as the land lift, so
+    it pans and zooms with the map. The family is per tile, softened across a hex side
+    over the lift's band; it touches everything drawn on land - trees, crags, painted
+    buildings - which at this strength reads as surface grain, not pattern.
 - **No rung magnifies at the reference window (Ben, 2026-11-05)**: the top rung is lowered to
   ~96 px, drawn from the 96 px master at about 1:1. A 4K-height window magnifies the top rung
   ~2× (the 2026-10-10 ruling accepted ~1.7× for the prototype, choosing 128 over 96 and over

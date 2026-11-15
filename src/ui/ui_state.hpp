@@ -1337,7 +1337,7 @@ struct ground_view
     ground_chunk_view neigh;
     entity_id neigh_tile = null_entity;
     /// BL-1659 (live grade shader): the land-lift level the canvas applies at draw
-    /// (the ground_lift shader); 0 when the bake carries the lift, or it is off.
+    /// (the ground shader); 0 when the bake carries the lift, or it is off.
     int draw_lift = 0;
 };
 
