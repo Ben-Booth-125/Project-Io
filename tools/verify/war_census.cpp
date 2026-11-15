@@ -24,6 +24,7 @@
 #include "scripting/lua_state.hpp"
 #include "world/campaign_settle.hpp"
 #include "world/corp_ai.hpp"
+#include "world/fronts.hpp"
 #include "world/orbital_system.hpp"
 #include "world/spawn_seat.hpp"
 #include "world/survey_system.hpp"
@@ -125,6 +126,8 @@ seed_result run_seed(std::uint32_t seed, int last_tick, bool print_trace)
 
     std::vector<war_ai_trace_row> trace;
     war_ai_trace_sink() = &trace;
+    rival_march_tally march_tally; // Ben, 2026-11-15: pre-war staging, counted
+    rival_march_tally_sink() = &march_tally;
 
     for (int step = 0; step < k_campaign_settle_ticks; ++step)
         (void)run_settle_tick(w, reg, step, /*day_tick=*/0, /*spectating=*/true);
@@ -137,7 +140,7 @@ seed_result run_seed(std::uint32_t seed, int last_tick, bool print_trace)
     const entity_id player = player_nation(w);
     r.nations = static_cast<int>(w.nations.size());
 
-    constexpr int k_days = 90;
+    constexpr int k_days = ::k_econ_tick_days; // a month (was 90, the quarter tick)
     std::set<std::pair<entity_id, entity_id>> embargo_prev = w.nation_embargoes; // BL-1481
     std::set<entity_id> rival_bunkers_seen, player_bunkers_flagged; // BL-1426
     std::size_t occupied_max = 0, push_orders_max = 0; // BL-1502
@@ -149,6 +152,58 @@ seed_result run_seed(std::uint32_t seed, int last_tick, bool print_trace)
         w.current_day_tick = k * k_days;
         (void)run_settle_tick(w, reg, step, k * k_days, /*spectating=*/false);
         r.at_war_max = std::max(r.at_war_max, nations_at_war(w));
+        // Ben, 2026-11-14 ("A war is declared only on a supplied front"): mid-year, what each
+        // rival's fronts would offer a declaration - coverage, fed edge, edge with all units.
+        if ((step - k_campaign_settle_ticks) % 12 == 6)
+        {
+            int fronts_n = 0, cover_ok = 0, fed_ok = 0, all_ok = 0, both_ok = 0;
+            std::vector<float> ratio;
+            for (const auto& [nid, nc] : w.nations)
+            {
+                if (nid == player || nc.ended) continue;
+                for (const war_front_reading& fr : read_war_fronts(w, reg, nid))
+                {
+                    if (fr.front_tiles <= 0) continue;
+                    ++fronts_n;
+                    const float q = static_cast<float>(fr.fed_on_front) / static_cast<float>(fr.front_tiles);
+                    ratio.push_back(q);
+                    cover_ok += q >= 0.10f ? 1 : 0;
+                    fed_ok += fr.edge_fed >= 0.33f ? 1 : 0;
+                    all_ok += fr.edge_all >= 0.33f ? 1 : 0;
+                    both_ok += (q >= 0.10f && fr.edge_fed >= 0.33f) ? 1 : 0;
+                }
+            }
+            // Where rival units stand in peace, and how much of each front the network feeds.
+            {
+                int units = 0, home = 0, defend = 0, on_front = 0, tiles = 0, fed_t = 0, fronts_fed = 0;
+                for (const auto& [nid, nc] : w.nations)
+                {
+                    if (nid == player || nc.ended) continue;
+                    const uint32_t cap = nc.capital_tile != null_entity ? w.provinces.province_of(nc.capital_tile) : 0u;
+                    for (const auto& [uid, u] : w.units)
+                    {
+                        if (u.owner != nid || u.count <= 0 || u.position == null_entity) continue;
+                        ++units;
+                        home += (cap != 0 && w.provinces.province_of(u.position) == cap) ? 1 : 0;
+                        defend += u.defend_province != no_province ? 1 : 0;
+                        on_front += u.front != null_entity ? 1 : 0;
+                    }
+                    for (const war_front_reading& fr : read_war_fronts(w, reg, nid))
+                    {
+                        tiles += fr.front_tiles; fed_t += fr.fed_tiles;
+                        fronts_fed += (fr.front_tiles > 0 && fr.fed_tiles * 10 >= fr.front_tiles) ? 1 : 0;
+                    }
+                }
+                std::printf("UNITYEAR seed=%u year=%d units=%d home=%d defend=%d on_front=%d front_tiles=%d fed_tiles=%d fronts_fed10=%d"
+                            " stage_motive=%lld stage_fronts=%lld released=%lld staged=%lld\n",
+                            seed, (step - k_campaign_settle_ticks) / 12 + 1, units, home, defend, on_front, tiles, fed_t, fronts_fed,
+                            march_tally.stage_motive, march_tally.stage_fronts, march_tally.stage_released, march_tally.staged);
+            }
+            std::sort(ratio.begin(), ratio.end());
+            const auto pc = [&](double f) { return ratio.empty() ? 0.0 : static_cast<double>(ratio[static_cast<std::size_t>(f * (ratio.size() - 1))]); };
+            std::printf("FRONTYEAR seed=%u year=%d fronts=%d edge_all_ok=%d edge_fed_ok=%d cover_ok=%d both_ok=%d cover_p50=%.3f cover_p90=%.3f cover_max=%.3f\n",
+                        seed, (step - k_campaign_settle_ticks) / 12 + 1, fronts_n, all_ok, fed_ok, cover_ok, both_ok, pc(0.5), pc(0.9), pc(1.0));
+        }
         // BL-1481 (NR-1117): the rivals' embargoes, step by step - enactments and repeals.
         for (const auto& e : w.nation_embargoes)
             if (embargo_prev.count(e) == 0)
@@ -242,6 +297,24 @@ seed_result run_seed(std::uint32_t seed, int last_tick, bool print_trace)
         std::printf("  FAIL  seed %u: %d embargo(es) enacted for the player's nation\n", seed, r.embargo_by_player);
         player_clean = false;
     }
+    // Wars over time (Ben, 2026-11-14: "measure wars over time"): per live year, the
+    // declarations made and the best declaration utility weighed (how near a war came).
+    {
+        const int years = std::max(1, (last_tick - k_campaign_settle_ticks) / 12 + 1);
+        std::vector<int> dec(static_cast<std::size_t>(years), 0);
+        std::vector<float> best(static_cast<std::size_t>(years), -1e9f);
+        for (const war_ai_trace_row& t : trace)
+        {
+            const int y = std::clamp((t.tick - k_campaign_settle_ticks) / 12, 0, years - 1);
+            if (t.choice == war_ai_choice::declare && t.applied) ++dec[static_cast<std::size_t>(y)];
+            if (t.choice == war_ai_choice::candidate || t.choice == war_ai_choice::declare)
+                best[static_cast<std::size_t>(y)] = std::max(best[static_cast<std::size_t>(y)], t.utility);
+        }
+        std::printf("WARYEAR seed=%u", seed);
+        for (int y = 0; y < years; ++y)
+            std::printf(" y%d=%d/%+.2f", y + 1, dec[static_cast<std::size_t>(y)], static_cast<double>(best[static_cast<std::size_t>(y)]));
+        std::printf("\n");
+    }
     for (const war_ai_trace_row& t : trace)
         if (print_trace || t.choice != war_ai_choice::candidate)
             std::printf("    t%-3d %-9s %4u -> %4u u %+.3f g %.3f a %.3f s %+.3f p %.2f x %.1f goals %d%s\n",
@@ -285,6 +358,7 @@ seed_result run_seed(std::uint32_t seed, int last_tick, bool print_trace)
     r.trace     = std::move(trace);
     if (!settle_clean || !player_clean)
         r.nations = -r.nations; // flagged for the verdict
+    rival_march_tally_sink() = nullptr;
     return r;
 }
 

@@ -2330,13 +2330,21 @@ int main()
         waged.set_military(mil);
     }
     const std::map<entity_id, std::set<entity_id>> no_borders;
+    // The income rows read the income term alone. Since a surplus raises the target (Ben,
+    // 2026-11-14; MILITARY.md § Force sizing), each return also carries a bill that, twelve
+    // months over, commits the whole treasury - with the income raised by the same bill, so the
+    // NET income these rows name is unchanged and the surplus is zero. `give_surplus` below is
+    // the row that reads the surplus term.
     const auto give_income = [](fixture& f, entity_id n, float income) {
-        f.w.nations.at(n).returns.clear();
+        nation_component& nc = f.w.nations.at(n);
+        nc.returns.clear();
+        const float bill = nc.treasury / 12.0f * 1.01f;
         for (int i = 0; i < 4; ++i)
         {
             quarterly_return q;
-            q.income = income;
-            f.w.nations.at(n).returns.push_back(q);
+            q.income = income + bill;
+            q.expenditure = bill;
+            nc.returns.push_back(q);
         }
     };
     const auto ships_of = [](const fixture& f, entity_id n) {
@@ -2353,9 +2361,21 @@ int main()
     std::printf("\nV2 - force sizing: income, peace, the player, the design\n");
     {
         fixture f; build(f);
+        {
+            // V2h: no income, no bill - the whole 1,000,000 treasury is surplus, and it alone
+            // raises the target by surplus / k_force_surplus_months and hires.
+            fixture s; build(s);
+            const force_reading r = read_nation_force(s.w, waged, s.b, no_borders);
+            score_nation_force(s.w, waged, s.b, 1, no_borders);
+            check(r.income == 0.0f && r.surplus > 0.0f
+                      && std::fabs(r.target - r.surplus / k_force_surplus_months) <= 1.0f && ships_of(s, s.b) == 1,
+                  "V2h with no income but a surplus a rival's target is surplus / " + std::to_string(k_force_surplus_months)
+                      + " months (" + std::to_string(r.target) + "), and it hires");
+        }
+        give_income(f, f.b, 0.0f);
         const std::string before = to_bytes(f.w);
         size_rounds(f, f.b, 3);
-        check(to_bytes(f.w) == before, "V2 with no income a rival hires nothing");
+        check(to_bytes(f.w) == before, "V2 with no income (and no surplus) a rival hires nothing");
         give_income(f, f.b, 2000.0f);
         give_income(f, f.a, 2000.0f);
         const std::string held = to_bytes(f.w);

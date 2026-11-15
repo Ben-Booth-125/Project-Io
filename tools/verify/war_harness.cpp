@@ -19,6 +19,7 @@
 #include "world/budget_system.hpp" // fix round: apply_budget files the conqueror's return
 #include "world/components.hpp"
 #include "world/corp_ai.hpp"      // BL-1461: score_nation_war, war_ai_trace_sink
+#include "world/campaign_settle.hpp" // k_campaign_settle_ticks (RW7f: live play)
 #include "world/corp_command.hpp"
 #include "world/economy_system.hpp"
 #include "world/embargo.hpp"      // BL-1562: set_embargo refuses an ended nation
@@ -1547,6 +1548,35 @@ int main()
             unit_component uc{}; uc.position = tile; uc.owner = owner; uc.count = men; uc.establishment = men;
             w.units[u] = uc;
         };
+        // A rival declares only on a SUPPLIED front (RELATIONS.md § Who declares, Ben 2026-11-14):
+        // fed units covering a share of the front's tiles, the 2:1 edge read on fed strength.
+        // Stands @p men split over every @p stride-th tile of @p owner's span toward @p toward,
+        // each with a logistics hub under it when @p hubbed (a hub feeds its own tile).
+        const auto stand_front = [](world& w, entity_id owner, entity_id toward, int men, int stride, bool hubbed) {
+            std::vector<entity_id> span;
+            for (const front& fr : derive_fronts(w, owner))
+                if (fr.neighbour == toward) span.insert(span.end(), fr.span.begin(), fr.span.end());
+            std::vector<entity_id> posts;
+            for (std::size_t i = 0; i < span.size(); i += static_cast<std::size_t>(stride)) posts.push_back(span[i]);
+            // A hub feeds only on a chain back to the capital (NR-1057). The fixture has no
+            // roads, so a supplied front stands its capital on the middle post: the hubs along
+            // the span chain from there.
+            if (hubbed && !posts.empty()) w.nations.at(owner).capital_tile = posts[posts.size() / 2];
+            for (const entity_id t : posts)
+            {
+                const entity_id u = w.create_entity();
+                unit_component uc{}; uc.position = t; uc.owner = owner;
+                uc.count = men / static_cast<int>(posts.size()); uc.establishment = uc.count;
+                w.units[u] = uc;
+                if (hubbed)
+                {
+                    const entity_id b = w.create_entity();
+                    building_component bc{}; bc.type = building_type::inland_logistics_hub; bc.tile = t;
+                    w.buildings[b] = bc;
+                }
+            }
+            return span.size();
+        };
         const auto grudge = [&sp](world& w, entity_id observer, entity_id subject, float magnitude) {
             apply_sentiment_events(w.sentiment, sp,
                                    { sentiment_event{ observer, subject, sentiment_factor_kind::hostility_declared,
@@ -1674,7 +1704,76 @@ int main()
             world& w = f.w;
             w.current_econ_tick = 20;
             grudge(w, f.A, f.B, 2.0f);
-            add_unit(w, f.A, front_tile(w, f.A, f.B), 2000);
+            {
+                // RW7d: the same motive and men, but nothing feeds them - no declaration.
+                world unfed = w;
+                (void)stand_front(unfed, f.A, f.B, 2000, 4, false);
+                trace.clear();
+                const snap s = take(unfed);
+                score_nation_war(unfed, reg, f.A, 20);
+                check(same(s, unfed), "RW7d the same motive and men on an UNSUPPLIED front: no declaration");
+            }
+            {
+                // RW7e: fed, but one post on the whole span - under a tenth of its tiles.
+                world thin = w;
+                const std::size_t span = stand_front(thin, f.A, f.B, 2000, 1000, true);
+                trace.clear();
+                const snap s = take(thin);
+                score_nation_war(thin, reg, f.A, 20);
+                check(span > 10 && same(s, thin),
+                      "RW7e one fed post on a " + std::to_string(span) + "-tile front (under a tenth covered): no declaration");
+            }
+            {
+                // RW7f (Ben, 2026-11-15, pre-war staging): the same motive and a fed front, but every
+                // unit posted home defending the capital province - live play stages some of them
+                // onto the front, keeping half home, and none onto a priced tile.
+                world st = w;
+                st.current_econ_tick = k_campaign_settle_ticks + 4;
+                (void)stand_front(st, f.A, f.B, 2000, 2, true);
+                const entity_id cap_tile = st.nations.at(f.A).capital_tile;
+                const uint32_t cap = st.provinces.province_of(cap_tile);
+                int posted = 0;
+                for (auto& [uid, u] : st.units)
+                    if (u.owner == f.A) { u.position = cap_tile; u.defend_province = cap; ++posted; }
+                rival_march_tally tally;
+                rival_march_tally_sink() = &tally;
+                score_nation_fronts_for_harness(st, reg, f.A, st.current_econ_tick);
+                rival_march_tally_sink() = nullptr;
+                int on_front = 0, still_home = 0;
+                for (const auto& [uid, u] : st.units)
+                    if (u.owner == f.A)
+                    {
+                        on_front += u.front != null_entity ? 1 : 0;
+                        still_home += u.defend_province == cap ? 1 : 0;
+                    }
+                std::printf("  [info] RW7f posted %d, released %lld, staged %lld, on a front %d, still home %d\n",
+                            posted, tally.stage_released, tally.staged, on_front, still_home);
+                check(tally.stage_released > 0 && on_front > 0 && on_front == tally.staged
+                          && 2 * still_home >= posted && !at_war(st, f.A, f.B),
+                      "RW7f with a motive and a fed front, live play stages capital defenders onto it (half kept home), declaring nothing");
+                // And with no motive, nothing leaves home.
+                world calm = w;
+                calm.sentiment = sentiment_table{};
+                calm.current_econ_tick = k_campaign_settle_ticks + 4;
+                (void)stand_front(calm, f.A, f.B, 2000, 2, true);
+                const entity_id ct = calm.nations.at(f.A).capital_tile;
+                const uint32_t cp = calm.provinces.province_of(ct);
+                for (auto& [uid, u] : calm.units)
+                    if (u.owner == f.A) { u.position = ct; u.defend_province = cp; }
+                score_nation_fronts_for_harness(calm, reg, f.A, calm.current_econ_tick);
+                int left = 0;
+                for (const auto& [uid, u] : calm.units)
+                    left += (u.owner == f.A && u.defend_province != cp) ? 1 : 0;
+                check(left == 0, "RW7g with no motive, no capital defender leaves its post");
+            }
+            (void)stand_front(w, f.A, f.B, 2000, 2, true); // a fed post on every second tile
+            {
+                world probe = w;
+                for (const war_front_reading& r : read_war_fronts(probe, reg, f.A))
+                    std::printf("  [info] RW7 front toward %llu: %d tiles, %d fed on it, edge all %.2f fed %.2f\n",
+                                static_cast<unsigned long long>(r.neighbour), r.front_tiles, r.fed_on_front,
+                                static_cast<double>(r.edge_all), static_cast<double>(r.edge_fed));
+            }
             {
                 world no_edge = w;
                 for (auto& [uid, u] : no_edge.units) u.count = 0; // no force: no edge on the front
@@ -1731,8 +1830,8 @@ int main()
                 w.current_econ_tick = 20;
                 grudge(w, f.A, f.B, 2.0f);
                 grudge(w, f.C, f.D, 1.0f);
-                add_unit(w, f.A, front_tile(w, f.A, f.B), 2000);
-                add_unit(w, f.C, front_tile(w, f.C, f.D), 1500);
+                (void)stand_front(w, f.A, f.B, 2000, 4, true); // supplied fronts (Ben, 2026-11-14)
+                (void)stand_front(w, f.C, f.D, 1500, 4, true);
                 trace.clear();
                 for (int t = 20; t < 40; ++t)
                 {

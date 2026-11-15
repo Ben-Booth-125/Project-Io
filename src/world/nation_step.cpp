@@ -202,8 +202,7 @@ void run_nation_step(world& w, const recipe_registry& reg, economy_report& repor
     // already covers the next pick takes it (at most the quarter's bound, spread
     // over its months). BL-1642: the idle-queue pick is ONE a quarter, as ruled -
     // taken on the quarter's last month - so a quarter's picks stay 1 + 8.
-    if (is_quarter_tick(econ_tick))
-        run_nation_research_ai(w, reg, spectating, &report.research_picks);
+    run_nation_research_ai(w, reg, spectating, &report.research_picks); // Ben, 2026-11-14: monthly
     advance_research(w, reg.research(), &report.research);
     run_nation_research_repick(w, reg, spectating, &report.research_picks);
 
@@ -214,15 +213,13 @@ void run_nation_step(world& w, const recipe_registry& reg, economy_report& repor
     // quarter's). Never the player's nation; nothing in the settle.
     // BL-1642: "at most one a quarter" holds on the monthly tick - the pick runs on
     // the quarter's last month only.
-    if (is_quarter_tick(econ_tick))
-        run_nation_space_ai(w, reg, &report.space_picks);
+    run_nation_space_ai(w, reg, &report.space_picks); // Ben, 2026-11-14: monthly
     // ---- 6a'. The far-space pick (BL-1608, the same grant) — the sibling faculty:
     // at most one far-space verb per non-player nation (designs, raises, moves,
     // the base programme, bombard), after the near pick so a station core
     // launched this quarter is already the world it reads. Never the player's.
     // BL-1642: one a quarter, on the quarter's last month, as the near pick.
-    if (is_quarter_tick(econ_tick))
-        run_nation_far_space_ai(w, reg, &report.far_space_picks);
+    run_nation_far_space_ai(w, reg, &report.far_space_picks); // Ben, 2026-11-14: monthly
 
     // ---- 6b. Pending near-space orders (BL-1587, SPACE_ASSETS.md § Signal delay) —
     // an order issued outside comms coverage last quarter reaches its station or

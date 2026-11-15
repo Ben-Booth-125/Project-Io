@@ -329,6 +329,12 @@ struct candidate
     bool                  needs_source = false;
     /// BL-1395: the hubs the build was priced with (its chain); never more are laid.
     int                   chain_hubs   = 0;
+    /// BL-1651 (Ben, 2026-11-15): a producing build's forecast inputs, so a nation's
+    /// pick can be re-asked after an earlier build of the SAME evaluation landed - with
+    /// no build limit, two plants scored against one spare would both draw it.
+    float                 glut_rate    = 0.0f; ///< its primary output per tick (the glut forecast's added rate)
+    int                   glut_horizon = 0;    ///< the forecast horizon it was scored at
+    float                 batches      = 0.0f; ///< a processor's batches (its draw = inputs x batches)
 };
 
 /// The BUDGET CLASS a candidate competes in — and, by construction, the only
@@ -532,6 +538,12 @@ float corp_personality_jitter(entity_id corp, uint64_t personality_seed)
     const uint64_t h = mix64(personality_seed ^ (static_cast<uint64_t>(corp) * 0x9e3779b97f4a7c15ull));
     // Map to [0.9, 1.1]: constant per campaign, deterministic by construction.
     return 0.9f + 0.2f * static_cast<float>(h % 10000ull) / 10000.0f;
+}
+
+std::map<entity_id, nation_build_tally>& nation_build_tally_log()
+{
+    static std::map<entity_id, nation_build_tally> log;
+    return log;
 }
 
 float corp_reserve_floor(const world& w, const recipe_registry& reg,
@@ -1059,11 +1071,16 @@ float actor_money(const world& w, const ai_actor& a)
 
 ai_books actor_books(const world& w, const ai_actor& a)
 {
-    // BL-1407: a nation's books read zero here, as they always did for a nation
-    // (BL-1401: a nation proposes no trade); the corporation's are deleted.
-    (void)w;
-    (void)a;
+    // BL-1651 (Ben, 2026-11-15, "export to other markets"; TRADE.md § Who may trade): a
+    // nation's own books - the points its trade buildings made last pass and its reserve -
+    // so an AI nation sets its own manual trades, the grant TRADE.md names. The
+    // corporation's books are deleted (BL-1407).
     ai_books b;
+    if (const auto nit = w.nations.find(a.id); a.is_nation && nit != w.nations.end())
+    {
+        b.trade_points  = nit->second.trade_points;
+        b.trade_reserve = nit->second.trade_reserve;
+    }
     return b;
 }
 
@@ -1665,6 +1682,46 @@ static bool base_province_of(const world& w, entity_id nation, entity_id tile)
     return false;
 }
 
+/// Ben, 2026-11-14: its own fed units standing on its front, per front tile, a declaration
+/// needs. First cut, calibrated by war_census.
+constexpr float k_war_ai_min_front_cover = 0.10f;
+/// The motive a declaration needs - (adverse Trust + Alarm) / limit - unless a
+/// justification holds: sentiment's ordinary drift is not a grievance.
+constexpr float k_war_ai_min_motive   = 0.025f;
+
+/// BL-1651 (2026-11-15): every plant's nominal draw of @p r at market @p m, standing and
+/// building (`committed_draw`), as the reach index holds it - the index is built by the
+/// supply clause this is asked beside. 0 for a market with no plant drawing it.
+float market_plant_draw(const input_reach& ir, entity_id m, std::size_t r)
+{
+    const auto& v = ir.draws[r]; // sorted by market
+    const auto it = std::lower_bound(v.begin(), v.end(), m,
+                                     [](const std::pair<entity_id, float>& e, entity_id k) { return e.first < k; });
+    return (it != v.end() && it->first == m) ? it->second : 0.0f;
+}
+
+/// PRE-WAR STAGING (Ben, 2026-11-15; AI_OPPONENT.md § 11, "A rival may stage a supplied
+/// front"; RELATIONS.md § Who declares). A staging front is staged to this many times the
+/// fed units the declaration's cover test needs, so the edge has men to read.
+constexpr float k_war_stage_margin   = 1.5f;
+/// The share of the capital province's own posted units staging never takes: the capital's
+/// force stays home (§ Fronts), in part.
+constexpr float k_war_stage_home_keep = 0.5f;
+
+/// Does @p nation hold the declaration's MOTIVE toward @p target - (adverse Trust + Alarm) /
+/// limit at k_war_ai_min_motive, or a justification that names no goal? The declaration's own
+/// first test, read without goals (LOST GROUND, which reads the goals, is the declaration's).
+bool war_motive_toward(const world& w, const recipe_registry& reg, entity_id nation, entity_id target)
+{
+    const sentiment_params& sp = reg.sentiment();
+    const float limit = sp.limit > 0.0f ? sp.limit : 100.0f;
+    const sentiment_value sv = sentiment_toward(w.sentiment, nation, target);
+    if (std::max(0.0f, -sv.trust) / limit + std::max(0.0f, sv.alarm) / limit >= k_war_ai_min_motive)
+        return true;
+    const auto j = war_justifications(w, sp, nation, target, {});
+    return std::any_of(j.begin(), j.end(), [](bool b) { return b; });
+}
+
 void score_nation_fronts(world& w, const recipe_registry& reg, entity_id nation, int tick)
 {
     const std::vector<front> fronts = nation_fronts(w, nation); // a copy: the verbs below may re-anchor
@@ -1804,6 +1861,57 @@ void score_nation_fronts(world& w, const recipe_registry& reg, entity_id nation,
         }
     }
 
+    // STAGE (Ben, 2026-11-15; AI_OPPONENT.md § 11, "A rival may stage a supplied front"):
+    // a front at peace toward a neighbour this nation holds the declaration's MOTIVE against
+    // (`war_motive_toward`), with no truce, is a staging front while its own units on it fall
+    // short of k_war_stage_margin x the fed units the declaration's cover test needs, and
+    // while enough of its tiles stand fed to hold them. Staging changes only WHO may join:
+    // units the capital province holds may go, down to k_war_stage_home_keep of them. The
+    // supply test is the joiner's test unchanged - a staging front has no reason, so it
+    // refuses a priced slot - so every staged unit stands fed. The declaration is the war
+    // pass's, on its own tests; staging plans nothing past this order.
+    std::vector<int> stage_need(fronts.size(), 0);
+    int stage_total = 0;
+    if (tick >= k_campaign_settle_ticks && sentiment_conduct_live(w))
+        for (std::size_t i = 0; i < fronts.size(); ++i)
+        {
+            const entity_id them = fronts[i].neighbour;
+            const auto tit = w.nations.find(them);
+            if (reason[i] || tit == w.nations.end() || tit->second.ended || at_war(w, nation, them)
+                || truce_between(w, nation, them) || !war_motive_toward(w, reg, nation, them))
+                continue;
+            const int want = static_cast<int>(std::ceil(k_war_ai_min_front_cover * k_war_stage_margin
+                                                        * static_cast<float>(fronts[i].span.size())));
+            int fed_tiles = 0;
+            for (const entity_id t : fronts[i].span)
+                fed_tiles += march_price_permille(w, reg, supply_memo, nation, t, 1000) == 0 ? 1 : 0;
+            if (tally != nullptr)
+                ++tally->stage_motive;
+            if (fed_tiles < want)
+                continue; // the network does not hold that many men there: nothing to stage
+            stage_need[i] = std::max(0, want - static_cast<int>(count[i]));
+            stage_total += stage_need[i];
+        }
+    if (tally != nullptr)
+        for (std::size_t i = 0; i < fronts.size(); ++i)
+            tally->stage_fronts += stage_need[i] > 0 ? 1 : 0;
+    // RELEASE ROOM: how many idle capital defenders may leave their post for a staging front
+    // while the province keeps k_war_stage_home_keep of its posted units. A defender leaves only
+    // once a staging front has taken it (ASSIGN, below): none is unposted to stand idle.
+    int home_room = 0;
+    if (stage_total > 0 && capital_prov != 0)
+    {
+        int posted = 0;
+        for (const entity_id uid : own)
+        {
+            const unit_component& u = w.units.at(uid);
+            if (u.count > 0 && u.defend_province == capital_prov && u.front == null_entity
+                && u.order.dest == null_entity && !unit_refitting(u) && !unit_in_battle(w, uid))
+                ++posted;
+        }
+        home_room = posted - static_cast<int>(std::ceil(k_war_stage_home_keep * static_cast<float>(posted)));
+    }
+
     // ASSIGN.
     for (const entity_id uid : own)
     {
@@ -1811,9 +1919,13 @@ void score_nation_fronts(world& w, const recipe_registry& reg, entity_id nation,
         if (u.front != null_entity || u.order.dest != null_entity || u.count <= 0
             || u.position == null_entity || unit_refitting(u) || unit_in_battle(w, uid))
             continue;
-        if (u.defend_province != no_province) // BL-1504: it has its order
+        // BL-1504: it has its order - save a capital defender a staging front may take (STAGE).
+        const bool defender = u.defend_province != no_province;
+        if (defender && !(u.defend_province == capital_prov && stage_total > 0 && home_room > 0))
             continue;
-        if (capital_prov != 0 && w.provinces.province_of(u.position) == capital_prov)
+        // The capital's force stays home - save for a staging front still short (STAGE above).
+        const bool at_home = capital_prov != 0 && w.provinces.province_of(u.position) == capital_prov;
+        if (at_home && stage_total <= 0)
             continue;
         // BL-1608 / NR-1206 (RAISED, NOT GRANTED; dial OFF): a base province is a home kept too.
         if (reg.nation_ai().far_space_keep_base_home != 0 && base_province_of(w, nation, u.position))
@@ -1828,6 +1940,11 @@ void score_nation_fronts(world& w, const recipe_registry& reg, entity_id nation,
         std::vector<char> tried(fronts.size(), 0);
         for (std::size_t i = 0; i < fronts.size(); ++i)
         {
+            if (at_home && stage_need[i] <= 0)
+            {
+                tried[i] = 1; // a home unit goes only to a staging front still short
+                continue;
+            }
             std::vector<entity_id> joined = assigned[i];
             const auto at = std::upper_bound(joined.begin(), joined.end(), uid);
             const std::size_t m = static_cast<std::size_t>(at - joined.begin());
@@ -1875,6 +1992,8 @@ void score_nation_fronts(world& w, const recipe_registry& reg, entity_id nation,
         }
         if (best == fronts.size())
         {
+            if (defender)
+                continue; // no staging front takes it: it keeps its post
             // FALL BACK (header above): no front takes it, and it stands on priced ground.
             if (here > 0)
                 if (const entity_id fed = fed_ground_of(uid); fed != null_entity)
@@ -1891,15 +2010,48 @@ void score_nation_fronts(world& w, const recipe_registry& reg, entity_id nation,
                 }
             continue;
         }
+        if (defender)
+        {
+            // Off its post, then onto the staging front (the two verbs the player's card issues).
+            corp_command off;
+            off.tick = tick; off.corp = nation; off.as_nation = nation;
+            off.verb = corp_verb::defend_province; off.subject = uid; off.province = no_province;
+            if (apply_corp_command(w, reg, off) != corp_command_result::applied)
+                continue;
+        }
         corp_command cmd;
         cmd.tick = tick; cmd.corp = nation; cmd.as_nation = nation;
         cmd.verb = corp_verb::assign_front; cmd.subject = uid; cmd.tile = fronts[best].key;
         const int64_t s = unit_strength(w, u);
-        if (apply_corp_command(w, reg, cmd) == corp_command_result::applied)
+        const bool assigned_ok = apply_corp_command(w, reg, cmd) == corp_command_result::applied;
+        if (defender)
+        {
+            if (assigned_ok)
+            {
+                --home_room;
+                if (tally != nullptr)
+                    ++tally->stage_released;
+            }
+            else
+            {
+                corp_command back; // the front refused it after all: back on its post
+                back.tick = tick; back.corp = nation; back.as_nation = nation;
+                back.verb = corp_verb::defend_province; back.subject = uid; back.province = capital_prov;
+                (void)apply_corp_command(w, reg, back);
+            }
+        }
+        if (assigned_ok)
         {
             ++count[best];
             strength[best] += s;
             assigned[best].insert(std::upper_bound(assigned[best].begin(), assigned[best].end(), uid), uid);
+            if (stage_need[best] > 0)
+            {
+                --stage_need[best];
+                --stage_total;
+                if (tally != nullptr)
+                    ++tally->staged;
+            }
             if (tally != nullptr && hunger[best] > 0 && reason[best])
             {
                 ++tally->odds_hungry;
@@ -2004,6 +2156,11 @@ void score_nation_fronts(world& w, const recipe_registry& reg, entity_id nation,
     }
 }
 } // namespace
+
+void score_nation_fronts_for_harness(world& w, const recipe_registry& reg, entity_id nation, int tick)
+{
+    score_nation_fronts(w, reg, nation, tick);
+}
 
 // ---------------------------------------------------------------------------
 // BL-1451 — a rival nation flies air wings (AI_OPPONENT.md § 11, "Rival nations fly
@@ -3027,6 +3184,29 @@ float nation_force_income(const nation_component& nc)
     return n > 0 ? std::max(0.0f, sum / static_cast<float>(n)) : 0.0f;
 }
 
+float nation_running_bill(const nation_component& nc)
+{
+    const auto& returns = nc.returns;
+    const int n = std::min<int>(k_force_income_returns, static_cast<int>(returns.size()));
+    float sum = 0.0f;
+    for (int i = 0; i < n; ++i)
+    {
+        const quarterly_return& q = returns[returns.size() - 1 - static_cast<std::size_t>(i)];
+        sum += q.expenditure + q.maintenance + q.wages;
+    }
+    return n > 0 ? std::max(0.0f, sum / static_cast<float>(n)) : 0.0f;
+}
+
+float nation_surplus(const world& w, entity_id nation, float bill_months)
+{
+    const auto nit = w.nations.find(nation);
+    if (nit == w.nations.end())
+        return 0.0f;
+    const float line = std::max(0.0f, bill_months) * nation_running_bill(nit->second);
+    const float s = state_uncommitted_treasury(w, nation) - line;
+    return std::isfinite(s) ? std::max(0.0f, s) : 0.0f;
+}
+
 force_reading read_nation_force(const world& w, const recipe_registry& reg, entity_id nation,
                                 const std::map<entity_id, std::set<entity_id>>& borders)
 {
@@ -3053,7 +3233,10 @@ force_reading read_nation_force(const world& w, const recipe_registry& reg, enti
     r.threat = largest / std::max(1.0f, r.own_value);
     const float climb = std::clamp((r.threat - 1.0f) / k_force_threat_span, 0.0f, 1.0f);
     r.share = k_force_base_share + (k_force_max_share - k_force_base_share) * climb;
-    r.target = r.income * r.share;
+    // BL-1651 (MILITARY.md § Force sizing, "A surplus raises the target"; Ben 2026-11-14):
+    // the running cost its own surplus could carry for k_force_surplus_months is added.
+    r.surplus = nation_surplus(w, nation, corp_ai_params{}.surplus_bill_months);
+    r.target = r.income * r.share + r.surplus / k_force_surplus_months;
     return r;
 }
 
@@ -3469,10 +3652,8 @@ constexpr float k_war_ai_w_trade      = 0.20f; ///< x trade exposure in [0, 1]
 constexpr float k_war_ai_w_exhaustion = 1.0f;  ///< x own exhaustion / 100
 constexpr float k_war_ai_w_open_wars  = 0.40f; ///< x wars it already fights
 constexpr float k_war_ai_declare_bar  = 0.32f; ///< the summed utility a declaration must clear
-constexpr float k_war_ai_min_edge     = 0.33f; ///< the front edge a declaration needs (2:1)
-/// The motive a declaration needs - (adverse Trust + Alarm) / limit - unless a
-/// justification holds: sentiment's ordinary drift is not a grievance.
-constexpr float k_war_ai_min_motive   = 0.025f;
+constexpr float k_war_ai_min_edge     = 0.33f; ///< the front edge a declaration needs (2:1), FED strength (Ben, 2026-11-14)
+// k_war_ai_min_front_cover and k_war_ai_min_motive: above score_nation_fronts (staging reads them).
 
 /// Peace: a war younger than this is neither offered nor accepted (a declaration
 /// is not withdrawn the quarter it is made).
@@ -3489,6 +3670,12 @@ constexpr int   k_war_ai_demand_score       = 25;   ///< an offer asks for held 
 struct war_pair_front
 {
     int64_t mine = 0, theirs = 0;      ///< standing strength on the front's provinces
+    /// Ben, 2026-11-14 (MILITARY.md § Force sizing, "A war is declared only on a supplied
+    /// front"): the declarer's strength in the front zone that stands on its OWN network's
+    /// cover at or past break-even - a unit that would not starve where it stands.
+    int64_t mine_fed = 0;
+    int     front_tiles = 0;           ///< its own front span toward this neighbour, in tiles
+    int     fed_on_front = 0;          ///< its own fed units standing on those tiles
     std::vector<uint32_t> their_provs; ///< the target's provinces on the front, ranked as goals
 };
 
@@ -3522,7 +3709,7 @@ void rank_goal_provinces(const world& w, std::vector<uint32_t>& provs)
 }
 
 /// Every shared border of @p nation, keyed by neighbour (ascending).
-std::map<entity_id, war_pair_front> war_pair_fronts(world& w, entity_id nation)
+std::map<entity_id, war_pair_front> war_pair_fronts(world& w, const recipe_registry& reg, entity_id nation)
 {
     std::map<entity_id, war_pair_front> out;
     const std::vector<front> mine = nation_fronts(w, nation); // a copy: the next call may re-anchor
@@ -3543,16 +3730,37 @@ std::map<entity_id, war_pair_front> war_pair_fronts(world& w, entity_id nation)
     // Standing strength per (province, owner): integer sums, so the unordered
     // unit walk cannot reach the result.
     std::map<std::pair<uint32_t, entity_id>, int64_t> force;
+    std::map<uint32_t, int64_t> fed_force; // the declarer's own fed strength, per province
+    std::map<entity_id, int> fed_at;       // the declarer's own fed units, per tile
+    unit_draw_memo memo; // its OWN network's cover; the network does not move inside the pass
+    const carried_supply_params& sup = reg.military().supplies;
     for (const auto& [uid, u] : w.units)
         if (u.count > 0 && u.position != null_entity)
             if (const uint32_t p = w.provinces.province_of(u.position); p != 0)
-                force[{ p, u.owner }] += unit_strength(w, u);
+            {
+                const int64_t st = unit_strength(w, u);
+                force[{ p, u.owner }] += st;
+                if (u.owner == nation
+                    && carried_hunger_price_permille(sup, 1000, unit_tile_cover_permille(w, memo, nation, u.position)) == 0)
+                {
+                    fed_force[p] += st;
+                    ++fed_at[u.position];
+                }
+            }
     for (auto& [nb, pf] : out)
         for (const uint32_t p : zone[nb])
         {
             if (const auto it = force.find({ p, nation }); it != force.end()) pf.mine += it->second;
             if (const auto it = force.find({ p, nb }); it != force.end()) pf.theirs += it->second;
+            if (const auto it = fed_force.find(p); it != fed_force.end()) pf.mine_fed += it->second;
         }
+    for (const front& f : mine)
+    {
+        war_pair_front& pf = out[f.neighbour];
+        pf.front_tiles += static_cast<int>(f.span.size());
+        for (const entity_id t : f.span)
+            if (const auto it = fed_at.find(t); it != fed_at.end()) pf.fed_on_front += it->second;
+    }
     return out;
 }
 
@@ -3632,7 +3840,51 @@ std::vector<uint32_t> legal_cession(const world& w, const war_record& war, entit
 
 } // namespace
 
-void score_nation_war(world& w, const recipe_registry& reg, entity_id nation, int tick, bool spectating)
+void score_nation_declarations_day(world& w, const recipe_registry& reg)
+{
+    const int tick = w.current_econ_tick;
+    if (tick < k_campaign_settle_ticks || !sentiment_conduct_live(w))
+        return;
+    std::vector<entity_id> ids;
+    ids.reserve(w.nations.size());
+    for (const auto& [n, nc] : w.nations)
+        ids.push_back(n);
+    std::sort(ids.begin(), ids.end());
+    for (const entity_id n : ids)
+        score_nation_war(w, reg, n, tick, /*spectating=*/false, /*own_wars=*/false);
+}
+
+std::vector<war_front_reading> read_war_fronts(world& w, const recipe_registry& reg, entity_id nation)
+{
+    std::vector<war_front_reading> out;
+    std::map<entity_id, int> fed_tiles; // neighbour -> its own front tiles a unit would stand fed on
+    {
+        unit_draw_memo memo;
+        const carried_supply_params& sup = reg.military().supplies;
+        const std::vector<front> mine = nation_fronts(w, nation);
+        for (const front& f : mine)
+            for (const entity_id t : f.span)
+                if (carried_hunger_price_permille(sup, 1000, unit_tile_cover_permille(w, memo, nation, t)) == 0)
+                    ++fed_tiles[f.neighbour];
+    }
+    for (const auto& [nb, pf] : war_pair_fronts(w, reg, nation)) // ascending neighbour
+    {
+        war_front_reading r;
+        r.neighbour = nb;
+        r.front_tiles = pf.front_tiles;
+        r.fed_on_front = pf.fed_on_front;
+        r.fed_tiles = fed_tiles[nb];
+        r.edge_all = front_edge(pf);
+        war_pair_front fed = pf;
+        fed.mine = pf.mine_fed;
+        r.edge_fed = front_edge(fed);
+        out.push_back(r);
+    }
+    return out;
+}
+
+void score_nation_war(world& w, const recipe_registry& reg, entity_id nation, int tick, bool spectating,
+                      bool own_wars)
 {
     // Never the player's nation (AI_OPPONENT.md § 11: "Not admitted: ... acting for
     // the player's nation"), never an unknown one, never in the settle. Under
@@ -3650,7 +3902,7 @@ void score_nation_war(world& w, const recipe_registry& reg, entity_id nation, in
     std::map<entity_id, war_pair_front> fronts; // built on first use
     bool fronts_built = false;
     const auto pair_fronts = [&]() -> const std::map<entity_id, war_pair_front>& {
-        if (!fronts_built) { fronts = war_pair_fronts(w, nation); fronts_built = true; }
+        if (!fronts_built) { fronts = war_pair_fronts(w, reg, nation); fronts_built = true; }
         return fronts;
     };
     const float exhaustion = nation_war_exhaustion(w, nation) / 100.0f;
@@ -3660,6 +3912,8 @@ void score_nation_war(world& w, const recipe_registry& reg, entity_id nation, in
     for (const auto& [key, war] : w.wars) // ascending
         if (war.declarer == nation || war.defender == nation)
             keys.push_back(key);
+    if (!own_wars)
+        keys.clear(); // the daily check: step 2 alone (the open-war count below still reads w.wars)
     for (const auto& key : keys)
     {
         const auto wit = w.wars.find(key);
@@ -3818,9 +4072,18 @@ void score_nation_war(world& w, const recipe_registry& reg, entity_id nation, in
         const float g    = std::max(0.0f, -sv.trust) / limit;
         const float a    = std::max(0.0f, sv.alarm) / limit;
         const float warm = std::max(0.0f, sv.trust) / limit;
-        const float s    = front_edge(pf);
+        // A WAR IS DECLARED ONLY ON A SUPPLIED FRONT (Ben, 2026-11-14): its own fed units
+        // must hold its front at k_war_ai_min_front_cover units a tile, and the 2:1 edge is
+        // read with its FED strength only - so a war needs units marched to the front and a
+        // network that feeds them there.
+        if (pf.front_tiles <= 0
+            || static_cast<float>(pf.fed_on_front) < k_war_ai_min_front_cover * static_cast<float>(pf.front_tiles))
+            continue;
+        war_pair_front fed = pf;
+        fed.mine = pf.mine_fed;
+        const float s    = front_edge(fed);
         if (s < k_war_ai_min_edge)
-            continue; // no edge on the shared front
+            continue; // no supplied edge on the shared front
         const float x = trade_exposure(w, nation, target);
         const std::size_t kmax = std::min<std::size_t>(k_war_goals_max, pf.their_provs.size());
         for (std::size_t k = 1; k <= kmax; ++k)
@@ -4142,8 +4405,9 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
         // NR-1117): at most one enactment or repeal of its own embargo, on the same
         // live-only gate as the war pass. Past the player guard above (lifted only by
         // spectate), and score_nation_embargo refuses the seated player's nation itself.
-        if (actor.is_nation && tick >= k_campaign_settle_ticks)
-            score_nation_embargo(w, reg, corp, tick, p.spectating);
+        if (actor.is_nation && tick >= k_campaign_settle_ticks
+            && (tick % std::max(1, p.embargo_k)) == (static_cast<int>(index) % std::max(1, p.embargo_k)))
+            score_nation_embargo(w, reg, corp, tick, p.spectating); // Ben, 2026-11-14: quarterly
 
         // BL-1533 (AI_OPPONENT.md § 11, "Rival nations sail fleets", Ben 2026-11-05,
         // read 2026-11-08): its own ports, ships and landings. Past the player guard
@@ -4169,7 +4433,7 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
         if (actor.is_nation && tick >= k_campaign_settle_ticks)
             score_nation_defence(w, reg, corp, tick); // BL-1504: before the front's assign
 
-        if (actor.is_nation && tick >= k_campaign_settle_ticks && is_quarter_tick(tick)) // BL-1642: a quarter
+        if (actor.is_nation && tick >= k_campaign_settle_ticks) // Ben, 2026-11-14: monthly (was a quarter)
             score_nation_fronts(w, reg, corp, tick);
 
         // BL-1451 (AI_OPPONENT.md § 11, "Rival nations fly air wings", Ben 2026-10-28):
@@ -4540,6 +4804,8 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                     c.score  = (net / all) * focus_weight(actor.focus, corp_verb::build) * jitter * glut;
                     c.spend  = all;
                 }
+                c.glut_rate    = added_rate;
+                c.glut_horizon = horizon;
                 c.reason = corp_decision_reason::best_build;
                 c.bucket = bucket_for_reason(c.reason);
                 if (held)
@@ -4640,8 +4906,16 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
 
             for (const entity_id tile : own_tiles)
             {
-                if (std::binary_search(tiles_with_processor.begin(),
-                                       tiles_with_processor.end(), tile))
+                // A PLANT THAT EATS THE GLUT (BL-1651; Ben, 2026-11-15, "processors that eat the
+                // glut"): a tile already standing one of its processors is no site for a SECOND -
+                // save, for a nation, a method whose input its own market holds in glut: listed
+                // supply, with the plants building there, beyond posted demand by the plant's
+                // whole draw. The rich nation's mines are refused for want of a buyer; this is
+                // the buyer it may build. Joining a stack of its product, it prices the stack's
+                // own method (PRODUCTION.md § One building per product: one method per stack).
+                const bool stacked = std::binary_search(tiles_with_processor.begin(),
+                                                        tiles_with_processor.end(), tile);
+                if (stacked && !actor.is_nation)
                     continue;
                 const auto tit = w.tiles.find(tile);
                 if (tit == w.tiles.end())
@@ -4720,10 +4994,10 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                     if (!recipe_runs_at_tile(w, *abs, tile))
                         continue;
                     // ONE METHOD PER STACK (Ben, 2026-11-11; PRODUCTION.md § One
-                    // building per product) needs no test here: a tile already
-                    // standing one of this actor's processors never reaches this
-                    // loop (`tiles_with_processor` above), so no candidate here can
-                    // join a stack - the build door's seating rule never binds.
+                    // building per product): only the glut-eater below reaches a tile
+                    // standing one of this actor's processors, and it prices the
+                    // stack's own method - so the build door's seating rule never
+                    // changes what a candidate was priced at.
                     // BL-1485: a generator only where its grid is short (above).
                     // Inside the argmax, as the forecast veto is (BL-1227), so a
                     // refused generator never claims its group's slot.
@@ -4731,6 +5005,32 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                         && abs->outputs[static_cast<std::size_t>(resource_type::power)] > 0.0f
                         && !grid_is_short(body, tile))
                         continue;
+                    if (stacked)
+                    {
+                        // The glut-eater (above): the stack's own method where its product
+                        // already stands here, and an input its own market holds in glut.
+                        if (const std::uint16_t m = product_stack_method(w, reg, tile, abs->group);
+                            m != no_recipe && m != rid)
+                            continue;
+                        const auto gm = mid != null_entity ? w.markets.find(mid) : w.markets.end();
+                        if (gm == w.markets.end())
+                            continue;
+                        const pending_output_map& pend = pending_out();
+                        bool eats = false;
+                        for (std::size_t r = 0; r < resource_count && !eats; ++r)
+                        {
+                            const float draw = abs->inputs[r] * batches;
+                            if (!(draw > 0.0f))
+                                continue;
+                            float pending = 0.0f;
+                            if (const auto pit = pend.find(std::make_pair(mid, r)); pit != pend.end())
+                                pending = pit->second;
+                            const float spare = gm->second.supply[r] + pending - std::max(0.0f, gm->second.demand[r]);
+                            eats = std::isfinite(spare) && spare >= draw;
+                        }
+                        if (!eats)
+                            continue;
+                    }
 
                     // INPUT ACCESS (BL-1187, build only what runs). A processor
                     // with an input it cannot obtain is an immediate loss-maker, so
@@ -4785,7 +5085,20 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                                 && landed >= 0.0f
                                 && (own_mkt == nullptr
                                     || shelf_admits(*own_mkt, r, reg.price_band().reservation_mult,
-                                                    /*off_buys=*/true));
+                                                    /*off_buys=*/true))
+                                // SUPPLY THAT ARRIVES (BL-1651, 2026-11-15; NATIONS.md § 3, "Each
+                                // build is asked of the world the last one left"): a nation's new
+                                // plant needs its OWN market's last month of listed supply - made
+                                // there or hauled in - to cover what every plant there will draw of
+                                // the input, standing and building, and its own draw besides. The
+                                // supply clause reads spare anywhere a leg reaches, and the haul does
+                                // not always bring it: measured on seeds 0 and 46, the uncapped settle
+                                // stacked steel mills on one market's coal - demand there 27 -> 257 a
+                                // month, the shelf drained - and 57 and 34 mills starved at the
+                                // handoff. A price lags the mills still building; their draw does not.
+                                && (own_mkt == nullptr || !actor.is_nation
+                                    || own_mkt->supply[r] >= market_plant_draw(reach(), mid, r)
+                                                             + abs->inputs[r] * batches);
                         input_cost[r] = landed;
                     }
                     if (!supplied)
@@ -4925,6 +5238,9 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                     // that trap by making corp_command assert the built processor
                     // kept the recipe it was given.
                     c.cmd.recipe = best_recipe;
+                    c.glut_rate    = added_rate;
+                    c.glut_horizon = horizon;
+                    c.batches      = batches;
                     // Same curve as the extraction candidate, deliberately: BL-417
                     // step 2 was taken ONCE for both rather than forked here. See
                     // that candidate for the full reasoning.
@@ -5759,11 +6075,10 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
         // carry the Marketplace's own upkeep is no site: a Marketplace makes no
         // points on a tick its upkeep goes unmet.
         // One at a time: none while another of its trade buildings is still
-        // under construction. Never the player's corp. BL-1401: a corporation's
-        // only for now — trade.cpp makes trade points for corporations alone, so
-        // a nation's Marketplace would carry no trade of its own (owed with the
-        // nation's trade books).
-        if (!actor.is_player && !actor.is_nation)
+        // under construction. Never the player's nation. BL-1651 (Ben, 2026-11-15,
+        // "export to other markets"): a nation's too - trade.cpp makes every owner's
+        // points (BL-1407), and the nation's books are now read.
+        if (!actor.is_player)
         {
             bool building_one = false;
             for (const entity_id bid : *actor.assets)
@@ -6030,7 +6345,7 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
         // BL-1401: read off the actor's books; a nation's are empty (see ai_books).
         const ai_books books = actor_books(w, actor);
         const bool trade_eligible =
-            !actor.is_player && !actor.is_nation && books.trade_points > 0.0f;
+            !actor.is_player && books.trade_points > 0.0f; // BL-1651: a nation too
         if (trade_eligible)
         {
             const trade_params& tp = reg.trade();
@@ -6190,6 +6505,16 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
 
         // ---- Greedy selection under the action budget + solvency gate -------
         int   builds = 0, dials = 0, surveys = 0, hires = 0, trades = 0, dispatches = 0;
+        bool  eval_dirty = false; // BL-1651: a build landed since the reach index was last refreshed
+        // BL-1651: observability only (nation_build_tally_log, corp_ai.hpp).
+        nation_build_tally* bt = actor.is_nation ? &nation_build_tally_log()[actor.id] : nullptr;
+        if (bt != nullptr)
+        {
+            ++bt->evals;
+            bt->uncommitted += actor_money(w, actor);
+            bt->treasury += w.nations.at(actor.id).treasury;
+            bt->floor += nice_to_have_floor;
+        }
         // BL-1296: a nation's dials count against their own `max_dials`.
         // BL-1401: the champion branch is gone, so an actor's dials are all of
         // one book; the split counter stays so either book dials as fully.
@@ -6338,11 +6663,53 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
             const bool is_trade    = (fam == candidate_family::trade);
             const bool is_dispatch = (fam == candidate_family::dispatch);
             const bool is_dial     = (fam == candidate_family::dial);
+            if (bt != nullptr && is_build) ++bt->cands;
             // Every `continue` below is a FOREGONE candidate, and each one calls
             // forgo() so it can compete to be the decision log's runner-up.
             // A budget-capped candidate is the purest case of the thing the
             // field is for: the corp wanted it and had no slot left.
-            if (is_build  && builds  >= p.max_builds) { forgo(c); continue; }
+            // BL-1651 (NATIONS.md § 3, "A rich nation builds more", Ben 2026-11-14): a
+            // NATION has no build limit - every build the solvency gate below admits is
+            // taken, in score order, never a plan. max_builds binds a corporation only.
+            if (is_build && !actor.is_nation && builds >= p.max_builds)
+            { if (bt != nullptr) ++bt->capped; forgo(c); continue; }
+            // BL-1651 (Ben, 2026-11-15): and with no limit, each pick is re-asked against the
+            // world its earlier picks THIS evaluation left - a plant already started counts as
+            // pending supply (the glut forecast) and as a pending draw (the supply clause), the
+            // same public facts a later actor reads. Scored against one spare, two plants would
+            // otherwise both draw it, and the second starve.
+            if (is_build && actor.is_nation && builds > 0 && c.glut_rate > 0.0f
+                && (c.cmd.type == building_type::extraction_site
+                    || c.cmd.type == building_type::processing_facility))
+            {
+                if (eval_dirty)
+                {
+                    input_reach_refresh(w, reg, reach());
+                    pending_ctx.reset();
+                    eval_dirty = false;
+                }
+                bool still = forecast_glut_multiplier(w, c.cmd.tile, c.cmd.target, c.glut_rate,
+                                                      c.glut_horizon, p, &pending_out()) > 0.0f;
+                if (still && c.cmd.type == building_type::processing_facility)
+                    if (const recipe* rc = reg.get_recipe(c.cmd.recipe); rc != nullptr)
+                    {
+                        const entity_id mid = market_for_tile(w, c.cmd.tile);
+                        const market_component* own_mkt = nullptr;
+                        if (mid != null_entity)
+                            if (const auto omit = w.markets.find(mid); omit != w.markets.end())
+                                own_mkt = &omit->second;
+                        for (std::size_t r = 0; r < resource_count && still; ++r)
+                            if (rc->inputs[r] > 0.0f)
+                                still = input_supply_covers(w, reg, reach(), mid, r,
+                                                            rc->inputs[r] * c.batches, null_entity)
+                                     // and the supply that arrives, as the pick asked it
+                                     && (own_mkt == nullptr
+                                         || own_mkt->supply[r] >= market_plant_draw(reach(), mid, r)
+                                                                  + rc->inputs[r] * c.batches);
+                    }
+                if (!still)
+                { if (bt != nullptr) ++bt->rechecked; forgo(c); continue; }
+            }
             const bool is_state_dial = is_dial && c.cmd.as_nation != null_entity;
             if (is_dial && (is_state_dial ? state_dials : dials) >= p.max_dials) { forgo(c); continue; }
             if (is_survey && surveys >= 1)            { forgo(c); continue; }
@@ -6414,6 +6781,10 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
             if (c.spend > 0.0f &&
                 (floor_money - spent_now - c.spend <= required_floor || over_room))
             {
+                if (bt != nullptr && is_build)
+                    ++((floor_money - spent_now - c.spend <= required_floor) ? bt->floor_gated : bt->room_gated);
+                if (bt != nullptr && is_build)
+                    bt->spend_gated += c.spend;
                 forgo(c); // could not afford it — foregone in the strongest sense
 
                 // ...and, for a survey, asked of the home nation instead. The
@@ -6475,6 +6846,7 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                 // refusal itself is unchanged and still benign (see the
                 // apply-then-count note below): the candidate consumes no action
                 // slot and the next-best candidate is still tried.
+                if (bt != nullptr && is_build) ++bt->refused;
                 continue; // a seam rejection mutates nothing; just skip it
             }
 
@@ -6503,6 +6875,8 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
             if (is_build && actor.is_nation)
                 run_reserved += build_run_bound(w, reg, c.cmd); // BL-1442 (above)
             if (is_build)  ++builds;
+            if (is_build)  eval_dirty = true;
+            if (bt != nullptr && is_build) ++bt->applied;
             // BL-1309 / BL-1395 grants: the hubs the build was scored with, laid in the
             // same decision through the same legal verb, paid by the same book. The chain
             // is RE-PLANNED from the world as it stands after each hub (the build itself

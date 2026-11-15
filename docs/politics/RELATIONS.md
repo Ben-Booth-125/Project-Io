@@ -339,6 +339,32 @@ raised as its own question and granted on the same terms (Ben, 2026-10-30, NR-11
 answers, offers, accepts or refuses peace, imposes at 100 — the player's nation included (NR-1119)
 — and so may cede ground (`../ai/AI_OPPONENT.md` § 11).
 
+**A rival declares war only on a supplied front (Ben, 2026-11-14).** Three tests, in a chain, on
+the front it shares with the target:
+
+1. **Supplied units.** A unit of the declarer counts only while its tile stands on the declarer's
+   own network at or past break-even cover, so it would not starve where it stands
+   (`../military/MILITARY.md` § Carried supplies).
+2. **Front coverage.** Its supplied units standing on its own front tiles must reach a minimum
+   share of those tiles. Units reach the front only by marching, and stay fed there only where
+   roads and Logistic Points reach, so a war cannot open on a border its network does not serve.
+3. **The edge.** Its supplied strength against the target's strength across the front must reach
+   **2:1**.
+
+A front that fails any test offers no declaration, however strong the motive. The tests read only
+the declarer's own network; of the target it reads the standing strength it already read.
+
+**Staging: a rival musters supplied units, then declares (Ben, 2026-11-15).** Toward a neighbour it
+holds a declaration's motive against, at peace and with no truce, a rival sends units to its front
+before any war: idle capital defenders may leave their post, keeping half of them home, until its units
+on that front reach one and a half times what the coverage test needs. A unit joins only where it
+would stand fed, so a front its network does not feed is never staged, and never declared on. The
+chain is legible from the map: grievance, then troops on a supplied border, then the declaration.
+
+**A declaration is checked daily (Ben, 2026-11-14).** A rival weighs a declaration on every day its
+military walks, as well as on its monthly turn; answers, impositions and peace stay on the monthly
+turn.
+
 **A declaration against the player is SIGNALLED** (Ben, 2026-08-22). This overturns NR-350, which
 had a declaration *"stay silent, discovered on contact rather than announced"*; newest-dated wins,
 and the reversal is recorded rather than quietly applied. The cost is real: directed hostility

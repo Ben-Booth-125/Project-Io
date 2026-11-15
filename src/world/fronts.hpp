@@ -171,6 +171,10 @@ struct rival_march_tally
     long long odds_hungry_no_war = 0; ///< Of them, on a bare hostility: no war between the pair.
     long long liberation = 0;     ///< A priced push target on its own occupied ground, weighed as plain ground.
     long long player_verbs = 0;   ///< `apply_corp_command` asked to order a seated player's unit or front.
+    long long stage_motive = 0;   ///< Ben 2026-11-15: a front at peace toward a neighbour it holds a motive against.
+    long long stage_fronts = 0;   ///< Of them, fed enough to stage and still short of its staged men.
+    long long stage_released = 0; ///< A capital defender taken off its post for a staging front.
+    long long staged = 0;         ///< A unit assigned to a staging front while it was short.
 };
 rival_march_tally*& rival_march_tally_sink();
 

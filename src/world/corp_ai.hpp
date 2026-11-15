@@ -79,7 +79,12 @@ const char* standing_component_name(standing_component c);
 /// a harness may tighten them to force behaviour into few ticks.
 struct corp_ai_params
 {
-    int   cadence_k       = 12;    ///< Corp c evaluates when tick % k == index(c) % k. 12 months, a year: the quarter tick's 4 (BL-1642).
+    /// Corp c evaluates when tick % k == index(c) % k. ONE: every actor decides every month
+    /// (Ben, 2026-11-14: "AI decisions take place over months rather than years"; was 12).
+    int   cadence_k       = 1;
+    /// Ben, 2026-11-14: an embargo's enactment or repeal keeps a quarterly clock, staggered
+    /// by the same index. (A declaration is checked DAILY: score_nation_declarations_day.)
+    int   embargo_k       = 3;     ///< months between a nation's embargo turns (Ben: quarterly)
     /// BL-711: build-site pre-filter width, PER RESOURCE - not a global cap.
     ///
     /// It was `top_m_sites = 8`, a global top-M over deposit x affinity x
@@ -116,8 +121,15 @@ struct corp_ai_params
     /// than driving the whole map onto one good. 0 restores pre-BL-440 behaviour.
     float input_demand_pull = 4.0f;
     float theta           = 0.15f; ///< Hysteresis: beat do-nothing/incumbent by this relative margin.
-    int   cooldown_evals  = 4;     ///< Evals a touched building holds before re-dialling.
+    int   cooldown_evals  = 12;    ///< Evals a touched building holds before re-dialling: a year of monthly evaluations (was 4 yearly ones).
     int   max_builds      = 1;     ///< Constructions per corp per evaluation.
+    /// BL-1651 (NATIONS.md § 3, "A rich nation builds more", Ben 2026-11-14): max_builds
+    /// binds a CORPORATION only. A nation has no build limit - it takes every build the
+    /// solvency gate admits, best first.
+    /// BL-1651 (MILITARY.md § Force sizing): the force target's surplus is the uncommitted
+    /// treasury above this many months of the nation's running bill (expenditure,
+    /// maintenance and wages, averaged over a year of returns). First cut: a year.
+    float surplus_bill_months = 12.0f;
     int   max_dials       = 3;     ///< Dial changes (recipe/workforce/idle/resume) per evaluation.
     int   max_trades      = 1;     ///< Manual-trade pins/unpins per corp per evaluation (BL-1267; was BL-293's order-book budget). The reserve correction is free of it.
     /// BL-1267 (a rival sets its own trades, AI_OPPONENT.md § 11): the share of
@@ -453,6 +465,18 @@ float forecast_glut_multiplier(const world& w, entity_id tile, resource_type tar
 pending_output_map pending_plant_output(const world& w, const recipe_registry& reg);
 
 /// The corp's solvency reserve floor under `p` (exposed for the harness).
+/// BL-1651 (majors hoard treasury): what happened to a nation's build candidates,
+/// summed over its evaluations. OBSERVABILITY ONLY - nothing in the sim reads it,
+/// it is not saved and not hashed; a harness clears and reads it (opening_parity).
+struct nation_build_tally
+{
+    int    evals = 0, cands = 0, applied = 0, capped = 0, floor_gated = 0, room_gated = 0, refused = 0;
+    int    rechecked = 0; ///< re-asked after an earlier build of the same evaluation, and refused
+    double uncommitted = 0.0, floor = 0.0; ///< summed at each evaluation's start
+    double treasury = 0.0, spend_gated = 0.0; ///< the treasury at each evaluation's start; a gated build's spend, summed
+};
+std::map<entity_id, nation_build_tally>& nation_build_tally_log();
+
 float corp_reserve_floor(const world& w, const recipe_registry& reg,
                          entity_id corp, const corp_ai_params& p = {});
 
@@ -559,11 +583,22 @@ int64_t rival_air_province_score(const world& w, entity_id nation, air_mission m
 inline constexpr float k_force_max_share = 0.50f; ///< The ceiling threat climbs to. First cut.
 /// Its operating surplus before military pay, averaged over a year of returns; never negative.
 float nation_force_income(const nation_component& nc);
+/// BL-1651: a month's running bill - expenditure, maintenance and wages - averaged over a
+/// year of returns (the same window as `nation_force_income`); never negative.
+float nation_running_bill(const nation_component& nc);
+/// BL-1651 (NATIONS.md § 3; MILITARY.md § Force sizing, "A surplus raises the target"):
+/// the nation's OWN uncommitted treasury above @p bill_months of its running bill, never
+/// negative. The only reading the surplus grant adds (AI_OPPONENT.md § 11, Ben 2026-11-14).
+float nation_surplus(const world& w, entity_id nation, float bill_months);
+/// BL-1651: a surplus raises the force target by the running cost it could carry for
+/// this many months. First cut: five years.
+inline constexpr float k_force_surplus_months = 60.0f;
 
 /// BL-1552 (MILITARY.md § Force sizing): what sizes a nation's forces.
 struct force_reading
 {
     float income = 0.0f, running = 0.0f, share = 0.0f, target = 0.0f, threat = 0.0f, own_value = 0.0f;
+    float surplus = 0.0f; ///< BL-1651: the nation's own surplus, at a year of its bill
 };
 /// What a nation's whole force would cost to hire: the ONE number another nation may read.
 float nation_force_value(const world& w, const recipe_registry& reg, entity_id nation);
@@ -640,8 +675,21 @@ space_ground_pick score_nation_space_ground(world& w, const recipe_registry& reg
 /// player's nation (unless @p spectating: BL-409, NR-1120 - nobody holds the seat), an
 /// unknown one, or while the settle gate is up. Called by run_corp_strategic_step for
 /// each due nation on a live tick; exported for harnesses.
+/// @p own_wars false skips its open wars (the daily declaration check runs only step 2).
 void score_nation_war(world& w, const recipe_registry& reg, entity_id nation, int tick,
-                      bool spectating = false);
+                      bool spectating = false, bool own_wars = true);
+
+/// Ben, 2026-11-14 ("in daily intervals"): every live rival nation's declaration step
+/// (score_nation_war's step 2 alone), on a day the military walks. Nothing a declaration
+/// reads changes on the days the walk skips, and the monthly turn checks too, so this is
+/// the declaration on a daily clock. Never the player's nation (no spectate here: under
+/// spectate the seat's nation declares on its monthly turn only). Ascending nation id.
+void score_nation_declarations_day(world& w, const recipe_registry& reg);
+
+/// BL-1427 / BL-1540 / Ben 2026-11-15 (pre-war staging): a rival nation's fronts pass -
+/// re-weigh, stage, release, assign, order - exactly as its monthly turn runs it. Exported
+/// for harnesses; the scorer calls the file-local pass itself.
+void score_nation_fronts_for_harness(world& w, const recipe_registry& reg, entity_id nation, int tick);
 
 /// BL-1481 (AI_OPPONENT.md § 11, "Rival nations embargo", Ben 2026-11-03, NR-1117;
 /// RELATIONS.md § 3): a rival nation's embargo utility toward @p target - its own
@@ -658,6 +706,19 @@ float rival_embargo_utility(const world& w, const recipe_registry& reg, entity_i
 /// each due nation on a live tick; exported for harnesses.
 void score_nation_embargo(world& w, const recipe_registry& reg, entity_id nation, int tick,
                           bool spectating = false);
+
+/// Ben, 2026-11-14 ("A war is declared only on a supplied front"): what the war pass reads
+/// of each of @p nation's fronts - its tiles, its own fed units standing on them, and the
+/// front edge with all its strength and with its fed strength only. Diagnostic; nothing in
+/// the world reads it (war_census prints it).
+struct war_front_reading
+{
+    entity_id neighbour = null_entity;
+    int front_tiles = 0, fed_on_front = 0;
+    int fed_tiles = 0; ///< front tiles its own network would feed a unit on (price 0)
+    float edge_all = 0.0f, edge_fed = 0.0f;
+};
+std::vector<war_front_reading> read_war_fronts(world& w, const recipe_registry& reg, entity_id nation);
 
 /// What the war pass chose (`war_ai_trace_row::choice`).
 enum class war_ai_choice : uint8_t

@@ -251,10 +251,30 @@ quarter. A per-tick flow bill is already a third, so it meets the same share it 
 
 **A rich nation builds more; wealth is spent, not held (Ben, 2026-11-14).** A rival nation whose
 treasury outgrows what its lines spend turns the surplus into buildings — economy or military —
-rather than banking it. The surplus is the treasury above what its budget and running bills draw;
+rather than banking it. **A rival nation has no build limit (Ben, 2026-11-14):** each evaluation it
+takes every build its money admits, best first, to grow its economy. The surplus is the treasury
+above what its budget and running bills draw;
 the nation's own scorer chooses what it buys, over the same legal build and hire verbs, so the
 brake on a hoard is construction a player can see, never a clamp on the balance. It follows from
 § 5: a nation does not want to be rich. The player's own surplus is the player's to spend.
+
+**Each build is asked of the world the last one left (Ben, 2026-11-15).** With no limit, one turn may
+start several plants; each later pick is re-asked against the plants started before it that turn —
+their output joins the market's supply forecast, their draw the supply an input needs — so two plants
+are never started against one spare. And a rival's new plant needs supply that arrives: its own market's last
+month of listed supply of each input — made there or hauled in — must cover what every plant there
+will draw of it, those still building included, and the new plant's draw besides. Supply a road could
+bring is not supply that arrives.
+
+**A glutted market is answered, not only avoided (Ben, 2026-11-15).** Where a rival's mines are
+refused because their market already holds more than it buys, its surplus has two outlets:
+
+- **A plant that eats the glut.** A tile already standing one of its processors may take another, for
+  a method whose input its own market holds in glut — listed supply, with the plants building there,
+  beyond posted demand by the new plant's whole draw. Joining a stack of its product, the plant runs
+  the stack's method (`../economy/PRODUCTION.md` § One building per product).
+- **Export.** A rival nation builds Planetary Marketplaces and sets its own manual trades, so a good its
+  home market cannot absorb is sold onto markets that can (`../economy/TRADE.md` § Who may trade).
 
 The ten lines, in their authored enum order (append-only once serialised — a weight vector is
 indexed by them):

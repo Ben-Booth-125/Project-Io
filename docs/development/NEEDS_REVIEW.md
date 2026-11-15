@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*104 entries — 51 open, 53 resolved.*
+*105 entries — 52 open, 53 resolved.*
 
 ---
 
@@ -556,6 +556,19 @@ Migration moves three months of its rate on the first month of each quarter, so 
 > **Recommendation:** Keep it; heads are conserved and the calendar rate holds.
 
 *Files: `src/world/economy_system.cpp`, `tools/verify/recruits_harness.cpp`*
+
+### NR-1226 — A rival's new plant needs supply that arrives at its own market
+*decision taken on your behalf · raised 2026-11-15 · from BL-1651 (majors hoard treasury) round 2, market_viability seed 0 trace*
+
+With no build limit, the settle stacked steel mills on one market's coal: coal demand there rose from 27 to 257 a month, the shelf drained, the price sat at 1.4-2.7x base, and 57 mills on seed 0 starved at the handoff (input-starved pooled 4.9% -> 8.9%). The input gate (BL-1234) reads spare coal anywhere a leg reaches (3,469 on the body); the haul never brought it. I added one test for a NATION's new processor: its own market's last month of listed supply of each input must cover every plant's draw there (standing and building) plus its own. A first cut on price (under 1.25x base) lagged the mills still building and moved nothing. Written into NATIONS.md § 3. Measured: seed 46 input-starved 20.6% -> 0.6%; pooled quick G1 87.6, G1t50 84.2, G1b 3.9, G2 143.4, G3 100 - all five targets met. The same test also re-asks each later pick in one evaluation. Seed 0 still reads 11.2% (coal stocked but priced over the mills' ceiling).
+
+**Why it matters.** It narrows what a rich rival may build, in the direction of build only what runs, on public market supply. The rule is new.
+
+- Keep the arrivals test
+- Read shortage from price instead (lags the plants still building)
+- Fix the cause in the supply clause: count only spare the haul has actually delivered
+
+> **Recommendation:** Keep it for now; the third option is the deeper fix and is backlog work if the price test proves too blunt.
 
 ---
 

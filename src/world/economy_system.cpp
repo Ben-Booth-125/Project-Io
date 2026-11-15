@@ -2757,6 +2757,8 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
         auto_solve_sets.emplace_back(pn->first, &pn->second.state_assets);
     // BL-1642: the ruling's step is ONE a quarter (AI_OPPONENT.md § 11, 2026-10-13); on
     // the monthly tick the dial moves one month in three, so its rate is the ruling's.
+    // Stays quarterly under the monthly AI turn (Ben, 2026-11-14): this dial sets the
+    // PLAYER's workforce too (PRODUCTION.md, "one step a quarter"), not a rival decision.
     if (!is_quarter_tick(w.current_econ_tick))
         auto_solve_sets.clear();
     for (const auto& [solve_owner, solve_assets] : auto_solve_sets)
@@ -5250,6 +5252,9 @@ military_day_result run_military_day(world& w, const recipe_registry& reg, int d
         advance_fronts(w, reg);
     // BL-1504 (MILITARY.md § Defend province): the same place, the same reason.
     advance_defenders(w, reg);
+    // Ben, 2026-11-14 ("in daily intervals"): the rivals' declaration check, on a day the
+    // military walks - after the fronts have placed today's units, before today's battles.
+    score_nation_declarations_day(w, reg);
 
     // BL-1452: the units in contact at the day's start fight today's rounds, so they
     // spend ammunition and battle-worn equipment today (read before the battles, which
