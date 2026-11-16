@@ -213,6 +213,35 @@ seed_result run_seed(std::uint32_t seed, int last_year, bool quiet, bool stage_s
                         "propellant stocked %d (%.0f units) admitted %d\n",
                         pr.no_market, pr.sc_stocked, pr.sc_units, pr.sc_admitted,
                         pr.pr_stocked, pr.pr_units, pr.pr_admitted);
+            // Where components come from at all (NR-1229): the plants whose recipe makes
+            // them - built, standing, staffed and not idled - and the world's shelves.
+            {
+                constexpr std::size_t SC = static_cast<std::size_t>(resource_type::spacecraft_components);
+                int plants = 0, standing = 0, staffed_p = 0, markets_holding = 0;
+                double units = 0.0;
+                for (const auto& [bid, b] : w.buildings)
+                {
+                    if (b.type != building_type::processing_facility || b.decommissioned)
+                        continue;
+                    const recipe* rc = reg.get_recipe(b.recipe);
+                    if (rc == nullptr || !(rc->outputs[SC] > 0.0f))
+                        continue;
+                    ++plants;
+                    if (b.ticks_remaining > 0)
+                        continue;
+                    ++standing;
+                    if (b.workforce_assigned > 0.0f && !b.state_idle)
+                        ++staffed_p;
+                }
+                for (const auto& [mid, m] : w.markets)
+                    if (m.inventory[SC] > 0.0f)
+                    {
+                        ++markets_holding;
+                        units += m.inventory[SC];
+                    }
+                std::printf("      component plants: %d (%d standing, %d staffed); world shelves %.0f units on %d market(s)\n",
+                            plants, standing, staffed_p, units, markets_holding);
+            }
         }
     }
     res.by_end = rival_launches;
