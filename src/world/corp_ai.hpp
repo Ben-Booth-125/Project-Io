@@ -474,6 +474,12 @@ struct nation_build_tally
     int    rechecked = 0; ///< re-asked after an earlier build of the same evaluation, and refused
     double uncommitted = 0.0, floor = 0.0; ///< summed at each evaluation's start
     double treasury = 0.0, spend_gated = 0.0; ///< the treasury at each evaluation's start; a gated build's spend, summed
+    /// NR-1229 (observability only): where a spacecraft-components method dies in the
+    /// processor candidate walk, one count per (own tile, method) visit at each stage.
+    int sc_visit = 0, sc_locked = 0, sc_air = 0, sc_stacked = 0, sc_supply = 0, sc_ceiling = 0,
+        sc_arrive = 0, sc_nodata = 0, sc_veto = 0, sc_best = 0, sc_placement = 0, sc_net = 0,
+        sc_materials = 0, sc_cand = 0;
+    std::map<int, int> sc_short; ///< the first input that failed, by resource id
 };
 std::map<entity_id, nation_build_tally>& nation_build_tally_log();
 

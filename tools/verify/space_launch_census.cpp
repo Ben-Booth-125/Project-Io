@@ -27,6 +27,8 @@
 #include "harness_params.hpp"
 #include "scripting/lua_state.hpp"
 #include "world/campaign_settle.hpp"
+#include "world/corp_ai.hpp"
+#include "world/resource_names.hpp"
 #include "world/digitisation_tree_data.hpp"
 #include "world/market_clearing.hpp"
 #include "world/nation_tech.hpp"
@@ -162,6 +164,7 @@ seed_result run_seed(std::uint32_t seed, int last_year, bool quiet, bool stage_s
     for (int step = 0; step < k_campaign_settle_ticks; ++step)
         (void)run_settle_tick(w, reg, step, /*day_tick=*/0, /*spectating=*/true);
     clear_research_at_handover(w);
+    nation_build_tally_log().clear(); // NR-1229: count the play window only
     seat_player_corporation(w, seed, start->land.search.winner_score);
     const entity_id player = player_nation(w);
     if (stage_space)
@@ -241,6 +244,27 @@ seed_result run_seed(std::uint32_t seed, int last_year, bool quiet, bool stage_s
                     }
                 std::printf("      component plants: %d (%d standing, %d staffed); world shelves %.0f units on %d market(s)\n",
                             plants, standing, staffed_p, units, markets_holding);
+                // The scorer's walk over component methods since the handover, summed over
+                // every nation (corp_ai.cpp's NR-1229 trace; cumulative).
+                nation_build_tally t{};
+                std::map<int, int> shorts;
+                for (const auto& [nid, bt] : nation_build_tally_log())
+                {
+                    t.sc_visit += bt.sc_visit; t.sc_locked += bt.sc_locked; t.sc_air += bt.sc_air;
+                    t.sc_stacked += bt.sc_stacked; t.sc_supply += bt.sc_supply; t.sc_ceiling += bt.sc_ceiling;
+                    t.sc_arrive += bt.sc_arrive; t.sc_nodata += bt.sc_nodata; t.sc_veto += bt.sc_veto;
+                    t.sc_best += bt.sc_best; t.sc_placement += bt.sc_placement; t.sc_net += bt.sc_net;
+                    t.sc_materials += bt.sc_materials; t.sc_cand += bt.sc_cand;
+                    for (const auto& [r, n] : bt.sc_short)
+                        shorts[r] += n;
+                }
+                std::printf("      component walk: visits %d locked %d air %d stacked %d | supply %d ceiling %d arrive %d"
+                            " | nodata %d veto %d best %d | placement %d net %d materials %d cand %d | short:",
+                            t.sc_visit, t.sc_locked, t.sc_air, t.sc_stacked, t.sc_supply, t.sc_ceiling, t.sc_arrive,
+                            t.sc_nodata, t.sc_veto, t.sc_best, t.sc_placement, t.sc_net, t.sc_materials, t.sc_cand);
+                for (const auto& [r, n] : shorts)
+                    std::printf(" %s %d", resource_names::name_of(static_cast<resource_type>(r)).c_str(), n);
+                std::printf("\n");
             }
         }
     }

@@ -4987,12 +4987,18 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                     // than discovered at the seam: construct_building refuses a
                     // tech-locked recipe, so a candidate that can only ever be
                     // refused costs a build slot to learn nothing.
+                    // NR-1229 trace (observability only): a spacecraft-components method's fate.
+                    nation_build_tally* sct =
+                        (actor.is_nation
+                         && abs->outputs[static_cast<std::size_t>(resource_type::spacecraft_components)] > 0.0f)
+                            ? &nation_build_tally_log()[actor.id] : nullptr;
+                    if (sct != nullptr) ++sct->sc_visit;
                     if (!recipe_unlocked(w, reg, corp, rid))
-                        continue;
+                    { if (sct != nullptr) ++sct->sc_locked; continue; }
                     // The body's air (Ben, 2026-10-09): construct_building refuses
                     // a propellant route the body cannot run.
                     if (!recipe_runs_at_tile(w, *abs, tile))
-                        continue;
+                    { if (sct != nullptr) ++sct->sc_air; continue; }
                     // ONE METHOD PER STACK (Ben, 2026-11-11; PRODUCTION.md § One
                     // building per product): only the glut-eater below reaches a tile
                     // standing one of this actor's processors, and it prices the
@@ -5029,7 +5035,7 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                             eats = std::isfinite(spare) && spare >= draw;
                         }
                         if (!eats)
-                            continue;
+                        { if (sct != nullptr) ++sct->sc_stacked; continue; }
                     }
 
                     // INPUT ACCESS (BL-1187, build only what runs). A processor
@@ -5079,6 +5085,18 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                         if (!(abs->inputs[r] > 0.0f))
                             continue;
                         float landed = -1.0f;
+                        const bool cover_ok = input_supply_covers(w, reg, reach(), mid, r,
+                                                       abs->inputs[r] * batches,
+                                                       null_entity, &landed)
+                                && landed >= 0.0f;
+                        const bool ceil_ok = cover_ok && (own_mkt == nullptr
+                                    || shelf_admits(*own_mkt, r, reg.price_band().reservation_mult,
+                                                    /*off_buys=*/true));
+                        if (sct != nullptr && !ceil_ok)
+                        { ++(cover_ok ? sct->sc_ceiling : sct->sc_supply); ++sct->sc_short[static_cast<int>(r)]; }
+                        else if (sct != nullptr && actor.is_nation && own_mkt != nullptr
+                                 && !(own_mkt->supply[r] >= market_plant_draw(reach(), mid, r) + abs->inputs[r] * batches))
+                        { ++sct->sc_arrive; ++sct->sc_short[static_cast<int>(r)]; }
                         supplied = input_supply_covers(w, reg, reach(), mid, r,
                                                        abs->inputs[r] * batches,
                                                        null_entity, &landed)
@@ -5150,7 +5168,7 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                         w, reg, tile, building_type::processing_facility, rt, rid,
                         nullptr, &input_cost);
                     if (!bp.has_data)
-                        continue;
+                    { if (sct != nullptr) ++sct->sc_nodata; continue; }
                     // BL-1227 (review round 1): the forecast HARD VETO runs here,
                     // inside the argmax, so a vetoed recipe never claims its
                     // group's slot. Run after the pick, a vetoed winner left the
@@ -5162,8 +5180,9 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                         const float added_rate = abs->outputs[static_cast<std::size_t>(rt)] * batches;
                         const int   horizon    = authored_build_ticks(pe) + p.forecast_clearing_ticks;
                         if (forecast_glut_multiplier(w, tile, rt, added_rate, horizon, p, &pending_out()) <= 0.0f)
-                            continue;
+                        { if (sct != nullptr) ++sct->sc_veto; continue; }
                     }
+                    if (sct != nullptr) ++sct->sc_best;
                     const float n = bp.net();
                     auto  slot = product_best.find(abs->group);
                     if (slot == product_best.end())
@@ -5199,18 +5218,22 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                     // reads for the Hydroponics Bay rule (BL-166).
                     const resource_type target    = primary_output(*rc);
                     const float         primary_q = rc->outputs[static_cast<std::size_t>(target)];
+                    nation_build_tally* sct =
+                        (actor.is_nation && target == resource_type::spacecraft_components)
+                            ? &nation_build_tally_log()[actor.id] : nullptr; // NR-1229 trace
 
                     if (!placement_rules::can_place_in_world(w, tile, building_type::processing_facility, target))
-                        continue;
+                    { if (sct != nullptr) ++sct->sc_placement; continue; }
 
                     const float net = best_net;
                     if (net <= 0.0f)
-                        continue; // never build into an expected loss, same as above
+                    { if (sct != nullptr) ++sct->sc_net; continue; } // never build into an expected loss, same as above
                     // BL-1183: its materials obtainable, as the extraction half.
                     if (!construction_materials_obtainable(w, reg, reach(), standing(), tile,
                                                            building_type::processing_facility,
                                                            target, best_recipe))
-                        continue;
+                    { if (sct != nullptr) ++sct->sc_materials; continue; }
+                    if (sct != nullptr) ++sct->sc_cand;
 
                     // BL-709 / NR-592, the processing half — same reasoning as the
                     // extraction candidate above. The recipe travels into the
