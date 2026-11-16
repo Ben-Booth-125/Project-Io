@@ -1068,6 +1068,13 @@ ground is retired, with no flat fallback.
   pass lays it out today (pads, yards, sheds, tanks, towers, a town's blocks), stands as
   low-poly 3D shapes - boxes, pitched roofs, cylinders - lit and shadowed with the ground.
   Roads and paving stay painted on the ground.
+- **Trees stand in 3D** (Ben, 2026-11-16: "We can render the trees in 3D as well"). Forest
+  and scrub tiles carry low-poly trees - dark conifer cones and rounder broadleaf crowns,
+  smaller bushes on scrub - in the number the tile's cover density gives, scattered by a
+  seed of the tile so the same forest always stands the same. They keep off roads, rivers
+  and installations, stand only where buildings do (the close rungs), and are lit and
+  shadowed with everything else. The painted canopy stays as the forest floor, and the
+  trees' own shadows darken it. Clicks still pick the terrain: a tree never hides its tile.
 - **Nothing in world/\* reads any of it.** The ground is presentation.
 
 The default calibration (proposed by Claude at Ben's request, 2026-11-16): tilt rising from

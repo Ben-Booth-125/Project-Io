@@ -1942,6 +1942,28 @@
     "docs/ui/PLANETARY.md"
    ],
    "resolution": null
+  },
+  {
+   "id": "NR-1230",
+   "title": "The flat ground stays on the software path: --verify captures still draw the squashed 2D map",
+   "raised": "2026-11-16",
+   "kind": "question",
+   "status": "open",
+   "source": "BL-1671 (flat ground retired), sprint 68",
+   "what": "On the GPU renderer the canvas now draws only the 3D ground: the squash is off, marks are draped, markers stand upright and clicks ray-pick. The software renderer (every --verify capture, and any machine without a GPU device) cannot run the 3D pass, so it still draws the flat, squashed map. Retiring that path too means moving --verify onto the GPU renderer, which moves every canvas golden and capture at once.",
+   "why_it_matters": "Until it moves, a green visual run proves the 2D map, not the 3D one the player sees. Moving it is a bulk re-bless, which the golden policy reserves for you.",
+   "options": [
+    "Keep the software path as the --verify map for now; check the 3D canvas by live click",
+    "Move --verify to the GPU renderer and re-bless the canvas captures once",
+    "Delete the 2D path and refuse to run the canvas without a GPU device"
+   ],
+   "recommendation": "Keep it for now, then take the one re-bless when the 3D defaults settle.",
+   "files": [
+    "src/ui/body_surface_canvas.cpp",
+    "src/core/ground_slice_3d.cpp",
+    "docs/ui/RENDERING.md"
+   ],
+   "resolution": null
   }
  ]
 }

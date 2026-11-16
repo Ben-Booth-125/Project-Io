@@ -31,6 +31,8 @@ enum class effect : int
                   ///< time, and the far rung's flat map (BL-1661); a tile table at slot 1, the
                   ///< coarse and fine detail textures at slots 2 and 3, the map table at slot 4,
                   ///< the rolling ground at slot 5; uniforms: float4 x7
+    drape,        ///< the 3D ground's marks over its frame: the draw's texture is the frame's
+                  ///< drape coordinates, the drape itself at slot 1 (bind_textures)
     count
 };
 

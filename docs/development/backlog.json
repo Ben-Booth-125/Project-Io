@@ -1901,7 +1901,7 @@
       "design": "TECH_FOUNDATIONS.md § Rendering dimension, \"Toward 3D, in two steps\" (Ben, 2026-11-16). WORK: draw one ground chunk as a heightmesh with a depth buffer on the SDL GPU device behind the GPU renderer, textured from the bake and shaded in the C-F style, composited as the ground layer; report the frame cost, the code it took, the device-sharing answer, and captures beside the fixed-angle ground, for Ben to judge true 3D against the fixed angle. A measurement, not a renderer: no camera, no layer replaced. READING (2026-11-16, SDL 3.4 headers): the device can be shared - SDL_GetGPURendererDevice returns the GPU renderer's own SDL_GPUDevice, so the slice renders the mesh with a depth target into an SDL_GPUTexture on it, and SDL_PROP_TEXTURE_CREATE_GPU_TEXTURE_POINTER wraps that texture as an SDL_Texture the canvas draws like a chunk. Open: ordering the slice's command buffer against the renderer's own (SDL_FlushRenderer before submit), measured in the slice. VERDICT (Ben, 2026-11-16): \"I much prefer the 3D look ... work with just 3D from now on\" - the ground is 3D (RENDERING.md § The 3D ground); the slice is the seed of BL-1666 GROUND_3D_CANVAS."
     },
     {
-      "glyph": "~",
+      "glyph": "✓",
       "sprint": 68,
       "version_goal": null,
       "written": "2026-11-16",
@@ -1910,7 +1910,7 @@
       "requires": [],
       "author": "Claude (Ben, 2026-11-16: \"work with just 3D from now on\", design form)",
       "category": "UI",
-      "status": "designed",
+      "status": "complete",
       "authority_doc": "docs/ui/RENDERING.md",
       "id": "BL-1666",
       "short_name": "GROUND_3D_CANVAS",
@@ -1925,7 +1925,7 @@
       "design": "RENDERING.md § The 3D ground and § The camera (Ben, 2026-11-16). WORK: promote the slice (BL-1665 (3D slice)) to the ground layer - tilt following zoom, no turn, the proposed default calibration; the far page as a backdrop only where no chunk is loaded; the mesh rebuilt off the frame (or incrementally per chunk) so a pan or zoom does not hitch; the master baked straight down (no oblique lift, no standing sprites); the slice window becomes the ground's tuning panel."
     },
     {
-      "glyph": "~",
+      "glyph": "✓",
       "sprint": 68,
       "version_goal": null,
       "written": "2026-11-16",
@@ -1934,7 +1934,7 @@
       "requires": [],
       "author": "Claude (Ben, 2026-11-16: \"work with just 3D from now on\", design form)",
       "category": "UI",
-      "status": "designed",
+      "status": "complete",
       "authority_doc": "docs/ui/RENDERING.md",
       "id": "BL-1667",
       "short_name": "GROUND_3D_DETAIL",
@@ -1948,7 +1948,7 @@
       "design": "RENDERING.md § The 3D ground, \"The close-zoom detail layer draws on the mesh\". WORK: port the ground shader's per-family detail textures, per-tile offset and tone, bump lighting, wind, creeping sand, the structure mark, and the far rungs' flat map into the 3D fragment shader, each weighted by drawn radius from screen derivatives; the parallax and draw-time shadow marches retire."
     },
     {
-      "glyph": "~",
+      "glyph": "✓",
       "sprint": 68,
       "version_goal": null,
       "written": "2026-11-16",
@@ -1957,7 +1957,7 @@
       "requires": [],
       "author": "Claude (Ben, 2026-11-16: \"work with just 3D from now on\", design form)",
       "category": "UI",
-      "status": "designed",
+      "status": "complete",
       "authority_doc": "docs/ui/RENDERING.md",
       "id": "BL-1668",
       "short_name": "GROUND_3D_DRAPE",
@@ -1971,7 +1971,7 @@
       "design": "RENDERING.md § The 3D ground, \"Ground marks are draped\". WORK: draw the canvas's ground-space marks each frame into an offscreen texture in canonical space (lens washes, border band, fronts, province selection, road highlights, hover and selection hex) and sample it in the 3D fragment shader over the terrain."
     },
     {
-      "glyph": "~",
+      "glyph": "✓",
       "sprint": 68,
       "version_goal": null,
       "written": "2026-11-16",
@@ -1980,7 +1980,7 @@
       "requires": [],
       "author": "Claude (Ben, 2026-11-16: \"work with just 3D from now on\", design form)",
       "category": "UI",
-      "status": "designed",
+      "status": "complete",
       "authority_doc": "docs/ui/RENDERING.md",
       "id": "BL-1669",
       "short_name": "GROUND_3D_MARKERS_PICK",
@@ -1994,7 +1994,7 @@
       "design": "RENDERING.md § The 3D ground, \"Markers stand upright\" and \"Clicks pick the terrain\". WORK: one camera shared by canvas and ground; a canonical-to-screen through it (height included) for every marker, label and icon, hidden behind terrain by a depth read; a ray pick against the height field for hover, press and every hit test, replacing the squash inverse."
     },
     {
-      "glyph": "~",
+      "glyph": "✓",
       "sprint": 68,
       "version_goal": null,
       "written": "2026-11-16",
@@ -2003,7 +2003,7 @@
       "requires": [],
       "author": "Claude (Ben, 2026-11-16: \"work with just 3D from now on\", design form)",
       "category": "UI",
-      "status": "designed",
+      "status": "complete",
       "authority_doc": "docs/ui/RENDERING.md",
       "id": "BL-1670",
       "short_name": "GROUND_3D_BUILDINGS",
@@ -2039,6 +2039,30 @@
         "scripts/verify"
       ],
       "design": "TECH_FOUNDATIONS.md § Rendering dimension, \"The ground is 3D\" (Ben, 2026-11-16: remove the flat ground entirely). WORK: --verify runs the GPU renderer for the planetary canvas; ground checks move to structural asserts and tolerance compares; then the flat ground draw, the fixed-angle ground shader passes and the squash camera are deleted. Ordered after the drape and the pick, which replace what the flat path still does."
+    },
+    {
+      "glyph": "✓",
+      "sprint": 68,
+      "version_goal": null,
+      "written": "2026-11-16",
+      "parked": false,
+      "blocked_on": null,
+      "requires": [
+        "BL-1670"
+      ],
+      "author": "Claude (Ben, 2026-11-16: \"We can render the trees in 3D as well\"; \"File it and build\")",
+      "category": "UI",
+      "status": "complete",
+      "authority_doc": "docs/ui/RENDERING.md",
+      "id": "BL-1672",
+      "short_name": "GROUND_3D_TREES",
+      "priority": "B",
+      "difficulty": 3,
+      "title": "Forest stands as low-poly 3D trees on the 3D ground",
+      "files": [
+        "src/core/ground_slice_3d.cpp"
+      ],
+      "design": "RENDERING.md § The 3D ground, \"Trees stand in 3D\". WORK: scatter seeded low-poly trees (conifer cones, broadleaf crowns) over forest and scrub tiles by cover density, off roads, rivers and installations, into each close chunk's building mesh, lit and shadowed by the sun; the painted canopy stays as the forest floor."
     }
   ]
 }

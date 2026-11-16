@@ -23,6 +23,7 @@
 #include "shaders/border_band.dxil.h"
 #include "shaders/water_glint.dxil.h"
 #include "shaders/ground.dxil.h"
+#include "shaders/drape.dxil.h"
 #endif
 
 namespace gfx {
@@ -49,6 +50,7 @@ const std::array<effect_def, static_cast<std::size_t>(effect::count)> k_defs = {
     { "border_band", IO_DXIL(border_band), 0, 1 },
     { "water_glint", IO_DXIL(water_glint), 0, 1 },
     { "ground", IO_DXIL(ground), 5, 1 },
+    { "drape", IO_DXIL(drape), 1, 0 },
 }};
 
 struct effect_slot

@@ -4427,9 +4427,9 @@ void bake_region(const bake_source& src, const geometry& g, const bake_params& p
     apply_structure_mark(out, mark.data(), npx);
 }
 
-geometry make_master_geometry(int gw, int gh)
+geometry make_master_geometry(int gw, int gh, double tilt_sy)
 {
-    geometry g = make_geometry(gw, gh, k_master_ppr, k_tilt_sy);
+    geometry g = make_geometry(gw, gh, k_master_ppr, tilt_sy);
     const double period = gw * kSqrt3;
     // W to the nearest multiple of the alignment (s re-derived so wrap copies
     // still abut exactly), then H up to one: a few transparent rows of margin.

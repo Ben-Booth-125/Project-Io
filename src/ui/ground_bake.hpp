@@ -257,6 +257,14 @@ struct bake_params
     // full bake (ground_bake_check P23); false = always resolve per pixel
     // (the harness's comparison lever).
     bool  fast_lock       = true;
+    // THE 3D GROUND (RENDERING.md § The 3D ground, Ben 2026-11-16): the canvas draws the
+    // ground as a lit heightmesh, so the bake is taken straight down and stands nothing up.
+    // `standing` false: the installation pass paints its ground parts (pads, fields, yards)
+    // and the roads, and no shadow or standing structure - those are geometry. `flat_master`
+    // true: the master and far page are baked straight down (no oblique lift, no
+    // pre-stretched trees). Both default to the fixed-angle bake.
+    bool  standing        = true;
+    bool  flat_master     = false;
 };
 
 /// Per-tile source fields for one body, extracted once per bake batch so the
@@ -512,7 +520,7 @@ inline constexpr int    k_chunk_px = 512;
 
 /// The master geometry for a body grid: oblique at k_tilt_sy, ~k_master_ppr
 /// px per hex, W and H rounded to multiples of k_master_align.
-geometry make_master_geometry(int gw, int gh);
+geometry make_master_geometry(int gw, int gh, double tilt_sy = k_tilt_sy);
 
 /// Level @p level (0 = the master) of @p master: s, W and H halved @p level
 /// times; y_min, lift and tilt unchanged — the same image, smaller.

@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*108 entries — 53 open, 55 resolved.*
+*109 entries — 54 open, 55 resolved.*
 
 ---
 
@@ -584,6 +584,21 @@ The item named a signed distance field. The pass instead reads a one-texel-per-t
 > **Recommendation:** Keep it; the border rule follows hex edges by design (PLANETARY.md).
 
 *Files: `src/shaders/border_band.frag.hlsl`, `docs/ui/PLANETARY.md`*
+
+### NR-1230 — The flat ground stays on the software path: --verify captures still draw the squashed 2D map
+*question · raised 2026-11-16 · from BL-1671 (flat ground retired), sprint 68*
+
+On the GPU renderer the canvas now draws only the 3D ground: the squash is off, marks are draped, markers stand upright and clicks ray-pick. The software renderer (every --verify capture, and any machine without a GPU device) cannot run the 3D pass, so it still draws the flat, squashed map. Retiring that path too means moving --verify onto the GPU renderer, which moves every canvas golden and capture at once.
+
+**Why it matters.** Until it moves, a green visual run proves the 2D map, not the 3D one the player sees. Moving it is a bulk re-bless, which the golden policy reserves for you.
+
+- Keep the software path as the --verify map for now; check the 3D canvas by live click
+- Move --verify to the GPU renderer and re-bless the canvas captures once
+- Delete the 2D path and refuse to run the canvas without a GPU device
+
+> **Recommendation:** Keep it for now, then take the one re-bless when the 3D defaults settle.
+
+*Files: `src/ui/body_surface_canvas.cpp`, `src/core/ground_slice_3d.cpp`, `docs/ui/RENDERING.md`*
 
 ---
 

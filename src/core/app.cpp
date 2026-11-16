@@ -446,6 +446,15 @@ int app::run(autostart_mode autostart)
     // BL-1659 (live grade shader): where the ground shader loaded, the canvas
     // lifts the land at draw and the bake stops carrying it.
     m_ground.set_lift_at_draw(gfx::loaded(gfx::effect::ground));
+    // THE 3D GROUND (RENDERING.md § The 3D ground, Ben 2026-11-16): where the GPU renderer
+    // runs, the canvas ground is the lit heightmesh, so the bake is taken straight down and
+    // installations stand as geometry, not paint. Interactive only, like the lift above:
+    // the --verify software path keeps the fixed-angle bake its goldens were taken from.
+    if (gfx::gpu_renderer())
+    {
+        m_ground.params.flat_master = true;
+        m_ground.params.standing    = false;
+    }
     apply_ui_scale();
 
     m_lua.load("scripts/init.lua");

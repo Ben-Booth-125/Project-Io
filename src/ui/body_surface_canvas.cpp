@@ -60,6 +60,7 @@
 #include <vector>
 
 #include <SDL3/SDL_stdinc.h> // SDL_getenv: the pass meter's off-by-default flag
+#include <SDL3/SDL.h>        // the 3D ground's drape: render targets and SDL_RenderGeometry
 #include <imgui_internal.h> // ImDrawListSharedData: the static stroke cache re-emits ImGui-tessellated strokes (BL-1260)
 
 namespace ui {
@@ -3915,10 +3916,64 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     // (the lens legend's vertices are excluded from it), and this inverse
     // maps the real cursor into that flat space so every hit test works
     // unchanged.
-    const float  tilt_sy    = planetary_tilt_sy(zoom);
+    //
+    // THE 3D GROUND (RENDERING.md § The 3D ground; Ben, 2026-11-16: "work with just 3D
+    // from now on"). Where the renderer runs on the GPU device, the ground is a heightmesh
+    // under a perspective camera whose tilt follows the zoom, and the squash is retired:
+    // the canvas still draws in FLAT ground space, now untilted, and that flat drawing is
+    // DRAPED over the terrain (rendered into a texture the ground shader lays on), while
+    // the markers stand upright at their tile's projected point. The cursor is ray-picked
+    // into the same flat space, so every hit test still works in one space. The software
+    // path (--verify, a renderer with no GPU device) keeps the squash.
+    const ImVec2 fb_scale = ImGui::GetIO().DisplayFramebufferScale;
+    bool g3d = false;
+    if (raster_ok && gw > 0 && gh > 0 && gfx::gpu_renderer()
+        && state.ground.body == state.active_body && state.ground.far_ready)
+    {
+        gfx::slice::view sv;
+        const float gcx = grid_area_origin.x + grid_area_size.x * 0.5f;
+        const float gcy = grid_area_origin.y + grid_area_size.y * 0.5f;
+        sv.cx     = ((gcx - view_origin.x) / zoom + grid_cx) / hex_size;
+        sv.cy     = ((gcy - view_origin.y) / zoom + grid_cy) / hex_size;
+        sv.view_h = grid_area_size.y / (zoom * hex_size);
+        sv.draw_r = hex_size * zoom;
+        sv.x = grid_area_origin.x;  sv.y = grid_area_origin.y;
+        sv.w = grid_area_size.x;    sv.h = grid_area_size.y;
+        sv.fb = fb_scale.y;
+        g3d = gfx::slice::begin_frame(gfx::renderer(), sv);
+    }
+    const float  tilt_sy    = g3d ? 1.0f : planetary_tilt_sy(zoom);
     const float  tilt_pivot = canvas_centre.y;
-    const ImVec2 mouse_g    = { mouse.x,
-                                tilt_pivot + (mouse.y - tilt_pivot) / tilt_sy };
+    // Canonical units (hex circumradius 1) <-> flat ground space.
+    const auto flat_of_canon = [&](float x, float y) -> ImVec2 {
+        return to_screen({ x * hex_size, y * hex_size });
+    };
+    const auto canon_of_flat = [&](ImVec2 p) -> ImVec2 {
+        return { ((p.x - view_origin.x) / zoom + grid_cx) / hex_size,
+                 ((p.y - view_origin.y) / zoom + grid_cy) / hex_size };
+    };
+    // A flat point to where it is drawn on screen (off screen, far away, when the
+    // camera cannot see it); and a screen point to the flat point of the ground under it.
+    const auto view_pt = [&](ImVec2 p) -> ImVec2 {
+        if (!g3d)
+            return { p.x, tilt_pivot + (p.y - tilt_pivot) * tilt_sy };
+        const ImVec2 c = canon_of_flat(p);
+        float sx = 0.0f, sy = 0.0f;
+        if (gfx::slice::project(c.x, c.y, sx, sy))
+            return { sx, sy };
+        return { -1e6f, -1e6f };
+    };
+    const auto ground_pt = [&](ImVec2 s) -> ImVec2 {
+        if (!g3d)
+            return { s.x, tilt_pivot + (s.y - tilt_pivot) / tilt_sy };
+        float cx_ = 0.0f, cy_ = 0.0f;
+        if (s.x < grid_area_origin.x || s.y < grid_area_origin.y
+            || s.x > grid_area_origin.x + grid_area_size.x || s.y > grid_area_origin.y + grid_area_size.y
+            || !gfx::slice::pick(s.x, s.y, cx_, cy_))
+            return { -1e6f, -1e6f };
+        return flat_of_canon(cx_, cy_);
+    };
+    const ImVec2 mouse_g    = ground_pt(mouse);
     state.marker_tilt_sy    = tilt_sy;
     state.marker_tilt_pivot = tilt_pivot;
 
@@ -4011,8 +4066,14 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     // (and hit-tested) at every integer wrap offset k whose copy falls within the
     // canvas, so panning past either edge continues seamlessly from the far side.
     const float period_px = static_cast<float>(gw) * col_step * zoom;
-    const float visible_left  = grid_area_origin.x - hit_r;
-    const float visible_right = grid_area_origin.x + grid_area_size.x + hit_r;
+    // In 3D, the flat window is the ground the camera sees: its footprint.
+    float fp_x0 = 0.0f, fp_y0 = 0.0f, fp_x1 = 0.0f, fp_y1 = 0.0f;
+    if (g3d)
+        gfx::slice::footprint(fp_x0, fp_y0, fp_x1, fp_y1);
+    const float visible_left  = g3d ? flat_of_canon(fp_x0, 0.0f).x - hit_r
+                                    : grid_area_origin.x - hit_r;
+    const float visible_right = g3d ? flat_of_canon(fp_x1, 0.0f).x + hit_r
+                                    : grid_area_origin.x + grid_area_size.x + hit_r;
 
     // Draw the active body's tiles in a deterministic order — row-major over the
     // raster. This IS the old sorted-by-id order (tile generation creates each
@@ -4027,9 +4088,13 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     const float row_pitch = 1.5f * hex_size; // hex_local_centre's vertical pitch
     // The clip edges map into GROUND space first (the camera squash shows a
     // taller ground band than the screen band when tilted — BL-737).
-    const float clip_top_g = tilt_pivot + (grid_area_origin.y - hit_r - tilt_pivot) / tilt_sy;
-    const float clip_bot_g = tilt_pivot
-        + (grid_area_origin.y + grid_area_size.y + hit_r - tilt_pivot) / tilt_sy;
+    const float clip_top_g = g3d ? flat_of_canon(0.0f, fp_y0).y - hit_r
+        : tilt_pivot + (grid_area_origin.y - hit_r - tilt_pivot) / tilt_sy;
+    const float clip_bot_g = g3d ? flat_of_canon(0.0f, fp_y1).y + hit_r
+        : tilt_pivot + (grid_area_origin.y + grid_area_size.y + hit_r - tilt_pivot) / tilt_sy;
+    // The markers' vertical cull: the screen band flat, the footprint in 3D.
+    const float mark_top = g3d ? clip_top_g : grid_area_origin.y;
+    const float mark_bot = g3d ? clip_bot_g : grid_area_origin.y + grid_area_size.y;
     const int row_lo = raster_ok ? std::max(
         0, static_cast<int>(std::floor(
                ((clip_top_g - view_origin.y) / zoom + grid_cy) / row_pitch)))
@@ -4087,6 +4152,30 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     pm.begin(draw_r, static_cast<int>(state.overlay));
     pm.mark(canvas_pass_meter::setup, dl);
     int v_key_start = -1, v_key_end = -1;
+    const int c_map_start = dl->CmdBuffer.Size; // the first command the map can own
+    // 3D: ImGui culls text against the clip rect, so the map passes clip to the flat
+    // footprint, not the screen; apply_camera sets the screen clip back on the result.
+    if (g3d)
+        dl->PushClipRect({ visible_left, clip_top_g }, { visible_right, clip_bot_g }, false);
+    // The upright marks (3D): each a vertex span drawn in flat space around its anchor,
+    // moved whole to where the camera shows the anchor, so it stands facing the viewer.
+    struct upright_span { int v0, v1; ImVec2 at; };
+    static std::vector<upright_span> uprights;
+    uprights.clear();
+    const auto upright = [&](ImVec2 at, int v0) {
+        if (g3d && dl->VtxBuffer.Size > v0)
+            uprights.push_back({ v0, dl->VtxBuffer.Size, at });
+    };
+    int frame_v0 = -1, frame_v1 = -1;
+    gfx::slice::inputs slice_in;
+    // The drape's frame: the flat footprint, at up to 1.25 texels a framebuffer px.
+    const ImVec2 drape_min{ visible_left, clip_top_g }, drape_max{ visible_right, clip_bot_g };
+    const float  drape_scale = std::min(1.25f * fb_scale.x,
+        4096.0f / std::max({ 1.0f, drape_max.x - drape_min.x, drape_max.y - drape_min.y }));
+    SDL_Texture* const drape_tex = g3d
+        ? gfx::slice::drape_target(static_cast<int>(std::ceil((drape_max.x - drape_min.x) * drape_scale)),
+                                   static_cast<int>(std::ceil((drape_max.y - drape_min.y) * drape_scale)))
+        : nullptr;
     // The camera over [from, to) of this list's vertices.
     const auto squash = [&](int from, int to) {
         if (tilt_sy >= 1.0f || from < 0)
@@ -4448,15 +4537,33 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 ground_fx = gfx::effect::ground;
             }
         }
-        // BL-1665 (3D slice), "Show on the canvas": the 3D frame fills the canvas in place of
-        // the flat ground. It is emitted inside the squashed range, so its rectangle is
-        // pre-stretched by the squash's inverse to land exactly on the canvas.
-        if (SDL_Texture* const f3d = gfx::slice::canvas_frame())
+        // THE 3D GROUND: the camera's frame fills the grid area in place of the flat
+        // ground images. Its vertices are screen space already (apply_camera keeps them).
+        if (g3d)
         {
-            const float top = tilt_pivot + (grid_area_origin.y - tilt_pivot) / tilt_sy;
-            const float bot = tilt_pivot + (grid_area_origin.y + grid_area_size.y - tilt_pivot) / tilt_sy;
-            dl->AddImage((ImTextureID)(intptr_t)f3d, { grid_area_origin.x, top },
-                         { grid_area_origin.x + grid_area_size.x, bot });
+            if (SDL_Texture* const f3d = gfx::slice::frame())
+            {
+                frame_v0 = dl->VtxBuffer.Size;
+                const ImVec2 gmax{ grid_area_origin.x + grid_area_size.x, grid_area_origin.y + grid_area_size.y };
+                dl->AddImage((ImTextureID)(intptr_t)f3d, grid_area_origin, gmax);
+                // The ground marks over it, in the renderer's own queue so they are this
+                // frame's: the drape is drawn into its texture (finish_3d) before ImGui
+                // renders this list, while the 3D pass's own command buffer reaches the
+                // GPU first - sampled there, the marks trailed the land by a frame.
+                static int drape_bound_gen = -1;
+                SDL_Texture* const dc = gfx::slice::drape_coords();
+                const int gen = gfx::slice::drape_generation();
+                if (dc && drape_tex && gen != drape_bound_gen)
+                    drape_bound_gen = gfx::bind_textures(gfx::effect::drape, &drape_tex, 1, true)
+                                    ? gen : -1;
+                if (dc && drape_tex && drape_bound_gen == gen && gfx::available(gfx::effect::drape))
+                {
+                    gfx::begin(dl, gfx::effect::drape);
+                    dl->AddImage((ImTextureID)(intptr_t)dc, grid_area_origin, gmax);
+                    gfx::end(dl);
+                }
+                frame_v1 = dl->VtxBuffer.Size;
+            }
             dl->ChannelsMerge();
             return;
         }
@@ -4466,6 +4573,163 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             draw_ground_rect(cv);
         gfx::end(dl);
         dl->ChannelsMerge();
+    };
+    // THE 3D FINISH. Every map vertex is one of four kinds: the legend's (left alone), the
+    // camera's frame (screen space already), an upright mark (moved whole to its anchor's
+    // projection), or a ground mark - everything else, drawn in flat ground space. The
+    // ground marks are taken out of the list and drawn into the drape texture, which the
+    // ground shader lays over the terrain; then the 3D ground renders.
+    const auto finish_3d = [&] {
+        const int n = dl->VtxBuffer.Size;
+        if (n <= v_map_start)
+            return;
+        ImDrawVert* vtx = dl->VtxBuffer.Data;
+        static std::vector<std::uint8_t> kind; // 0 leave, 1 drape, 2 upright, 3 frame
+        kind.assign(static_cast<std::size_t>(n - v_map_start), 1u);
+        const auto mark = [&](int a, int b, std::uint8_t k) {
+            for (int i = std::max(a, v_map_start); i < std::min(b, n); ++i)
+                kind[static_cast<std::size_t>(i - v_map_start)] = k;
+        };
+        if (v_key_start >= 0)
+            mark(v_key_start, v_key_end, 0u);
+        if (frame_v0 >= 0)
+            mark(frame_v0, frame_v1, 3u);
+        for (const upright_span& u : uprights)
+        {
+            mark(u.v0, u.v1, 2u);
+            const ImVec2 c = canon_of_flat(u.at);
+            float sx = 0.0f, sy = 0.0f;
+            const bool seen = gfx::slice::project(c.x, c.y, sx, sy) && gfx::slice::in_sight(c.x, c.y);
+            for (int i = u.v0; i < u.v1 && i < n; ++i)
+            {
+                if (seen)
+                {
+                    vtx[i].pos.x += sx - u.at.x;
+                    vtx[i].pos.y += sy - u.at.y;
+                }
+                else
+                    vtx[i].col &= ~IM_COL32_A_MASK;
+            }
+        }
+        // The drape's frame: the flat footprint, at up to 1.25 texels a framebuffer px.
+        const ImVec2 dmin = drape_min;
+        const float scale = drape_scale;
+        SDL_Renderer* const rr = gfx::renderer();
+        SDL_Texture* const dt = drape_tex;
+        // Collect the ground marks' triangles, command by command, and the effect
+        // callbacks between them, in draw order.
+        // Each op owns its vertices (SDL walks every vertex passed it, per call).
+        struct drape_op { SDL_Texture* tex; int vfirst, vcount, first, count; ImDrawCmd cb; bool is_cb; };
+        static std::vector<drape_op> ops;
+        static std::vector<SDL_Vertex> dverts;
+        static std::vector<int> didx;
+        static std::vector<int> remap, remap_op;
+        ops.clear(); dverts.clear(); didx.clear();
+        remap.assign(static_cast<std::size_t>(n - v_map_start), -1);
+        remap_op.assign(static_cast<std::size_t>(n - v_map_start), -1);
+        const ImVec4 grid_clip{ grid_area_origin.x, grid_area_origin.y,
+                                grid_area_origin.x + grid_area_size.x, grid_area_origin.y + grid_area_size.y };
+        const ImDrawIdx* idx = dl->IdxBuffer.Data;
+        for (int ci = 0; ci < dl->CmdBuffer.Size; ++ci)
+        {
+            ImDrawCmd& cmd = dl->CmdBuffer[ci];
+            if (cmd.UserCallback)
+            {
+                // Only the map's own callbacks (the effect seam's begin and end), and
+                // never the composite's, which samples the drape being drawn.
+                if (ci >= c_map_start
+                    && cmd.UserCallbackData != reinterpret_cast<void*>(
+                           static_cast<std::intptr_t>(gfx::effect::drape)))
+                    ops.push_back({ nullptr, 0, 0, 0, 0, cmd, true });
+                continue;
+            }
+            if (cmd.ElemCount == 0)
+                continue;
+            const int first_v = static_cast<int>(cmd.VtxOffset + idx[cmd.IdxOffset]);
+            if (first_v < v_map_start)
+                continue;
+            const bool key_cmd = first_v >= v_key_start && first_v < v_key_end && v_key_start >= 0;
+            if (!key_cmd)
+                cmd.ClipRect = grid_clip;
+            SDL_Texture* const tex = (SDL_Texture*)(intptr_t)cmd.GetTexID();
+            const int op_id = static_cast<int>(ops.size());
+            const int vfirst = static_cast<int>(dverts.size());
+            const int first = static_cast<int>(didx.size());
+            for (unsigned e = 0; e + 2 < cmd.ElemCount; e += 3)
+            {
+                const int i0 = static_cast<int>(cmd.VtxOffset + idx[cmd.IdxOffset + e]);
+                if (i0 < v_map_start || kind[static_cast<std::size_t>(i0 - v_map_start)] != 1u)
+                    continue;
+                for (unsigned q = 0; q < 3; ++q)
+                {
+                    const int vi = static_cast<int>(cmd.VtxOffset + idx[cmd.IdxOffset + e + q]);
+                    if (vi < v_map_start)
+                        continue;
+                    const std::size_t ri = static_cast<std::size_t>(vi - v_map_start);
+                    int& r = remap[ri];
+                    if (remap_op[ri] != op_id)
+                    {
+                        remap_op[ri] = op_id;
+                        const ImDrawVert& v = vtx[vi];
+                        SDL_Vertex sv;
+                        sv.position  = { (v.pos.x - dmin.x) * scale, (v.pos.y - dmin.y) * scale };
+                        sv.color     = { ((v.col >> IM_COL32_R_SHIFT) & 0xFFu) / 255.0f,
+                                         ((v.col >> IM_COL32_G_SHIFT) & 0xFFu) / 255.0f,
+                                         ((v.col >> IM_COL32_B_SHIFT) & 0xFFu) / 255.0f,
+                                         ((v.col >> IM_COL32_A_SHIFT) & 0xFFu) / 255.0f };
+                        sv.tex_coord = { v.uv.x, v.uv.y };
+                        r = static_cast<int>(dverts.size()) - vfirst;
+                        dverts.push_back(sv);
+                    }
+                    didx.push_back(r);
+                }
+            }
+            const int count = static_cast<int>(didx.size()) - first;
+            if (count > 0)
+                ops.push_back({ tex, vfirst, static_cast<int>(dverts.size()) - vfirst, first, count,
+                                ImDrawCmd(), false });
+        }
+        // Take the ground marks out of the canvas list: their triangles collapse.
+        for (int i = v_map_start; i < n; ++i)
+            if (kind[static_cast<std::size_t>(i - v_map_start)] == 1u)
+            {
+                vtx[i].pos = { -1e5f, -1e5f };
+                vtx[i].col = 0u;
+            }
+        // Draw them into the drape.
+        float tw = 0.0f, th = 0.0f;
+        if (rr && dt && SDL_GetTextureSize(dt, &tw, &th) && tw > 0.0f && th > 0.0f)
+        {
+            SDL_Texture* const prev = SDL_GetRenderTarget(rr);
+            SDL_SetRenderTarget(rr, dt);
+            SDL_SetRenderViewport(rr, nullptr);
+            SDL_SetRenderClipRect(rr, nullptr);
+            SDL_SetRenderDrawColor(rr, 0, 0, 0, 0);
+            SDL_RenderClear(rr);
+            SDL_SetRenderDrawBlendMode(rr, SDL_BLENDMODE_BLEND);
+            for (drape_op& op : ops)
+            {
+                if (op.is_cb)
+                {
+                    if (op.cb.UserCallback == ImDrawCallback_ResetRenderState)
+                        SDL_SetGPURenderState(rr, nullptr);
+                    else
+                        op.cb.UserCallback(dl, &op.cb);
+                    continue;
+                }
+                SDL_RenderGeometry(rr, op.tex, dverts.data() + op.vfirst, op.vcount,
+                                   didx.data() + op.first, op.count);
+            }
+            SDL_SetGPURenderState(rr, nullptr);
+            SDL_SetRenderTarget(rr, prev);
+            // uv = canonical * a + b, the flat transform followed by the drape's.
+            slice_in.drape    = dt;
+            slice_in.drape_ax = hex_size * zoom * scale / tw;
+            slice_in.drape_ay = hex_size * zoom * scale / th;
+            slice_in.drape_bx = (view_origin.x - grid_cx * zoom - dmin.x) * scale / tw;
+            slice_in.drape_by = (view_origin.y - grid_cy * zoom - dmin.y) * scale / th;
+        }
+        gfx::slice::render(slice_in);
     };
     // Every map vertex emitted so far, minus the legend's: called once, at
     // whichever exit the frame takes (the input early-out included — a
@@ -4477,6 +4741,11 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         pm.mark(canvas_pass_meter::ground, dl);
         pm.end(dl, v_map_start);
         const int n = dl->VtxBuffer.Size;
+        if (g3d)
+        {
+            finish_3d();
+            return;
+        }
         if (v_key_start < 0)
             squash(v_map_start, n);
         else
@@ -5062,7 +5331,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         map_w = m * m * (3.0f - 2.0f * m);
     }
     lift_gpu = ground_on && raster_ok && (gview.draw_lift > 0 || detail_s > 0.0f || map_w > 0.0f) && !lift_table_failed
-            && gfx::loaded(gfx::effect::ground) && gw > 0 && gh > 0;
+            && gfx::loaded(gfx::effect::ground) && gw > 0 && gh > 0 && !g3d;
     if (lift_gpu)
     {
         lift_table.assign(static_cast<std::size_t>(gw) * static_cast<std::size_t>(gh), 0u);
@@ -5111,12 +5380,9 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                     map_table[ci] = (col & ~IM_COL32_A_MASK) | (a << IM_COL32_A_SHIFT);
                 }
     }
-    // BL-1665 (3D slice): the visible ground as a heightmesh - in its own window beside the
-    // F11 frame HUD, and, with "Show on the canvas" (Ben, 2026-11-16: "wire that into the
-    // main canvas so I can comment more accurately on it"), in place of the flat ground,
-    // the camera following the canvas view. A preview: the map's marks and clicks stay flat.
-    if ((state.show_frame_hud || gfx::slice::on_canvas()) && ground_on && raster_ok
-        && gfx::gpu_renderer() && gw > 0 && gh > 0)
+    // THE 3D GROUND's inputs: every surveyed tile's height and family, the chunks, the
+    // backdrop, the detail layer's tables and constants (apply_camera adds the drape).
+    if (g3d)
     {
         // Every surveyed tile's height and family (the tile table's packing), for the
         // backdrop as well as the chunks; hidden ground stays flat at zero.
@@ -5139,29 +5405,60 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                     slice_tiles[ci] = IM_COL32(255, detail_family(*t),
                                                t->landform == terrain_landform::mountain ? 255 : 0, ha);
             }
+        gfx::slice::set_tiles(slice_tiles.data(), gw, gh);
+        // The far map's table (BL-1661), while the map shows.
+        if (map_w > 0.0f)
+        {
+            map_table.assign(static_cast<std::size_t>(gw) * static_cast<std::size_t>(gh), 0u);
+            for (int r = 0; r < gh; ++r)
+                for (int c = 0; c < gw; ++c)
+                {
+                    const std::size_t ci = static_cast<std::size_t>(r) * gw + c;
+                    if (raster[ci] == null_entity || !survey_tile_visible(body.survey, gw, gh, c, r))
+                        continue;
+                    const tile_component* t = tile_rc(c, r);
+                    if (!t)
+                        continue;
+                    ImU32 col = k_map_paper;
+                    if ((slice_tiles[ci] & 0xFFu) == 0u)
+                        col = k_map_water;
+                    else if (const entity_id nat = nation_rc(c, r); nat != null_entity)
+                        col = lerp_colour(k_map_paper, palette::nation_colour(nat), k_map_nation_share);
+                    const unsigned a = 128u | (static_cast<unsigned>(t->river_edges) & 0x3Fu);
+                    map_table[ci] = (col & ~IM_COL32_A_MASK) | (a << IM_COL32_A_SHIFT);
+                }
+        }
         static std::vector<gfx::slice::chunk> slice_chunks;
         slice_chunks.clear();
         for (const ground_chunk_view& cv : gview.chunks)
             slice_chunks.push_back({ cv.x0, cv.y0, cv.x1, cv.y1, static_cast<SDL_Texture*>(cv.tex) });
-        const ImVec2 fbs = ImGui::GetIO().DisplayFramebufferScale;
-        gfx::slice::inputs si;
-        si.renderer   = gfx::renderer();
-        si.tiles      = slice_tiles.data();
-        si.gw         = gw;
-        si.gh         = gh;
-        si.chunks     = slice_chunks.data();
-        si.n_chunks   = static_cast<int>(slice_chunks.size());
-        si.lift_gamma = ui::ground::land_lift_gamma(gview.draw_lift);
-        si.far        = { gview.far.x0, gview.far.y0, gview.far.x1, gview.far.y1,
-                          static_cast<SDL_Texture*>(gview.far.tex) };
-        si.view_cx    = ((canvas_centre.x - view_origin.x) / zoom + grid_cx) / hex_size;
-        si.view_cy    = ((canvas_centre.y - view_origin.y) / zoom + grid_cy) / hex_size;
-        si.view_h     = grid_area_size.y / (zoom * hex_size);
-        si.draw_r     = hex_size * zoom;
-        si.view_px_w  = static_cast<int>(grid_area_size.x * fbs.x);
-        si.view_px_h  = static_cast<int>(grid_area_size.y * fbs.y);
-        si.window     = state.show_frame_hud;
-        gfx::slice::draw_window(si);
+        slice_in.chunks     = slice_chunks.data();
+        slice_in.n_chunks   = static_cast<int>(slice_chunks.size());
+        slice_in.lift_gamma = ui::ground::land_lift_gamma(gview.draw_lift);
+        slice_in.far        = { gview.far.x0, gview.far.y0, gview.far.x1, gview.far.y1,
+                                static_cast<SDL_Texture*>(gview.far.tex) };
+        slice_in.src        = gview.src;
+        gfx::slice::detail& d = slice_in.det;
+        d.tiles   = gfx::table_texture(3, gw, gh, slice_tiles.data());
+        d.map     = map_w > 0.0f ? gfx::table_texture(4, gw, gh, map_table.data()) : nullptr;
+        d.coarse  = gfx::detail_texture(0);
+        d.fine    = gfx::detail_texture(1);
+        d.rolling = gfx::detail_texture(2);
+        d.strength = k_detail_strength;           d.period = k_detail_period;
+        d.fine_strength = k_detail_fine_strength; d.fine_period = k_detail_fine_period;
+        d.r_none = k_detail_r_none;   d.r_full = k_detail_r_full;
+        d.map_r_none = k_map_r_none;  d.map_r_full = k_map_r_full;
+        d.coast_px = k_map_coast_half_px * fb_scale.x;
+        d.river_px = k_map_river_half_px * fb_scale.x;
+        d.edge_band = k_lift_edge_band;       d.tone_swing = k_tile_tone_swing;
+        d.mountain_mul = k_bump_mountain_mul; d.fine_bump_share = k_bump_fine_share;
+        d.gust = k_gust_brighten; d.flutter = k_blade_flutter; d.creep = k_sand_creep;
+        d.bump[0] = k_bump_vegetation; d.bump[1] = k_bump_forest; d.bump[2] = k_bump_arid; d.bump[3] = k_bump_rock;
+        d.famk[0] = k_fam_vegetation;  d.famk[1] = k_fam_forest;  d.famk[2] = k_fam_arid;  d.famk[3] = k_fam_rock;
+        d.wind[0] = k_wind_vegetation; d.wind[1] = k_wind_forest; d.wind[2] = 0.0f;        d.wind[3] = 0.0f;
+        d.time = state.fixed_frame_clock ? 0.0f : static_cast<float>(ImGui::GetTime());
+        if (state.show_frame_hud)
+            gfx::slice::draw_panel();
     }
     border_gpu = draw_border_band && ground_on && raster_ok && !border_table_failed
               && gfx::available(gfx::effect::border_band) && gw > 0 && gh > 0;
@@ -6844,7 +7141,9 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             {
                 constexpr ImU32 supply_col = IM_COL32(80, 200, 255, 200);
                 const float gr = std::max(2.0f, draw_r * 0.28f);
+                const int u0 = dl->VtxBuffer.Size;
                 icons::convoy(dl, {cx, cy}, gr, supply_col);
+                upright({cx, cy}, u0);
             }
 
             // BATTLE MARKER (BL-469). Drawn on the battle's DEFENDED TILE, its
@@ -6872,7 +7171,9 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                                     || b->defender == w.player_entity); // BL-1406
                     const ImU32 col = mine ? IM_COL32(255, 120, 90, 235)
                                            : IM_COL32(190, 170, 160, 190);
+                    const int u0 = dl->VtxBuffer.Size;
                     icons::battle(dl, {cx, cy}, std::max(3.0f, draw_r * 0.42f), col);
+                    upright({cx, cy}, u0);
                 }
             }
 
@@ -6961,8 +7262,10 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                     const bool hovered = state.overlay == overlay_mode::none
                                       && std::find(ws.begin(), ws.end(), state.hovered_entity) != ws.end();
                     const bool lit = std::find(ws.begin(), ws.end(), state.selected_entity) != ws.end();
+                    const int u0 = dl->VtxBuffer.Size;
                     icons::wing_marker(dl, wpos, wr, corp_identity(player_owner),
                                        static_cast<int>(ws.size()), hovered || lit);
+                    upright({cx, cy}, u0);
                     marker_hit_zone hz;
                     hz.id     = next;
                     hz.kind   = marker_hit_zone::kind::unit; // a marker the player aimed at, ahead of the ground
@@ -6995,8 +7298,10 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                     const bool hovered = state.overlay == overlay_mode::none
                                       && std::find(ss.begin(), ss.end(), state.hovered_entity) != ss.end();
                     const bool lit = std::find(ss.begin(), ss.end(), state.selected_entity) != ss.end();
+                    const int u0 = dl->VtxBuffer.Size;
                     icons::ship_marker(dl, spos, sr, ship_class_of(sh), corp_identity(sh.owner),
                                        static_cast<int>(ss.size()), hovered || lit);
+                    upright({cx, cy}, u0);
                     marker_hit_zone hz;
                     hz.id     = next;
                     hz.kind   = marker_hit_zone::kind::unit; // a marker the player aimed at, ahead of the ground
@@ -7010,15 +7315,19 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             // A CLOSED PORT (BL-1534): the blockade is public, as the port's trade stopping is.
             if (draw_r >= 6.0f && revealed && !w.closed_ports.empty() && w.closed_ports.count(id) != 0)
             {
+                const int u0 = dl->VtxBuffer.Size;
                 icons::closed_port_mark(dl, {cx - draw_r * 0.46f, cy - draw_r * 0.46f}, std::max(6.0f, draw_r * 0.22f));
+                upright({cx, cy}, u0);
                 ++state.ship.closed_marks;
             }
             // WHERE A CARGO WAS TAKEN (BL-1534): for the few ticks the Convoys ledger states it.
             if (draw_r >= 6.0f && revealed && !loss_tiles.empty())
                 if (const auto lt = loss_tiles.find(id); lt != loss_tiles.end())
                 {
+                    const int u0 = dl->VtxBuffer.Size;
                     icons::interception_mark(dl, {cx + draw_r * 0.46f, cy + draw_r * 0.40f}, std::max(6.0f, draw_r * 0.22f),
                                              lt->second ? palette::air_refused : palette::selection);
+                    upright({cx, cy}, u0);
                     ++state.ship.loss_marks;
                 }
             if (id == landing_mark && landing_mark != null_entity)
@@ -7056,8 +7365,10 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             // where the glyph has room to read; below that the wash carries it.
             if (site_active && revealed && draw_r >= 8.0f && site_class(t_col, t_row) == 2)
             {
+                const int u0 = dl->VtxBuffer.Size;
                 icons::no_logistics(dl, {cx, cy}, std::min(draw_r * 0.42f, 11.0f),
                                     palette::site_no_logistics);
+                upright({cx, cy}, u0);
                 ++state.site_finder.map_marks;
             }
             // THE RETURN OVER THE TILE (Ben, 2026-11-09): the table's Net, collected here
@@ -7390,8 +7701,8 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 trail_now[hm.m->id] = { drawn, own };
             }
             const ImVec2 sc = to_screen(drawn);
-            if (sc.y < grid_area_origin.y - cr * 2.0f
-                || sc.y > grid_area_origin.y + grid_area_size.y + cr * 2.0f)
+            if (sc.y < mark_top - cr * 2.0f
+                || sc.y > mark_bot + cr * 2.0f)
                 continue;
             const ImU32 col = corp_identity(m.owner);
             const ImU32 edge_col = selected ? palette::selection : hovered ? palette::hover : col;
@@ -7414,19 +7725,22 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 const float half_h = std::max(cr + 1.0f, count_size.y * 0.5f + pad_y);
                 const ImVec2 bmin{ mp.x - cr - 2.0f, mp.y - half_h };
                 const ImVec2 bmax{ mp.x + cr + 2.0f + count_size.x + pad_x, mp.y + half_h };
+                const int u0 = dl->VtxBuffer.Size;
                 dl->AddRectFilled(bmin, bmax, IM_COL32(14, 18, 26, 215), 3.0f);
                 dl->AddRect(bmin, bmax, edge_col, 3.0f, 0, (selected || hovered) ? 2.0f : 1.0f);
                 icons::convoy(dl, mp, cr * 0.72f, col);
                 dl->AddText(ImGui::GetFont(), count_font,
                             { mp.x + cr + 2.0f, mp.y - count_size.y * 0.5f },
                             IM_COL32(236, 240, 248, 255), num); // fit-exempt: the box is measured from this text
+                upright(mp, u0);
                 z.box_min = bmin;
                 z.box_max = bmax;
                 z.id     = next;
                 z.centre = mp;
                 z.radius = cr * 1.25f;
-                z.x      = mp.x;
-                z.y      = tilt_pivot + (mp.y - tilt_pivot) * tilt_sy;
+                const ImVec2 zv = view_pt(mp);
+                z.x      = zv.x;
+                z.y      = zv.y;
                 z.count  = static_cast<int>(marks.size());
                 z.mine   = m.mine;
                 state.convoy_zones.push_back(z);
@@ -7537,8 +7851,8 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 s_glide_trail[uid] = { drawn, target };
             const ImVec2 sc = to_screen(drawn);
             const float  uy = sc.y + draw_r * 0.50f;
-            if (uy < grid_area_origin.y - ur * 2.0f
-                || uy > grid_area_origin.y + grid_area_size.y + ur * 2.0f)
+            if (uy < mark_top - ur * 2.0f
+                || uy > mark_bot + ur * 2.0f)
                 continue;
             int men = 0;
             long long est = 0, ready = 0;
@@ -7571,8 +7885,9 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 state.marker_hit_zones.push_back(hz);
                 if (k == k_min)
                 {
-                    g.x = mpos.x;
-                    g.y = tilt_pivot + (mpos.y - tilt_pivot) * tilt_sy; // the camera's squash: a screen point
+                    const ImVec2 gv = view_pt(mpos); // the camera's: a screen point
+                    g.x = gv.x;
+                    g.y = gv.y;
                 }
             }
         }
@@ -7777,8 +8092,8 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     // vertical culling and horizontal wrap as every other settlement label.
     if (!w.population_centres.empty())
     {
-        const float visible_top    = grid_area_origin.y - hit_r;
-        const float visible_bottom = grid_area_origin.y + grid_area_size.y + hit_r;
+        const float visible_top    = mark_top - hit_r;
+        const float visible_bottom = mark_bot + hit_r;
 
         // Sorted gather: the store is an unordered_map, and overlapping labels
         // must overdraw in one deterministic order for the capture harness.
@@ -7834,6 +8149,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             for (int k = k_min; k <= k_max; ++k)
             {
                 const ImVec2 mc = { sc.x + static_cast<float>(k) * period_px, sc.y };
+                const int u0 = dl->VtxBuffer.Size;
                 ImVec2 tp{ mc.x + sr + 3.0f, mc.y - sr };
                 if (a.market)
                 {
@@ -7847,6 +8163,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 }
                 dl->AddText({ tp.x + 1.0f, tp.y + 1.0f }, IM_COL32(20, 22, 28, 200), name); // shadow // fit-exempt: legend box sized to its measured entries (container 2)
                 dl->AddText(tp, IM_COL32(236, 230, 214, 255), name); // fit-exempt: legend box sized to its measured entries (container 2)
+                upright(mc, u0);
             }
         }
     }
@@ -8014,8 +8331,8 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     if (state.overlay == overlay_mode::throughput && !state.lp_supplied.empty()
         && hit_r >= 20.0f && raster_ok)
     {
-        const float visible_top    = grid_area_origin.y - hit_r;
-        const float visible_bottom = grid_area_origin.y + grid_area_size.y + hit_r;
+        const float visible_top    = mark_top - hit_r;
+        const float visible_bottom = mark_bot + hit_r;
         const float line_h         = ImGui::GetTextLineHeight();
         for (int row = 0; row < state.lp_reaching_gh; ++row)
             for (int col = 0; col < state.lp_reaching_gw; ++col)
@@ -8097,8 +8414,8 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         && state.overlay != overlay_mode::continent && state.overlay != overlay_mode::population)
     {
         const entity_id pn_star = player_nation(w);
-        const float visible_top    = grid_area_origin.y - hit_r;
-        const float visible_bottom = grid_area_origin.y + grid_area_size.y + hit_r;
+        const float visible_top    = mark_top - hit_r;
+        const float visible_bottom = mark_bot + hit_r;
         const float base_r = std::clamp(hit_r * 0.42f, 7.0f, 14.0f);
         // Sorted (ascending nation id, the player's last so it draws on top), so
         // overlapping stars overdraw in one order for the capture harness.
@@ -8136,6 +8453,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             for (int k = k_min; k <= k_max; ++k)
             {
                 const ImVec2 c{ sc.x + static_cast<float>(k) * period_px, sc.y };
+                const int u0 = dl->VtxBuffer.Size;
                 if (mine)
                 {
                     // The seat's ring: a pale halo over a dark casing, outside the star.
@@ -8148,6 +8466,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 // is the outline rule's second ring, not a plate - it follows the star.
                 icons::capital(dl, c, sr * 1.22f, IM_COL32(246, 240, 222, 235));
                 icons::capital(dl, c, sr, col);
+                upright(c, u0);
                 ++state.capital_stars_drawn;
                 state.capital_star_player = state.capital_star_player || mine;
             }
@@ -8156,7 +8475,11 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
 
     // The unit counters, standing then marching, over the capital star.
     for (const deferred_counter& uc : unit_counters_drawn)
+    {
+        const int u0 = dl->VtxBuffer.Size;
         icons::unit_counter(dl, uc.pos, uc.r, uc.fill, uc.count, uc.hp, uc.ready, uc.bars, uc.hovered);
+        upright(uc.pos, u0);
+    }
 
     // Trade-flow lens (BL-1222; LENSES.md § Trade-flow lens). Reads only the
     // player's own dispatcher record (`w.player_trade_flow`, written by
@@ -8588,6 +8911,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             for (int k = k_min; k <= k_max; ++k)
             {
                 const ImVec2 c{ c0.x + static_cast<float>(k) * period_px, c0.y };
+                const int u0 = dl->VtxBuffer.Size;
                 dl->AddCircleFilled(c, cr + th * 0.5f, IM_COL32(10, 12, 18, 200), 24);
                 dl->AddCircle(c, cr, IM_COL32(70, 74, 86, 255), 24, th);
                 if (rd.frac > 0.0f)
@@ -8597,6 +8921,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                                   std::max(4, static_cast<int>(24.0f * rd.frac)));
                     dl->PathStroke(ink, ImDrawFlags_None, th);
                 }
+                upright(c, u0);
                 const float dx = mouse_g.x - c.x, dy = mouse_g.y - c.y;
                 if (dx * dx + dy * dy <= best_d2)
                 {
@@ -8609,8 +8934,9 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 m.row        = tit->second.grid_y;
                 m.days_done  = rd.days_done;
                 m.days_total = rd.days_total;
-                m.x          = c.x;
-                m.y          = tilt_pivot + (c.y - tilt_pivot) * tilt_sy; // after the squash
+                const ImVec2 mv = view_pt(c); // after the camera
+                m.x          = mv.x;
+                m.y          = mv.y;
                 m.r          = cr;
                 state.construction_ui.site_marks.push_back(m);
             }
@@ -8816,6 +9142,8 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         }
     }
 
+    if (g3d)
+        dl->PopClipRect();
     dl->PopClipRect();
 
     // The active lens's key, in the ONE lens chrome region (BL-602): the minimap's
@@ -8846,8 +9174,11 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         if (ts.x + 4.0f > draw_r * 1.73f)
             continue;
         state.site_finder.net_labels.push_back(txt); // the text as drawn, never where
-        const float y = tilt_pivot + (lab.y - draw_r * 0.42f - tilt_pivot) * tilt_sy;
-        const ImVec2 at{lab.x - ts.x * 0.5f, y - ts.y * 0.5f};
+        const ImVec2 lp = view_pt({ lab.x, lab.y });
+        if (g3d && !gfx::slice::in_sight(canon_of_flat({ lab.x, lab.y }).x, canon_of_flat({ lab.x, lab.y }).y))
+            continue;
+        const float y = lp.y - draw_r * 0.42f * tilt_sy;
+        const ImVec2 at{lp.x - ts.x * 0.5f, y - ts.y * 0.5f};
         dl->AddRectFilled({at.x - 2.0f, at.y}, {at.x + ts.x + 2.0f, at.y + ts.y}, IM_COL32(8, 14, 10, 170), 2.0f);
         dl->AddText(at, palette::positive, txt.c_str()); // fit-exempt: the guard above is the fit
     }
@@ -8892,8 +9223,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     // counter under it. A drag over nothing of the player's leaves what the press selected.
     if (state.unit_drag.pressed)
     {
-        const ImVec2 g0{ state.unit_drag.x0,
-                         tilt_pivot + (state.unit_drag.y0 - tilt_pivot) / tilt_sy };
+        const ImVec2 g0 = ground_pt({ state.unit_drag.x0, state.unit_drag.y0 });
         const float mdx = mouse.x - state.unit_drag.x0, mdy = mouse.y - state.unit_drag.y0;
         if (mdx * mdx + mdy * mdy > 36.0f)
             state.unit_drag.band = true; // six pixels: a shaky press stays a press
@@ -8991,7 +9321,8 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         ImDrawList* fdl = ImGui::GetForegroundDrawList();
         const ImVec2 ts  = ImGui::CalcTextSize(text.c_str());
         const float  pad = 5.0f;
-        const ImVec2 tl { mouse_g.x + 14.0f, mouse_g.y + 14.0f };
+        const ImVec2 tip = g3d ? mouse : mouse_g;
+        const ImVec2 tl { tip.x + 14.0f, tip.y + 14.0f };
         const ImVec2 br { tl.x + ts.x + pad * 2.0f, tl.y + ts.y + pad * 2.0f };
         const ImU32  edge = (tf_hover_marker >= 0) ? palette::neutral : palette::trade_flow_arrow;
         fdl->AddRectFilled(tl, br, IM_COL32(18, 18, 24, 235), 3.0f);
@@ -9057,7 +9388,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             const float  pad = 5.0f;
             // Positioned at the GROUND-space cursor: the camera squash maps it
             // back onto the real one (BL-737).
-            const ImVec2 tl { mouse_g.x + 14.0f, mouse_g.y + 14.0f };
+            const ImVec2 tl { (g3d ? mouse : mouse_g).x + 14.0f, (g3d ? mouse : mouse_g).y + 14.0f };
             const ImVec2 br { tl.x + ts.x + pad * 2.0f, tl.y + ts.y + pad * 2.0f };
             fdl->AddRectFilled(tl, br, IM_COL32(18, 18, 24, 235), 3.0f);
             fdl->AddRect(tl, br, label_col, 3.0f, 0, 1.5f);
@@ -9920,10 +10251,17 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             // read through the tilt's inverse, re-projected through it (one
             // angle now, so both are the same squash — BL-737, BL-1246).
             const float new_sy = planetary_tilt_sy(new_zoom);
-            const ImVec2 wp = { (mouse.x - view_origin.x) / zoom + grid_cx,
-                                (mouse_g.y - view_origin.y) / zoom + grid_cy };
-            const float target_gy = tilt_pivot + (mouse.y - tilt_pivot) / new_sy;
-            state.planetary_pan_x = mouse.x - (wp.x - grid_cx) * new_zoom - canvas_centre.x;
+            // 3D: the ground point under the cursor keeps its flat place, which the camera
+            // (scaled with the zoom) shows at nearly the same screen point; a cursor over
+            // no ground anchors the view's centre.
+            const bool   g3d_hit = g3d && mouse_g.x > -1e5f;
+            const ImVec2 anchor  = g3d ? (g3d_hit ? mouse_g : canvas_centre)
+                                       : ImVec2{ mouse.x, mouse_g.y };
+            const ImVec2 wp = { (anchor.x - view_origin.x) / zoom + grid_cx,
+                                (anchor.y - view_origin.y) / zoom + grid_cy };
+            const float target_gy = g3d ? anchor.y : tilt_pivot + (mouse.y - tilt_pivot) / new_sy;
+            const float anchor_x  = anchor.x;
+            state.planetary_pan_x = anchor_x - (wp.x - grid_cx) * new_zoom - canvas_centre.x;
             state.planetary_pan_y = target_gy - (wp.y - grid_cy) * new_zoom - canvas_centre.y;
             state.planetary_zoom  = new_zoom;
             if (!state.fixed_frame_clock && new_zoom != zoom)
@@ -9935,7 +10273,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 glide.t   = 0.0f;
                 glide.wx  = wp.x;
                 glide.wy  = wp.y;
-                glide.ax  = mouse.x;
+                glide.ax  = anchor_x;
                 glide.agy = target_gy;
             }
         }

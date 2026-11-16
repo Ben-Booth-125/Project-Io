@@ -11,6 +11,9 @@
 #include <array>
 #include <cstdint>
 #include <map>
+#include <memory>
+
+namespace ui::ground { struct bake_source; } // ground_bake.hpp (BL-1670: ground_view::src)
 #include <set>
 #include <string>
 #include <unordered_map>
@@ -1339,6 +1342,9 @@ struct ground_view
     /// BL-1659 (live grade shader): the land-lift level the canvas applies at draw
     /// (the ground shader); 0 when the bake carries the lift, or it is off.
     int draw_lift = 0;
+    /// BL-1670 (procedural 3D buildings): the source snapshot the active body's bake was
+    /// taken from, whose installations the 3D ground stands up as geometry. Null until set.
+    std::shared_ptr<const ui::ground::bake_source> src;
 };
 
 /// The Selection band's neighbourhood-page request (BL-1241): the tile the

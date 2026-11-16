@@ -588,7 +588,7 @@ ground_layer::body_state* ground_layer::ensure_body(const world& w, entity_id id
     b.id = id;
     b.gw = bit->second.grid_width;
     b.gh = bit->second.grid_height;
-    const gb::geometry m = gb::make_master_geometry(b.gw, b.gh);
+    const gb::geometry m = gb::make_master_geometry(b.gw, b.gh, params.flat_master ? 1.0 : gb::k_tilt_sy);
     for (int l = 0; l < L; ++l)
     {
         level_store& s = b.lv[l];
@@ -613,7 +613,7 @@ ground_layer::body_state* ground_layer::ensure_body(const world& w, entity_id id
     b.disk_pending.assign(n, 0);
     b.disk_size.assign(n, 0);
     b.disk_raw.assign(n, 0);
-    b.far_geom = gb::make_geometry(b.gw, b.gh, gb::k_far_ppr, gb::k_tilt_sy);
+    b.far_geom = gb::make_geometry(b.gw, b.gh, gb::k_far_ppr, params.flat_master ? 1.0 : gb::k_tilt_sy);
     b.far_cw = (b.far_geom.W + gb::k_chunk_px - 1) / gb::k_chunk_px;
     b.far_ch = (b.far_geom.H + gb::k_chunk_px - 1) / gb::k_chunk_px;
     b.far_jobs.assign(static_cast<std::size_t>(b.far_cw) * b.far_ch, 0);
@@ -1750,7 +1750,8 @@ void ground_layer::feed(bool verify)
             // Estimate before allocating anything: geometry only.
             const auto bit = w.bodies.find(c.id);
             const gb::geometry m = gb::make_master_geometry(bit->second.grid_width,
-                                                            bit->second.grid_height);
+                                                            bit->second.grid_height,
+                                                            params.flat_master ? 1.0 : gb::k_tilt_sy);
             long long est = 0;
             for (int l = 0; l < L; ++l)
             {
@@ -2498,6 +2499,7 @@ void ground_layer::publish(ui_state& ui, const body_state* bp) const
     const body_state& b = *bp;
     v.body      = b.id;
     v.draw_lift = m_lift_at_draw ? m_land_lift : 0;
+    v.src       = b.src; // BL-1670 (3D buildings): the installations the 3D ground stands up
     v.far_ready = b.far_ready && m_far_tex && m_far_tex_ver == b.far_ver;
     v.far.tex   = v.far_ready ? m_far_tex : nullptr;
     v.far.x0    = 0.0f;
