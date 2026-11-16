@@ -386,6 +386,22 @@ if(IO_DXC AND IO_SHADER_SOURCES)
             VERBATIM)
         list(APPEND IO_SHADER_HEADERS "${out}")
     endforeach()
+    # Vertex shaders (BL-1665 (3D slice)): <name>.vert.hlsl -> <name>_vert.dxil.h holding
+    # g_<name>_vert_dxil, for passes that draw their own geometry on the GPU device.
+    file(GLOB IO_VERT_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/shaders/*.vert.hlsl")
+    foreach(src IN LISTS IO_VERT_SOURCES)
+        get_filename_component(fname "${src}" NAME)          # slice3d.vert.hlsl
+        string(REPLACE ".vert.hlsl" "_vert" sname "${fname}") # slice3d_vert
+        set(out "${CMAKE_BINARY_DIR}/generated/shaders/${sname}.dxil.h")
+        add_custom_command(
+            OUTPUT "${out}"
+            COMMAND "${CMAKE_COMMAND}" -E make_directory "${CMAKE_BINARY_DIR}/generated/shaders"
+            COMMAND "${IO_DXC}" -nologo -T vs_6_0 -E main -O3 -Fh "${out}" -Vn "g_${sname}_dxil" "${src}"
+            DEPENDS "${src}" ${IO_SHADER_INCLUDES}
+            COMMENT "DXC ${fname}"
+            VERBATIM)
+        list(APPEND IO_SHADER_HEADERS "${out}")
+    endforeach()
     add_custom_target(io_shaders DEPENDS ${IO_SHADER_HEADERS})
     add_dependencies(ProjectIo io_shaders)
     target_include_directories(ProjectIo PRIVATE "${CMAKE_BINARY_DIR}/generated")
