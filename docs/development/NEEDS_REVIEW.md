@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*109 entries — 56 open, 53 resolved.*
+*110 entries — 57 open, 53 resolved.*
 
 ---
 
@@ -628,6 +628,19 @@ MEASURED (space_launch_census, the app's own monthly tick). SHIPPED: seeds 0, 28
 > **Recommendation:** A: the boost mechanism does what SPACE_ASSETS.md says; the walls are research pacing and components supply, each a design question of its own. Start with why spacecraft_components is never made: the over-ceiling price at zero stock silences its want at most pads.
 
 *Files: `tools/verify/space_launch_census.cpp`, `src/world/economy_system.cpp`, `docs/economy/SPACE_ASSETS.md`*
+
+### NR-1231 — Industry startups open space to the rivals but cost the tick-50 market gate 1.6 points: turn the switch on?
+*question · raised 2026-11-16 · from BL-1673 (industry startups), measured behind its switch*
+
+Built as ruled (Ben, 2026-11-16: start new industries though not the most profitable; waive supply and arrival; behind a switch). Off, the scorer is byte-identical: the 16 digests match the merge gate's exactly, and world_determinism passes. ON, staged (rivals handed Rocketry), space_launch_census to 2030: rival launches seed 0 6 -> 170 (first 2000 -> 1972), 46 0 -> 57 (1976), 13 0 -> 19 (1977), 7 0 -> 2 (1978); Spacecraft Assembly Plants by 2030 21 / 35 / 18 / 0 standing, through the heavy method (machinery + steel; alloys and electronics stay near 0). Shipped worlds still launch nothing: no nation reaches Rocketry by 2030 (the research wall, NR-1229). market_viability quick, off -> on: G1 87.6 -> 91.1, G1t50 84.2 -> 82.6 (FAILS its 84), G1b 3.9 -> 1.5, G2 143.4 -> 140.0, G3 100 -> 100. Seed 0 staged launches 157 comms satellites by 2030, which may be more than the design wants.
+
+**Why it matters.** It is the first lever that opens space to the rivals at all; it fails one market gate by 1.6 points, and a failing gate is not weakened.
+
+- Turn it on and accept the G1t50 miss, carried as its own item
+- Keep it off; tune it first (fewer startups - one a year, or only for goods a standing plant or pad wants) and re-measure
+- Turn it on only after the research wall is answered, since shipped worlds cannot use it yet
+
+> **Recommendation:** B: tune first. The tick-50 cost likely comes from startups for ordinary goods early in play; limiting them to products some standing building or pad already wants should keep the space effect and spare the gate. The research wall is the next blocker either way.
 
 ---
 

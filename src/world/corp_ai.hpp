@@ -487,6 +487,10 @@ struct nation_build_tally
 };
 /// NR-1229: arms the processor trace above. Off unless a harness sets it.
 bool& proc_trace_armed();
+/// A rival nation's STARTUP (Ben, 2026-11-16; AI_OPPONENT.md § 11, NATIONS.md § 3): a plant
+/// for a product its own ground makes nowhere, admitted without spare input. Behind this
+/// switch while it is measured; off, the scorer is byte-identical to before.
+bool& industry_startup_enabled();
 std::map<entity_id, nation_build_tally>& nation_build_tally_log();
 
 float corp_reserve_floor(const world& w, const recipe_registry& reg,

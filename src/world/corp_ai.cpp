@@ -335,6 +335,9 @@ struct candidate
     float                 glut_rate    = 0.0f; ///< its primary output per tick (the glut forecast's added rate)
     int                   glut_horizon = 0;    ///< the forecast horizon it was scored at
     float                 batches      = 0.0f; ///< a processor's batches (its draw = inputs x batches)
+    /// A STARTUP (Ben, 2026-11-16): admitted without spare input, so the same-evaluation
+    /// re-check does not re-ask the input gates of it.
+    bool                  startup      = false;
 };
 
 /// The BUDGET CLASS a candidate competes in — and, by construction, the only
@@ -544,6 +547,12 @@ bool& proc_trace_armed()
 {
     static bool armed = false;
     return armed;
+}
+
+bool& industry_startup_enabled()
+{
+    static bool on = false;
+    return on;
 }
 
 std::map<entity_id, nation_build_tally>& nation_build_tally_log()
@@ -4910,6 +4919,20 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                 return g != 0 && it->second.count(g) != 0;
             };
 
+            // STARTUPS (Ben, 2026-11-16; NATIONS.md § 3, "A rival starts new industries"): the
+            // products this nation's own ground already makes, standing or building - a method of
+            // any other product is a new industry. One startup an evaluation.
+            const bool startups_on = industry_startup_enabled() && actor.is_nation && !actor.is_player;
+            std::set<std::string> own_groups;
+            if (startups_on)
+                for (const entity_id bid : *actor.assets)
+                    if (const auto bit = w.buildings.find(bid);
+                        bit != w.buildings.end() && bit->second.type == building_type::processing_facility
+                        && !bit->second.decommissioned)
+                        if (const recipe* orc = reg.get_recipe(bit->second.recipe); orc != nullptr)
+                            own_groups.insert(orc->group);
+            bool startup_taken = false;
+
             for (const entity_id tile : own_tiles)
             {
                 // A PLANT THAT EATS THE GLUT (BL-1651; Ben, 2026-11-15, "processors that eat the
@@ -4974,6 +4997,7 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                 // order rather than registry-walk order — a function of the
                 // roster, not of iteration.
                 std::map<std::string, std::pair<uint16_t, float>> product_best;
+                std::set<uint16_t> startup_rids; // methods admitted on this tile as a startup
                 for (int i = 0; i < n_recipes; ++i)
                 {
                     const recipe&  rc  = reg.play_recipe_at(building_type::processing_facility, i);
@@ -5125,6 +5149,36 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                                                              + abs->inputs[r] * batches);
                         input_cost[r] = landed;
                     }
+                    if (!supplied && startups_on && !startup_taken && !stacked && mid != null_entity
+                        && own_groups.count(abs->group) == 0)
+                    {
+                        // A STARTUP (Ben, 2026-11-16): a product this nation makes nowhere, admitted
+                        // without spare input. Priced as the chain start is - each input at the posted
+                        // price where it cannot be had - and asked every other test below: a profit
+                        // once fed, its output's buyer, placement, materials, the solvency gate.
+                        (void)recipe_inputs_obtainable(w, reg, reach(), mid, pool, *abs,
+                                                       batches, null_entity, input_cost);
+                        const resource_type srt = primary_output(*abs);
+                        const building_profit sbp = estimate_prospective_profit(
+                            w, reg, tile, building_type::processing_facility, srt, rid,
+                            nullptr, &input_cost);
+                        const float s_rate = abs->outputs[static_cast<std::size_t>(srt)] * batches;
+                        const int   s_hz   = authored_build_ticks(pe) + p.forecast_clearing_ticks;
+                        if (sbp.has_data && sbp.net() > 0.0f
+                            && forecast_glut_multiplier(w, tile, srt, s_rate, s_hz, p, &pending_out()) > 0.0f)
+                        {
+                            const float sn = sbp.net();
+                            auto slot = product_best.find(abs->group);
+                            if (slot == product_best.end()
+                                || sn > slot->second.second
+                                || (sn == slot->second.second && rid < slot->second.first))
+                            {
+                                product_best[abs->group] = std::make_pair(rid, sn);
+                                startup_rids.insert(rid);
+                            }
+                            continue;
+                        }
+                    }
                     if (!supplied)
                     {
                         // BL-1227, the chain start (§ 11): refused ONLY for an
@@ -5218,6 +5272,9 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                     (void)grp; // the key is the category; the pick is what to build
                     const uint16_t best_recipe = pick.first;
                     const float    best_net    = pick.second;
+                    const bool     is_startup  = startup_rids.count(best_recipe) != 0;
+                    if (is_startup && startup_taken)
+                        continue; // one startup an evaluation
                     const recipe* rc = reg.get_recipe(best_recipe);
                     // The target names the primary output. It is what the glut
                     // forecast is run against, and it is the argument placement_rules
@@ -5268,6 +5325,7 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                     // that trap by making corp_command assert the built processor
                     // kept the recipe it was given.
                     c.cmd.recipe = best_recipe;
+                    c.startup      = is_startup;
                     c.glut_rate    = added_rate;
                     c.glut_horizon = horizon;
                     c.batches      = batches;
@@ -5289,6 +5347,8 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                     c.reason = corp_decision_reason::best_build;
                     c.bucket = bucket_for_reason(c.reason);
                     cands.push_back(c);
+                    if (is_startup)
+                        startup_taken = true;
                 }
             }
         }
@@ -6720,7 +6780,7 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                 }
                 bool still = forecast_glut_multiplier(w, c.cmd.tile, c.cmd.target, c.glut_rate,
                                                       c.glut_horizon, p, &pending_out()) > 0.0f;
-                if (still && c.cmd.type == building_type::processing_facility)
+                if (still && c.cmd.type == building_type::processing_facility && !c.startup)
                     if (const recipe* rc = reg.get_recipe(c.cmd.recipe); rc != nullptr)
                     {
                         const entity_id mid = market_for_tile(w, c.cmd.tile);

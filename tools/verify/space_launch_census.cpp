@@ -20,7 +20,7 @@
 //
 // The calendar: tick 0 is January of the epoch year (1960), a tick is a month (BL-1642).
 //
-//   build_gen/verify/space_launch_census.exe [--seeds a,b,c] [--year Y] [--replay] [--stage-space]
+//   build_gen/verify/space_launch_census.exe [--seeds a,b,c] [--year Y] [--replay] [--stage-space] [--startups]
 //
 // Build: cmd //c tools\verify\build_lua_harness.bat space_launch_census. Run from the repo root.
 
@@ -326,6 +326,8 @@ int main(int argc, char** argv)
             replay = true;
         else if (std::strcmp(argv[i], "--stage-space") == 0)
             stage_space = true;
+        else if (std::strcmp(argv[i], "--startups") == 0)
+            industry_startup_enabled() = true; // Ben, 2026-11-16: the startup switch, measured
     }
     int fails = 0;
     for (const std::uint32_t seed : seeds)

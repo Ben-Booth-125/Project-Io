@@ -276,6 +276,18 @@ refused because their market already holds more than it buys, its surplus has tw
 - **Export.** A rival nation builds Planetary Marketplaces and sets its own manual trades, so a good its
   home market cannot absorb is sold onto markets that can (`../economy/TRADE.md` § Who may trade).
 
+**A rival starts new industries (Ben, 2026-11-16).** A deep product has no buyer until the plant above
+it stands, and that plant needs the product spare already, so a chain four levels deep never fills from
+the bottom: measured, rival nations asked for a Spacecraft Assembly Plant hundreds of thousands of
+times across four worlds and almost none was admitted, for want of spare alloys, steel and machinery
+(NR-1229). So a rival may build a **startup**: a plant for a product no processor on its own ground
+makes, standing or building. A startup is admitted without spare input - the supply clause and the
+supply-that-arrives test are waived for it - and need not be the turn's best build. Everything else
+holds: its output has a buyer, its estimated profit is positive once it runs fed, it stands on the
+nation's own ground, its materials are obtainable, and the solvency gate admits it. One startup a turn.
+Standing starved, it posts its want like any plant (`../economy/MARKETS.md`), and that want is the buyer
+the plant beneath it reads next turn. Demand walks down the chain one level at a time, on public facts.
+
 The ten lines, in their authored enum order (append-only once serialised — a weight vector is
 indexed by them):
 

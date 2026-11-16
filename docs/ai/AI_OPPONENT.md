@@ -2494,6 +2494,16 @@ boilerplate: pure, seeded, deterministic, replayable, legal verbs only, never a 
   so a rich nation spends its surplus on force as well as on buildings. **Not admitted:** reading
   another nation's treasury; sizing the player's nation; disbanding; a plan beyond the next hire.
   Pure, seeded, deterministic, replayable, legal verbs only, never a planner.
+  **A rival may start a new industry — granted (Ben, 2026-11-16; `../politics/NATIONS.md` § 3).**
+  His words: *"We should encourage the AI to attempt to startup new industries even when they are not
+  the most profitable."* A rival nation may build a plant for a product its own ground makes nowhere -
+  a STARTUP - though it is not its best build, and though no spare input for it exists yet: for that
+  plant the input-supply clause and the supply-that-arrives test are waived (Ben, 2026-11-16, "waive
+  supply and arrival"). Standing, it posts its want like any plant, and that public want is the buyer
+  the level beneath reads. Every other test holds: its output has a buyer, it stands on the nation's
+  own ground, its materials are obtainable, the solvency gate admits its cost. **Not admitted:** a chain
+  chosen in one turn; building for another nation; reading another nation's plans. Pure, seeded,
+  deterministic, replayable, legal verbs only, never a planner.
   **Rival nations fire missiles — granted (Ben, 2026-11-10; `../military/MILITARY.md` § Missiles).**
   A new subject: a rival nation's scorer may buy missiles and interceptors onto its OWN shelves, fire
   a missile from one of its OWN launchers at a province or building of a nation it is already hostile
