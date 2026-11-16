@@ -2712,6 +2712,22 @@ void write_world_snapshot_at(const world& w, std::ostream& out, uint32_t version
             }
     }
     // ===== END BL-1614 =====
+    // ===== BEGIN BL-1637 (v96): A PAD'S BANKED BOOST, the last section =====
+    if (world_stream_has_launch_boost(version))
+    {
+        std::vector<entity_id> ids;
+        for (const auto& [bid, b] : w.buildings)
+            if (b.boost != 0.0f)
+                ids.push_back(bid);
+        std::sort(ids.begin(), ids.end()); // `buildings` is unordered
+        w_u32(out, static_cast<uint32_t>(ids.size()));
+        for (const entity_id bid : ids)
+        {
+            w_id(out, bid);
+            w_f32(out, w.buildings.at(bid).boost);
+        }
+    }
+    // ===== END BL-1637 =====
 }
 
 void write_world_snapshot_pre_missiles(const world& w, std::ostream& out)
@@ -2900,6 +2916,20 @@ void write_world_snapshot_pre_space_bombard(const world& w, std::ostream& out)
 std::size_t world_save_space_bombard_section_bytes(const world& w)
 {
     return 4 + 9 * w.space_bombard_orders.size();
+}
+
+void write_world_snapshot_pre_launch_boost(const world& w, std::ostream& out)
+{
+    // VERIFICATION ONLY (BL-1637): the v95 stream shape - no pad-boost section.
+    write_world_snapshot_at(w, out, k_world_save_version_pre_launch_boost);
+}
+
+std::size_t world_save_launch_boost_section_bytes(const world& w)
+{
+    std::size_t n = 4;
+    for (const auto& [bid, b] : w.buildings)
+        n += b.boost != 0.0f ? 8 : 0;
+    return n;
 }
 
 void write_world_snapshot_pre_transit_origin(const world& w, std::ostream& out)
@@ -3556,12 +3586,14 @@ std::size_t tail_bytes_after_key(int version, const world& w)
         { k_space_key + k_world_save_version_offworld_bases, world_save_offworld_base_section_bytes },      // v90
         { k_space_key + k_world_save_version_space_firsts, world_save_space_firsts_section_bytes },       // v91
         { k_space_key + k_world_save_version_transit_origin, world_save_transit_origin_section_bytes },     // v92
+        // BL-1637: after every space-line section in writer order, so keyed past them all.
+        { 2 * k_space_key + k_world_save_version_launch_boost, world_save_launch_boost_section_bytes },     // v96
     };
     // BL-1641: v94 (one building per product) adds no section, nor does v95 (BL-1642, the
     // monthly tick), so the table ends at v92's. v95 does GROW one record: each off-world
     // base carries its loss carry (16 bytes, was 12) - the v90 row above counts today's
     // stream, which is what a tail "after" an older version is measured in.
-    static_assert(world_save_version == k_world_save_version_monthly,
+    static_assert(world_save_version == k_world_save_version_launch_boost,
                   "BL-1632: a new trailing section joins world_save_tail_bytes_after's table");
     assert(version >= static_cast<int>(k_world_save_version_pre_tax)); // older tails are not today's
     std::size_t n = 0;
@@ -3648,6 +3680,7 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
     // of v48.
     if (!r_u32(in, version)
         || (version != world_save_version && version != k_world_save_version_pre_lp
+            && version != k_world_save_version_pre_launch_boost // BL-1637: v95, no pad boost
             && version != k_world_save_version_one_product // v94: v95's layout, the quarter tick (BL-1642)
             && version != k_world_save_version_space_merge // BL-1641: v93, the same layout as v94
             && version != k_world_save_version_pre_rail
@@ -6715,6 +6748,34 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
         }
     }
     // ===== END BL-1614 =====
+    // ===== BEGIN BL-1637 (v96): a pad's banked boost. Untrusted, refused whole on any
+    // breach of world_save.hpp's v96 paragraph. A v95 (and older) stream ends before
+    // it: every pad holds none. Read into scratch, applied only when all pass. =====
+    if (world_stream_has_launch_boost(version))
+    {
+        uint32_t count = 0;
+        if (!r_u32(in, count) || count > s.buildings.size())
+            return false;
+        std::vector<std::pair<entity_id, float>> recs;
+        recs.reserve(count);
+        entity_id prev = null_entity;
+        for (uint32_t k = 0; k < count; ++k)
+        {
+            entity_id bid   = null_entity;
+            float     boost = 0.0f;
+            if (!r_id(in, bid) || bid == null_entity || (k > 0 && bid <= prev) || !r_f32(in, boost)
+                || !std::isfinite(boost) || !(boost > 0.0f) || boost > k_pad_boost_max)
+                return false;
+            prev = bid;
+            const auto bit = s.buildings.find(bid);
+            if (bit == s.buildings.end() || bit->second.type != building_type::launchpad)
+                return false;
+            recs.emplace_back(bid, boost);
+        }
+        for (const auto& [bid, boost] : recs)
+            s.buildings.at(bid).boost = boost;
+    }
+    // ===== END BL-1637 =====
 
     // BL-1266 (v46): every manual trade names a live owner and two distinct
     // standing markets, and holds an id below the next one to be issued, all

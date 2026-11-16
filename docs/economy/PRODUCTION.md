@@ -524,7 +524,7 @@ Infrastructure buildings affect logistical or economic capacity rather than extr
 |----------|----------|-----|
 | Port | A sea-lane node for shipments on the body, and a maker of **trade points** for its owner (`TRADE.md` § The Planetary Marketplace); coastal placement (`is_coastal`) | 0 |
 | Planetary Marketplace | Makes **trade points** for its owner each tick at its staffed rate — the capacity a trade spends to move goods between markets (`building_type::planetary_marketplace`; `TRADE.md` owns the rule). Cost and maintenance in `economy.buildings.planetary_marketplace`. | any |
-| Launchpad | Required on the source body for any trade between bodies; each launch burns propellant the trader buys off the source shelf | 0 (built), 1 (operational) |
+| Launchpad | Required on the source body for any trade between bodies; a processor that draws launch goods off its market's shelf and banks them as boost, which every launch through it spends (`SPACE_ASSETS.md` § Boost) | 0 (built), 1 (operational) |
 | Inland Logistics Hub | Land-mode logistics node (`building_type::inland_logistics_hub`, BL-149): its tile joins the population-centre set that discounts the A\* haul cost of any intra-body convoy routed through it (LOGISTICS.md). The player-placeable counterpart to a city's free-hub discount — extends the cheap land network out to remote sites. Produces nothing (0 workforce); cost in `economy.buildings.inland_logistics_hub`. | 0 |
 | Military Base | Unit muster building (`building_type::military_base`, BL-325). Produces nothing, staffs at zero, and is deliberately **not** a supply anchor — military reach IS the economic reach field. `docs/military/MILITARY.md`. | any |
 | Bunker | Concrete on a tile (`building_type::bunker`). Produces nothing, staffs at zero, one to a tile on any land tile of the builder's own ground; its owner's units defending the tile gain defence and hardness by its condition (`docs/military/MILITARY.md` § Fortifications). Cost in `economy.buildings.bunker`. | any |
@@ -556,14 +556,13 @@ makes no trade points that tick (`TRADE.md` § The Planetary Marketplace).
 
 **The Launchpad is the physical gate to space**: a trader must hold one on the source body before
 any trade between bodies can ship (`corp_has_launchpad_on`, `src/world/supply_system.cpp`), and
-the launch must be **fuelled** as well as the pad present. Each launch burns **1.0 unit of
-propellant** (`launch_draw_per_convoy`, `src/world/supply_system.cpp`): per launch, not per unit
-of cargo and not per AU — the pad is the thing being fuelled. **The trader buys that propellant
-off the source market's shelf** at the posted price, under the fair-price ceiling, with the
-shipment it launches (Ben, 2026-10-10); there is no reserve of launch fuel held anywhere. A shelf
-with no propellant, or propellant priced over the ceiling, shuts the pad exactly as no pad at all
-would. A shipment of propellant itself cannot burn the cargo it carries; the launch's own draw is
-taken off the shelf first. See **`docs/economy/ERAS.md`** for the Era 1→2 transition.
+the launch must be **fuelled** as well as the pad present. A staffed pad is a processor: it
+draws `spacecraft_components` and `propellant` off its own market's shelf each tick, in the ratio
+a launch burns them, and banks them as **boost** up to a cap (`SPACE_ASSETS.md` § Boost). Each
+straight-line launch spends **1.0 boost** (`launch_draw_per_convoy`,
+`src/world/supply_system.cpp`): per launch, not per unit of cargo and not per AU — the pad is the
+thing being fuelled. A pad holding less than a launch's boost shuts the lane exactly as no pad at
+all would; nothing is bought off the shelf at the moment of launch. See **`docs/economy/ERAS.md`** for the Era 1→2 transition.
 
 *Save-format note.* Appending a `resource_type` value renumbers nothing but changes the length of
 every per-resource array; every such array is sized off `resource_count`, so the append costs a

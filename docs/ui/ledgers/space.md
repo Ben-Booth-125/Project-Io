@@ -13,7 +13,7 @@
 
 | View | Question it answers |
 |---|---|
-| **Launch** (default) | What can I launch, to where, and what will it cost? A class picker (satellite with its role, station core, crewed mission, rover), a destination picker listing orbital nodes with their free slots and the path's thrust cost, and the quote: goods off the home shelf at their price, credits, travel days, crew drawn. Refused launches say why. |
+| **Launch** (default) | What can I launch, to where, and what will it cost? A class picker (satellite with its role, station core, crewed mission, rover), a destination picker listing orbital nodes with their free slots and the path's thrust cost, and the quote: the boost the launch spends against what the home pad has banked, credits, travel days, crew drawn. Refused launches say why. |
 | **Assets** | What do I have up there? One row per satellite, station and mission: class, role, node, state (in transit / active / decaying), upkeep, and whether its node is in comms coverage. Orders waiting on a signal show as *pending — no signal*. |
 | **Stations** | The station designer for the station picked in the Assets view or on the canvas. |
 | **Crew** | How many astronauts do I hold, how fast are they trained, and where are they? |
@@ -38,7 +38,7 @@ research allows, quoted like any launch.
 - **Sub-levels + default.** Launch / Assets / Stations / Crew; opens on Launch.
 - **Lens on open.** None. Space has no map field; the Circumplanetary canvas already draws the nodes.
 - **Data sources.** The space-asset store, the station store and templates, the nation's astronaut
-  pool, the orbital graph (paths, slots), the nation's comms coverage, the home market's shelf.
+  pool, the orbital graph (paths, slots), the nation's comms coverage, the home pad's banked boost.
 - **Toggle / close.** The rail icon toggles the ledger; re-clicking the active tab closes it.
 - **What it leaves elsewhere.** A picked satellite or station's own card is the Selection band's
   (`selection.md`); the ledger is the list and the designer, not a second card.

@@ -94,18 +94,25 @@ struct space_haul_quote
     entity_id dest_market = null_entity;
     orbital_node from{}, to{};       ///< The two low orbits.
     float     cap = 0.0f;            ///< The most cargo the trip can carry.
-    std::array<float, resource_count> fixed{}; ///< The raise lot or the refuel, off the source shelf.
+    std::array<float, resource_count> fixed{}; ///< The raise lot (kit and tank) or the refuel, off the pad's shelf.
     float     fixed_credits  = 0.0f;
-    float     lift_per_unit  = 0.0f; ///< Propellant per unit of cargo lifted (source).
-    float     drop_per_unit  = 0.0f; ///< Propellant per unit of cargo set down (destination).
-    float     src_prop_price = 0.0f;
-    float     dest_prop_price = 0.0f;
+    /// BL-1637 (SPACE_ASSETS.md § Boost): every climb through the pad spends its boost.
+    float     fixed_boost    = 0.0f; ///< A raised Hauler's own climb (0 for a reused one).
+    float     lift_per_unit  = 0.0f; ///< Boost per unit of cargo lifted (source).
+    float     boost_held     = 0.0f; ///< The pad's boost now.
+    float     boost_price    = 0.0f; ///< A boost's replacement value on the pad's shelf (the decision's price only).
+    float     drop_per_unit  = 0.0f; ///< Propellant per unit of cargo set down - burned from the tank (BL-1637).
     float     days = 0.0f;           ///< Outbound days, hop by hop, plus the day it waits to leave.
-    /// What a send of @p q units costs in all: fixed + lift + drop.
+    /// What a send of @p q units costs in all: the fixed credits, plus the boost it
+    /// spends at its replacement value (the goods the pad bought for it; no credits
+    /// change hands at the launch for them). The descent burns the tank, which the
+    /// fixed lot filled.
     float cost_for(float q) const
     {
-        return fixed_credits + q * (lift_per_unit * src_prop_price + drop_per_unit * dest_prop_price);
+        return fixed_credits + boost_price * (fixed_boost + q * lift_per_unit);
     }
+    /// The credits the launch itself debits (the raise or refuel's goods).
+    float credits_now() const { return fixed_credits; }
 };
 
 /// Does @p nation ship its inter-body trade by Hauler? A nation holding a live
@@ -120,10 +127,11 @@ space_haul_quote quote_space_haul(const world& w, const space_unit_params& p, en
                                   entity_id src_market, entity_id dest_market);
 
 /// The space side of a quoted trip, for a cargo of @p send of good @p ri: the
-/// Hauler readied (reused and refuelled, or raised) and the lift's propellant
-/// bought, all off the source shelf and the nation's treasury. Refused WHOLE (null,
-/// nothing written) when the shelf cannot fill the lot, the cargo with it, or the
-/// treasury the credits; @p out_credits is what it spent. The cargo itself is the
+/// Hauler readied (reused and refuelled, or raised: its goods off the pad's shelf and
+/// the treasury) and the climbs - the raise's and the cargo's lift - spent off the
+/// pad's boost (BL-1637). Refused WHOLE (null, nothing written) when the shelf cannot
+/// fill the lot, the cargo with it, the pad the boost, or the treasury the credits;
+/// @p out_credits is what it spent. The cargo itself is the
 /// caller's to buy; `attach_space_haul` then puts it aboard.
 entity_id launch_space_haul(world& w, const space_unit_params& p, const space_haul_quote& q,
                             entity_id nation, std::size_t ri, float send, float* out_credits);

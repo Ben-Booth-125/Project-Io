@@ -75,9 +75,9 @@ with P trade points*. Each tick it ships up to `P × capacity(R)` units:
 A's price, less the haul. A trade that loses money still runs until its owner changes it; auto
 trade (below) does not choose one.
 
-**Between bodies** a trade rides the space lane: the trader must hold a Launchpad on the source
-body, and each launch burns propellant the trader buys from that body's shelf
-(`PRODUCTION.md` § Launchpad). The network prices and times the lane as it does any leg.
+**Between bodies** a trade rides the space lane: the trader must hold a staffed Launchpad on the
+source body, and each launch spends that pad's boost (`SPACE_ASSETS.md` § Boost; Ben,
+2026-11-14). The network prices and times the lane as it does any leg.
 
 ### The trade value record
 

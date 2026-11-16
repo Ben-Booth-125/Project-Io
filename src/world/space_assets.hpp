@@ -48,13 +48,12 @@ struct world;
 // is refused whole unless the nation holds `space_dispatch` (Rocketry), owns a
 // STAFFED Launchpad on its home body (`space_has_staffed_pad`), and holds the
 // class's key (a satellite's role key; the station core's key — the module and
-// upgrade keys are the station layer's). It BUYS `spacecraft_components` (a lot
-// per class) and `propellant` (per class, per Δv of the path) off the HOME
-// market's shelf (`space_home_market`) at its posted price, under the
-// fair-price ceiling; the treasury pays the goods' value plus the class's base
-// credits plus the path's thrust credits. A shelf that cannot fill the whole
-// lot, or a treasury that cannot pay the whole sum, refuses the launch whole.
-// The goods leave the market's real inventory: the launch consumes them.
+// upgrade keys are the station layer's). BL-1637 (§ Boost): it SPENDS the pad's
+// BOOST — `space_launch_boost`, a lot of components per class plus propellant per
+// class per Δv of the path — which the pad's daily intake already bought off its
+// own market's shelf (`run_pad_intake`, economy_system). The treasury pays the
+// class's base credits plus the path's thrust credits. A pad holding too little
+// boost, or a treasury that cannot pay the whole sum, refuses the launch whole.
 //
 // WHAT IS NOT HERE, deliberately: any scorer that chooses to launch
 // (AI_OPPONENT.md § 11 — no grant exists for it) and any UI. The nation-level
@@ -262,6 +261,22 @@ struct space_asset_params
     /// the integer cast, so no separation can overflow a tick.
     int32_t max_extra_quarters = 1200; // months (BL-1642; was 400 quarters)
 
+    /// BL-1637 (SPACE_ASSETS.md § Boost): a staffed pad's intake, in boost a DAY.
+    /// One boost is one unit of launch goods (a `spacecraft_components` or a
+    /// `propellant`), so a satellite to home low orbit (25 + 50) spends 75. A tick
+    /// takes `k_econ_tick_days` of it. 2.5 a day is one such launch a month.
+    float boost_per_day = 2.5f;
+
+    /// BL-1637: the most boost a pad banks — enough for its largest launch (a
+    /// crewed mission to the far reaches, or the heaviest hull's climb). A full pad
+    /// stops drawing.
+    float boost_cap = 1500.0f;
+
+    /// BL-1637: the components' share of a unit of boost; the rest is propellant.
+    /// One third is a satellite to home low orbit's own ratio (25 : 50), the launch
+    /// the old whole lot bought — so a launch costs the same goods it always did.
+    float boost_components_share = 1.0f / 3.0f;
+
     /// BL-1582: the fair-price ceiling (`price_band_params::reservation_mult`,
     /// BL-1172: it governs every goods draw). NOT a space dial: the command seam
     /// (space_command.cpp) copies the registry's value in; 0 = off, which for a
@@ -318,21 +333,25 @@ enum class space_launch_result : uint8_t
     rejected_no_launchpad,         ///< No staffed Launchpad of the nation's on its home body.
     rejected_no_slot,              ///< The node's slots are all held.
     rejected_no_route,             ///< No orbital path from the home surface reaches the node.
-    rejected_shelf,                ///< The home market's shelf cannot fill the whole goods lot.
+    rejected_shelf,                ///< A satellite move: the home shelf cannot fill its propellant.
     // ---- BL-1599, appended ----
     rejected_blockaded,            ///< The home body is blockaded (space_bombard.hpp): no launch reaches orbit.
+    // ---- BL-1637, appended ----
+    rejected_boost,                ///< The home pad holds too little boost for the path.
 };
 
 struct space_launch_quote
 {
     space_launch_result result = space_launch_result::rejected_invalid;
     space_reach         reach  = space_reach::home_orbit;
-    float               cost   = 0.0f;  ///< Credits, the whole launch: credits + goods_value.
+    float               cost   = 0.0f;  ///< Credits, the whole order: credits + goods_value.
     float               credits = 0.0f; ///< Base credits + thrust credits.
-    float               goods_value = 0.0f; ///< components x price + propellant x price.
-    float               components  = 0.0f; ///< `spacecraft_components` the launch buys.
-    float               propellant  = 0.0f; ///< `propellant` the launch buys.
-    entity_id           market = null_entity; ///< The shelf the goods come off.
+    float               goods_value = 0.0f; ///< A satellite move's propellant x price (0 on a launch: its goods are boost).
+    float               propellant  = 0.0f; ///< A satellite move's propellant, off the home shelf.
+    entity_id           market = null_entity; ///< A satellite move's shelf.
+    float               boost  = 0.0f;  ///< BL-1637: the boost the launch spends.
+    float               boost_held = 0.0f; ///< BL-1637: the boost the pad holds now.
+    entity_id           pad    = null_entity; ///< BL-1637: the pad the boost comes off.
     double              dv     = 0.0;   ///< The path's thrust cost.
     double              days   = 0.0;   ///< The path's days.
     int32_t             travel_quarters = 0;
@@ -348,29 +367,41 @@ float space_heliocentric_au(const world& w, entity_id body);
 /// `null_entity` when neither resolves.
 entity_id space_home_body_of(const world& w, entity_id nation);
 
-/// BL-1630 (SPACE_ASSETS.md § Launching, "A staffed pad bids for its launch"):
-/// the standing lot a launch-ready nation bids for on its home market — one
-/// satellite's goods to its home low orbit: `components_lot[satellite]`
-/// `spacecraft_components` and `propellant_per_dv[satellite]` x the path's Δv
-/// of `propellant`, at @p market (`space_home_market`). True only for a nation
-/// holding Rocketry with a staffed Launchpad on its home body, a home market and
-/// a path to its low orbit; false, outputs zeroed, otherwise. Pure.
-bool space_standing_lot(const world& w, const space_asset_params& p, entity_id nation,
-                        entity_id& market, float& components, float& propellant);
+/// BL-1637 (SPACE_ASSETS.md § Boost): @p nation's STAFFED Launchpad on @p body,
+/// as `space_has_staffed_pad` tests it (one pad per nation per body; the lowest id
+/// should a stream ever hold two), or `null_entity`.
+entity_id space_launch_pad_of(const world& w, entity_id nation, entity_id body);
+
+/// BL-1637: the boost a launch of @p cls along a path of @p dv spends —
+/// `components_lot[cls] + propellant_per_dv[cls] x dv`, the goods the launch
+/// burned when it bought a lot. Non-finite or negative inputs give +infinity (a
+/// launch no pad can pay). Pure.
+float space_launch_boost(const space_asset_params& p, space_asset_class cls, double dv);
+
+/// BL-1637: the boost @p pad holds (0 for a missing building). Pure.
+float space_pad_boost(const world& w, entity_id pad);
+
+/// BL-1637: spend @p need of @p pad's boost. False, and nothing written, when the
+/// pad is missing, @p need is not finite and non-negative, or the pad holds less.
+bool space_spend_boost(world& w, entity_id pad, float need);
+
+/// BL-1637: the most boost the save reader admits on one pad (corruption guard,
+/// far above any authored cap).
+inline constexpr float k_pad_boost_max = 1.0e7f;
 
 /// PURE. Price @p cls to @p node for @p nation and say whether it is legal,
 /// gated open, slotted, stocked and affordable — `result` is what
 /// `launch_space_asset` would return. @p role is a satellite's role (required,
 /// not `none`) and `none` for every other class. Reads only. Checked in this
 /// order, so each refusal is reachable alone: invalid, nation, body, legality,
-/// technology, launchpad, slot, route, shelf, treasury.
+/// technology, launchpad, slot, route, boost, treasury.
 space_launch_quote quote_space_launch(const world& w, const space_asset_params& p,
                                       entity_id nation, space_asset_class cls,
                                       orbital_node node,
                                       space_satellite_role role = space_satellite_role::none);
 
-/// THE VERB. Launch @p cls to @p node for @p nation: the goods leave the home
-/// shelf, the whole cost leaves the treasury. Rejected WHOLE — the world is not
+/// THE VERB. Launch @p cls to @p node for @p nation: the boost leaves the home
+/// pad, the whole cost leaves the treasury. Rejected WHOLE — the world is not
 /// touched, not even the entity allocator — when the quote is not `launched`.
 ///
 /// THE TICK CONTRACT. The launch tick is `w.current_econ_tick`, read from the
@@ -415,7 +446,9 @@ satellite_order retask_satellite(world& w, entity_id nation, entity_id asset, sp
 /// no components — nothing new is built), needs a free slot at @p to and
 /// Rocketry (no Launchpad: nothing leaves the ground), and puts the satellite
 /// in transit to @p to for the path's quarters (no reach floor: a move is not a
-/// launch). Its old slot frees at once.
+/// launch). Its old slot frees at once. BL-1637: a move climbs through no pad, so
+/// it spends no boost; its propellant stays a home-shelf buy (refused
+/// `rejected_shelf` when that shelf cannot fill it).
 satellite_order quote_move_satellite(const world& w, const space_asset_params& p, entity_id nation,
                                      entity_id asset, orbital_node to, space_launch_quote* detail = nullptr);
 satellite_order move_satellite(world& w, const space_asset_params& p, entity_id nation,

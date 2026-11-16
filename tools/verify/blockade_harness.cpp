@@ -286,6 +286,8 @@ void build(fixture& f)
     }
     f.home_pad = add_building(w, f.a, f.home_tile, building_type::launchpad);
     f.moon_pad = add_building(w, f.a, f.moon_tile, building_type::launchpad);
+    w.buildings.at(f.home_pad).boost = 100000.0f; // BL-1637: banked, so a launch check is not also a boost check
+    w.buildings.at(f.moon_pad).boost = 100000.0f;
     set_space_unit_design(w, f.a, space_hull::hauler, hauler_d());
     f.home_low  = {f.home, orbital_node_kind::low_orbit};
     f.home_high = {f.home, orbital_node_kind::high_orbit};

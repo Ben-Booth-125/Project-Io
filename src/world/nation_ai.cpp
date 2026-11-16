@@ -1923,12 +1923,13 @@ far_space_block quote_far_raise(const world& w, const space_unit_params& sup, en
     if (space_blockaded(w, nation, body))
         return far_space_block::blockaded;
     const entity_id market = space_market_on_body(w, w.buildings.at(pad).tile, body);
-    const double climb = orbital_climb_dv(w, orbital_graph_params{}, body);
-    const float  rate  = std::isfinite(sup.launch_propellant_per_dv) ? std::max(0.0f, sup.launch_propellant_per_dv) : 0.0f;
+    // BL-1637: the kit and the tank off the shelf; the climb off the pad's boost.
     std::array<float, resource_count> lot = st.goods;
-    lot[k_far_prop] += st.tank + static_cast<float>(climb * rate * (st.dry_mass + st.tank));
+    lot[k_far_prop] += st.tank;
     if (market == null_entity || !space_quote_lot(w, sup, market, lot, &cost))
         return far_space_block::shelf_short;
+    if (!(space_pad_boost(w, pad) >= space_climb_boost(w, sup, body, st.dry_mass + st.tank)))
+        return far_space_block::boost_short;
     if (w.nations.at(nation).astronauts < st.crew)
         return far_space_block::crew_short;
     upkeep = st.upkeep;
@@ -2325,13 +2326,14 @@ far_space_pick choose_far_space_action(const world& w, const recipe_registry& re
                     continue;
                 }
                 const entity_id market = space_market_on_body(w, w.buildings.at(pad).tile, home);
-                const double climb = orbital_climb_dv(w, orbital_graph_params{}, home);
+                // BL-1637: the kit off the shelf; its lift off the pad's boost.
                 std::array<float, resource_count> lot{};
                 lot[static_cast<std::size_t>(bp.kit_res)] += qty;
-                lot[k_far_prop] += static_cast<float>(climb * std::max(0.0f, sup.launch_propellant_per_dv) * qty);
                 float c = 0.0f;
                 if (market == null_entity || !space_quote_lot(w, sup, market, lot, &c))
                     note(far_space_block::shelf_short);
+                else if (!(space_pad_boost(w, pad) >= space_climb_boost(w, sup, home, qty)))
+                    note(far_space_block::boost_short);
                 else if (!space_reserve_admits(w, nation, p, c, 0.0f))
                     note(far_space_block::reserve);
                 else

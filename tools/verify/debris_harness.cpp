@@ -165,6 +165,7 @@ entity_id add_pad(world& w, entity_id nation, entity_id tile)
     b.tile = tile;
     b.type = building_type::launchpad;
     b.workforce_assigned = 1.0f;
+    b.boost = 100000.0f; // BL-1637: banked, so a launch check is not also a boost check
     b.ticks_remaining = 0;
     w.buildings.emplace(bid, b);
     w.nations.at(nation).state_assets.push_back(bid);
@@ -660,6 +661,8 @@ int main()
               "D9c", "the v87 prefix reads as a world with no debris, no wear, no quiet days");
         fixture e;
         build(e);
+        for (auto& [bid, bb] : e.w.buildings) // BL-1637: a v87 stream predates the boost
+            bb.boost = 0.0f;
         std::ostringstream oe(std::ios::binary);
         write_world_snapshot_pre_debris(e.w, oe);
         world we;

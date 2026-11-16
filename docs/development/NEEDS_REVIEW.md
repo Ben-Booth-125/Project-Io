@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*105 entries — 52 open, 53 resolved.*
+*109 entries — 56 open, 53 resolved.*
 
 ---
 
@@ -569,6 +569,65 @@ With no build limit, the settle stacked steel mills on one market's coal: coal d
 - Fix the cause in the supply clause: count only spare the haul has actually delivered
 
 > **Recommendation:** Keep it for now; the third option is the deeper fix and is backlog work if the price test proves too blunt.
+
+### NR-1226 — Launch boost: a satellite move still buys propellant off the home shelf; a lane now needs a STAFFED pad
+*decision taken on your behalf · raised 2026-11-14 · from BL-1637 (launch boost) build*
+
+Two calls taken while building launch boost. (1) A satellite changing orbit climbs through no pad, so it spends no boost: it keeps buying the move's propellant off the home shelf (rejected_shelf now means only that). Written into SPACE_ASSETS.md § Boost. (2) The straight-line space lane used to open on any Launchpad on the source body; it now needs a staffed one holding a launch's boost, because only a staffed pad banks boost and a launch spends it. (3) A launch asset's recorded launch_cost, and what the rival AI's reserve check and cheapest-kind pick read, is now the credits alone: the goods were bought by the intake beforehand, so they are a sunk cost at launch (cold review). The launch_spend census and verify_api launch_cost under-read a launch by its goods value accordingly.
+
+**Why it matters.** Call (1) leaves one lump shelf buy in space, outside the pad intake that § Boost names the only goods buyer. Call (2) can close a lane an unstaffed pad used to open.
+
+- Keep both as built
+- A satellite move spends boost from the home pad instead (one rule for every burn from the ground's goods)
+- A satellite move burns nothing extra: its launch quote already covers its first node
+
+> **Recommendation:** Keep both: a move is in space, and § Boost says a unit in space burns what it carries; a satellite carries no tank, so the shelf stands in for it.
+
+*Files: `src/world/space_assets.cpp`, `src/world/supply_system.cpp`, `docs/economy/SPACE_ASSETS.md`*
+
+### NR-1227 — Launch boost dials: 2.5 boost a day (75 a month), cap 1,500, one third components
+*decision taken on your behalf · raised 2026-11-14 · from BL-1637 (launch boost) build*
+
+boost_per_day 2.5 makes a pad bank one home-orbit satellite (25 components + 50 propellant = 75 boost) each monthly tick. boost_cap 1,500 is twenty satellites, above the largest single launch the classes and paths quote. boost_components_share 1/3 is the satellite lot's own ratio, so a satellite costs exactly the goods it did. All three are C++ defaults in space_asset_params, not yet authored in Lua.
+
+**Why it matters.** The rate paces every nation's space programme and is a steady draw on two scarce goods at every pad market; too high drains a thin shelf, too low starves rivals of launches.
+
+- Keep as built and read the spectated run
+- Author them in scripts/economy.lua now
+- Tie the rate to the pad's staffing
+
+> **Recommendation:** Keep as built; re-read after the spectated run shows rival launch counts.
+
+*Files: `src/world/space_assets.hpp`*
+
+### NR-1228 — Does propellant carried up through a pad - a raise's tank, a refuel - spend boost?
+*question · raised 2026-11-14 · from BL-1637 (launch boost) cold review*
+
+Your 2026-11-14 ruling: every climb through a pad spends boost. As built, the climb of the HULL and of CARGO spends boost; the propellant a unit carries up (its tank at a raise, a refuel over the pad) is still bought off the shelf as goods. refuel_space_unit's own comment says that propellant "climbs through the pad", so the ruling arguably reaches it.
+
+**Why it matters.** If the tank spends boost, a Hauler trade draws much more boost per trip and the cap and rate want re-reading; if not, the shelf still sees a lump propellant buy at every raise and refuel.
+
+- Keep as built: the tank and a refuel are goods bought off the shelf; only the climb of hull and cargo is boost
+- The tank and a refuel spend boost too (their propellant is the cargo of the climb)
+
+> **Recommendation:** Keep as built: the tank is the unit's own fuel, bought as goods like its kit, and boost stays the launch's cost.
+
+*Files: `src/world/space_units.cpp`, `src/world/space_convoy.cpp`, `docs/economy/SPACE_ASSETS.md`*
+
+### NR-1229 — Launch boost is built but no rival launches: no nation reaches Rocketry by 2015, and staged, no pad market ever holds a spacecraft component
+*question · raised 2026-11-14 · from BL-1637 (launch boost) spectated census (tools/verify/space_launch_census.cpp)*
+
+MEASURED (space_launch_census, the app's own monthly tick). SHIPPED: seeds 0, 28, 11 to 2015 - no nation holds Rocketry; the leading nation holds 22, 19, 21 of 212 Digitisation nodes; no pad is ever built, so boost never engages. STAGED (--stage-space: every rival handed the near-space keys and their chains at the handover; replay deterministic on all three): pads are built and staffed (seed 0: 2 in 1965, 14 in 1980, 23 in 2000; seed 28: 10 by 2010; seed 11: 5 by 2010, 19 still building), but every pad banks 0 boost and no rival launches by 2010. Seed 0 probe: propellant reaches the pad markets (22 of 22 pads stocked, 7,826 units in 1995), but spacecraft_components stand at 0 on every pad market in every reading, and only 8 of 22 pads see components under the fair-price ceiling - so 14 pads' components want goes to the hauler-only register and is never bid. The intake draws in the recipe ratio, so no components means no boost at all.
+
+**Why it matters.** The item's done-line (a spectated run shows rival launches without pooling, same goods per launch) is not met, and boost cannot meet it alone: two walls stand upstream - the research pace never reaches Rocketry inside a campaign, and spacecraft components are never made or moved to a pad.
+
+- A) Close launch boost as built (its mechanism verified by harness) and file the two walls as their own items: research pace to Rocketry, and a spacecraft-components supply
+- B) Bank each good separately, so a pad holds propellant boost and components boost and a launch spends both - shelves fill with propellant meanwhile, but no launch still happens while components are absent
+- C) Keep launch boost open until a spectated run launches, and work the components supply under it
+
+> **Recommendation:** A: the boost mechanism does what SPACE_ASSETS.md says; the walls are research pacing and components supply, each a design question of its own. Start with why spacecraft_components is never made: the over-ceiling price at zero stock silences its want at most pads.
+
+*Files: `tools/verify/space_launch_census.cpp`, `src/world/economy_system.cpp`, `docs/economy/SPACE_ASSETS.md`*
 
 ---
 

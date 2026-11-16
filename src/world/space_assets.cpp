@@ -10,6 +10,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 #include <vector>
 
 // BL-1327, BL-1581, BL-1582 — see space_assets.hpp for the design. This is the arithmetic.
@@ -64,11 +65,11 @@ int orbital_slots_held(const world& w, orbital_node n)
     return held;
 }
 
-bool space_has_staffed_pad(const world& w, entity_id nation, entity_id body)
+entity_id space_launch_pad_of(const world& w, entity_id nation, entity_id body)
 {
     const auto nit = w.nations.find(nation);
     if (nit == w.nations.end() || body == null_entity)
-        return false;
+        return null_entity;
     std::vector<entity_id> ids(nit->second.state_assets.begin(), nit->second.state_assets.end());
     std::sort(ids.begin(), ids.end());
     for (const entity_id bid : ids)
@@ -82,9 +83,42 @@ bool space_has_staffed_pad(const world& w, entity_id nation, entity_id body)
             continue;
         const auto tit = w.tiles.find(b.tile);
         if (tit != w.tiles.end() && tit->second.body == body)
-            return true;
+            return bid;
     }
-    return false;
+    return null_entity;
+}
+
+bool space_has_staffed_pad(const world& w, entity_id nation, entity_id body)
+{
+    return space_launch_pad_of(w, nation, body) != null_entity;
+}
+
+float space_launch_boost(const space_asset_params& p, space_asset_class cls, double dv)
+{
+    const std::size_t ci = static_cast<std::size_t>(cls);
+    if (ci >= space_asset_class_count || !std::isfinite(dv) || dv < 0.0)
+        return std::numeric_limits<float>::infinity();
+    const float c  = p.components_lot[ci];
+    const float pr = p.propellant_per_dv[ci] * static_cast<float>(dv);
+    const float n  = c + pr;
+    if (!std::isfinite(c) || c < 0.0f || !std::isfinite(pr) || pr < 0.0f || !std::isfinite(n))
+        return std::numeric_limits<float>::infinity();
+    return n;
+}
+
+float space_pad_boost(const world& w, entity_id pad)
+{
+    const auto bit = w.buildings.find(pad);
+    return bit == w.buildings.end() ? 0.0f : bit->second.boost;
+}
+
+bool space_spend_boost(world& w, entity_id pad, float need)
+{
+    const auto bit = w.buildings.find(pad);
+    if (bit == w.buildings.end() || !std::isfinite(need) || need < 0.0f || !(bit->second.boost >= need))
+        return false;
+    bit->second.boost = std::max(0.0f, bit->second.boost - need);
+    return true;
 }
 
 entity_id space_home_market(const world& w, entity_id nation)
@@ -148,13 +182,13 @@ bool role_in_range(space_satellite_role r)
     return static_cast<std::size_t>(r) < space_satellite_role_count;
 }
 
-/// The goods half of a quote: price @p components + @p propellant off the home
-/// shelf. False (and `q.result = rejected_shelf`) when the shelf cannot fill
-/// the whole lot, the ceiling refuses it, or a price is not positive.
-bool price_goods(const world& w, const space_asset_params& p, entity_id nation,
-                 float components, float propellant, space_launch_quote& q)
+/// A satellite move's goods (BL-1637: the one space order that climbs through no
+/// pad, so buys its propellant): price @p propellant off the home shelf. False
+/// (and `q.result = rejected_shelf`) when the shelf cannot fill it, the ceiling
+/// refuses it, or the price is not positive.
+bool price_move_propellant(const world& w, const space_asset_params& p, entity_id nation,
+                           float propellant, space_launch_quote& q)
 {
-    q.components = components;
     q.propellant = propellant;
     q.goods_value = 0.0f;
     q.market = space_home_market(w, nation);
@@ -164,36 +198,26 @@ bool price_goods(const world& w, const space_asset_params& p, entity_id nation,
         q.result = space_launch_result::rejected_shelf;
         return false;
     }
+    if (!(propellant > 0.0f))
+        return true;
     const market_component& mc = mit->second;
-    const std::pair<resource_type, float> lot[] = {
-        { resource_type::spacecraft_components, components },
-        { resource_type::propellant,            propellant },
-    };
-    for (const auto& [good, qty] : lot)
+    const std::size_t ri = static_cast<std::size_t>(resource_type::propellant);
+    const float unit = posted_price(mc, ri);
+    if (!std::isfinite(propellant) || !shelf_admits(mc, ri, p.reservation_mult, /*off_buys=*/true)
+        || !(unit > 0.0f) || !std::isfinite(unit) || !(mc.inventory[ri] >= propellant))
     {
-        if (!(qty > 0.0f))
-            continue;
-        const std::size_t ri = static_cast<std::size_t>(good);
-        const float unit = posted_price(mc, ri);
-        if (!std::isfinite(qty) || !shelf_admits(mc, ri, p.reservation_mult, /*off_buys=*/true)
-            || !(unit > 0.0f) || !std::isfinite(unit) || !(mc.inventory[ri] >= qty))
-        {
-            q.result = space_launch_result::rejected_shelf;
-            return false;
-        }
-        q.goods_value += qty * unit;
+        q.result = space_launch_result::rejected_shelf;
+        return false;
     }
+    q.goods_value = propellant * unit;
     return true;
 }
 
-/// Draw the quoted lot off its shelf (the quote proved it is there).
-void draw_goods(world& w, const space_launch_quote& q)
+/// Draw a move's quoted propellant off its shelf (the quote proved it is there).
+void draw_move_propellant(world& w, const space_launch_quote& q)
 {
-    market_component& mc = w.markets.at(q.market);
-    if (q.components > 0.0f)
-        mc.inventory[static_cast<std::size_t>(resource_type::spacecraft_components)] -= q.components;
     if (q.propellant > 0.0f)
-        mc.inventory[static_cast<std::size_t>(resource_type::propellant)] -= q.propellant;
+        w.markets.at(q.market).inventory[static_cast<std::size_t>(resource_type::propellant)] -= q.propellant;
 }
 
 /// The path's quarters, days over `days_per_quarter` rounded down, clamped in
@@ -213,38 +237,6 @@ int32_t path_quarters(const space_asset_params& p, double days, int32_t cap)
 float space_heliocentric_au(const world& w, entity_id body)
 {
     return heliocentric_au(w, body);
-}
-
-bool space_standing_lot(const world& w, const space_asset_params& p, entity_id nation,
-                        entity_id& market, float& components, float& propellant)
-{
-    market     = null_entity;
-    components = 0.0f;
-    propellant = 0.0f;
-    if (nation == null_entity || w.nations.count(nation) == 0
-        || !nation_has_mechanic(w, nation, space_keys::dispatch))
-        return false;
-    const entity_id home = space_home_body_of(w, nation);
-    if (home == null_entity || !space_has_staffed_pad(w, nation, home))
-        return false;
-    const entity_id mid = space_home_market(w, nation);
-    if (mid == null_entity || w.markets.count(mid) == 0)
-        return false;
-    // The launch the quote would price first: a satellite, surface to low orbit.
-    const orbital_path_result path = orbital_path(w, orbital_graph_params{},
-                                                  orbital_node{home, orbital_node_kind::surface},
-                                                  orbital_node{home, orbital_node_kind::low_orbit});
-    if (!path.ok || !std::isfinite(path.dv) || path.dv < 0.0)
-        return false;
-    const std::size_t ci = static_cast<std::size_t>(space_asset_class::satellite);
-    const float c  = p.components_lot[ci];
-    const float pr = p.propellant_per_dv[ci] * static_cast<float>(path.dv);
-    if (!std::isfinite(c) || c < 0.0f || !std::isfinite(pr) || pr < 0.0f || !(c + pr > 0.0f))
-        return false;
-    market     = mid;
-    components = c;
-    propellant = pr;
-    return true;
 }
 
 space_launch_quote quote_space_launch(const world& w, const space_asset_params& p,
@@ -304,11 +296,13 @@ space_launch_quote quote_space_launch(const world& w, const space_asset_params& 
         q.result = space_launch_result::rejected_tech_locked;
         return q;
     }
-    if (!space_has_staffed_pad(w, nation, home))
+    q.pad = space_launch_pad_of(w, nation, home);
+    if (q.pad == null_entity)
     {
         q.result = space_launch_result::rejected_no_launchpad;
         return q;
     }
+    q.boost_held = space_pad_boost(w, q.pad);
     // BL-1599 (SPACE_FLEETS.md § Blockade): no launch from a blockaded body reaches orbit.
     if (space_blockaded(w, nation, home))
     {
@@ -344,24 +338,20 @@ space_launch_quote quote_space_launch(const world& w, const space_asset_params& 
     q.travel_quarters = std::max(floor_q, path_quarters(p, path.days, cap + p.travel_quarters[ri]));
 
     q.credits = p.launch_cost[ci] + p.credits_per_dv * static_cast<float>(path.dv);
-    const float components = p.components_lot[ci];
-    const float propellant = p.propellant_per_dv[ci] * static_cast<float>(path.dv);
+    q.boost   = space_launch_boost(p, cls, path.dv);
     if (!std::isfinite(q.credits) || q.credits < 0.0f || q.travel_quarters < 0
-        || !std::isfinite(p.upkeep[ci]) || p.upkeep[ci] < 0.0f
-        || !std::isfinite(components) || components < 0.0f
-        || !std::isfinite(propellant) || propellant < 0.0f)
+        || !std::isfinite(p.upkeep[ci]) || p.upkeep[ci] < 0.0f || !std::isfinite(q.boost))
     {
         q.result = space_launch_result::rejected_invalid;
         return q;
     }
-    if (!price_goods(w, p, nation, components, propellant, q))
-        return q;
-    q.cost = q.credits + q.goods_value;
-    if (!std::isfinite(q.cost))
+    // BL-1637 (§ Boost): the goods are the pad's banked boost, bought already.
+    if (!(q.boost_held >= q.boost))
     {
-        q.result = space_launch_result::rejected_invalid;
+        q.result = space_launch_result::rejected_boost;
         return q;
     }
+    q.cost = q.credits;
     if (!(nit->second.treasury >= q.cost))
     {
         q.result = space_launch_result::rejected_insufficient_treasury;
@@ -399,7 +389,7 @@ space_launch_quote launch_space_asset(world& w, const space_asset_params& p,
     a.transit_from = {space_home_body_of(w, nation), orbital_node_kind::surface};
     a.depart_tick  = econ_tick;
 
-    draw_goods(w, q);
+    space_spend_boost(w, q.pad, q.boost); // the quote proved the pad holds it
     w.nations.at(nation).treasury -= q.cost;
     w.space_assets.emplace(a.id, a);
     q.asset = a.id;
@@ -521,7 +511,7 @@ satellite_order quote_move_satellite(const world& w, const space_asset_params& p
         q.result = r.launch = space_launch_result::rejected_invalid;
         return finish();
     }
-    if (!price_goods(w, p, nation, 0.0f, propellant, q))
+    if (!price_move_propellant(w, p, nation, propellant, q))
     {
         r.launch = q.result;
         return finish();
@@ -545,7 +535,7 @@ satellite_order move_satellite(world& w, const space_asset_params& p, entity_id 
     const satellite_order r = quote_move_satellite(w, p, nation, asset, to, &q);
     if (r.result != satellite_order_result::ok)
         return r;
-    draw_goods(w, q);
+    draw_move_propellant(w, q);
     w.nations.at(nation).treasury -= q.cost;
     space_asset& a = w.space_assets.at(asset);
     // BL-1614: the transit leaves the node it sat at, now.

@@ -78,6 +78,7 @@
 #include "world/placement_rules.hpp"
 #include "world/recipe_registry.hpp"
 #include "world/resource_names.hpp" // BL-648: NAME the good in a failure, never an id
+#include "world/economy_system.hpp" // BL-1637: the pad intake declares what it draws
 #include "world/supply_system.hpp"  // BL-648: the launch draw declares what it burns
 #include "world/world.hpp"
 
@@ -164,9 +165,9 @@ constexpr resource_type FAR   = resource_type::alloys;
 //                               (the vectors run_economy_step's build pass and
 //                               road placement actually consume from market
 //                               inventory)
-//   launch_draw                 launch_draw_per_convoy() — supply_system's OWN
-//                               exported draw vector, the one price_convoy_leg
-//                               gates on and commit_convoy debits
+//   launch_draw                 pad_intake_basket() — economy_system's OWN
+//                               exported basket, the one run_pad_intake draws
+//                               off the pad's shelf as boost (BL-1637)
 //
 // THE ONE HONEST COMPROMISE, stated rather than hidden. Four of the five are
 // Lua-authored data and are therefore derived in the strongest sense: change the
@@ -216,7 +217,7 @@ const char* injector_label(injector i)
         case injector::unit_upkeep_draw:           return "run_unit_upkeep goods draw";
         case injector::building_upkeep_draw:       return "run_building_upkeep goods draw";
         case injector::construction_material_draw: return "construction material draw";
-        case injector::launch_draw:                return "commit_convoy launch draw";
+        case injector::launch_draw:                return "run_pad_intake launch boost draw";
         case injector::kit_draw:                   return "kit goods draw (hire, refit, refill)";
     }
     return "(unknown injector)";
@@ -260,8 +261,8 @@ bool injector_moves(const recipe_registry& reg, injector i, std::size_t r)
         case injector::state_purchase:
         {
             const space_programme_params& sp = reg.space_programme();
-            // BL-1630: or the launch-ready pads' standing bid (economy_system.cpp).
-            const bool standing = std::isfinite(sp.standing_lots) && sp.standing_lots > 0.0f;
+            // BL-1637: or the staffed pads' intake (economy_system.cpp run_pad_intake).
+            const bool standing = std::isfinite(reg.space_assets().boost_per_day) && reg.space_assets().boost_per_day > 0.0f;
             if (r == static_cast<std::size_t>(resource_type::spacecraft_components))
                 return standing || (std::isfinite(sp.components_lump) && sp.components_lump > 0.0f);
             if (r == static_cast<std::size_t>(resource_type::propellant))
@@ -301,7 +302,9 @@ bool injector_moves(const recipe_registry& reg, injector i, std::size_t r)
             return false;
         }
         case injector::launch_draw:
-            return launch_draw_per_convoy()[r] > 0.0f;
+            // BL-1637: a launch spends its pad's boost; the SHELF draw is the pad's
+            // intake, so the row reads the intake's own basket and rate.
+            return reg.space_assets().boost_per_day > 0.0f && pad_intake_basket(reg.space_assets())[r] > 0.0f;
         // BL-1422: the land kit catalogue's items name the goods a hire, a refit and a
         // wounded unit's refill buy - read off the catalogue itself, so a good no item
         // names any more turns its row red by name.
@@ -386,7 +389,7 @@ struct exemption
 const exemption k_actor_consumed[] = {
     // --- Claims that name a real pass ------------------------------------
     { resource_type::propellant, injector::launch_draw,
-      "per-convoy dispatch, space mode (BL-308)" },
+      "a staffed pad's intake, banked as boost (BL-1637)" },
     { resource_type::clean_water, injector::population_demand,
       "population centres, the BL-368 habitability tranche" },
     { resource_type::consumer_goods, injector::population_demand,

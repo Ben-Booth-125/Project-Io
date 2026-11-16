@@ -648,16 +648,23 @@ void advance_musters(world& w);
 /// advance_musters; exposed so a harness can step it alone.
 void advance_refits(world& w);
 
-/// BL-1630 (SPACE_ASSETS.md § Launching, "A staffed pad bids for its launch"):
-/// every nation holding Rocketry with a staffed Launchpad on its home body posts
-/// @p standing_lots x its standing lot (`space_standing_lot`) as a want on its
-/// home market — `report.wants` (so the clear raises it into `demand`), or
-/// `report.hauler_wants` for a good priced over the fair-price ceiling
-/// (@p reservation_mult; it does not bid). Ascending nation id; inert at
-/// `standing_lots <= 0` and before the research age opens. Called by
-/// run_economy_step after building upkeep; exposed so a harness can run it alone.
-void post_space_launch_wants(const world& w, const space_asset_params& sp, float reservation_mult,
-                             float standing_lots, economy_report& report);
+/// BL-1637 (SPACE_ASSETS.md § Boost): THE PAD'S INTAKE. Every staffed Launchpad of a
+/// nation holding Rocketry draws `boost_per_day` x the tick's days of launch goods
+/// (no more than the room under `boost_cap`) off its own market's shelf in the
+/// recipe ratio and banks them as boost: the full intake is posted as a want
+/// (`report.wants`, or `report.hauler_wants` for a good over the fair-price ceiling,
+/// @p reservation_mult, which is not drawn), the draw is booked in
+/// `report.purchases` for the clear to bill, and no nation's draws exceed what its
+/// treasury can pay. Ascending nation id, pads ascending; inert before the research
+/// age opens. Called by run_economy_step after building upkeep; exposed so a
+/// harness can run it alone.
+void run_pad_intake(world& w, const space_asset_params& sp, float reservation_mult,
+                    economy_report& report);
+
+/// BL-1637: the goods one unit of boost is made of — the basket run_pad_intake
+/// draws, exported so a registry (chain_depth's launch_draw injector) reads the
+/// draw itself rather than a second copy of it.
+std::array<float, resource_count> pad_intake_basket(const space_asset_params& sp);
 
 economy_report run_economy_step(world& w, const recipe_registry& reg,
                                 bool spectating = false);

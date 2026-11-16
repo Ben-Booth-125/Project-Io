@@ -1390,15 +1390,11 @@ economy = {
         -- Was 25 / 50.
         components_lump = 0.0, -- spacecraft_components per purchase
         propellant_lump = 0.0, -- propellant per purchase
-        -- BL-1630 (SPACE_ASSETS.md § Launching, "A staffed pad bids for its
-        -- launch"): launch lots a nation holding Rocketry with a staffed pad
-        -- bids for on its home market each quarter, as POSTED demand (one lot
-        -- = one satellite to home low orbit: 25 components, 50 propellant).
-        -- Without it the launch's want was off the book, the goods had no price,
-        -- and no plant was built for them (seed 0: 4 staffed pads, 0 launches by
-        -- 1995). 1.0 = one launch a quarter, the rate a rival's pick can take.
-        -- 0 switches the bid off. Loader bounds [0, 4].
-        standing_lots = 0.333333, -- lots a month (BL-1642: one a quarter)
+        -- BL-1637 (SPACE_ASSETS.md § Boost): the standing launch-lot bid
+        -- (BL-1630's standing_lots) is retired. A staffed pad is the space
+        -- programme's goods buyer now: its daily intake draws components and
+        -- propellant off its own market's shelf and banks them as boost
+        -- (space_asset_params::boost_per_day, boost_cap).
     },
 
     -- BL-1335: taxes and Discontent (docs/politics/NATIONS.md § Taxes and

@@ -12,13 +12,15 @@
 //      spacecraft_components plant is no longer vetoed.
 //   U2 network upkeep, nothing held anywhere: its stone/timber bill is wanted.
 //   U3 procurement fulfilment (run_economy_step): the contract's quantity.
-//   U4 space-lane launch fuel, bought off the source shelf (commit_trade_shipment;
-//      BL-1265: no pools — posted as a want, demand after the clear).
+//   U4 a staffed pad's intake (run_pad_intake, BL-1637): its launch goods are posted
+//      as a want though the shelf is empty, demand after the clear; U4d the space
+//      lane spends the pad's boost and buys no fuel.
 //   U5 building upkeep, bought off its market's shelf (run_building_upkeep; posted).
-//   U6 the cadence hold: a record 3 ticks old still counts (cadence_k 4); one
-//      older than the cadence does not.
+//   U6 the cadence hold: a record up to the scorer's cadence_k old still counts (read
+//      from corp_ai_params, 1 since the monthly ruling, Ben 2026-11-14); one older does not.
 // Exits non-zero on any FAIL.
 
+#include "world/campaign_settle.hpp"
 #include "world/components.hpp"
 #include "world/corp_ai.hpp"
 #include "world/corporation_generation.hpp" // seat_release_dial_idled (U8)
@@ -31,7 +33,9 @@
 #include "world/space_programme.hpp"
 #include "world/supply_system.hpp"
 #include "world/world.hpp"
+#include "space_fixture.hpp"
 
+#include <cmath>
 #include <cstdio>
 #include <map>
 #include <vector>
@@ -174,11 +178,35 @@ int main()
     // which the clear turns into demand. U4/U5 now assert that: the purchase
     // lands in the tick's want register at the market, and after the clear the
     // good carries demand there and its plant is not vetoed.
-    std::printf("U4 space-lane launch fuel is bought off the source shelf\n");
+    // BL-1637 (SPACE_ASSETS.md § Boost): a launch no longer buys its fuel - it spends
+    // its pad's boost. The shelf draw is the PAD'S INTAKE, posted as a want even when
+    // the shelf is empty, so the launch goods are never a dead market where a pad
+    // stands. U4 asserts the intake's want; U4d that the lane takes no fuel off the shelf.
+    std::printf("U4 a staffed pad's intake posts its launch goods as a want at its market\n");
     {
         fixture f = make_fixture();
         const recipe_registry reg;
-        // A second body with its own market: the lane's destination.
+        f.w.current_econ_tick = k_campaign_settle_ticks; // the research age is open
+        space_fixture::hold_every_node(f.w, f.corp);    // Rocketry: the pad operates
+        const entity_id lp = space_fixture::add_pad(f.w, f.corp, f.tile, 10.0f, /*boost=*/0.0f);
+        const std::size_t prop = ri(resource_type::propellant);
+        f.w.markets.at(f.market).inventory[prop] = 0.0f; // nothing on the shelf: the dead-market case
+        check(vetoed(f, resource_type::propellant), "U4 not vacuous: before the intake, propellant is a dead market at M");
+        economy_report rep;
+        run_pad_intake(f.w, reg.space_assets(), reg.price_band().reservation_mult, rep);
+        const auto wit = rep.wants.find(std::make_pair(f.corp, f.market));
+        check(wit != rep.wants.end() && wit->second[prop] > 0.0f && f.w.buildings.at(lp).boost == 0.0f,
+              "U4 the intake posts its want at the pad's market though the shelf is empty (nothing banked)");
+        (void)clear_markets(f.w, reg, rep);
+        check(f.w.markets.at(f.market).demand[prop] > 0.0f,
+              "U4 ... the clear turns it into demand at the pad's market");
+        check(composite_bid(f.w.markets.at(f.market), prop, f.w.current_econ_tick, 4) > 0.0f,
+              "U4 ... and propellant is no longer a dead market at M (it carries a bid)");
+    }
+    std::printf("U4d the space lane's launch spends the pad's boost and buys no fuel\n");
+    {
+        fixture f = make_fixture();
+        const recipe_registry reg;
         const entity_id b2 = f.w.create_entity();
         body_component b2c{};
         b2c.name = "Far"; b2c.type = body_type::planet; b2c.grid_width = 1; b2c.grid_height = 1;
@@ -191,37 +219,24 @@ int main()
         market_component m2c{};
         m2c.body = b2; m2c.centre_tile = t2;
         f.w.markets[m2] = m2c;
-
-        const auto& fuel = launch_draw_per_convoy();
+        const float launch = lane_launch_boost();
+        const entity_id lp = space_fixture::add_pad(f.w, f.corp, f.tile, 10.0f, 3.0f * launch);
         market_component& shelf = f.w.markets.at(f.market);
         shelf.inventory[ri(resource_type::iron_ore)] = 100.0f;
-        std::size_t fuel_good = resource_count;
-        for (std::size_t r = 0; r < resource_count; ++r)
-            // Exactly ONE launch's fuel: the launch empties the shelf, so the
-            // clear sees the want with nothing standing to glut it.
-            if (fuel[r] > 0.0f) { shelf.inventory[r] += fuel[r]; if (fuel_good == resource_count) fuel_good = r; }
-        check(fuel_good < resource_count, "U4 not vacuous: a launch draws a fuel good");
-        const resource_type fg = static_cast<resource_type>(fuel_good < resource_count ? fuel_good : 0);
-        check(vetoed(f, fg), "U4 not vacuous: before the launch, the fuel good is a dead market at M");
+        const std::array<float, resource_count> before = shelf.inventory;
         convoy_leg leg;
         leg.viable = true; leg.mode = convoy_mode::space; leg.cost = 0.0f; leg.travel_ticks = 2;
         economy_report rep;
         const bool sent = commit_trade_shipment(f.w, reg, rep, f.corp, f.market, m2,
                                                 ri(resource_type::iron_ore), 10.0f, leg);
-        check(sent, "U4 the space shipment launched");
+        bool fuel_untouched = true;
+        for (std::size_t r = 0; r < resource_count; ++r)
+            if (r != ri(resource_type::iron_ore))
+                fuel_untouched = fuel_untouched && f.w.markets.at(f.market).inventory[r] == before[r];
         const auto wit = rep.wants.find(std::make_pair(f.corp, f.market));
-        check(fuel_good < resource_count && wit != rep.wants.end() && wit->second[fuel_good] == fuel[fuel_good],
-              "U4 the launch fuel is bought off the source shelf and posted as a want there");
-        (void)clear_markets(f.w, reg, rep);
-        check(fuel_good < resource_count && f.w.markets.at(f.market).demand[fuel_good] > 0.0f,
-              "U4 ... the clear turns it into demand at the source market");
-        // The want is POSTED now, so the market is no longer DEAD for the fuel
-        // good: it carries a bid (the dead-market veto's test). Whether a
-        // 5-a-tick plant against a one-launch want is then a GLUT is the glut
-        // forecast's separate question, and it rightly says yes here.
-        check(fuel_good < resource_count
-                  && composite_bid(f.w.markets.at(f.market), fuel_good, f.w.current_econ_tick, 4) > 0.0f,
-              "U4 ... and the fuel good is no longer a dead market at M (it carries a bid)");
+        check(sent && launch > 0.0f && std::fabs(f.w.buildings.at(lp).boost - 2.0f * launch) < 1.0e-3f && fuel_untouched
+                  && wit != rep.wants.end() && wit->second[ri(resource_type::propellant)] == 0.0f,
+              "U4d the shipment launched; the pad's boost paid the launch; no fuel left the shelf or was wanted");
     }
 
     std::printf("U5 building upkeep is bought off the building's market shelf\n");
@@ -258,12 +273,14 @@ int main()
     std::printf("U6 the record is held for the scorer's cadence\n");
     {
         fixture f = make_fixture();
+        // The scorer's own cadence, not a copy of it: monthly since Ben's 2026-11-14 ruling.
+        const int k = corp_ai_params{}.cadence_k;
         note_unposted_bid(f.w.markets.at(f.market), ri(resource_type::coal), 2.0f, 10);
-        f.w.current_econ_tick = 13; // a corp evaluating 3 ticks after the want
-        check(!vetoed(f, resource_type::coal), "U6 a corporation evaluating 3 ticks after the want still sees it (cadence 4)");
-        f.w.current_econ_tick = 14; // age == cadence_k: the boundary, still held
-        check(!vetoed(f, resource_type::coal), "U6 boundary: a record exactly cadence_k (4) ticks old is still held");
-        f.w.current_econ_tick = 15; // age == cadence_k + 1
+        f.w.current_econ_tick = 10 + k - 1; // a scorer evaluating inside its cadence
+        check(!vetoed(f, resource_type::coal), "U6 a scorer evaluating inside its cadence after the want still sees it");
+        f.w.current_econ_tick = 10 + k; // age == cadence_k: the boundary, still held
+        check(!vetoed(f, resource_type::coal), "U6 boundary: a record exactly cadence_k ticks old is still held");
+        f.w.current_econ_tick = 10 + k + 1; // age == cadence_k + 1
         check(vetoed(f, resource_type::coal), "U6 boundary: one tick past the cadence it no longer counts: dead again");
         f.w.current_econ_tick = 8;  // the record is dated AHEAD of the current tick
         check(vetoed(f, resource_type::coal), "U6 a record dated ahead of the current tick (a settle replayed from tick 1) is never read");
@@ -274,21 +291,21 @@ int main()
               "U6 a later tick's first record overwrites; same-tick records add");
     }
 
-    // U7 — THE SPACE LANE NEEDS A PAD AND ITS PROPELLANT ON THE SHELF (TRADE.md
-    // § A trade, "Between bodies"; BL-1266). The pool-keeps-its-propellant rows
-    // (MARKETS.md step 4: a pad's pool, auto-surplus, a standing sell order)
-    // retired with pools (BL-1265): the trader now BUYS the launch's propellant
-    // off the source shelf. What stands is the gate: `price_trade_leg` is viable
-    // on a space lane only with a Launchpad on the source body AND the launch's
-    // propellant on that shelf.
-    std::printf("U7 the space lane needs a pad and the launch's propellant on the shelf\n");
+    // U7 — THE SPACE LANE NEEDS A STAFFED PAD HOLDING A LAUNCH'S BOOST (TRADE.md
+    // § A trade, "Between bodies"; BL-1266, BL-1637). The trader once bought the
+    // launch's propellant off the source shelf; a launch now spends its pad's boost
+    // (SPACE_ASSETS.md § Boost). What stands is the gate: `price_trade_leg` is viable
+    // on a space lane only with a staffed Launchpad on the source body holding a
+    // launch's boost - with nothing on the fuel shelf at all.
+    std::printf("U7 the space lane needs a staffed pad holding a launch's boost\n");
     {
         const std::size_t prop = ri(resource_type::propellant);
-        const auto& fuel = launch_draw_per_convoy();
-        check(fuel[prop] > 0.0f, "U7 not vacuous: the launch draw burns propellant");
+        const float launch = lane_launch_boost();
+        check(launch > 0.0f, "U7 not vacuous: a lane launch spends boost");
 
-        auto leg_for = [&](bool pad, float propellant) {
+        auto leg_for = [&](bool pad, float boost) {
             fixture f = make_fixture();
+            space_fixture::hold_every_node(f.w, f.corp); // Rocketry: the lane's other gate
             const entity_id b2 = f.w.create_entity();
             body_component b2c{};
             b2c.name = "Far"; b2c.type = body_type::planet; b2c.grid_width = 1; b2c.grid_height = 1;
@@ -309,23 +326,24 @@ int main()
                 const entity_id lp = f.w.create_entity();
                 building_component lb{};
                 lb.tile = f.tile; lb.type = building_type::launchpad;
+                lb.workforce_assigned = 10.0f; lb.boost = boost;
                 f.w.buildings[lp] = lb;
                 f.w.nations.at(f.corp).state_assets.push_back(lp);
             }
-            f.w.markets.at(f.market).inventory[prop]                         = propellant;
+            f.w.markets.at(f.market).inventory[prop]                         = 0.0f; // the shelf is not asked
             f.w.markets.at(f.market).inventory[ri(resource_type::iron_ore)] = 100.0f;
             const recipe_registry reg;
             const logistics_nodes nodes = collect_logistics_nodes(f.w);
             return price_trade_leg(f.w, reg, nodes, f.corp, f.market, far,
                                    ri(resource_type::iron_ore), 10.0f);
         };
-        const convoy_leg ok = leg_for(/*pad=*/true, 5.0f * fuel[prop]);
+        const convoy_leg ok = leg_for(/*pad=*/true, 5.0f * launch);
         check(ok.viable && ok.mode == convoy_mode::space,
-              "U7a a pad on the body and the launch's propellant on the shelf: the space lane is viable");
-        check(!leg_for(/*pad=*/false, 5.0f * fuel[prop]).viable,
+              "U7a a staffed pad holding the launch's boost, an empty fuel shelf: the space lane is viable");
+        check(!leg_for(/*pad=*/false, 5.0f * launch).viable,
               "U7b no pad on the source body: no space lane");
-        check(!leg_for(/*pad=*/true, 0.0f).viable,
-              "U7c a pad but no propellant on the shelf: no space lane");
+        check(!leg_for(/*pad=*/true, 0.5f * launch).viable,
+              "U7c a pad holding less than a launch's boost: no space lane");
     }
     // U8 — NR-986 (Ben, 2026-10-09): at the handoff the seat's dial-idled plants
     // return to auto. Sibling of U-rows only by fixture; the subject is the

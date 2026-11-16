@@ -635,6 +635,7 @@ enum class far_space_block : uint8_t
     blockaded,       ///< The home body is blockaded for it.
     refused,         ///< The verb refused what the pick chose.
     nothing_wanted,  ///< Nothing far-space is wanted now.
+    boost_short,     ///< BL-1637: the pad holds too little boost for the climb.
 };
 
 /// What the far-space pick did for one nation. Reported, never stored.
