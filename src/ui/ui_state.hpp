@@ -115,6 +115,12 @@ struct marker_hit_zone
     enum class kind : uint8_t { building, unit } kind = kind::building;
     ImVec2    centre{};         ///< Marker centre in screen pixels (this frame).
     float     radius = 0.0f;   ///< Hit-test radius in screen pixels.
+    /// On the 3D ground a counter stands upright, moved whole from its flat point to where
+    /// the camera shows its anchor. Such a zone is asked with the SCREEN cursor less
+    /// `shift`, not the ground under the cursor - a press on a tall marker's top would
+    /// otherwise pick the ground behind it.
+    bool      stands = false;
+    ImVec2    shift{};
 };
 
 /// The grain of a STRUCTURE selection: a region-scale entity the player selects
@@ -2520,6 +2526,8 @@ struct ui_state
         int           count = 1;
         bool          mine  = false;
         ImVec2        box_min{}, box_max{}; ///< The box holding glyph and count; empty with no count drawn.
+        bool          stands = false;       ///< Upright on the 3D ground: asked as marker_hit_zone::stands.
+        ImVec2        shift{};
     };
     std::vector<convoy_zone> convoy_zones;
     std::uint32_t hovered_convoy = 0; ///< The convoy the pointer's marker names; 0 none.

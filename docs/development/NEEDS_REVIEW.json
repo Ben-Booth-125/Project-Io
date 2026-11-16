@@ -1964,6 +1964,27 @@
     "docs/ui/RENDERING.md"
    ],
    "resolution": null
+  },
+  {
+   "id": "NR-1231",
+   "title": "Compressed ground textures: BC1 measures cheap and close to lossless - build the GPU path, or close the spike?",
+   "raised": "2026-11-16",
+   "kind": "question",
+   "status": "open",
+   "source": "BL-1662 (compressed ground textures) spike, sprint 68",
+   "what": "The spike measured BC1 with stb_dxt on 18 chunks of 512 px: a median 3.32 ms a chunk on one core, PSNR 41.1 dB median (38.8 worst); by eye the loss is the finest grain noise. A 2.9 GB chain would hold about 0.5 GB. The 3D ground draws only on the GPU renderer, which can take a BC1 texture; the software path and every --verify capture would keep RGB.",
+   "why_it_matters": "It is the largest memory lever left for the ground: a finer master, or many more resident chunks, in today's budget. The cost is a second chunk format beside the capture path, and a lossy one.",
+   "options": [
+    "A) Build it: BC1 chunks on the GPU renderer, RGB kept for software and captures",
+    "B) Close the spike unbuilt; reopen when ground memory binds again",
+    "C) Measure BC7 first (bc7enc), for quality, before deciding"
+   ],
+   "recommendation": "B for now: nothing binds on memory today, and the 3D ground has moved where the budget goes. The numbers stay in the item for when it does.",
+   "files": [
+    "src/core/ground_slice_3d.cpp",
+    "docs/ui/RENDERING.md"
+   ],
+   "resolution": null
   }
  ]
 }

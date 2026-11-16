@@ -1061,7 +1061,7 @@ void build_trees(const ui::ground::bake_source& src, float x0, float y0, float x
             if (conifer)
             {
                 const float rad = hgt * 0.34f;
-                b.frustum(px, py, rad, 0.001f, ground + hgt * 0.12f, ground + hgt, 0, 0.0f, crown, crown, 6);
+                b.frustum(px, py, rad, 0.0f, ground + hgt * 0.12f, ground + hgt, 3, 0.0f, crown, crown, 6);
             }
             else
             {
@@ -1069,7 +1069,7 @@ void build_trees(const ui::ground::bake_source& src, float x0, float y0, float x
                 const float rad = hgt * (scrub ? 0.55f : 0.42f);
                 const float ym = ground + hgt * 0.55f;
                 b.frustum(px, py, rad * 0.35f, rad, ground + hgt * 0.15f, ym, 3, 0.0f, crown, crown, 6);
-                b.frustum(px, py, rad, 0.001f, ym, ground + hgt, 0, 0.0f, crown, crown, 6);
+                b.frustum(px, py, rad, 0.0f, ym, ground + hgt, 3, 0.0f, crown, crown, 6);
             }
         }
     });

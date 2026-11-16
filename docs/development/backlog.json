@@ -1710,7 +1710,7 @@
       "design": "PLANETARY.md § The national border band. Paradox-style: a distance field to the nearest owner boundary, derived on the CPU from the tile-id texture when ownership changes (an event, never a tick), thresholded and anti-aliased in the shader. The band's rules (which edges draw, never a third blended colour, clicking the border selects the nation) are unchanged; only how it is drawn moves. No-shader path: today's vector band. DELIVERED 2026-11-14: border_band.frag reads an owner table and measures each differing side analytically (NR-1229 records the choice over a stored field); the rule is a fixed screen width at every zoom. The vector AddLine rule is the no-shader path. Live-checked across the zoom rungs."
     },
     {
-      "glyph": "~",
+      "glyph": "✓",
       "sprint": 68,
       "version_goal": null,
       "written": "2026-11-14",
@@ -1724,7 +1724,7 @@
       "authority_doc": "docs/ui/RENDERING.md",
       "id": "BL-1658",
       "short_name": "CLOSE_ZOOM_DETAIL_LAYER",
-      "status": "design-owed",
+      "status": "complete",
       "priority": "C",
       "difficulty": 4,
       "title": "A tiling detail texture per terrain family sharpens the two closest rungs",
@@ -1733,7 +1733,7 @@
         "src/ui/ground_bake.cpp",
         "assets/brushes/"
       ],
-      "design": "RENDERING.md § Level of detail. Paradox, Total War and Civ tile a high-frequency detail texture over base colour, so close zoom stays crisp past the base resolution; it also answers the ~2x magnification of the top rung at 4K height. OPEN (Ben's call): this overturns \"zooming does not add detail\" (Ben, 2026-10-09). That ruling was about the lag of a fresh bake per rung; a draw-time detail layer adds no bake. A family mask comes from the tile-id texture."
+      "design": "RENDERING.md § Level of detail, \"The two closest rungs add detail at draw time\" (Ben, 2026-11-15, overturning \"zooming does not add detail\" for those two rungs). WORK: a tiling detail texture per terrain family modulates the land's luminance at the two closest rungs, at draw time, from a family mask; nothing baked, the software path draws none."
     },
     {
       "glyph": "✓",
@@ -1830,7 +1830,7 @@
       "files": [
         "src/core/ground_layer.cpp"
       ],
-      "design": "RENDERING.md § Resident set. Every AAA reference stores terrain BC1/BC7-compressed: four to eight times less memory per pixel, so a 192 px master would fit today's budget. UNKNOWN: whether an SDL_Renderer texture can be uploaded compressed (likely not; the GPU API can). WORK: a spike that answers that and measures encode cost per chunk; lossy, so the 6 GB ceiling and capture determinism are both on the table. SPIKE 2026-11-14: SDL 3.4's GPU renderer wraps an external SDL_GPUTexture (SDL_PROP_TEXTURE_CREATE_GPU_TEXTURE_POINTER), so a BC1/BC7 chunk can draw on the GPU path, never in software captures. Measuring encode cost needs a vendored encoder; NR-1227 holds the call. Ben, 2026-11-16 (NR-1227 option A): vendor stb_dxt (BC1, public domain) and MEASURE encode ms per 512 px chunk only; the format decision follows the numbers. READING 2026-11-16 (tools/verify/bc1_encode_measure.cpp, stb_dxt v1.13 vendored at third_party/stb/stb_dxt.h, 18 chunks of 512 px from the ground previews): BC1 encodes in a median 3.32 ms a chunk on one core (high-quality mode 3.60 ms), PSNR 41.1 dB median (38.8 worst), worst channel error 54 at a structure edge; by eye the loss is the finest grain noise. A 2.9 GB chain re-encodes in about 13 s of one core, about 1 s across the bake pool, and holds about 0.5 GB. OPEN (Ben): build the BC1 path (GPU renderer only; captures keep RGB), or close."
+      "design": "RENDERING.md § Resident set. Every AAA reference stores terrain BC1/BC7-compressed: four to eight times less memory per pixel, so a 192 px master would fit today's budget. UNKNOWN: whether an SDL_Renderer texture can be uploaded compressed (likely not; the GPU API can). WORK: a spike that answers that and measures encode cost per chunk; lossy, so the 6 GB ceiling and capture determinism are both on the table. SPIKE 2026-11-14: SDL 3.4's GPU renderer wraps an external SDL_GPUTexture (SDL_PROP_TEXTURE_CREATE_GPU_TEXTURE_POINTER), so a BC1/BC7 chunk can draw on the GPU path, never in software captures. Measuring encode cost needs a vendored encoder; NR-1227 holds the call. Ben, 2026-11-16 (NR-1227 option A): vendor stb_dxt (BC1, public domain) and MEASURE encode ms per 512 px chunk only; the format decision follows the numbers. READING 2026-11-16 (tools/verify/bc1_encode_measure.cpp, stb_dxt v1.13 vendored at third_party/stb/stb_dxt.h, 18 chunks of 512 px from the ground previews): BC1 encodes in a median 3.32 ms a chunk on one core (high-quality mode 3.60 ms), PSNR 41.1 dB median (38.8 worst), worst channel error 54 at a structure edge; by eye the loss is the finest grain noise. A 2.9 GB chain re-encodes in about 13 s of one core, about 1 s across the bake pool, and holds about 0.5 GB. OPEN (Ben): build the BC1 path (GPU renderer only; captures keep RGB), or close. The build-or-close call is NR-1231."
     },
     {
       "glyph": "✓",

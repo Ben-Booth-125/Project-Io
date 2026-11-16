@@ -1882,7 +1882,10 @@ body_frame_stamp make_body_frame_stamp(const world& w, entity_id body)
 /// a unit standing on a built tile must be reachable on the FIRST click, not
 /// only after cycling past the building. Extracted so the two paths cannot
 /// drift (BL-362).
-entity_id resolve_marker_hit(const std::vector<marker_hit_zone>& zones, float mx, float my)
+///
+/// `ground` is the flat point under the cursor; `screen` the cursor itself. A zone that
+/// stands upright on the 3D ground is asked with `screen - shift`, the rest with `ground`.
+entity_id resolve_marker_hit(const std::vector<marker_hit_zone>& zones, ImVec2 ground, ImVec2 screen)
 {
     float     best_unit_d2 = std::numeric_limits<float>::max();
     float     best_bld_d2  = std::numeric_limits<float>::max();
@@ -1890,8 +1893,9 @@ entity_id resolve_marker_hit(const std::vector<marker_hit_zone>& zones, float mx
     entity_id bld  = null_entity;
     for (const marker_hit_zone& hz : zones)
     {
-        const float dx = mx - hz.centre.x;
-        const float dy = my - hz.centre.y;
+        const ImVec2 m = hz.stands ? ImVec2{ screen.x - hz.shift.x, screen.y - hz.shift.y } : ground;
+        const float dx = m.x - hz.centre.x;
+        const float dy = m.y - hz.centre.y;
         const float d2 = dx * dx + dy * dy;
         if (d2 > hz.radius * hz.radius)
             continue;
@@ -4165,6 +4169,23 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     const auto upright = [&](ImVec2 at, int v0) {
         if (g3d && dl->VtxBuffer.Size > v0)
             uprights.push_back({ v0, dl->VtxBuffer.Size, at });
+    };
+    // An upright mark's hit zone stands where the mark does: the same move, from its
+    // anchor's flat point to where the camera shows it; out of sight, it cannot be hit.
+    const auto stand_zone = [&](ImVec2 at, bool& stands, ImVec2& shift) {
+        if (!g3d)
+            return;
+        stands = true;
+        const ImVec2 c = canon_of_flat(at);
+        float sx = 0.0f, sy = 0.0f;
+        if (gfx::slice::project(c.x, c.y, sx, sy) && gfx::slice::in_sight(c.x, c.y))
+            shift = { sx - at.x, sy - at.y };
+        else
+            shift = { 1e7f, 1e7f };
+    };
+    // The cursor in an upright zone's own flat frame.
+    const auto zone_cursor = [&](bool stands, ImVec2 shift) -> ImVec2 {
+        return stands ? ImVec2{ mouse.x - shift.x, mouse.y - shift.y } : mouse_g;
     };
     int frame_v0 = -1, frame_v1 = -1;
     gfx::slice::inputs slice_in;
@@ -7238,6 +7259,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                             hz.kind   = marker_hit_zone::kind::unit;
                             hz.centre = mpos;
                             hz.radius = ur * 1.3f; // BL-1425: the counter's half-width, and a little over
+                            stand_zone(mpos, hz.stands, hz.shift);
                             state.marker_hit_zones.push_back(hz);
                         }
                     }
@@ -7271,6 +7293,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                     hz.kind   = marker_hit_zone::kind::unit; // a marker the player aimed at, ahead of the ground
                     hz.centre = wpos;
                     hz.radius = wr * 1.25f;
+                    stand_zone({cx, cy}, hz.stands, hz.shift);
                     state.marker_hit_zones.push_back(hz);
                     state.wing.markers.push_back({next, wpos.x, wpos.y, static_cast<int>(ws.size())});
                     ++state.wing.markers_drawn;
@@ -7307,6 +7330,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                     hz.kind   = marker_hit_zone::kind::unit; // a marker the player aimed at, ahead of the ground
                     hz.centre = spos;
                     hz.radius = sr * 1.1f;
+                    stand_zone({cx, cy}, hz.stands, hz.shift);
                     state.marker_hit_zones.push_back(hz);
                     state.ship.markers.push_back({next, spos.x, spos.y, static_cast<int>(ss.size()),
                                                   is_player_side(w, sh.owner)});
@@ -7738,6 +7762,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 z.id     = next;
                 z.centre = mp;
                 z.radius = cr * 1.25f;
+                stand_zone(mp, z.stands, z.shift);
                 const ImVec2 zv = view_pt(mp);
                 z.x      = zv.x;
                 z.y      = zv.y;
@@ -7758,12 +7783,13 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             float best = std::numeric_limits<float>::max();
             for (const ui_state::convoy_zone& z : state.convoy_zones)
             {
-                const float dx = mouse_g.x - z.centre.x, dy = mouse_g.y - z.centre.y;
+                const ImVec2 zm = zone_cursor(z.stands, z.shift);
+                const float dx = zm.x - z.centre.x, dy = zm.y - z.centre.y;
                 const float d2 = dx * dx + dy * dy;
                 // The press answers on everything drawn: the circle, or the box that holds both.
                 const bool on_box = z.box_max.x > z.box_min.x
-                    && mouse_g.x >= z.box_min.x && mouse_g.x <= z.box_max.x
-                    && mouse_g.y >= z.box_min.y && mouse_g.y <= z.box_max.y;
+                    && zm.x >= z.box_min.x && zm.x <= z.box_max.x
+                    && zm.y >= z.box_min.y && zm.y <= z.box_max.y;
                 if ((d2 <= z.radius * z.radius || on_box) && d2 < best)
                 {
                     best = d2;
@@ -7882,6 +7908,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 hz.kind   = marker_hit_zone::kind::unit;
                 hz.centre = mpos;
                 hz.radius = ur * 1.3f;
+                stand_zone(mpos, hz.stands, hz.shift);
                 state.marker_hit_zones.push_back(hz);
                 if (k == k_min)
                 {
@@ -7966,7 +7993,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         // as it outranks the border band); a building zone does not, because a
         // press there falls through to the ground anyway (BL-1312).
         const entity_id over_marker =
-            resolve_marker_hit(state.marker_hit_zones, mouse_g.x, mouse_g.y);
+            resolve_marker_hit(state.marker_hit_zones, mouse_g, mouse);
         const bool pointer_free = hovered_tile != null_entity
                                && (over_marker == null_entity || (w.units.count(over_marker) == 0 && w.wings.count(over_marker) == 0 && w.ships.count(over_marker) == 0));
 
@@ -9251,7 +9278,8 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                       && hz.centre.y >= bmin.y && hz.centre.y <= bmax.y;
                 else if (state.unit_drag.shift)
                 {
-                    const float dx = mouse_g.x - hz.centre.x, dy = mouse_g.y - hz.centre.y;
+                    const ImVec2 zm = zone_cursor(hz.stands, hz.shift);
+                    const float dx = zm.x - hz.centre.x, dy = zm.y - hz.centre.y;
                     in = dx * dx + dy * dy <= hz.radius * hz.radius;
                 }
                 if (!in)
@@ -9404,7 +9432,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         // Resolve the highest-priority entity under the cursor (shared with the
         // click path below — resolve_marker_hit, BL-362).
         const entity_id marker_hover =
-            resolve_marker_hit(state.marker_hit_zones, mouse_g.x, mouse_g.y);
+            resolve_marker_hit(state.marker_hit_zones, mouse_g, mouse);
 
         // A built tile resolves to its BUILDING across the whole hex, not just inside
         // the glyph's radius: once a tile carries an installation, the installation is
@@ -9685,9 +9713,11 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             // screen, so the press asks with `mouse_g` exactly as hover does.
             // Asking with the screen `mouse` missed off-centre presses on every
             // tilted rung — the hover named one thing and the press took another.
+            // On the 3D ground an upright zone is asked with the screen cursor less
+            // its stand shift instead; the press still asks exactly as hover does.
             entity_id marker_hit =
                 lensed ? null_entity
-                       : resolve_marker_hit(state.marker_hit_zones, mouse_g.x, mouse_g.y);
+                       : resolve_marker_hit(state.marker_hit_zones, mouse_g, mouse);
 
             // A CANVAS PRESS SELECTS THE TILE (BL-1312 round 2; SELECTION.md
             // § Multi-building tiles — Ben, 2026-10-13: "default tile selection
