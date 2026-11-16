@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*108 entries — 54 open, 54 resolved.*
+*108 entries — 53 open, 55 resolved.*
 
 ---
 
@@ -556,21 +556,6 @@ Migration moves three months of its rate on the first month of each quarter, so 
 > **Recommendation:** Keep it; heads are conserved and the calendar rate holds.
 
 *Files: `src/world/economy_system.cpp`, `tools/verify/recruits_harness.cpp`*
-
-### NR-1227 — Compressed ground textures: the GPU path can draw them, but measuring needs a vendored encoder
-*question · raised 2026-11-14 · from BL-1662 (compressed ground textures) spike, sprint 68*
-
-SDL 3.4's GPU renderer wraps an external SDL_GPUTexture (SDL_PROP_TEXTURE_CREATE_GPU_TEXTURE_POINTER), so a BC1 or BC7 chunk can be drawn on the GPU path. The software renderer (every --verify capture) cannot, so captures would keep the RGB chunk. The open cost is encode time per 512 px chunk at bake, which needs an encoder in the tree.
-
-**Why it matters.** BC1 is 6:1 against RGB (BC7 3:1), the largest memory lever left for the ground. It adds a third-party dependency and a second chunk format beside the capture path.
-
-- A) Vendor a single-file BC1 encoder (stb_dxt, public domain) and measure encode ms per chunk
-- B) Vendor a BC7 encoder (bc7enc, MIT) for quality, slower to encode
-- C) Defer: close the item unbuilt until ground memory binds again
-
-> **Recommendation:** A for the measurement only; decide the format from the numbers.
-
-*Files: `src/core/gpu_effects.cpp`, `docs/ui/RENDERING.md`*
 
 ### NR-1228 — Shader seam: --verify captures stay on the software renderer, so they never show a shader pass
 *decision taken on your behalf · raised 2026-11-14 · from BL-1655 (shader seam), sprint 68*
@@ -1427,4 +1412,21 @@ The baked grade lifts land and leaves water, so a draw-time grade must know, per
 > **RESOLVED.** Ben, 2026-11-15: try D (a per-tile land table, no stored weight), fall back to B (a half-resolution land mask) if the hex-side shore shows. D built: RENDERING.md § Art direction and palette, 'The lift at draw time'. Only the land lift moved to draw time; the near-future grade stays baked.
 
 *Files: `src/ui/body_surface_canvas.cpp`, `docs/ui/RENDERING.md`*
+
+### NR-1227 — Compressed ground textures: the GPU path can draw them, but measuring needs a vendored encoder
+*question · raised 2026-11-14 · from BL-1662 (compressed ground textures) spike, sprint 68*
+
+SDL 3.4's GPU renderer wraps an external SDL_GPUTexture (SDL_PROP_TEXTURE_CREATE_GPU_TEXTURE_POINTER), so a BC1 or BC7 chunk can be drawn on the GPU path. The software renderer (every --verify capture) cannot, so captures would keep the RGB chunk. The open cost is encode time per 512 px chunk at bake, which needs an encoder in the tree.
+
+**Why it matters.** BC1 is 6:1 against RGB (BC7 3:1), the largest memory lever left for the ground. It adds a third-party dependency and a second chunk format beside the capture path.
+
+- A) Vendor a single-file BC1 encoder (stb_dxt, public domain) and measure encode ms per chunk
+- B) Vendor a BC7 encoder (bc7enc, MIT) for quality, slower to encode
+- C) Defer: close the item unbuilt until ground memory binds again
+
+> **Recommendation:** A for the measurement only; decide the format from the numbers.
+
+> **RESOLVED.** Ben, 2026-11-16: option A. Vendor stb_dxt and measure BC1 encode time per 512 px chunk; decide the format from the numbers.
+
+*Files: `src/core/gpu_effects.cpp`, `docs/ui/RENDERING.md`*
 

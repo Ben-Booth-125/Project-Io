@@ -1798,7 +1798,7 @@
       "authority_doc": "docs/ui/RENDERING.md",
       "id": "BL-1661",
       "short_name": "FAR_ZOOM_CARTOGRAPHIC_MAP",
-      "status": "design-owed",
+      "status": "designed",
       "priority": "C",
       "difficulty": 3,
       "title": "At the whole-grid rung the ground gives way to a stylised map",
@@ -1806,7 +1806,7 @@
         "src/core/ground_layer.cpp",
         "src/ui/body_surface_canvas.cpp"
       ],
-      "design": "RENDERING.md § Level of detail, the 6 px level. CK3 and Victoria 3 cross-fade to a flat paper map at far zoom, and Civ VI has a hand-drawn strategic view; at 6 px a hex the painted ground reads as noise. OPEN (Ben's call, a feel question for CONCEPT/RENDERING): whether the far rung changes style, and what it shows (terrain families flat, national colour, coasts inked)."
+      "design": "RENDERING.md § Level of detail, \"The farthest rung is a flat map\" (Ben, 2026-11-16: flat map cross-faded from the 12 px rung; national colour, inked coastlines, rivers as lines). WORK: a per-tile map table (colour, river sides, survey) and the ground shader's map pass, weighted by drawn radius."
     },
     {
       "glyph": "~",
@@ -1830,7 +1830,7 @@
       "files": [
         "src/core/ground_layer.cpp"
       ],
-      "design": "RENDERING.md § Resident set. Every AAA reference stores terrain BC1/BC7-compressed: four to eight times less memory per pixel, so a 192 px master would fit today's budget. UNKNOWN: whether an SDL_Renderer texture can be uploaded compressed (likely not; the GPU API can). WORK: a spike that answers that and measures encode cost per chunk; lossy, so the 6 GB ceiling and capture determinism are both on the table. SPIKE 2026-11-14: SDL 3.4's GPU renderer wraps an external SDL_GPUTexture (SDL_PROP_TEXTURE_CREATE_GPU_TEXTURE_POINTER), so a BC1/BC7 chunk can draw on the GPU path, never in software captures. Measuring encode cost needs a vendored encoder; NR-1227 holds the call."
+      "design": "RENDERING.md § Resident set. Every AAA reference stores terrain BC1/BC7-compressed: four to eight times less memory per pixel, so a 192 px master would fit today's budget. UNKNOWN: whether an SDL_Renderer texture can be uploaded compressed (likely not; the GPU API can). WORK: a spike that answers that and measures encode cost per chunk; lossy, so the 6 GB ceiling and capture determinism are both on the table. SPIKE 2026-11-14: SDL 3.4's GPU renderer wraps an external SDL_GPUTexture (SDL_PROP_TEXTURE_CREATE_GPU_TEXTURE_POINTER), so a BC1/BC7 chunk can draw on the GPU path, never in software captures. Measuring encode cost needs a vendored encoder; NR-1227 holds the call. Ben, 2026-11-16 (NR-1227 option A): vendor stb_dxt (BC1, public domain) and MEASURE encode ms per 512 px chunk only; the format decision follows the numbers. READING 2026-11-16 (tools/verify/bc1_encode_measure.cpp, stb_dxt v1.13 vendored at third_party/stb/stb_dxt.h, 18 chunks of 512 px from the ground previews): BC1 encodes in a median 3.32 ms a chunk on one core (high-quality mode 3.60 ms), PSNR 41.1 dB median (38.8 worst), worst channel error 54 at a structure edge; by eye the loss is the finest grain noise. A 2.9 GB chain re-encodes in about 13 s of one core, about 1 s across the bake pool, and holds about 0.5 GB. OPEN (Ben): build the BC1 path (GPU renderer only; captures keep RGB), or close."
     },
     {
       "glyph": "✓",
@@ -1856,6 +1856,189 @@
         "src/ui/structure_stamps.cpp"
       ],
       "design": "RENDERING.md § Roads and sea lanes. FOUND 2026-11-14 while delivering BL-1652 (gamma-correct mips): ground_bake_check --routes fails 8 assertions with main's ground_bake.cpp (224020d6) and identically with the new downsample. Failing: P28 the highway (93 px moved), track (46 px), town, works and forecourt surfaces (0 px moved) draw; P29 a works tile a road meets takes its roaded variant; P33 no staged road comes within a roaded cluster's disc plus its half-width; P34 every road set draws. WORK: find which change broke them (git bisect over the route pass and the structure plan), then decide per row whether the bake or the check is wrong. Do not weaken a row to pass: a check that no longer matches a ruled design is re-derived from the doc, never loosened. DELIVERED 2026-11-14: the check now stages road_sides from the staged tiers before each rederive; P30's upgrade raises one whole crossing. ground_bake_check 163 PASS, 0 failures."
+    },
+    {
+      "glyph": "~",
+      "sprint": 68,
+      "version_goal": null,
+      "written": "2026-11-16",
+      "parked": false,
+      "blocked_on": null,
+      "requires": [],
+      "author": "Claude (Ben, 2026-11-16: \"Shader now, 3D slice\")",
+      "category": "UI",
+      "status": "designed",
+      "priority": "B",
+      "authority_doc": "docs/ui/RENDERING.md",
+      "id": "BL-1664",
+      "short_name": "FIXED_ANGLE_DEPTH",
+      "difficulty": 3,
+      "title": "The ground gains depth at the fixed angle: parallax relief, long shadows, wind",
+      "files": [
+        "src/shaders/ground.frag.hlsl",
+        "src/ui/body_surface_canvas.cpp"
+      ],
+      "design": "RENDERING.md § Level of detail, \"Depth at the fixed angle\" (Ben, 2026-11-16: \"more elevation, shadows, and possibly animations on the texture\", answered \"Shader now, 3D slice\"). WORK: parallax-occlusion relief on the detail bumps along the view tilt, a long shadow march over the height field toward the light, and wind gusts and drifting sand on the detail textures, all in the ground shader with the static bake as the no-shader path. SUPERSEDED (2026-11-16) by the 3D ground: its wind and sand carry into BL-1667 GROUND_3D_DETAIL; its parallax and shadow marches retire."
+    },
+    {
+      "glyph": "~",
+      "sprint": 68,
+      "version_goal": null,
+      "written": "2026-11-16",
+      "parked": false,
+      "blocked_on": null,
+      "requires": [],
+      "author": "Claude (Ben, 2026-11-16: \"Shader now, 3D slice\")",
+      "category": "UI",
+      "status": "designed",
+      "priority": "B",
+      "authority_doc": "docs/tech/TECH_FOUNDATIONS.md",
+      "id": "BL-1665",
+      "short_name": "GROUND_3D_SLICE",
+      "difficulty": 4,
+      "title": "A 3D vertical slice: one heightmesh chunk in the painted style, measured",
+      "files": [],
+      "design": "TECH_FOUNDATIONS.md § Rendering dimension, \"Toward 3D, in two steps\" (Ben, 2026-11-16). WORK: draw one ground chunk as a heightmesh with a depth buffer on the SDL GPU device behind the GPU renderer, textured from the bake and shaded in the C-F style, composited as the ground layer; report the frame cost, the code it took, the device-sharing answer, and captures beside the fixed-angle ground, for Ben to judge true 3D against the fixed angle. A measurement, not a renderer: no camera, no layer replaced. READING (2026-11-16, SDL 3.4 headers): the device can be shared - SDL_GetGPURendererDevice returns the GPU renderer's own SDL_GPUDevice, so the slice renders the mesh with a depth target into an SDL_GPUTexture on it, and SDL_PROP_TEXTURE_CREATE_GPU_TEXTURE_POINTER wraps that texture as an SDL_Texture the canvas draws like a chunk. Open: ordering the slice's command buffer against the renderer's own (SDL_FlushRenderer before submit), measured in the slice. VERDICT (Ben, 2026-11-16): \"I much prefer the 3D look ... work with just 3D from now on\" - the ground is 3D (RENDERING.md § The 3D ground); the slice is the seed of BL-1666 GROUND_3D_CANVAS."
+    },
+    {
+      "glyph": "~",
+      "sprint": 68,
+      "version_goal": null,
+      "written": "2026-11-16",
+      "parked": false,
+      "blocked_on": null,
+      "requires": [],
+      "author": "Claude (Ben, 2026-11-16: \"work with just 3D from now on\", design form)",
+      "category": "UI",
+      "status": "designed",
+      "authority_doc": "docs/ui/RENDERING.md",
+      "id": "BL-1666",
+      "short_name": "GROUND_3D_CANVAS",
+      "priority": "A",
+      "difficulty": 3,
+      "title": "The 3D ground is the planetary canvas ground: camera, mesh, backdrop, a straight-down bake",
+      "files": [
+        "src/core/ground_slice_3d.cpp",
+        "src/ui/body_surface_canvas.cpp",
+        "src/ui/ground_bake.cpp"
+      ],
+      "design": "RENDERING.md § The 3D ground and § The camera (Ben, 2026-11-16). WORK: promote the slice (BL-1665 (3D slice)) to the ground layer - tilt following zoom, no turn, the proposed default calibration; the far page as a backdrop only where no chunk is loaded; the mesh rebuilt off the frame (or incrementally per chunk) so a pan or zoom does not hitch; the master baked straight down (no oblique lift, no standing sprites); the slice window becomes the ground's tuning panel."
+    },
+    {
+      "glyph": "~",
+      "sprint": 68,
+      "version_goal": null,
+      "written": "2026-11-16",
+      "parked": false,
+      "blocked_on": null,
+      "requires": [],
+      "author": "Claude (Ben, 2026-11-16: \"work with just 3D from now on\", design form)",
+      "category": "UI",
+      "status": "designed",
+      "authority_doc": "docs/ui/RENDERING.md",
+      "id": "BL-1667",
+      "short_name": "GROUND_3D_DETAIL",
+      "priority": "A",
+      "difficulty": 3,
+      "title": "The close-zoom detail layer and the far map draw on the 3D ground",
+      "files": [
+        "src/shaders/slice3d.frag.hlsl",
+        "src/core/ground_slice_3d.cpp"
+      ],
+      "design": "RENDERING.md § The 3D ground, \"The close-zoom detail layer draws on the mesh\". WORK: port the ground shader's per-family detail textures, per-tile offset and tone, bump lighting, wind, creeping sand, the structure mark, and the far rungs' flat map into the 3D fragment shader, each weighted by drawn radius from screen derivatives; the parallax and draw-time shadow marches retire."
+    },
+    {
+      "glyph": "~",
+      "sprint": 68,
+      "version_goal": null,
+      "written": "2026-11-16",
+      "parked": false,
+      "blocked_on": null,
+      "requires": [],
+      "author": "Claude (Ben, 2026-11-16: \"work with just 3D from now on\", design form)",
+      "category": "UI",
+      "status": "designed",
+      "authority_doc": "docs/ui/RENDERING.md",
+      "id": "BL-1668",
+      "short_name": "GROUND_3D_DRAPE",
+      "priority": "A",
+      "difficulty": 4,
+      "title": "Ground marks - lenses, borders, fronts, selections - drape over the 3D terrain",
+      "files": [
+        "src/ui/body_surface_canvas.cpp",
+        "src/core/ground_slice_3d.cpp"
+      ],
+      "design": "RENDERING.md § The 3D ground, \"Ground marks are draped\". WORK: draw the canvas's ground-space marks each frame into an offscreen texture in canonical space (lens washes, border band, fronts, province selection, road highlights, hover and selection hex) and sample it in the 3D fragment shader over the terrain."
+    },
+    {
+      "glyph": "~",
+      "sprint": 68,
+      "version_goal": null,
+      "written": "2026-11-16",
+      "parked": false,
+      "blocked_on": null,
+      "requires": [],
+      "author": "Claude (Ben, 2026-11-16: \"work with just 3D from now on\", design form)",
+      "category": "UI",
+      "status": "designed",
+      "authority_doc": "docs/ui/RENDERING.md",
+      "id": "BL-1669",
+      "short_name": "GROUND_3D_MARKERS_PICK",
+      "priority": "A",
+      "difficulty": 4,
+      "title": "Markers stand upright at their 3D point; clicks ray-pick the terrain",
+      "files": [
+        "src/ui/body_surface_canvas.cpp",
+        "src/core/ground_slice_3d.cpp"
+      ],
+      "design": "RENDERING.md § The 3D ground, \"Markers stand upright\" and \"Clicks pick the terrain\". WORK: one camera shared by canvas and ground; a canonical-to-screen through it (height included) for every marker, label and icon, hidden behind terrain by a depth read; a ray pick against the height field for hover, press and every hit test, replacing the squash inverse."
+    },
+    {
+      "glyph": "~",
+      "sprint": 68,
+      "version_goal": null,
+      "written": "2026-11-16",
+      "parked": false,
+      "blocked_on": null,
+      "requires": [],
+      "author": "Claude (Ben, 2026-11-16: \"work with just 3D from now on\", design form)",
+      "category": "UI",
+      "status": "designed",
+      "authority_doc": "docs/ui/RENDERING.md",
+      "id": "BL-1670",
+      "short_name": "GROUND_3D_BUILDINGS",
+      "priority": "B",
+      "difficulty": 4,
+      "title": "Installations stand as procedural low-poly geometry on the 3D ground",
+      "files": [
+        "src/ui/ground_bake.cpp",
+        "src/core/ground_slice_3d.cpp"
+      ],
+      "design": "RENDERING.md § The 3D ground, \"Buildings are procedural geometry\", and § Installations, \"Structures stand up as geometry\". WORK: lift the installation pass's structure layout (sheds, tanks, towers, a town's blocks) into a mesh of boxes, pitched roofs and cylinders per chunk, lit and shadow-mapped with the ground; the bake keeps only ground parts and roads."
+    },
+    {
+      "glyph": "~",
+      "sprint": 68,
+      "version_goal": null,
+      "written": "2026-11-16",
+      "parked": false,
+      "blocked_on": null,
+      "requires": [],
+      "author": "Claude (Ben, 2026-11-16: \"work with just 3D from now on\", design form)",
+      "category": "UI",
+      "status": "designed",
+      "authority_doc": "docs/ui/RENDERING.md",
+      "id": "BL-1671",
+      "short_name": "GROUND_FLAT_RETIRED",
+      "priority": "B",
+      "difficulty": 3,
+      "title": "The flat ground is removed; --verify captures the 3D ground on the GPU renderer",
+      "files": [
+        "src/ui/body_surface_canvas.cpp",
+        "src/core/app.cpp",
+        "scripts/verify"
+      ],
+      "design": "TECH_FOUNDATIONS.md § Rendering dimension, \"The ground is 3D\" (Ben, 2026-11-16: remove the flat ground entirely). WORK: --verify runs the GPU renderer for the planetary canvas; ground checks move to structural asserts and tolerance compares; then the flat ground draw, the fixed-angle ground shader passes and the squash camera are deleted. Ordered after the drape and the pick, which replace what the flat path still does."
     }
   ]
 }

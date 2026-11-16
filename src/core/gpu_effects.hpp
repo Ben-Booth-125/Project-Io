@@ -28,7 +28,9 @@ enum class effect : int
     border_band,  ///< the national border rule from an owner table (BL-1657; uniforms: float4)
     water_glint,  ///< moving light on open water from a water table (BL-1660; uniforms: float4)
     ground,       ///< the ground images with the land lift (BL-1659) and close-zoom detail (BL-1658) at draw
-                  ///< time; a tile table at slot 1, the detail texture at slot 2; uniforms: float4 x2
+                  ///< time, and the far rung's flat map (BL-1661); a tile table at slot 1, the
+                  ///< coarse and fine detail textures at slots 2 and 3, the map table at slot 4,
+                  ///< the rolling ground at slot 5; uniforms: float4 x7
     count
 };
 
@@ -40,6 +42,8 @@ void shutdown();
 
 /// True when the renderer is SDL's GPU renderer (so effects are possible at all).
 bool gpu_renderer();
+/// The renderer init() was given (null before it).
+SDL_Renderer* renderer();
 /// True when effect `e` loaded and may be used this frame.
 bool available(effect e);
 /// True when effect `e`'s shader loaded, though it may still wait on bind_textures.
@@ -61,15 +65,17 @@ void set_uniforms(effect e, const void* data, std::size_t len);
 bool bind_textures(effect e, SDL_Texture* const* textures, int n, bool linear);
 
 /// A small RGBA32 texture (nearest, alpha-blended) an effect reads as its DRAW
-/// texture - a lookup table, one texel per tile. `slot` (0-3) names the table; it is
+/// texture - a lookup table, one texel per tile. `slot` (0-4) names the table; it is
 /// re-uploaded only when `px` differs from the last upload, so a table that does not
 /// change costs one compare a frame. Null without the GPU renderer.
 SDL_Texture* table_texture(int slot, int w, int h, const std::uint32_t* px);
 
-/// BL-1658 (close-zoom detail layer): the four detail textures (assets/detail/
-/// vegetation, forest, arid, rock .png, greyscale, all one size) packed into the r, g,
-/// b, a channels of one linear, repeating texture. Loaded on first call; null without
-/// the GPU renderer or when a file is missing or malformed (logged once).
-SDL_Texture* detail_texture();
+/// BL-1658 (close-zoom detail layer): the four detail textures of one scale (0 coarse:
+/// assets/detail/, 1 fine: assets/detail/fine/; vegetation, forest, arid, rock .png;
+/// 2: the rolling ground, assets/detail/rolling.png in every channel;
+/// greyscale, all one size) packed into the r, g, b, a channels of one linear texture
+/// (the shader wraps its own lookups). Loaded on first call; null without the GPU
+/// renderer or when a file is missing or malformed (logged once).
+SDL_Texture* detail_texture(int scale);
 
 } // namespace gfx

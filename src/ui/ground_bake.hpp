@@ -271,8 +271,8 @@ struct bake_source
     std::vector<float> height;          ///< BL-517 normalised height.
     std::vector<float> grad_x, grad_y;  ///< Height gradient (neighbour differences).
     std::vector<float> relief_bias;     ///< palette::relief_amount, landform accent input.
-    /// Flat land renders flat (Ben, 2026-10-10): how far the tile's ground
-    /// ROLLS — 0 on plains and valleys, 1 on highland and the dramatic forms
+    /// How far the tile's ground ROLLS — 0.25 on plains and valleys (Ben,
+    /// 2026-11-16, revising 2026-10-10's 0), 1 on highland and the dramatic forms
     /// (landform_roll). Interpolated as the relief bias is, it weights the
     /// fold field, the hills and the tile tilt, so relief eases out smoothly.
     std::vector<float> roll;
@@ -529,8 +529,16 @@ int choose_level(double draw_r);
 /// (sw/2 x sh/2), alpha-weighted so a transparent margin never darkens an
 /// edge. Pure: the mip chain is built with it chunk by chunk, and because a
 /// master chunk's sides are multiples of k_master_align the chunkwise chain
-/// equals the whole-image one byte for byte.
+/// equals the whole-image one byte for byte. The structure mark (blue's lowest bit,
+/// apply_structure_mark) carries where at least two of the four pixels carry it.
 void downsample_half(const std::uint32_t* src, int sw, int sh, std::uint32_t* dst);
+
+/// THE STRUCTURE MARK (Ben, 2026-11-16; RENDERING.md § Level of detail, "Buildings and
+/// roads draw over the detail"): bake_region's last step. Sets blue's lowest bit on every
+/// pixel @p mark flags (the road-and-installation pass painted it) and clears it on every
+/// other opaque pixel, so the draw-time detail can leave roads and structures as baked.
+/// A transparent pixel is left untouched.
+void apply_structure_mark(std::uint32_t* px, const std::uint8_t* mark, std::size_t n);
 
 /// Content hash of everything bake_region reads for the given pixel window
 /// (tile fields + mask state of the tiles overlapping it, plus a margin ring).

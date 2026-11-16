@@ -3035,6 +3035,11 @@ void bake_landforms(const bake_source& src, const geometry& g, const bake_params
     const double crag_c  = periodic_cell(0.085, crag_n);
     int crest2_n;
     const double crest2_c = periodic_cell(0.30, crest2_n); // BL-1243: close-set peaks
+    // Erosion gullies (Ben, 2026-11-16: mountains looked "very smooth compared to the
+    // detail"): two octaves of channels running down each flank.
+    int gully_n, gully2_n;
+    const double gully_c  = periodic_cell(0.28, gully_n);
+    const double gully2_c = periodic_cell(0.14, gully2_n);
     const float  vs = p.variant_strength;
     const bool   band_on = p.edge_band > 0.0f;   // BL-1251: the variant cross-fade narrows to the edge band
     const double band    = std::max(1e-3, static_cast<double>(p.edge_band));
@@ -3201,12 +3206,21 @@ void bake_landforms(const bake_source& src, const geometry& g, const bake_params
         const auto field = [&](double qx, double qy, mat* m) -> double
         {
             double dm = 1e9, dc = 1e9, dr = 1e9, tt;
+            double nmx = 0.0, nmy = 0.0; // the mountain skeleton's nearest point
+            const double mqx = qx + 0.14 * jx + 0.03 * fx, mqy = qy + 0.14 * jy + 0.03 * fy;
             for (int s = 0; s < nseg; ++s)
             {
                 const seg& sg = segs[s];
                 if (sg.lf == L_mountain)
-                    dm = std::min(dm, seg_dist(qx + 0.14 * jx + 0.03 * fx, qy + 0.14 * jy + 0.03 * fy,
-                                               sg.ax, sg.ay, sg.bx, sg.by, tt));
+                {
+                    const double dd = seg_dist(mqx, mqy, sg.ax, sg.ay, sg.bx, sg.by, tt);
+                    if (dd < dm)
+                    {
+                        dm  = dd;
+                        nmx = sg.ax + (sg.bx - sg.ax) * tt;
+                        nmy = sg.ay + (sg.by - sg.ay) * tt;
+                    }
+                }
                 else if (sg.lf == L_canyon)
                     dc = std::min(dc, seg_dist(qx + 0.09 * jx + 0.025 * fx, qy + 0.09 * jy + 0.025 * fy,
                                                sg.ax, sg.ay, sg.bx, sg.by, tt));
@@ -3246,8 +3260,22 @@ void bake_landforms(const bake_source& src, const geometry& g, const bake_params
                     if (close)
                         crag = 1.0 - std::fabs(
                             2.0 * value_noise(ax_, ay_, crag_c, crag_n, 0x1A68u) - 1.0);
+                    // EROSION GULLIES (Ben, 2026-11-16): sampled at a point a fixed run
+                    // from the ridge along the pixel's own downhill direction, so the
+                    // value holds all the way down a flank and each channel runs
+                    // straight downhill; sharp (ridged, to the fourth), deepest mid-flank.
+                    double gully = 0.0;
+                    if (dm > 1e-6)
+                    {
+                        const double ux_ = (mqx - nmx) / dm, uy_ = (mqy - nmy) / dm;
+                        const double sx = ocx + nmx + 0.35 * ux_, sy = ocy + nmy + 0.35 * uy_;
+                        const double g1 = 1.0 - std::fabs(2.0 * value_noise(sx, sy, gully_c, gully_n, 0x1A71u) - 1.0);
+                        const double g2 = 1.0 - std::fabs(2.0 * value_noise(sx, sy, gully2_c, gully2_n, 0x1A72u) - 1.0);
+                        gully = 0.65 * sq(sq(g1)) + 0.35 * sq(sq(g2));
+                    }
                     h += std::pow(t_, 1.5) * (0.6 + 0.8 * crest)
-                       + 0.11 * m_spur * t_ * (spur - 0.5) + 0.045 * m_crag * t_ * (crag - 0.5);
+                       + 0.11 * m_spur * t_ * (spur - 0.5) + 0.09 * m_crag * t_ * (crag - 0.5)
+                       - 0.14 * 4.0 * t_ * (1.0 - t_) * gully;
                 }
                 if (m) m->tm = t_;
             }
@@ -3973,7 +4001,7 @@ void bake_terrain_features(const bake_source& src, const geometry& g, const bake
 /// (optional, pw*ph) receives the terrain tag of each output pixel.
 void bake_region_at(const bake_source& src, const geometry& g, const bake_params& p,
                     int px0, int py0, int pw, int ph, std::uint32_t* out,
-                    std::uint8_t* tag_out, std::uint8_t* land_out)
+                    std::uint8_t* tag_out, std::uint8_t* land_out, std::uint8_t* mark_out = nullptr)
 {
     const double ns = nominal_s(g);
     // APRON (BL-736): the post passes below read neighbours (ink 1 px,
@@ -3994,8 +4022,9 @@ void bake_region_at(const bake_source& src, const geometry& g, const bake_params
     // BL-1537: the land lift's water mask - a water tile's ground, then (the
     // river pass) a river's water. Read only when the caller asks for the land
     // weight; the bake itself is unchanged by it.
+    // The structure mark reads it too: a river is painted over the detail (Ben, 2026-11-16).
     std::vector<std::uint8_t> awet;
-    if (land_out)
+    if (land_out || mark_out)
     {
         awet.assign(an, 0u);
         for (std::size_t i = 0; i < an; ++i)
@@ -4029,7 +4058,7 @@ void bake_region_at(const bake_source& src, const geometry& g, const bake_params
     {
         const pass_timer pt{ bp_features };
         bake_terrain_features(src, g, p, apw, aph, abuf.data(), atag.data(), acov.data(), afpx.data(),
-                              land_out ? awet.data() : nullptr);
+                              awet.empty() ? nullptr : awet.data());
     }
     // Roads and sea lanes (BL-1253, route_paint.hpp), then the installations
     // (BL-1241): the route pass runs INSIDE the installation pass, between its
@@ -4059,6 +4088,12 @@ void bake_region_at(const bake_source& src, const geometry& g, const bake_params
     };
     route_call rc{ src, g, p, px0 - A, py0 - A, apw, aph, abuf.data(), atag.data(), acov.data(), afpx.data(),
                    split };
+    // The structure mark (Ben, 2026-11-16; RENDERING.md § Level of detail, "Buildings and
+    // roads draw over the detail"): every pixel this pass paints - a road, a pad, a yard,
+    // a roof, a town's paving - is marked, so the draw-time detail leaves it as baked.
+    std::vector<std::uint32_t> pre;
+    if (mark_out)
+        pre = abuf;
     {
         const pass_timer pt{ bp_install };
         if (p.installations)
@@ -4067,6 +4102,15 @@ void bake_region_at(const bake_source& src, const geometry& g, const bake_params
         else
             route_call::run(&rc);
     }
+    if (mark_out)
+        for (int y = 0; y < ph; ++y)
+            for (int x = 0; x < pw; ++x)
+            {
+                const std::size_t i = static_cast<std::size_t>(y + A) * apw + A + x;
+                // A river's water (wet over ground that was not a water tile's) marks too.
+                const bool river = awet[i] >= 128u && acov[i] != 100;
+                mark_out[static_cast<std::size_t>(y) * pw + x] = abuf[i] != pre[i] || river ? 1u : 0u;
+            }
 
     // BL-1256: cast shadows from the low NW sun, over everything the ground
     // carries (a tree or a works in a ridge's shadow is in it too), before
@@ -4207,6 +4251,18 @@ void apply_land_lift(std::uint32_t* px, const std::uint8_t* land, std::size_t n,
 
 } // namespace
 
+void apply_structure_mark(std::uint32_t* px, const std::uint8_t* mark, std::size_t n)
+{
+    for (std::size_t i = 0; i < n; ++i)
+    {
+        const std::uint32_t c = px[i];
+        if (palette::col_a(c) == 0)
+            continue; // the transparent margin stays exactly 0
+        const int b = (palette::col_b(c) & ~1) | (mark[i] ? 1 : 0);
+        px[i] = palette::col32(palette::col_r(c), palette::col_g(c), b, palette::col_a(c));
+    }
+}
+
 float land_lift_gamma(int level)
 {
     // +15%, +30%, +45% on the home body's median land luminance (the shipped
@@ -4275,11 +4331,13 @@ void bake_region(const bake_source& src, const geometry& g, const bake_params& p
     }
 
     const int ss = std::max(1, p.supersample);
+    std::vector<std::uint8_t> mark(npx, 0u);
     if (ss == 1)
     {
-        bake_region_at(src, g, p, px0, py0, pw, ph, out, nullptr, land_out);
+        bake_region_at(src, g, p, px0, py0, pw, ph, out, nullptr, land_out, mark.data());
         if (lift)
             apply_land_lift(out, land_out, npx, src.land_lift);
+        apply_structure_mark(out, mark.data(), npx);
         return;
     }
 
@@ -4301,8 +4359,9 @@ void bake_region(const bake_source& src, const geometry& g, const bake_params& p
     std::vector<std::uint32_t> hi(static_cast<std::size_t>(hw) * hh);
     std::vector<std::uint8_t>  htag(static_cast<std::size_t>(hw) * hh, 0u);
     std::vector<std::uint8_t>  hland(land_out ? static_cast<std::size_t>(hw) * hh : 0u, 0u);
+    std::vector<std::uint8_t>  hmark(static_cast<std::size_t>(hw) * hh, 0u);
     bake_region_at(src, gs, p, (px0 - M) * ss, (py0 - M) * ss, hw, hh,
-                   hi.data(), htag.data(), land_out ? hland.data() : nullptr);
+                   hi.data(), htag.data(), land_out ? hland.data() : nullptr, hmark.data());
 
     // Box downsample, alpha-weighted so the transparent margin never darkens
     // a grid edge. A nominal pixel is TAGGED only when every sub-sample is
@@ -4312,11 +4371,12 @@ void bake_region(const bake_source& src, const geometry& g, const bake_params& p
     std::vector<std::uint32_t> lo(static_cast<std::size_t>(mw) * mh);
     std::vector<std::uint8_t>  ltag(static_cast<std::size_t>(mw) * mh);
     std::vector<std::uint8_t>  lland(land_out ? static_cast<std::size_t>(mw) * mh : 0u, 0u);
+    std::vector<std::uint8_t>  lmark(static_cast<std::size_t>(mw) * mh, 0u);
     const int n = ss * ss;
     for (int y = 0; y < mh; ++y)
         for (int x = 0; x < mw; ++x)
         {
-            int sr = 0, sg = 0, sb = 0, sa = 0, sl = 0;
+            int sr = 0, sg = 0, sb = 0, sa = 0, sl = 0, sm = 0;
             std::uint8_t all = 1;
             for (int dy = 0; dy < ss; ++dy)
             {
@@ -4331,12 +4391,14 @@ void bake_region(const bake_source& src, const geometry& g, const bake_params& p
                     sb += palette::col_b(c) * a;
                     sa += a;
                     all &= htag[i];
+                    sm += hmark[i];
                     if (land_out)
                         sl += hland[i];
                 }
             }
             const std::size_t o = static_cast<std::size_t>(y) * mw + x;
             ltag[o] = all;
+            lmark[o] = 2 * sm >= n ? 1u : 0u; // marked where half the sub-samples are
             if (land_out)
                 lland[o] = static_cast<std::uint8_t>((sl + n / 2) / n);
             lo[o] = sa == 0 ? 0u
@@ -4356,9 +4418,13 @@ void bake_region(const bake_source& src, const geometry& g, const bake_params& p
             std::memcpy(land_out + static_cast<std::size_t>(y) * pw,
                         lland.data() + static_cast<std::size_t>(y + M) * mw + M,
                         static_cast<std::size_t>(pw));
+        std::memcpy(mark.data() + static_cast<std::size_t>(y) * pw,
+                    lmark.data() + static_cast<std::size_t>(y + M) * mw + M,
+                    static_cast<std::size_t>(pw));
     }
-    if (lift) // last, after the unsharp: the lift is the final pass
+    if (lift) // after the unsharp: the lift is the last pass on colour
         apply_land_lift(out, land_out, npx, src.land_lift);
+    apply_structure_mark(out, mark.data(), npx);
 }
 
 geometry make_master_geometry(int gw, int gh)
@@ -4465,8 +4531,13 @@ void downsample_half(const std::uint32_t* src, int sw, int sh, std::uint32_t* ds
             const auto mean = [sa](std::uint64_t s) {
                 return lin_to_srgb(static_cast<std::uint32_t>((s + sa / 2) / sa));
             };
+            // The structure mark (blue's lowest bit) where at least two of the four
+            // carry it; the mean's own lowest bit is replaced.
+            int marks = 0;
+            for (const std::uint32_t c : q)
+                marks += palette::col_a(c) != 0 && (palette::col_b(c) & 1) != 0 ? 1 : 0;
             o[x] = sa == 0 ? 0u
-                 : palette::col32(mean(sr), mean(sg), mean(sb),
+                 : palette::col32(mean(sr), mean(sg), (mean(sb) & ~1) | (marks >= 2 ? 1 : 0),
                                   static_cast<int>((sa + 2) / 4));
         }
     }
@@ -4700,13 +4771,14 @@ float hill_field(const bake_source& s, double x, double y, float& gx, float& gy)
 
 float landform_roll(std::uint8_t landform)
 {
-    // Flat land renders flat (Ben, 2026-10-10; RENDERING.md § Art direction
-    // and palette): plains and valleys lie flat, highland rolls, the dramatic
-    // forms keep their folds under their own forms.
+    // Flat land rolls gently (Ben, 2026-11-16, revising 2026-10-10's "flat land
+    // renders flat"; RENDERING.md § Art direction and palette): plains and valleys
+    // roll a quarter as much as highland, highland rolls, the dramatic forms keep
+    // their folds under their own forms.
     switch (static_cast<terrain_landform>(landform))
     {
         case terrain_landform::plains:
-        case terrain_landform::valley:   return 0.0f;
+        case terrain_landform::valley:   return 0.25f;
         case terrain_landform::highland:
         case terrain_landform::mountain:
         case terrain_landform::canyon:

@@ -1979,7 +1979,7 @@
    "preconditions": [
     "None — handled before the screen guard, so the frame budget can be watched on the menu and the generation screen too."
    ],
-   "expected_output": "Toggles the frame-budget HUD, the per-frame timing instrument. In game it first anchors top-left of the canvas area (movable after); on the pre-play screens it insets from the top-left corner. Honest status: this is a dev/audit instrument (the v0.1.0 performance audit tool), not shipped player chrome, and it sits outside the shared canvas command vocabulary.",
+   "expected_output": "Toggles the frame-budget HUD, the per-frame timing instrument. In game it first anchors top-left of the canvas area (movable after); on the pre-play screens it insets from the top-left corner. In game on the planetary ground, it also opens the '3D slice (BL-1665)' window: a 'Show on the canvas' checkbox (the 3D ground replaces the flat ground on the canvas, its camera following the canvas pan and zoom; the map's marks and clicks stay flat; it stays on with the HUD closed), a 'Render here' checkbox, a Fit button and sliders (tilt, turn, distance, field of view, height, bumps, rolling) over a rendered heightmesh of the visible ground chunks, with its vertex, triangle and CPU-cost figures - a measurement for judging true 3D, read by nothing else. Honest status: this is a dev/audit instrument (the v0.1.0 performance audit tool), not shipped player chrome, and it sits outside the shared canvas command vocabulary.",
    "reason_to_select": "To watch build/submit/present frame costs while reproducing a performance concern."
   },
   {

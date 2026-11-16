@@ -4,6 +4,7 @@
 #include <imgui.h>
 
 #include "ui/png_decode.hpp"
+#include "core/ground_slice_3d.hpp"
 
 #include <array>
 #include <fstream>
@@ -47,7 +48,7 @@ const std::array<effect_def, static_cast<std::size_t>(effect::count)> k_defs = {
     { "lens_wash", IO_DXIL(lens_wash), 0, 1 },
     { "border_band", IO_DXIL(border_band), 0, 1 },
     { "water_glint", IO_DXIL(water_glint), 0, 1 },
-    { "ground", IO_DXIL(ground), 2, 1 },
+    { "ground", IO_DXIL(ground), 5, 1 },
 }};
 
 struct effect_slot
@@ -65,10 +66,15 @@ struct table_slot
     int w = 0, h = 0;
     std::vector<std::uint32_t> last; ///< what was last uploaded (skip an equal upload)
 };
-std::array<table_slot, 4> g_tables;
+std::array<table_slot, 5> g_tables;
 
-SDL_Texture* g_detail = nullptr;
-bool         g_detail_tried = false;
+/// BL-1658 (close-zoom detail layer): the coarse and fine detail textures.
+struct detail_slot
+{
+    SDL_Texture* tex   = nullptr;
+    bool         tried = false;
+};
+std::array<detail_slot, 3> g_detail;
 
 SDL_Renderer*  g_renderer = nullptr;
 SDL_GPUDevice* g_device   = nullptr;
@@ -175,6 +181,7 @@ int init(SDL_Renderer* renderer)
 
 void shutdown()
 {
+    slice::shutdown(); // BL-1665 (3D slice): its GPU objects, before the device goes
     for (effect_slot& s : g_slots)
     {
         if (s.state)   SDL_DestroyGPURenderState(s.state);
@@ -187,14 +194,18 @@ void shutdown()
         if (t.tex) SDL_DestroyTexture(t.tex);
         t = table_slot{};
     }
-    if (g_detail) SDL_DestroyTexture(g_detail);
-    g_detail = nullptr;
-    g_detail_tried = false;
+    for (detail_slot& d : g_detail)
+    {
+        if (d.tex) SDL_DestroyTexture(d.tex);
+        d = detail_slot{};
+    }
     g_renderer = nullptr;
     g_device   = nullptr;
 }
 
 bool gpu_renderer() { return g_device != nullptr; }
+
+SDL_Renderer* renderer() { return g_renderer; }
 
 bool available(effect e) { return g_device && slot(e).ok && slot(e).state; }
 
@@ -298,17 +309,24 @@ SDL_Texture* table_texture(int slot_i, int w, int h, const std::uint32_t* px)
     return t.tex;
 }
 
-SDL_Texture* detail_texture()
+SDL_Texture* detail_texture(int scale)
 {
-    if (g_detail || g_detail_tried || !g_device)
-        return g_detail;
-    g_detail_tried = true;
-    static const char* const k_files[4] = { "vegetation", "forest", "arid", "rock" };
+    if (scale < 0 || scale > 2 || !g_device)
+        return nullptr;
+    detail_slot& d = g_detail[static_cast<std::size_t>(scale)];
+    if (d.tex || d.tried)
+        return d.tex;
+    d.tried = true;
+    // Scale 2 is the rolling ground (Ben, 2026-11-16): one height texture in every channel.
+    static const char* const k_family_files[4]  = { "vegetation", "forest", "arid", "rock" };
+    static const char* const k_rolling_files[4] = { "rolling", "rolling", "rolling", "rolling" };
+    const char* const* const k_files = scale == 2 ? k_rolling_files : k_family_files;
+    const char* const dir = scale == 1 ? "assets/detail/fine/" : "assets/detail/";
     int w = 0, h = 0;
     std::vector<std::uint8_t> packed;
     for (int ch = 0; ch < 4; ++ch)
     {
-        const std::string path = std::string("assets/detail/") + k_files[ch] + ".png";
+        const std::string path = std::string(dir) + k_files[ch] + ".png";
         std::ifstream f(path, std::ios::binary);
         if (!f)
         {
@@ -344,8 +362,8 @@ SDL_Texture* detail_texture()
     SDL_SetTextureScaleMode(t, SDL_SCALEMODE_LINEAR);
     SDL_SetTextureBlendMode(t, SDL_BLENDMODE_NONE);
     SDL_UpdateTexture(t, nullptr, packed.data(), w * 4);
-    g_detail = t;
-    return g_detail;
+    d.tex = t;
+    return d.tex;
 }
 
 } // namespace gfx

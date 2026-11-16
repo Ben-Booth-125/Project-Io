@@ -1887,7 +1887,7 @@
    "title": "Compressed ground textures: the GPU path can draw them, but measuring needs a vendored encoder",
    "raised": "2026-11-14",
    "kind": "question",
-   "status": "open",
+   "status": "resolved",
    "source": "BL-1662 (compressed ground textures) spike, sprint 68",
    "what": "SDL 3.4's GPU renderer wraps an external SDL_GPUTexture (SDL_PROP_TEXTURE_CREATE_GPU_TEXTURE_POINTER), so a BC1 or BC7 chunk can be drawn on the GPU path. The software renderer (every --verify capture) cannot, so captures would keep the RGB chunk. The open cost is encode time per 512 px chunk at bake, which needs an encoder in the tree.",
    "why_it_matters": "BC1 is 6:1 against RGB (BC7 3:1), the largest memory lever left for the ground. It adds a third-party dependency and a second chunk format beside the capture path.",
@@ -1901,7 +1901,7 @@
     "src/core/gpu_effects.cpp",
     "docs/ui/RENDERING.md"
    ],
-   "resolution": null
+   "resolution": "Ben, 2026-11-16: option A. Vendor stb_dxt and measure BC1 encode time per 512 px chunk; decide the format from the numbers."
   },
   {
    "id": "NR-1228",

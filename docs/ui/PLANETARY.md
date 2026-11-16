@@ -788,9 +788,9 @@ for i in 0..5:
 - **Scroll wheel:** zoom, anchored at the cursor position — **stepped**, one ×2 ladder
   rung per notch (Ben, 2026-09-01; [RENDERING.md](RENDERING.md) § Level of detail owns the
   ladder: one master image per body, every rung a downsample of it). The `=`/`-` keys step
-  the same ladder. The land is viewed at **one oblique angle, 22.5°, at every rung and under
-  every lens** (Ben, 2026-10-09 — RENDERING.md § One angle); interaction is unchanged under
-  the tilt, with hit-testing through the camera's inverse.
+  the same ladder. The land is a **3D ground under a perspective camera whose tilt follows zoom**, with no
+  turn, under every lens (Ben, 2026-11-16 — RENDERING.md § The camera, § The 3D ground);
+  hit-testing picks the terrain with a ray from the camera.
 
 The wrap seam has **no marker**: the wrap is seamless by construction and a seam indicator would
 draw attention to a boundary that does not exist for the player.

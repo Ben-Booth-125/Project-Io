@@ -242,7 +242,30 @@ is a defect; one that only the minimum PC would miss is measured on it before re
 *Rendering approach and view structure. Per-view detail is deferred to the UI document.*
 
 ### Rendering dimension
-The game renders in **2D**. No 3D terrain, unit models, or depth-based rendering is in the prototype. Detailed surface visualisation **is** in scope for the Planetary canvas (Ben, 2026-09-01, the sprint-29 design forms — overturning this section's earlier exclusion): the ground renders as **baked painterly terrain chunks** (hillshade from the height field + authored biome brushes, C-F art direction) on the existing 2D renderer, with ambient overlay animation. Authority: `docs/ui/RENDERING.md`. The staged end-state — a tilting oblique camera with terrain and structures as true geometry — is a **flagged future milestone** (2.5D pre-render vs SDL3 GPU 3D, undecided; `docs/research/CANVAS_RENDERING.md` § The end-state choice), not prototype scope; the SDL3 GPU API remains the door held open for it.
+The game's chrome renders in **2D**; the **planetary ground renders in 3D** (Ben, 2026-11-16, below). No unit models are in the prototype. Detailed surface visualisation **is** in scope for the Planetary canvas (Ben, 2026-09-01, the sprint-29 design forms — overturning this section's earlier exclusion): the ground renders as **baked painterly terrain chunks** (hillshade from the height field + authored biome brushes, C-F art direction) on the existing 2D renderer, with ambient overlay animation. Authority: `docs/ui/RENDERING.md`. The staged end-state — a tilting oblique camera with terrain and structures as true geometry — is a **flagged future milestone** (2.5D pre-render vs SDL3 GPU 3D, undecided; `docs/research/CANVAS_RENDERING.md` § The end-state choice), not prototype scope; the SDL3 GPU API remains the door held open for it.
+
+**Toward 3D, in two steps (Ben, 2026-11-16: "Shader now, 3D slice", answering whether the
+direction should move to 3D for "more elevation, shadows, and possibly animations").** The
+fixed-angle ground takes more depth **in its fragment shader** first: parallax relief on the
+height field, shadows long enough for one hex to shade the next, and animated surface
+texture - still textured quads on the 2D renderer, still with a no-shader path, still one
+camera angle. Beside it, a **3D vertical slice** - one heightmesh chunk drawn in the C-F
+painted style with a depth buffer on the SDL GPU device - is built to measure the cost and the
+look before the full 3D ground is chosen or refused. The slice is a measurement, not a
+renderer, and its verdict decides whether the staged end-state is true 3D. It may stand in
+for the ground on the canvas as a **preview** (Ben, 2026-11-16: "wire that into the main canvas
+so I can comment more accurately on it"): the camera follows the canvas view, and the map's
+marks, lenses and clicks stay on the flat ground, so they do not line up under a tilt.
+
+**The ground is 3D (Ben, 2026-11-16, after the slice: "I much prefer the 3D look ... work with
+just 3D from now on").** The planetary ground is a heightmesh with a depth buffer and a shadow
+map, drawn on the GPU device behind SDL's GPU renderer and shown as the canvas's ground layer;
+ImGui and the 2D renderer keep the chrome. **The flat ground is removed, with no flat
+fallback** - the one standing exception to "every shader pass has a no-shader path". So the
+app needs the GPU renderer on the planetary canvas, and `--verify` must capture the ground
+through it: those captures are no longer machine-independent, so a ground check asserts
+structure (what is drawn where) and compares with a tolerance, never byte-exact. Everything
+else it draws is owned by docs/ui/RENDERING.md § The 3D ground.
 
 ### Main views
 The main game window has two primary views:

@@ -3,6 +3,7 @@
 #include "diplomacy_ledger.hpp" // open_declaration — the right-click declare-and-attack
 #include "text_fit.hpp"
 #include "core/gpu_effects.hpp" // BL-1655: the ground draws through the shader seam
+#include "core/ground_slice_3d.hpp" // BL-1665: the 3D slice beside the frame HUD
 
 #include "construction_panel.hpp" // the build-progress circle and its site card (Ben, 2026-10-26)
 #include "construction_sites.hpp" // site_press_refusal: why a press with a building chosen placed nothing
@@ -373,10 +374,67 @@ constexpr float k_lift_edge_band = 0.10f;
 /// BL-1658 (close-zoom detail layer; RENDERING.md § Level of detail): the detail
 /// texture's luminance swing at its extremes, its repeat in canonical units, and the
 /// drawn hex radii (px) it fades in over - none at the 24 px rung, full from 48 px.
-constexpr float k_detail_strength = 0.09f;
-constexpr float k_detail_period   = 2.0f;
+/// Ben, 2026-11-16: doubled in swing and size ("not really seeing" the first cut).
+constexpr float k_detail_strength = 0.18f;
+constexpr float k_detail_period   = 4.0f;
+/// The fine layer over it (Ben, 2026-11-15: "two scales"): its own swing and a repeat a
+/// quarter of the coarse one. The shader fades it out where its texels shrink below the
+/// pixel; at this repeat it shows fully at both of the closest rungs.
+constexpr float k_detail_fine_strength = 0.14f;
+constexpr float k_detail_fine_period   = 2.0f; // 256 px over 2 units (Ben, 2026-11-16)
 constexpr float k_detail_r_none   = 24.0f;
 constexpr float k_detail_r_full   = 48.0f;
+/// BL-1661 (far-zoom cartographic map; RENDERING.md § Level of detail, "The farthest rung
+/// is a flat map"): the map's weight rises from none at a drawn hex radius of 16 px to
+/// full at 6 px (a third at the 12 px rung); paper, the share of a nation's colour on its
+/// land, flat water, and the ink half-widths in screen px.
+/// BL-1658 (close-zoom detail layer), the relief (Ben, 2026-11-16: "draw-time relief: lit
+/// bumps on a smooth height field, with short shadows"; RENDERING.md § Level of detail,
+/// "The ground has relief"): canonical units of rise per unit of tile height, each
+/// family's coarse bump height (full swing; vegetation, forest, arid, rock), the fine
+/// layer's share of it, and how far a full shadow darkens. Calibration, tuned by eye.
+constexpr float k_relief_height_scale = 16.0f;
+constexpr float k_bump_vegetation     = 0.04f;
+constexpr float k_bump_forest         = 0.08f;
+constexpr float k_bump_arid           = 0.03f;
+constexpr float k_bump_rock           = 0.10f;
+constexpr float k_bump_fine_share     = 0.3f;
+constexpr float k_bump_mountain_mul   = 2.5f;  // a mountain tile's bumps stand this much taller
+constexpr float k_rolling_height      = 0.25f; // the draw-time rolling ground's full swing
+constexpr float k_rolling_period      = 12.0f; // its repeat, canonical units
+constexpr float k_shadow_depth        = 0.35f;
+/// Tiles read on their own (Ben, 2026-11-16: families looked alike and neighbours ran on
+/// as wallpaper): each tile reads the textures at its own offset, takes its own tone
+/// (full swing of the detail term), and each family carries its own strength. The height
+/// map's own slope shading is restated at draw time at this share (0..1).
+constexpr float k_tile_tone_swing     = 0.10f;
+constexpr float k_fam_vegetation      = 0.8f;
+constexpr float k_fam_forest          = 1.3f;
+constexpr float k_fam_arid            = 1.0f;
+constexpr float k_fam_rock            = 1.25f;
+constexpr float k_height_shade_share  = 1.0f;
+/// BL-1664 (fixed-angle depth; RENDERING.md § Level of detail, "Depth at the fixed angle"):
+/// the parallax depth as a multiple of the bump heights and the view's tilt (the bake's own
+/// lift per unit height, 0.9 tan 22.5 deg); the long shadow's reach (three hex radii) and
+/// depth; a gust's brightening and each blade's flutter inside it (brightness swings, not
+/// a moved lookup: Ben, 2026-11-16, a sway "looks more like the ground is warping"), sand's
+/// creep (canonical units a second), and each family's share of the wind. Calibration.
+constexpr float k_parallax_depth      = 2.0f;
+constexpr float k_parallax_tilt       = 0.3728f;
+constexpr float k_long_shadow_reach   = 3.0f;
+constexpr float k_long_shadow_depth   = 0.25f;
+constexpr float k_gust_brighten       = 0.06f;
+constexpr float k_blade_flutter       = 0.12f;
+constexpr float k_sand_creep          = 0.008f;
+constexpr float k_wind_vegetation     = 1.0f;
+constexpr float k_wind_forest         = 0.6f;
+constexpr float k_map_r_none        = 16.0f;
+constexpr float k_map_r_full        = 6.0f;
+constexpr float k_map_nation_share  = 0.45f;
+constexpr ImU32 k_map_paper         = IM_COL32(216, 205, 178, 255);
+constexpr ImU32 k_map_water         = IM_COL32(46, 84, 132, 255);  // Ben, 2026-11-16: "a deeper blue"
+constexpr float k_map_coast_half_px = 0.75f;
+constexpr float k_map_river_half_px = 0.5f;
 
 /// BL-1658: a tile's detail family (the channel of the detail texture): 0 vegetation,
 /// 1 forest, 2 arid, 3 rock - its cover first, its substrate when bare.
@@ -4155,6 +4213,11 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     bool lift_gpu = false;
     float detail_s = 0.0f;
     static std::vector<std::uint32_t> lift_table;
+    // BL-1661 (far-zoom cartographic map): each surveyed tile's flat colour and river
+    // sides, and the map's weight this frame.
+    float map_w = 0.0f;
+    static std::vector<std::uint32_t> map_table;
+    static SDL_Texture* map_bound = nullptr;
     if (lens_gpu)
         lens_table.assign(static_cast<std::size_t>(gw) * static_cast<std::size_t>(gh), 0u);
     // The close-zoom seam (BL-1251 part 5): one segment per shared tile edge.
@@ -4342,13 +4405,18 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         if (lift_gpu)
         {
             SDL_Texture* const ltex = gfx::table_texture(3, gw, gh, lift_table.data());
-            SDL_Texture* const dtex = gfx::detail_texture();
-            if (ltex && dtex && ltex != lift_bound)
+            SDL_Texture* const dtex = gfx::detail_texture(0);
+            SDL_Texture* const ftex = gfx::detail_texture(1);
+            SDL_Texture* const rtex = gfx::detail_texture(2);
+            SDL_Texture* const mtex = gfx::table_texture(4, gw, gh, map_table.data());
+            if (ltex && dtex && ftex && mtex && rtex && (ltex != lift_bound || mtex != map_bound))
             {
-                SDL_Texture* const both[2] = { ltex, dtex };
-                lift_bound = gfx::bind_textures(gfx::effect::ground, both, 2, true) ? ltex : nullptr;
+                SDL_Texture* const all[5] = { ltex, dtex, ftex, mtex, rtex };
+                const bool ok = gfx::bind_textures(gfx::effect::ground, all, 5, true);
+                lift_bound = ok ? ltex : nullptr;
+                map_bound  = ok ? mtex : nullptr;
             }
-            if (!ltex || !dtex || !lift_bound)
+            if (!ltex || !dtex || !ftex || !mtex || !rtex || !lift_bound)
             {
                 lift_table_failed = true; // this frame and every later one: no lift, no detail
                 std::fprintf(stderr, "canvas: ground shader tables unavailable - no draw-time lift or detail\n");
@@ -4359,16 +4427,38 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 const float sy  = tilt_sy < 1.0f ? tilt_sy : 1.0f;
                 const float a0  = canon_to_screen(0.0f, 0.0f).y;
                 const float a1  = canon_to_screen(0.0f, 1.0f).y;
-                const float params[8] = {
+                const float params[48] = {
                     1.0f / (zoom * hex_size * fb.x),
                     (grid_cx - view_origin.x / zoom) / hex_size,
                     1.0f / (sy * fb.y * (a1 - a0)),
                     (tilt_pivot * (1.0f - 1.0f / sy) - a0) / (a1 - a0),
                     ui::ground::land_lift_gamma(gview.draw_lift), k_lift_edge_band,
-                    detail_s, k_detail_period };
+                    detail_s, k_detail_period,
+                    detail_s * (k_detail_fine_strength / k_detail_strength), k_detail_fine_period, 0.0f, 0.0f,
+                    map_w, k_map_coast_half_px * fb.x, k_map_river_half_px * fb.x, 0.0f,
+                    k_bump_vegetation, k_bump_forest, k_bump_arid, k_bump_rock,
+                    detail_s / k_detail_strength, k_relief_height_scale, k_shadow_depth, k_bump_fine_share,
+                    k_bump_mountain_mul, k_rolling_height, k_rolling_period, 0.0f,
+                    1.0f, k_tile_tone_swing, k_height_shade_share, 0.0f,
+                    k_fam_vegetation, k_fam_forest, k_fam_arid, k_fam_rock,
+                    k_parallax_depth, k_parallax_tilt, k_long_shadow_reach, k_long_shadow_depth,
+                    static_cast<float>(ImGui::GetTime()), k_gust_brighten, k_blade_flutter, k_sand_creep,
+                    k_wind_vegetation, k_wind_forest, 0.0f, 0.0f };
                 gfx::set_uniforms(gfx::effect::ground, params, sizeof params);
                 ground_fx = gfx::effect::ground;
             }
+        }
+        // BL-1665 (3D slice), "Show on the canvas": the 3D frame fills the canvas in place of
+        // the flat ground. It is emitted inside the squashed range, so its rectangle is
+        // pre-stretched by the squash's inverse to land exactly on the canvas.
+        if (SDL_Texture* const f3d = gfx::slice::canvas_frame())
+        {
+            const float top = tilt_pivot + (grid_area_origin.y - tilt_pivot) / tilt_sy;
+            const float bot = tilt_pivot + (grid_area_origin.y + grid_area_size.y - tilt_pivot) / tilt_sy;
+            dl->AddImage((ImTextureID)(intptr_t)f3d, { grid_area_origin.x, top },
+                         { grid_area_origin.x + grid_area_size.x, bot });
+            dl->ChannelsMerge();
+            return;
         }
         gfx::begin(dl, ground_fx);
         draw_ground_rect(gview.far);
@@ -4968,8 +5058,10 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         const float r_px = hex_size * zoom;
         const float k = std::clamp((r_px - k_detail_r_none) / (k_detail_r_full - k_detail_r_none), 0.0f, 1.0f);
         detail_s = k_detail_strength * k * k * (3.0f - 2.0f * k);
+        const float m = std::clamp((k_map_r_none - r_px) / (k_map_r_none - k_map_r_full), 0.0f, 1.0f);
+        map_w = m * m * (3.0f - 2.0f * m);
     }
-    lift_gpu = ground_on && raster_ok && (gview.draw_lift > 0 || detail_s > 0.0f) && !lift_table_failed
+    lift_gpu = ground_on && raster_ok && (gview.draw_lift > 0 || detail_s > 0.0f || map_w > 0.0f) && !lift_table_failed
             && gfx::loaded(gfx::effect::ground) && gw > 0 && gh > 0;
     if (lift_gpu)
     {
@@ -4981,10 +5073,95 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 if (raster[ci] == null_entity || !survey_tile_visible(body.survey, gw, gh, c, r))
                     continue;
                 const tile_component* t = tile_rc(c, r);
-                if (t && t->substrate != terrain_substrate::ocean && t->substrate != terrain_substrate::coast
-                      && t->substrate != terrain_substrate::lake)
-                    lift_table[ci] = IM_COL32(255, detail_family(*t), 0, 255);
+                if (!t)
+                    continue;
+                // a: the tile's height on every surveyed tile, water too (the relief's
+                // height field runs through the coast).
+                const int ha = static_cast<int>(std::lround(std::clamp(t->height, 0.0f, 1.0f) * 255.0f));
+                if (t->substrate == terrain_substrate::ocean || t->substrate == terrain_substrate::coast
+                    || t->substrate == terrain_substrate::lake)
+                {
+                    lift_table[ci] = IM_COL32(0, 0, 0, ha);
+                    continue;
+                }
+                // b: a mountain tile - its relief bumps stand taller (Ben, 2026-11-16).
+                // Buildings and roads keep off the detail per pixel, by the chunk's own
+                // structure mark, not per tile.
+                const bool mountain = t->landform == terrain_landform::mountain;
+                lift_table[ci] = IM_COL32(255, detail_family(*t), mountain ? 255 : 0, ha);
             }
+        // BL-1661: the map table, only while the map shows (all zero otherwise).
+        map_table.assign(static_cast<std::size_t>(gw) * static_cast<std::size_t>(gh), 0u);
+        if (map_w > 0.0f)
+            for (int r = std::max(0, row_lo - 2); r <= std::min(gh - 1, row_hi + 2); ++r)
+                for (int c = 0; c < gw; ++c)
+                {
+                    const std::size_t ci = static_cast<std::size_t>(r) * gw + c;
+                    if (raster[ci] == null_entity || !survey_tile_visible(body.survey, gw, gh, c, r))
+                        continue;
+                    const tile_component* t = tile_rc(c, r);
+                    if (!t)
+                        continue;
+                    ImU32 col = k_map_paper;
+                    if ((lift_table[ci] & 0xFFu) == 0u) // the bake's water (ocean, coast, lake)
+                        col = k_map_water;
+                    else if (const entity_id nat = nation_rc(c, r); nat != null_entity)
+                        col = lerp_colour(k_map_paper, palette::nation_colour(nat), k_map_nation_share);
+                    const unsigned a = 128u | (static_cast<unsigned>(t->river_edges) & 0x3Fu);
+                    map_table[ci] = (col & ~IM_COL32_A_MASK) | (a << IM_COL32_A_SHIFT);
+                }
+    }
+    // BL-1665 (3D slice): the visible ground as a heightmesh - in its own window beside the
+    // F11 frame HUD, and, with "Show on the canvas" (Ben, 2026-11-16: "wire that into the
+    // main canvas so I can comment more accurately on it"), in place of the flat ground,
+    // the camera following the canvas view. A preview: the map's marks and clicks stay flat.
+    if ((state.show_frame_hud || gfx::slice::on_canvas()) && ground_on && raster_ok
+        && gfx::gpu_renderer() && gw > 0 && gh > 0)
+    {
+        // Every surveyed tile's height and family (the tile table's packing), for the
+        // backdrop as well as the chunks; hidden ground stays flat at zero.
+        static std::vector<std::uint32_t> slice_tiles;
+        slice_tiles.assign(static_cast<std::size_t>(gw) * static_cast<std::size_t>(gh), 0u);
+        for (int r = 0; r < gh; ++r)
+            for (int c = 0; c < gw; ++c)
+            {
+                const std::size_t ci = static_cast<std::size_t>(r) * gw + c;
+                if (raster[ci] == null_entity || !survey_tile_visible(body.survey, gw, gh, c, r))
+                    continue;
+                const tile_component* t = tile_rc(c, r);
+                if (!t)
+                    continue;
+                const int ha = static_cast<int>(std::lround(std::clamp(t->height, 0.0f, 1.0f) * 255.0f));
+                if (t->substrate == terrain_substrate::ocean || t->substrate == terrain_substrate::coast
+                    || t->substrate == terrain_substrate::lake)
+                    slice_tiles[ci] = IM_COL32(0, 0, 0, ha);
+                else
+                    slice_tiles[ci] = IM_COL32(255, detail_family(*t),
+                                               t->landform == terrain_landform::mountain ? 255 : 0, ha);
+            }
+        static std::vector<gfx::slice::chunk> slice_chunks;
+        slice_chunks.clear();
+        for (const ground_chunk_view& cv : gview.chunks)
+            slice_chunks.push_back({ cv.x0, cv.y0, cv.x1, cv.y1, static_cast<SDL_Texture*>(cv.tex) });
+        const ImVec2 fbs = ImGui::GetIO().DisplayFramebufferScale;
+        gfx::slice::inputs si;
+        si.renderer   = gfx::renderer();
+        si.tiles      = slice_tiles.data();
+        si.gw         = gw;
+        si.gh         = gh;
+        si.chunks     = slice_chunks.data();
+        si.n_chunks   = static_cast<int>(slice_chunks.size());
+        si.lift_gamma = ui::ground::land_lift_gamma(gview.draw_lift);
+        si.far        = { gview.far.x0, gview.far.y0, gview.far.x1, gview.far.y1,
+                          static_cast<SDL_Texture*>(gview.far.tex) };
+        si.view_cx    = ((canvas_centre.x - view_origin.x) / zoom + grid_cx) / hex_size;
+        si.view_cy    = ((canvas_centre.y - view_origin.y) / zoom + grid_cy) / hex_size;
+        si.view_h     = grid_area_size.y / (zoom * hex_size);
+        si.draw_r     = hex_size * zoom;
+        si.view_px_w  = static_cast<int>(grid_area_size.x * fbs.x);
+        si.view_px_h  = static_cast<int>(grid_area_size.y * fbs.y);
+        si.window     = state.show_frame_hud;
+        gfx::slice::draw_window(si);
     }
     border_gpu = draw_border_band && ground_on && raster_ok && !border_table_failed
               && gfx::available(gfx::effect::border_band) && gw > 0 && gh > 0;

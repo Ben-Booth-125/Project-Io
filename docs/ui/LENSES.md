@@ -142,7 +142,7 @@ behaviour.
 ### A lens washes the rendered ground (Ben, 2026-10-09, NR-1003)
 
 **Under a lens the Planetary canvas still draws the baked ground** — the same master image,
-at the same 22.5° camera, with its structures, settlements, landform forms and rivers
+under the same camera, with its structures, settlements, landform forms and rivers
 ([RENDERING.md](RENDERING.md) § Level of detail, § Installations). The lens is a
 **translucent wash over it**, per tile, in the identical geometry, never an opaque fill that
 replaces it. The wash was ruled once the ground became one image per body: before that, a lens
