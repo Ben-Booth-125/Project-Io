@@ -165,6 +165,7 @@ seed_result run_seed(std::uint32_t seed, int last_year, bool quiet, bool stage_s
         (void)run_settle_tick(w, reg, step, /*day_tick=*/0, /*spectating=*/true);
     clear_research_at_handover(w);
     nation_build_tally_log().clear(); // NR-1229: count the play window only
+    proc_trace_armed() = true; // NR-1229: the processor walk, by product
     seat_player_corporation(w, seed, start->land.search.winner_score);
     const entity_id player = player_nation(w);
     if (stage_space)
@@ -216,55 +217,70 @@ seed_result run_seed(std::uint32_t seed, int last_year, bool quiet, bool stage_s
                         "propellant stocked %d (%.0f units) admitted %d\n",
                         pr.no_market, pr.sc_stocked, pr.sc_units, pr.sc_admitted,
                         pr.pr_stocked, pr.pr_units, pr.pr_admitted);
-            // Where components come from at all (NR-1229): the plants whose recipe makes
-            // them - built, standing, staffed and not idled - and the world's shelves.
+            // The chain beneath a launch (NR-1229): for each good, the plants whose recipe
+            // makes it (built / standing / staffed and not idled), the world's spare (listed
+            // supply over demand, summed over the markets where it is positive), and the
+            // scorer's walk over methods making it since the handover, summed over every
+            // nation (corp_ai.cpp's armed trace; cumulative).
             {
-                constexpr std::size_t SC = static_cast<std::size_t>(resource_type::spacecraft_components);
-                int plants = 0, standing = 0, staffed_p = 0, markets_holding = 0;
-                double units = 0.0;
-                for (const auto& [bid, b] : w.buildings)
+                const resource_type chain[] = {resource_type::spacecraft_components, resource_type::alloys,
+                                               resource_type::machinery, resource_type::electronics,
+                                               resource_type::steel, resource_type::ree_alloy,
+                                               resource_type::refined_copper};
+                for (const resource_type g : chain)
                 {
-                    if (b.type != building_type::processing_facility || b.decommissioned)
-                        continue;
-                    const recipe* rc = reg.get_recipe(b.recipe);
-                    if (rc == nullptr || !(rc->outputs[SC] > 0.0f))
-                        continue;
-                    ++plants;
-                    if (b.ticks_remaining > 0)
-                        continue;
-                    ++standing;
-                    if (b.workforce_assigned > 0.0f && !b.state_idle)
-                        ++staffed_p;
-                }
-                for (const auto& [mid, m] : w.markets)
-                    if (m.inventory[SC] > 0.0f)
+                    const std::size_t G = static_cast<std::size_t>(g);
+                    int plants = 0, standing = 0, staffed_p = 0, spare_markets = 0;
+                    double spare = 0.0, shelf = 0.0;
+                    for (const auto& [bid, b] : w.buildings)
                     {
-                        ++markets_holding;
-                        units += m.inventory[SC];
+                        if (b.type != building_type::processing_facility || b.decommissioned)
+                            continue;
+                        const recipe* rc = reg.get_recipe(b.recipe);
+                        if (rc == nullptr || !(rc->outputs[G] > 0.0f))
+                            continue;
+                        ++plants;
+                        if (b.ticks_remaining > 0)
+                            continue;
+                        ++standing;
+                        if (b.workforce_assigned > 0.0f && !b.state_idle)
+                            ++staffed_p;
                     }
-                std::printf("      component plants: %d (%d standing, %d staffed); world shelves %.0f units on %d market(s)\n",
-                            plants, standing, staffed_p, units, markets_holding);
-                // The scorer's walk over component methods since the handover, summed over
-                // every nation (corp_ai.cpp's NR-1229 trace; cumulative).
-                nation_build_tally t{};
-                std::map<int, int> shorts;
-                for (const auto& [nid, bt] : nation_build_tally_log())
-                {
-                    t.sc_visit += bt.sc_visit; t.sc_locked += bt.sc_locked; t.sc_air += bt.sc_air;
-                    t.sc_stacked += bt.sc_stacked; t.sc_supply += bt.sc_supply; t.sc_ceiling += bt.sc_ceiling;
-                    t.sc_arrive += bt.sc_arrive; t.sc_nodata += bt.sc_nodata; t.sc_veto += bt.sc_veto;
-                    t.sc_best += bt.sc_best; t.sc_placement += bt.sc_placement; t.sc_net += bt.sc_net;
-                    t.sc_materials += bt.sc_materials; t.sc_cand += bt.sc_cand;
-                    for (const auto& [r, n] : bt.sc_short)
-                        shorts[r] += n;
+                    for (const auto& [mid, m] : w.markets)
+                    {
+                        shelf += m.inventory[G];
+                        const double sp = static_cast<double>(m.supply[G]) - std::max(0.0f, m.demand[G]);
+                        if (sp > 0.0)
+                        {
+                            spare += sp;
+                            ++spare_markets;
+                        }
+                    }
+                    nation_build_tally::proc_trace t{};
+                    std::map<int, int> shorts;
+                    for (const auto& [nid, bt] : nation_build_tally_log())
+                    {
+                        const auto it = bt.by_product.find(static_cast<int>(g));
+                        if (it == bt.by_product.end())
+                            continue;
+                        const auto& q = it->second;
+                        t.visit += q.visit; t.locked += q.locked; t.air += q.air; t.stacked += q.stacked;
+                        t.supply += q.supply; t.ceiling += q.ceiling; t.arrive += q.arrive; t.nodata += q.nodata;
+                        t.veto += q.veto; t.best += q.best; t.placement += q.placement; t.net += q.net;
+                        t.materials += q.materials; t.cand += q.cand;
+                        for (const auto& [r, n] : q.shorts)
+                            shorts[r] += n;
+                    }
+                    std::printf("      %-21s plants %d (%d standing, %d staffed); shelves %.0f; spare %.1f on %d market(s)\n",
+                                resource_names::name_of(g).c_str(), plants, standing, staffed_p, shelf, spare, spare_markets);
+                    std::printf("        walk: visits %d locked %d air %d stacked %d | supply %d ceiling %d arrive %d"
+                                " | nodata %d veto %d best %d | placement %d net %d materials %d cand %d | short:",
+                                t.visit, t.locked, t.air, t.stacked, t.supply, t.ceiling, t.arrive,
+                                t.nodata, t.veto, t.best, t.placement, t.net, t.materials, t.cand);
+                    for (const auto& [r, n] : shorts)
+                        std::printf(" %s %d", resource_names::name_of(static_cast<resource_type>(r)).c_str(), n);
+                    std::printf("\n");
                 }
-                std::printf("      component walk: visits %d locked %d air %d stacked %d | supply %d ceiling %d arrive %d"
-                            " | nodata %d veto %d best %d | placement %d net %d materials %d cand %d | short:",
-                            t.sc_visit, t.sc_locked, t.sc_air, t.sc_stacked, t.sc_supply, t.sc_ceiling, t.sc_arrive,
-                            t.sc_nodata, t.sc_veto, t.sc_best, t.sc_placement, t.sc_net, t.sc_materials, t.sc_cand);
-                for (const auto& [r, n] : shorts)
-                    std::printf(" %s %d", resource_names::name_of(static_cast<resource_type>(r)).c_str(), n);
-                std::printf("\n");
             }
         }
     }
