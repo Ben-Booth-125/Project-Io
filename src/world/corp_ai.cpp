@@ -5149,8 +5149,21 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                                                              + abs->inputs[r] * batches);
                         input_cost[r] = landed;
                     }
+                    // A startup answers a BUILDING's want, not a household's (NR-1231, tuned
+                    // 2026-11-17): some plant at its market draws the product, standing or
+                    // building, starved or not; or the ceiling silenced a plant's bid for it;
+                    // or an off-book want - a pad's lump, upkeep - is held there. Ordinary
+                    // goods with only a household bid are left to the ordinary walk.
+                    const auto building_wants = [&](resource_type out) {
+                        const std::size_t o = static_cast<std::size_t>(out);
+                        return market_plant_draw(reach(), mid, o) > 0.0f
+                            || (own_mkt != nullptr
+                                && (own_mkt->hauler_want[o] > 0.0f
+                                    || unposted_bid_held(*own_mkt, o, w.current_econ_tick,
+                                                         std::max(1, p.cadence_k))));
+                    };
                     if (!supplied && startups_on && !startup_taken && !stacked && mid != null_entity
-                        && own_groups.count(abs->group) == 0)
+                        && own_groups.count(abs->group) == 0 && building_wants(primary_output(*abs)))
                     {
                         // A STARTUP (Ben, 2026-11-16): a product this nation makes nowhere, admitted
                         // without spare input. Priced as the chain start is - each input at the posted

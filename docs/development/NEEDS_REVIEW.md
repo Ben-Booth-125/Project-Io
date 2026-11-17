@@ -632,15 +632,16 @@ MEASURED (space_launch_census, the app's own monthly tick). SHIPPED: seeds 0, 28
 ### NR-1231 — Industry startups open space to the rivals but cost the tick-50 market gate 1.6 points: turn the switch on?
 *question · raised 2026-11-16 · from BL-1673 (industry startups), measured behind its switch*
 
-Built as ruled (Ben, 2026-11-16: start new industries though not the most profitable; waive supply and arrival; behind a switch). Off, the scorer is byte-identical: the 16 digests match the merge gate's exactly, and world_determinism passes. ON, staged (rivals handed Rocketry), space_launch_census to 2030: rival launches seed 0 6 -> 170 (first 2000 -> 1972), 46 0 -> 57 (1976), 13 0 -> 19 (1977), 7 0 -> 2 (1978); Spacecraft Assembly Plants by 2030 21 / 35 / 18 / 0 standing, through the heavy method (machinery + steel; alloys and electronics stay near 0). Shipped worlds still launch nothing: no nation reaches Rocketry by 2030 (the research wall, NR-1229). market_viability quick, off -> on: G1 87.6 -> 91.1, G1t50 84.2 -> 82.6 (FAILS its 84), G1b 3.9 -> 1.5, G2 143.4 -> 140.0, G3 100 -> 100. Seed 0 staged launches 157 comms satellites by 2030, which may be more than the design wants.
+Built as ruled (Ben, 2026-11-16: start new industries though not the most profitable; waive supply and arrival; behind a switch). Off, the scorer is byte-identical: the 16 digests match the merge gate's exactly, and world_determinism passes. ON, staged (rivals handed Rocketry), space_launch_census to 2030: rival launches seed 0 6 -> 170 (first 2000 -> 1972), 46 0 -> 57 (1976), 13 0 -> 19 (1977), 7 0 -> 2 (1978); Spacecraft Assembly Plants by 2030 21 / 35 / 18 / 0 standing, through the heavy method (machinery + steel; alloys and electronics stay near 0). Shipped worlds still launch nothing: no nation reaches Rocketry by 2030 (the research wall, NR-1229). market_viability quick, off -> on: G1 87.6 -> 91.1, G1t50 84.2 -> 82.6 (FAILS its 84), G1b 3.9 -> 1.5, G2 143.4 -> 140.0, G3 100 -> 100. Seed 0 staged launches 157 comms satellites by 2030, which may be more than the design wants. TUNED (Ben, 2026-11-17: 'Tune it first'): a startup now needs a BUILDING's want for its product at its market - a plant drawing it (standing or building, starved or not), a ceiling-silenced plant bid, or a held off-book want (a pad's lump, upkeep); a household bid alone no longer admits one. Staged census to 2030, untuned -> tuned: seed 0 170 -> 71 launches (comms class 157 -> 57; first 1972 -> 1985), 46 57 -> 125 (1976 -> 1974), 13 19 -> 4 (1977 -> 1975), 7 2 -> 4 (1978 -> 1995); component plants 21/35/18/0 -> 23/33/6/2. market_viability quick (the quick tier is FOUR seeds, 0/28/46/12 - not sixteen, as first reported), off / untuned / tuned: G1 87.6 / 91.1 / 88.8, G1t50 84.2 / 82.6 / 82.9 (still FAILS 84), G1b 3.9 / 1.5 / 3.2, G2 143.4 / 140.0 / 136.3, G3 100. Per seed, G1t50 with the switch OFF already spans 76.9 to 89.6, so a 1.3-point pooled move on four seeds is inside the seed spread: the full tier would say whether the miss is real.
 
 **Why it matters.** It is the first lever that opens space to the rivals at all; it fails one market gate by 1.6 points, and a failing gate is not weakened.
 
-- Turn it on and accept the G1t50 miss, carried as its own item
-- Keep it off; tune it first (fewer startups - one a year, or only for goods a standing plant or pad wants) and re-measure
-- Turn it on only after the research wall is answered, since shipped worlds cannot use it yet
+- Run the full tier, off and tuned, before deciding: is the G1t50 miss real or four-seed noise?
+- Turn it on now and carry the G1t50 miss as its own item
+- Tune further (one startup a year) and re-measure
+- Keep it off until the research wall is answered, since shipped worlds cannot use it yet
 
-> **Recommendation:** B: tune first. The tick-50 cost likely comes from startups for ordinary goods early in play; limiting them to products some standing building or pad already wants should keep the space effect and spare the gate. The research wall is the next blocker either way.
+> **Recommendation:** A: measure the full tier first - Ben measures before he reshapes, and four seeds cannot tell a 1.3-point move from the spread between worlds.
 
 ---
 
