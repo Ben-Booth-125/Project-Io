@@ -121,25 +121,6 @@ and/or a version goal (v0.1.1 etc.).
 - BL-1630 (LAUNCH_GOODS_SUPPLY)
 - BL-1611 (FAR_SPACE_SPECTATOR_CHECK)
 
-### Sprint 68 — Map fidelity
-*Open · opened 2026-11-14 · Claude (Ben, 2026-11-14: "try implementing the easier changes first")*
-
-**Goal.** The Planetary map holds more detail at every rung: correct mips and a smooth zoom first, then SDL 3.4 and a shader seam that moves lenses, borders, grade and water off the bake.
-
-**Planned.**
-- BL-1652 (GAMMA_CORRECT_MIPS)
-- BL-1653 (ANIMATED_ZOOM_STEP)
-- BL-1654 (SDL_3_4_UPGRADE)
-- BL-1655 (SHADER_SEAM)
-- BL-1656 (LENS_ID_LOOKUP)
-- BL-1657 (SDF_NATIONAL_BORDERS)
-- BL-1658 (CLOSE_ZOOM_DETAIL_LAYER)
-- BL-1659 (LIVE_GRADE_SHADER)
-- BL-1660 (SHADER_WATER)
-- BL-1661 (FAR_ZOOM_CARTOGRAPHIC_MAP)
-- BL-1662 (COMPRESSED_GROUND_TEXTURES)
-- BL-1663 (ROAD_PAINT_CHECKS_FAIL)
-
 ## Where things stand
 
 | Sprint | Theme | State |
@@ -227,13 +208,13 @@ and/or a version goal (v0.1.1 etc.).
 | 62 | equal starts for majors | CLOSED 2026-11-04, no version cut (sprint 61 targets v0.3.0). Every major opens on the Rich-core kit, 12,000 credits and a fixed eight-unit army; the logistics cap keeps the nodes that cover the kit and re-sites what it strands; the kit stocks its processors' inputs. Treasury spread at 20:4 21x -> 1.63x; men spread 1.00x; no major loses money; 569 of 578 kit processors run. Wizard default 30 nations. Three re-pins. |
 | 63 | UI, QOL and the opening | CLOSED 2026-11-10; v0.2.5 cut with sprints 61 to 64. 42 of 46 items delivered and archived; four carried (UI scale, the clip it gates, the lighter tileset, tech pacing). The opening is a climb on equal credits; war ends in elimination; the save keeps its economy; population grows at an Earth-anchored rate; marches take their own fastest route on six sides. The naval branch merged onto main the same day. The one re-bless is owed on Ben's go. |
 | 64 | The war at sea | CLOSED 2026-11-10; v0.2.5 cut with sprints 61 to 64. 16 of 17 items delivered and archived; one carried (price falls as supply vanishes). Ships patrol, escort, raid, blockade and land armies for every nation; forces are paid, equipped and sized from income. Merged onto main the same day (world save v88, envelope v29). The re-bless is set aside on Ben's word. |
+| 68 | Map fidelity | CLOSED 2026-11-17. 20 of 21 items delivered, one closed unbuilt (compressed ground textures, NR-1231). The ground went 3D mid-sprint on Ben's word: a lit heightmesh under a camera whose tilt follows zoom, marks draped, markers standing, buildings and trees as geometry, and the flat ground retired with --verify capturing on the GPU renderer. On branch claude/rendering-sprint; not merged. |
 | 65 | Near space (v0.4.0) | gated on NR-1203 (trade wall): every item built except BL-1630 (launch goods supply); spectate shows 0 rival launches (BL-1593, NEXT_SESSION.md) |
 | 66 | Far space (v0.5.0) | open: every item built except BL-1611 (far-space spectator check), gated on NR-1203; four live clicks owed (NEXT_SESSION.md) |
 | 67 | Launch fix and space calls | open: boost (BL-1637), generated body mass (BL-1638), probe retirement (BL-1639) in lanes; B measured for NR-1203 |
-| 68 | Map fidelity | open: nine of twelve delivered (mips, zoom step, SDL 3.4, shader seam, lens lookup, SDF borders, live land lift, shader water, road paint checks); BL-1662 (compressed ground) waits on NR-1227; BL-1658 (close-zoom detail) and BL-1661 (far-zoom map) wait on Ben's design answers |
 
 **Next up.** SPRINT 61 CLOSED 2026-11-05 (no version cut). v0.3.0 needs the naval system and a playtest with a few wars. BL-1470 (sentiment contributors) passed its live click 2026-11-05; BL-1490 (province resource clip) waits on BL-1495 (UI scale down); BL-1494 (new-library tick-50 stall) leads the economy work. SPRINT 63 (UI, QOL and the opening) OPEN 2026-11-05: Ben's playtest list is filed; the payback census has read: research is the missing money and the door quotes mirages on scarce goods.
 
 **The standing debt out of P1**, worth repeating here because it spans four items: nothing built in that sprint was ever *rendered*. The session ran in a container that cannot build the GUI, so every UI half is compile-clean and arithmetically checked and visually unseen, and no golden was blessed. For a sprint whose own method note is *build it, look at it, then rule*, that is the thing to fix first.
 
-*83 sprints archived cold; 4 open/gated in the hot store.*
+*84 sprints archived cold; 3 open/gated in the hot store.*

@@ -149,31 +149,6 @@
     "BL-1611 (FAR_SPACE_SPECTATOR_CHECK)"
    ],
    "notes": []
-  },
-  {
-   "id": 68,
-   "theme": "Map fidelity",
-   "state": "open",
-   "status_line": "open: nine of twelve delivered (mips, zoom step, SDL 3.4, shader seam, lens lookup, SDF borders, live land lift, shader water, road paint checks); BL-1662 (compressed ground) waits on NR-1227; BL-1658 (close-zoom detail) and BL-1661 (far-zoom map) wait on Ben's design answers",
-   "opened_date": "2026-11-14",
-   "closed_date": null,
-   "author": "Claude (Ben, 2026-11-14: \"try implementing the easier changes first\")",
-   "goal": "The Planetary map holds more detail at every rung: correct mips and a smooth zoom first, then SDL 3.4 and a shader seam that moves lenses, borders, grade and water off the bake.",
-   "planned": [
-    "BL-1652 (GAMMA_CORRECT_MIPS)",
-    "BL-1653 (ANIMATED_ZOOM_STEP)",
-    "BL-1654 (SDL_3_4_UPGRADE)",
-    "BL-1655 (SHADER_SEAM)",
-    "BL-1656 (LENS_ID_LOOKUP)",
-    "BL-1657 (SDF_NATIONAL_BORDERS)",
-    "BL-1658 (CLOSE_ZOOM_DETAIL_LAYER)",
-    "BL-1659 (LIVE_GRADE_SHADER)",
-    "BL-1660 (SHADER_WATER)",
-    "BL-1661 (FAR_ZOOM_CARTOGRAPHIC_MAP)",
-    "BL-1662 (COMPRESSED_GROUND_TEXTURES)",
-    "BL-1663 (ROAD_PAINT_CHECKS_FAIL)"
-   ],
-   "notes": []
   }
  ],
  "next_up": "SPRINT 61 CLOSED 2026-11-05 (no version cut). v0.3.0 needs the naval system and a playtest with a few wars. BL-1470 (sentiment contributors) passed its live click 2026-11-05; BL-1490 (province resource clip) waits on BL-1495 (UI scale down); BL-1494 (new-library tick-50 stall) leads the economy work. SPRINT 63 (UI, QOL and the opening) OPEN 2026-11-05: Ben's playtest list is filed; the payback census has read: research is the missing money and the door quotes mirages on scarce goods.",
