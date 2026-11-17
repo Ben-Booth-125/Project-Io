@@ -1809,7 +1809,7 @@
       "design": "RENDERING.md § Level of detail, \"The farthest rung is a flat map\" (Ben, 2026-11-16: flat map cross-faded from the 12 px rung; national colour, inked coastlines, rivers as lines). WORK: a per-tile map table (colour, river sides, survey) and the ground shader's map pass, weighted by drawn radius."
     },
     {
-      "glyph": "~",
+      "glyph": "✗",
       "sprint": 68,
       "version_goal": null,
       "written": "2026-11-14",
@@ -1823,14 +1823,14 @@
       "authority_doc": "docs/ui/RENDERING.md",
       "id": "BL-1662",
       "short_name": "COMPRESSED_GROUND_TEXTURES",
-      "status": "design-owed",
+      "status": "cancelled",
       "priority": "F",
       "difficulty": 4,
       "title": "Spike: can the ground hold GPU-compressed chunks, for a finer master in the same RAM",
       "files": [
         "src/core/ground_layer.cpp"
       ],
-      "design": "RENDERING.md § Resident set. Every AAA reference stores terrain BC1/BC7-compressed: four to eight times less memory per pixel, so a 192 px master would fit today's budget. UNKNOWN: whether an SDL_Renderer texture can be uploaded compressed (likely not; the GPU API can). WORK: a spike that answers that and measures encode cost per chunk; lossy, so the 6 GB ceiling and capture determinism are both on the table. SPIKE 2026-11-14: SDL 3.4's GPU renderer wraps an external SDL_GPUTexture (SDL_PROP_TEXTURE_CREATE_GPU_TEXTURE_POINTER), so a BC1/BC7 chunk can draw on the GPU path, never in software captures. Measuring encode cost needs a vendored encoder; NR-1227 holds the call. Ben, 2026-11-16 (NR-1227 option A): vendor stb_dxt (BC1, public domain) and MEASURE encode ms per 512 px chunk only; the format decision follows the numbers. READING 2026-11-16 (tools/verify/bc1_encode_measure.cpp, stb_dxt v1.13 vendored at third_party/stb/stb_dxt.h, 18 chunks of 512 px from the ground previews): BC1 encodes in a median 3.32 ms a chunk on one core (high-quality mode 3.60 ms), PSNR 41.1 dB median (38.8 worst), worst channel error 54 at a structure edge; by eye the loss is the finest grain noise. A 2.9 GB chain re-encodes in about 13 s of one core, about 1 s across the bake pool, and holds about 0.5 GB. OPEN (Ben): build the BC1 path (GPU renderer only; captures keep RGB), or close. The build-or-close call is NR-1231."
+      "design": "RENDERING.md § Resident set. Every AAA reference stores terrain BC1/BC7-compressed: four to eight times less memory per pixel, so a 192 px master would fit today's budget. UNKNOWN: whether an SDL_Renderer texture can be uploaded compressed (likely not; the GPU API can). WORK: a spike that answers that and measures encode cost per chunk; lossy, so the 6 GB ceiling and capture determinism are both on the table. SPIKE 2026-11-14: SDL 3.4's GPU renderer wraps an external SDL_GPUTexture (SDL_PROP_TEXTURE_CREATE_GPU_TEXTURE_POINTER), so a BC1/BC7 chunk can draw on the GPU path, never in software captures. Measuring encode cost needs a vendored encoder; NR-1227 holds the call. Ben, 2026-11-16 (NR-1227 option A): vendor stb_dxt (BC1, public domain) and MEASURE encode ms per 512 px chunk only; the format decision follows the numbers. READING 2026-11-16 (tools/verify/bc1_encode_measure.cpp, stb_dxt v1.13 vendored at third_party/stb/stb_dxt.h, 18 chunks of 512 px from the ground previews): BC1 encodes in a median 3.32 ms a chunk on one core (high-quality mode 3.60 ms), PSNR 41.1 dB median (38.8 worst), worst channel error 54 at a structure edge; by eye the loss is the finest grain noise. A 2.9 GB chain re-encodes in about 13 s of one core, about 1 s across the bake pool, and holds about 0.5 GB. CLOSED UNBUILT (Ben, 2026-11-17, NR-1231 option B): nothing binds on ground memory today; reopen from these numbers when it does."
     },
     {
       "glyph": "✓",
