@@ -369,7 +369,7 @@ constexpr float k_lens_edge_band = 0.13f;
 /// BL-1660 (shader water): the open-water glint's peak alpha over the baked water.
 constexpr float k_water_glint_strength = 0.55f;
 /// BL-1659 (live grade shader): the band, in canonical units, over which the
-/// draw-time land lift fades across a land/water hex side (NR-1226 option D: the
+/// draw-time land lift fades across a land/water hex side (NR-1232 option D: the
 /// land weight is per tile, so the lift's shore is the hex side, softened).
 constexpr float k_lift_edge_band = 0.10f;
 /// BL-1658 (close-zoom detail layer; RENDERING.md § Level of detail): the detail

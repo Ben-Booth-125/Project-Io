@@ -950,7 +950,7 @@ Judged against `docs/ui/design/renders/map/`. What it asks of the bake, procedur
   `ground_bake_check` P35's reading (`--lift`), which also holds the water byte-identical to the
   lift off. The player sees the setting as **Brightness** (Ben, 2026-11-15); "land lift" stays
   the design's name for the pass.
-- **The lift at draw time (BL-1659, live grade shader; NR-1226 option D, Ben 2026-11-15).**
+- **The lift at draw time (BL-1659, live grade shader; NR-1232 option D, Ben 2026-11-15).**
   The canvas's ground bakes **without** the lift and the 3D pass (§ The 3D ground) applies the
   same curve as it draws, so a change of level is instant and re-bakes nothing. The land weight
   there is **per tile**, not per pixel: a table of one texel per tile (land = seen and not
@@ -960,7 +960,7 @@ Judged against `docs/ui/design/renders/map/`. What it asks of the bake, procedur
   tile lifts with its tile. The opaque chunks stay RGB (§ Resident set): no per-pixel weight is
   stored. The Selection band's neighbourhood page, which no shader draws, still bakes the lift.
   If the hex-side shore shows at play zooms, the fallback is a half-resolution land mask
-  per chunk (NR-1226 option B).
+  per chunk (NR-1232 option B).
 - **Palette and value.** Base hues take **it1's colour** — warm olive and khaki, rich green
   forest, white peaks, blue-green sea — not C-F's grey (the grade's desaturation eases to
   match); from it3 the value structure stays:

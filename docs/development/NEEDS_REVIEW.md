@@ -557,7 +557,7 @@ Migration moves three months of its rate on the first month of each quarter, so 
 
 *Files: `src/world/economy_system.cpp`, `tools/verify/recruits_harness.cpp`*
 
-### NR-1228 — Shader seam: --verify captures stay on the software renderer, so they never show a shader pass
+### NR-1234 — Shader seam: --verify captures stay on the software renderer, so they never show a shader pass
 *decision taken on your behalf · raised 2026-11-14 · from BL-1655 (shader seam), sprint 68*
 
 --verify forces the software renderer, and every shader pass (lens wash, border band, water glint) has a no-shader path that is what captures draw. The shader passes were checked by a live look in the GPU app, not a capture. IO_NO_GPU_EFFECTS=1 turns every pass off in the GPU app, for an A/B.
@@ -571,7 +571,7 @@ Migration moves three months of its rate on the first month of each quarter, so 
 
 *Files: `src/core/gpu_effects.cpp`, `src/core/app.cpp`*
 
-### NR-1229 — Borders: the shader measures the hex side analytically, with no distance field stored
+### NR-1235 — Borders: the shader measures the hex side analytically, with no distance field stored
 *decision taken on your behalf · raised 2026-11-14 · from BL-1657 (SDF national borders), sprint 68*
 
 The item named a signed distance field. The pass instead reads a one-texel-per-tile owner table and, per pixel, measures the distance to each of the six sides whose neighbour has a different owner. That is exact for a hex grid and needs no baked field or extra memory. The rule's width is set in screen pixels, so it holds across zoom.
@@ -1396,7 +1396,7 @@ The search now walks placement alone over 2 rounds (1 seed + 2 evaluations), ter
 
 *Files: `src/world/finish_campaign_world.cpp`, `tools/verify/player_seed_sweep.cpp`*
 
-### NR-1226 — Live grade shader: a draw-time grade needs a per-pixel land weight the chunks no longer hold
+### NR-1232 — Live grade shader: a draw-time grade needs a per-pixel land weight the chunks no longer hold
 *question · raised 2026-11-14 · from BL-1659 (live grade shader), sprint 68*
 
 The baked grade lifts land and leaves water, so a draw-time grade must know, per pixel, how much of it is land. The opaque master chunks are held as RGB since BL-1311 (master chunk RAM), so alpha cannot carry that weight. The baked grade also runs before the unsharp pass and the shadows; a draw-time grade after them is close, not exact.
@@ -1413,7 +1413,7 @@ The baked grade lifts land and leaves water, so a draw-time grade must know, per
 
 *Files: `src/ui/body_surface_canvas.cpp`, `docs/ui/RENDERING.md`*
 
-### NR-1227 — Compressed ground textures: the GPU path can draw them, but measuring needs a vendored encoder
+### NR-1233 — Compressed ground textures: the GPU path can draw them, but measuring needs a vendored encoder
 *question · raised 2026-11-14 · from BL-1662 (compressed ground textures) spike, sprint 68*
 
 SDL 3.4's GPU renderer wraps an external SDL_GPUTexture (SDL_PROP_TEXTURE_CREATE_GPU_TEXTURE_POINTER), so a BC1 or BC7 chunk can be drawn on the GPU path. The software renderer (every --verify capture) cannot, so captures would keep the RGB chunk. The open cost is encode time per 512 px chunk at bake, which needs an encoder in the tree.
@@ -1430,7 +1430,7 @@ SDL 3.4's GPU renderer wraps an external SDL_GPUTexture (SDL_PROP_TEXTURE_CREATE
 
 *Files: `src/core/gpu_effects.cpp`, `docs/ui/RENDERING.md`*
 
-### NR-1230 — The flat ground stays on the software path: --verify captures still draw the squashed 2D map
+### NR-1236 — The flat ground stays on the software path: --verify captures still draw the squashed 2D map
 *question · raised 2026-11-16 · from BL-1671 (flat ground retired), sprint 68*
 
 On the GPU renderer the canvas now draws only the 3D ground: the squash is off, marks are draped, markers stand upright and clicks ray-pick. The software renderer (every --verify capture, and any machine without a GPU device) cannot run the 3D pass, so it still draws the flat, squashed map. Retiring that path too means moving --verify onto the GPU renderer, which moves every canvas golden and capture at once.
@@ -1447,7 +1447,7 @@ On the GPU renderer the canvas now draws only the 3D ground: the squash is off, 
 
 *Files: `src/ui/body_surface_canvas.cpp`, `src/core/ground_slice_3d.cpp`, `docs/ui/RENDERING.md`*
 
-### NR-1231 — Compressed ground textures: BC1 measures cheap and close to lossless - build the GPU path, or close the spike?
+### NR-1237 — Compressed ground textures: BC1 measures cheap and close to lossless - build the GPU path, or close the spike?
 *question · raised 2026-11-16 · from BL-1662 (compressed ground textures) spike, sprint 68*
 
 The spike measured BC1 with stb_dxt on 18 chunks of 512 px: a median 3.32 ms a chunk on one core, PSNR 41.1 dB median (38.8 worst); by eye the loss is the finest grain noise. A 2.9 GB chain would hold about 0.5 GB. The 3D ground draws only on the GPU renderer, which can take a BC1 texture; the software path and every --verify capture would keep RGB.

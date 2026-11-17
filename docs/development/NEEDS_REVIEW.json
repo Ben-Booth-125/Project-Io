@@ -1862,7 +1862,7 @@
    ]
   },
   {
-   "id": "NR-1226",
+   "id": "NR-1232",
    "title": "Live grade shader: a draw-time grade needs a per-pixel land weight the chunks no longer hold",
    "raised": "2026-11-14",
    "kind": "question",
@@ -1883,7 +1883,7 @@
    "resolution": "Ben, 2026-11-15: try D (a per-tile land table, no stored weight), fall back to B (a half-resolution land mask) if the hex-side shore shows. D built: RENDERING.md § Art direction and palette, 'The lift at draw time'. Only the land lift moved to draw time; the near-future grade stays baked."
   },
   {
-   "id": "NR-1227",
+   "id": "NR-1233",
    "title": "Compressed ground textures: the GPU path can draw them, but measuring needs a vendored encoder",
    "raised": "2026-11-14",
    "kind": "question",
@@ -1904,7 +1904,7 @@
    "resolution": "Ben, 2026-11-16: option A. Vendor stb_dxt and measure BC1 encode time per 512 px chunk; decide the format from the numbers."
   },
   {
-   "id": "NR-1228",
+   "id": "NR-1234",
    "title": "Shader seam: --verify captures stay on the software renderer, so they never show a shader pass",
    "raised": "2026-11-14",
    "kind": "decision-taken",
@@ -1924,7 +1924,7 @@
    "resolution": null
   },
   {
-   "id": "NR-1229",
+   "id": "NR-1235",
    "title": "Borders: the shader measures the hex side analytically, with no distance field stored",
    "raised": "2026-11-14",
    "kind": "decision-taken",
@@ -1944,7 +1944,7 @@
    "resolution": null
   },
   {
-   "id": "NR-1230",
+   "id": "NR-1236",
    "title": "The flat ground stays on the software path: --verify captures still draw the squashed 2D map",
    "raised": "2026-11-16",
    "kind": "question",
@@ -1966,7 +1966,7 @@
    "resolution": "Ben, 2026-11-17 (\"Let's work on BL-1671\"): options B and C. --verify runs the GPU renderer and bakes the 3D ground; the flat ground draw, the squash camera and the fixed-angle ground shader are deleted; a renderer with no GPU device draws no ground and says so. The two ground goldens were re-blessed once on the GPU renderer."
   },
   {
-   "id": "NR-1231",
+   "id": "NR-1237",
    "title": "Compressed ground textures: BC1 measures cheap and close to lossless - build the GPU path, or close the spike?",
    "raised": "2026-11-16",
    "kind": "question",

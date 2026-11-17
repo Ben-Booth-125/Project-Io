@@ -1,5 +1,5 @@
 // bc1_encode_measure - the BL-1662 (compressed ground textures) spike's measurement
-// (Ben, 2026-11-16, NR-1227 option A: "vendor stb_dxt and measure encode ms per 512 px
+// (Ben, 2026-11-16, NR-1233 option A: "vendor stb_dxt and measure encode ms per 512 px
 // chunk; decide the format from the numbers"). A READING, not a check: it asserts nothing.
 //
 // For each ground image named on the command line (a baked-ground capture, RGBA PNG), it
