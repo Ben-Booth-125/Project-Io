@@ -164,6 +164,7 @@ entity_id add_pad(world& w, entity_id nation, entity_id tile)
     bc.tile = tile;
     bc.type = building_type::launchpad;
     bc.workforce_assigned = 1.0f;
+    bc.boost = 100000.0f; // BL-1637: banked, so a launch check is not also a boost check
     bc.ticks_remaining = 0;
     w.buildings.emplace(pad, bc);
     w.nations.at(nation).state_assets.push_back(pad);

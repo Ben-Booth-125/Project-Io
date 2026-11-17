@@ -220,9 +220,10 @@ int working_modules(const world& w, const station_params& stp, entity_id station
 }
 
 /// The raise both verbs share once the site is resolved: quote the lot, check the
-/// crew, then (on @p commit) write. @p extra_prop is the climb's propellant.
+/// crew, then (on @p commit) write. BL-1637: @p climb_boost is the climb's boost,
+/// spent off @p pad (none at a shipyard: 0 and null).
 space_unit_op raise_at(world& w, const space_unit_params& p, entity_id nation, space_hull h,
-                       entity_id market, float extra_prop, orbital_node node,
+                       entity_id market, entity_id pad, float climb_boost, orbital_node node,
                        space_unit_state state, entity_id station)
 {
     space_unit_op op;
@@ -234,12 +235,17 @@ space_unit_op raise_at(world& w, const space_unit_params& p, entity_id nation, s
         return op;
     }
     std::array<float, resource_count> lot = st.goods;
-    const float prop = st.tank + extra_prop;
+    const float prop = st.tank; // the tank aboard; the climb is the pad's boost
     lot[static_cast<std::size_t>(rt::propellant)] += prop;
     const lot_quote q = quote_lot(w, p, market, lot);
     if (!q.shelf_ok)
     {
         op.result = space_unit_result::rejected_shelf_short;
+        return op;
+    }
+    if (climb_boost > 0.0f && !(space_pad_boost(w, pad) >= climb_boost))
+    {
+        op.result = space_unit_result::rejected_boost_short;
         return op;
     }
     nation_component& nc = w.nations.at(nation);
@@ -256,6 +262,8 @@ space_unit_op raise_at(world& w, const space_unit_params& p, entity_id nation, s
 
     // Every check passed: write.
     take_lot(w, nation, market, lot, q.credits);
+    if (climb_boost > 0.0f)
+        space_spend_boost(w, pad, climb_boost); // checked above
     nc.astronauts -= st.crew;
     space_unit u;
     u.id          = w.create_entity();
@@ -276,7 +284,8 @@ space_unit_op raise_at(world& w, const space_unit_params& p, entity_id nation, s
     op.unit             = u.id;
     op.credits          = q.credits;
     op.propellant       = prop;
-    op.climb_propellant = extra_prop;
+    op.climb_boost      = climb_boost;
+    op.pad              = pad;
     op.market           = market;
     return op;
 }
@@ -474,28 +483,24 @@ const space_design* space_unit_design_of(const world& w, entity_id nation, space
     return dit == nit->second.end() ? nullptr : &dit->second;
 }
 
+float space_climb_boost(const world& w, const space_unit_params& p, entity_id body, float mass)
+{
+    if (!std::isfinite(mass))
+        return std::numeric_limits<float>::infinity();
+    if (!(mass > 0.0f))
+        return 0.0f;
+    const double climb = orbital_climb_dv(w, orbital_graph_params{}, body);
+    const float  rate  = std::isfinite(p.launch_propellant_per_dv) ? std::max(0.0f, p.launch_propellant_per_dv) : 0.0f;
+    const float  b     = static_cast<float>(climb * rate * mass);
+    return (std::isfinite(b) && b >= 0.0f) ? b : std::numeric_limits<float>::infinity();
+}
+
 entity_id space_staffed_pad_on(const world& w, entity_id nation, entity_id body)
 {
-    const std::vector<entity_id>* assets = assets_of(w, nation);
-    if (assets == nullptr)
-        return null_entity;
-    entity_id best = null_entity;
-    for (const entity_id bid : *assets)
-    {
-        const auto bit = w.buildings.find(bid);
-        if (bit == w.buildings.end())
-            continue;
-        const building_component& b = bit->second;
-        if (b.type != building_type::launchpad || b.ticks_remaining > 0 || b.decommissioned
-            || !(b.workforce_assigned > 0.0f))
-            continue;
-        const auto tit = w.tiles.find(b.tile);
-        if (tit == w.tiles.end() || tit->second.body != body)
-            continue;
-        if (best == null_entity || bid < best)
-            best = bid;
-    }
-    return best;
+    // BL-1637: ONE answer to "which pad operates here", the launch gate's and the
+    // intake's - so an idled or occupied pad neither banks boost nor spends it on a
+    // raise, a lift or a lane while a launch is refused there.
+    return space_launch_pad_of(w, nation, body);
 }
 
 space_unit_op raise_space_unit_at_pad(world& w, const space_unit_params& p, entity_id nation,
@@ -529,16 +534,14 @@ space_unit_op raise_space_unit_at_pad(world& w, const space_unit_params& p, enti
         return op;
     }
     const space_design_stats st = evaluate_space_design(h, *space_unit_design_of(w, nation, h));
-    const double climb = orbital_climb_dv(w, orbital_graph_params{}, body);
-    const float rate = std::isfinite(p.launch_propellant_per_dv) ? std::max(0.0f, p.launch_propellant_per_dv) : 0.0f;
-    const float climb_prop = static_cast<float>(climb * rate * (st.dry_mass + st.tank));
-    if (!std::isfinite(climb_prop))
+    const float climb_boost = space_climb_boost(w, p, body, st.dry_mass + st.tank);
+    if (!std::isfinite(climb_boost))
     {
         op.result = space_unit_result::rejected_invalid;
         return op;
     }
     const entity_id market = market_on_body(w, w.buildings.at(pad).tile, body);
-    return raise_at(w, p, nation, h, market, climb_prop, low, space_unit_state::idle, null_entity);
+    return raise_at(w, p, nation, h, market, pad, climb_boost, low, space_unit_state::idle, null_entity);
 }
 
 space_unit_op raise_space_unit_at_shipyard(world& w, const space_unit_params& p,
@@ -565,7 +568,7 @@ space_unit_op raise_space_unit_at_shipyard(world& w, const space_unit_params& p,
         op.result = space_unit_result::rejected_no_shipyard;
         return op;
     }
-    return raise_at(w, p, nation, h, home_market_of(w, nation), 0.0f, sit->second.node,
+    return raise_at(w, p, nation, h, home_market_of(w, nation), null_entity, 0.0f, sit->second.node,
                     space_unit_state::docked, station);
 }
 

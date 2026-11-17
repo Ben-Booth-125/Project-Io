@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*110 entries — 53 open, 57 resolved.*
+*116 entries — 59 open, 57 resolved.*
 
 ---
 
@@ -460,7 +460,7 @@ ROADMAP says the numbers are naming order, not build order, and you asked for v0
 ### NR-1203 — Launch goods sit on the wrong shelves: their trade routes rank too low to move (measured)
 *question · raised 2026-11-10 · from BL-1630 lane report*
 
-With a staffed pad bidding for its launch lot, plants appear (seed 0: 5 components, 10 propellant by 2000), but the goods pile on different markets of the one body: 2015, 47582 holds 1,468 components and 21 propellant; 47599 and 47665 hold 1,542 and 788 propellant. 0 launches through 2015. MEASURED (experiment lane, seed 0): the ceiling does silence some wants, but auto trade already sizes to them (BL-1547, dispatch_absorbable), and every route exists overland. What blocks is RANKING: auto trade ranks by margin per trade point, and launch goods move few units per point (components 0.13, propellant 0.6), so their routes rank #68-#141 of ~250 at the source and the points run out first (272 "no points left" against 3 sends in the sample). Logistic Points by value also bite: a component draws 77.9 LP, a propellant unit 16.1. EXPERIMENT (branch worktree-agent-a9f2b8a287ef3a8e6, 8aa5f49b, NOT merged): routes into a market with a silenced want rank first. Result: first rival launch 1992, 3 by 2005, 4 by 2015 (vs none). Cost: pads completed by 2000 fall 7 to 4; treasuries 2015 947k to 629k; market_viability quick G1 at tick 50 86.0 PASS to 80.8 FAIL (target 84). It moves every good from ~1970. OPTION D MEASURED (branch worktree-agent-a83d4ca4b411f9d7d, bbcb17b5, NOT merged; switch launch_draws_body_wide, off byte-identical): a good the home shelf cannot cover may come whole off another market on the home body where the nation owns ground, ascending market id, at that market's price, no haul charge. Seed 0 to 2010: first rival launch 1993; 4 launches by 2000 (Teishe: a comms satellite, then a station core; Thuamuas and Tososhei: comms satellites); none added 2000-2010; 7 of 11 padded nations still refused at the shelf, cause unprobed. Pads unchanged (7 by 2000, 11 by 2010). Treasury sum 2000: -87k. market_viability quick: identical (it ends ~1972, before Rocketry, so it cannot see D). RULING (Ben, 2026-11-10): D is rejected; no global pools for goods (written into SPACE_ASSETS.md). Measure B next. Ben also raised a fourth shape: a Launchpad produces boost, a good on its market, so the economic draw happens over time; a launch consumes boost by the distance in space. FORM (Ben, 2026-11-10): build boost now alongside the B measurement: a pad burns propellant and components into boost, which stays on the pad's market (SPACE_ASSETS.md § Boost). Work: BL-1637 (launch boost).
+With a staffed pad bidding for its launch lot, plants appear (seed 0: 5 components, 10 propellant by 2000), but the goods pile on different markets of the one body: 2015, 47582 holds 1,468 components and 21 propellant; 47599 and 47665 hold 1,542 and 788 propellant. 0 launches through 2015. MEASURED (experiment lane, seed 0): the ceiling does silence some wants, but auto trade already sizes to them (BL-1547, dispatch_absorbable), and every route exists overland. What blocks is RANKING: auto trade ranks by margin per trade point, and launch goods move few units per point (components 0.13, propellant 0.6), so their routes rank #68-#141 of ~250 at the source and the points run out first (272 "no points left" against 3 sends in the sample). Logistic Points by value also bite: a component draws 77.9 LP, a propellant unit 16.1. EXPERIMENT (branch worktree-agent-a9f2b8a287ef3a8e6, 8aa5f49b, NOT merged): routes into a market with a silenced want rank first. Result: first rival launch 1992, 3 by 2005, 4 by 2015 (vs none). Cost: pads completed by 2000 fall 7 to 4; treasuries 2015 947k to 629k; market_viability quick G1 at tick 50 86.0 PASS to 80.8 FAIL (target 84). It moves every good from ~1970. OPTION D MEASURED (branch worktree-agent-a83d4ca4b411f9d7d, bbcb17b5, NOT merged; switch launch_draws_body_wide, off byte-identical): a good the home shelf cannot cover may come whole off another market on the home body where the nation owns ground, ascending market id, at that market's price, no haul charge. Seed 0 to 2010: first rival launch 1993; 4 launches by 2000 (Teishe: a comms satellite, then a station core; Thuamuas and Tososhei: comms satellites); none added 2000-2010; 7 of 11 padded nations still refused at the shelf, cause unprobed. Pads unchanged (7 by 2000, 11 by 2010). Treasury sum 2000: -87k. market_viability quick: identical (it ends ~1972, before Rocketry, so it cannot see D). RULING (Ben, 2026-11-10): D is rejected; no global pools for goods (written into SPACE_ASSETS.md). Measure B next. Ben also raised a fourth shape: a Launchpad produces boost, a good on its market, so the economic draw happens over time; a launch consumes boost by the distance in space. FORM (Ben, 2026-11-10): build boost now alongside the B measurement: a pad burns propellant and components into boost, which stays on the pad's market (SPACE_ASSETS.md § Boost). Work: BL-1637 (launch boost). B MEASURED 2026-11-16 (main 59663e5a, launch boost merged; space_launch_census --stage-space, seeds 0, 46, 7, 13 to 2030; data-only worktrees, not merged): spacecraft components and propellant raised from the table's ~40-credits-a-point line to 2.4x it (0.31 / 1.5, steel's precedent) and to 10x (1.3 / 6). Rival launches by 2030: seed 0 6 -> 8 -> 16 (first 2000 -> 1996 -> 1994); seeds 46, 7, 13 stay 0 at every dose. The probe says why: on 46, 7 and 13 no component plant is ever built through 2010 (0 plants, 0 units on any shelf), and on seed 0 plants appear only from 1985 (9 by 2010) and every unit sits on the one market that makes it. Capacity moves what is made; the wall on most worlds is that nothing makes components. Components carry no background demand (recipes.lua id 13, BL-365); a pad's intake want is their only buyer, and a plant needs alloys + electronics or machinery + steel on its own market.
 
 **Why it matters.** The wall between rivals and space is a trade-ranking rule. The one lever tried works for space and hurts the wider economy.
 
@@ -556,6 +556,92 @@ Migration moves three months of its rate on the first month of each quarter, so 
 > **Recommendation:** Keep it; heads are conserved and the calendar rate holds.
 
 *Files: `src/world/economy_system.cpp`, `tools/verify/recruits_harness.cpp`*
+
+### NR-1230 — A rival's new plant needs supply that arrives at its own market
+*decision taken on your behalf · raised 2026-11-15 · from BL-1651 (majors hoard treasury) round 2, market_viability seed 0 trace*
+
+With no build limit, the settle stacked steel mills on one market's coal: coal demand there rose from 27 to 257 a month, the shelf drained, the price sat at 1.4-2.7x base, and 57 mills on seed 0 starved at the handoff (input-starved pooled 4.9% -> 8.9%). The input gate (BL-1234) reads spare coal anywhere a leg reaches (3,469 on the body); the haul never brought it. I added one test for a NATION's new processor: its own market's last month of listed supply of each input must cover every plant's draw there (standing and building) plus its own. A first cut on price (under 1.25x base) lagged the mills still building and moved nothing. Written into NATIONS.md § 3. Measured: seed 46 input-starved 20.6% -> 0.6%; pooled quick G1 87.6, G1t50 84.2, G1b 3.9, G2 143.4, G3 100 - all five targets met. The same test also re-asks each later pick in one evaluation. Seed 0 still reads 11.2% (coal stocked but priced over the mills' ceiling).
+
+**Why it matters.** It narrows what a rich rival may build, in the direction of build only what runs, on public market supply. The rule is new.
+
+- Keep the arrivals test
+- Read shortage from price instead (lags the plants still building)
+- Fix the cause in the supply clause: count only spare the haul has actually delivered
+
+> **Recommendation:** Keep it for now; the third option is the deeper fix and is backlog work if the price test proves too blunt.
+
+### NR-1226 — Launch boost: a satellite move still buys propellant off the home shelf; a lane now needs a STAFFED pad
+*decision taken on your behalf · raised 2026-11-14 · from BL-1637 (launch boost) build*
+
+Two calls taken while building launch boost. (1) A satellite changing orbit climbs through no pad, so it spends no boost: it keeps buying the move's propellant off the home shelf (rejected_shelf now means only that). Written into SPACE_ASSETS.md § Boost. (2) The straight-line space lane used to open on any Launchpad on the source body; it now needs a staffed one holding a launch's boost, because only a staffed pad banks boost and a launch spends it. (3) A launch asset's recorded launch_cost, and what the rival AI's reserve check and cheapest-kind pick read, is now the credits alone: the goods were bought by the intake beforehand, so they are a sunk cost at launch (cold review). The launch_spend census and verify_api launch_cost under-read a launch by its goods value accordingly.
+
+**Why it matters.** Call (1) leaves one lump shelf buy in space, outside the pad intake that § Boost names the only goods buyer. Call (2) can close a lane an unstaffed pad used to open.
+
+- Keep both as built
+- A satellite move spends boost from the home pad instead (one rule for every burn from the ground's goods)
+- A satellite move burns nothing extra: its launch quote already covers its first node
+
+> **Recommendation:** Keep both: a move is in space, and § Boost says a unit in space burns what it carries; a satellite carries no tank, so the shelf stands in for it.
+
+*Files: `src/world/space_assets.cpp`, `src/world/supply_system.cpp`, `docs/economy/SPACE_ASSETS.md`*
+
+### NR-1227 — Launch boost dials: 2.5 boost a day (75 a month), cap 1,500, one third components
+*decision taken on your behalf · raised 2026-11-14 · from BL-1637 (launch boost) build*
+
+boost_per_day 2.5 makes a pad bank one home-orbit satellite (25 components + 50 propellant = 75 boost) each monthly tick. boost_cap 1,500 is twenty satellites, above the largest single launch the classes and paths quote. boost_components_share 1/3 is the satellite lot's own ratio, so a satellite costs exactly the goods it did. All three are C++ defaults in space_asset_params, not yet authored in Lua.
+
+**Why it matters.** The rate paces every nation's space programme and is a steady draw on two scarce goods at every pad market; too high drains a thin shelf, too low starves rivals of launches.
+
+- Keep as built and read the spectated run
+- Author them in scripts/economy.lua now
+- Tie the rate to the pad's staffing
+
+> **Recommendation:** Keep as built; re-read after the spectated run shows rival launch counts.
+
+*Files: `src/world/space_assets.hpp`*
+
+### NR-1228 — Does propellant carried up through a pad - a raise's tank, a refuel - spend boost?
+*question · raised 2026-11-14 · from BL-1637 (launch boost) cold review*
+
+Your 2026-11-14 ruling: every climb through a pad spends boost. As built, the climb of the HULL and of CARGO spends boost; the propellant a unit carries up (its tank at a raise, a refuel over the pad) is still bought off the shelf as goods. refuel_space_unit's own comment says that propellant "climbs through the pad", so the ruling arguably reaches it.
+
+**Why it matters.** If the tank spends boost, a Hauler trade draws much more boost per trip and the cap and rate want re-reading; if not, the shelf still sees a lump propellant buy at every raise and refuel.
+
+- Keep as built: the tank and a refuel are goods bought off the shelf; only the climb of hull and cargo is boost
+- The tank and a refuel spend boost too (their propellant is the cargo of the climb)
+
+> **Recommendation:** Keep as built: the tank is the unit's own fuel, bought as goods like its kit, and boost stays the launch's cost.
+
+*Files: `src/world/space_units.cpp`, `src/world/space_convoy.cpp`, `docs/economy/SPACE_ASSETS.md`*
+
+### NR-1229 — Launch boost is built but no rival launches: no nation reaches Rocketry by 2015, and staged, no pad market ever holds a spacecraft component
+*question · raised 2026-11-14 · from BL-1637 (launch boost) spectated census (tools/verify/space_launch_census.cpp)*
+
+MEASURED (space_launch_census, the app's own monthly tick). SHIPPED: seeds 0, 28, 11 to 2015 - no nation holds Rocketry; the leading nation holds 22, 19, 21 of 212 Digitisation nodes; no pad is ever built, so boost never engages. STAGED (--stage-space: every rival handed the near-space keys and their chains at the handover; replay deterministic on all three): pads are built and staffed (seed 0: 2 in 1965, 14 in 1980, 23 in 2000; seed 28: 10 by 2010; seed 11: 5 by 2010, 19 still building), but every pad banks 0 boost and no rival launches by 2010. Seed 0 probe: propellant reaches the pad markets (22 of 22 pads stocked, 7,826 units in 1995), but spacecraft_components stand at 0 on every pad market in every reading, and only 8 of 22 pads see components under the fair-price ceiling - so 14 pads' components want goes to the hauler-only register and is never bid. The intake draws in the recipe ratio, so no components means no boost at all. RE-MEASURED 2026-11-16 on main 763e603e (boost merged with BL-1651's uncapped rivals and monthly AI), seeds 0, 46, 7, 13 to 2030. SHIPPED: no nation holds Rocketry by 2030 on any seed; the leader holds 31, 28, 30, 29 of 212 nodes; no pad is built. STAGED: rival pads are built and staffed (seed 0: 21, 46: 27, 13: 23, 7: 7 by 2030) and propellant stands on nearly every pad market (2.8k-16k units), but spacecraft components stand on almost none (0 on seeds 46, 13 and 7 in every five-year read; 1-6 pads on seed 0). Seed 0 alone launches: first in 2000, 6 by 2030, none after 2005. Mean boost 0 on the other three. Two walls stand: research reaches Rocketry too slowly to see in 70 years, and components never reach a pad (NR-1203's ranking). TRACED 2026-11-16 (corp_ai.cpp's write-only component trace, read by space_launch_census --stage-space, seeds 0, 46, 7, 13, 1960-2000): every rival nation asks for a Spacecraft Assembly Plant on each of its own tiles every month - 257k to 575k method visits per seed - and on 46, 7 and 13 not one passes. No method is tech-locked or barred by the air. Of the visits: 51-64% die at the SUPPLY clause (no spare input anywhere a leg reaches), 7-12% at the fair-price ceiling on the plant's own shelf, 6-10% at the supply-that-arrives test (BL-1651), 22-32% on a tile already standing a processor. The short input is the chain beneath: alloys first (43-48% of first failures), then steel (29-44%), then machinery (8-28%). On seed 0, 33 methods reached the pick and 32 became candidates, all from 1980. So the wall is the chain beneath: no world holds spare alloys, steel or machinery for a plant to draw, and the chain start (BL-1227's refused-draw bid) does not raise them. CHAIN TRACED 2026-11-16 (the trace generalised to every product, armed only by the harness; staged, seeds 0, 46, 7, 13, 1960-1990). Plants by 1990, seeds 0/46/7/13: alloys 1/0/0/0, machinery 12/0/0/1, electronics 0 everywhere, REE alloy 10/1/3/1, refined copper 75/9/14/7, steel 98/68/11/47. Steel is built but drawn to the bone: the world's spare steel is 117/72/24/10 units a month on 2-5 markets, and alloys and machinery die on steel first (steel is the first failed input in 44-85% of their visits, REE alloy or copper the rest). One level down, REE alloy dies at the supply clause on rare-earth ore (28-63% of visits), at the supply-that-arrives test (BL-1651; 20-40%) and at the glut veto, no buyer for its output (1-20%); refined copper likewise on copper ore (supply 43-74%, arrive 8-32%). Steel itself dies on iron ore and coal not spare. READING: every level of the chain is starved of spare input, and demand does not travel down it - a pad's want reaches components only; alloys, machinery and REE alloy have no buyer until the plant above them stands, and that plant needs their spare already. BL-1227's chain start bridges one level, not four. NOT YET TRACED: why extraction never runs the raws (iron ore, coal, rare-earth ore, copper ore) spare.
+
+**Why it matters.** The item's done-line (a spectated run shows rival launches without pooling, same goods per launch) is not met, and boost cannot meet it alone: two walls stand upstream - the research pace never reaches Rocketry inside a campaign, and spacecraft components are never made or moved to a pad.
+
+- A) Close launch boost as built (its mechanism verified by harness) and file the two walls as their own items: research pace to Rocketry, and a spacecraft-components supply
+- B) Bank each good separately, so a pad holds propellant boost and components boost and a launch spends both - shelves fill with propellant meanwhile, but no launch still happens while components are absent
+- C) Keep launch boost open until a spectated run launches, and work the components supply under it
+
+> **Recommendation:** A: the boost mechanism does what SPACE_ASSETS.md says; the walls are research pacing and components supply, each a design question of its own. Start with why spacecraft_components is never made: the over-ceiling price at zero stock silences its want at most pads.
+
+*Files: `tools/verify/space_launch_census.cpp`, `src/world/economy_system.cpp`, `docs/economy/SPACE_ASSETS.md`*
+
+### NR-1231 — Industry startups open space to the rivals but cost the tick-50 market gate 1.6 points: turn the switch on?
+*question · raised 2026-11-16 · from BL-1673 (industry startups), measured behind its switch*
+
+Built as ruled (Ben, 2026-11-16: start new industries though not the most profitable; waive supply and arrival; behind a switch). Off, the scorer is byte-identical: the 16 digests match the merge gate's exactly, and world_determinism passes. ON, staged (rivals handed Rocketry), space_launch_census to 2030: rival launches seed 0 6 -> 170 (first 2000 -> 1972), 46 0 -> 57 (1976), 13 0 -> 19 (1977), 7 0 -> 2 (1978); Spacecraft Assembly Plants by 2030 21 / 35 / 18 / 0 standing, through the heavy method (machinery + steel; alloys and electronics stay near 0). Shipped worlds still launch nothing: no nation reaches Rocketry by 2030 (the research wall, NR-1229). market_viability quick, off -> on: G1 87.6 -> 91.1, G1t50 84.2 -> 82.6 (FAILS its 84), G1b 3.9 -> 1.5, G2 143.4 -> 140.0, G3 100 -> 100. Seed 0 staged launches 157 comms satellites by 2030, which may be more than the design wants. TUNED (Ben, 2026-11-17: 'Tune it first'): a startup now needs a BUILDING's want for its product at its market - a plant drawing it (standing or building, starved or not), a ceiling-silenced plant bid, or a held off-book want (a pad's lump, upkeep); a household bid alone no longer admits one. Staged census to 2030, untuned -> tuned: seed 0 170 -> 71 launches (comms class 157 -> 57; first 1972 -> 1985), 46 57 -> 125 (1976 -> 1974), 13 19 -> 4 (1977 -> 1975), 7 2 -> 4 (1978 -> 1995); component plants 21/35/18/0 -> 23/33/6/2. market_viability quick (the quick tier is FOUR seeds, 0/28/46/12 - not sixteen, as first reported), off / untuned / tuned: G1 87.6 / 91.1 / 88.8, G1t50 84.2 / 82.6 / 82.9 (still FAILS 84), G1b 3.9 / 1.5 / 3.2, G2 143.4 / 140.0 / 136.3, G3 100. Per seed, G1t50 with the switch OFF already spans 76.9 to 89.6, so a 1.3-point pooled move on four seeds is inside the seed spread: the full tier would say whether the miss is real.
+
+**Why it matters.** It is the first lever that opens space to the rivals at all; it fails one market gate by 1.6 points, and a failing gate is not weakened.
+
+- Run the full tier, off and tuned, before deciding: is the G1t50 miss real or four-seed noise?
+- Turn it on now and carry the G1t50 miss as its own item
+- Tune further (one startup a year) and re-measure
+- Keep it off until the research wall is answered, since shipped worlds cannot use it yet
+
+> **Recommendation:** A: measure the full tier first - Ben measures before he reshapes, and four seeds cannot tell a 1.3-point move from the spread between worlds.
 
 ### NR-1234 — Shader seam: --verify captures stay on the software renderer, so they never show a shader pass
 *decision taken on your behalf · raised 2026-11-14 · from BL-1655 (shader seam), sprint 68*

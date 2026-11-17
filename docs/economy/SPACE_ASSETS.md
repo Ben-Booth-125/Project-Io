@@ -145,12 +145,26 @@ the boost waits. A good held on another market of the same body is that market's
 pad that is not launching does not drain its market.
 
 **A launch spends boost by distance.** The boost a launch needs scales with the payload's class
-and the path's thrust cost to its node: a further node spends more. A space unit raised at a pad is
-a launch and spends boost the same way. Once a unit is in space it burns the propellant aboard it
+and the path's thrust cost to its node: a further node spends more. A space unit raised at a pad
+climbs as a launch does, and its climb spends boost the same way; its hull's kit and its tank are
+goods, bought off the shelf as the unit is raised (`../military/SPACE_FLEETS.md`). Once a unit
+is in space it burns the propellant aboard it
 (`../military/SPACE_FLEETS.md`), not boost.
 
-**Boost is the space programme's goods buyer.** No lump of space goods is bought and consumed
-besides the pad's intake. The pad draws for every nation alike, the player's included: it is a
+**Every climb through a pad spends boost** (Ben, 2026-11-14). A Hauler lifting cargo off a surface
+spends its pad's boost for the climb, by the cargo's mass; so does a trade sent on a straight-line
+space lane, one launch's worth per shipment (`TRADE.md` § A trade). The cargo itself is bought off
+the shelf as any trade's is; only the climb is boost. **A descent burns the tank** (Ben,
+2026-11-14): only the climb up spends boost, and a Hauler setting cargo down burns the propellant
+it carries, buying nothing at the far end.
+
+**A satellite that changes orbit climbs through no pad**, so it spends no boost: it buys the
+propellant for the move off its nation's home shelf, as a launch once did.
+
+**Boost is the space programme's launch buyer.** No lump of launch goods is bought at a launch;
+the pad's intake bought them as it banked them. What a unit carries into space — its kit, its
+tank, a refuel, a satellite's move — is bought off the shelf when it is wanted. The pad draws for
+every nation alike, the player's included: it is a
 building's input, not a decision.
 
 **A launch is refused whole** — the world is not touched — when the nation has no staffed pad, lacks

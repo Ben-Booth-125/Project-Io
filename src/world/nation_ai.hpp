@@ -106,7 +106,7 @@ struct nation_ai_params
     /// (rather than on the raw id, or on a hash) is what makes admitting a
     /// nation shift nobody else's slot when the new id sorts last, which is the
     /// case a world that grows a nation actually produces. Verified by R2.
-    int cadence_k = 12; // months: a year, the quarter tick's 4 (BL-1642)
+    int cadence_k = 1; // months: every month (Ben, 2026-11-14: national policy monthly; was 12)
 
     // --- Term 1: niche fit --------------------------------------------------
     /// A neighbour is counted as LACKING resource r by how far its own output
@@ -635,6 +635,7 @@ enum class far_space_block : uint8_t
     blockaded,       ///< The home body is blockaded for it.
     refused,         ///< The verb refused what the pick chose.
     nothing_wanted,  ///< Nothing far-space is wanted now.
+    boost_short,     ///< BL-1637: the pad holds too little boost for the climb.
 };
 
 /// What the far-space pick did for one nation. Reported, never stored.

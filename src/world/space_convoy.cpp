@@ -169,7 +169,8 @@ space_haul_quote quote_space_haul(const world& w, const space_unit_params& p, en
         if (nit->second.astronauts < st.crew)
             return q;
         q.fixed = st.goods;
-        q.fixed[PR] += st.tank + climb_rate(w, p, src_body) * (st.dry_mass + st.tank);
+        q.fixed[PR] += st.tank;
+        q.fixed_boost = space_climb_boost(w, p, src_body, st.dry_mass + st.tank); // BL-1637
     }
     if (!st.valid || !(st.cargo > 0.0f) || !(st.tank > 0.0f))
         return q;
@@ -180,29 +181,35 @@ space_haul_quote quote_space_haul(const world& w, const space_unit_params& p, en
     if (any_fixed && !space_quote_lot(w, p, pad_market, q.fixed, &q.fixed_credits))
         return q;
 
-    q.lift_per_unit   = climb_rate(w, p, src_body);
-    q.drop_per_unit   = climb_rate(w, p, dest_body);
-    q.src_prop_price  = price_of(w, pad_market, PR);
-    q.dest_prop_price = price_of(w, dest_market, PR);
-    if (!std::isfinite(q.lift_per_unit) || !std::isfinite(q.drop_per_unit))
-        return q;
-    if ((q.lift_per_unit > 0.0f && !(q.src_prop_price > 0.0f)) || (q.drop_per_unit > 0.0f && !(q.dest_prop_price > 0.0f)))
+    // BL-1637 (SPACE_ASSETS.md § Boost): the lift spends the pad's boost; the
+    // descent burns the Hauler's tank.
+    q.lift_per_unit = space_climb_boost(w, p, src_body, 1.0f);
+    q.drop_per_unit = climb_rate(w, p, dest_body);
+    q.boost_held    = space_pad_boost(w, q.pad);
+    q.boost_price   = price_of(w, pad_market, PR); // a climb burned propellant: its replacement
+    if (!std::isfinite(q.lift_per_unit) || !std::isfinite(q.drop_per_unit) || !std::isfinite(q.fixed_boost)
+        || !std::isfinite(q.boost_price) || !(q.boost_held >= q.fixed_boost))
         return q;
 
-    // THE CAP: the laden outbound burn and the empty return both fit one full tank,
-    // with a thousandth held back so the hop-by-hop burns (equal in exact
-    // arithmetic) never fall a float short.
-    //   return  R = dry (e^(D2/ve) - 1)
-    //   outbound (dry + c + P)(1 - e^(-D1/ve)) <= (P - R) x 0.999
+    // THE CAP: the laden outbound burn, the descent's burn and the empty return all
+    // fit one full tank, with a thousandth held back so the hop-by-hop burns (equal in
+    // exact arithmetic) never fall a float short.
+    //   return   R = dry (e^(D2/ve) - 1)
+    //   outbound (dry + c + P)(1 - e^(-D1/ve)) + d c <= (P - R) x 0.999
+    // And the lift: the pad's boost after the raise's climb covers c x lift.
     const double ve  = st.exhaust;
     const double dry = st.dry_mass;
     const double P   = st.tank;
     const double R   = dry * (std::exp(back.dv / ve) - 1.0);
     const double f   = 1.0 - std::exp(-out.dv / ve);
-    const double c   = ((P - R) * 0.999) / f - dry - P;
+    const double d   = q.drop_per_unit;
+    const double c   = ((P - R) * 0.999 - (dry + P) * f) / (f + d);
     if (!std::isfinite(c) || !(P > R))
         return q;
-    q.cap = static_cast<float>(std::min<double>(st.cargo, c));
+    double cap = std::min<double>(st.cargo, c);
+    if (q.lift_per_unit > 0.0f)
+        cap = std::min<double>(cap, (static_cast<double>(q.boost_held) - q.fixed_boost) / q.lift_per_unit);
+    q.cap = static_cast<float>(cap);
     if (!(q.cap > 1.0e-3f))
     {
         q.cap = 0.0f;
@@ -234,11 +241,12 @@ entity_id launch_space_haul(world& w, const space_unit_params& p, const space_ha
             || uit->second.cargo > 0.0f || w.space_hauls.count(q.unit) != 0)
             return null_entity;
     }
-    // The whole space lot on the pad's shelf: the raise or refuel, and the lift.
-    std::array<float, resource_count> lot = q.fixed;
-    std::array<float, resource_count> lift{};
-    lift[PR] = q.lift_per_unit * send;
-    lot[PR] += lift[PR];
+    // The whole space lot on the pad's shelf: the raise or refuel. The climbs (the
+    // raise's and the lift) are the pad's boost (BL-1637).
+    const std::array<float, resource_count> lot = q.fixed;
+    const float lift = q.lift_per_unit * send;
+    if (!std::isfinite(lift) || !(space_pad_boost(w, q.pad) >= q.fixed_boost + lift))
+        return null_entity;
     float credits = 0.0f;
     if (!space_quote_lot(w, p, pad_market, lot, &credits))
         return null_entity;
@@ -266,13 +274,8 @@ entity_id launch_space_haul(world& w, const space_unit_params& p, const space_ha
             return null_entity; // refuses whole
         spent += op.credits;
     }
-    if (lift[PR] > 0.0f)
-    {
-        float lift_credits = 0.0f;
-        space_quote_lot(w, p, pad_market, lift, &lift_credits);
-        space_take_lot(w, nation, pad_market, lift, lift_credits);
-        spent += lift_credits;
-    }
+    if (lift > 0.0f)
+        space_spend_boost(w, q.pad, lift); // the raise spent its own climb; the rest covers this
     if (out_credits != nullptr)
         *out_credits = spent;
     return unit;
@@ -358,16 +361,22 @@ space_unit_op load_space_cargo(world& w, const space_unit_params& p, entity_id n
         op.result = space_unit_result::rejected_blockaded;
         return op;
     }
-    const float lift = climb_rate(w, p, u.node.body) * qty;
+    // BL-1637 (SPACE_ASSETS.md § Boost): the cargo is bought off the pad's shelf; its
+    // lift spends the pad's boost.
+    const float lift = space_climb_boost(w, p, u.node.body, qty);
     if (!std::isfinite(lift))
         return op; // rejected_invalid
     std::array<float, resource_count> lot{};
     lot[ri] += qty;
-    lot[PR] += lift;
     float credits = 0.0f;
     if (!space_quote_lot(w, p, market, lot, &credits))
     {
         op.result = space_unit_result::rejected_shelf_short;
+        return op;
+    }
+    if (!(space_pad_boost(w, pad) >= lift))
+    {
+        op.result = space_unit_result::rejected_boost_short;
         return op;
     }
     if (!(w.nations.at(nation).treasury >= credits))
@@ -377,6 +386,7 @@ space_unit_op load_space_cargo(world& w, const space_unit_params& p, entity_id n
     }
 
     space_take_lot(w, nation, market, lot, credits);
+    space_spend_boost(w, pad, lift);
     uit->second.cargo = u.cargo + qty;
     if (hit == w.space_hauls.end())
     {
@@ -388,10 +398,11 @@ space_unit_op load_space_cargo(world& w, const space_unit_params& p, entity_id n
         h.target = h.home = u.node;
         w.space_hauls.emplace(unit, h);
     }
-    op.result     = space_unit_result::ok;
-    op.credits    = credits;
-    op.propellant = lift;
-    op.market     = market;
+    op.result      = space_unit_result::ok;
+    op.credits     = credits;
+    op.climb_boost = lift;
+    op.pad         = pad;
+    op.market      = market;
     return op;
 }
 
@@ -451,25 +462,17 @@ space_unit_op unload_space_cargo(world& w, const space_unit_params& p, entity_id
         op.result = space_unit_result::rejected_blockaded;
         return op;
     }
+    // BL-1637 (Ben, 2026-11-14): the descent burns the Hauler's own tank.
     const float drop = climb_rate(w, p, u.node.body) * u.cargo;
     if (!std::isfinite(drop))
         return op; // rejected_invalid
-    std::array<float, resource_count> lot{};
-    lot[PR] = drop;
-    float credits = 0.0f;
-    if (drop > 0.0f && !space_quote_lot(w, p, market, lot, &credits))
+    if (!(u.propellant >= drop))
     {
-        op.result = space_unit_result::rejected_shelf_short;
+        op.result = space_unit_result::rejected_insufficient_dv;
         return op;
     }
-    if (!(w.nations.at(nation).treasury >= credits))
-    {
-        op.result = space_unit_result::rejected_insufficient_treasury;
-        return op;
-    }
-
-    if (drop > 0.0f)
-        space_take_lot(w, nation, market, lot, credits);
+    const float credits = 0.0f;
+    u.propellant = std::max(0.0f, u.propellant - drop);
     // The cargo lands: an arrived convoy, which the next clear lands and sells.
     convoy_component c;
     c.id             = w.allocate_convoy_id();
@@ -594,25 +597,21 @@ void run_space_convoy_day(world& w, const space_unit_params& p, const station_pa
             {
                 const auto mit = w.markets.find(h.dest_market);
                 const entity_id body = u.node.body;
+                // BL-1637 (Ben, 2026-11-14): the descent burns the Hauler's own tank,
+                // which the quote's cap sized to hold it beside the return.
                 const float drop = climb_rate(w, p, body) * u.cargo;
-                std::array<float, resource_count> lot{};
-                lot[PR] = std::isfinite(drop) ? drop : 0.0f;
-                float credits = 0.0f;
                 // BL-1599: a blockaded destination takes no unload; the Hauler waits.
                 const bool can = mit != w.markets.end() && std::isfinite(drop) && staffed_pad_any(w, body) != null_entity
                               && !space_blockaded(w, h.owner, body) && !space_market_blockaded(w, h.dest_market)
-                              && (!(drop > 0.0f) || space_quote_lot(w, p, h.dest_market, lot, &credits))
-                              && w.nations.count(h.owner) != 0 && w.nations.at(h.owner).treasury >= credits;
+                              && u.propellant >= drop && w.nations.count(h.owner) != 0;
                 if (!can)
                 {
-                    ++r.waiting; // the descent cannot be paid today: it waits in orbit
+                    ++r.waiting; // the descent cannot be made today: it waits in orbit
                     continue;
                 }
-                if (drop > 0.0f)
-                    space_take_lot(w, h.owner, h.dest_market, lot, credits);
+                u.propellant = std::max(0.0f, u.propellant - drop);
                 c->arrived   = true;
                 c->progress  = 1.0f;
-                c->cost_paid += credits;
                 u.cargo  = 0.0f;
                 h.convoy = 0;
                 h.phase  = space_haul_phase::returning;

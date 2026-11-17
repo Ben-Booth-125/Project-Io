@@ -70,11 +70,12 @@ A space unit is in one of four states:
 ## Raising and launching (Ben, 2026-11-10)
 
 **A hull is raised in one of two places.** A hull that may launch from a surface is raised at a
-**Launchpad** on a body the nation holds, and launched to that body's low orbit; the launch buys the
-climb's propellant off that body's shelf. Any hull may be raised at a station's **Shipyard**, and
+**Launchpad** on a body the nation holds, and launched to that body's low orbit; the climb spends
+the pad's boost (`../economy/SPACE_ASSETS.md` § Boost), and the hull's kit and tank are bought off
+that body's shelf. Any hull may be raised at a station's **Shipyard**, and
 appears docked there.
 
-**The climb is what makes a body cheap or dear.** A launch's propellant scales with the
+**The climb is what makes a body cheap or dear.** A launch's boost scales with the
 surface-to-low-orbit link's Δv, which grows with the body's mass and its atmosphere. **A launch from
 a moon or an asteroid costs a fraction of a launch from the home world**, which is why the moons
 become the yards of a mature space power.
@@ -94,10 +95,11 @@ ordered to travel with a convoy.
 Launchpad (up) and by a Lander or the Launchpad (down), at that body's climb cost.
 
 **Loading and unloading.** A carrier — a Hauler or a Lander — idle in a body's low orbit **loads**
-goods off that body's shelf through its owner's staffed Launchpad there, buying the goods and the
-lift's propellant: the climb's Δv × the launch rate × the cargo's mass. It **unloads** its whole
-cargo down through a staffed Launchpad on the body below, buying the descent's propellant the same
-way off that market. Unloaded cargo **lands** on that market and is sold there, as any convoy's
+goods off that body's shelf through its owner's staffed Launchpad there, buying the goods and
+spending the pad's boost for the lift: the climb's Δv × the launch rate × the cargo's mass (Ben,
+2026-11-14). It **unloads** its whole cargo down through a staffed Launchpad on the body below,
+**burning the descent from its own tank** at the same rate (Ben, 2026-11-14): nothing is bought at
+the far end, and a tank too low for the descent cannot unload. Unloaded cargo **lands** on that market and is sold there, as any convoy's
 cargo is (`../economy/SUPPLY.md` § A shipment). A carrier holds one good at a time. Neither happens
 while a hostile armed unit stands at the node.
 
@@ -106,13 +108,13 @@ while a hostile armed unit stands at the node.
 - **The hull.** An idle, empty Hauler of the trading nation already in the source's low orbit
   takes the trade, refuelled over the source's Launchpad; with none, one is raised at that pad.
   So a nation's yard of Haulers grows only as fast as its trade outruns them.
-- **The cap.** A Hauler carries no more than lets its laden outbound trip **and** its empty
-  return both fit one tank. How much a trade can carry between two bodies is a number the player
+- **The cap.** A Hauler carries no more than lets its laden outbound trip, the descent **and** its
+  empty return all fit one tank, and no more than its pad's boost can lift. How much a trade can carry between two bodies is a number the player
   reads off the design, not a guess.
 - **The flight.** It flies the cheapest path **hop by hop**, standing at every node of it, so
   every node of the path is a place it can be met.
-- **The cost.** The trade pays the space side as it is bought — the hull readied, the lift at the
-  source's climb and the descent at the destination's — rather than a priced haul. The cargo is
+- **The cost.** The trade pays the space side as it is bought — the hull readied, the lift spent
+  from the source pad's boost and the descent burned from the tank — rather than a priced haul. The cargo is
   bought and sold as any trade's.
 - **Interdiction.** At a node holding an armed unit of a nation at war with its owner, a Hauler
   with no armed unit of its own there is **lost with its cargo** (an unarmed hull has nothing to

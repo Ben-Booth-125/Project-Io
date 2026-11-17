@@ -531,7 +531,7 @@ rival nation (Ben, 2026-10-23).
 
 The AI evaluates at the **econ-tick boundary inside `run_economy_step`**, in the slot the BL-079
 agency block occupies; that block is the scorer's **reflex tier** (tier 0: recipe rescue,
-idle-a-loser). Strategic evaluation is **staggered**: actor `c` evaluates every `cadence_k` (4)
+idle-a-loser). Strategic evaluation is **staggered**: actor `c` evaluates every `cadence_k` (1: every month, Ben 2026-11-14)
 ticks when `tick % k == index(c) % k`, the index taken over the **sorted actor set** (Victoria-3's
 tick-task idea — bounded per-tick cost, fully deterministic). Admitting or removing a nation from
 evaluation never shifts another's slot, because the index is over the sorted set.
@@ -2454,6 +2454,39 @@ boilerplate: pure, seeded, deterministic, replayable, legal verbs only, never a 
   borders it or is hostile to it), through fog, with no position, type or count. **Not admitted:** any
   other read of another nation's force; disbanding to meet the target; sizing the player's nation;
   a plan beyond the next hire. Pure, seeded, deterministic, replayable, legal verbs only, never a planner.
+  **A rival's declaration reads its own front's supply (Ben, 2026-11-14; `../politics/RELATIONS.md`
+  § Who declares, "A rival declares war only on a supplied front").** A new reading for the stance
+  grant's declaration: its OWN network's cover at each of its own units' tiles (the reading the march
+  grant already admits), and how many of those supplied units stand on its own front tiles. **Not
+  admitted:** the target's cover or network.
+  **A rival may stage a supplied front — granted (Ben, 2026-11-15; `../politics/RELATIONS.md` § Who
+  declares, "Staging").** Raised on the measurement: with the supplied-front rule, declarations fell from
+  140 to 12 in ten years over sixteen worlds, because a rival at peace posted no supplied units on any
+  front. His answer: *"Grant pre-war staging: muster supplied units, then declare."* A widening of the
+  2026-10-27 fronts grant and the 2026-11-05 defence grant: toward a neighbour it holds the declaration's
+  own motive against, at peace and with no truce, a rival may take its OWN idle capital defenders off
+  their post (keeping half) and assign them to its OWN front toward that neighbour, until its units there
+  reach one and a half times the fed units the declaration's cover test needs. The march's supply test
+  is unchanged, so a staged unit stands only on fed ground; a front its network does not feed is never
+  staged. It reads only what the declaration already reads. **Not admitted:** declaring (the war pass
+  decides, on its own tests); building toward a front to supply it; staging against a neighbour with no
+  motive; any plan past the next order. Pure, seeded, deterministic, replayable, legal verbs only, never
+  a planner.
+  **A rival's surplus may answer a glut — granted (Ben, 2026-11-15; `../politics/NATIONS.md` § 3).**
+  His answer to *where a rich rival's surplus goes when its mines are refused for want of a buyer*:
+  *"Processors that eat the glut; export to other markets."* A rival nation may build a second processor
+  on a tile already standing one of its own, for a method whose input its own market holds in glut; and
+  the standing Marketplace and manual-trade grants, carried to the nation on 2026-10-23, now run for it.
+  Each of a turn's builds is asked of the world the turn's earlier builds left. **Not admitted:** reading
+  another nation's trades, points or plans. Pure, seeded, deterministic, replayable, legal verbs only,
+  never a planner.
+  **Rivals decide monthly (Ben, 2026-11-14):** *"AI decisions take place over months rather than
+  years."* Every pass the evaluation runs is on the monthly turn, national policy included (budget,
+  reserve, tax, tariffs, law); an embargo's enactment or repeal is quarterly; a declaration is checked
+  daily. Nothing in what may be done widens: the clock is not a grant.
+  **A rich nation builds without limit (Ben, 2026-11-14; `../politics/NATIONS.md` § 3).** A rival
+  nation takes every build its money admits each turn, best first; the per-evaluation build budget
+  binds a corporation only.
   **A rival's force target may read its own treasury surplus — granted (Ben, 2026-11-14;
   `../military/MILITARY.md` § Force sizing, `../politics/NATIONS.md` § 3).** A widening of the
   2026-11-08 sizing grant, raised because it adds a reading: the target, set as a share of income,
@@ -2461,6 +2494,16 @@ boilerplate: pure, seeded, deterministic, replayable, legal verbs only, never a 
   so a rich nation spends its surplus on force as well as on buildings. **Not admitted:** reading
   another nation's treasury; sizing the player's nation; disbanding; a plan beyond the next hire.
   Pure, seeded, deterministic, replayable, legal verbs only, never a planner.
+  **A rival may start a new industry — granted (Ben, 2026-11-16; `../politics/NATIONS.md` § 3).**
+  His words: *"We should encourage the AI to attempt to startup new industries even when they are not
+  the most profitable."* A rival nation may build a plant for a product its own ground makes nowhere -
+  a STARTUP - though it is not its best build, and though no spare input for it exists yet: for that
+  plant the input-supply clause and the supply-that-arrives test are waived (Ben, 2026-11-16, "waive
+  supply and arrival"). Standing, it posts its want like any plant, and that public want is the buyer
+  the level beneath reads. Every other test holds: its output has a buyer, it stands on the nation's
+  own ground, its materials are obtainable, the solvency gate admits its cost. **Not admitted:** a chain
+  chosen in one turn; building for another nation; reading another nation's plans. Pure, seeded,
+  deterministic, replayable, legal verbs only, never a planner.
   **Rival nations fire missiles — granted (Ben, 2026-11-10; `../military/MILITARY.md` § Missiles).**
   A new subject: a rival nation's scorer may buy missiles and interceptors onto its OWN shelves, fire
   a missile from one of its OWN launchers at a province or building of a nation it is already hostile
@@ -2528,8 +2571,8 @@ boilerplate: pure, seeded, deterministic, replayable, legal verbs only, never a 
   **A rival's march may weigh supply — granted (Ben, 2026-11-07; BL-1540, rival march supply;
   `../military/MILITARY.md` § Fronts, "A rival's fronts").** Raised on the measurement: rival marches
   starved 9-16% of their opening armies in 8 quarters. His answer: *"Grant it, scorer weighs supply."* A
-  new reading, on the standing terms. **A rival scores its fronts every quarter (Ben, 2026-11-09)**: that
-  pass alone leaves the yearly evaluation clock. A rival nation's scorer, weighing a march of its OWN units, may
+  new reading, on the standing terms. **A rival scores its fronts on its monthly turn (Ben, 2026-11-14; every quarter from
+  2026-11-09, when the rest kept a yearly clock).** A rival nation's scorer, weighing a march of its OWN units, may
   read its OWN network's **cover** at the destination (never the route, and not the pool), what that
   cover does to the unit's stock and men, and the days of the straight march. The price is how fast the
   ground would kill it, so every cover below break-even costs something; the brake is the hunger itself,

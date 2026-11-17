@@ -8,6 +8,7 @@
 #include "orbital_system.hpp"
 #include "space_effects.hpp"    // BL-1586: the Navigation satellite's haul factor
 #include "space_convoy.hpp"     // BL-1596: inter-body trade ships as a Hauler
+#include "space_units.hpp"      // BL-1637: space_staffed_pad_on, the lane launch's pad
 #include "space_bombard.hpp"    // BL-1599: a blockaded body ships nothing between bodies
 #include "stance.hpp"
 #include "sentiment_emitters.hpp" // BL-1458: trade_conducted at landing
@@ -622,29 +623,6 @@ bool owner_has_launchpad_on(const world& w, entity_id owner, entity_id body)
 
 namespace {
 
-/// BL-1265 (TRADE.md § A trade, "Between bodies"): the stock of the launch-drawn
-/// good `dr` a launch of `cargo_qty` units of `ri` can BUY off the source
-/// market's shelf — what the shelf holds, where the fair-price ceiling admits
-/// it — less the cargo itself when the cargo IS the drawn good (a launch cannot
-/// burn the propellant it is exporting). 0 where the ceiling refuses the shelf.
-float launch_shelf_available(const world& w, const recipe_registry& reg, entity_id src_market,
-                             std::size_t dr, std::size_t ri, float cargo_qty)
-{
-    const auto mit = w.markets.find(src_market);
-    if (mit == w.markets.end())
-        return 0.0f;
-    if (!shelf_admits(mit->second, dr, reg.price_band().reservation_mult, /*off_buys=*/true))
-        return 0.0f;
-    float avail = std::max(0.0f, mit->second.inventory[dr]);
-    if (ri == dr)
-        avail -= cargo_qty;
-    return avail;
-}
-
-} // namespace
-
-namespace {
-
 /// Fraction in [0, cap] to discount one leg's haul cost by — summed over the
 /// population-centre (scale-weighted) and hub (flat) tiles the leg crosses, capped.
 /// Deterministic: a pure function of the tiles and the node sets.
@@ -1100,6 +1078,14 @@ convoy_leg market_leg_with_haul(world& w, const recipe_registry& reg,
 // The shared dispatch (BL-452) — see supply_system.hpp for why it is shared.
 // ---------------------------------------------------------------------------
 
+float lane_launch_boost()
+{
+    float n = 0.0f;
+    for (const float v : launch_draw_per_convoy())
+        n += v;
+    return n;
+}
+
 const std::array<float, resource_count>& launch_draw_per_convoy()
 {
     // PRODUCTION.md § Launchpad specifies the cost *per launch*, not per tonne
@@ -1244,17 +1230,12 @@ convoy_leg price_trade_leg(world& w, const recipe_registry& reg,
         leg.travel_ticks = std::max(1, travel_ticks_for_days(q.days));
         return leg;
     }
-    // BL-308 / BL-1265: the pad also has to be FUELLED. A launch burns
-    // `launch_draw_per_convoy()`, which the trader BUYS off the source shelf;
-    // without it on the shelf (under the ceiling) the lane is shut exactly as if
-    // no pad existed. Ascending resource index: a fixed order.
-    {
-        const auto& launch_draw = launch_draw_per_convoy();
-        for (std::size_t dr = 0; dr < resource_count; ++dr)
-            if (launch_draw[dr] > 0.0f
-                && launch_shelf_available(w, reg, src_market, dr, ri, qty) < launch_draw[dr])
-                return leg;
-    }
+    // BL-308 / BL-1637 (SPACE_ASSETS.md § Boost): the launch climbs through the
+    // trader's own staffed pad on the source body and SPENDS ITS BOOST -
+    // `launch_draw_per_convoy()`, summed, in boost. A pad holding less shuts the lane
+    // exactly as if no pad existed. Nothing is bought off a shelf for it.
+    if (!(space_pad_boost(w, space_staffed_pad_on(w, corp_id, src_body)) >= lane_launch_boost()))
+        return leg;
     // ROCKETRY GATES LAUNCH (Ben, 2026-10-10; ERAS.md § Era 2 -> Era 3 gate,
     // "Rocketry research purchased"): the pad operates only for a corp whose
     // home nation holds Rocketry's `space_dispatch` mechanic.
@@ -1321,19 +1302,17 @@ bool commit_hauler_shipment(world& w, const recipe_registry& reg, economy_report
     const std::size_t pr = static_cast<std::size_t>(resource_type::propellant);
     const entity_id pad_market = space_market_on_body(w, w.buildings.at(q.pad).tile, src.body);
     // The space lot comes off the pad's shelf; where that is this shelf, the launch's
-    // goods come off first and the cargo has what is left.
+    // goods come off first and the cargo has what is left. BL-1637: the climbs are
+    // the pad's boost, not the shelf's (q.cap already holds the lift to the boost).
     float avail = std::max(0.0f, src.inventory[ri]);
     if (pad_market == src_market)
-    {
         avail -= q.fixed[ri];
-        if (ri == pr)
-            avail /= (1.0f + q.lift_per_unit);
-    }
+    (void)pr;
     const float send = std::min({qty, q.cap, avail});
     if (!(send > 0.0f) || !std::isfinite(send))
         return false;
     const float purchase = send * posted_price(src, ri);
-    const float now      = q.fixed_credits + send * q.lift_per_unit * q.src_prop_price;
+    const float now      = q.credits_now();
     const float already  = (io_committed != nullptr) ? *io_committed : 0.0f;
     if (!std::isfinite(purchase) || !std::isfinite(now) || !(*purse - already >= now + purchase))
         return false;
@@ -1400,18 +1379,22 @@ bool commit_trade_shipment(world& w, const recipe_registry& reg, economy_report&
     // TRADE.md § A trade, step 1: IT BUYS at the source shelf, at its posted
     // price, as any buyer does — under the fair-price ceiling (Ben, 2026-10-10).
     // A shelf the ceiling refuses sells nothing; a short shelf sells what it
-    // holds. A space launch's own propellant is bought from the same shelf, so
-    // when the cargo IS that good the launch's draw is left behind.
+    // holds. BL-1637: a space launch spends the pad's boost, not the shelf.
     if (!shelf_admits(src, ri, res_mult, /*off_buys=*/true))
         return false;
     // BL-1596: a Hauler leg buys its launch physically (space_convoy.hpp).
     if (leg.mode == convoy_mode::space && leg.hauler)
         return commit_hauler_shipment(w, reg, report, corp_id, src_market, dest_market_id, ri, qty, purse,
                                       out_sent, io_committed);
-    const auto& launch_draw = launch_draw_per_convoy();
-    float on_shelf = std::max(0.0f, src.inventory[ri]);
-    if (leg.mode == convoy_mode::space && launch_draw[ri] > 0.0f)
-        on_shelf -= launch_draw[ri];
+    // BL-1637: the straight-line lane's launch spends the trader's pad's boost.
+    entity_id lane_pad = null_entity;
+    if (leg.mode == convoy_mode::space)
+    {
+        lane_pad = space_staffed_pad_on(w, corp_id, src.body);
+        if (!(space_pad_boost(w, lane_pad) >= lane_launch_boost()))
+            return false;
+    }
+    const float on_shelf = std::max(0.0f, src.inventory[ri]);
     float send = std::min(qty, on_shelf);
     if (!(send > 0.0f))
         return false;
@@ -1448,11 +1431,7 @@ bool commit_trade_shipment(world& w, const recipe_registry& reg, economy_report&
     // trimmed cargo pays its share of the priced leg and no more.
     const float haul     = (send < qty) ? leg.cost * (send / qty) : leg.cost;
     const float price_a  = posted_price(src, ri);
-    float       purchase = send * price_a;
-    if (leg.mode == convoy_mode::space)
-        for (std::size_t dr = 0; dr < resource_count; ++dr)
-            if (launch_draw[dr] > 0.0f)
-                purchase += launch_draw[dr] * posted_price(src, dr);
+    const float purchase = send * price_a;
     // The solvency gate, in ONE place for every trade: the trader pays the haul
     // now and the purchase at this tick's clear, and must be able to cover both
     // — beside every purchase it has already committed this tick.
@@ -1471,15 +1450,9 @@ bool commit_trade_shipment(world& w, const recipe_registry& reg, economy_report&
     src.inventory[ri] = std::max(0.0f, src.inventory[ri] - send);
     report.purchases[std::make_pair(corp_id, src_market)][ri] += send;
     report.wants[std::make_pair(corp_id, src_market)][ri]     += send;
-    // BL-308: the launch's propellant, once per launch, bought the same way.
+    // BL-308 / BL-1637: the launch, once per launch, off the pad's boost.
     if (leg.mode == convoy_mode::space)
-        for (std::size_t dr = 0; dr < resource_count; ++dr)
-            if (launch_draw[dr] > 0.0f)
-            {
-                src.inventory[dr] = std::max(0.0f, src.inventory[dr] - launch_draw[dr]);
-                report.purchases[std::make_pair(corp_id, src_market)][dr] += launch_draw[dr];
-                report.wants[std::make_pair(corp_id, src_market)][dr]     += launch_draw[dr];
-            }
+        space_spend_boost(w, lane_pad, lane_launch_boost()); // checked above
 
     // TRADE.md § A trade, step 2: IT PAYS THE HAUL, and the goods travel as a
     // convoy for the leg's travel time (SUPPLY.md).

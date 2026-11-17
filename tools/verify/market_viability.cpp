@@ -180,6 +180,7 @@
 #include "scripting/lua_state.hpp"
 #include "harness_params.hpp"
 #include "export_refusal.hpp"
+#include "world/corp_ai.hpp"
 #include "world/campaign_settle.hpp"
 #include "world/components.hpp"
 #include "world/economy_system.hpp"
@@ -1896,6 +1897,7 @@ int main(int argc, char** argv)
         else if (!std::strcmp(argv[i], "--seeds") && i + 1 < argc) { seeds = parse_seed_list(argv[++i]); from_args = true; }
         else if (!std::strcmp(argv[i], "--k") && i + 1 < argc) g_k_override = static_cast<float>(std::atof(argv[++i]));
         else if (!std::strcmp(argv[i], "--no-spoil")) g_no_spoil = true;
+        else if (!std::strcmp(argv[i], "--startups")) industry_startup_enabled() = true; // BL-1673, measured
         else if (!std::strcmp(argv[i], "--no-logistics")) g_logistics = false;
         else if (!std::strcmp(argv[i], "--dump-processors") && i + 1 < argc) g_dump_processors = argv[++i]; // BL-1287
         else if (!std::strcmp(argv[i], "--dump-t50") && i + 1 < argc) g_dump_t50 = argv[++i]; // BL-1442

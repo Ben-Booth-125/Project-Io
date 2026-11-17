@@ -484,8 +484,8 @@ plant forecast zero revenue and was idled the moment it stood (102 of them acros
 seeds). Its base price is derived from its inputs as every Tier 3 product's is (`PRODUCTION.md` §
 The recipe margin anchor), on the route a body with an atmosphere runs — `propellant_atmospheric`,
 refined fuel ×2 — since the airless route runs only on airless bodies (Ben, 2026-10-09): marginal
-cost 31.95, so **64.0**. There is no reserve of launch fuel: a launch buys its propellant off the
-shelf it leaves from (`PRODUCTION.md` § Launchpad).
+cost 31.95, so **64.0**. Launch fuel is held nowhere but a Launchpad's boost: the pad draws its
+propellant off the shelf it stands on, a little each tick (`SPACE_ASSETS.md` § Boost).
 
 Water is in this tradeable set from tick 0: it carries an authored base price on the home-body
 markets and sits in the substrate demand basket (`scripts/economy.lua`, weight 0.40).

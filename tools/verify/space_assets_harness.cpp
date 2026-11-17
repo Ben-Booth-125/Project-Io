@@ -66,6 +66,7 @@
 #include "space_fixture.hpp"
 
 #include <algorithm>
+#include <limits>
 #include <cmath>
 #include <cstdarg>
 #include <cstdint>
@@ -193,6 +194,7 @@ struct snap
     std::uint32_t cursor;
     float         ta, tb;
     float         comp, prop; // BL-1582: the home shelf's launch goods
+    float         boost;      // BL-1637: the home pad's banked boost
 };
 
 snap take(const fixture& f)
@@ -200,13 +202,14 @@ snap take(const fixture& f)
     return {f.w.state_hash(0), f.w.space_assets.size(), f.w.next_entity_id(),
             f.w.nations.at(f.a).treasury, f.w.nations.at(f.b).treasury,
             space_fixture::shelf_of(f.w, f.market, resource_type::spacecraft_components),
-            space_fixture::shelf_of(f.w, f.market, resource_type::propellant)};
+            space_fixture::shelf_of(f.w, f.market, resource_type::propellant),
+            space_pad_boost(f.w, f.pad_a)};
 }
 
 bool same(const snap& x, const snap& y)
 {
     return x.hash == y.hash && x.assets == y.assets && x.cursor == y.cursor && x.ta == y.ta
-        && x.tb == y.tb && x.comp == y.comp && x.prop == y.prop;
+        && x.tb == y.tb && x.comp == y.comp && x.prop == y.prop && x.boost == y.boost;
 }
 
 const char* state_name(space_asset_state s)
@@ -264,16 +267,19 @@ int main()
               "A2", "each node resolves to its reach tier (the travel floor)");
         const orbital_path_result pm = orbital_path(w, orbital_graph_params{}, SURF(f.home), LO(f.moon));
         check(ho.cost < hh.cost && hh.cost < mo.cost && mo.dv == pm.dv && ho.dv > 0.0
-                  && mo.propellant > ho.propellant && ho.travel_quarters <= mo.travel_quarters
+                  && mo.boost > ho.boost && ho.travel_quarters <= mo.travel_quarters
                   && mo.cost < fo.cost && mo.travel_quarters < fo.travel_quarters,
-              "A2", fmt("a moon node costs more than home low orbit (%.0f > %.0f; %.2f dv > %.2f, the path's own), and burns more propellant; far costs more again",
+              "A2", fmt("a moon node costs more than home low orbit (%.0f > %.0f; %.2f dv > %.2f, the path's own), and spends more boost; far costs more again",
                         mo.cost, ho.cost, mo.dv, ho.dv));
-        const float expect = p.launch_cost[0] + p.credits_per_dv * static_cast<float>(ho.dv)
-                           + p.components_lot[0] * space_fixture::k_components_price
-                           + p.propellant_per_dv[0] * static_cast<float>(ho.dv) * space_fixture::k_propellant_price;
-        check(std::fabs(ho.cost - expect) <= 1e-3f * expect && ho.cost == ho.credits + ho.goods_value
-                  && ho.market == f.market,
-              "A2", fmt("home LO = base + credits/dv x dv + components x price + propellant/dv x dv x price (%.0f), off the home shelf", expect));
+        // BL-1637 (SPACE_ASSETS.md § Boost): the goods are the pad's boost, so the
+        // credits are the whole cost, and the boost is the old lot's goods.
+        const float expect = p.launch_cost[0] + p.credits_per_dv * static_cast<float>(ho.dv);
+        const float expect_boost = p.components_lot[0] + p.propellant_per_dv[0] * static_cast<float>(ho.dv);
+        check(std::fabs(ho.cost - expect) <= 1e-3f * expect && ho.cost == ho.credits && ho.goods_value == 0.0f
+                  && std::fabs(ho.boost - expect_boost) <= 1e-3f * expect_boost && ho.pad == f.pad_a
+                  && ho.boost_held == space_pad_boost(w, f.pad_a),
+              "A2", fmt("home LO = base + credits/dv x dv (%.0f); it spends components + propellant/dv x dv of the pad's boost (%.1f)",
+                        expect, expect_boost));
         // BL-1642 (the tick is a month): the floors are months (0/3/3/6/9), and a path's
         // own days now round to months, so a far trip can run past its floor.
         check(ho.travel_quarters == 0 && mo.travel_quarters >= p.travel_quarters[1] && fo.travel_quarters >= p.travel_quarters[3]
@@ -351,14 +357,10 @@ int main()
         const auto it = w.space_assets.find(sat);
         {
             const snap s1 = take(f);
-            const float price = qq.components * space_fixture::k_components_price
-                              + qq.propellant * space_fixture::k_propellant_price;
-            check(s1.comp == s0.comp - qq.components && s1.prop == s0.prop - qq.propellant
-                      && qq.components == p.components_lot[0] && qq.propellant > 0.0f
-                      && std::fabs(qq.goods_value - price) <= 1e-3f * price
-                      && s1.ta == s0.ta - qq.cost && qq.cost == qq.credits + qq.goods_value,
-                  "A12", fmt("the launch draws the home shelf (%.0f components, %.1f propellant) and debits the treasury the SAME priced lot (%.0f goods + %.0f credits)",
-                             qq.components, qq.propellant, qq.goods_value, qq.credits));
+            check(s1.comp == s0.comp && s1.prop == s0.prop && qq.boost > p.components_lot[0]
+                      && s1.boost == s0.boost - qq.boost && s1.ta == s0.ta - qq.cost && qq.cost == qq.credits,
+                  "A12", fmt("the launch spends the pad's boost (%.1f) and leaves the shelf untouched; the treasury pays the credits (%.0f)",
+                             qq.boost, qq.credits));
         }
         check(q.result == space_launch_result::launched && it != w.space_assets.end()
                   && w.nations.at(f.a).treasury == before - qq.cost && sat == cursor
@@ -573,7 +575,7 @@ int main()
                                + world_save_ships_section_bytes(w) + world_save_growth_carry_section_bytes(w) // the space merge: main's v81..v83
                                + world_save_ended_section_bytes(w) + world_save_missile_section_bytes(w)     // and v89, before the space sections
                                + world_save_station_section_bytes(w) + world_save_early_space_section_bytes(w) // BL-1583 (v81), BL-1612 (v82)
-                               + (world_save_space_node_section_bytes(w) + (world_save_space_unit_section_bytes(w) + (world_save_space_battle_section_bytes(w) + (world_save_prospecting_section_bytes(w) + (world_save_space_convoy_section_bytes(w) + (world_save_debris_section_bytes(w) + (world_save_space_bombard_section_bytes(w) + (world_save_offworld_base_section_bytes(w) + (world_save_space_firsts_section_bytes(w) + world_save_transit_origin_section_bytes(w)))))))))); // BL-1581 (v83), last
+                               + (world_save_space_node_section_bytes(w) + (world_save_space_unit_section_bytes(w) + (world_save_space_battle_section_bytes(w) + (world_save_prospecting_section_bytes(w) + (world_save_space_convoy_section_bytes(w) + (world_save_debris_section_bytes(w) + (world_save_space_bombard_section_bytes(w) + (world_save_offworld_base_section_bytes(w) + (world_save_space_firsts_section_bytes(w) + world_save_transit_origin_section_bytes(w) + world_save_launch_boost_section_bytes(w)))))))))); // BL-1581 (v83); BL-1637 (v96) last
         // BL-1582: the launch-gate staging (a gridless tile, its pad, the shelf) predates
         // v53 tiles; the v50 rows read the world without it.
         const auto unstaged = [](world x) {
@@ -772,12 +774,24 @@ int main()
                  [](fixture& k) { k.w.buildings.at(k.pad_a).ticks_remaining = 3; });
         run_case("a Launchpad off the home body", space_launch_result::rejected_no_launchpad,
                  [](fixture& k) { k.w.buildings.at(k.pad_a).tile = space_fixture::add_tile(k.w, k.moon); });
-        run_case("an empty propellant shelf", space_launch_result::rejected_shelf,
-                 [](fixture& k) { k.w.markets.at(k.market).inventory[static_cast<std::size_t>(resource_type::propellant)] = 10.0f; });
-        run_case("a components shelf one short", space_launch_result::rejected_shelf,
-                 [&](fixture& k) { k.w.markets.at(k.market).inventory[static_cast<std::size_t>(resource_type::spacecraft_components)] = p.components_lot[0] - 1.0f; });
-        run_case("no market on the home body", space_launch_result::rejected_shelf,
-                 [](fixture& k) { k.w.markets.at(k.market).body = k.moon; });
+        // BL-1637: the launch's goods are the pad's boost.
+        run_case("a pad with no boost", space_launch_result::rejected_boost,
+                 [](fixture& k) { k.w.buildings.at(k.pad_a).boost = 0.0f; });
+        run_case("a pad one boost short", space_launch_result::rejected_boost,
+                 [&](fixture& k) {
+                     const space_launch_quote full = Q(k.w, p, k.a, space_asset_class::satellite, LO(k.home));
+                     k.w.buildings.at(k.pad_a).boost = full.boost - 1.0f;
+                 });
+        {
+            // The shelf is not the launch's: an empty one launches from a banked pad.
+            fixture k;
+            build(k);
+            k.w.markets.at(k.market).inventory.fill(0.0f);
+            k.w.current_econ_tick = 4;
+            const space_launch_quote q = L(k.w, p, k.a, space_asset_class::satellite, LO(k.home));
+            check(q.result == space_launch_result::launched, "A11",
+                  "an empty home shelf does not refuse a launch: its goods are the pad's boost");
+        }
         run_case("a short treasury", space_launch_result::rejected_insufficient_treasury,
                  [](fixture& k) { k.w.nations.at(k.a).treasury = 100.0f; });
         {
@@ -844,7 +858,7 @@ int main()
                       && back.space_orders[0].cmd.role == retask.role && back.next_space_order_id == kw.next_space_order_id
                       && back.state_hash(0) == kw.state_hash(0) && to_bytes(back) == b,
                   "A14", "a pending order round-trips (fields, equal state_hash, byte-identical re-serialise)");
-            const std::size_t sec = b.size() - (world_save_space_node_section_bytes(kw) + (world_save_space_unit_section_bytes(kw) + (world_save_space_battle_section_bytes(kw) + (world_save_prospecting_section_bytes(kw) + (world_save_space_convoy_section_bytes(kw) + (world_save_debris_section_bytes(kw) + (world_save_space_bombard_section_bytes(kw) + (world_save_offworld_base_section_bytes(kw) + (world_save_space_firsts_section_bytes(kw) + world_save_transit_origin_section_bytes(kw))))))))));
+            const std::size_t sec = b.size() - (world_save_space_node_section_bytes(kw) + (world_save_space_unit_section_bytes(kw) + (world_save_space_battle_section_bytes(kw) + (world_save_prospecting_section_bytes(kw) + (world_save_space_convoy_section_bytes(kw) + (world_save_debris_section_bytes(kw) + (world_save_space_bombard_section_bytes(kw) + (world_save_offworld_base_section_bytes(kw) + (world_save_space_firsts_section_bytes(kw) + world_save_transit_origin_section_bytes(kw) + world_save_launch_boost_section_bytes(kw))))))))));
             const std::size_t ord = sec + 4 + kw.space_assets.size() * 10 + 4 + 4; // the first order
             auto refused = [&](std::size_t off, const void* v, std::size_t n) {
                 std::string t = b;
@@ -924,7 +938,7 @@ int main()
                   && kw.space_assets.at(lh.asset).state == space_asset_state::in_transit
                   && orbital_slots_held(kw, LO(k.home)) == lo_held - 1 && orbital_slots_held(kw, HO(k.home)) == hi_held + 1,
               "A13", "a move in coverage lands at once: in transit to the new node, the old slot freed, the new one held");
-        check(mq.components == 0.0f && after.comp == before.comp && after.prop == before.prop - mq.propellant
+        check(mq.boost == 0.0f && after.comp == before.comp && after.prop == before.prop - mq.propellant
                   && mq.propellant > 0.0f && after.ta == before.ta - mq.cost,
               "A13", fmt("a move buys only the path's propellant (%.1f) and pays its thrust (%.0f total)", mq.propellant, mq.cost));
 
@@ -1046,6 +1060,7 @@ int main()
               "A15b", fmt("the origin round-trips byte-identical (%zu bytes, v%u)", b.size(),
                           static_cast<unsigned>(world_save_version)));
         const std::size_t sec = world_save_transit_origin_section_bytes(x.w);
+        const std::size_t lb  = world_save_launch_boost_section_bytes(x.w); // BL-1637 (v96), after it
         std::ostringstream o89(std::ios::binary);
         write_world_snapshot_pre_transit_origin(x.w, o89);
         world old;
@@ -1053,7 +1068,9 @@ int main()
         world cleared = x.w;
         cleared.space_assets.at(sid).transit_from = {};
         cleared.space_assets.at(sid).depart_tick  = 0;
-        check(sec == 4 + 13 && o89.str().size() + world_save_space_line_gap_bytes(x.w) /* the space merge: main's naval..missile sections */ + sec == b.size() && ok89
+        for (auto& [bid, bb] : cleared.buildings) // BL-1637: a v89 stream predates the boost
+            bb.boost = 0.0f;
+        check(sec == 4 + 13 && o89.str().size() + world_save_space_line_gap_bytes(x.w) /* the space merge: main's naval..missile sections */ + sec + lb == b.size() && ok89
                   && !space_asset_has_transit_origin(old.space_assets.at(sid))
                   && old.state_hash(0) == cleared.state_hash(0) && cleared.state_hash(0) != x.w.state_hash(0),
               "A15c", fmt("the section is the tail (v89 %zu + %zu == %zu); a v89 stream reads with no origin, "
@@ -1061,7 +1078,7 @@ int main()
                           o89.str().size(), sec, b.size()));
 
         // Tampered tails are refused whole, destination untouched.
-        const std::size_t s0 = b.size() - sec;
+        const std::size_t s0 = b.size() - lb - sec;
         const auto refused = [&](const std::string& bad) {
             world t;
             t.nations.emplace(999, nation_component{});
@@ -1096,6 +1113,62 @@ int main()
         check(all, "A15d", "tampered tails refused whole (count, ghost asset, star or ghost origin, kind, a tick outside "
                            "[launch, arrival], origin == destination, truncation); the clean stream reads" +
                                (why.empty() ? std::string() : " — FAILED:" + why));
+
+        // BL-1637 (v96): the pad-boost section, the stream's last. A v95 stream reads
+        // with every pad empty; a tampered section is refused whole.
+        {
+            std::vector<entity_id> padded;
+            for (const auto& [bid, bb] : x.w.buildings)
+                if (bb.boost != 0.0f)
+                    padded.push_back(bid);
+            std::sort(padded.begin(), padded.end());
+            std::ostringstream o95(std::ios::binary);
+            write_world_snapshot_pre_launch_boost(x.w, o95);
+            world w95;
+            world drained = x.w;
+            for (auto& [bid, bb] : drained.buildings)
+                bb.boost = 0.0f;
+            bool empty95 = true;
+            const bool ok95 = from_bytes(o95.str(), w95);
+            if (ok95)
+                for (const auto& [bid, bb] : w95.buildings)
+                    empty95 = empty95 && bb.boost == 0.0f;
+            check(!padded.empty() && lb == 4 + 8 * padded.size() && ok95 && empty95
+                      && o95.str().size() + lb == b.size() && w95.state_hash(0) == drained.state_hash(0)
+                      && drained.state_hash(0) != x.w.state_hash(0),
+                  "A16a", fmt("v96: %zu pads hold boost (section %zu bytes, the tail); a v95 stream reads with every "
+                              "pad empty, hashing as the drained world", padded.size(), lb));
+
+            const std::size_t at = b.size() - lb; // count, then (id, boost) per pad, ascending
+            entity_id not_pad = null_entity;
+            for (const auto& [bid, bb] : x.w.buildings)
+                if (bb.type != building_type::launchpad && (not_pad == null_entity || bid < not_pad))
+                    not_pad = bid;
+            const float nan_v = std::numeric_limits<float>::quiet_NaN(), inf_v = std::numeric_limits<float>::infinity();
+            const float zero_v = 0.0f, neg_v = -5.0f, huge_v = 2.0f * k_pad_boost_max;
+            const uint32_t too_many = static_cast<uint32_t>(x.w.buildings.size() + 1);
+            bool sall = true;
+            std::string swhy;
+            const auto sexpect = [&](bool c, const char* what) { sall = sall && c; if (!c) { swhy += " "; swhy += what; } };
+            sexpect(refused(poke(at, &too_many, 4)), "count>buildings");
+            sexpect(refused(poke(at + 4, &ghost, 4)), "ghost-pad");
+            if (not_pad != null_entity)
+                sexpect(refused(poke(at + 4, &not_pad, 4)), "not-a-launchpad");
+            sexpect(refused(poke(at + 8, &nan_v, 4)), "nan");
+            sexpect(refused(poke(at + 8, &inf_v, 4)), "inf");
+            sexpect(refused(poke(at + 8, &zero_v, 4)), "zero");
+            sexpect(refused(poke(at + 8, &neg_v, 4)), "negative");
+            sexpect(refused(poke(at + 8, &huge_v, 4)), "over-max");
+            if (padded.size() >= 2)
+            {
+                // Descending ids: the second record names the first's pad.
+                const entity_id first = padded.front();
+                sexpect(refused(poke(at + 4 + 8, &first, 4)), "not-ascending");
+            }
+            check(sall, "A16b",
+                  "a tampered boost section is refused whole (count, ghost pad, a building not a Launchpad, NaN, inf, "
+                  "zero, negative, over the maximum, ids not ascending)" + (swhy.empty() ? std::string() : " — FAILED:" + swhy));
+        }
 
         // Arrival clears it; a move records the node it left.
         for (int t = 3; t <= sa->arrival_tick; ++t)

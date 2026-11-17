@@ -310,15 +310,14 @@ run_record run_sequence(world& w, const recipe_registry& reg, bool verbose)
     {
         std::printf("T1 pin\n");
         check(!ranked.empty(), "the shared ranking names at least one route for the rival");
-        // BL-1407: the scorer's TRADE family (pin / shrink / unpin / reserve, and
-        // the Marketplace build below) is the corporation's alone (corp_ai.cpp,
-        // `trade_eligible` and the Marketplace candidate: `!actor.is_nation`);
-        // every rival is now a nation, so a rival pins NOTHING. A nation trade
-        // family would be a new widening of the grant (AI_OPPONENT.md § 11) —
-        // raised, not assumed — so these rows assert the boundary.
-        check(mine.empty(), "BL-1407: a rival NATION pins no manual trade (the trade family was the corporation's)");
-        check(count_reason(d1, rival, corp_decision_reason::trade_pin) == 0,
-              "BL-1407: the decision log carries no trade_pin for the rival nation");
+        // Ben, 2026-11-15 ("export to other markets"; TRADE.md § Who may trade, AI_OPPONENT.md
+        // § 11, "A rival's surplus may answer a glut"): the scorer's TRADE family (pin / shrink /
+        // unpin / reserve, and the Marketplace build below) runs for a rival NATION, on its own
+        // books. Until then it was the deleted corporation's alone (BL-1407), and these rows
+        // asserted that boundary.
+        check(!mine.empty(), "a rival NATION pins a manual trade on its own points (Ben, 2026-11-15)");
+        check(count_reason(d1, rival, corp_decision_reason::trade_pin) > 0,
+              "the decision log carries the rival nation's trade_pin");
         if (!mine.empty() && !ranked.empty())
         {
             const standing_trade& t = mine.front();
@@ -335,8 +334,8 @@ run_record run_sequence(world& w, const recipe_registry& reg, bool verbose)
         std::printf("T2 reserve\n");
         check(std::fabs(w.nations.at(rival).trade_reserve - manual_points(w, rival)) <= 1e-4f,
               "the rival's reserve equals its manual trades' points, same evaluation");
-        check(count_reason(d1, rival, corp_decision_reason::trade_reserve) == 0,
-              "BL-1407: no reserve correction for a rival nation (it pinned nothing)");
+        check(count_reason(d1, rival, corp_decision_reason::trade_reserve) > 0,
+              "the rival nation corrects its reserve to its pins, in the same evaluation");
     }
 
     // A second evaluation at unchanged prices: nothing to unpin, the held route
@@ -376,10 +375,10 @@ run_record run_sequence(world& w, const recipe_registry& reg, bool verbose)
         std::size_t still = 0;
         for (const standing_trade& t : w.trades)
             if (std::find(losing_ids.begin(), losing_ids.end(), t.id) != losing_ids.end()) ++still;
-        check(held_before == 0 && still == 0,
-              "BL-1407: a rival nation holds no manual trade to unpin");
-        check(count_reason(d3, rival, corp_decision_reason::trade_unpin) == 0,
-              "BL-1407: the decision log carries no trade_unpin for the rival nation");
+        check(held_before > 0 && still == 0,
+              "a rival nation unpins every manual trade of its own whose route now loses");
+        check(count_reason(d3, rival, corp_decision_reason::trade_unpin) > 0,
+              "the decision log carries the rival nation's trade_unpin");
         check(std::fabs(w.nations.at(rival).trade_reserve - manual_points(w, rival)) <= 1e-4f,
               "the reserve follows the manual points down");
     }
@@ -539,9 +538,9 @@ void run_marketplace_build(world& w, const recipe_registry& reg)
     }
 
     rig_spare(w, true, 1.0e6f);
-    // BL-1407: the Marketplace candidate is the corporation's (see T1).
-    check(!proposes(w, true), "BL-1407: a rival NATION, even with a margin route, spare goods, upkeep "
-                              "and Logistic Points, builds no Planetary Marketplace (the candidate was the corporation's)");
+    // Ben, 2026-11-15 (see T1): the Marketplace candidate runs for a rival nation.
+    check(proposes(w, true), "a rival NATION with a margin route, spare goods, upkeep and Logistic Points "
+                             "builds a Planetary Marketplace in that market (Ben, 2026-11-15)");
 }
 
 } // namespace

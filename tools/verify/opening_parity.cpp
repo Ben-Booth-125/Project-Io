@@ -42,6 +42,7 @@
 #include "harness_params.hpp"
 #include "scripting/lua_state.hpp"
 #include "world/campaign_settle.hpp"
+#include "world/corp_ai.hpp"
 #include "world/components.hpp"
 #include "world/building_profit.hpp"
 #include "world/economy_system.hpp"
@@ -503,6 +504,7 @@ int main(int argc, char** argv)
             std::map<entity_id, double> flow_prev;
             for (const entity_id nid : majors)
                 if (const auto it = w.nations.find(nid); it != w.nations.end()) flow_prev[nid] = it->second.treasury;
+            nation_build_tally_log().clear(); // BL-1651: count the play window only
             for (int k = 1; k <= quarters; ++k)
             {
                 const int day = k * k_econ_tick_days;
@@ -594,6 +596,17 @@ int main(int argc, char** argv)
                             " wages=%.2f interest=%.2f levies=%.2f upkeep=%.2f taxes=%.2f research=%.2f refunds=%.2f outside=%.2f\n",
                             seed, tt, mt, static_cast<unsigned long long>(nid), quarters, fs[0] / n, fs[1] / n, fs[2] / n,
                             fs[3] / n, fs[4] / n, fs[5] / n, fs[6] / n, fs[7] / n, fs[8] / n, fs[9] / n, fs[10] / n);
+            }
+            for (const entity_id nid : majors) // BL-1651: what became of the nation's build candidates
+            {
+                const nation_build_tally t = nation_build_tally_log()[nid];
+                const double e = t.evals > 0 ? static_cast<double>(t.evals) : 1.0;
+                std::printf("BUILDS seed=%d nation=%llu evals=%d cands=%d applied=%d capped=%d floor_gated=%d"
+                            " room_gated=%d refused=%d rechecked=%d uncommitted=%.1f floor=%.1f treasury=%.1f gated_spend=%.1f\n",
+                            seed, static_cast<unsigned long long>(nid), t.evals, t.cands, t.applied, t.capped,
+                            t.floor_gated, t.room_gated, t.refused, t.rechecked, t.uncommitted / e, t.floor / e,
+                            t.treasury / e,
+                            (t.floor_gated + t.room_gated) > 0 ? t.spend_gated / (t.floor_gated + t.room_gated) : 0.0);
             }
             for (std::size_t g = 0; g < resource_count; ++g)
                 if (g_n[g] > 0)
