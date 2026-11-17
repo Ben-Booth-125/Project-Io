@@ -1979,7 +1979,7 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 - The app is in-game and no ImGui text field has keyboard focus.
 - The current rung is not at its zoom bound in that direction.
 
-**Expected output.** The view zooms about the canvas centre. On the Planetary rung a press lands on the next rung of the fixed x2 ladder (same ladder as the wheel; the baked ground reads the next level of the body's one master at once — detail does not change with zoom, only scale; the land is viewed at one 22.5-degree angle at every rung and under every lens; the drawn zoom glides to it over 0.18 s about the canvas centre, and under --verify lands at once, BL-1653); on the other rungs it is a continuous x1.1 change. No selection or lens state changes.
+**Expected output.** The view zooms about the canvas centre. On the Planetary rung a press lands on the next rung of the fixed x2 ladder (same ladder as the wheel; the baked ground reads the next level of the body's one master at once — detail does not change with zoom, only scale; the land is a 3D surface under a camera whose tilt follows the zoom; the drawn zoom glides to it over 0.18 s about the canvas centre, and under --verify lands at once, BL-1653); on the other rungs it is a continuous x1.1 change. No selection or lens state changes.
 
 **Reason to select.** Zoom without the mouse — the keyboard leg of the pan/zoom pair for keyboard-only driving.
 
@@ -2012,7 +2012,7 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 - The pointer is over the primary canvas, not the minimap inset or an ImGui panel.
 - The current rung is not already at its zoom bound in that direction (zoom is clamped per rung).
 
-**Expected output.** The view zooms about the cursor (the point under the mouse stays fixed). On the Planetary rung the zoom lands on the next rung of the fixed x2 ladder and the baked ground reads that rung's level of the body's one master, final on arrival (every level is a downsample of the same 96 px/hex image, so detail does not change with zoom, only scale). The land is viewed at ONE 22.5-degree angle at every rung and under every lens, so neither a zoom step nor a lens toggle moves the map; fractional wheel deltas accumulate and a rung fires per whole notch, at most one rung per frame. The drawn zoom glides to the new rung over 0.18 s, holding the point under the cursor; the rung itself (the zoom state) changes at once, and under --verify the step is instant (BL-1653). On the Solar and Circumplanetary rungs zoom is continuous (x1.1 per notch). No selection or lens state changes.
+**Expected output.** The view zooms about the cursor (the point under the mouse stays fixed). On the Planetary rung the zoom lands on the next rung of the fixed x2 ladder and the baked ground reads that rung's level of the body's one master, final on arrival (every level is a downsample of the same 96 px/hex image, so detail does not change with zoom, only scale). The land is a 3D surface under a camera whose tilt follows the zoom, and a lens toggle never moves the map; fractional wheel deltas accumulate and a rung fires per whole notch, at most one rung per frame. The drawn zoom glides to the new rung over 0.18 s, holding the point under the cursor; the rung itself (the zoom state) changes at once, and under --verify the step is instant (BL-1653). On the Solar and Circumplanetary rungs zoom is continuous (x1.1 per notch). No selection or lens state changes.
 
 **Reason to select.** Move closer to or further from a specific spot — cursor anchoring means you aim the zoom at the thing you are interested in.
 
@@ -4133,7 +4133,7 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 **Valid when:**
 - Options window open.
 
-**Expected output.** The planetary map's land takes the chosen brightness: at once on the GPU renderer (drawn by the ground_lift shader, per tile, so a river's water on a land tile lifts with it), or re-baked over the next moments (the view first) on the software renderer, where water - sea, lakes and rivers - keeps its colour. Persists to options.cfg immediately. Sim, view and selection untouched.
+**Expected output.** The planetary map's land takes the chosen brightness at once, drawn by the 3D ground pass per tile (a river's water on a land tile lifts with it); nothing re-bakes. Persists to options.cfg immediately. Sim, view and selection untouched.
 
 **Reason to select.** To make the map's land read brighter or darker on this display.
 

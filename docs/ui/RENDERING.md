@@ -199,8 +199,14 @@ ground retires only as coverage arrives.
 
   **Under `--verify` everything a frame draws is complete before the frame
   returns:** the master chunks under the view bake on the pool and the main
-  thread waits for them; every visible texture uploads with no budget; no
+  thread waits for them; every visible texture uploads, and every chunk mesh
+  of the 3D ground builds, with no budget; no
   pre-bake or background bake runs — a capture must never race the pool.
+  The canvas asks for the next frame's ground, so a capture first renders until
+  the canvas asks for nothing the bake has not covered and every chunk under the
+  view is on the GPU, then one frame more (the 3D pass draws from the last frame's
+  camera): a capture taken straight after a zoom, a pan or a lens shows its own
+  view's ground, not the last one's.
   (The home master is ~1-3 minutes of pool time, paid by the first
   whole-body framing of a run.) So the master **never fills by itself**
   under `--verify`: it holds what the views so far have covered. A script
@@ -737,8 +743,7 @@ zoom; the two closest rungs add a draw-time detail texture (Ben, 2026-11-15, bel
   Io's fragment shaders, the ground shader modulates the land's **luminance only**, by a
   tiling **detail texture** chosen per terrain family, so close zoom stays crisp past the
   master's 96 px per hex (and past the ~2x magnification of a 4K-height window). Nothing is
-  baked: the bake and its chain are unchanged, and the software renderer (every `--verify`
-  capture) draws no detail.
+  baked: the bake and its chain are unchanged. The 3D pass applies it (§ The 3D ground).
   - **Four families**, one greyscale texture each, packed into the four channels of one
     texture: **vegetation** (grass, scrub, marsh; bare sedimentary ground), **forest**,
     **arid** (dunes, ash, salt; bare barren ground) and **rock** (snow, urban; bare rocky,
@@ -865,8 +870,7 @@ zoom; the two closest rungs add a draw-time detail texture (Ben, 2026-11-15, bel
     no ink is drawn against it, so the map does not leak a coast the player has not seen.
   - **Drawn by the ground shader, over the images.** A per-tile map table carries each tile's
     colour and river sides; the canvas's washes, border rule and strokes draw over the map as
-    over the painting. Where the renderer runs no shaders (every `--verify` capture), the
-    farthest rung stays the painting.
+    over the painting.
 - **No rung is wider than the whole grid (Ben, 2026-11-16).** A ~3 px rung was tried and
   cancelled the same day: it shows the same land several times across the cylinder's wrap,
   which confuses more than the wider view helps.
@@ -947,16 +951,15 @@ Judged against `docs/ui/design/renders/map/`. What it asks of the bake, procedur
   lift off. The player sees the setting as **Brightness** (Ben, 2026-11-15); "land lift" stays
   the design's name for the pass.
 - **The lift at draw time (BL-1659, live grade shader; NR-1226 option D, Ben 2026-11-15).**
-  Where the renderer runs Io's fragment shaders, the canvas's ground bakes **without** the lift
-  and the `ground_lift` shader applies the same curve as it draws, so a change of level is
-  instant and re-bakes nothing. The land weight there is **per tile**, not per pixel: a table of
-  one texel per tile (land = seen and not ocean, coast or lake, the bake's own class), looked up
-  from each pixel's screen position through the inverse camera. So the lifted shore is the
+  The canvas's ground bakes **without** the lift and the 3D pass (§ The 3D ground) applies the
+  same curve as it draws, so a change of level is instant and re-bakes nothing. The land weight
+  there is **per tile**, not per pixel: a table of one texel per tile (land = seen and not
+  ocean, coast or lake, the bake's own class), looked up at each point of the ground. So the
+  lifted shore is the
   **hex side**, softened over a short band, not the painted coast, and a river's water on a land
   tile lifts with its tile. The opaque chunks stay RGB (§ Resident set): no per-pixel weight is
   stored. The Selection band's neighbourhood page, which no shader draws, still bakes the lift.
-  The software renderer (every `--verify` capture) bakes the lift as before, so captures do not
-  move. If the hex-side shore shows at play zooms, the fallback is a half-resolution land mask
+  If the hex-side shore shows at play zooms, the fallback is a half-resolution land mask
   per chunk (NR-1226 option B).
 - **Palette and value.** Base hues take **it1's colour** — warm olive and khaki, rich green
   forest, white peaks, blue-green sea — not C-F's grey (the grade's desaturation eases to
@@ -1103,7 +1106,8 @@ view; tile height ×4 canonical units; bumps at twice the detail layer's; the su
 - **Headless:** chunk invalidation (a build dirties exactly the intersecting
   chunks; nothing else re-bakes) and brush-manifest integrity are display-free
   checks.
-- Captures stay machine-portable: same rasteriser path, bundled cwd-relative assets.
+- Captures use bundled cwd-relative assets, but the ground is rasterised by the GPU
+  device: a ground golden holds on the machine that blessed it.
 
 Design owners: BL-732 (ground bake renderer) — the mechanism; BL-733 (biome brush &
 structure art pipeline) — the authored assets; BL-734 (ground/chrome layer contract)

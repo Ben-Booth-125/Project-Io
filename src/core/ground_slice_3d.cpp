@@ -163,6 +163,7 @@ struct state
     std::size_t n_vertices = 0, n_triangles = 0, n_building_tris = 0;
     double build_ms = 0, submit_ms = 0;
     int built_this_frame = 0, pending = 0;
+    bool unbudgeted = false; // set_unbudgeted: no mesh time budget (--verify)
     // The textures the heights read: the coarse detail (one channel per family) and the
     // rolling ground, CPU copies.
     int det_n = 0, roll_n = 0;
@@ -1299,6 +1300,7 @@ bool begin_frame(SDL_Renderer* renderer, const view& v)
 }
 
 bool active() { return g.active; }
+void set_unbudgeted(bool on) { g.unbudgeted = on; }
 
 bool project(float cx, float cy, float& sx, float& sy)
 {
@@ -1512,7 +1514,7 @@ void update_meshes(const inputs& in)
     for (const want& w : todo)
     {
         const double used_us = static_cast<double>(SDL_GetPerformanceCounter() - t0) * 1e6 / freq;
-        if (g.built_this_frame > 0 && used_us > k_mesh_budget_us)
+        if (!g.unbudgeted && g.built_this_frame > 0 && used_us > k_mesh_budget_us)
             break;
         chunk_mesh& m = g.meshes[static_cast<std::size_t>(w.i)];
         if (build_chunk(m, in.src.get()))

@@ -27,10 +27,6 @@ enum class effect : int
     lens_wash,    ///< a lens wash from a per-tile colour table (BL-1656; uniforms: float4, x = edge band)
     border_band,  ///< the national border rule from an owner table (BL-1657; uniforms: float4)
     water_glint,  ///< moving light on open water from a water table (BL-1660; uniforms: float4)
-    ground,       ///< the ground images with the land lift (BL-1659) and close-zoom detail (BL-1658) at draw
-                  ///< time, and the far rung's flat map (BL-1661); a tile table at slot 1, the
-                  ///< coarse and fine detail textures at slots 2 and 3, the map table at slot 4,
-                  ///< the rolling ground at slot 5; uniforms: float4 x7
     drape,        ///< the 3D ground's marks over its frame: the draw's texture is the frame's
                   ///< drape coordinates, the drape itself at slot 1 (bind_textures)
     count

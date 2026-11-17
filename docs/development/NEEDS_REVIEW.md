@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*110 entries — 54 open, 56 resolved.*
+*110 entries — 53 open, 57 resolved.*
 
 ---
 
@@ -584,21 +584,6 @@ The item named a signed distance field. The pass instead reads a one-texel-per-t
 > **Recommendation:** Keep it; the border rule follows hex edges by design (PLANETARY.md).
 
 *Files: `src/shaders/border_band.frag.hlsl`, `docs/ui/PLANETARY.md`*
-
-### NR-1230 — The flat ground stays on the software path: --verify captures still draw the squashed 2D map
-*question · raised 2026-11-16 · from BL-1671 (flat ground retired), sprint 68*
-
-On the GPU renderer the canvas now draws only the 3D ground: the squash is off, marks are draped, markers stand upright and clicks ray-pick. The software renderer (every --verify capture, and any machine without a GPU device) cannot run the 3D pass, so it still draws the flat, squashed map. Retiring that path too means moving --verify onto the GPU renderer, which moves every canvas golden and capture at once.
-
-**Why it matters.** Until it moves, a green visual run proves the 2D map, not the 3D one the player sees. Moving it is a bulk re-bless, which the golden policy reserves for you.
-
-- Keep the software path as the --verify map for now; check the 3D canvas by live click
-- Move --verify to the GPU renderer and re-bless the canvas captures once
-- Delete the 2D path and refuse to run the canvas without a GPU device
-
-> **Recommendation:** Keep it for now, then take the one re-bless when the 3D defaults settle.
-
-*Files: `src/ui/body_surface_canvas.cpp`, `src/core/ground_slice_3d.cpp`, `docs/ui/RENDERING.md`*
 
 ---
 
@@ -1444,6 +1429,23 @@ SDL 3.4's GPU renderer wraps an external SDL_GPUTexture (SDL_PROP_TEXTURE_CREATE
 > **RESOLVED.** Ben, 2026-11-16: option A. Vendor stb_dxt and measure BC1 encode time per 512 px chunk; decide the format from the numbers.
 
 *Files: `src/core/gpu_effects.cpp`, `docs/ui/RENDERING.md`*
+
+### NR-1230 — The flat ground stays on the software path: --verify captures still draw the squashed 2D map
+*question · raised 2026-11-16 · from BL-1671 (flat ground retired), sprint 68*
+
+On the GPU renderer the canvas now draws only the 3D ground: the squash is off, marks are draped, markers stand upright and clicks ray-pick. The software renderer (every --verify capture, and any machine without a GPU device) cannot run the 3D pass, so it still draws the flat, squashed map. Retiring that path too means moving --verify onto the GPU renderer, which moves every canvas golden and capture at once.
+
+**Why it matters.** Until it moves, a green visual run proves the 2D map, not the 3D one the player sees. Moving it is a bulk re-bless, which the golden policy reserves for you.
+
+- Keep the software path as the --verify map for now; check the 3D canvas by live click
+- Move --verify to the GPU renderer and re-bless the canvas captures once
+- Delete the 2D path and refuse to run the canvas without a GPU device
+
+> **Recommendation:** Keep it for now, then take the one re-bless when the 3D defaults settle.
+
+> **RESOLVED.** Ben, 2026-11-17 ("Let's work on BL-1671"): options B and C. --verify runs the GPU renderer and bakes the 3D ground; the flat ground draw, the squash camera and the fixed-angle ground shader are deleted; a renderer with no GPU device draws no ground and says so. The two ground goldens were re-blessed once on the GPU renderer.
+
+*Files: `src/ui/body_surface_canvas.cpp`, `src/core/ground_slice_3d.cpp`, `docs/ui/RENDERING.md`*
 
 ### NR-1231 — Compressed ground textures: BC1 measures cheap and close to lossless - build the GPU path, or close the spike?
 *question · raised 2026-11-16 · from BL-1662 (compressed ground textures) spike, sprint 68*

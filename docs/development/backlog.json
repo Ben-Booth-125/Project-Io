@@ -1786,7 +1786,7 @@
       "design": "RENDERING.md § Ambient animation (overlay, never baked; render-side clock; pinned to phase 0 under --verify). The shader replaces the flipbook overlay design for water: a water mask from the bake, two scrolling normal fields lit by the NW sun, foam where the shore shelf sits. No-shader path: the static bake. DELIVERED 2026-11-14: water_glint.frag draws a moving specular glint over a water table, faded toward the shore and in from 16-40 px hexes; no foam. Live-checked at close zoom: the glints move between frames."
     },
     {
-      "glyph": "~",
+      "glyph": "✓",
       "sprint": 68,
       "version_goal": null,
       "written": "2026-11-14",
@@ -1798,7 +1798,7 @@
       "authority_doc": "docs/ui/RENDERING.md",
       "id": "BL-1661",
       "short_name": "FAR_ZOOM_CARTOGRAPHIC_MAP",
-      "status": "designed",
+      "status": "complete",
       "priority": "C",
       "difficulty": 3,
       "title": "At the whole-grid rung the ground gives way to a stylised map",
@@ -1806,7 +1806,7 @@
         "src/core/ground_layer.cpp",
         "src/ui/body_surface_canvas.cpp"
       ],
-      "design": "RENDERING.md § Level of detail, \"The farthest rung is a flat map\" (Ben, 2026-11-16: flat map cross-faded from the 12 px rung; national colour, inked coastlines, rivers as lines). WORK: a per-tile map table (colour, river sides, survey) and the ground shader's map pass, weighted by drawn radius."
+      "design": "RENDERING.md § Level of detail, \"The farthest rung is a flat map\" (Ben, 2026-11-16: flat map cross-faded from the 12 px rung; national colour, inked coastlines, rivers as lines). WORK: a per-tile map table (colour, river sides, survey) and the ground shader's map pass, weighted by drawn radius. BUILT in the sprint 68 ground commit; the map table now feeds the 3D pass."
     },
     {
       "glyph": "✗",
@@ -1858,7 +1858,7 @@
       "design": "RENDERING.md § Roads and sea lanes. FOUND 2026-11-14 while delivering BL-1652 (gamma-correct mips): ground_bake_check --routes fails 8 assertions with main's ground_bake.cpp (224020d6) and identically with the new downsample. Failing: P28 the highway (93 px moved), track (46 px), town, works and forecourt surfaces (0 px moved) draw; P29 a works tile a road meets takes its roaded variant; P33 no staged road comes within a roaded cluster's disc plus its half-width; P34 every road set draws. WORK: find which change broke them (git bisect over the route pass and the structure plan), then decide per row whether the bake or the check is wrong. Do not weaken a row to pass: a check that no longer matches a ruled design is re-derived from the doc, never loosened. DELIVERED 2026-11-14: the check now stages road_sides from the staged tiers before each rederive; P30's upgrade raises one whole crossing. ground_bake_check 163 PASS, 0 failures."
     },
     {
-      "glyph": "~",
+      "glyph": "✓",
       "sprint": 68,
       "version_goal": null,
       "written": "2026-11-16",
@@ -1867,7 +1867,7 @@
       "requires": [],
       "author": "Claude (Ben, 2026-11-16: \"Shader now, 3D slice\")",
       "category": "UI",
-      "status": "designed",
+      "status": "complete",
       "priority": "B",
       "authority_doc": "docs/ui/RENDERING.md",
       "id": "BL-1664",
@@ -1878,10 +1878,10 @@
         "src/shaders/ground.frag.hlsl",
         "src/ui/body_surface_canvas.cpp"
       ],
-      "design": "RENDERING.md § Level of detail, \"Depth at the fixed angle\" (Ben, 2026-11-16: \"more elevation, shadows, and possibly animations on the texture\", answered \"Shader now, 3D slice\"). WORK: parallax-occlusion relief on the detail bumps along the view tilt, a long shadow march over the height field toward the light, and wind gusts and drifting sand on the detail textures, all in the ground shader with the static bake as the no-shader path. SUPERSEDED (2026-11-16) by the 3D ground: its wind and sand carry into BL-1667 GROUND_3D_DETAIL; its parallax and shadow marches retire."
+      "design": "RENDERING.md § Level of detail, \"Depth at the fixed angle\" (Ben, 2026-11-16: \"more elevation, shadows, and possibly animations on the texture\", answered \"Shader now, 3D slice\"). WORK: parallax-occlusion relief on the detail bumps along the view tilt, a long shadow march over the height field toward the light, and wind gusts and drifting sand on the detail textures, all in the ground shader with the static bake as the no-shader path. SUPERSEDED (2026-11-16) by the 3D ground: its wind and sand carry into BL-1667 GROUND_3D_DETAIL; its parallax and shadow marches retire. BUILT, then RETIRED with the flat ground by BL-1671 (flat ground retired): its wind and sand live on in the 3D pass."
     },
     {
-      "glyph": "~",
+      "glyph": "✓",
       "sprint": 68,
       "version_goal": null,
       "written": "2026-11-16",
@@ -1890,7 +1890,7 @@
       "requires": [],
       "author": "Claude (Ben, 2026-11-16: \"Shader now, 3D slice\")",
       "category": "UI",
-      "status": "designed",
+      "status": "complete",
       "priority": "B",
       "authority_doc": "docs/tech/TECH_FOUNDATIONS.md",
       "id": "BL-1665",
@@ -1898,7 +1898,7 @@
       "difficulty": 4,
       "title": "A 3D vertical slice: one heightmesh chunk in the painted style, measured",
       "files": [],
-      "design": "TECH_FOUNDATIONS.md § Rendering dimension, \"Toward 3D, in two steps\" (Ben, 2026-11-16). WORK: draw one ground chunk as a heightmesh with a depth buffer on the SDL GPU device behind the GPU renderer, textured from the bake and shaded in the C-F style, composited as the ground layer; report the frame cost, the code it took, the device-sharing answer, and captures beside the fixed-angle ground, for Ben to judge true 3D against the fixed angle. A measurement, not a renderer: no camera, no layer replaced. READING (2026-11-16, SDL 3.4 headers): the device can be shared - SDL_GetGPURendererDevice returns the GPU renderer's own SDL_GPUDevice, so the slice renders the mesh with a depth target into an SDL_GPUTexture on it, and SDL_PROP_TEXTURE_CREATE_GPU_TEXTURE_POINTER wraps that texture as an SDL_Texture the canvas draws like a chunk. Open: ordering the slice's command buffer against the renderer's own (SDL_FlushRenderer before submit), measured in the slice. VERDICT (Ben, 2026-11-16): \"I much prefer the 3D look ... work with just 3D from now on\" - the ground is 3D (RENDERING.md § The 3D ground); the slice is the seed of BL-1666 GROUND_3D_CANVAS."
+      "design": "TECH_FOUNDATIONS.md § Rendering dimension, \"Toward 3D, in two steps\" (Ben, 2026-11-16). WORK: draw one ground chunk as a heightmesh with a depth buffer on the SDL GPU device behind the GPU renderer, textured from the bake and shaded in the C-F style, composited as the ground layer; report the frame cost, the code it took, the device-sharing answer, and captures beside the fixed-angle ground, for Ben to judge true 3D against the fixed angle. A measurement, not a renderer: no camera, no layer replaced. READING (2026-11-16, SDL 3.4 headers): the device can be shared - SDL_GetGPURendererDevice returns the GPU renderer's own SDL_GPUDevice, so the slice renders the mesh with a depth target into an SDL_GPUTexture on it, and SDL_PROP_TEXTURE_CREATE_GPU_TEXTURE_POINTER wraps that texture as an SDL_Texture the canvas draws like a chunk. Open: ordering the slice's command buffer against the renderer's own (SDL_FlushRenderer before submit), measured in the slice. VERDICT (Ben, 2026-11-16): \"I much prefer the 3D look ... work with just 3D from now on\" - the ground is 3D (RENDERING.md § The 3D ground); the slice is the seed of BL-1666 GROUND_3D_CANVAS. BUILT (the slice); grown into the 3D canvas ground."
     },
     {
       "glyph": "✓",
@@ -2017,7 +2017,7 @@
       "design": "RENDERING.md § The 3D ground, \"Buildings are procedural geometry\", and § Installations, \"Structures stand up as geometry\". WORK: lift the installation pass's structure layout (sheds, tanks, towers, a town's blocks) into a mesh of boxes, pitched roofs and cylinders per chunk, lit and shadow-mapped with the ground; the bake keeps only ground parts and roads."
     },
     {
-      "glyph": "~",
+      "glyph": "✓",
       "sprint": 68,
       "version_goal": null,
       "written": "2026-11-16",
@@ -2026,7 +2026,7 @@
       "requires": [],
       "author": "Claude (Ben, 2026-11-16: \"work with just 3D from now on\", design form)",
       "category": "UI",
-      "status": "designed",
+      "status": "complete",
       "authority_doc": "docs/ui/RENDERING.md",
       "id": "BL-1671",
       "short_name": "GROUND_FLAT_RETIRED",
@@ -2036,6 +2036,9 @@
       "files": [
         "src/ui/body_surface_canvas.cpp",
         "src/core/app.cpp",
+        "src/core/verify_api.cpp",
+        "src/core/gpu_effects.cpp",
+        "src/shaders/ground.frag.hlsl",
         "scripts/verify"
       ],
       "design": "TECH_FOUNDATIONS.md § Rendering dimension, \"The ground is 3D\" (Ben, 2026-11-16: remove the flat ground entirely). WORK: --verify runs the GPU renderer for the planetary canvas; ground checks move to structural asserts and tolerance compares; then the flat ground draw, the fixed-angle ground shader passes and the squash camera are deleted. Ordered after the drape and the pick, which replace what the flat path still does."
@@ -2063,6 +2066,31 @@
         "src/core/ground_slice_3d.cpp"
       ],
       "design": "RENDERING.md § The 3D ground, \"Trees stand in 3D\". WORK: scatter seeded low-poly trees (conifer cones, broadleaf crowns) over forest and scrub tiles by cover density, off roads, rivers and installations, into each close chunk's building mesh, lit and shadowed by the sun; the painted canopy stays as the forest floor."
+    },
+    {
+      "glyph": "~",
+      "sprint": null,
+      "version_goal": null,
+      "written": "2026-11-17",
+      "parked": false,
+      "blocked_on": null,
+      "requires": [],
+      "author": "Claude (found running the BL-1671 (flat ground retired) checks, 2026-11-17)",
+      "category": "UI",
+      "status": "designed",
+      "authority_doc": "docs/ui/SELECTION.md",
+      "id": "BL-1674",
+      "short_name": "STALE_PRESS_CHECKS",
+      "priority": "C",
+      "difficulty": 2,
+      "title": "Three visual checks assert rules that changed: a canvas press on a building, and a muster fixture that cannot hire",
+      "files": [
+        "scripts/verify/click_injection.lua",
+        "scripts/verify/ground_bake.lua",
+        "scripts/verify/lib.lua",
+        "scripts/verify/unit_counter.lua"
+      ],
+      "design": "SELECTION.md § Multi-building tiles (Ben, 2026-10-13, BL-1312): a canvas press on a building selects the TILE; the Building rung is reached by the repeat-click cycle, ledger rows and the grid. Three checks still assert the older rule and fail on the flat path and the 3D ground alike (measured 2026-11-17, a flat control run with IO_NO_GPU_RENDERER=1 against the GPU run): click_injection.lua C3b, C3d and C4 (the first press \"resolved the BUILDING marker\"), and ground_bake.lua's nine \"a press on a single-building tile selects the building\" asserts. WORK: restate each against the tile-first rule (first press = the tile; the repeat press = the next live rung). SEPARATELY: unit_counter.lua errors in lib.lua raise_player_force - \"no roster row could be hired onto it: rejected_no_recruits x16\" - a world-side fixture fault, not the canvas; find why the muster base has no recruits."
     }
   ]
 }

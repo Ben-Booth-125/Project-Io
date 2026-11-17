@@ -82,20 +82,20 @@ live grade, water) can run at draw time instead of being baked. This is still th
 textured quads and ImGui draw lists, no depth, no 3D terrain (§ Rendering dimension). ImGui and
 its SDLRenderer3 backend stay. Every shader pass has a **no-shader path** — what it draws when the
 renderer cannot take a GPU render state — so the app runs on any renderer, and nothing in `world/*`
-reads a shader's output. Which renderer `--verify` captures with, once a shader pass exists, is
-an open question owned by BL-1655 (shader seam), not settled here.
+reads a shader's output. `--verify` captures through the GPU renderer, like play (§ Rendering
+dimension, "The ground is 3D").
 
-**The seam (BL-1655, shader seam).** The app asks SDL for its `gpu` renderer with DXIL shaders
-(`IO_NO_GPU_RENDERER` or an explicit `SDL_RENDER_DRIVER` keeps the default one); `--verify` sets
-the software driver, so captures draw every no-shader path. Shaders are HLSL in `src/shaders/`,
+**The seam (BL-1655, shader seam).** The app asks SDL for its `gpu` renderer with DXIL shaders,
+`--verify` included (`IO_NO_GPU_RENDERER` keeps SDL's default one, where the planetary canvas
+has no ground). Shaders are HLSL in `src/shaders/`,
 compiled at build time by the Windows SDK's DXC into C headers; a build without DXC has no
 shaders and runs its no-shader paths. `core/gpu_effects` holds one `SDL_GPURenderState` per
 **effect**: a canvas brackets the draws an effect covers with `gfx::begin` / `gfx::end`, which
 record ImGui draw-list callbacks, so the switch lands exactly between the draws it brackets.
 An effect reads the draw's own texture at slot 0, may bind extra textures, takes one uniform
 block, and may read a small **table texture** (one texel per tile) re-uploaded only when it
-changes. `identity` — the texture times the vertex colour, exactly SDL's own shader — brackets
-the ground images as the seam's standing self-check.
+changes. `identity` — the texture times the vertex colour, exactly SDL's own shader — is the
+seam's standing self-check.
 
 SFML was ruled out due to slower evolution and a C++ OOP API that works against a data-oriented simulation model. Raylib was ruled out because its built-in main loop and camera abstractions create friction when building a custom engine with a separate simulation tick and multiple distinct view systems.
 

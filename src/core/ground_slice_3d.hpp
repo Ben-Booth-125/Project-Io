@@ -51,6 +51,9 @@ void set_tiles(const std::uint32_t* tiles, int gw, int gh);
 bool begin_frame(SDL_Renderer* renderer, const view& v);
 /// Whether the 3D ground ran this frame (begin_frame returned true).
 bool active();
+/// Builds every chunk mesh in view within the frame, with no time budget (--verify:
+/// everything a frame draws is complete before the frame returns).
+void set_unbudgeted(bool on);
 
 /// A canonical ground point to a screen point (logical px), at the ground's height there.
 /// False behind the camera.

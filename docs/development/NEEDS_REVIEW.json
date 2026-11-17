@@ -1948,7 +1948,7 @@
    "title": "The flat ground stays on the software path: --verify captures still draw the squashed 2D map",
    "raised": "2026-11-16",
    "kind": "question",
-   "status": "open",
+   "status": "resolved",
    "source": "BL-1671 (flat ground retired), sprint 68",
    "what": "On the GPU renderer the canvas now draws only the 3D ground: the squash is off, marks are draped, markers stand upright and clicks ray-pick. The software renderer (every --verify capture, and any machine without a GPU device) cannot run the 3D pass, so it still draws the flat, squashed map. Retiring that path too means moving --verify onto the GPU renderer, which moves every canvas golden and capture at once.",
    "why_it_matters": "Until it moves, a green visual run proves the 2D map, not the 3D one the player sees. Moving it is a bulk re-bless, which the golden policy reserves for you.",
@@ -1963,7 +1963,7 @@
     "src/core/ground_slice_3d.cpp",
     "docs/ui/RENDERING.md"
    ],
-   "resolution": null
+   "resolution": "Ben, 2026-11-17 (\"Let's work on BL-1671\"): options B and C. --verify runs the GPU renderer and bakes the 3D ground; the flat ground draw, the squash camera and the fixed-angle ground shader are deleted; a renderer with no GPU device draws no ground and says so. The two ground goldens were re-blessed once on the GPU renderer."
   },
   {
    "id": "NR-1231",

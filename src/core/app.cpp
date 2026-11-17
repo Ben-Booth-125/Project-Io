@@ -253,14 +253,14 @@ app::app()
     }
 
     // BL-1655 (shader seam): SDL's GPU renderer, which can run Io's fragment shaders
-    // (gpu_effects), unless a driver is forced - `--verify` and its goldens force the
-    // software renderer through SDL_RENDER_DRIVER, and that path must stay exactly as
-    // it was - or IO_NO_GPU_RENDERER is set. A GPU renderer that cannot be made falls
-    // back to SDL's default choice, and every shader pass then draws its no-shader path.
+    // (gpu_effects) and the 3D ground. `--verify` runs it too (BL-1671 (flat ground
+    // retired)): the planetary canvas draws only the 3D ground, so a capture on any other
+    // renderer would hold no ground at all. IO_NO_GPU_RENDERER opts out. A GPU renderer
+    // that cannot be made falls back to SDL's default choice, where the canvas says it
+    // needs a GPU device and every other shader pass draws its no-shader path.
     {
-        const char* forced = SDL_GetHint(SDL_HINT_RENDER_DRIVER);
         const char* no_gpu = SDL_getenv("IO_NO_GPU_RENDERER");
-        if ((!forced || !*forced) && !(no_gpu && *no_gpu && *no_gpu != '0'))
+        if (!(no_gpu && *no_gpu && *no_gpu != '0'))
         {
             const SDL_PropertiesID props = SDL_CreateProperties();
             SDL_SetPointerProperty(props, SDL_PROP_RENDERER_CREATE_WINDOW_POINTER, m_window);
@@ -277,6 +277,13 @@ app::app()
     }
     SDL_SetRenderVSync(m_renderer, 1);
     gfx::init(m_renderer);
+    // THE 3D GROUND (RENDERING.md § The 3D ground, Ben 2026-11-16): the canvas ground is
+    // the lit heightmesh, so the bake is taken straight down, installations stand as
+    // geometry, not paint, and the land lift is applied at draw by the 3D pass. Set here,
+    // before either path forks, so --verify bakes exactly the ground the player sees.
+    m_ground.params.flat_master = true;
+    m_ground.params.standing    = false;
+    m_ground.set_lift_at_draw(true);
 
     // Record the display environment on startup so the runtime resolution is on the
     // log. Verify captures render at the fixed verify_w×verify_h (run_verify resizes
@@ -443,18 +450,6 @@ int app::run(autostart_mode autostart)
     load_settings();
     apply_display_settings();
     m_ground.set_land_lift(m_settings.land_lift); // BL-1537: interactive only, like the rest
-    // BL-1659 (live grade shader): where the ground shader loaded, the canvas
-    // lifts the land at draw and the bake stops carrying it.
-    m_ground.set_lift_at_draw(gfx::loaded(gfx::effect::ground));
-    // THE 3D GROUND (RENDERING.md § The 3D ground, Ben 2026-11-16): where the GPU renderer
-    // runs, the canvas ground is the lit heightmesh, so the bake is taken straight down and
-    // installations stand as geometry, not paint. Interactive only, like the lift above:
-    // the --verify software path keeps the fixed-angle bake its goldens were taken from.
-    if (gfx::gpu_renderer())
-    {
-        m_ground.params.flat_master = true;
-        m_ground.params.standing    = false;
-    }
     apply_ui_scale();
 
     m_lua.load("scripts/init.lua");
@@ -3033,6 +3028,7 @@ void app::render()
                 // draw below. Texture work on the render thread, before the
                 // draw data is submitted.
                 m_ground.registry = &m_registry; // BL-1241: processing stamps key on the recipe family
+                m_ground_req_ticked = m_ui.ground_req;
                 m_ground.tick(m_renderer, m_world, m_ui, m_ground_bake_all);
                 // No lens-key anchor argument (Sprint 17b, one chrome home):
                 // every legend now asks ui::lens_chrome_rect for the one region —

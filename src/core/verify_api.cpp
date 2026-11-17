@@ -11,6 +11,7 @@
 #include <chrono>
 #include <thread>
 #include "app.hpp"
+#include "core/ground_slice_3d.hpp" // set_unbudgeted: whole 3D ground per capture
 #include "world/nation_tech.hpp"
 #include "world/economy_system.hpp" // BL-1453: advance_quarter_to for day_step
 #include "core/session_history.hpp" // BL-1453: day_step posts battle dispatches
@@ -926,6 +927,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     // BL-732: a capture must never race the ground cache's per-frame bake
     // budget — every chunk bakes synchronously for the whole batch.
     m_ground_bake_all = true;
+    gfx::slice::set_unbudgeted(true); // and the 3D ground builds every chunk mesh in view
 
     // Deterministic, non-interactive setup: fixed window (resized to verify_w/
     // verify_h below), seeded world, sim left paused so orbits and ticks never
@@ -1002,6 +1004,10 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     DisableProcessWindowsGhosting();
 #endif
     SDL_SyncWindow(m_window);
+    // No vsync: a verify frame is counted, never timed (the fixed frame clock), and on the
+    // GPU renderer (BL-1671 (flat ground retired)) a hidden window's swapchain would pace
+    // every present to the display for nothing.
+    SDL_SetRenderVSync(m_renderer, 0);
 
     m_verify_bless = bless;
 
@@ -1130,7 +1136,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         t["tier_ppr"]    = ppr;
         t["level_ppr"]   = ppr;
         t["texel_per_px"] = draw_r > 0.0f ? ppr / draw_r : 0.0;
-        t["sy"]          = ui::ground::k_tilt_sy;
+        t["sy"]          = m_ui.view_sy; // the 3D camera's, at the view centre
         t["chunks"]      = static_cast<int>(m_ui.ground.chunks.size());
         t["standin"]     = 0; // retired with the per-rung tiers (BL-1246)
         t["active_slot"] = s.active_slot;
@@ -8188,8 +8194,10 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
                 continue;
             sol::table e = st.create_table();
             e["id"]     = static_cast<unsigned int>(hz.id);
-            e["x"]      = hz.centre.x;
-            e["y"]      = m_ui.marker_tilt_pivot + (hz.centre.y - m_ui.marker_tilt_pivot) * m_ui.marker_tilt_sy;
+            // A standing counter is drawn at its anchor's projection: its flat point moved by
+            // the zone's shift (BL-1671 (flat ground retired): no squash remains).
+            e["x"]      = hz.centre.x + (hz.stands ? hz.shift.x : 0.0f);
+            e["y"]      = hz.centre.y + (hz.stands ? hz.shift.y : 0.0f);
             e["player"] = uit->second.owner == player_actor(m_world) || uit->second.owner == m_world.player_entity;
             out[i++] = e;
         }

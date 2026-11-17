@@ -23,7 +23,7 @@
 #include "presentation.hpp"
 #include "road_tool.hpp"        // BL-1370: the crossings an armed road press may reach
 #include "shell_metrics.hpp"     // right chrome column + minimap rect (BL-533 legend home)
-#include "ground_bake.hpp"      // k_tilt_sy: the one camera angle (BL-1246)
+#include "ground_bake.hpp"
 #include "world/battle_system.hpp" // first_battle_in (BL-469 battle rung)
 #include "world/economy_system.hpp" // march_hop_fraction: the glide reads the march's own bank (BL-1507)
 #include "world/hex_neighbors.hpp"   // canonical odd-r neighbour offsets (BL-363)
@@ -385,50 +385,37 @@ constexpr float k_detail_fine_strength = 0.14f;
 constexpr float k_detail_fine_period   = 2.0f; // 256 px over 2 units (Ben, 2026-11-16)
 constexpr float k_detail_r_none   = 24.0f;
 constexpr float k_detail_r_full   = 48.0f;
-/// BL-1661 (far-zoom cartographic map; RENDERING.md § Level of detail, "The farthest rung
-/// is a flat map"): the map's weight rises from none at a drawn hex radius of 16 px to
-/// full at 6 px (a third at the 12 px rung); paper, the share of a nation's colour on its
-/// land, flat water, and the ink half-widths in screen px.
 /// BL-1658 (close-zoom detail layer), the relief (Ben, 2026-11-16: "draw-time relief: lit
 /// bumps on a smooth height field, with short shadows"; RENDERING.md § Level of detail,
-/// "The ground has relief"): canonical units of rise per unit of tile height, each
-/// family's coarse bump height (full swing; vegetation, forest, arid, rock), the fine
-/// layer's share of it, and how far a full shadow darkens. Calibration, tuned by eye.
-constexpr float k_relief_height_scale = 16.0f;
+/// "The ground has relief"): each family's coarse bump height (full swing; vegetation,
+/// forest, arid, rock), the fine layer's share of it, and a mountain's multiple. The 3D
+/// pass reads them. Calibration, tuned by eye.
 constexpr float k_bump_vegetation     = 0.04f;
 constexpr float k_bump_forest         = 0.08f;
 constexpr float k_bump_arid           = 0.03f;
 constexpr float k_bump_rock           = 0.10f;
 constexpr float k_bump_fine_share     = 0.3f;
 constexpr float k_bump_mountain_mul   = 2.5f;  // a mountain tile's bumps stand this much taller
-constexpr float k_rolling_height      = 0.25f; // the draw-time rolling ground's full swing
-constexpr float k_rolling_period      = 12.0f; // its repeat, canonical units
-constexpr float k_shadow_depth        = 0.35f;
 /// Tiles read on their own (Ben, 2026-11-16: families looked alike and neighbours ran on
 /// as wallpaper): each tile reads the textures at its own offset, takes its own tone
-/// (full swing of the detail term), and each family carries its own strength. The height
-/// map's own slope shading is restated at draw time at this share (0..1).
+/// (full swing of the detail term), and each family carries its own strength.
 constexpr float k_tile_tone_swing     = 0.10f;
 constexpr float k_fam_vegetation      = 0.8f;
 constexpr float k_fam_forest          = 1.3f;
 constexpr float k_fam_arid            = 1.0f;
 constexpr float k_fam_rock            = 1.25f;
-constexpr float k_height_shade_share  = 1.0f;
-/// BL-1664 (fixed-angle depth; RENDERING.md § Level of detail, "Depth at the fixed angle"):
-/// the parallax depth as a multiple of the bump heights and the view's tilt (the bake's own
-/// lift per unit height, 0.9 tan 22.5 deg); the long shadow's reach (three hex radii) and
-/// depth; a gust's brightening and each blade's flutter inside it (brightness swings, not
-/// a moved lookup: Ben, 2026-11-16, a sway "looks more like the ground is warping"), sand's
-/// creep (canonical units a second), and each family's share of the wind. Calibration.
-constexpr float k_parallax_depth      = 2.0f;
-constexpr float k_parallax_tilt       = 0.3728f;
-constexpr float k_long_shadow_reach   = 3.0f;
-constexpr float k_long_shadow_depth   = 0.25f;
+/// The wind: a gust's brightening and each blade's flutter inside it (brightness swings,
+/// not a moved lookup: Ben, 2026-11-16, a sway "looks more like the ground is warping"),
+/// sand's creep (canonical units a second), and each family's share. Calibration.
 constexpr float k_gust_brighten       = 0.06f;
 constexpr float k_blade_flutter       = 0.12f;
 constexpr float k_sand_creep          = 0.008f;
 constexpr float k_wind_vegetation     = 1.0f;
 constexpr float k_wind_forest         = 0.6f;
+/// BL-1661 (far-zoom cartographic map; RENDERING.md § Level of detail, "The farthest rung
+/// is a flat map"): the map's weight rises from none at a drawn hex radius of 16 px to
+/// full at 6 px (a third at the 12 px rung); paper, the share of a nation's colour on its
+/// land, flat water, and the ink half-widths in screen px.
 constexpr float k_map_r_none        = 16.0f;
 constexpr float k_map_r_full        = 6.0f;
 constexpr float k_map_nation_share  = 0.45f;
@@ -3162,8 +3149,10 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     // transform is in hand, set the pan that places the requested tile's local
     // centre on the canvas centre — pan = (grid_centre − tile_local) · zoom. This
     // is the one place the centring math lives; Lua callers never replicate it.
+    bool centred_now = false; // the 3D camera re-publishes the point once it exists
     if (state.planetary_center_pending)
     {
+        centred_now = true;
         const ImVec2 lc = hex_local_centre(state.planetary_center_col,
                                            state.planetary_center_row, hex_size);
         state.planetary_pan_x = (grid_cx - lc.x) * target_zoom;
@@ -3912,23 +3901,16 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                          ? ImVec2{state.mouse.x, state.mouse.y}
                          : ImVec2{-1.0f, -1.0f}; // off-screen sentinel suppresses hover
 
-    // --- The camera: ONE angle (RENDERING.md § One angle; BL-1246) ----------
-    // The land is viewed at 22.5° at every rung and under every lens (Ben,
-    // 2026-10-09 — one angle is what makes one master possible, and toggling
-    // a lens never moves the map). The canvas keeps drawing entirely in FLAT
-    // ground space; one vertex-range squash over the map passes is the camera
-    // (the lens legend's vertices are excluded from it), and this inverse
-    // maps the real cursor into that flat space so every hit test works
-    // unchanged.
-    //
+    // --- The camera -------------------------------------------------------------
     // THE 3D GROUND (RENDERING.md § The 3D ground; Ben, 2026-11-16: "work with just 3D
-    // from now on"). Where the renderer runs on the GPU device, the ground is a heightmesh
-    // under a perspective camera whose tilt follows the zoom, and the squash is retired:
-    // the canvas still draws in FLAT ground space, now untilted, and that flat drawing is
+    // from now on"). The ground is a heightmesh under a perspective camera whose tilt
+    // follows the zoom. The canvas draws in FLAT ground space, and that flat drawing is
     // DRAPED over the terrain (rendered into a texture the ground shader lays on), while
     // the markers stand upright at their tile's projected point. The cursor is ray-picked
-    // into the same flat space, so every hit test still works in one space. The software
-    // path (--verify, a renderer with no GPU device) keeps the squash.
+    // into the same flat space, so every hit test still works in one space. There is no
+    // other ground (BL-1671 (flat ground retired)): a renderer with no GPU device draws the
+    // marks flat over an empty canvas and says it needs one, and a frame before the far
+    // page is ready draws the marks alone.
     const ImVec2 fb_scale = ImGui::GetIO().DisplayFramebufferScale;
     bool g3d = false;
     if (raster_ok && gw > 0 && gh > 0 && gfx::gpu_renderer()
@@ -3946,8 +3928,6 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         sv.fb = fb_scale.y;
         g3d = gfx::slice::begin_frame(gfx::renderer(), sv);
     }
-    const float  tilt_sy    = g3d ? 1.0f : planetary_tilt_sy(zoom);
-    const float  tilt_pivot = canvas_centre.y;
     // Canonical units (hex circumradius 1) <-> flat ground space.
     const auto flat_of_canon = [&](float x, float y) -> ImVec2 {
         return to_screen({ x * hex_size, y * hex_size });
@@ -3960,7 +3940,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     // camera cannot see it); and a screen point to the flat point of the ground under it.
     const auto view_pt = [&](ImVec2 p) -> ImVec2 {
         if (!g3d)
-            return { p.x, tilt_pivot + (p.y - tilt_pivot) * tilt_sy };
+            return p;
         const ImVec2 c = canon_of_flat(p);
         float sx = 0.0f, sy = 0.0f;
         if (gfx::slice::project(c.x, c.y, sx, sy))
@@ -3969,7 +3949,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     };
     const auto ground_pt = [&](ImVec2 s) -> ImVec2 {
         if (!g3d)
-            return { s.x, tilt_pivot + (s.y - tilt_pivot) / tilt_sy };
+            return s;
         float cx_ = 0.0f, cy_ = 0.0f;
         if (s.x < grid_area_origin.x || s.y < grid_area_origin.y
             || s.x > grid_area_origin.x + grid_area_size.x || s.y > grid_area_origin.y + grid_area_size.y
@@ -3978,8 +3958,30 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         return flat_of_canon(cx_, cy_);
     };
     const ImVec2 mouse_g    = ground_pt(mouse);
-    state.marker_tilt_sy    = tilt_sy;
-    state.marker_tilt_pivot = tilt_pivot;
+    // The centred tile (BL-521) stands where the camera shows its ground, height included.
+    if (centred_now && g3d)
+        state.planetary_center_screen = view_pt(state.planetary_center_screen);
+    // The camera's vertical scale at the view's centre (screen px per flat px), so a
+    // verify script can aim a press a fraction of a hex above or below a tile's centre.
+    state.view_sy = 1.0f;
+    if (g3d)
+    {
+        const ImVec2 mid = canon_of_flat({ grid_area_origin.x + grid_area_size.x * 0.5f,
+                                           grid_area_origin.y + grid_area_size.y * 0.5f });
+        float ax = 0.0f, ay = 0.0f, bx = 0.0f, by = 0.0f;
+        if (gfx::slice::project(mid.x, mid.y - 0.5f, ax, ay) && gfx::slice::project(mid.x, mid.y + 0.5f, bx, by))
+            state.view_sy = std::fabs(by - ay) / (hex_size * zoom);
+    }
+    // No GPU device, no ground: say so where the ground would be.
+    if (!gfx::gpu_renderer())
+    {
+        const char* const msg = "The planetary ground needs a GPU device.";
+        const ImVec2 ts = ImGui::CalcTextSize(msg);
+        ImGui::GetForegroundDrawList()->AddText(
+            { grid_area_origin.x + (grid_area_size.x - ts.x) * 0.5f,
+              grid_area_origin.y + (grid_area_size.y - ts.y) * 0.5f },
+            IM_COL32(200, 210, 220, 220), msg); // fit-exempt: one short centred line in the canvas
+    }
 
     // Hover resolves to a single tile copy. Adjacent hexes' circular hit-tests
     // overlap, and the cylinder draws several wrap copies of each tile, so more
@@ -4090,12 +4092,11 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     // visibility is the wrap-window test itself, hoisted to the top of the loop
     // body — an off-screen tile costs one bounds test and one multiply-compare.
     const float row_pitch = 1.5f * hex_size; // hex_local_centre's vertical pitch
-    // The clip edges map into GROUND space first (the camera squash shows a
-    // taller ground band than the screen band when tilted — BL-737).
+    // The clip edges in flat ground space: the camera's footprint in 3D.
     const float clip_top_g = g3d ? flat_of_canon(0.0f, fp_y0).y - hit_r
-        : tilt_pivot + (grid_area_origin.y - hit_r - tilt_pivot) / tilt_sy;
+                                 : grid_area_origin.y - hit_r;
     const float clip_bot_g = g3d ? flat_of_canon(0.0f, fp_y1).y + hit_r
-        : tilt_pivot + (grid_area_origin.y + grid_area_size.y + hit_r - tilt_pivot) / tilt_sy;
+                                 : grid_area_origin.y + grid_area_size.y + hit_r;
     // The markers' vertical cull: the screen band flat, the footprint in 3D.
     const float mark_top = g3d ? clip_top_g : grid_area_origin.y;
     const float mark_bot = g3d ? clip_bot_g : grid_area_origin.y + grid_area_size.y;
@@ -4147,10 +4148,10 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         // off the ground").
         state.ground_req.hide_routes = state.overlay == overlay_mode::throughput;
     }
-    // BL-737: everything from here to the camera squash at the end of the map
-    // passes draws in FLAT ground space; the squash over this vertex range IS
-    // the tilt. (The background rect, title and chrome above this line stay
-    // screen-space; so does the lens legend, whose vertex range is cut out.)
+    // Everything from here to the camera at the end of the map passes draws in FLAT
+    // ground space, which the 3D finish drapes or stands upright. (The background rect,
+    // title and chrome above this line stay screen-space; so does the lens legend, whose
+    // vertex range is cut out.)
     const int v_map_start = dl->VtxBuffer.Size;
     canvas_pass_meter& pm = pass_meter();
     pm.begin(draw_r, static_cast<int>(state.overlay));
@@ -4197,84 +4198,9 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         ? gfx::slice::drape_target(static_cast<int>(std::ceil((drape_max.x - drape_min.x) * drape_scale)),
                                    static_cast<int>(std::ceil((drape_max.y - drape_min.y) * drape_scale)))
         : nullptr;
-    // The camera over [from, to) of this list's vertices.
-    const auto squash = [&](int from, int to) {
-        if (tilt_sy >= 1.0f || from < 0)
-            return;
-        ImDrawVert* vtx = dl->VtxBuffer.Data;
-        for (int vi = from; vi < to; ++vi)
-            vtx[vi].pos.y = tilt_pivot + (vtx[vi].pos.y - tilt_pivot) * tilt_sy;
-    };
-    // THE GROUND IS EMITTED LAST AND DRAWN FIRST (sprint 51, the 60 fps budget;
-    // PLANETARY.md § Draw-loop cost model). The SDL renderer backend converts a
-    // draw command's vertex colours from that command's VtxOffset to the END of
-    // the list, once per command — and every ground chunk is its own texture,
-    // so its own command. Emitted first, ~50 chunk images each re-converted the
-    // whole vector layer behind them (~300k vertices): measured, that was most
-    // of the canvas's submit time, not the vectors themselves. So the images go
-    // into channel 0 of a three-channel split (0 ground, 1 washes, 2 strokes),
-    // written AFTER the vector passes on a vertex offset of their own: the draw
-    // order is unchanged, the per-command conversion is ~4 vertices.
-    //
-    // Draw one image quad per wrap copy that intersects the canvas. The
-    // image spans exactly one wrap period, so copies abut seamlessly.
-    const auto draw_ground_rect = [&](const ground_chunk_view& cv)
-    {
-        if (!cv.tex)
-            return;
-        const ImVec2 p0 = canon_to_screen(cv.x0, cv.y0);
-        const ImVec2 p1 = canon_to_screen(cv.x1, cv.y1);
-        const int k_lo = (period_px > 0.0f)
-            ? static_cast<int>(std::floor((visible_left  - p1.x) / period_px)) : 0;
-        const int k_hi = (period_px > 0.0f)
-            ? static_cast<int>(std::ceil ((visible_right - p0.x) / period_px)) : 0;
-        // BL-1387 - CLIP THE QUAD TO THE VIEW, AND KEEP ITS UVs.
-        //
-        // WHAT WAS MEASURED, not inferred: at `roads_painted.lua`'s closest rung a ground
-        // page is described as a destination rectangle of 50,025 x 20,254 px against a
-        // view of 1,941 x 1,281 - twenty-five times the window across, with the rest off
-        // screen. ImGui records that quad, the SDL3 backend hands it on, and the SOFTWARE
-        // renderer (the one `--verify` forces so goldens stay machine-independent) turns
-        // an axis-aligned textured quad into a SCALED BLIT whose fixed-point source step
-        // is derived from the DESTINATION extent. Over fifty thousand destination columns
-        // that accumulator lands one sample past the source surface, and the process dies
-        // inside SDL's own blitter - Blit8888to8888PixelAlphaSwizzleAVX2, SDL_blit_A.c -
-        // reading a few bytes past a live allocation, with nothing of ours on the faulting
-        // frame.
-        //
-        // WHOSE DEFECT, stated plainly because it decides what this code is: SDL accepts
-        // the rectangle, documents no limit on it, and then mis-samples it, so the
-        // rounding is SDL's (reproduced on the pinned SDL release-3.2.0; the hardware
-        // renderer draws the same quad correctly). This clip is therefore a WORKAROUND
-        // for someone else's arithmetic - and also the right thing on its own terms,
-        // because describing geometry twenty-five times the size of the window was always
-        // waste. It is deliberately narrow: it clips to the view and nothing else, so it
-        // does nothing at all once SDL samples a wide blit correctly, and it never shrinks
-        // what a capture shows - the UVs move by exactly the fraction the edges did, so
-        // what remains samples the texels it did before and no pixel changes.
-        //
-        // The renderer's own clip rectangle does NOT help: it hides the overflow's result
-        // without stopping SDL computing the blit from the unclipped extent first.
-        const float view_l = visible_left, view_r = visible_right;
-        const float view_t = grid_area_origin.y - hit_r;
-        const float view_b = grid_area_origin.y + grid_area_size.y + hit_r;
-        for (int k = k_lo; k <= k_hi; ++k)
-        {
-            const float off = static_cast<float>(k) * period_px;
-            if (p1.x + off < visible_left || p0.x + off > visible_right)
-                continue;
-            float x0 = p0.x + off, x1 = p1.x + off, y0 = p0.y, y1 = p1.y;
-            const float w_span = x1 - x0, h_span = y1 - y0;
-            ImVec2 uv0{0.0f, 0.0f}, uv1{1.0f, 1.0f};
-            if (x0 < view_l) { uv0.x += (view_l - x0) / w_span; x0 = view_l; }
-            if (x1 > view_r) { uv1.x -= (x1 - view_r) / w_span; x1 = view_r; }
-            if (y0 < view_t) { uv0.y += (view_t - y0) / h_span; y0 = view_t; }
-            if (y1 > view_b) { uv1.y -= (y1 - view_b) / h_span; y1 = view_b; }
-            if (!(x1 > x0) || !(y1 > y0))
-                continue; // clipped away entirely
-            dl->AddImage((ImTextureID)(intptr_t)cv.tex, { x0, y0 }, { x1, y1 }, uv0, uv1);
-        }
-    };
+    // THE GROUND IS EMITTED LAST AND DRAWN FIRST (sprint 51, the 60 fps budget): a
+    // three-channel split (0 ground, 1 washes, 2 strokes), the ground written after the
+    // vector passes on a vertex offset of its own (emit_ground).
     if (ground_on)
     {
         dl->ChannelsSplit(3);
@@ -4315,19 +4241,10 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     static bool water_table_failed = false;
     bool water_gpu = false;
     static std::vector<std::uint32_t> water_table;
-    // BL-1659 (live grade shader) and BL-1658 (close-zoom detail layer): which tiles
-    // the bake draws as land, and each one's detail family, for the ground shader that
-    // applies the land lift and the detail at draw.
-    static bool lift_table_failed = false;
-    static SDL_Texture* lift_bound = nullptr; // the table the effect's state holds
-    bool lift_gpu = false;
-    float detail_s = 0.0f;
-    static std::vector<std::uint32_t> lift_table;
     // BL-1661 (far-zoom cartographic map): each surveyed tile's flat colour and river
     // sides, and the map's weight this frame.
     float map_w = 0.0f;
     static std::vector<std::uint32_t> map_table;
-    static SDL_Texture* map_bound = nullptr;
     if (lens_gpu)
         lens_table.assign(static_cast<std::size_t>(gw) * static_cast<std::size_t>(gh), 0u);
     // The close-zoom seam (BL-1251 part 5): one segment per shared tile edge.
@@ -4500,66 +4417,8 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             dl->_CmdHeader.VtxOffset = static_cast<unsigned int>(dl->VtxBuffer.Size);
             dl->_OnChangedVtxOffset();
         }
-        // The far page carries only a body whose master has not yet covered
-        // the view (BL-1246): every other frame the level's chunks cover it.
-        // BL-1655 (shader seam): the ground images draw through Io's own fragment
-        // shader where the renderer can take one. `identity` draws exactly what SDL's
-        // shader does - the seam's standing self-check until a ground pass replaces it.
-        // Unavailable (the --verify software path), begin/end record nothing.
-        // BL-1659 (live grade shader), BL-1658 (close-zoom detail layer): with a
-        // land-lift level the bake did not carry, or a close rung's detail, the
-        // images draw through the ground shader instead, which finds each pixel's
-        // tile from its screen position - the inverse of this frame's camera, squash
-        // included - and modulates and lifts it by its tile's land weight.
-        gfx::effect ground_fx = gfx::effect::identity;
-        if (lift_gpu)
-        {
-            SDL_Texture* const ltex = gfx::table_texture(3, gw, gh, lift_table.data());
-            SDL_Texture* const dtex = gfx::detail_texture(0);
-            SDL_Texture* const ftex = gfx::detail_texture(1);
-            SDL_Texture* const rtex = gfx::detail_texture(2);
-            SDL_Texture* const mtex = gfx::table_texture(4, gw, gh, map_table.data());
-            if (ltex && dtex && ftex && mtex && rtex && (ltex != lift_bound || mtex != map_bound))
-            {
-                SDL_Texture* const all[5] = { ltex, dtex, ftex, mtex, rtex };
-                const bool ok = gfx::bind_textures(gfx::effect::ground, all, 5, true);
-                lift_bound = ok ? ltex : nullptr;
-                map_bound  = ok ? mtex : nullptr;
-            }
-            if (!ltex || !dtex || !ftex || !mtex || !rtex || !lift_bound)
-            {
-                lift_table_failed = true; // this frame and every later one: no lift, no detail
-                std::fprintf(stderr, "canvas: ground shader tables unavailable - no draw-time lift or detail\n");
-            }
-            else
-            {
-                const ImVec2 fb = ImGui::GetIO().DisplayFramebufferScale;
-                const float sy  = tilt_sy < 1.0f ? tilt_sy : 1.0f;
-                const float a0  = canon_to_screen(0.0f, 0.0f).y;
-                const float a1  = canon_to_screen(0.0f, 1.0f).y;
-                const float params[48] = {
-                    1.0f / (zoom * hex_size * fb.x),
-                    (grid_cx - view_origin.x / zoom) / hex_size,
-                    1.0f / (sy * fb.y * (a1 - a0)),
-                    (tilt_pivot * (1.0f - 1.0f / sy) - a0) / (a1 - a0),
-                    ui::ground::land_lift_gamma(gview.draw_lift), k_lift_edge_band,
-                    detail_s, k_detail_period,
-                    detail_s * (k_detail_fine_strength / k_detail_strength), k_detail_fine_period, 0.0f, 0.0f,
-                    map_w, k_map_coast_half_px * fb.x, k_map_river_half_px * fb.x, 0.0f,
-                    k_bump_vegetation, k_bump_forest, k_bump_arid, k_bump_rock,
-                    detail_s / k_detail_strength, k_relief_height_scale, k_shadow_depth, k_bump_fine_share,
-                    k_bump_mountain_mul, k_rolling_height, k_rolling_period, 0.0f,
-                    1.0f, k_tile_tone_swing, k_height_shade_share, 0.0f,
-                    k_fam_vegetation, k_fam_forest, k_fam_arid, k_fam_rock,
-                    k_parallax_depth, k_parallax_tilt, k_long_shadow_reach, k_long_shadow_depth,
-                    static_cast<float>(ImGui::GetTime()), k_gust_brighten, k_blade_flutter, k_sand_creep,
-                    k_wind_vegetation, k_wind_forest, 0.0f, 0.0f };
-                gfx::set_uniforms(gfx::effect::ground, params, sizeof params);
-                ground_fx = gfx::effect::ground;
-            }
-        }
-        // THE 3D GROUND: the camera's frame fills the grid area in place of the flat
-        // ground images. Its vertices are screen space already (apply_camera keeps them).
+        // THE 3D GROUND: the camera's frame fills the grid area. Its vertices are
+        // screen space already (apply_camera keeps them).
         if (g3d)
         {
             if (SDL_Texture* const f3d = gfx::slice::frame())
@@ -4588,11 +4447,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             dl->ChannelsMerge();
             return;
         }
-        gfx::begin(dl, ground_fx);
-        draw_ground_rect(gview.far);
-        for (const ground_chunk_view& cv : gview.chunks)
-            draw_ground_rect(cv);
-        gfx::end(dl);
+        // No 3D frame (no GPU device, or the far page not ready): the marks alone.
         dl->ChannelsMerge();
     };
     // THE 3D FINISH. Every map vertex is one of four kinds: the legend's (left alone), the
@@ -4754,26 +4609,15 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     };
     // Every map vertex emitted so far, minus the legend's: called once, at
     // whichever exit the frame takes (the input early-out included — a
-    // cursor over a panel must not un-tilt the map).
-    // The ground's deferred images are emitted here, so they ride the squash.
+    // cursor over a panel must not drop the drape).
+    // The ground (the 3D frame and its drape) is emitted here, after every mark.
     const auto apply_camera = [&] {
         pm.mark(canvas_pass_meter::post, dl);
         emit_ground();
         pm.mark(canvas_pass_meter::ground, dl);
         pm.end(dl, v_map_start);
-        const int n = dl->VtxBuffer.Size;
         if (g3d)
-        {
             finish_3d();
-            return;
-        }
-        if (v_key_start < 0)
-            squash(v_map_start, n);
-        else
-        {
-            squash(v_map_start, v_key_start);
-            squash(v_key_end, n);
-        }
     };
 
     if (ground_on)
@@ -5340,66 +5184,12 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                     water_table[ci] = IM_COL32(255, 0, 0, 255);
             }
     }
-    // BL-1659 (live grade shader): the land table - a tile the bake draws as land
-    // (seen, and not ocean, coast or lake: prepare_source's class), r = 255; and
-    // BL-1658 (close-zoom detail layer): g = its detail family. The detail fades in
-    // from the 24 px rung to the 48 px rung, so a zoom glide brings it in smoothly.
+    // BL-1661 (far-zoom cartographic map): the map's weight, fading in below the
+    // map rung, so a zoom glide brings it in smoothly.
     {
         const float r_px = hex_size * zoom;
-        const float k = std::clamp((r_px - k_detail_r_none) / (k_detail_r_full - k_detail_r_none), 0.0f, 1.0f);
-        detail_s = k_detail_strength * k * k * (3.0f - 2.0f * k);
         const float m = std::clamp((k_map_r_none - r_px) / (k_map_r_none - k_map_r_full), 0.0f, 1.0f);
         map_w = m * m * (3.0f - 2.0f * m);
-    }
-    lift_gpu = ground_on && raster_ok && (gview.draw_lift > 0 || detail_s > 0.0f || map_w > 0.0f) && !lift_table_failed
-            && gfx::loaded(gfx::effect::ground) && gw > 0 && gh > 0 && !g3d;
-    if (lift_gpu)
-    {
-        lift_table.assign(static_cast<std::size_t>(gw) * static_cast<std::size_t>(gh), 0u);
-        for (int r = std::max(0, row_lo - 2); r <= std::min(gh - 1, row_hi + 2); ++r)
-            for (int c = 0; c < gw; ++c)
-            {
-                const std::size_t ci = static_cast<std::size_t>(r) * gw + c;
-                if (raster[ci] == null_entity || !survey_tile_visible(body.survey, gw, gh, c, r))
-                    continue;
-                const tile_component* t = tile_rc(c, r);
-                if (!t)
-                    continue;
-                // a: the tile's height on every surveyed tile, water too (the relief's
-                // height field runs through the coast).
-                const int ha = static_cast<int>(std::lround(std::clamp(t->height, 0.0f, 1.0f) * 255.0f));
-                if (t->substrate == terrain_substrate::ocean || t->substrate == terrain_substrate::coast
-                    || t->substrate == terrain_substrate::lake)
-                {
-                    lift_table[ci] = IM_COL32(0, 0, 0, ha);
-                    continue;
-                }
-                // b: a mountain tile - its relief bumps stand taller (Ben, 2026-11-16).
-                // Buildings and roads keep off the detail per pixel, by the chunk's own
-                // structure mark, not per tile.
-                const bool mountain = t->landform == terrain_landform::mountain;
-                lift_table[ci] = IM_COL32(255, detail_family(*t), mountain ? 255 : 0, ha);
-            }
-        // BL-1661: the map table, only while the map shows (all zero otherwise).
-        map_table.assign(static_cast<std::size_t>(gw) * static_cast<std::size_t>(gh), 0u);
-        if (map_w > 0.0f)
-            for (int r = std::max(0, row_lo - 2); r <= std::min(gh - 1, row_hi + 2); ++r)
-                for (int c = 0; c < gw; ++c)
-                {
-                    const std::size_t ci = static_cast<std::size_t>(r) * gw + c;
-                    if (raster[ci] == null_entity || !survey_tile_visible(body.survey, gw, gh, c, r))
-                        continue;
-                    const tile_component* t = tile_rc(c, r);
-                    if (!t)
-                        continue;
-                    ImU32 col = k_map_paper;
-                    if ((lift_table[ci] & 0xFFu) == 0u) // the bake's water (ocean, coast, lake)
-                        col = k_map_water;
-                    else if (const entity_id nat = nation_rc(c, r); nat != null_entity)
-                        col = lerp_colour(k_map_paper, palette::nation_colour(nat), k_map_nation_share);
-                    const unsigned a = 128u | (static_cast<unsigned>(t->river_edges) & 0x3Fu);
-                    map_table[ci] = (col & ~IM_COL32_A_MASK) | (a << IM_COL32_A_SHIFT);
-                }
     }
     // THE 3D GROUND's inputs: every surveyed tile's height and family, the chunks, the
     // backdrop, the detail layer's tables and constants (apply_camera adds the drape).
@@ -9187,11 +8977,10 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     // same sprint, and its key with it.
     //
     // The key is screen chrome on the canvas's own draw list: its vertices
-    // are cut out of the camera squash (BL-1246 — lenses ride the one angle
-    // now, their legends do not).
+    // are cut out of the camera (the 3D finish leaves them where they are).
     v_key_start = dl->VtxBuffer.Size;
     // THE RETURN OVER THE TILE (Ben, 2026-11-09): the table's own Net, in green, in the
-    // chrome range so the camera's squash leaves the digits upright. Only where the figure
+    // chrome range so the camera leaves the digits upright. Only where the figure
     // fits the hex: at a coarser rung the wash alone reads.
     state.site_finder.net_labels.clear();
     for (const site_net_label& lab : site_net_labels)
@@ -9204,7 +8993,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         const ImVec2 lp = view_pt({ lab.x, lab.y });
         if (g3d && !gfx::slice::in_sight(canon_of_flat({ lab.x, lab.y }).x, canon_of_flat({ lab.x, lab.y }).y))
             continue;
-        const float y = lp.y - draw_r * 0.42f * tilt_sy;
+        const float y = lp.y - draw_r * 0.42f;
         const ImVec2 at{lp.x - ts.x * 0.5f, y - ts.y * 0.5f};
         dl->AddRectFilled({at.x - 2.0f, at.y}, {at.x + ts.x + 2.0f, at.y + ts.y}, IM_COL32(8, 14, 10, 170), 2.0f);
         dl->AddText(at, palette::positive, txt.c_str()); // fit-exempt: the guard above is the fit
@@ -10230,10 +10019,9 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     if (ImGui::IsMouseClicked(ImGuiMouseButton_Right) && ship_preview.kind == 1)
         state.ship.pending.push_back(ship_preview.cmd);
 
-    // BL-737: the camera. One squash over every map-space vertex emitted since
-    // v_map_start — fills, strokes, ground images, glyphs and labels alike —
-    // about the canvas centre. Chrome drawn before the marker, the lens key,
-    // ImGui windows (hover card, ledgers) and the foreground list are untouched.
+    // The camera: the 3D finish over every map-space vertex emitted since v_map_start
+    // (drape or stand upright). Chrome drawn before the marker, the lens key, ImGui
+    // windows (hover card, ledgers) and the foreground list are untouched.
     apply_camera();
 
     // Pan and zoom. Middle mouse button pans; scroll wheel zooms, anchored at
@@ -10277,19 +10065,15 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             // rung past the glide's target (BL-1653). The world point is read at
             // what is drawn — what is actually under the cursor.
             const float new_zoom = planetary_zoom_stepped(target_zoom, dir);
-            // World point under the cursor, kept fixed across the zoom change —
-            // read through the tilt's inverse, re-projected through it (one
-            // angle now, so both are the same squash — BL-737, BL-1246).
-            const float new_sy = planetary_tilt_sy(new_zoom);
+            // World point under the cursor, kept fixed across the zoom change.
             // 3D: the ground point under the cursor keeps its flat place, which the camera
             // (scaled with the zoom) shows at nearly the same screen point; a cursor over
             // no ground anchors the view's centre.
             const bool   g3d_hit = g3d && mouse_g.x > -1e5f;
-            const ImVec2 anchor  = g3d ? (g3d_hit ? mouse_g : canvas_centre)
-                                       : ImVec2{ mouse.x, mouse_g.y };
+            const ImVec2 anchor  = g3d ? (g3d_hit ? mouse_g : canvas_centre) : mouse;
             const ImVec2 wp = { (anchor.x - view_origin.x) / zoom + grid_cx,
                                 (anchor.y - view_origin.y) / zoom + grid_cy };
-            const float target_gy = g3d ? anchor.y : tilt_pivot + (mouse.y - tilt_pivot) / new_sy;
+            const float target_gy = anchor.y;
             const float anchor_x  = anchor.x;
             state.planetary_pan_x = anchor_x - (wp.x - grid_cx) * new_zoom - canvas_centre.x;
             state.planetary_pan_y = target_gy - (wp.y - grid_cy) * new_zoom - canvas_centre.y;
@@ -10328,14 +10112,6 @@ float planetary_zoom_stepped(float current, int direction)
         : static_cast<int>(std::ceil (k_exact - eps)) - 1;
     const int   kc = std::clamp(k, 0, k_zoom_rungs - 1);
     return std::min(kMinZoom * static_cast<float>(1 << kc), kMaxZoom);
-}
-
-float planetary_tilt_sy(float zoom)
-{
-    // ONE angle at every rung (RENDERING.md § One angle, Ben 2026-10-09; the
-    // stepped 22.5°/45° tilt of 2026-09-02 is retired): cos(22.5°).
-    (void)zoom;
-    return static_cast<float>(ground::k_tilt_sy);
 }
 
 } // namespace ui

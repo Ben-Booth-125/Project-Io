@@ -1254,6 +1254,10 @@ private:
     /// True while a --verify script drives frames: the ground cache bakes every
     /// chunk synchronously so a capture never races the per-frame bake budget.
     bool            m_ground_bake_all = false;
+    /// The ground request the last tick baked against. The canvas publishes its request
+    /// for the NEXT frame, so a --verify capture renders settle frames until the canvas
+    /// asks for nothing the tick has not baked (BL-1671 (flat ground retired)).
+    ground_request  m_ground_req_ticked{};
     /// BL-1246: set by run() (the live frame loop) — the home master pre-bakes
     /// when the world is finished, and entering play waits for it. Off on the
     /// headless paths, which pump no frames.

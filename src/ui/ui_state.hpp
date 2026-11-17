@@ -2389,8 +2389,7 @@ struct ui_state
     /// so click/hover handling can hit-test in priority order. See marker_hit_zone.
     std::vector<marker_hit_zone> marker_hit_zones;
     std::vector<unit_glide> unit_glides; ///< BL-1507: this frame's marching counters.
-    float marker_tilt_sy    = 1.0f; ///< BL-1508: the camera's squash, so a zone's ground point has a screen point.
-    float marker_tilt_pivot = 0.0f;
+    float view_sy = 1.0f; ///< the 3D camera's vertical scale at the view centre (screen px per flat px), for verify aiming
 
     /// Per-frame list of on-canvas STRUCTURE boundaries (national borders today).
     /// Cleared and rebuilt with `marker_hit_zones`, and hit-tested after it: a
