@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*110 entries — 57 open, 53 resolved.*
+*111 entries — 58 open, 53 resolved.*
 
 ---
 
@@ -642,6 +642,20 @@ Built as ruled (Ben, 2026-11-16: start new industries though not the most profit
 - Keep it off; first answer why main fails G1 at the full tier with the switch off
 
 > **Recommendation:** D then A: main fails G1 and G1t50 at the full tier without startups, so the reopened gate is the first question; startups only deepen a miss already there.
+
+### NR-1232 — The G1 market gates fail on main because arms works stand unstaffed: no buyer posts a bid for arms
+*question · raised 2026-11-18 · from NR-1231 (industry startups switch) full-tier reading; traced by bisect*
+
+market_viability full tier, startups off: G1 82.2 (FAILS 85), G1t50 80.2 (FAILS 84); last green 94.5 / 84.7 at b2b2502b (BL-1442, post-capacity starvation, 2026-11-04). BISECT (seeds 17/27/31/0, handoff labour-short count, 6 then 5 steps): first bad on main is the naval merge 860c24d6; inside it, b8336a0d - BL-1551 (force equipment, 2026-11-08), which puts three Arms Works in each major's opening kit, exempt from the kit's want and feed gates ('opens, idle, and runs when they arrive'). On main at the handoff, 16 seeds: 374 arms works, 21 running (312 short of labour, 34 decommissioned); every other processor 2350 / 2512 running = 93.6%, back at the last green reading. MECHANISM: the workforce dial prices a works' output against posted demand (dial_bid = demand only, Ben 2026-10-09), and a refill buys arms off the shelves without posting a bid; the capital opens on an arms reserve besides (seed_arms_reserve), so the dial sees supply and no buyer and staffs the works at zero. OPEN: seed 0 holds exactly 3 per major (15 for 5), but seed 27 holds 68 for 11 majors and seed 17 30 for 6 - something besides the kit builds them, likely the rival scorer in the settle; not traced. The tick-50 gate is assumed to share the cause (not split by recipe yet).
+
+**Why it matters.** Both G1 gates fail on main with nothing switched on, and NR-1231 (startups switch) cannot be read against a baseline that already fails. A failing gate is not weakened, so the cause needs a call.
+
+- A: arms are wanted - a refill's arms draw is held as an unposted bid and the dial reads it for arms (widens the dial's buyer signal, Ben's 2026-10-09 narrowing; an AI-grant question)
+- B: an Arms Works waiting for its first hire is a reserve, not a failure - G1 leaves it out until it has run once (a gate definition, never a quiet weakening)
+- C: fewer works - trace and stop the extra arms works beyond the kit's three a major, then re-measure (may be enough on its own)
+- D: the kit opens arms works only where a hire will soon want them (undoes part of BL-1551 force equipment)
+
+> **Recommendation:** C first, then A. The extras past three a major are unexplained and may be a defect; A makes the works answer their real buyer, which is what BL-1551 (force equipment) meant by runs when they arrive.
 
 ---
 

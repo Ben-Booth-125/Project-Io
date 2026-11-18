@@ -1332,7 +1332,8 @@ void run_seed(std::uint32_t seed, int ticks, seed_reading& r)
             if (ti == w.tiles.end()) continue;
             const int good = (row != nullptr && row->has_limiting) ? static_cast<int>(row->limiting_input) : -1;
             dump << seed << ' ' << ti->second.grid_x << ' ' << ti->second.grid_y << ' ' << k_state_name[s]
-                 << ' ' << (starved ? 1 : 0) << ' ' << good << '\n';
+                 << ' ' << (starved ? 1 : 0) << ' ' << good << ' '
+                 << (reg.get_recipe(b.recipe) ? reg.get_recipe(b.recipe)->name : std::string("?")) << '\n';
         }
     }
     {
