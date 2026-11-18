@@ -875,7 +875,7 @@ bool app::try_adopt_wizard_world()
     m_worldgen_progress.begin_wait();
     m_worldgen_progress.stage_count.store(1, std::memory_order_relaxed);
     m_worldgen_progress.stage.store(1, std::memory_order_relaxed);
-    m_worldgen_progress.label.store(12, std::memory_order_relaxed); // "Finishing"
+    m_worldgen_progress.label.store(12, std::memory_order_relaxed); // "Setting up markets, moons and garrisons"
     m_worldgen_progress.weight_total.store(1, std::memory_order_relaxed);
     m_worldgen_progress.weight_done.store(1, std::memory_order_relaxed);
     m_worldgen_progress.budget_ready.store(false, std::memory_order_relaxed);
@@ -1173,15 +1173,8 @@ void app::draw_building_screen()
         // while Begin waits on round 6 the sink drawn is that round's.
         generation_progress& sink = building_sink();
         ui::draw_generation_wait(sink, ui::px(420.0f), nullptr, m_golden_dir.empty());
-
-        ImGui::Dummy(ui::px(420.0f, 8.0f));
-        ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(120, 128, 142, 255));
-        const int step = sink.label.load(std::memory_order_relaxed);
-        ImGui::TextUnformatted(step == 16 ? "The landscape is searched for the field play opens on."
-                               : step == 17 ? "Three years of commerce prove the chosen landscape."
-                               : m_begin_waits_round6 ? "Round 6 is still building this world."
-                                                      : "Four hundred years of history are being lived through.");
-        ImGui::PopStyleColor();
+        // No flavour line under the caption (Ben, 2026-11-18): the caption
+        // names the step, and that is all the wait says.
 
         // --- The generation budget, on the screen that spends it (BL-754) ---
         //
@@ -1307,7 +1300,7 @@ void app::drop_wizard_ground(const char* why)
 
 /// BL-1246 (STARTUP.md § Handoff): the last loading step — the home body's
 /// ground master finishing on the pool after the seat is taken. The same one
-/// wait surface as every other step, captioned "Painting the ground", its bar
+/// wait surface as every other step, captioned "Loading textures", its bar
 /// the master's chunks landed over its total. When the master is whole, play
 /// opens through finish_new_game exactly as it would have without the wait.
 void app::draw_painting_screen()
@@ -1336,12 +1329,8 @@ void app::draw_painting_screen()
         ImGui::TextUnformatted(title);
         ImGui::PopStyleColor();
         ImGui::Dummy(ui::px(420.0f, 10.0f));
-        ui::draw_generation_wait(m_paint_wait, ui::px(420.0f), "Painting the ground",
+        ui::draw_generation_wait(m_paint_wait, ui::px(420.0f), "Loading textures",
                                  m_golden_dir.empty());
-        ImGui::Dummy(ui::px(420.0f, 8.0f));
-        ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(120, 128, 142, 255));
-        ImGui::TextUnformatted("The home world's ground is baked once, for every zoom.");
-        ImGui::PopStyleColor();
     }
     ImGui::End();
 
@@ -1379,7 +1368,7 @@ void app::draw_painting_screen()
 /// generation lays at "Placing companies"; on a budget world generation lays no
 /// roster, and the rows and markers are the landscape search WINNER's
 /// specialists, published once its web is applied (`publish_charter_web`, in
-/// finish_campaign_world) — after "Searching the landscape", while the field
+/// finish_campaign_world) — after "Placing buildings", while the field
 /// is being proven. No row is marked as the player's there: the seat is drawn
 /// at Begin.
 ///
@@ -1891,7 +1880,7 @@ void app::finish_new_game()
     // BL-1246 (STARTUP.md § Handoff — the ground pre-bakes behind the
     // handoff): play does not open on a half-painted ground. If the home
     // body's master is still baking, wait for it on the loading screen
-    // ("Painting the ground"); that screen calls back here when it lands.
+    // ("Loading textures"); that screen calls back here when it lands.
     // Before the clock rebase below, so the wait never lands as game days.
     int paint_ready = 0, paint_total = 0;
     m_ground.master_progress(m_world.home_body, paint_ready, paint_total);

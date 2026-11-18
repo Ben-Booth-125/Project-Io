@@ -24,7 +24,7 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 > **Generated file.** Produced by `node tools/session/render_actions.js`.
 > Edit the JSON, then re-run; hand edits here are overwritten.
 
-*288 entries — 85 gameplay · 45 canvas · 15 lens · 100 ledger · 43 chrome.*
+*287 entries — 85 gameplay · 45 canvas · 15 lens · 100 ledger · 42 chrome.*
 
 ---
 
@@ -4036,20 +4036,9 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 
 **Reason to select.** Mouse route to the session controls (Save, Options, Exit to Menu, Exit Game); Esc is the keyboard parity.
 
-### `chrome.menu_new_game` — Main menu, primary button column
+### `chrome.menu_quick_start` — Main menu, primary button column, above Load
 
-**Press.** Click New Game.
-
-**Valid when:**
-- App is on the main menu screen.
-
-**Expected output.** The screen transitions to the New World wizard (app_screen::generating), opening on round 1 of 7 (System, Setup, Life, Culture, Empires, Exploration, Industrialisation). Nothing is generated or committed by this press; the wizard only previews.
-
-**Reason to select.** To start setting up a new world round by round: the nation targets and resources on the setup round, then the planetology and history leans. The seed is hidden: the wizard draws it unseen, and the Life round's Reroll gives another world (Ben, 2026-10-15).
-
-### `chrome.menu_quick_start` — Main menu, primary button column, between New Game and Load
-
-**Press.** Click Quick Start.
+**Press.** Click New Game (Quick Start: the only new-world press, Ben 2026-11-18).
 
 **Valid when:**
 - App is on the main menu screen.
@@ -4058,7 +4047,7 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 
 **Reason to select.** To start play on chosen settings without walking the wizard's rounds; the seat is still chosen.
 
-### `chrome.menu_load` — Main menu, primary button column, between Quick Start and Quit
+### `chrome.menu_load` — Main menu, primary button column, between New Game and Quit
 
 **Press.** Click Load.
 

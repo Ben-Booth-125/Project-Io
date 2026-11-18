@@ -550,41 +550,33 @@ int64_t generation_step_cost_ms(int label_index, const world_params& params)
     // nearest anchor as one field per body): roads 7-22 s, ~2.1x step 9 in the
     // same runs; the old-road stamp 7-15 s, ~2.3x step 9; the settle 14-21 s
     // (its first tick no longer floods the body once per anchor).
+    // RE-MEASURED 2026-11-18 (Ben: "make the total progress bar more
+    // accurate"), every step at once, by `gen_step_costs --finish 0 28`
+    // (Release /O2; seed 0 = 41 nations, 32.3 s to the seat; seed 28 = 21
+    // nations, 10.2 s). Each weight is the mean of the two seeds' `[gen steps]`
+    // and `[finish_campaign_world]` figures. The old table had drifted badly:
+    // borders was weighted 3500 for ~240 ms of work, and the search + settle
+    // together 69% of the bar where they now cost ~64%.
     static constexpr int64_t cost[generation_stage_label_count] = {
         1,     //  0 Preparing
-        90,    //  1 Forming the system
-        250,   //  2 Settling chemistry
+        76,    //  1 Forming the system            (80 / 73)
+        205,   //  2 Settling chemistry            (139 / 272)
         0,     //  3 Drifting continents (never entered)
-        150,   //  4 Raising terrain
-        7,     //  5 Carving rivers
+        136,   //  4 Raising terrain               (138 / 135)
+        5,     //  5 Carving rivers                (5 / 5)
         1,     //  6 Seeding peoples
-        12,    //  7 Founding regions (the settlement pass)
-        1600,  //  8 Running the ancient era
-        3500,  //  9 Drawing borders (generate_nations .. the province anchors)
-        7500,  // 10 Laying roads (generate_roads; 38000 before BL-1119)
-        150,   // 11 Placing companies
-        150,   // 12 Finishing (markets, the other bodies, laws, garrisons)
-        1500,  // 13 Running the exploration age
-        2000,  // 14 Running the Industrialisation span
-        1500,  // 15 Tracing the old roads (stamp_history_roads; 8000 before BL-1119 round 4)
-        // The two steps finish_campaign_world runs after generation (BL-1085),
-        // measured by `gen_step_costs --finish 0 28` on the same footing
-        // (Release, 2026-09-24): the search 28,801 / 12,623 ms over 13
-        // evaluations (a budget world skips the roster axis); the twelve-tick
-        // settle 113,922 / 68,832 ms -- of which ONE tick is 50-90 s and the
-        // rest ~1.5 s each (the `[finish_campaign_world]` line names it).
-        // RE-MEASURED 2026-09-26 (the BL-1136 review; Release, indicative on a
-        // loaded machine) after the search went to two threads (BL-1136) and the
-        // carve to the budget's planned firms (BL-1086): the search 8,208 /
-        // 4,007 ms on seeds 0 / 28 (20000 before, measured serially), so the bar
-        // no longer spends a third of itself on eight seconds of work.
-        // RE-MEASURED 2026-11-13 (BL-1646, the search walks placement alone over
-        // two rounds: 1 + 2 evaluations; Release, quiet machine): the step
-        // 34,480 / 10,654 ms on seeds 0 / 28 by `gen_step_costs --finish 0 28`
-        // (the walk ~18.7 / ~6.0 s of it; 79,735 / 28,523 ms before at 13
-        // evaluations). The weight is their mean.
-        22500, // 16 Searching the landscape (build_stockpile_budget .. apply)
-        18000, // 17 Proving the field (run_settle, twelve ticks; 90000 before BL-1117)
+        9,     //  7 Founding regions              (11 / 7)
+        1091,  //  8 Running the ancient era       (1831 / 351)
+        239,   //  9 Drawing borders               (215 / 263; 3500 before)
+        2066,  // 10 Laying roads                  (2973 / 1159)
+        3,     // 11 Placing companies             (3 / 2)
+        670,   // 12 Setting up markets, moons and garrisons (857 / 484)
+        1235,  // 13 Running the exploration age   (2194 / 277)
+        722,   // 14 Running the Industrialisation span (1176 / 269)
+        1358,  // 15 Tracing the old roads         (2039 / 678)
+        // The two steps finish_campaign_world runs after generation (BL-1085).
+        7785,  // 16 Placing buildings  (build_stockpile_budget .. apply; 11376 / 4194)
+        5613,  // 17 Settling industry  (run_settle, 36 ticks; 9231 / 1996)
     };
     if (label_index < 0 || label_index >= generation_stage_label_count) return 0;
     if (label_index == 8 && !era_minus_one_enabled(params)) return 1;
@@ -3138,7 +3130,7 @@ void run_tail(generation_cursor& c)
         std::fflush(stdout);
     }
 
-    // BL-1072: "Finishing" is entered HERE, so its caption covers what is
+    // BL-1072: step 12 ("Setting up markets, moons and garrisons") is entered HERE, so its caption covers what is
     // actually left -- the markets, the other bodies, laws, provinces and
     // garrisons -- rather than being published after the last of it ran.
     bump(c, 12);

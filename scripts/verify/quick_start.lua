@@ -38,8 +38,10 @@ verify.show_menu(true)
 verify.frames(3)
 verify.capture("quick_start_00_menu")
 
-local QX, QY = 958, 628 --the Quick Start button's centre (see the menu capture)
-verify.click(QX, QY)
+-- The Quick Start press as drawn (the menu's only new-world press; Ben, 2026-11-18).
+local qp = verify.escape_menu().main_quick_start
+verify.expect(qp.x >= 0, "the menu draws New Game (the Quick Start press)")
+verify.click(qp.x, qp.y)
 verify.frames(4)
 local s = verify.screen()
 local round, rounds, quick = verify.wizard_round()

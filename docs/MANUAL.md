@@ -105,8 +105,8 @@ Pausing is a legitimate way to play; nothing is hidden behind reaction speed.
 
 ### 2.1 Starting a campaign
 
-From the main menu, **New Game** opens the New World wizard. You set *preferences*, not parameters:
-how abundant the world's resources are, and the lean of the generation. The one exception is the
+From the main menu, **New Game** opens the world's setup. You set *preferences*, not parameters:
+how abundant the world's resources are. The one exception is the
 nation count: before the world is built you choose how many nations it ends with (up to 40) and how
 many are **majors** (up to 6), and the history will arrive at exactly those numbers. The world is then generated
 in visible stages — planetology, continents, tiles, rivers, population, history, nations, roads,

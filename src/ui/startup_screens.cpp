@@ -1741,29 +1741,21 @@ void app::draw_main_menu()
         if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
             ImGui::SetTooltip("A variable body count is coming in a later update.");
 
-        // The Planetology knobs (BL-167) used to sit here as six sliders. They now
-        // live in the New World wizard, one decision per chain stage, where each is
-        // taken against a chart of the system as it stands — a slider whose effect
-        // you cannot see is a slider you cannot judge.
-        {
-            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + ui::px(280.0f));
-            ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(120, 128, 145, 255));
-            ImGui::TextUnformatted("The world's character is chosen during generation.");
-            ImGui::PopStyleColor();
-            ImGui::PopTextWrapPos();
-        }
-
         ImGui::Dummy(ui::px(0.0f, 12.0f));
 
+        // QUICK START IS THE ONLY WAY INTO A NEW WORLD, and it is labelled "New
+        // Game" (Ben, 2026-11-18): the round-by-round wizard's own press is
+        // withdrawn from the menu. The wizard's code stays (Quick Start draws
+        // its setup round).
         const ImVec2 btn = {280.0f, 40.0f};
+        const ImVec2 quick_at = ImGui::GetCursorScreenPos();
         if (ImGui::Button("New Game", btn))
-            open_new_world_wizard();
-        ImGui::Dummy(ui::px(0.0f, 6.0f));
-        if (ImGui::Button("Quick Start", btn))
             open_quick_start();
+        m_ui.escape_drawn[ui_state::esc_main_quick_start].x = quick_at.x + btn.x * 0.5f;
+        m_ui.escape_drawn[ui_state::esc_main_quick_start].y = quick_at.y + btn.y * 0.5f;
         if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("Set the nations and resources, then build the world\n"
-                              "straight through, past the rounds, and choose your corporation.");
+            ImGui::SetTooltip("Set the seed, nations and resources, then build the world\n"
+                              "straight through and choose your nation.");
         ImGui::Dummy(ui::px(0.0f, 6.0f));
         {
             // Load (STARTUP.md § Main menu; Ben, 2026-11-09): every save, by name. The
@@ -2365,7 +2357,7 @@ void app::draw_generation_screen()
             // BL-1279: Quick Start shows the setup round alone, so it counts
             // no rounds -- it names the path it is on instead.
             if (m_wiz_quick_start)
-                std::snprintf(buf, sizeof buf, "Quick Start");
+                std::snprintf(buf, sizeof buf, "New Game");
             else
                 std::snprintf(buf, sizeof buf, "Round %d of %d", m_wiz_round + 1, wizard_round_count);
             const ImVec2 ts = ImGui::CalcTextSize(buf);
@@ -3198,7 +3190,7 @@ void app::draw_generation_screen()
                 // (STARTUP.md § Round 6): the record landed at the span's close
                 // and plays; the same worker is still building the world. A
                 // caption beside the map names the one step under way ("Drawing
-                // borders", "Searching the landscape", "Proving the field") and
+                // borders", "Placing buildings", "Settling industry") and
                 // nothing else. Never under --verify, where nothing is running.
                 if (m_wiz_history_future[lapse_index].valid() && m_wiz_record_landed[lapse_index])
                 {

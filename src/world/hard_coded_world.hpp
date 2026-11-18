@@ -755,15 +755,15 @@ inline const char* const generation_stage_labels[] = {
     "Drawing borders",      // 9
     "Laying roads",         // 10
     "Placing companies",    // 11
-    "Finishing",            // 12
+    "Setting up markets, moons and garrisons", // 12
     "Running the exploration age", // 13 — 1200 -> 1660, after the ancient era
     "Running the Industrialisation span", // 14 — 1660 -> 1960, after the exploration age (BL-1040)
     "Tracing the old roads", // 15 — re-captions stage 10: the history's corridors stamped (BL-1072)
     // The two steps `finish_campaign_world` runs AFTER generation on the same
     // sink (BL-1085): never entered by make_hard_coded_world, never counted by
     // generation_stage_count; weighted like every other step.
-    "Searching the landscape", // 16 — phase 6's search and the winner's apply
-    "Proving the field",       // 17 — the twelve-tick settle
+    "Placing buildings",       // 16 — phase 6's search and the winner's apply
+    "Settling industry",       // 17 — the twelve-tick settle
 };
 inline constexpr int generation_stage_label_count =
     static_cast<int>(sizeof(generation_stage_labels) / sizeof(generation_stage_labels[0]));

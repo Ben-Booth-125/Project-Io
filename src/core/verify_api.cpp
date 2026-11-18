@@ -4105,7 +4105,8 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         out["speed"]   = m_sim_loop.speed();
         out["options_open"] = m_show_options;
         static const char* const k_names[ui_state::esc_press_count] = {
-            "save", "options", "exit_menu", "exit_game", "warn_confirm", "warn_cancel", "gear", "main_load"};
+            "save", "options", "exit_menu", "exit_game", "warn_confirm", "warn_cancel", "gear", "main_load",
+            "main_quick_start"};
         for (int i = 0; i < ui_state::esc_press_count; ++i)
         {
             sol::table p = st.create_table();

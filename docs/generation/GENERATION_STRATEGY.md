@@ -89,7 +89,7 @@ world. What stays at Begin is presentation and the seat: the epoch formatter, th
 zoom and frame, the tech tree and persona bench, the balance series from filed returns,
 `take_seat` and the clock rebase (`../ui/STARTUP.md` § Handoff). The round's record lands at the
 1960 close and plays back while the worker builds this tail behind it, captioned by the step under
-way — "Searching the landscape", "Proving the field" — never a blank wait (`../ui/STARTUP.md`
+way — "Placing buildings", "Settling industry" — never a blank wait (`../ui/STARTUP.md`
 § The wait, then the lapse). The settle keeps its meaning from
 `../economy/ERAS.md`: thirty-six monthly ticks with no calendar meaning, and the clock rebased at
 Begin. The serve path adopts the searched and settled world; the verify path opens on the
@@ -390,7 +390,7 @@ through what it produced.
 | 17 | Market carving | Market lens; market ledger | Watched (outcome) / **Owed** (*why* a nation fractured into N markets is nowhere) |
 | 18 | Prototype laws | Law panel | Watched |
 | 19 | The opening industry | The Industrialisation round's close — the search that places it runs inside that round's worker (§ The eight phases), and the round closes on the winner's buildings | Watched (outcome) — the ranking itself is not a spectacle, § The two watched passes |
-| 20 | The settle — twelve ticks on the winner | The Industrialisation round's caption ("Proving the field"), and the cold Begin path's bar | Partly watched — the caption is honest, but what the ticks prove is not shown |
+| 20 | The settle — twelve ticks on the winner | The Industrialisation round's caption ("Settling industry"), and the cold Begin path's bar | Partly watched — the caption is honest, but what the ticks prove is not shown |
 
 Three owed items, none of them blocking: the tile-derivation ledger (designed in
 `GENERATION_LEDGER.md`), a region surface and a market-carving explanation. Recorded here rather

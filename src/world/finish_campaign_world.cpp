@@ -24,8 +24,8 @@ namespace {
 
 /// The two captioned steps this file adds to a wait (hard_coded_world.hpp's
 /// label table): the search and the settle.
-constexpr int k_label_search = 16; // "Searching the landscape"
-constexpr int k_label_settle = 17; // "Proving the field"
+constexpr int k_label_search = 16; // "Placing buildings"
+constexpr int k_label_settle = 17; // "Settling industry"
 
 using fin_clock = std::chrono::steady_clock;
 

@@ -33,8 +33,8 @@
 // camera, the tech tree, the persona bench, the balance series and the seat
 // all stay at Begin (STARTUP.md § Handoff, items 2-4).
 //
-// PROGRESS. Steps 4 and 6 are captioned on the caller's sink as "Searching
-// the landscape" and "Proving the field" at their measured weights
+// PROGRESS. Steps 4 and 6 are captioned on the caller's sink as "Placing
+// buildings" and "Settling industry" at their measured weights
 // (`generation_step_cost_ms` 16 and 17). The caller publishes those two
 // weights into `generation_progress::weight_after` BEFORE its
 // make_hard_coded_world, so generation's plan already holds them and the bar

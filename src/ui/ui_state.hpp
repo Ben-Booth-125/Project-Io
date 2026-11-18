@@ -2365,7 +2365,8 @@ struct ui_state
     /// The menu's presses as drawn this frame, so a check presses the real control
     /// through verify.click. Verify-only reader; x < 0 means not drawn this frame.
     enum escape_press { esc_save, esc_options, esc_exit_menu, esc_exit_game,
-                        esc_warn_confirm, esc_warn_cancel, esc_gear, esc_main_load, esc_press_count };
+                        esc_warn_confirm, esc_warn_cancel, esc_gear, esc_main_load,
+                        esc_main_quick_start, esc_press_count };
     struct { float x = -1.0f, y = -1.0f; } escape_drawn[esc_press_count];
     float escape_gear_w = 0.0f, escape_gear_h = 0.0f; ///< The time panel's gear, which the menu redraws in place.
     // Naming a save on the escape menu (Ben, 2026-11-09; MENU.md). A press of Save

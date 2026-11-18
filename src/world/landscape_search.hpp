@@ -166,7 +166,7 @@ struct landscape_search_params
 
     /// BL-1085: a loading screen's sink, or null. The search reports its
     /// evaluations done over the evaluations planned on the INNER bar
-    /// (`generation_progress::report_sub`) so "Searching the landscape" never
+    /// (`generation_progress::report_sub`) so "Placing buildings" never
     /// looks stopped. WRITE-ONLY, as every progress tap is: nothing in the
     /// walk reads it back, so a watched search is the same walk as an
     /// unwatched one.

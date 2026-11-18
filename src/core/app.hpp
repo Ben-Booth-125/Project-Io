@@ -485,7 +485,7 @@ private:
     void poll_worldgen();
     /// The loading screen: a progress bar over generation_progress.
     void draw_building_screen();
-    void draw_painting_screen(); ///< BL-1246: "Painting the ground", after the seat.
+    void draw_painting_screen(); ///< BL-1246: "Loading textures", after the seat.
     /// The live nation carve + charter marks drawn inside it (BL-305).
     void draw_building_carve();
 
@@ -1286,10 +1286,10 @@ private:
     /// Leaving the wizard's homeworld (a new gate world is coming, or the
     /// menu): stop the wizard pre-bake. No-op when none runs.
     void drop_wizard_ground(const char* why);
-    /// BL-1246: the "Painting the ground" wait's sink (its bar is the master's
+    /// BL-1246: the "Loading textures" wait's sink (its bar is the master's
     /// chunks landed over its total).
     generation_progress m_paint_wait;
-    /// When the "Painting the ground" wait began (its length is said as play opens).
+    /// When the "Loading textures" wait began (its length is said as play opens).
     std::chrono::steady_clock::time_point m_paint_t0{};
 
     /// BL-1247 — the ground benchmark's state (`--bench-ground`; the driver is
@@ -1306,7 +1306,7 @@ private:
         int         prebake_starts = 0;
         bool        was_current = false;
         tp          current_since{};       ///< When the home master last became current.
-        tp          paint_wait_t0{};       ///< The "Painting the ground" screen first shown.
+        tp          paint_wait_t0{};       ///< The "Loading textures" screen first shown.
         double      seat_wait_s = 0.0;     ///< The pre-bake's cost added to generation.
         double      paint_total_s = -1.0;  ///< Pre-bake start -> home master current.
         // In play.

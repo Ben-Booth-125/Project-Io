@@ -42,7 +42,7 @@ void pad_to_loading_band(float lead_px);
 ///                      only) which this updates so the bar never steps back.
 /// @param pane_w        Width to centre in; the bars are at most 420 px wide.
 /// @param caption       Overrides the stage label when non-null (the building
-///                      screen's validation run: "Proving the field").
+///                      screen's validation run: "Settling industry").
 /// @param live_clock    False under `--verify`: the elapsed count reads 0 so a
 ///                      capture never races the wall clock.
 void draw_generation_wait(generation_progress& prog, float pane_w,

@@ -70,14 +70,16 @@ settings hub. **It offers Load (Ben, 2026-11-05)**, because Exit to Menu must no
   with the seed (Ben, 2026-10-11).**
 - **Bodies** — a disabled slider, fixed at 5; the count knob is phased to a
   later update. The nation targets are set on the setup round, not here (§ Rounds).
-- **New Game** → `open_new_world_wizard()` (commits nothing); **Quick Start**; **Load**; **Quit**.
+- **New Game**; **Load**; **Quit**. **Quick Start is the only way into a new world, and its press
+  is labelled New Game (Ben, 2026-11-18)**: the menu carries no press into the round-by-round
+  wizard, so no player walks the wizard's rounds.
 - **Load lists the saves by name (Ben, 2026-11-09)**, newest first, in place of its button, with a
   **Back** press; a row opens that save. Every `*.iosave` beside the executable is on the list, so
   an existing quicksave lists as "quicksave". Disabled with the tooltip *Nothing saved yet* when
   there are none. Names are `MENU.md` § Application / system menu.
 - **A loaded save opens through the loading screen (Ben, 2026-11-09).** A save holds no baked
   ground, so loading one — from this list or by F6 — starts the home master and waits on the same
-  top-band wait surface as a new game's last step (§ Handoff, "Painting the ground"), under the
+  top-band wait surface as a new game's last step (§ Handoff, "Loading textures"), under the
   title *Loading the save*, then enters play. The save's clock and series stand as they were: the
   wait is not a new game's start and lands no game days.
 - **Quick Start (Ben, 2026-10-08)** — generates the world straight through with no wizard rounds
@@ -402,8 +404,8 @@ hands forward is the world play opens on. The span is most of the round's meanin
 part of its wall time, so the two are split: the record is published whole at the span's last
 year, and **the lapse starts playing there while the same worker builds the tail behind it**
 into § The world cache. Landing swaps only the world slot; a caption beside the playing map
-names the one step under way ("Drawing borders", "Searching the landscape", "Proving the
-field") and nothing else. **The tail lands within 35 s of the round's arrival (Ben,
+names the one step under way ("Drawing borders", "Placing buildings", "Settling
+industry") and nothing else. **The tail lands within 35 s of the round's arrival (Ben,
 2026-09-25, after a round 6 that took "just over one minute")**, and the whole tail is held to
 it. The time goes to two places: the road pass, which the road rule (LOGISTICS.md § 4, the
 detour test) cuts, and the settle's first tick, which costs more than the other eleven together
@@ -557,7 +559,8 @@ reports progress within itself, so the bar moves for as long as the wait lasts; 
 under the bars names the one step under way ("Running the Exploration span"); and an
 **elapsed-seconds count** shows the run is alive. ("Drawing borders" is a caption of the cold
 path's loading bar, where the tail runs in front of the player; on the wizard the tail's
-captions sit beside the playing map, § Round 6.)
+captions sit beside the playing map, § Round 6.) **The caption is all the wait says (Ben,
+2026-11-18):** no flavour line sits under it — the step's name, the bars and the count.
 
 **The lapse** begins when the record is whole and plays it from its first year at the pace the
 player chose. Accepting moves to the next round; rerolling runs it again.
@@ -671,7 +674,7 @@ buildings at the end — never from a world a round worker is still mutating; wh
 history's urban growth, settlements, roads, the settle's buildings — moves only the content
 hashes of its own chunks, and only those chunks re-bake. Play does not open on a half-painted
 ground: if the master is still unfinished when the player confirms a seat, entering play waits
-on the loading screen with its own labelled step ("Painting the ground"), and the budget is that
+on the loading screen with its own labelled step ("Loading textures"), and the budget is that
 it adds **at most 15 s** on the minimum PC ([TECH_FOUNDATIONS.md](../tech/TECH_FOUNDATIONS.md)
 § Target hardware). The cold path, with no wizard to hide behind, starts the bake when its world
 is built and waits as needed. Other bodies bake in the background once play opens.
@@ -687,8 +690,8 @@ is built and waits as needed. Other bodies bake in the background once play open
 (`../economy/ERAS.md` § The opening position; BL-978, warm start retired), run **in spectate**
 — `corp_ai_params::spectating`, nobody seated — because the seat comes after it, so the card
 can show the figures it files; every nation opens onto non-empty pools and live markets rather
-than a cold zero state. Only the wait's caption names it ("Proving the field"), and the loading
-bar's label table carries that step and "Searching the landscape" at their measured weights.
+than a cold zero state. Only the wait's caption names it ("Settling industry"), and the loading
+bar's label table carries that step and "Placing buildings" at their measured weights.
 `run_serve` adopts the searched and settled world; `run_verify` opens on the unsearched
 seed-candidate world and stays cold — a golden reads generation alone, so it is pinned to the
 world before the search.
