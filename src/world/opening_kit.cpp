@@ -518,8 +518,11 @@ struct proc_refusals
     }
 };
 
+/// @p arms_slot: the slot being laid makes an arms good. Only such a slot takes BL-1551's
+/// arms exemption from the want and feed gates; any other slot sees an Arms Works under the
+/// ordinary gates, so a slot its ground cannot hold never falls to an idle works at rung 3.
 entity_id place_processor(kit_layer& L, major_kit& mk, const std::vector<int>& cands, int& chosen,
-                          proc_refusals* why = nullptr)
+                          proc_refusals* why = nullptr, bool arms_slot = false)
 {
     chosen = -1;
     if (cands.empty())
@@ -588,10 +591,12 @@ entity_id place_processor(kit_layer& L, major_kit& mk, const std::vector<int>& c
         {
             const recipe& rc = L.reg.recipe_at(building_type::processing_facility, i);
             // BL-1551 (Ben, 2026-11-08): no market asks for arms before the first hire, so the
-            // want gate cannot speak for them. The kit's arms slots are the ruling's own want.
-            const bool arms = rc.outputs[static_cast<std::size_t>(resource_type::small_arms)] > 0.0f
-                || rc.outputs[static_cast<std::size_t>(resource_type::armoured_vehicles)] > 0.0f
-                || rc.outputs[static_cast<std::size_t>(resource_type::artillery_pieces)] > 0.0f;
+            // want gate cannot speak for them. The kit's arms slots are the ruling's own want --
+            // the arms slots only (NR-1238): another good's slot is not that want.
+            const bool arms = arms_slot
+                && (rc.outputs[static_cast<std::size_t>(resource_type::small_arms)] > 0.0f
+                    || rc.outputs[static_cast<std::size_t>(resource_type::armoured_vehicles)] > 0.0f
+                    || rc.outputs[static_cast<std::size_t>(resource_type::artillery_pieces)] > 0.0f);
             if (!arms && !mk.want.short_for(L.w, rc, site))
             {
                 if (why) ++why->not_wanted;
@@ -951,9 +956,12 @@ opening_kit_report lay_major_opening_kits(world& w, const recipe_registry& reg,
             for (int idx = 0; idx < reg.recipe_count(building_type::processing_facility); ++idx)
                 nearest_feed.push_back(idx);
 
+            const bool arms_slot = s.good == resource_type::small_arms
+                || s.good == resource_type::armoured_vehicles
+                || s.good == resource_type::artillery_pieces;
             int chosen = -1;
             proc_refusals as_named;
-            entity_id bid = place_processor(L, mk, named, chosen, &as_named);
+            entity_id bid = place_processor(L, mk, named, chosen, &as_named, arms_slot);
             rm.refused_no_site    += as_named.no_site;
             rm.refused_not_wanted += as_named.not_wanted;
             rm.refused_no_feed    += as_named.no_feed;
@@ -964,14 +972,14 @@ opening_kit_report lay_major_opening_kits(world& w, const recipe_registry& reg,
                            reg.recipe_at(building_type::processing_facility, chosen).name, "", bid);
                 continue;
             }
-            if ((bid = place_processor(L, mk, other, chosen)) != null_entity)
+            if ((bid = place_processor(L, mk, other, chosen, nullptr, arms_slot)) != null_entity)
             {
                 set_record(rm.slots[i], rec_outcome::substituted,
                            reg.recipe_at(building_type::processing_facility, chosen).name,
                            "rung 2: another recipe for the good; as named " + as_named.text(), bid);
                 continue;
             }
-            if ((bid = place_processor(L, mk, nearest_feed, chosen)) != null_entity)
+            if ((bid = place_processor(L, mk, nearest_feed, chosen, nullptr, arms_slot)) != null_entity)
             {
                 set_record(rm.slots[i], rec_outcome::substituted,
                            reg.recipe_at(building_type::processing_facility, chosen).name,
