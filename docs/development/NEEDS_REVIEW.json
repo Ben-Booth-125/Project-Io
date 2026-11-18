@@ -1976,6 +1976,131 @@
    "recommendation": "D then A: main fails G1 and G1t50 at the full tier without startups, so the reopened gate is the first question; startups only deepen a miss already there."
   },
   {
+   "id": "NR-1232",
+   "title": "Live grade shader: a draw-time grade needs a per-pixel land weight the chunks no longer hold",
+   "raised": "2026-11-14",
+   "kind": "question",
+   "status": "resolved",
+   "source": "BL-1659 (live grade shader), sprint 68",
+   "what": "The baked grade lifts land and leaves water, so a draw-time grade must know, per pixel, how much of it is land. The opaque master chunks are held as RGB since BL-1311 (master chunk RAM), so alpha cannot carry that weight. The baked grade also runs before the unsharp pass and the shadows; a draw-time grade after them is close, not exact.",
+   "why_it_matters": "Without a land weight the live grade lifts the sea too. Each way of carrying the weight costs ground memory that BL-1311 just won back.",
+   "options": [
+    "A) Hold opaque chunks as RGBA again: +33% master memory, exact weight",
+    "B) A half-resolution one-byte land mask per chunk, sampled with filtering: about +8% of master memory, one extra texture bind, a softer shore in the grade",
+    "C) Keep the grade baked; the live lever stays a re-bake, and the item closes unbuilt"
+   ],
+   "recommendation": "B. It keeps most of BL-1311's saving (a full-resolution byte would cost the same as RGBA), and the mask is reusable (shore fade, water glint). Accept that the grade then sits after unsharp, a visible but small change, with one re-bless.",
+   "files": [
+    "src/ui/body_surface_canvas.cpp",
+    "docs/ui/RENDERING.md"
+   ],
+   "resolution": "Ben, 2026-11-15: try D (a per-tile land table, no stored weight), fall back to B (a half-resolution land mask) if the hex-side shore shows. D built: RENDERING.md § Art direction and palette, 'The lift at draw time'. Only the land lift moved to draw time; the near-future grade stays baked."
+  },
+  {
+   "id": "NR-1233",
+   "title": "Compressed ground textures: the GPU path can draw them, but measuring needs a vendored encoder",
+   "raised": "2026-11-14",
+   "kind": "question",
+   "status": "resolved",
+   "source": "BL-1662 (compressed ground textures) spike, sprint 68",
+   "what": "SDL 3.4's GPU renderer wraps an external SDL_GPUTexture (SDL_PROP_TEXTURE_CREATE_GPU_TEXTURE_POINTER), so a BC1 or BC7 chunk can be drawn on the GPU path. The software renderer (every --verify capture) cannot, so captures would keep the RGB chunk. The open cost is encode time per 512 px chunk at bake, which needs an encoder in the tree.",
+   "why_it_matters": "BC1 is 6:1 against RGB (BC7 3:1), the largest memory lever left for the ground. It adds a third-party dependency and a second chunk format beside the capture path.",
+   "options": [
+    "A) Vendor a single-file BC1 encoder (stb_dxt, public domain) and measure encode ms per chunk",
+    "B) Vendor a BC7 encoder (bc7enc, MIT) for quality, slower to encode",
+    "C) Defer: close the item unbuilt until ground memory binds again"
+   ],
+   "recommendation": "A for the measurement only; decide the format from the numbers.",
+   "files": [
+    "src/core/gpu_effects.cpp",
+    "docs/ui/RENDERING.md"
+   ],
+   "resolution": "Ben, 2026-11-16: option A. Vendor stb_dxt and measure BC1 encode time per 512 px chunk; decide the format from the numbers."
+  },
+  {
+   "id": "NR-1234",
+   "title": "Shader seam: --verify captures stay on the software renderer, so they never show a shader pass",
+   "raised": "2026-11-14",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "BL-1655 (shader seam), sprint 68",
+   "what": "--verify forces the software renderer, and every shader pass (lens wash, border band, water glint) has a no-shader path that is what captures draw. The shader passes were checked by a live look in the GPU app, not a capture. IO_NO_GPU_EFFECTS=1 turns every pass off in the GPU app, for an A/B.",
+   "why_it_matters": "A green visual run proves the no-shader path, not the shader. A shader regression would pass every capture.",
+   "options": [
+    "Keep it: captures prove the fallback, live looks prove the shader",
+    "File a GPU capture mode (read back the GPU target) as its own item"
+   ],
+   "recommendation": "Keep it for this sprint; file the GPU capture mode if a shader pass regresses unseen.",
+   "files": [
+    "src/core/gpu_effects.cpp",
+    "src/core/app.cpp"
+   ],
+   "resolution": null
+  },
+  {
+   "id": "NR-1235",
+   "title": "Borders: the shader measures the hex side analytically, with no distance field stored",
+   "raised": "2026-11-14",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "BL-1657 (SDF national borders), sprint 68",
+   "what": "The item named a signed distance field. The pass instead reads a one-texel-per-tile owner table and, per pixel, measures the distance to each of the six sides whose neighbour has a different owner. That is exact for a hex grid and needs no baked field or extra memory. The rule's width is set in screen pixels, so it holds across zoom.",
+   "why_it_matters": "It is cheaper and exact on hexes, but it cannot draw a border off the hex edges (a smoothed or river-following line would need a real field).",
+   "options": [
+    "Keep the analytic pass",
+    "Bake a true distance field later if borders should leave the hex edges"
+   ],
+   "recommendation": "Keep it; the border rule follows hex edges by design (PLANETARY.md).",
+   "files": [
+    "src/shaders/border_band.frag.hlsl",
+    "docs/ui/PLANETARY.md"
+   ],
+   "resolution": null
+  },
+  {
+   "id": "NR-1236",
+   "title": "The flat ground stays on the software path: --verify captures still draw the squashed 2D map",
+   "raised": "2026-11-16",
+   "kind": "question",
+   "status": "resolved",
+   "source": "BL-1671 (flat ground retired), sprint 68",
+   "what": "On the GPU renderer the canvas now draws only the 3D ground: the squash is off, marks are draped, markers stand upright and clicks ray-pick. The software renderer (every --verify capture, and any machine without a GPU device) cannot run the 3D pass, so it still draws the flat, squashed map. Retiring that path too means moving --verify onto the GPU renderer, which moves every canvas golden and capture at once.",
+   "why_it_matters": "Until it moves, a green visual run proves the 2D map, not the 3D one the player sees. Moving it is a bulk re-bless, which the golden policy reserves for you.",
+   "options": [
+    "Keep the software path as the --verify map for now; check the 3D canvas by live click",
+    "Move --verify to the GPU renderer and re-bless the canvas captures once",
+    "Delete the 2D path and refuse to run the canvas without a GPU device"
+   ],
+   "recommendation": "Keep it for now, then take the one re-bless when the 3D defaults settle.",
+   "files": [
+    "src/ui/body_surface_canvas.cpp",
+    "src/core/ground_slice_3d.cpp",
+    "docs/ui/RENDERING.md"
+   ],
+   "resolution": "Ben, 2026-11-17 (\"Let's work on BL-1671\"): options B and C. --verify runs the GPU renderer and bakes the 3D ground; the flat ground draw, the squash camera and the fixed-angle ground shader are deleted; a renderer with no GPU device draws no ground and says so. The two ground goldens were re-blessed once on the GPU renderer."
+  },
+  {
+   "id": "NR-1237",
+   "title": "Compressed ground textures: BC1 measures cheap and close to lossless - build the GPU path, or close the spike?",
+   "raised": "2026-11-16",
+   "kind": "question",
+   "status": "resolved",
+   "source": "BL-1662 (compressed ground textures) spike, sprint 68",
+   "what": "The spike measured BC1 with stb_dxt on 18 chunks of 512 px: a median 3.32 ms a chunk on one core, PSNR 41.1 dB median (38.8 worst); by eye the loss is the finest grain noise. A 2.9 GB chain would hold about 0.5 GB. The 3D ground draws only on the GPU renderer, which can take a BC1 texture; the software path and every --verify capture would keep RGB.",
+   "why_it_matters": "It is the largest memory lever left for the ground: a finer master, or many more resident chunks, in today's budget. The cost is a second chunk format beside the capture path, and a lossy one.",
+   "options": [
+    "A) Build it: BC1 chunks on the GPU renderer, RGB kept for software and captures",
+    "B) Close the spike unbuilt; reopen when ground memory binds again",
+    "C) Measure BC7 first (bc7enc), for quality, before deciding"
+   ],
+   "recommendation": "B for now: nothing binds on memory today, and the 3D ground has moved where the budget goes. The numbers stay in the item for when it does.",
+   "files": [
+    "src/core/ground_slice_3d.cpp",
+    "docs/ui/RENDERING.md"
+   ],
+   "resolution": "Ben, 2026-11-17: option B. Close the spike unbuilt; the BC1 measurements stay on BL-1662 (compressed ground textures) for when ground memory binds again."
+  },
+  {
    "raised": "2026-11-18",
    "status": "open",
    "source": "NR-1231 (industry startups switch) full-tier reading; traced by bisect",

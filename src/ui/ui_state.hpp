@@ -11,6 +11,9 @@
 #include <array>
 #include <cstdint>
 #include <map>
+#include <memory>
+
+namespace ui::ground { struct bake_source; } // ground_bake.hpp (BL-1670: ground_view::src)
 #include <set>
 #include <string>
 #include <unordered_map>
@@ -112,6 +115,12 @@ struct marker_hit_zone
     enum class kind : uint8_t { building, unit } kind = kind::building;
     ImVec2    centre{};         ///< Marker centre in screen pixels (this frame).
     float     radius = 0.0f;   ///< Hit-test radius in screen pixels.
+    /// On the 3D ground a counter stands upright, moved whole from its flat point to where
+    /// the camera shows its anchor. Such a zone is asked with the SCREEN cursor less
+    /// `shift`, not the ground under the cursor - a press on a tall marker's top would
+    /// otherwise pick the ground behind it.
+    bool      stands = false;
+    ImVec2    shift{};
 };
 
 /// The grain of a STRUCTURE selection: a region-scale entity the player selects
@@ -1336,6 +1345,12 @@ struct ground_view
     /// the same baked ground, structures included, as the canvas.
     ground_chunk_view neigh;
     entity_id neigh_tile = null_entity;
+    /// BL-1659 (live grade shader): the land-lift level the canvas applies at draw
+    /// (the ground shader); 0 when the bake carries the lift, or it is off.
+    int draw_lift = 0;
+    /// BL-1670 (procedural 3D buildings): the source snapshot the active body's bake was
+    /// taken from, whose installations the 3D ground stands up as geometry. Null until set.
+    std::shared_ptr<const ui::ground::bake_source> src;
 };
 
 /// The Selection band's neighbourhood-page request (BL-1241): the tile the
@@ -1391,6 +1406,22 @@ struct ui_state
     /// trackpads deliver fractional deltas per event, and each must NOT fire a
     /// full x2 rung — deltas accumulate here and a step fires per whole notch.
     float planetary_wheel_accum = 0.0f;
+    /// BL-1653 (animated zoom step), RENDERING.md § Level of detail, "A step glides".
+    /// `planetary_zoom` / `planetary_pan_*` stay the STATE (the rung, what is saved and
+    /// what every reader sees); this is only the zoom DRAWN on the way to it. View
+    /// state, render-side real time, never serialised; inert under `fixed_frame_clock`.
+    struct planetary_glide_t
+    {
+        bool  active   = false;
+        float z0 = 1.0f, z1 = 1.0f; ///< drawn zoom at the step, and the rung it goes to
+        float t        = 0.0f;      ///< seconds into the glide
+        bool  anchored = false;     ///< a wheel step: hold the world point under the cursor
+        float wx = 0.0f, wy = 0.0f; ///< that world point (local, unzoomed)
+        float ax = 0.0f, agy = 0.0f;///< where it stays: screen x, and ground-space y
+        bool  seen = false;         ///< last frame's values below are valid
+        float last_zoom = 0.0f, last_pan_x = 0.0f, last_pan_y = 0.0f; ///< state at last frame's end
+        float last_drawn = 0.0f;    ///< the zoom drawn last frame
+    } planetary_glide;
 
     entity_id    active_body   = null_entity;         ///< Navigation anchor: drives the lower rungs (circumplanetary anchor and surface). Changed by *navigation* (double-click / focus), not by selection. null_entity = no anchor.
     entity_id    selected_entity = null_entity;       ///< The entity the player single-clicked to inspect — drives the Selection info element. Distinct from the active_* anchors: selecting never moves the canvas. null_entity = nothing selected. See SELECTION.md, ui/selection.hpp.
@@ -2358,8 +2389,7 @@ struct ui_state
     /// so click/hover handling can hit-test in priority order. See marker_hit_zone.
     std::vector<marker_hit_zone> marker_hit_zones;
     std::vector<unit_glide> unit_glides; ///< BL-1507: this frame's marching counters.
-    float marker_tilt_sy    = 1.0f; ///< BL-1508: the camera's squash, so a zone's ground point has a screen point.
-    float marker_tilt_pivot = 0.0f;
+    float view_sy = 1.0f; ///< the 3D camera's vertical scale at the view centre (screen px per flat px), for verify aiming
 
     /// Per-frame list of on-canvas STRUCTURE boundaries (national borders today).
     /// Cleared and rebuilt with `marker_hit_zones`, and hit-tested after it: a
@@ -2495,6 +2525,8 @@ struct ui_state
         int           count = 1;
         bool          mine  = false;
         ImVec2        box_min{}, box_max{}; ///< The box holding glyph and count; empty with no count drawn.
+        bool          stands = false;       ///< Upright on the 3D ground: asked as marker_hit_zone::stands.
+        ImVec2        shift{};
     };
     std::vector<convoy_zone> convoy_zones;
     std::uint32_t hovered_convoy = 0; ///< The convoy the pointer's marker names; 0 none.

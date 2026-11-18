@@ -116,6 +116,7 @@
 #include "world/hard_coded_world.hpp"
 #include "world/survey_system.hpp"
 #include "world/hex_neighbors.hpp"
+#include "world/river_generation.hpp"
 #include "world/world.hpp"
 #include "harness_params.hpp"
 
@@ -444,6 +445,30 @@ void master_row(const bake_source& src, const body_component& hb, int land_i, co
         downsample_half(flat.data(), 4, 4, half.data());
         check(half == std::vector<std::uint32_t>(4, 0xFF204060u), "P22",
               "a flat run (lock fill, open sea) downsamples byte-exact");
+    }
+    {
+        // BL-1652 (gamma-correct mips): a black/white checker halves to the sRGB byte of
+        // HALF the light (188), not the byte mean (128); one lit pixel in three dark ones
+        // to a quarter of the light (137); greys a step apart stay ordered and exact.
+        auto px = [](int v) { return ui::palette::col32(v, v, v, 255); };
+        auto half_of = [](std::vector<std::uint32_t> q) {
+            std::vector<std::uint32_t> h(1);
+            downsample_half(q.data(), 2, 2, h.data());
+            return ui::palette::col_r(h[0]);
+        };
+        const int checker = half_of({ px(0), px(255), px(255), px(0) });
+        const int one_lit = half_of({ px(255), px(0), px(0), px(0) });
+        const int grey    = half_of({ px(100), px(100), px(101), px(101) });
+        std::printf("P36: checker %d, one lit of four %d, 100/101 greys %d\n", checker, one_lit, grey);
+        check(checker == 188, "P36", "a black/white checker halves to half the LIGHT (sRGB 188), not the byte mean");
+        check(one_lit == 137, "P36", "one lit pixel of four halves to a quarter of the light (sRGB 137)");
+        check(grey == 100 || grey == 101, "P36", "two adjacent greys halve to one of them");
+        // Transparent samples carry no colour: an opaque white beside three clear pixels
+        // stays white at a quarter coverage.
+        std::vector<std::uint32_t> q{ px(255), 0u, 0u, 0u }, h(1);
+        downsample_half(q.data(), 2, 2, h.data());
+        check(ui::palette::col_r(h[0]) == 255 && ui::palette::col_a(h[0]) == 64, "P36",
+              "alpha weights the colour and averages as coverage");
     }
 
     // The chooser. Rung radii at 1720x1080 (drawn: 5.91 / 11.83 / 23.66 /
@@ -1903,6 +1928,47 @@ void look_row(const bake_source& src, const bake_params& p0, const char* suffix)
 //       upgraded, removed; a lane stamped) re-baked and blitted over the old
 //       master chunk give the new chunk byte for byte, under 40% of it.
 // `--routes` runs P28-P30 alone and writes routes_*.png previews.
+// BL-1663 (road paint checks fail): a road is an EDGE (BL-1340, LOGISTICS.md
+// section 4) and the route pass reads its links from `road_sides`, never from
+// the neighbours. A row that stages roads tile by tile (`road[i] = tier`) must
+// therefore lay the crossings too, or only rail links draw. This lays them the
+// way a pre-v53 save migrates (BL-1340): between each pair of 4-cardinal
+// neighbours that both carry a road, an edge at the LOWER of their two tiers
+// (rail counts as a highway's weight), on both halves. Every side is rebuilt
+// from `road`, so call it only on a source whose roads the row staged itself.
+void stage_road_sides(bake_source& s)
+{
+    s.road_sides.assign(s.road.size(), 0);
+    static constexpr int card[4][2] = { { +1, 0 }, { -1, 0 }, { 0, +1 }, { 0, -1 } };
+    for (int r = 0; r < s.gh; ++r)
+        for (int c = 0; c < s.gw; ++c)
+        {
+            const std::size_t i = static_cast<std::size_t>(r) * s.gw + c;
+            if (!s.road[i])
+                continue;
+            for (const auto& d : card)
+            {
+                const int nr = r + d[1];
+                if (nr < 0 || nr >= s.gh)
+                    continue;
+                const int nc = ((c + d[0]) % s.gw + s.gw) % s.gw;
+                const std::size_t ni = static_cast<std::size_t>(nr) * s.gw + nc;
+                if (!s.road[ni])
+                    continue;
+                const int side = hex_side_for_offset(d[0], d[1], (r & 1) != 0);
+                if (side < 0)
+                    continue;
+                const int tier = std::min({ static_cast<int>(s.road[i]), static_cast<int>(s.road[ni]), 3 });
+                const std::uint16_t cur = static_cast<std::uint16_t>((s.road_sides[i] >> (2 * side)) & 0x3u);
+                if (tier > cur)
+                {
+                    s.road_sides[i] = static_cast<std::uint16_t>(
+                        (s.road_sides[i] & ~(0x3u << (2 * side))) | (static_cast<unsigned>(tier) << (2 * side)));
+                }
+            }
+        }
+}
+
 // ---------------------------------------------------------------------------
 void route_row(world& w, entity_id home, const bake_source& src0, const bake_params& p, bool previews,
                bool prof = false)
@@ -1976,6 +2042,7 @@ void route_row(world& w, entity_id home, const bake_source& src0, const bake_par
         for (int dr = 0; dr < 2; ++dr)
             if (s.cls[idx(wc + k, wr + dr)] == water)
                 s.lane[idx(wc + k, wr + dr)] = 1;
+    stage_road_sides(s);
     rederive_routes(s);
     std::printf("P28: staged network at [%d,%d] (%zu pieces), lane at [%d,%d]\n", ac, ar,
                 s.route_pieces.size(), wc, wr);
@@ -2274,6 +2341,7 @@ void route_row(world& w, entity_id home, const bake_source& src0, const bake_par
         const auto with = [&](const bake_source& base, std::size_t i, std::uint8_t tier, bool lane) {
             bake_source t = base;
             (lane ? t.lane : t.road)[i] = tier;
+            stage_road_sides(t);
             rederive_routes(t);
             return t;
         };
@@ -2281,7 +2349,17 @@ void route_row(world& w, entity_id home, const bake_source& src0, const bake_par
         std::vector<change> changes;
         if (s.cls[idx(ac - 4, ar)] == land)
             changes.push_back({ "a road built (highway extended)", with(s, idx(ac - 4, ar), k_route_highway, false), ac - 4, ar });
-        changes.push_back({ "a road upgraded (track -> road)", with(s, idx(ac + 3, ar + 1), k_route_road, false), ac + 3, ar + 1 });
+        // BL-1663: a road is an edge (BL-1340), so an upgrade is ONE CROSSING raised -
+        // both of its tiles, here the track column's (ac+3, ar+1)-(ac+3, ar+2). Raising
+        // one tile alone between two tracks moves no edge, and draws nothing new.
+        {
+            bake_source up = s;
+            up.road[idx(ac + 3, ar + 1)] = k_route_road;
+            up.road[idx(ac + 3, ar + 2)] = k_route_road;
+            stage_road_sides(up);
+            rederive_routes(up);
+            changes.push_back({ "a road upgraded (one track crossing -> road)", std::move(up), ac + 3, ar + 1 });
+        }
         changes.push_back({ "a road removed (a link into the works)", with(s, idx(ac - 1, ar + 2), 0, false), ac - 1, ar + 2 });
         changes.push_back({ "a lane stamped", with(s, idx(wc + 8, wr), 1, true), wc + 8, wr });
         // A track cut through the deepest forest: the trees it clears and the
@@ -2295,6 +2373,7 @@ void route_row(world& w, entity_id home, const bake_source& src0, const bake_par
                 for (int c = fc - 1; c <= fc + 1; ++c)
                     if (cut.cls[idx(c, fr)] == land)
                         cut.road[idx(c, fr)] = k_route_track;
+                stage_road_sides(cut);
                 rederive_routes(cut);
                 changes.push_back({ "a track cut through a forest", std::move(cut), fc, fr, false }); // three tiles: past 40% is the rule working
             }
@@ -2486,6 +2565,7 @@ std::vector<roadset_aim> stage_roadsets(bake_source& s, const bake_source& src0)
         aims.push_back({ "seam", s.gw - 1, r });
         break;
     }
+    stage_road_sides(s);
     rederive_routes(s);
     return aims;
 }
@@ -2847,6 +2927,7 @@ void towns_row(const bake_source& src0, const bake_params& p)
     stand("city, two roads crossing (4)", ac + 1, rr, 4, 0);
     stand("metropolis, road through (5)", ac + 3, rr, 5, 0);
     stand("town beside works (3+2)", ac + 5, rr, 3, 2);
+    stage_road_sides(s);
     rederive_routes(s);
     std::printf("towns: staged %zu at aim [%d,%d], %zu route pieces\n", towns.size(), ac, ar,
                 s.route_pieces.size());

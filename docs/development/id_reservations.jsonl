@@ -117,3 +117,15 @@
 {"id":"BL-1616","name":"MINOR_PLANT_FLOOR (renumbered from the naval branch BL-1554 at its merge)","ts":"2026-11-10T12:00:00.000Z","branch":"worktree-agent-a1300c3a0aca23713"}
 {"id":"BL-1617","name":"GARRISON_INCOME (renumbered from the naval branch BL-1555 at its merge)","ts":"2026-11-10T12:00:00.000Z","branch":"worktree-agent-a1300c3a0aca23713"}
 {"id":"BL-1618","name":"PRICE_FALLS_AS_SUPPLY_VANISHES (renumbered from the naval branch BL-1615 at its merge)","ts":"2026-11-10T12:00:00.000Z","branch":"worktree-agent-a1300c3a0aca23713"}
+{"id":"BL-1652","name":"GAMMA_CORRECT_MIPS","ts":"2026-11-14T20:34:23.089Z","branch":"claude/rendering-sprint"}
+{"id":"BL-1653","name":"ANIMATED_ZOOM_STEP","ts":"2026-11-14T20:34:23.089Z","branch":"claude/rendering-sprint"}
+{"id":"BL-1654","name":"SDL_3_4_UPGRADE","ts":"2026-11-14T20:34:23.089Z","branch":"claude/rendering-sprint"}
+{"id":"BL-1655","name":"SHADER_SEAM","ts":"2026-11-14T20:34:23.089Z","branch":"claude/rendering-sprint"}
+{"id":"BL-1656","name":"LENS_ID_LOOKUP","ts":"2026-11-14T20:34:23.089Z","branch":"claude/rendering-sprint"}
+{"id":"BL-1657","name":"SDF_NATIONAL_BORDERS","ts":"2026-11-14T20:34:23.089Z","branch":"claude/rendering-sprint"}
+{"id":"BL-1658","name":"CLOSE_ZOOM_DETAIL_LAYER","ts":"2026-11-14T20:34:23.089Z","branch":"claude/rendering-sprint"}
+{"id":"BL-1659","name":"LIVE_GRADE_SHADER","ts":"2026-11-14T20:34:23.089Z","branch":"claude/rendering-sprint"}
+{"id":"BL-1660","name":"SHADER_WATER","ts":"2026-11-14T20:34:23.089Z","branch":"claude/rendering-sprint"}
+{"id":"BL-1661","name":"FAR_ZOOM_CARTOGRAPHIC_MAP","ts":"2026-11-14T20:34:23.089Z","branch":"claude/rendering-sprint"}
+{"id":"BL-1662","name":"COMPRESSED_GROUND_TEXTURES","ts":"2026-11-14T20:34:23.089Z","branch":"claude/rendering-sprint"}
+{"id":"BL-1663","name":"ROAD_PAINT_CHECKS_FAIL","ts":"2026-11-14T21:31:03.192Z","branch":"claude/rendering-sprint"}

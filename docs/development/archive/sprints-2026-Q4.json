@@ -603,6 +603,53 @@
      "Parallel lanes collided on ids: world save v81 with the war lane, and NR-1181..1192 with the space branch. Ids were renumbered at the merge."
     ]
    }
+  },
+  "68": {
+   "id": 68,
+   "theme": "Map fidelity",
+   "state": "landed",
+   "status_line": "CLOSED 2026-11-17. 20 of 21 items delivered, one closed unbuilt (compressed ground textures, NR-1237). The ground went 3D mid-sprint on Ben's word: a lit heightmesh under a camera whose tilt follows zoom, marks draped, markers standing, buildings and trees as geometry, and the flat ground retired with --verify capturing on the GPU renderer. On branch claude/rendering-sprint; not merged.",
+   "opened_date": "2026-11-14",
+   "closed_date": "2026-11-17",
+   "author": "Claude (Ben, 2026-11-14: \"try implementing the easier changes first\")",
+   "goal": "The Planetary map holds more detail at every rung: correct mips and a smooth zoom first, then SDL 3.4 and a shader seam that moves lenses, borders, grade and water off the bake.",
+   "planned": [
+    "BL-1652 (GAMMA_CORRECT_MIPS)",
+    "BL-1653 (ANIMATED_ZOOM_STEP)",
+    "BL-1654 (SDL_3_4_UPGRADE)",
+    "BL-1655 (SHADER_SEAM)",
+    "BL-1656 (LENS_ID_LOOKUP)",
+    "BL-1657 (SDF_NATIONAL_BORDERS)",
+    "BL-1658 (CLOSE_ZOOM_DETAIL_LAYER)",
+    "BL-1659 (LIVE_GRADE_SHADER)",
+    "BL-1660 (SHADER_WATER)",
+    "BL-1661 (FAR_ZOOM_CARTOGRAPHIC_MAP)",
+    "BL-1662 (COMPRESSED_GROUND_TEXTURES)",
+    "BL-1663 (ROAD_PAINT_CHECKS_FAIL)",
+    "ADDED 2026-11-16 (the 3D turn): BL-1664 (FIXED_ANGLE_DEPTH), BL-1665 (GROUND_3D_SLICE), BL-1666 (GROUND_3D_CANVAS), BL-1667 (GROUND_3D_DETAIL), BL-1668 (GROUND_3D_DRAPE), BL-1669 (GROUND_3D_MARKERS_PICK), BL-1670 (GROUND_3D_BUILDINGS), BL-1671 (GROUND_FLAT_RETIRED), BL-1672 (GROUND_3D_TREES)"
+   ],
+   "notes": [],
+   "retro": {
+    "landed": [
+     "SEAM: BL-1652 (gamma-correct mips), BL-1653 (animated zoom step), BL-1654 (SDL 3.4), BL-1655 (shader seam), BL-1663 (road paint checks).",
+     "SHADERS: BL-1656 (lens lookup), BL-1657 (SDF borders), BL-1659 (live land lift, named Brightness), BL-1660 (shader water), BL-1658 (close-zoom detail layer), BL-1661 (far-zoom map).",
+     "3D: BL-1665 (3D slice) won Ben over (\"work with just 3D from now on\"); BL-1666 (3D canvas), BL-1667 (3D detail), BL-1668 (drape), BL-1669 (upright markers and terrain pick), BL-1670 (buildings), BL-1672 (trees), BL-1671 (flat ground retired: --verify on the GPU renderer, the squash and the fixed-angle shader deleted).",
+     "CALLS (Ben): NR-1233 (measure BC1 first), NR-1237 (close the compressed-textures spike), NR-1236 (move --verify to the GPU renderer)."
+    ],
+    "carried": [
+     "BL-1662 (compressed ground textures): closed unbuilt; BC1 numbers kept on the item.",
+     "BL-1674 (stale press checks): filed at the close; checks that press a building expecting the building, against the tile-select rule, and a stale unit-counter fixture.",
+     "The branch is unmerged; its NR-1232..1231 collide with main's ids and must be renumbered at the merge."
+    ],
+    "went_well": [
+     "The slice was a measurement first, and its verdict turned the sprint: one day from preview to the whole ground in 3D.",
+     "Live clicks caught what captures could not: the drape lag, tall markers whose click zones sat at their feet."
+    ],
+    "went_badly": [
+     "BL-1664 (fixed-angle depth) was built and retired within a day: the parallax and long shadows went with the flat ground.",
+     "Ground captures are now machine-dependent: a GPU rasterises per device, so goldens hold on this PC only and compare with a tolerance."
+    ]
+   }
   }
  }
 }

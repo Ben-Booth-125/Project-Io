@@ -386,11 +386,11 @@ THE SEAM'S ANSWER IS SHOWN, because set_trade validates what the form cannot (bo
 
 *Demanded by BL-022, BL-027, BL-028 · `src/ui/nav_pane.cpp` · id `nav_pane`*
 
-### Options window - Map section, Ground lightness combo (Off, +15%, +30%, +45%)
+### Options window - Map section, Brightness combo (Off, +15%, +30%, +45%)
 
 **Answers:** How light should the map's land read on this display?
 
-**Because:** Ben, 2026-11-10 (RENDERING.md § Art direction and palette, 'The land lift'): the lighter tileset is a grade pass on land only with three trial levels, chosen live rather than tuned blind, and the choice must survive a restart. One combo in the window that already holds the display settings; it re-bakes the land and leaves water as it is, so the player sees the effect on the map behind the window.
+**Because:** Ben, 2026-11-10 (RENDERING.md § Art direction and palette, 'The land lift'): the lighter tileset is a grade pass on land only with three trial levels, chosen live rather than tuned blind, and the choice must survive a restart. One combo in the window that already holds the display settings; it brightens the land and leaves water as it is - at draw time where the renderer runs Io's shaders (BL-1659), by a re-bake otherwise - so the player sees the effect on the map behind the window. Named Brightness (Ben, 2026-11-15).
 
 *Demanded by BL-1537 · `src/core/app.cpp`, `src/core/ground_layer.cpp`, `src/ui/ground_bake.cpp` · id `options_ground_lightness`*
 
@@ -410,11 +410,11 @@ THE SEAM'S ANSWER IS SHOWN, because set_trade validates what the form cannot (bo
 
 *Demanded by Ben's request 2026-10-25: building-first placement lens and site ledger (no backlog id yet), Ben's live-click rulings 2026-10-26 (Construction ledger and site finder; no backlog id yet) · `src/ui/body_surface_canvas.cpp`, `src/ui/construction_sites.cpp`, `src/ui/icons.cpp`, `docs/ui/LENSES.md`, `docs/ui/ICONS.md` · id `placement_lens`*
 
-### The Planetary canvas ground at every zoom - one baked master per body, viewed at one 22.5-degree angle at every rung and under every lens
+### The Planetary canvas ground at every zoom - one baked master per body, draped over a lit 3D surface under a camera whose tilt follows zoom
 
 **Answers:** What does this ground look like, at any zoom, the instant I look at it?
 
-**Because:** Ben, 2026-10-09, after walking the sprint 51 build: the ground lag was off-putting, because every zoom step had been a fresh bake that arrived late and softer first. One 96 px/hex master (Ben, 2026-11-05) per body, pre-baked behind the handoff and held in RAM, makes every rung a downsample of the same picture: a rung change is final on arrival, and detail never changes with zoom, only scale - so the player learns one picture of a world, not five. One camera angle at every rung and under every lens is what makes one master possible (a second angle was a second bake), and it means neither a zoom step nor a lens toggle moves the map under the cursor. It adds no chrome and no control: it replaces the per-rung tiers, the stand-in that hid their fills, and the stepped tilt.
+**Because:** Ben, 2026-10-09, after walking the sprint 51 build: the ground lag was off-putting, because every zoom step had been a fresh bake that arrived late and softer first. One 96 px/hex master (Ben, 2026-11-05) per body, pre-baked behind the handoff and held in RAM, makes every rung a downsample of the same picture: a rung change is final on arrival, and the baked detail never changes with zoom, only scale - so the player learns one picture of a world, not five. The two closest rungs add only a draw-time surface grain over it (Ben, 2026-11-15, BL-1658 (close-zoom detail layer)), which bakes nothing. The master is taken straight down and laid over the 3D ground (Ben, 2026-11-16: "work with just 3D from now on"; RENDERING.md § The 3D ground), so the same picture serves every tilt: a zoom step tilts the camera, never re-bakes, and a lens toggle never moves the map under the cursor. It adds no chrome and no control: it replaces the per-rung tiers, the stand-in that hid their fills, the stepped tilt and the flat ground.
 
 *Demanded by BL-1246 · `src/core/ground_layer.cpp`, `src/core/ground_layer.hpp`, `src/ui/ground_bake.cpp`, `src/ui/body_surface_canvas.cpp` · id `planetary_ground_master`*
 

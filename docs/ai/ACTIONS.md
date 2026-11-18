@@ -1979,7 +1979,7 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 - The app is in-game and no ImGui text field has keyboard focus.
 - The current rung is not at its zoom bound in that direction.
 
-**Expected output.** The view zooms about the canvas centre. On the Planetary rung a press lands on the next rung of the fixed x2 ladder (same ladder as the wheel; the baked ground reads the next level of the body's one master at once — detail does not change with zoom, only scale; the land is viewed at one 22.5-degree angle at every rung and under every lens); on the other rungs it is a continuous x1.1 change. No selection or lens state changes.
+**Expected output.** The view zooms about the canvas centre. On the Planetary rung a press lands on the next rung of the fixed x2 ladder (same ladder as the wheel; the baked ground reads the next level of the body's one master at once — detail does not change with zoom, only scale; the land is a 3D surface under a camera whose tilt follows the zoom; the drawn zoom glides to it over 0.18 s about the canvas centre, and under --verify lands at once, BL-1653); on the other rungs it is a continuous x1.1 change. No selection or lens state changes.
 
 **Reason to select.** Zoom without the mouse — the keyboard leg of the pan/zoom pair for keyboard-only driving.
 
@@ -2012,7 +2012,7 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 - The pointer is over the primary canvas, not the minimap inset or an ImGui panel.
 - The current rung is not already at its zoom bound in that direction (zoom is clamped per rung).
 
-**Expected output.** The view zooms about the cursor (the point under the mouse stays fixed). On the Planetary rung the zoom lands on the next rung of the fixed x2 ladder and the baked ground reads that rung's level of the body's one master, final on arrival (every level is a downsample of the same 96 px/hex image, so detail does not change with zoom, only scale). The land is viewed at ONE 22.5-degree angle at every rung and under every lens, so neither a zoom step nor a lens toggle moves the map; fractional wheel deltas accumulate and a rung fires per whole notch, at most one rung per frame. On the Solar and Circumplanetary rungs zoom is continuous (x1.1 per notch). No selection or lens state changes.
+**Expected output.** The view zooms about the cursor (the point under the mouse stays fixed). On the Planetary rung the zoom lands on the next rung of the fixed x2 ladder and the baked ground reads that rung's level of the body's one master, final on arrival (every level is a downsample of the same 96 px/hex image, so detail does not change with zoom, only scale). The land is a 3D surface under a camera whose tilt follows the zoom, and a lens toggle never moves the map; fractional wheel deltas accumulate and a rung fires per whole notch, at most one rung per frame. The drawn zoom glides to the new rung over 0.18 s, holding the point under the cursor; the rung itself (the zoom state) changes at once, and under --verify the step is instant (BL-1653). On the Solar and Circumplanetary rungs zoom is continuous (x1.1 per notch). No selection or lens state changes.
 
 **Reason to select.** Move closer to or further from a specific spot — cursor anchoring means you aim the zoom at the thing you are interested in.
 
@@ -3975,7 +3975,7 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 - App is in game.
 - Not while an ImGui widget owns the keyboard.
 
-**Expected output.** Toggles the Options window: a Display section (Resolution preset combo, Fullscreen, VSync), an Accessibility section (UI Scale), a Map section (Ground lightness), a live window-size readout, and Close. Every change applies live to the SDL window and persists to options.cfg immediately.
+**Expected output.** Toggles the Options window: a Display section (Resolution preset combo, Fullscreen, VSync), an Accessibility section (UI Scale), a Map section (Brightness), a live window-size readout, and Close. Every change applies live to the SDL window and persists to options.cfg immediately.
 
 **Reason to select.** To adjust display and UI-scale settings mid-session.
 
@@ -3986,7 +3986,7 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 **Valid when:**
 - None — handled before the screen guard, so the frame budget can be watched on the menu and the generation screen too.
 
-**Expected output.** Toggles the frame-budget HUD, the per-frame timing instrument. In game it first anchors top-left of the canvas area (movable after); on the pre-play screens it insets from the top-left corner. Honest status: this is a dev/audit instrument (the v0.1.0 performance audit tool), not shipped player chrome, and it sits outside the shared canvas command vocabulary.
+**Expected output.** Toggles the frame-budget HUD, the per-frame timing instrument. In game it first anchors top-left of the canvas area (movable after); on the pre-play screens it insets from the top-left corner. In game on the planetary ground, it also opens the '3D slice (BL-1665)' window: a 'Show on the canvas' checkbox (the 3D ground replaces the flat ground on the canvas, its camera following the canvas pan and zoom; the map's marks and clicks stay flat; it stays on with the HUD closed), a 'Render here' checkbox, a Fit button and sliders (tilt, turn, distance, field of view, height, bumps, rolling) over a rendered heightmesh of the visible ground chunks, with its vertex, triangle and CPU-cost figures - a measurement for judging true 3D, read by nothing else. Honest status: this is a dev/audit instrument (the v0.1.0 performance audit tool), not shipped player chrome, and it sits outside the shared canvas command vocabulary.
 
 **Reason to select.** To watch build/submit/present frame costs while reproducing a performance concern.
 
@@ -4122,7 +4122,7 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 
 **Reason to select.** To fit the window to the display or to a capture-friendly size.
 
-### `chrome.options_set_ground_lightness` — Options window, Map section, Ground lightness combo
+### `chrome.options_set_ground_lightness` — Options window, Map section, Brightness combo
 
 **Press.** Open the combo and click a level.
 
@@ -4133,9 +4133,9 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 **Valid when:**
 - Options window open.
 
-**Expected output.** The planetary map's land re-bakes at the chosen lightness over the next moments (the view first); water - sea, lakes and rivers - keeps its colour. Persists to options.cfg immediately. Sim, view and selection untouched.
+**Expected output.** The planetary map's land takes the chosen brightness at once, drawn by the 3D ground pass per tile (a river's water on a land tile lifts with it); nothing re-bakes. Persists to options.cfg immediately. Sim, view and selection untouched.
 
-**Reason to select.** To make the map's land read lighter or darker on this display.
+**Reason to select.** To make the map's land read brighter or darker on this display.
 
 ### `chrome.options_vsync` — Options window, Display section
 

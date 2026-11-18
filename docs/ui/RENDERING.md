@@ -33,8 +33,7 @@ reference renders:
    ruling once the references showed grid-free continuous ground).
 3. **Camera: staged.** The bake ships under the **current top-down camera**; the
    tilting oblique camera of the references ("as if standing on the planet") is a
-   **future milestone of its own** — `docs/development/ROADMAP.md` owns when, and
-   § The staged end-state below owns what carries forward.
+   **future milestone of its own** (since ruled: § The 3D ground).
 4. **The grid rule: no hex grid on screen.** The grid exists only as interaction
    feedback — a single amber hex on the selected tile, the hover treatment likewise.
 5. **Installations are rendered geometry, not glyphs.** Building markers retire from
@@ -47,10 +46,16 @@ dramatic landforms and rivers leave the canvas's vector layer for the bake too; 
 is **never magnified** at any rung (§ Level of detail).
 
 Ruled by Ben, 2026-10-09, after walking the sprint 51 build: the ground is viewed at **one
-angle** (22.5°) at every rung, and **zooming does not add detail** — one 96 px/hex master
+angle** (22.5°) at every rung, and **zooming bakes no new detail** — one 96 px/hex master
 per body, pre-baked during generation and held in RAM, with every other zoom a downsample
-of it (§ Level of detail; § One angle). This supersedes the never-magnify tier ladder and
-the stepped tilt.
+of it (§ Level of detail; the angle since ruled 3D, § The camera). This supersedes the never-magnify tier ladder and
+the stepped tilt. The two closest rungs add a draw-time detail texture over it (Ben,
+2026-11-15, § Level of detail).
+
+Ruled by Ben, 2026-11-16, after the 3D slice: **the ground is 3D**, seen through a perspective
+camera whose tilt follows zoom, with no turn; the flat ground retires entirely; ground marks
+drape over the terrain, markers stand upright, clicks pick the terrain, and buildings are
+procedural geometry (§ The 3D ground; § The camera). This supersedes the one-angle ruling.
 
 ---
 
@@ -194,8 +199,14 @@ ground retires only as coverage arrives.
 
   **Under `--verify` everything a frame draws is complete before the frame
   returns:** the master chunks under the view bake on the pool and the main
-  thread waits for them; every visible texture uploads with no budget; no
+  thread waits for them; every visible texture uploads, and every chunk mesh
+  of the 3D ground builds, with no budget; no
   pre-bake or background bake runs — a capture must never race the pool.
+  The canvas asks for the next frame's ground, so a capture first renders until
+  the canvas asks for nothing the bake has not covered and every chunk under the
+  view is on the GPU, then one frame more (the 3D pass draws from the last frame's
+  camera): a capture taken straight after a zoom, a pan or a lens shows its own
+  view's ground, not the last one's.
   (The home master is ~1-3 minutes of pool time, paid by the first
   whole-body framing of a run.) So the master **never fills by itself**
   under `--verify`: it holds what the views so far have covered. A script
@@ -396,11 +407,11 @@ Consequences the design accepts and answers:
   must be authored to read at distance (footprint contrast, cleared ground, a road
   stub), the way the it3 settlement reads. Ben chose this against a
   geometry-close/glyphs-far ladder, deliberately.
-- **Structures stand up.** At the one oblique angle (§ One angle) a structure bakes as a
-  standing sprite like a tree — verticals pre-stretched by 1/cos(tilt), shadow left on
-  the ground plane — so the camera squash returns it to true proportion.
+- **Structures stand up as geometry.** A structure is procedural low-poly 3D shapes on its
+  footprint, lit and shadowed with the ground (§ The 3D ground); the bake keeps only its
+  ground parts - pads, yards, aprons, a town's paving - and the roads.
 - **Under a lens a structure is ground.** It takes the lens wash like the terrain around
-  it; a lens is an analytic read, seen at the same one angle as the plain canvas.
+  it; a lens is an analytic read, seen under the same camera as the plain canvas.
 - A structure stamp may **overhang its tile** (chimneys, towers); stamps compose in
   row order like every other pass. **Hit-testing is unchanged**: the hex, not the stamp,
   is what a press lands on (SELECTION.md § Multi-building tiles).
@@ -412,6 +423,12 @@ Both were vector chrome drawn over the bake — a stroke-only landform glyph on 
 centre, a straight river line from tile centre to tile centre with downstream chevrons —
 and both read as annotation laid on a painting. They move into the bake.
 
+- **A mountain's flanks are broken, not smooth (Ben, 2026-11-16: mountains looked "very smooth
+  compared to the detail", "even when zooming out a bit").** Into the massif the bake cuts
+  **erosion gullies** - sharp, narrow channels running straight down each flank from the
+  ridge, a field sampled at the ridge point a pixel drains from, so every gully runs downhill -
+  and its **crags** stand twice as tall as before. Both are in the 96 px master, so they reach
+  every rung the mips carry; the draw-time relief adds taller rock bumps at the closest two.
 - **Dramatic landforms bake their own forms.** Mountain bakes as massif and ridge (the
   ridged relief the close tiers already fold toward, now carrying the read at every
   tier); canyon as a cut between paired rims; crater as a raised-rim bowl; rift as a dark
@@ -634,8 +651,19 @@ both draw by one rule:
 
 ### Ambient animation
 
-Motion is **overlay flipbook, not baked**: the ground bake is static, and animated
-passes (water shimmer) draw as looping frame overlays on top of the baked chunks. No
+Motion is **an overlay, not baked**: the ground bake is static, and animated
+passes draw over the baked chunks.
+
+**Water moves by shader (BL-1660, shader water).** Where the renderer runs Io's fragment
+shaders ([TECH_FOUNDATIONS.md](../tech/TECH_FOUNDATIONS.md) § Framework), open water carries a
+**glint**: two crossing height fields, three and five waves a hex, scrolling slowly and lit by
+the bake's low NW sun, add a small specular highlight over the baked water — the bake stays the
+water's colour, the shader only adds light. It reads one table, which tiles are visible water,
+and fades to nothing within half a hex of any side facing a non-water tile, so the painted
+coastline, the shore shelf and a river mouth never move; and below ~24 px a hex, where a wave
+would be under a pixel. Shore foam is not part of it: foam must follow the painted coast,
+which a per-tile table cannot place. **No-shader path:** the static bake. The flipbook
+overlay this replaces is retired for water. No
 animation keys on an installation's state — the art is static (§ Installations). The animation clock is **render-side real time** — never sim
 state — so ambience continues while paused; under `--verify` the clock is **pinned to
 phase 0** and a check advances it explicitly. The near-future grade applies over
@@ -653,22 +681,38 @@ zoom we currently have (2.5D)"*): the player's wheel and keyboard move through a
 (`planetary_zoom_stepped`; verify's `set_zoom` stays free-form so scripted framings
 are unaffected). The upper canvas rungs keep continuous zoom.
 
+**A step glides** (Ben, 2026-11-14, BL-1653 (animated zoom step)). The ladder is the
+state — the saved zoom and every reader of it see the rung — but the zoom DRAWN moves to
+the new rung over **0.18 s**, eased out, geometric in zoom, holding fixed the point under
+the cursor (the wheel) or the view's centre (the keyboard). In between, the level drawn
+follows the drawn radius by the rule below (minified at most 2:1), so a glide asks for no
+level the ladder's two ends do not. A step taken mid-glide starts from the zoom drawn. A
+middle-button pan ends the glide at its rung. Under `--verify` (the fixed frame clock) a
+step is instant, so a capture never lands mid-glide.
+
 **Zooming does not add detail** (Ben, 2026-10-09, after walking the sprint 51 build:
 *"the current lag is very off putting… zooming doesn't add more detail, arguably the
 biggest fix even if we keep a high resolution"*). This supersedes the per-rung bake
 tiers of 2026-09-01 and the never-magnify tier chooser of 2026-10-08: a zoom step had
-been a fresh, expensive bake, and that bake was the lag.
+been a fresh, expensive bake, and that bake was the lag. The BAKE still adds nothing with
+zoom; the two closest rungs add a draw-time detail texture (Ben, 2026-11-15, below).
 
 - **One master per body.** The ground is baked ONCE per body, at **96 px per hex** (Ben, 2026-11-05, overturning 128 px, Ben,
   2026-10-10: "simply up the resolution in each tile"), its levels halving from there, at
-  the one camera angle (§ One angle), whole-body, in 512 px chunks. Everything the
+  straight down (§ The camera), whole-body, in 512 px chunks. Everything the
   player sees at any rung is this image: the close-tier features (trees, crags, strata,
   structures) are always in it and simply grow small with distance.
 - **Every other zoom is a downsample.** A **mip chain** — 48, 24, 12 and 6 px per hex
   — is box-downsampled from the master, chunk by chunk, in milliseconds. A rung
   draws the level at or above its drawn radius, minified by at most 2:1, so no step
-  shimmers (`SDL_Renderer` has no mipmaps; the chain is ours). Detail never changes
-  with zoom; only scale does.
+  shimmers (`SDL_Renderer` has no mipmaps; the chain is ours). The baked detail never changes
+  with zoom; only scale does. **The downsample averages in linear light** (Ben,
+  2026-11-14, BL-1652 (gamma-correct mips)): each sRGB byte is decoded through a fixed
+  table, the four samples averaged by alpha weight, and the mean re-encoded through the
+  inverse table. An sRGB-byte mean darkens fine contrast — a lit crown beside its
+  shadow averages to a darker grey than the eye sees — so each level would read
+  muddier than the master it came from. Integer tables, so the chain stays
+  deterministic; a flat run stays exact.
 - **The master is held in RAM; the GPU holds what is on screen.** The master and its
   chain live in system memory (about 2.9 GB for an Earth-sized body, opaque chunks as RGB); each frame uploads
   the visible chunks of the level in use, within a per-frame upload budget so a pan
@@ -693,6 +737,143 @@ been a fresh, expensive bake, and that bake was the lag.
   — the one rung that reads the master near 1:1 — would gain from a 2× bake, at four
   times the bake cost. A 2× master is taken only if the pool's measured pre-bake still
   fits the target in TECH_FOUNDATIONS.md § Target hardware.
+- **The two closest rungs add detail at draw time (Ben, 2026-11-15, BL-1658 (close-zoom
+  detail layer); overturning "zooming does not add detail" for these two rungs, whose
+  ground for that ruling was the lag of a fresh bake per rung).** Where the renderer runs
+  Io's fragment shaders, the ground shader modulates the land's **luminance only**, by a
+  tiling **detail texture** chosen per terrain family, so close zoom stays crisp past the
+  master's 96 px per hex (and past the ~2x magnification of a 4K-height window). Nothing is
+  baked: the bake and its chain are unchanged. The 3D pass applies it (§ The 3D ground).
+  - **Four families**, one greyscale texture each, packed into the four channels of one
+    texture: **vegetation** (grass, scrub, marsh; bare sedimentary ground), **forest**,
+    **arid** (dunes, ash, salt; bare barren ground) and **rock** (snow, urban; bare rocky,
+    volcanic, metallic, regolith and icy ground). A tile's family is its cover first, its substrate
+    when bare. Water and the survey lock fill take none.
+  - **Two scales (Ben, 2026-11-15: "more detail than this", answered "two scales").** A
+    **coarse** layer gives the patches; a **fine** layer over it gives grain inside them.
+    Each family has a texture at each scale.
+  - **The textures are generated files**: the coarse `assets/detail/<family>.png`, 256 px
+    square, and the fine `assets/detail/fine/<family>.png`, also 256 px square (Ben,
+    2026-11-16: "increase the resolution of the fine grain textures, and make them larger"),
+    from its own seed. Both are seamless, written by `tools/art/gen_detail_textures.py` from fixed
+    seeds. They are ordinary art files: repainting one by hand replaces the generator's
+    output for it.
+  - **The textures are hard-edged where the ground is:** forest is small round crowns of
+    varied size in shadowed gaps (Ben, 2026-11-16: whole-cell crowns read "too jagged"), arid ground is steep-faced ripples with pebbles, rock is cracked plates. Soft noise
+    there reads as blur, not detail. **Grass is the exception** (Ben, 2026-11-16: cellular
+    tufts "just look rocky"): soft clumps with a short, bent blade grain, no cells or seams.
+  - **Strength (Ben, 2026-11-16: doubled, the first cut was "not really seeing" it): ±18% of
+    luminance for the coarse layer, ±14% for the fine**, at each
+    texture's extremes (each is normalised so its 99th-percentile deviation is the full
+    swing); the two add. Both apply at the **48 and 96 px rungs**, fading to none from 48
+    down to 24 px drawn radius, so a zoom glide brings them in smoothly.
+  - **The fine layer shows only where it resolves:** it fades out as its texels shrink
+    from 1.5 to 3 per screen pixel, past which it would shimmer.
+  - **World-locked:** the coarse texture repeats every 4 canonical units (one hex
+    circumradius is 1), the fine one every 2, so a grass tuft is about 10 px across at the
+    96 px rung, anchored to the ground through the same inverse camera as the land lift, so
+    it pans and zooms with the map. The family is per tile, softened across a hex side
+    over the lift's band. It touches what is drawn on land - trees, crags - which reads as
+    surface texture, not pattern.
+  - **Each tile reads on its own (Ben, 2026-11-16: the style "doesn't differentiate between
+    different tiles very well" - both the families looking alike and neighbours running on as
+    wallpaper).** Every tile reads the textures **at its own offset**, a hash of its grid cell,
+    so no two neighbours continue one pattern, and takes its **own tone**, a small lift or dip of
+    the whole tile (±10% of luminance at the extremes). Each **family carries its own strength**:
+    forest and rock strongest, then arid ground, grass weakest. Across a hex side the two tiles'
+    readings blend over the lift's band, as the family does. No rotation or mirroring: the
+    textures carry the bake's light direction in them.
+  - **Buildings and roads draw over the detail (Ben, 2026-11-16: "draw buildings and roads over
+    the detail layer, so it can still be seen in the space between buildings").** A per-tile
+    rule left whole hexes plain; this one is per pixel. The bake **marks every pixel the
+    road-and-installation pass paints** (a road, a pad, a yard, a roof, a town's paving), and
+    **every pixel of a river's water** (Ben, 2026-11-16: "rivers should be painted over the fine
+    grain textures"), in
+    the **lowest bit of its blue channel**, and clears that bit on every other pixel; the
+    shader reads the bit, unfiltered, and applies no detail and no relief there. So the
+    ground between buildings carries its texture and the buildings and roads stay as baked.
+    The bit costs no memory and moves no colour by more than one step in 255. Each mip level
+    keeps it where at least two of the four pixels it averages carry it. A compressed chunk
+    format would not keep it (BL-1662 (compressed ground textures) would need its own mask).
+  - **The ground has relief (Ben, 2026-11-16: "draw-time relief: lit bumps on a smooth height
+    field, with short shadows").** A brightness ripple alone reads faint; light and shadow read.
+    So the detail is also a surface, lit at draw time:
+    - **A smooth height field.** Each tile's generation `height` is a sample at its centre; a
+      pixel's height is the plane through the three nearest tile centres (barycentric), so the
+      ground slopes continuously from tile to tile and never steps at a hex side.
+    - **Rolling ground at draw time (Ben, 2026-11-16: flat tiles showed "no elevation or
+      shading").** A broad, gentle height noise (`assets/detail/rolling.png`, swells about
+      three hex radii across) adds to the height field on all land, so flat country rises
+      and falls under the light at the two closest rungs.
+    - **Bumps on it.** Each family's coarse detail texture is also a height map: the tufts,
+      crowns, ripples and plates stand up from the slope, rock and forest tallest, arid ground
+      lowest; the fine layer adds a smaller roughness over it. **A mountain tile's bumps stand
+      two and a half times taller** (Ben, 2026-11-16: mountains looked "very smooth compared
+      to the detail").
+    - **Lit from the bake's light** (the upper left, about 40° up). The bumps apply what they
+      add: the light on the bumped surface over the light on the bare slope. **The height field
+      is shaded too (Ben, 2026-11-16: "I can't see the height map being rendered at all")**: the
+      bake's own slope shading is too soft to read under the detail, so the shader restates it,
+      the light on the bare slope over the light on flat ground. A tile's height rises 16
+      canonical units per unit of generation height, so a step between neighbours is a slope
+      the light finds. A bump on a slope facing the light lights more
+      than one facing away, so the roughness follows the height map.
+    - **Short shadows.** Each pixel looks toward the light over a short distance (half a hex
+      radius, in four steps) through the slope and the bumps; where they rise above its line
+      of sight it darkens. A crag throws its shadow downhill, and a steep slope facing away
+      from the light lies in its own bumps' shade.
+    - Weighted as the detail is: land only, none at 24 px rising to full at 48 px, none on a
+      structure's or a river's pixel. The values (height scale, bump heights, shadow depth,
+      family strengths, tile tone) are calibration,
+      tuned by eye.
+  - *Superseded the same day by § The 3D ground, which keeps its wind and sand and retires its
+    parallax and shadow marches.* **Depth at the fixed angle (Ben, 2026-11-16: "more elevation, shadows, and possibly
+    animations on the texture", answered "Shader now, 3D slice"; BL-1664 (fixed-angle depth)).**
+    The relief above gains depth the camera can see, still at the one angle and still at draw
+    time:
+    - **Parallax relief.** The bumps are a surface the view ray meets, not only a light. A pixel
+      steps its ray down through the bump heights along the view's tilt and reads the detail
+      where the ray first meets the surface, so a raised crown or crag stands in front of the
+      ground behind it and hides it. The tile-scale slope is not stepped: the bake already lifts
+      it. The parallax runs at a depth of its own, deeper than the bumps' lighting height, tuned
+      by eye.
+    - **Long shadows.** Past the short march through the bumps, a second march runs **three hex
+      radii** toward the light over the height field and the rolling ground, so a high tile
+      shades the low ground beside it and a ridge throws its shadow across a valley. It is
+      softer and lighter than the bumps' own shade.
+    - **Wind and sand.** Grass and forest move: **gusts** - broad bands of the rolling texture
+      drifting downwind - brighten the detail they cross, grass more than forest, and inside a
+      gust **each blade flutters on its own**: the texture's raised parts swing in brightness,
+      each blade-sized cell at its own phase and pace. Nothing moves the texture itself (Ben,
+      2026-11-16: a moving lookup "looks more like the ground is warping than individual blades
+      of grass are waving").
+      Arid ground's ripples **creep downwind**, a pixel or so a second at the closest rung. The
+      clock is § Ambient animation's: render-side real time, never sim state. Rock and snow do
+      not move.
+    - **No-shader path:** the static bake, as for every draw-time pass.
+- **The farthest rung is a flat map (Ben, 2026-11-16: "flat map, cross-fade from 12 px";
+  it shows national colour, inked coastlines and rivers as lines).** At ~6 px a hex the painted
+  ground reads as noise: every feature the bake carries is a pixel or two. So the whole-grid
+  rung trades the painting for a cartographic read, as a strategy map's far zoom does.
+  - **What it shows.** Land is flat **paper**, tinted toward its **nation's colour**
+    (unclaimed land stays paper); all water — sea, coast and lake tiles — is one flat, deep
+    blue. **Coastlines are inked**: a dark line on the hex side between a land tile and a
+    water tile. **Rivers are lines**: each land tile draws its half of the course, centre to
+    the midpoint of each river side, in a darker blue. No terrain colours, relief or paper
+    grain: the far map answers *whose* and *where the water is*, nothing else.
+  - **Widths are in screen pixels**, about 1.5 px for a coast and 1 px for a river, so the
+    ink does not thicken or thin through the fade.
+  - **It fades in from the 12 px rung.** The map's weight rises from none at a drawn hex
+    radius of 16 px to full at 6 px, smoothly: a third at the 12 px rung, so that rung
+    previews the map, and full at the 6 px rung. A zoom glide passes through the fade.
+  - **The survey still hides.** A tile the player has not surveyed keeps the bake's lock fill;
+    no ink is drawn against it, so the map does not leak a coast the player has not seen.
+  - **Drawn by the ground shader, over the images.** A per-tile map table carries each tile's
+    colour and river sides; the canvas's washes, border rule and strokes draw over the map as
+    over the painting.
+- **No rung is wider than the whole grid (Ben, 2026-11-16).** A ~3 px rung was tried and
+  cancelled the same day: it shows the same land several times across the cylinder's wrap,
+  which confuses more than the wider view helps.
 - **No rung magnifies at the reference window (Ben, 2026-11-05)**: the top rung is lowered to
   ~96 px, drawn from the 96 px master at about 1:1. A 4K-height window magnifies the top rung
   ~2× (the 2026-10-10 ruling accepted ~1.7× for the prototype, choosing 128 over 96 and over
@@ -715,32 +896,20 @@ wide-rung level of detail and frame budget: PLANETARY.md § Draw-loop cost model
 vertex offset of their own, drawn first: that ordering is part of the 60 fps budget, not
 a style choice (the same section says why).
 
-### One angle — the 2.5D seam at a single tilt
+### The camera — a perspective view, tilt following zoom
 
-The planetary ground is viewed at **one fixed oblique angle, 22.5°, at every rung** (Ben,
-2026-10-09, replacing the 2026-09-02 stepped tilt of 22.5° at rung 3 and 45° at rung 4):
-axonometric — a y-squash by cos(22.5°) ≈ 0.924, no perspective convergence. One angle is
-what makes one master possible: a second angle was a second bake.
+The planetary ground is a **3D surface seen through a perspective camera** (Ben, 2026-11-16,
+§ The 3D ground, replacing the one fixed 22.5° angle of 2026-10-09). The camera looks at the
+centre of the canvas view, north up, and **never turns**. Its **tilt follows zoom**: straight
+down at the far rungs, where the map reads as a map, rising with each closer rung to its
+steepest - about 50° from straight down - at the closest. Its distance is set by zoom, so the
+view's height fills the canvas as it does today; panning moves what it looks at. The player
+does not tilt or turn it.
 
-Two halves make it:
-
-- **The camera is one vertex squash, applied always.** The canvas draws everything in
-  flat ground space; a single transform over the map-space vertex range squashes fills,
-  strokes, images and labels alike about the canvas centre, and one inverse on the
-  cursor keeps every hit test correct. It applies under every lens too, so switching a
-  lens never moves the map; the lens key, which is screen chrome drawn on the same list,
-  is cut out of the squash. Height displacement is deliberately ignored for hits — a
-  few px on mountain tops.
-- **The master bakes oblique:** the height field displaces content upward by
-  `lift = 0.9·tan(22.5°)` canonical units per unit height, so hills grow real
-  silhouettes (a masked re-resolve locks, so a peak truncates at the survey mask rather
-  than leaking); trees and structures bake as **standing sprites** — upright, shadow
-  left on the ground plane — with their verticals pre-stretched by 1/cos(22.5°) so the
-  camera squash returns them to true proportion. The lift stays modest, so the
-  projection is monotonic and needs no occlusion handling. Deterministic and
-  wrap-exact (`ground_bake_check` P9).
-
-
+The master is still baked once per body and every rung still reads one level of it (§ Level of
+detail). It is now baked **straight down**: with real heights the 3D ground lifts the hills
+itself, so the bake's own oblique lift and its standing sprites retire. Trees stay painted on
+the ground; structures leave the bake for geometry (§ The 3D ground).
 ---
 
 ## Art direction and palette
@@ -779,7 +948,19 @@ Judged against `docs/ui/design/renders/map/`. What it asks of the bake, procedur
   ground holding no land (open sea, the survey lock fill) is not re-baked. The default is the
   **middle level (+30%)** until Ben picks. The percentiles each level gives are
   `ground_bake_check` P35's reading (`--lift`), which also holds the water byte-identical to the
-  lift off.
+  lift off. The player sees the setting as **Brightness** (Ben, 2026-11-15); "land lift" stays
+  the design's name for the pass.
+- **The lift at draw time (BL-1659, live grade shader; NR-1232 option D, Ben 2026-11-15).**
+  The canvas's ground bakes **without** the lift and the 3D pass (§ The 3D ground) applies the
+  same curve as it draws, so a change of level is instant and re-bakes nothing. The land weight
+  there is **per tile**, not per pixel: a table of one texel per tile (land = seen and not
+  ocean, coast or lake, the bake's own class), looked up at each point of the ground. So the
+  lifted shore is the
+  **hex side**, softened over a short band, not the painted coast, and a river's water on a land
+  tile lifts with its tile. The opaque chunks stay RGB (§ Resident set): no per-pixel weight is
+  stored. The Selection band's neighbourhood page, which no shader draws, still bakes the lift.
+  If the hex-side shore shows at play zooms, the fallback is a half-resolution land mask
+  per chunk (NR-1232 option B).
 - **Palette and value.** Base hues take **it1's colour** — warm olive and khaki, rich green
   forest, white peaks, blue-green sea — not C-F's grey (the grade's desaturation eases to
   match); from it3 the value structure stays:
@@ -803,8 +984,14 @@ Judged against `docs/ui/design/renders/map/`. What it asks of the bake, procedur
   broken by the form's jag so snow runs down gullies. The baked ground has its own palette for this
   (`palette::ground_tile_colour`); the identity fill the vector fallback, minimap and
   generation preview draw keeps its own hues.
+- **Flat land rolls gently (Ben, 2026-11-16, revising 2026-10-10's "flat land renders flat"):
+  flat tiles showed "no elevation or shading" once the close rungs carried relief.** Plains and
+  valleys take a **roll of 0.25** where they took 0, so the fold field, the hills and the slope
+  shading lift them a quarter as much as highland - gentle swells, still plainly flatter than
+  rolling country. The draw-time rolling ground (§ Level of detail) adds to it up close.
 - **Flat land renders flat** (Ben, 2026-10-10, closing sprint 51: *"render flat land as flat -
-  currently the whole world seems very rugged and hilly"* — this revises the bullet below). Relief
+  currently the whole world seems very rugged and hilly"* — this revises the bullet below;
+  its "0 on plains and valleys" is revised in turn by the bullet above). Relief
   follows the tile's **landform**: **plains and valleys are flat** (only the faint grain and patterns
   move their light), **highland rolls**, and the dramatic forms — mountain, canyon, crater, rift —
   keep their drama; the rolling fold field below applies to highland only, and cast shadows fall
@@ -841,8 +1028,8 @@ Judged against `docs/ui/design/renders/map/`. What it asks of the bake, procedur
 
 Truly painterly trees and towns need authored brushes and stamps; that is a later item, on
 the stamp seam that already exists. What the reference owes to its low perspective camera —
-silhouetted ridges, foreshortening, distance haze — is out of reach of the top-down bake
-(§ The staged end-state).
+silhouetted ridges, foreshortening, distance haze — comes from the 3D ground, not the bake
+(§ The 3D ground).
 
 **Assets.** Authored raster brushes and structure stamps — the project's first
 shipped raster art beyond fonts — live under **`assets/brushes/`**, resolved
@@ -852,22 +1039,51 @@ cwd-relative like fonts, with a provenance line per sheet in the brush manifest
 
 ---
 
-## The staged end-state
+## The 3D ground (Ben, 2026-11-16)
 
-The references express a camera this stage does not ship: continuous tilt from
-near-orbital to a low oblique, with terrain and structures as true geometry. That is
-**a renderer milestone of its own** (the SDL3 GPU door TECH_FOUNDATIONS holds open —
-or its 2.5D pre-rendered alternative; the trade-off analysis lives in
-`docs/research/CANVAS_RENDERING.md` § The end-state choice). What this stage
-guarantees about it:
+Ruled after the 3D slice (BL-1665 (3D slice)) stood in for the ground on the canvas: "I much
+prefer the 3D look ... work with just 3D from now on". The planetary ground is **true 3D on
+the GPU device** behind SDL's GPU renderer (TECH_FOUNDATIONS § Rendering dimension); the flat
+ground is retired, with no flat fallback.
 
-- **Nothing authored here dead-ends.** Biome brushes, structure stamps, the grade
-  recipe and the palette carry into any successor as textures and materials; the
-  bake's pass structure is the material definition a 3D ground would consume.
-- **The ground is one swappable layer.** Everything above it (chrome, lenses,
-  selection) composes onto "a ground layer" — the successor replaces the layer, not
-  the canvas.
+- **The terrain is a heightmesh** per ground chunk, coloured by that chunk's bake. A vertex's
+  height is the tile height field (the plane through the three nearest tile centres), the
+  rolling ground, and each family's detail bumps - mountains' standing taller. The far page is
+  a coarse backdrop **only where no chunk is loaded**, without bumps and a little below, so a
+  tilted view never runs off the ground and never shows it through the detail.
+- **It is lit and shadowed in 3D:** the bake's light, now a sun casting a shadow map over the
+  whole view. The bake keeps its own painted shading; the sun applies as a ratio against flat
+  ground under the same light, so the two agree.
+- **The close-zoom detail layer draws on the mesh** (§ Level of detail): the per-family detail
+  textures, each tile's own offset and tone, the bumps as lit surface, wind and creeping sand,
+  and the far rungs' flat map - each with the weight by drawn radius it had on the flat
+  ground. Parallax and the draw-time shadow marches retire: the mesh and the shadow map are the
+  depth now.
+- **Ground marks are draped.** Everything the canvas draws flat on the ground - lens washes,
+  borders, fronts, a province's selection, roads' highlights, the hover and selection hex - is
+  drawn each frame into a texture in ground space and laid over the terrain, so it follows the
+  hills and is hidden behind them where they rise.
+- **Markers stand upright.** Units, labels, icons and the tile card's anchor stand at their 3D
+  point on the ground, facing the screen, at a constant screen size; behind a hill they hide.
+- **Clicks pick the terrain.** A click casts a ray from the camera and lands on the first
+  ground it meets; hover and every hit test use the same pick.
+- **Buildings are procedural geometry.** Each installation's footprint, as the installation
+  pass lays it out today (pads, yards, sheds, tanks, towers, a town's blocks), stands as
+  low-poly 3D shapes - boxes, pitched roofs, cylinders - lit and shadowed with the ground.
+  Roads and paving stay painted on the ground.
+- **Trees stand in 3D** (Ben, 2026-11-16: "We can render the trees in 3D as well"). Forest
+  and scrub tiles carry low-poly trees - dark conifer cones and rounder broadleaf crowns,
+  smaller bushes on scrub - in the number the tile's cover density gives, scattered by a
+  seed of the tile so the same forest always stands the same. They keep off roads, rivers
+  and installations, stand only where buildings do (the close rungs), and are lit and
+  shadowed with everything else. The painted canopy stays as the forest floor, and the
+  trees' own shadows darken it. Clicks still pick the terrain: a tree never hides its tile.
+- **Nothing in world/\* reads any of it.** The ground is presentation.
 
+The default calibration (proposed by Claude at Ben's request, 2026-11-16): tilt rising from
+straight down at the 12 px rung to 50° from straight down at the 96 px rung; a 35° field of
+view; tile height ×4 canonical units; bumps at twice the detail layer's; the sun at the bake's
+40° from the north-west; a full shadow darkening by half. Calibration, tuned by eye.
 ---
 
 ## Verification
@@ -890,7 +1106,8 @@ guarantees about it:
 - **Headless:** chunk invalidation (a build dirties exactly the intersecting
   chunks; nothing else re-bakes) and brush-manifest integrity are display-free
   checks.
-- Captures stay machine-portable: same rasteriser path, bundled cwd-relative assets.
+- Captures use bundled cwd-relative assets, but the ground is rasterised by the GPU
+  device: a ground golden holds on the machine that blessed it.
 
 Design owners: BL-732 (ground bake renderer) — the mechanism; BL-733 (biome brush &
 structure art pipeline) — the authored assets; BL-734 (ground/chrome layer contract)

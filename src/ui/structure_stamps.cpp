@@ -2127,6 +2127,10 @@ void stamp_installations(const bake_source& src, const geometry& g, const bake_p
 
     // 1b. Roads and sea lanes (BL-1253): over the ground, under the rest.
     run_between();
+    // The 3D ground stands the structures up as geometry (BL-1670): no shadow, no standing
+    // part is painted - installation_solids hands them over instead.
+    if (!p.standing)
+        return;
 
     // 2. Shadows: one union over every standing part, applied once — two
     // overlapping shadows never double-darken.
@@ -2361,6 +2365,50 @@ float installation_clear_radius(const bake_source& src, std::size_t i)
     if (ti.settlement.subject == stamp_subject::ruin)
         r = std::max(r, 0.45f);
     return r;
+}
+
+void installation_solids(const bake_source& src, int c, int r, std::vector<structure_solid>& out)
+{
+    if (src.inst.list.empty() || src.inst.of_tile.size() != src.cls.size() || src.gw <= 0
+        || r < 0 || r >= src.gh)
+        return;
+    geometry g;
+    g.gw = src.gw; g.gh = src.gh; g.s = k_master_ppr; g.ss = 1.0; g.tilt_sy = 1.0; g.lift = 0.0;
+    bake_params p;
+    std::vector<part>     parts;
+    std::vector<instance> inst;
+    build_tile(src, g, p, c, r, /*fine=*/true, parts, inst);
+    const auto lin = [](const rgb& c_, float* o) {
+        o[0] = std::clamp(c_.r / 255.0f, 0.0f, 1.0f);
+        o[1] = std::clamp(c_.g / 255.0f, 0.0f, 1.0f);
+        o[2] = std::clamp(c_.b / 255.0f, 0.0f, 1.0f);
+    };
+    for (const part& q : parts)
+    {
+        if (q.k == pk::gell || q.k == pk::grect)
+            continue;
+        structure_solid s;
+        switch (q.k)
+        {
+        case pk::box:    s.kind = structure_solid::box; break;
+        case pk::gable:  s.kind = structure_solid::gable; break;
+        case pk::saw:    s.kind = structure_solid::saw; break;
+        case pk::cyl:    s.kind = structure_solid::cyl; break;
+        case pk::dome:   s.kind = structure_solid::dome; break;
+        case pk::heap:   s.kind = structure_solid::heap; break;
+        case pk::sphere: s.kind = structure_solid::sphere; break;
+        case pk::beam:   s.kind = structure_solid::beam; break;
+        case pk::ring:   s.kind = structure_solid::ring; break;
+        default: continue;
+        }
+        s.cap = static_cast<std::uint8_t>(q.cap);
+        s.x = static_cast<float>(q.x);  s.y = static_cast<float>(q.y);
+        s.hw = q.hw; s.hd = q.hd; s.z0 = q.z0; s.h = q.h; s.rh = q.rh;
+        s.x2 = static_cast<float>(q.x2); s.y2 = static_cast<float>(q.y2); s.z2 = q.z2; s.w = q.w;
+        lin(q.roof, s.roof);
+        lin(q.wall, s.wall);
+        out.push_back(s);
+    }
 }
 
 const char* stamp_name(const stamp_key& k)

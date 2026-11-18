@@ -219,4 +219,24 @@ float installation_clear_radius(const bake_source& src, std::size_t i);
 /// The depicted-subject name of a key (verify / log use).
 const char* stamp_name(const stamp_key& k);
 
+/// BL-1670 (procedural 3D buildings; RENDERING.md § The 3D ground, "Buildings are procedural
+/// geometry"): one STANDING part of a tile's structures - the same parts the installation
+/// pass paints, in canonical units, for the 3D ground to build as low-poly geometry. Ground
+/// parts (pads, fields, yards) are not here: the bake keeps them.
+struct structure_solid
+{
+    enum kind_t : std::uint8_t { box, gable, saw, cyl, dome, heap, sphere, beam, ring };
+    kind_t       kind = box;
+    std::uint8_t cap  = 0;      ///< Cylinders: 0 flat, 1 dome, 2 cone, 3 open.
+    float x = 0, y = 0;         ///< Footprint centre (canonical; the column as asked, unwrapped).
+    float hw = 0, hd = 0;       ///< Half extents x / y; cylinders: base and top radius.
+    float z0 = 0, h = 0, rh = 0;///< Base height, body height, roof rise (saw: teeth count).
+    float x2 = 0, y2 = 0, z2 = 0, w = 0; ///< A beam's far end and thickness; a ring's thickness.
+    float roof[3] = {}, wall[3] = {};    ///< Linear 0..1 colours of the top and the sides.
+};
+
+/// Every standing part tile (@p c, unwrapped, @p r) carries, appended to @p out - built
+/// through the pass's own tile builder, so the geometry is exactly what the bake would paint.
+void installation_solids(const bake_source& src, int c, int r, std::vector<structure_solid>& out);
+
 } // namespace ui::ground

@@ -165,22 +165,24 @@ wizard round, lens and Selection kind at 1280×720 and ends with `verify.expect_
   `// fit-exempt: <reason>` comment. A bare hit is a site invisible to the check — route it
   through `ui::text_fit` or exempt it on the record.
 
-## Determinism: software renderer + headless display (read first)
+## Determinism: the GPU renderer (read first)
 
-Goldens must be **renderer- and machine-independent**, so always run `--verify`
-(and `--bless`) through the **software renderer** — set `SDL_RENDER_DRIVER=software`.
-A GPU/accelerated renderer rasterises tiles and text differently from the software
-path, so goldens blessed on a GPU diff ~8–45% against the CI software renderer
-(the BL-057 spike confirmed this). The software renderer is deterministic across
-machines, so CI and any dev box agree.
+`--verify` runs on **SDL's GPU renderer**, like play: the planetary ground is 3D and
+draws only there (TECH_FOUNDATIONS.md § Rendering dimension, "The ground is 3D";
+BL-1671 (flat ground retired)). Do **not** set `SDL_RENDER_DRIVER=software` — it is
+ignored now, and `IO_NO_GPU_RENDERER=1` gives a canvas with **no ground** at all.
 
-- **Linux, no monitor:** wrap the run in `xvfb-run -a` (a virtual X display — the
-  capture uses `SDL_RenderReadPixels`, which is renderer-agnostic, so no real
-  display is needed). CI's `visual-verify` job does exactly this.
-- **Windows / a desktop with a display:** `SDL_RENDER_DRIVER=software` alone is
-  enough; the window can render on the real display.
+- **Captures are machine-dependent.** A GPU rasterises differently per device and
+  driver, so a ground capture is reproducible on one machine, not across machines.
+  A ground check asserts **structure** (what is drawn where, through the verify reads)
+  and compares a golden **with a tolerance**, never byte-exact. Bless on the machine
+  that will compare.
+- **The 3D frame is pinned under `--verify`:** the ground's wind and sand clock reads
+  0 (the fixed frame clock), so two runs on one machine draw the same pixels.
+- **Linux, no monitor:** a GPU device is still needed (lavapipe, Mesa's software
+  Vulkan, serves under `xvfb-run -a`). Without one, the canvas draws no ground.
 - **Re-bless everything at once:** `scripts/verify/bless_all.sh [path-to-exe]`
-  forces the software renderer (and Xvfb if present) and blesses every script.
+  blesses every script on this machine's GPU renderer.
 
 ## Procedure
 
@@ -268,11 +270,10 @@ runs capture-only.
   if any capture fails. No golden present = capture-only (the original behaviour), so
   the upgrade is incremental per check.
 - **Bless (regenerate goldens).** When a change is intentional, eyeball the captures
-  then regenerate the goldens with `--bless` **through the software renderer** (so
-  the committed goldens match CI):
+  then regenerate the goldens with `--bless` on the machine that compares them:
   ```
-  SDL_RENDER_DRIVER=software ./build/ProjectIo --verify scripts/verify/<name>.lua --bless   # Linux
-  SDL_RENDER_DRIVER=software build/Debug/ProjectIo.exe --verify scripts/verify/<name>.lua --bless   # Windows
+  ./build/ProjectIo --verify scripts/verify/<name>.lua --bless   # Linux
+  build/ProjectIo.exe --verify scripts/verify/<name>.lua --bless   # Windows
   ```
   Or re-bless every script at once with `scripts/verify/bless_all.sh`. Each capture is
   written into `scripts/verify/golden/` instead of compared. **Run the bless (and the

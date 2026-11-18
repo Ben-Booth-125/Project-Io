@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
-# Re-bless every visual-verify golden under the deterministic SOFTWARE renderer,
-# so the committed goldens (scripts/verify/golden/*.png) match what CI's
-# `visual-verify` job produces (it runs --verify with SDL_RENDER_DRIVER=software
-# under Xvfb). A GPU/accelerated renderer rasterises tiles and text differently,
-# so goldens blessed on a GPU diff against CI — always bless via this script.
+# Re-bless every visual-verify golden on THIS machine's GPU renderer. The planetary
+# ground is 3D and draws only on SDL's GPU renderer (BL-1671 (flat ground retired);
+# TECH_FOUNDATIONS.md § Rendering dimension), so captures are machine-dependent:
+# bless on the machine that will compare, and compare with a tolerance.
 #
 # Usage (from the repo root, after building ProjectIo):
 #   scripts/verify/bless_all.sh [path-to-ProjectIo]      # default: ./build/ProjectIo
@@ -19,18 +18,12 @@ if [ ! -x "$EXE" ]; then
     exit 1
 fi
 
-export SDL_RENDER_DRIVER=software
-
-# Use a virtual display if one is available so the bless needs no monitor.
-# Without xvfb, SDL's offscreen video driver serves the same purpose — verified
-# bit-identical to the xvfb+software path (2026-08-07: 0.0000% against goldens
-# blessed by cloud sessions). The software renderer alone on a live Wayland
-# display FAILS to create textures, so one of the two headless paths is required.
+# A GPU device is required. Under xvfb (Linux, no monitor) the GPU renderer needs a
+# Vulkan device - lavapipe (Mesa's software Vulkan) serves; without one the canvas
+# draws no ground.
 RUN=()
-if command -v xvfb-run >/dev/null 2>&1; then
+if command -v xvfb-run >/dev/null 2>&1 && [ -z "${DISPLAY:-}" ]; then
     RUN=(xvfb-run -a)
-else
-    export SDL_VIDEO_DRIVER=offscreen
 fi
 
 shopt -s nullglob
@@ -43,5 +36,5 @@ for s in scripts/verify/*.lua; do
 done
 
 echo
-echo "Blessed $count script(s) under the software renderer."
+echo "Blessed $count script(s) on this machine's GPU renderer."
 echo "Review and commit the updated scripts/verify/golden/*.png."

@@ -356,6 +356,19 @@ The band is gated on `revealed`, like the survey mask itself: a border drawn thr
 mask would leak the political shape of ground the player has not paid to survey
 ([DISCOVERY.md](DISCOVERY.md)).
 
+### How the rule is drawn (BL-1657, SDF borders)
+
+Where the renderer runs Io's fragment shaders ([TECH_FOUNDATIONS.md](../tech/TECH_FOUNDATIONS.md)
+§ Framework), the rule is drawn **per pixel**, from an **owner table** — one texel per tile: its
+muted colour, its owner, and whether it draws — over one quad covering the view. Each pixel of a
+drawing tile measures its distance to the rule on each side whose neighbour has another owner,
+and covers it at the stroke's width **in screen pixels**, anti-aliased over one pixel, so the band
+is smooth and the same weight at every zoom. Every rule above holds unchanged: the inset, the
+per-edge weight toward unclaimed ground, the muting, the survey gate, and no pixel shared by two
+nations, since each rule lies inside its own tile. The click corridors are registered by the same
+per-edge walk as before. **No-shader path:** the rule drawn as vector segments — what `--verify`
+captures.
+
 ### Clicking the border selects the nation
 
 **The band is a selection target, and it is the route the Country lens used to own.** With the lens
@@ -775,9 +788,9 @@ for i in 0..5:
 - **Scroll wheel:** zoom, anchored at the cursor position — **stepped**, one ×2 ladder
   rung per notch (Ben, 2026-09-01; [RENDERING.md](RENDERING.md) § Level of detail owns the
   ladder: one master image per body, every rung a downsample of it). The `=`/`-` keys step
-  the same ladder. The land is viewed at **one oblique angle, 22.5°, at every rung and under
-  every lens** (Ben, 2026-10-09 — RENDERING.md § One angle); interaction is unchanged under
-  the tilt, with hit-testing through the camera's inverse.
+  the same ladder. The land is a **3D ground under a perspective camera whose tilt follows zoom**, with no
+  turn, under every lens (Ben, 2026-11-16 — RENDERING.md § The camera, § The 3D ground);
+  hit-testing picks the terrain with a ray from the camera.
 
 The wrap seam has **no marker**: the wrap is seamless by construction and a seam indicator would
 draw attention to a boundary that does not exist for the player.

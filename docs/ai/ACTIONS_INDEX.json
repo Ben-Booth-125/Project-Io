@@ -503,7 +503,7 @@
   ],
   [
    "chrome.options_set_ground_lightness",
-   "Options window, Map section, Ground lightness combo"
+   "Options window, Map section, Brightness combo"
   ],
   [
    "chrome.options_vsync",

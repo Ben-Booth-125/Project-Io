@@ -1,6 +1,7 @@
 #include "app.hpp"
 
 #include "png_writer.hpp"
+#include "gpu_effects.hpp" // BL-1655: the fragment-shader seam
 #include <cstdlib> // std::_Exit: quitting mid-build
 #include "save_game.hpp" // BL-536 quick save / quick load
 #include "session_history.hpp" // step_economy's post-step presentation (BL-361)
@@ -251,8 +252,38 @@ app::app()
         SDL_free(displays);
     }
 
-    m_renderer = SDL_CreateRenderer(m_window, nullptr);
+    // BL-1655 (shader seam): SDL's GPU renderer, which can run Io's fragment shaders
+    // (gpu_effects) and the 3D ground. `--verify` runs it too (BL-1671 (flat ground
+    // retired)): the planetary canvas draws only the 3D ground, so a capture on any other
+    // renderer would hold no ground at all. IO_NO_GPU_RENDERER opts out. A GPU renderer
+    // that cannot be made falls back to SDL's default choice, where the canvas says it
+    // needs a GPU device and every other shader pass draws its no-shader path.
+    {
+        const char* no_gpu = SDL_getenv("IO_NO_GPU_RENDERER");
+        if (!(no_gpu && *no_gpu && *no_gpu != '0'))
+        {
+            const SDL_PropertiesID props = SDL_CreateProperties();
+            SDL_SetPointerProperty(props, SDL_PROP_RENDERER_CREATE_WINDOW_POINTER, m_window);
+            SDL_SetStringProperty(props, SDL_PROP_RENDERER_CREATE_NAME_STRING, "gpu");
+            SDL_SetBooleanProperty(props, SDL_PROP_RENDERER_CREATE_GPU_SHADERS_DXIL_BOOLEAN, true);
+            m_renderer = SDL_CreateRendererWithProperties(props);
+            SDL_DestroyProperties(props);
+            if (!m_renderer)
+                SDL_Log("GPU renderer unavailable (%s) - using SDL's default", SDL_GetError());
+        }
+        if (!m_renderer)
+            m_renderer = SDL_CreateRenderer(m_window, nullptr);
+        SDL_Log("Renderer: %s", SDL_GetRendererName(m_renderer));
+    }
     SDL_SetRenderVSync(m_renderer, 1);
+    gfx::init(m_renderer);
+    // THE 3D GROUND (RENDERING.md § The 3D ground, Ben 2026-11-16): the canvas ground is
+    // the lit heightmesh, so the bake is taken straight down, installations stand as
+    // geometry, not paint, and the land lift is applied at draw by the 3D pass. Set here,
+    // before either path forks, so --verify bakes exactly the ground the player sees.
+    m_ground.params.flat_master = true;
+    m_ground.params.standing    = false;
+    m_ground.set_lift_at_draw(true);
 
     // Record the display environment on startup so the runtime resolution is on the
     // log. Verify captures render at the fixed verify_w×verify_h (run_verify resizes
@@ -345,6 +376,7 @@ app::~app()
     ImGui_ImplSDLRenderer3_Shutdown();
     ImGui_ImplSDL3_Shutdown();
     ImGui::DestroyContext();
+    gfx::shutdown(); // render states die before their renderer
     SDL_DestroyRenderer(m_renderer);
     SDL_DestroyWindow(m_window);
     SDL_Quit();
@@ -2996,6 +3028,7 @@ void app::render()
                 // draw below. Texture work on the render thread, before the
                 // draw data is submitted.
                 m_ground.registry = &m_registry; // BL-1241: processing stamps key on the recipe family
+                m_ground_req_ticked = m_ui.ground_req;
                 m_ground.tick(m_renderer, m_world, m_ui, m_ground_bake_all);
                 // No lens-key anchor argument (Sprint 17b, one chrome home):
                 // every legend now asks ui::lens_chrome_rect for the one region —
@@ -4294,7 +4327,7 @@ void app::render()
             ImGui::SeparatorText("Map");
             static const char* land_lift_labels[] = {"Off", "+15%", "+30%", "+45%"};
             static_assert(IM_ARRAYSIZE(land_lift_labels) == ui::ground::k_land_lift_levels);
-            if (ImGui::BeginCombo("Ground lightness", land_lift_labels[m_settings.land_lift]))
+            if (ImGui::BeginCombo("Brightness", land_lift_labels[m_settings.land_lift]))
             {
                 for (int i = 0; i < IM_ARRAYSIZE(land_lift_labels); ++i)
                 {

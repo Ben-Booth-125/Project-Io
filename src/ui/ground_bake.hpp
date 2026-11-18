@@ -257,6 +257,14 @@ struct bake_params
     // full bake (ground_bake_check P23); false = always resolve per pixel
     // (the harness's comparison lever).
     bool  fast_lock       = true;
+    // THE 3D GROUND (RENDERING.md § The 3D ground, Ben 2026-11-16): the canvas draws the
+    // ground as a lit heightmesh, so the bake is taken straight down and stands nothing up.
+    // `standing` false: the installation pass paints its ground parts (pads, fields, yards)
+    // and the roads, and no shadow or standing structure - those are geometry. `flat_master`
+    // true: the master and far page are baked straight down (no oblique lift, no
+    // pre-stretched trees). Both default to the fixed-angle bake.
+    bool  standing        = true;
+    bool  flat_master     = false;
 };
 
 /// Per-tile source fields for one body, extracted once per bake batch so the
@@ -271,8 +279,8 @@ struct bake_source
     std::vector<float> height;          ///< BL-517 normalised height.
     std::vector<float> grad_x, grad_y;  ///< Height gradient (neighbour differences).
     std::vector<float> relief_bias;     ///< palette::relief_amount, landform accent input.
-    /// Flat land renders flat (Ben, 2026-10-10): how far the tile's ground
-    /// ROLLS — 0 on plains and valleys, 1 on highland and the dramatic forms
+    /// How far the tile's ground ROLLS — 0.25 on plains and valleys (Ben,
+    /// 2026-11-16, revising 2026-10-10's 0), 1 on highland and the dramatic forms
     /// (landform_roll). Interpolated as the relief bias is, it weights the
     /// fold field, the hills and the tile tilt, so relief eases out smoothly.
     std::vector<float> roll;
@@ -512,7 +520,7 @@ inline constexpr int    k_chunk_px = 512;
 
 /// The master geometry for a body grid: oblique at k_tilt_sy, ~k_master_ppr
 /// px per hex, W and H rounded to multiples of k_master_align.
-geometry make_master_geometry(int gw, int gh);
+geometry make_master_geometry(int gw, int gh, double tilt_sy = k_tilt_sy);
 
 /// Level @p level (0 = the master) of @p master: s, W and H halved @p level
 /// times; y_min, lift and tilt unchanged — the same image, smaller.
@@ -529,8 +537,16 @@ int choose_level(double draw_r);
 /// (sw/2 x sh/2), alpha-weighted so a transparent margin never darkens an
 /// edge. Pure: the mip chain is built with it chunk by chunk, and because a
 /// master chunk's sides are multiples of k_master_align the chunkwise chain
-/// equals the whole-image one byte for byte.
+/// equals the whole-image one byte for byte. The structure mark (blue's lowest bit,
+/// apply_structure_mark) carries where at least two of the four pixels carry it.
 void downsample_half(const std::uint32_t* src, int sw, int sh, std::uint32_t* dst);
+
+/// THE STRUCTURE MARK (Ben, 2026-11-16; RENDERING.md § Level of detail, "Buildings and
+/// roads draw over the detail"): bake_region's last step. Sets blue's lowest bit on every
+/// pixel @p mark flags (the road-and-installation pass painted it) and clears it on every
+/// other opaque pixel, so the draw-time detail can leave roads and structures as baked.
+/// A transparent pixel is left untouched.
+void apply_structure_mark(std::uint32_t* px, const std::uint8_t* mark, std::size_t n);
 
 /// Content hash of everything bake_region reads for the given pixel window
 /// (tile fields + mask state of the tiles overlapping it, plus a margin ring).

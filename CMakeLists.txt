@@ -128,6 +128,8 @@ endif()
 # A bare directory test would accept a half-extracted cache.
 set(IO_DEPS_SEEDED "")
 set(IO_DEPS_COLD "")
+# The pinned SDL release (TECH_FOUNDATIONS.md § Framework: SDL 3.4, Ben 2026-11-14).
+set(IO_SDL_TAG "release-3.4.18")
 foreach(dep_spec IN ITEMS
         "sdl3|CMakeLists.txt"
         "lua_src|lua.h"
@@ -151,6 +153,16 @@ foreach(dep_spec IN ITEMS
     # and no one configured cold. It surfaced only when sub-agent worktrees
     # started each trying to download ~120 MB.
     set(dep_cached_src "${IO_DEPS_CACHE}/${dep_name}")
+    # SDL's cache entry is keyed by its release (BL-1654): the pin moves, and an
+    # unversioned `sdl3` checkout would silently hand a new pin the old source.
+    # A tree seeded from the old unversioned entry drops that seed here.
+    if(dep_name STREQUAL "sdl3")
+        set(dep_cached_src "${IO_DEPS_CACHE}/sdl3-${IO_SDL_TAG}")
+        if("${${dep_var}}" MATCHES "/sdl3$")
+            unset(${dep_var} CACHE)
+            unset(${dep_var})
+        endif()
+    endif()
 
     if(NOT "${${dep_var}}" STREQUAL "")
         # Explicitly pointed somewhere by the caller — never second-guess it.
@@ -183,7 +195,7 @@ include(FetchContent)
 # ---------------------------------------------------------------------------
 FetchContent_Declare(
     SDL3
-    URL https://codeload.github.com/libsdl-org/SDL/tar.gz/refs/tags/release-3.2.0
+    URL https://codeload.github.com/libsdl-org/SDL/tar.gz/refs/tags/${IO_SDL_TAG}
 )
 set(SDL_TEST OFF CACHE BOOL "" FORCE)
 set(SDL_TESTS OFF CACHE BOOL "" FORCE)
@@ -340,6 +352,62 @@ if(GIT_EXECUTABLE)
              "${CMAKE_BINARY_DIR}/generated/io_build_info.hpp" ONLY_IF_DIFFERENT)
         target_include_directories(ProjectIo PRIVATE "${CMAKE_BINARY_DIR}/generated")
     endif()
+endif()
+
+# ---------------------------------------------------------------------------
+# Fragment shaders for the 2D renderer (BL-1655 (shader seam); TECH_FOUNDATIONS.md
+# § Framework, "SDL 3.4, and fragment shaders on the 2D renderer").
+# ---------------------------------------------------------------------------
+# Each src/shaders/<name>.frag.hlsl compiles with DXC to DXIL, emitted as a C
+# header (`-Fh`) holding the byte array `g_<name>_dxil`; src/core/gpu_effects.cpp
+# includes them. No DXC (a non-Windows host, or an SDK without it) means no
+# headers (gpu_effects.cpp tests __has_include): the app then runs every pass's no-shader
+# path, which is a supported configuration, never an error.
+file(GLOB IO_SHADER_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/shaders/*.frag.hlsl")
+file(GLOB IO_SHADER_INCLUDES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/shaders/*.hlsli")
+set(IO_DXC_HINTS "")
+if(WIN32)
+    file(GLOB IO_DXC_HINTS "C:/Program Files (x86)/Windows Kits/10/bin/10.*/x64")
+    list(SORT IO_DXC_HINTS ORDER DESCENDING) # the newest SDK first
+endif()
+find_program(IO_DXC NAMES dxc HINTS ${IO_DXC_HINTS})
+if(IO_DXC AND IO_SHADER_SOURCES)
+    set(IO_SHADER_HEADERS "")
+    foreach(src IN LISTS IO_SHADER_SOURCES)
+        get_filename_component(fname "${src}" NAME)          # ground_lens.frag.hlsl
+        string(REPLACE ".frag.hlsl" "" sname "${fname}")     # ground_lens
+        set(out "${CMAKE_BINARY_DIR}/generated/shaders/${sname}.dxil.h")
+        add_custom_command(
+            OUTPUT "${out}"
+            COMMAND "${CMAKE_COMMAND}" -E make_directory "${CMAKE_BINARY_DIR}/generated/shaders"
+            COMMAND "${IO_DXC}" -nologo -T ps_6_0 -E main -O3 -Fh "${out}" -Vn "g_${sname}_dxil" "${src}"
+            DEPENDS "${src}" ${IO_SHADER_INCLUDES}
+            COMMENT "DXC ${fname}"
+            VERBATIM)
+        list(APPEND IO_SHADER_HEADERS "${out}")
+    endforeach()
+    # Vertex shaders (BL-1665 (3D slice)): <name>.vert.hlsl -> <name>_vert.dxil.h holding
+    # g_<name>_vert_dxil, for passes that draw their own geometry on the GPU device.
+    file(GLOB IO_VERT_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/shaders/*.vert.hlsl")
+    foreach(src IN LISTS IO_VERT_SOURCES)
+        get_filename_component(fname "${src}" NAME)          # slice3d.vert.hlsl
+        string(REPLACE ".vert.hlsl" "_vert" sname "${fname}") # slice3d_vert
+        set(out "${CMAKE_BINARY_DIR}/generated/shaders/${sname}.dxil.h")
+        add_custom_command(
+            OUTPUT "${out}"
+            COMMAND "${CMAKE_COMMAND}" -E make_directory "${CMAKE_BINARY_DIR}/generated/shaders"
+            COMMAND "${IO_DXC}" -nologo -T vs_6_0 -E main -O3 -Fh "${out}" -Vn "g_${sname}_dxil" "${src}"
+            DEPENDS "${src}" ${IO_SHADER_INCLUDES}
+            COMMENT "DXC ${fname}"
+            VERBATIM)
+        list(APPEND IO_SHADER_HEADERS "${out}")
+    endforeach()
+    add_custom_target(io_shaders DEPENDS ${IO_SHADER_HEADERS})
+    add_dependencies(ProjectIo io_shaders)
+    target_include_directories(ProjectIo PRIVATE "${CMAKE_BINARY_DIR}/generated")
+    message(STATUS "Shaders: DXC at ${IO_DXC}")
+else()
+    message(STATUS "Shaders: no DXC - every shader pass runs its no-shader path")
 endif()
 
 # ---------------------------------------------------------------------------

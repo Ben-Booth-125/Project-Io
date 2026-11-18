@@ -551,7 +551,7 @@ private:
         int  window_h   = 1080;
         bool fullscreen = false;  ///< Borderless-desktop fullscreen.
         bool vsync      = true;
-        int  land_lift = ui::ground::k_land_lift_default; ///< BL-1537 ground lightness: 0 = off, 1-3.
+        int  land_lift = ui::ground::k_land_lift_default; ///< BL-1537 the Brightness setting (the land lift): 0 = off, 1-3.
     };
 
     /// Read options.cfg into m_settings; a missing/partial file leaves defaults.
@@ -1254,6 +1254,10 @@ private:
     /// True while a --verify script drives frames: the ground cache bakes every
     /// chunk synchronously so a capture never races the per-frame bake budget.
     bool            m_ground_bake_all = false;
+    /// The ground request the last tick baked against. The canvas publishes its request
+    /// for the NEXT frame, so a --verify capture renders settle frames until the canvas
+    /// asks for nothing the tick has not baked (BL-1671 (flat ground retired)).
+    ground_request  m_ground_req_ticked{};
     /// BL-1246: set by run() (the live frame loop) — the home master pre-bakes
     /// when the world is finished, and entering play waits for it. Off on the
     /// headless paths, which pump no frames.

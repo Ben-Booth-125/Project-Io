@@ -1,0 +1,66 @@
+[
+ {
+  "ruling": "SDL 3.4, and fragment shaders on the 2D renderer (Ben, 2026-11-14)",
+  "doc": "docs/tech/TECH_FOUNDATIONS.md",
+  "anchor": "SDL 3.4, and fragment shaders on the 2D renderer \\(Ben, 2026-11-14\\)",
+  "stale": [
+   "`--verify` sets\\s+the software driver",
+   "Which renderer `--verify` captures with, once a shader pass exists, is\\s+an open question"
+  ],
+  "owner": "sprint 68 (BL-1654, SDL 3.4 upgrade; BL-1655, shader seam)"
+ },
+ {
+  "ruling": "The two closest rungs add detail at draw time (Ben, 2026-11-15)",
+  "doc": "docs/ui/RENDERING.md",
+  "anchor": "The two closest rungs add detail at draw time \\(Ben, 2026-11-15",
+  "stale": [
+   "the software renderer \\(every `--verify`\\s+capture\\) draws no detail"
+  ],
+  "owner": "sprint 68 (BL-1658, close-zoom detail layer)"
+ },
+ {
+  "ruling": "The land lift is applied at draw time; the setting is named Brightness (Ben, 2026-11-15)",
+  "doc": "docs/ui/RENDERING.md",
+  "anchor": "The lift at draw time \\(BL-1659, live grade shader",
+  "stale": [
+   "the `ground_lift` shader applies",
+   "The software renderer \\(every `--verify` capture\\) bakes the lift as before"
+  ],
+  "owner": "sprint 68 (BL-1659, live grade shader)"
+ },
+ {
+  "ruling": "The farthest rung is a flat map (Ben, 2026-11-16)",
+  "doc": "docs/ui/RENDERING.md",
+  "anchor": "The farthest rung is a flat map \\(Ben, 2026-11-16",
+  "stale": [
+   "Where the renderer runs no shaders \\(every `--verify` capture\\), the\\s+farthest rung stays the painting"
+  ],
+  "owner": "sprint 68 (BL-1661, far-zoom cartographic map)"
+ },
+ {
+  "ruling": "Flat land rolls gently (Ben, 2026-11-16, revising 2026-10-10)",
+  "doc": "docs/ui/RENDERING.md",
+  "anchor": "Flat land rolls gently \\(Ben, 2026-11-16",
+  "stale": [],
+  "owner": "sprint 68 (BL-1658, close-zoom detail layer)"
+ },
+ {
+  "ruling": "The ground is 3D: perspective camera whose tilt follows zoom, the flat ground removed with no flat fallback, --verify captures through the GPU renderer (Ben, 2026-11-16)",
+  "doc": "docs/tech/TECH_FOUNDATIONS.md",
+  "anchor": "The ground is 3D \\(Ben, 2026-11-16",
+  "stale": [
+   "viewed at one 22\\.5-degree angle at every rung",
+   "One camera angle at every rung and under every lens is what makes one master possible",
+   "on the software renderer, where water",
+   "drawn by the ground_lift shader"
+  ],
+  "owner": "sprint 68 (BL-1665, 3D slice; BL-1666..1672, the 3D ground)"
+ },
+ {
+  "ruling": "The 3D ground: drape, upright markers, terrain pick, procedural buildings, trees (Ben, 2026-11-16)",
+  "doc": "docs/ui/RENDERING.md",
+  "anchor": "## The 3D ground \\(Ben, 2026-11-16\\)",
+  "stale": [],
+  "owner": "sprint 68 (BL-1666..1672, the 3D ground)"
+ }
+]

@@ -19,6 +19,35 @@
 
 void app::capture_frame(const std::string& name)
 {
+    // A capture shows the ground complete for its own view (RENDERING.md § Resident
+    // set, "Under --verify everything a frame draws is complete"). The canvas publishes
+    // its request for the next frame's bake, so after a view change - a zoom, a pan, a
+    // lens that hides the routes - settle until the canvas asks for nothing the tick has
+    // not baked, and every chunk under the view has landed and uploaded. The 3D ground's
+    // footprint follows the camera, so this matters there.
+    if (m_ground_bake_all)
+    {
+        const auto same = [](const ground_request& a, const ground_request& b) {
+            return a.body == b.body && a.valid == b.valid && a.hide_routes == b.hide_routes
+                && a.x0 == b.x0 && a.y0 == b.y0 && a.x1 == b.x1 && a.y1 == b.y1 && a.draw_r == b.draw_r;
+        };
+        const auto settled = [&] {
+            if (!m_ui.ground_req.valid || m_ui.ground_req.body == null_entity)
+                return true; // no planetary ground on screen
+            const ground_layer::stats s = m_ground.stats_snapshot();
+            return same(m_ui.ground_req, m_ground_req_ticked) && s.view_final && s.pending_uploads == 0;
+        };
+        // The 3D pass draws from the previous frame's camera, so once the ground has
+        // settled one more frame lets the drape and the culls catch up - most visibly
+        // after the view crosses the wrap seam. Settled twice running, then capture.
+        int run = 0;
+        for (int i = 0; i < 8 && run < 2; ++i)
+        {
+            run = settled() ? run + 1 : 0;
+            if (run < 2)
+                render();
+        }
+    }
     m_capture_name      = name;
     m_capture_requested = true;
     ui::set_overflow_frame(name); // BL-215: overflow records name the capture they happened in
