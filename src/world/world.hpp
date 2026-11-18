@@ -140,6 +140,11 @@ struct logistics_flood_field
     std::vector<float> dist;              ///< Weighted travel cost cell -> anchor; 1e30f unreached.
     std::vector<int>   came_from;         ///< The cell's next hop toward the anchor, -1 at anchor/unreached.
     std::vector<char>  crossed;           ///< Best path cell -> anchor touches ocean?
+    /// Served by the lazy path since it was cached. NOT part of the field's value:
+    /// a cache-bookkeeping flag that decides only which fields a cache clear
+    /// remembers for rewarm_flood_fields, so a rebuilt field nobody asks for again
+    /// drops out rather than being rebuilt after every clear.
+    bool               asked = false;
 };
 
 /// A body's NEAREST-ANCHOR FIELD (BL-1117, settle tick one): for every cell, the

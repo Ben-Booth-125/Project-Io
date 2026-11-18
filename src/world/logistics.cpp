@@ -568,12 +568,13 @@ const logistics_flood_field& flood_field_for(world& w, entity_id body, entity_id
                                              const tile_component& anchor_tc)
 {
     const auto key = std::make_pair(body, anchor_tile);
-    const auto fit = w.logistics_flood_fields.find(key);
-    if (fit != w.logistics_flood_fields.end())
-        return fit->second;
-    return w.logistics_flood_fields
-        .emplace(key, build_unconfined_flood(w, gw, gh, grid, anchor_tc))
-        .first->second;
+    auto fit = w.logistics_flood_fields.find(key);
+    if (fit == w.logistics_flood_fields.end())
+        fit = w.logistics_flood_fields
+                  .emplace(key, build_unconfined_flood(w, gw, gh, grid, anchor_tc))
+                  .first;
+    fit->second.asked = true; // bookkeeping only (rewarm_flood_fields)
+    return fit->second;
 }
 
 } // namespace
@@ -1113,12 +1114,13 @@ const logistics_flood_field& leg_flood_field_for(world& w, entity_id body, entit
                                                  const tile_component& anchor_tc)
 {
     const auto key = std::make_tuple(body, anchor_tile, static_cast<std::uint8_t>(domain));
-    const auto fit = w.leg_flood_fields.find(key);
-    if (fit != w.leg_flood_fields.end())
-        return fit->second;
-    return w.leg_flood_fields
-        .emplace(key, build_leg_flood(w, null_entity, domain, gw, gh, grid, anchor_tc))
-        .first->second;
+    auto fit = w.leg_flood_fields.find(key);
+    if (fit == w.leg_flood_fields.end())
+        fit = w.leg_flood_fields
+                  .emplace(key, build_leg_flood(w, null_entity, domain, gw, gh, grid, anchor_tc))
+                  .first;
+    fit->second.asked = true; // bookkeeping only (rewarm_flood_fields)
+    return fit->second;
 }
 
 } // namespace
@@ -1158,6 +1160,7 @@ void rewarm_flood_fields(world& w)
         const std::vector<entity_id>*  grid = nullptr;
         const tile_component*          anchor = nullptr;
         logistics_flood_field          out;
+        bool                           done = false;
     };
     std::vector<job> jobs;
     jobs.reserve(want_u.size() + want_l.size());
@@ -1182,8 +1185,9 @@ void rewarm_flood_fields(world& w)
         return;
 
     const auto run = [&w](job& j) {
-        j.out = j.leg ? build_leg_flood(w, null_entity, j.domain, j.gw, j.gh, *j.grid, *j.anchor)
-                      : build_unconfined_flood(w, j.gw, j.gh, *j.grid, *j.anchor);
+        j.out  = j.leg ? build_leg_flood(w, null_entity, j.domain, j.gw, j.gh, *j.grid, *j.anchor)
+                       : build_unconfined_flood(w, j.gw, j.gh, *j.grid, *j.anchor);
+        j.done = true;
     };
     const unsigned hw = std::max(1u, std::thread::hardware_concurrency());
     const int threads = static_cast<int>(std::min<std::size_t>(std::min(hw, 8u), jobs.size()));
@@ -1196,16 +1200,30 @@ void rewarm_flood_fields(world& w)
     {
         // Strided, each result at its own index: nothing below can see which
         // finished first.
+        // A thread that cannot start, or a worker that throws (resource
+        // exhaustion), leaves its jobs undone; they run serially below, on this
+        // thread, exactly as the lazy path would have run them.
         std::vector<std::thread> pool;
         pool.reserve(static_cast<std::size_t>(threads));
-        for (int t = 0; t < threads; ++t)
-            pool.emplace_back([&, t] {
-                for (std::size_t i = static_cast<std::size_t>(t); i < jobs.size();
-                     i += static_cast<std::size_t>(threads))
-                    run(jobs[i]);
-            });
+        try
+        {
+            for (int t = 0; t < threads; ++t)
+                pool.emplace_back([&, t] {
+                    try
+                    {
+                        for (std::size_t i = static_cast<std::size_t>(t); i < jobs.size();
+                             i += static_cast<std::size_t>(threads))
+                            run(jobs[i]);
+                    }
+                    catch (...) {}
+                });
+        }
+        catch (...) {}
         for (std::thread& th : pool)
             th.join();
+        for (job& j : jobs)
+            if (!j.done)
+                run(j);
     }
     for (job& j : jobs)
     {

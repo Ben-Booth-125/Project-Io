@@ -374,14 +374,18 @@ inline bool grid_good_crosses_markets(std::size_t r)
 /// sites keep the unconditional clear; over-clearing at click rate is free.
 inline void invalidate_logistics_caches(world& w)
 {
-    // Remember which flood fields stood, for rewarm_flood_fields. A second clear
-    // with nothing rebuilt in between keeps the first list.
+    // Remember which flood fields were ASKED for since they were cached, for
+    // rewarm_flood_fields: a field the rewarm rebuilt that nobody then asked for is
+    // not remembered again, so the list tracks what the sim uses rather than every
+    // anchor ever flooded. A second clear with nothing cached keeps the first list.
     if (!w.logistics_flood_fields.empty() || !w.leg_flood_fields.empty())
     {
         w.flood_rewarm_keys.clear();
         w.leg_flood_rewarm_keys.clear();
-        for (const auto& kv : w.logistics_flood_fields) w.flood_rewarm_keys.push_back(kv.first);
-        for (const auto& kv : w.leg_flood_fields)       w.leg_flood_rewarm_keys.push_back(kv.first);
+        for (const auto& kv : w.logistics_flood_fields)
+            if (kv.second.asked) w.flood_rewarm_keys.push_back(kv.first);
+        for (const auto& kv : w.leg_flood_fields)
+            if (kv.second.asked) w.leg_flood_rewarm_keys.push_back(kv.first);
     }
     w.astar_cost_cache.clear();
     w.logistics_flood_fields.clear(); // same contract: any traversal/anchor change stales it
