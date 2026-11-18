@@ -13,6 +13,7 @@
 #include <limits>
 #include <queue>
 #include <set>
+#include <thread>
 #include <tuple>
 #include <unordered_map>
 #include <unordered_set>
@@ -487,16 +488,13 @@ inline bool flood_edge_is_bridge(const tile_component& n_tc, int n_row, int i)
 /// cost of travelling cell i -> anchor and `came_from[i]` is cell i's next hop
 /// on that route. `intra_body_path(o, d)` reads d's field at o, never o's field
 /// at d — the two differ wherever a river discounts an edge one way only.
-const logistics_flood_field& flood_field_for(world& w, entity_id body, entity_id anchor_tile,
-                                             int gw, int gh,
+/// The unconfined flood anchored at @p anchor_tc, built and returned without
+/// touching any cache: a pure function of the body's tiles, so it may run on a
+/// worker thread (rewarm_flood_fields) and give the field the lazy path would.
+logistics_flood_field build_unconfined_flood(const world& w, int gw, int gh,
                                              const std::vector<entity_id>& grid,
                                              const tile_component& anchor_tc)
 {
-    const auto key = std::make_pair(body, anchor_tile);
-    const auto fit = w.logistics_flood_fields.find(key);
-    if (fit != w.logistics_flood_fields.end())
-        return fit->second;
-
     logistics_flood_field f;
     const int total = gw * gh;
     f.dist.assign(static_cast<std::size_t>(total), 1e30f);
@@ -561,7 +559,21 @@ const logistics_flood_field& flood_field_for(world& w, entity_id body, entity_id
         }
     }
 
-    return w.logistics_flood_fields.emplace(key, std::move(f)).first->second;
+    return f;
+}
+
+const logistics_flood_field& flood_field_for(world& w, entity_id body, entity_id anchor_tile,
+                                             int gw, int gh,
+                                             const std::vector<entity_id>& grid,
+                                             const tile_component& anchor_tc)
+{
+    const auto key = std::make_pair(body, anchor_tile);
+    const auto fit = w.logistics_flood_fields.find(key);
+    if (fit != w.logistics_flood_fields.end())
+        return fit->second;
+    return w.logistics_flood_fields
+        .emplace(key, build_unconfined_flood(w, gw, gh, grid, anchor_tc))
+        .first->second;
 }
 
 } // namespace
@@ -1110,6 +1122,101 @@ const logistics_flood_field& leg_flood_field_for(world& w, entity_id body, entit
 }
 
 } // namespace
+
+void rewarm_flood_fields(world& w)
+{
+    // THE SAME FIELDS, BUILT AT ONCE (Ben, 2026-11-18: a faster settle that moves no
+    // world). invalidate_logistics_caches remembers which flood fields stood; the
+    // first strategic pass after it asks for most of them again, one Dijkstra at a
+    // time, on one actor's turn. Each field is a pure function of the body's tiles
+    // (build_unconfined_flood, build_leg_flood with no party), so building them on
+    // worker threads gives the field the lazy path would have built, bit for bit,
+    // and the caches are never saved or hashed. Only the work moves: a world built
+    // with this call and one built without hold the same state. A field nobody asks
+    // for again costs a worker's time and stays cached until the next clear.
+    std::vector<std::pair<entity_id, entity_id>> want_u;
+    std::vector<std::tuple<entity_id, entity_id, std::uint8_t>> want_l;
+    for (const auto& k : w.flood_rewarm_keys)
+        if (w.logistics_flood_fields.find(k) == w.logistics_flood_fields.end())
+            want_u.push_back(k);
+    for (const auto& k : w.leg_flood_rewarm_keys)
+        if (w.leg_flood_fields.find(k) == w.leg_flood_fields.end())
+            want_l.push_back(k);
+    w.flood_rewarm_keys.clear();
+    w.leg_flood_rewarm_keys.clear();
+    if (want_u.empty() && want_l.empty())
+        return;
+
+    // Everything a job reads, resolved here on the calling thread: body_tile_grid
+    // fills its own cache on first use, so it is never called from a worker.
+    struct job
+    {
+        entity_id                      body = null_entity, anchor_tile = null_entity;
+        bool                           leg = false;
+        leg_domain                     domain{};
+        int                            gw = 0, gh = 0;
+        const std::vector<entity_id>*  grid = nullptr;
+        const tile_component*          anchor = nullptr;
+        logistics_flood_field          out;
+    };
+    std::vector<job> jobs;
+    jobs.reserve(want_u.size() + want_l.size());
+    const auto add_job = [&](entity_id body, entity_id anchor_tile, bool leg, leg_domain d) {
+        const auto bit = w.bodies.find(body);
+        const auto tit = w.tiles.find(anchor_tile);
+        if (bit == w.bodies.end() || tit == w.tiles.end() || tit->second.body != body)
+            return; // the lazy path builds (or refuses) it as it always did
+        const std::vector<entity_id>& grid = body_tile_grid(w, body);
+        const int gw = bit->second.grid_width, gh = bit->second.grid_height;
+        if (gw <= 0 || gh <= 0 || grid.empty())
+            return;
+        job j;
+        j.body = body; j.anchor_tile = anchor_tile; j.leg = leg; j.domain = d; j.gw = gw; j.gh = gh; j.grid = &grid; j.anchor = &tit->second;
+        jobs.push_back(std::move(j));
+    };
+    for (const auto& [body, anchor] : want_u)
+        add_job(body, anchor, false, leg_domain{});
+    for (const auto& [body, anchor, d] : want_l)
+        add_job(body, anchor, true, static_cast<leg_domain>(d));
+    if (jobs.empty())
+        return;
+
+    const auto run = [&w](job& j) {
+        j.out = j.leg ? build_leg_flood(w, null_entity, j.domain, j.gw, j.gh, *j.grid, *j.anchor)
+                      : build_unconfined_flood(w, j.gw, j.gh, *j.grid, *j.anchor);
+    };
+    const unsigned hw = std::max(1u, std::thread::hardware_concurrency());
+    const int threads = static_cast<int>(std::min<std::size_t>(std::min(hw, 8u), jobs.size()));
+    if (threads <= 1)
+    {
+        for (job& j : jobs)
+            run(j);
+    }
+    else
+    {
+        // Strided, each result at its own index: nothing below can see which
+        // finished first.
+        std::vector<std::thread> pool;
+        pool.reserve(static_cast<std::size_t>(threads));
+        for (int t = 0; t < threads; ++t)
+            pool.emplace_back([&, t] {
+                for (std::size_t i = static_cast<std::size_t>(t); i < jobs.size();
+                     i += static_cast<std::size_t>(threads))
+                    run(jobs[i]);
+            });
+        for (std::thread& th : pool)
+            th.join();
+    }
+    for (job& j : jobs)
+    {
+        if (j.leg)
+            w.leg_flood_fields.emplace(
+                std::make_tuple(j.body, j.anchor_tile, static_cast<std::uint8_t>(j.domain)),
+                std::move(j.out));
+        else
+            w.logistics_flood_fields.emplace(std::make_pair(j.body, j.anchor_tile), std::move(j.out));
+    }
+}
 
 // ---------------------------------------------------------------------------
 // BL-1505: lanes under a war

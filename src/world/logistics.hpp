@@ -374,6 +374,15 @@ inline bool grid_good_crosses_markets(std::size_t r)
 /// sites keep the unconditional clear; over-clearing at click rate is free.
 inline void invalidate_logistics_caches(world& w)
 {
+    // Remember which flood fields stood, for rewarm_flood_fields. A second clear
+    // with nothing rebuilt in between keeps the first list.
+    if (!w.logistics_flood_fields.empty() || !w.leg_flood_fields.empty())
+    {
+        w.flood_rewarm_keys.clear();
+        w.leg_flood_rewarm_keys.clear();
+        for (const auto& kv : w.logistics_flood_fields) w.flood_rewarm_keys.push_back(kv.first);
+        for (const auto& kv : w.leg_flood_fields)       w.leg_flood_rewarm_keys.push_back(kv.first);
+    }
     w.astar_cost_cache.clear();
     w.logistics_flood_fields.clear(); // same contract: any traversal/anchor change stales it
     w.leg_flood_fields.clear();       // BL-1186: the leg-confined floods and pairs, and the
@@ -390,6 +399,13 @@ inline void invalidate_logistics_caches(world& w)
     w.power_grid_built = false;
     bump_logistics_cache_generation(w); // BL-1195: the UI's lane cache re-reads on this
 }
+
+/// Rebuild, on worker threads, the flood fields invalidate_logistics_caches last
+/// cleared (both caches' keys as they stood), skipping any already rebuilt. Each
+/// field is a pure function of the body's tiles, so the cache ends holding the
+/// fields the lazy path would build, bit for bit; only the work moves. Called by
+/// the strategic pass, whose first actor otherwise rebuilds them one at a time.
+void rewarm_flood_fields(world& w);
 
 /// True when a state change on this building TYPE can alter a cached logistics
 /// answer — i.e. it can appear in the anchor set (is_supply_anchor: completed,

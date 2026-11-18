@@ -1139,6 +1139,8 @@ void clear_derived_state(world& w)
     w.astar_cost_cache.clear();
     w.logistics_flood_fields.clear();
     w.leg_flood_fields.clear(); // BL-1186: the leg-confined floods, same footing
+    w.flood_rewarm_keys.clear();     // the rewarm lists, same footing
+    w.leg_flood_rewarm_keys.clear();
     w.leg_path_cache.clear();
     w.lane_path_cache.clear();   // BL-1505: the warring lanes, same footing
     w.lane_flood_fields.clear();

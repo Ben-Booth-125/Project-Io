@@ -4282,6 +4282,11 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
     // Sorted actor ids: the deterministic visit order AND the stable per-actor
     // index the cadence stagger keys on. BL-1401: every corporation and every
     // nation (sorted_actor_ids), so the stagger moved with the actor set.
+    // The flood fields the last cache clear dropped, rebuilt at once on worker
+    // threads before the first actor asks for them one at a time (rewarm_flood_fields:
+    // the same fields, bit for bit; only the wait moves).
+    rewarm_flood_fields(w);
+
     const std::vector<entity_id> corp_ids = sorted_actor_ids(w);
 
     const int k = std::max(1, p.cadence_k);
