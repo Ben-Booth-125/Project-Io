@@ -3856,6 +3856,71 @@ std::vector<uint32_t> legal_cession(const world& w, const war_record& war, entit
     return held;
 }
 
+// ---- BL-1706 (wars draw in allies; AI_OPPONENT.md § 11, "Rival nations join wars", Ben
+// 2026-11-19; RELATIONS.md § Joining a war, § Capitulation) ---------------------------
+// The grant and nothing wider: ask to join an open war on a side (a declaration's motive
+// against a member across, or the defender's friend); as a side's LEADER accept or refuse
+// a request on its side; as a JOINER make a separate peace with the other side's leader.
+// Capitulation is the war-whole grant's ("the threshold is the war scorer's calibration",
+// RELATIONS.md § Capitulation). Never for the player's nation; never both sides (the
+// world refuses it); never a war planned beyond the next verb.
+
+/// A FRIEND'S DEFENCE (RELATIONS.md § Who asks: "A friend of a war's defender may ask to
+/// join the defender's side"). "Friend" is the STANCE - an accepted friendship
+/// (`are_friends`), the same reading the *a friend attacked* justification takes - never a
+/// sentiment band. The weight stands in the join utility where a declaration's grievance
+/// and alarm stand, so a friend joins only when the sum - less the price, trade with the
+/// declarer, its own exhaustion and the wars it already fights - clears the declaration's
+/// own bar. First cut (in band, BL-1706): one open war already (0.40) or full exhaustion
+/// (1.0) keeps a friend out; a fresh, unengaged friend joins.
+constexpr float k_war_ai_join_w_friend = 0.6f;
+
+/// A LEADER ANSWERS (BL-1706): it REFUSES a nation asking to join its side when its own
+/// Trust toward the asker is at or below -this x limit, and ACCEPTS otherwise. 0.10 is the
+/// figure the wary band's near edge carries (`band_edge_near`), held here as the scorer's
+/// own number because `band_of` is presentation only: a leader does not take into its war
+/// a nation it already distrusts. A request that no longer holds is left for the quarter's
+/// sweep to lapse, not refused (a refusal would start the asker's twelve-tick cooldown).
+constexpr float k_war_ai_join_refuse_trust = 0.10f;
+
+/// CAPITULATION (RELATIONS.md § Capitulation: "when its war is going badly and its last
+/// offer was refused"): its side's score at or below -this AND its last peace offer to the
+/// other side's leader refused within the cooldown (`peace_offer_cooling`). 50 is
+/// 2 x k_war_ai_demand_score - the score at which the offer branch already offers to cede
+/// its own held ground; refused even that, it gives up the goals instead.
+constexpr int k_war_ai_capitulate_score = 2 * k_war_ai_demand_score;
+
+/// True iff @p nation is a member of any open war (a leader or a joiner).
+bool in_any_war(const world& w, entity_id nation)
+{
+    for (const auto& [key, war] : w.wars)
+        if (war_side(war, nation) >= 0)
+            return true;
+    return false;
+}
+
+/// The accept sum the leaders' peace reads (score_nation_war § 1), shared by a separate
+/// peace: exhaustion, a war going badly and its length for, the stake and a war going
+/// well against. -1 under k_war_ai_min_peace_ticks.
+float peace_accept_sum(float exhaustion, int mine, int dur, float stake)
+{
+    if (dur < k_war_ai_min_peace_ticks)
+        return -1.0f;
+    const float losing  = static_cast<float>(std::max(0, -mine)) / 100.0f;
+    const float winning = static_cast<float>(std::max(0, mine)) / 100.0f;
+    const float lasted  = std::min(1.0f, static_cast<float>(std::max(0, dur)) / static_cast<float>(k_war_truce_ticks));
+    return k_war_ai_peace_w_exhaustion * exhaustion + k_war_ai_peace_w_losing * losing
+         + k_war_ai_peace_w_duration * lasted + k_war_ai_peace_w_stake * stake
+         - k_war_ai_peace_w_winning * winning;
+}
+
+/// @p nation's side's score in the war (positive in its side's favour).
+int side_score(const world& w, const war_record& war, entity_id nation)
+{
+    const int s = war_score(w, war);
+    return war_side(war, nation) == 0 ? s : -s;
+}
+
 } // namespace
 
 void score_nation_declarations_day(world& w, const recipe_registry& reg)
@@ -3924,6 +3989,34 @@ void score_nation_war(world& w, const recipe_registry& reg, entity_id nation, in
         return fronts;
     };
     const float exhaustion = nation_war_exhaustion(w, nation) / 100.0f;
+
+    // ---- 1a. REQUESTS TO JOIN ITS SIDE (BL-1706): a leader accepts or refuses -----
+    // Rule (k_war_ai_join_refuse_trust): refuse a nation it distrusts - its own Trust
+    // toward the asker at or below the wary edge - and accept any other. One verb per
+    // request, in (war key, asker) order. A request that no longer holds is skipped.
+    if (own_wars)
+    {
+        std::vector<std::pair<war_join_key_t, join_request>> asks;
+        for (const auto& [jk, req] : w.join_requests) // ascending (war key, asker)
+            if (const auto wit = w.wars.find(jk.first);
+                wit != w.wars.end() && war_leader(wit->second, req.side) == nation)
+                asks.emplace_back(jk, req);
+        for (const auto& [jk, req] : asks)
+        {
+            const entity_id asker = jk.second;
+            if (w.join_requests.count(jk) == 0 || w.wars.count(jk.first) == 0)
+                continue;
+            if (check_join(w, jk.first, asker, req.side, req.goals, /*allow_pending=*/true) != war_result::applied)
+                continue; // lapsing: the quarter's sweep removes it
+            const float trust = sentiment_toward(w.sentiment, nation, asker).trust / limit; // its OWN row
+            const bool accept = trust > -k_war_ai_join_refuse_trust;
+            const corp_command cmd = war_cmd(nation, tick, accept ? corp_verb::accept_join : corp_verb::refuse_join,
+                                             asker, {});
+            const bool ok = apply_corp_command(w, reg, cmd) == corp_command_result::applied;
+            war_trace(tick, nation, asker, accept ? war_ai_choice::accept_join : war_ai_choice::refuse_join,
+                      trust, 0, 0, 0, 0, 0, static_cast<int>(req.goals.size()), ok);
+        }
+    }
 
     // ---- 1. ITS OWN OPEN WARS: answer, impose, accept or refuse, offer ---------
     std::vector<std::pair<entity_id, entity_id>> keys;
@@ -4031,6 +4124,16 @@ void score_nation_war(world& w, const recipe_registry& reg, entity_id nation, in
         if (oit != w.peace_offers.end())
             continue; // its own offer stands; the other side answers it
 
+        // CAPITULATE (BL-1706; RELATIONS.md § Capitulation): losing badly and its last
+        // offer refused (k_war_ai_capitulate_score). A leader's capitulation ends the war.
+        if (mine <= -k_war_ai_capitulate_score && peace_offer_cooling(w, nation, other))
+        {
+            const corp_command cmd = war_cmd(nation, tick, corp_verb::capitulate, other, {});
+            const bool ok = apply_corp_command(w, reg, cmd) == corp_command_result::applied;
+            war_trace(tick, nation, other, war_ai_choice::capitulate, static_cast<float>(mine), 0, 0, 0, 0, 0, 0, ok);
+            continue;
+        }
+
         // OFFER: weariness, a war going badly, or one going well enough to cash in.
         if (dur < k_war_ai_min_peace_ticks)
             continue;
@@ -4059,10 +4162,132 @@ void score_nation_war(world& w, const recipe_registry& reg, entity_id nation, in
                   static_cast<int>(provs.size()), ok);
     }
 
-    // ---- 2. A DECLARATION: at most one, toward a neighbour across a front ------
+    // ---- 1b. SEPARATE PEACE OFFERED TO IT AS A LEADER (BL-1706) -----------------
+    // A joiner across offered to leave: the leader weighs it with the leaders' accept
+    // sum (its side's score, its exhaustion, the joiner's time in the war, the stake). A
+    // refusal, or an accept the world refuses (stale terms), refuses - so a stale offer
+    // never freezes the pair, as the leaders' branch above reasons.
+    if (own_wars)
+    {
+        std::vector<std::pair<std::pair<entity_id, entity_id>, peace_offer>> sep;
+        for (const auto& [k, o] : w.separate_peace_offers) // ascending (joiner, leader)
+            if (k.second == nation && o.offerer == k.first)
+                sep.emplace_back(k, o);
+        for (const auto& [k, o] : sep)
+        {
+            const entity_id joiner = k.first;
+            const war_record* wr = war_of_member(w, nation, joiner);
+            if (wr == nullptr || w.separate_peace_offers.count(k) == 0)
+                continue;
+            int32_t joined = wr->opened_tick;
+            for (const war_member& m : wr->joiners)
+                if (m.nation == joiner) joined = m.joined_tick;
+            const int mine = side_score(w, *wr, nation);
+            float stake = 0.0f;
+            if (o.terms.kind == peace_kind::cession)
+                stake = (o.terms.gainer == nation ? 1.0f : -1.0f) * static_cast<float>(o.terms.provinces.size());
+            const float a = peace_accept_sum(exhaustion, mine, tick - joined, stake);
+            bool accept = a > k_war_ai_peace_bar;
+            bool ok = false;
+            if (accept)
+            {
+                ok = apply_corp_command(w, reg, war_cmd(nation, tick, corp_verb::accept_peace, joiner, {}))
+                  == corp_command_result::applied;
+                accept = ok;
+            }
+            if (!accept)
+                ok = apply_corp_command(w, reg, war_cmd(nation, tick, corp_verb::refuse_peace, joiner, {}))
+                  == corp_command_result::applied;
+            war_trace(tick, nation, joiner, accept ? war_ai_choice::accept : war_ai_choice::refuse, a, stake, 0, 0, 0,
+                      0, static_cast<int>(o.terms.provinces.size()), ok);
+        }
+    }
+
+    // ---- 1c. THE WARS IT JOINED (BL-1706): a separate peace, or capitulation ------
+    // Per war, at most one verb, against the other side's LEADER (the only nation a
+    // separate peace is made with): answer its offer (the leaders' accept sum); else,
+    // losing badly and refused, capitulate; else, losing, offer a WHITE separate peace
+    // when the leaders' offer sum (exhaustion, losing, time in the war) clears the bar.
+    // A joiner never offers while it is ahead: a joined war is the leaders' to end.
+    if (own_wars)
+    {
+        std::vector<war_key_t> joined_keys;
+        for (const auto& [key, war] : w.wars) // ascending
+            if (war_side(war, nation) >= 0 && war.declarer != nation && war.defender != nation)
+                joined_keys.push_back(key);
+        for (const war_key_t& key : joined_keys)
+        {
+            const auto wit = w.wars.find(key);
+            if (wit == w.wars.end() || war_side(wit->second, nation) < 0)
+                continue;
+            const war_record war = wit->second; // a copy: the verbs below may change it
+            const int side = war_side(war, nation);
+            const entity_id leader = war_leader(war, 1 - side);
+            int32_t joined = war.opened_tick;
+            for (const war_member& m : war.joiners)
+                if (m.nation == nation) joined = m.joined_tick;
+            const int dur  = tick - joined;
+            const int mine = side_score(w, war, nation);
+
+            const auto sit = w.separate_peace_offers.find({ nation, leader });
+            if (sit != w.separate_peace_offers.end() && sit->second.offerer == leader)
+            {
+                const peace_terms t = sit->second.terms;
+                float stake = 0.0f;
+                if (t.kind == peace_kind::cession)
+                    stake = (t.gainer == nation ? 1.0f : -1.0f) * static_cast<float>(t.provinces.size());
+                const float a = peace_accept_sum(exhaustion, mine, dur, stake);
+                bool accept = a > k_war_ai_peace_bar;
+                bool ok = false;
+                if (accept)
+                {
+                    ok = apply_corp_command(w, reg, war_cmd(nation, tick, corp_verb::accept_peace, leader, {}))
+                      == corp_command_result::applied;
+                    accept = ok;
+                }
+                if (!accept)
+                    ok = apply_corp_command(w, reg, war_cmd(nation, tick, corp_verb::refuse_peace, leader, {}))
+                      == corp_command_result::applied;
+                war_trace(tick, nation, leader, accept ? war_ai_choice::accept : war_ai_choice::refuse, a, stake, 0, 0,
+                          0, 0, static_cast<int>(t.provinces.size()), ok);
+                continue;
+            }
+            if (sit != w.separate_peace_offers.end())
+                continue; // its own offer stands; the leader answers it
+
+            if (mine <= -k_war_ai_capitulate_score && peace_offer_cooling(w, nation, leader))
+            {
+                const corp_command cmd = war_cmd(nation, tick, corp_verb::capitulate, leader, {});
+                const bool ok = apply_corp_command(w, reg, cmd) == corp_command_result::applied;
+                war_trace(tick, nation, leader, war_ai_choice::capitulate, static_cast<float>(mine), 0, 0, 0, 0, 0, 0,
+                          ok);
+                continue;
+            }
+
+            if (mine >= 0 || dur < k_war_ai_min_peace_ticks || peace_offer_cooling(w, nation, leader))
+                continue;
+            const float losing = static_cast<float>(-mine) / 100.0f;
+            const float lasted = std::min(1.0f, static_cast<float>(dur) / static_cast<float>(k_war_truce_ticks));
+            const float d = k_war_ai_peace_w_exhaustion * exhaustion + k_war_ai_peace_w_losing * losing
+                          + k_war_ai_peace_w_duration * lasted;
+            if (d <= k_war_ai_peace_bar)
+                continue;
+            const corp_command cmd = war_cmd(nation, tick, corp_verb::offer_peace, leader, {}, 0);
+            const bool ok = apply_corp_command(w, reg, cmd) == corp_command_result::applied;
+            war_trace(tick, nation, leader, war_ai_choice::offer, d, 0, 0, 0, 0, 0, 0, ok);
+        }
+    }
+
+    // ---- 2. A DECLARATION OR A JOIN: at most one verb, toward a neighbour across a front
+    // BL-1706 (RELATIONS.md § Who asks): "A rival declares a new war only on a nation at
+    // peace." Where it would have declared on a nation already at war - the same gates,
+    // the same motive, the same utility - it asks to join the side opposite that nation
+    // instead, priced by `join_price` (hostility on every member across). And it may ask
+    // to join a FRIEND's defence (k_war_ai_join_w_friend). Every candidate - declaration
+    // or join - competes in one pool; the best clears the declaration's bar or nothing does.
     int open_wars = 0;
     for (const auto& [key, war] : w.wars)
-        if (war.declarer == nation || war.defender == nation)
+        if (war_side(war, nation) >= 0) // BL-1706: a war it joined weighs as one it leads
             ++open_wars;
     // The third parties a declaration prices: every nation but the pair.
     std::size_t live = 0; // BL-1562: an ended nation prices no declaration
@@ -4070,6 +4295,18 @@ void score_nation_war(world& w, const recipe_registry& reg, entity_id nation, in
         live += nc.ended ? 0u : 1u;
     const std::size_t others = live >= 2 ? live - 2 : 0;
     const float base_trust = sp.factors[static_cast<std::size_t>(sentiment_factor_kind::war_declared)].trust;
+    const auto price_term = [&](const war_price& price) {
+        return (base_trust < 0.0f && others > 0) ? price.sum_trust / (base_trust * static_cast<float>(others)) : 0.0f;
+    };
+    /// A join it may file: not pending, not cooling, and never turning on a friend.
+    const auto joinable = [&](const war_key_t& key, const war_record& war, uint8_t side) {
+        if (w.join_requests.count({ key, nation }) != 0 || join_cooling(w, key, nation))
+            return false;
+        for (const entity_id m : war_side_members(war, 1 - side))
+            if (are_friends(w, nation, m))
+                return false;
+        return true;
+    };
 
     struct pick
     {
@@ -4077,9 +4314,19 @@ void score_nation_war(world& w, const recipe_registry& reg, entity_id nation, in
         entity_id t = null_entity;
         std::vector<uint32_t> goals;
         float g = 0, a = 0, s = 0, p = 0, x = 0;
+        bool join = false;     ///< BL-1706: request_join_war rather than declare_war
+        war_key_t key{};
+        uint8_t side = 0;
     };
     pick best;
     bool have = false;
+    const auto consider = [&](pick c) {
+        if (!have || c.u > best.u) // strict: ties keep the earlier candidate
+        {
+            have = true;
+            best = std::move(c);
+        }
+    };
     for (const auto& [target, pf] : pair_fronts()) // ascending neighbour
     {
         if (target == nation || w.nations.find(target) == w.nations.end() || pf.their_provs.empty())
@@ -4103,50 +4350,151 @@ void score_nation_war(world& w, const recipe_registry& reg, entity_id nation, in
         if (s < k_war_ai_min_edge)
             continue; // no supplied edge on the shared front
         const float x = trade_exposure(w, nation, target);
-        const std::size_t kmax = std::min<std::size_t>(k_war_goals_max, pf.their_provs.size());
-        for (std::size_t k = 1; k <= kmax; ++k)
+        const auto utility = [&](std::size_t k, float p) {
+            return k_war_ai_w_grievance * g + k_war_ai_w_alarm * a - k_war_ai_w_warmth * warm
+                 + k_war_ai_w_edge * s + k_war_ai_w_goal * static_cast<float>(k)
+                 - k_war_ai_w_price * p - k_war_ai_w_trade * x
+                 - k_war_ai_w_exhaustion * exhaustion
+                 - k_war_ai_w_open_wars * static_cast<float>(open_wars);
+        };
+        // The MOTIVE first, and cheaply: the sentiment test needs no price, and when it
+        // fails only the justification rows are read (war_justifications skips the
+        // price's bordering walk over every tile). The price is taken only for a
+        // candidate with a motive. NOT a `break` on failure: LOST GROUND reads the goals
+        // themselves (a goal the declarer once ceded to the target), so a larger goal set
+        // can hold a justification the smaller one lacks. Grievance, embargo and a friend
+        // attacked do not depend on the goals.
+        const auto motive = [&](const std::vector<uint32_t>& goals) {
+            if (g + a >= k_war_ai_min_motive)
+                return true;
+            const auto j = war_justifications(w, sp, nation, target, goals);
+            return std::any_of(j.begin(), j.end(), [](bool b) { return b; });
+        };
+
+        if (!in_any_war(w, target))
         {
-            const std::vector<uint32_t> goals(pf.their_provs.begin(),
-                                              pf.their_provs.begin() + static_cast<std::ptrdiff_t>(k));
-            // The MOTIVE first, and cheaply: the sentiment test needs no price, and
-            // when it fails only the justification rows are read (war_justifications
-            // skips the price's bordering walk over every tile). The price is taken
-            // only for a candidate with a motive. NOT a `break` on failure: LOST
-            // GROUND reads the goals themselves (a goal the declarer once ceded to
-            // the target), so a larger goal set can hold a justification the
-            // smaller one lacks. Grievance, embargo and a friend attacked do not
-            // depend on the goals.
-            if (g + a < k_war_ai_min_motive)
+            const std::size_t kmax = std::min<std::size_t>(k_war_goals_max, pf.their_provs.size());
+            for (std::size_t k = 1; k <= kmax; ++k)
             {
-                const auto j = war_justifications(w, sp, nation, target, goals);
-                if (std::none_of(j.begin(), j.end(), [](bool b) { return b; }))
+                const std::vector<uint32_t> goals(pf.their_provs.begin(),
+                                                  pf.their_provs.begin() + static_cast<std::ptrdiff_t>(k));
+                if (!motive(goals))
                     continue; // no motive at this goal count
+                const war_price price = declaration_price(w, sp, nation, target, goals);
+                if (!price.valid)
+                    continue;
+                const float p = price_term(price);
+                const float u = utility(k, p);
+                war_trace(tick, nation, target, war_ai_choice::candidate, u, g, a, s, p, x,
+                          static_cast<int>(k), false);
+                consider(pick{ u, target, goals, g, a, s, p, x, false, {}, 0 });
             }
-            const war_price price = declaration_price(w, sp, nation, target, goals);
-            if (!price.valid)
+            continue;
+        }
+        // BL-1706: the target is at war - ask to join the side opposite it, in each war it
+        // fights (ascending key). Never a member already, never a side with a friend across.
+        for (const auto& [key, war] : w.wars)
+        {
+            const int ts = war_side(war, target);
+            if (ts < 0 || war_side(war, nation) >= 0)
                 continue;
-            const float p = (base_trust < 0.0f && others > 0)
-                                ? price.sum_trust / (base_trust * static_cast<float>(others)) : 0.0f;
-            const float u = k_war_ai_w_grievance * g + k_war_ai_w_alarm * a - k_war_ai_w_warmth * warm
-                          + k_war_ai_w_edge * s + k_war_ai_w_goal * static_cast<float>(k)
-                          - k_war_ai_w_price * p - k_war_ai_w_trade * x
-                          - k_war_ai_w_exhaustion * exhaustion
-                          - k_war_ai_w_open_wars * static_cast<float>(open_wars);
-            war_trace(tick, nation, target, war_ai_choice::candidate, u, g, a, s, p, x,
-                      static_cast<int>(k), false);
-            if (!have || u > best.u) // strict: ties keep the lower target, then fewer goals
+            const uint8_t side = static_cast<uint8_t>(1 - ts);
+            if (!joinable(key, war, side))
+                continue;
+            std::vector<uint32_t> provs; // the target's front provinces its side has not named
+            for (const uint32_t pr : pf.their_provs)
+                if (war_goal_namer(war, side, pr) == null_entity)
+                    provs.push_back(pr);
+            const std::size_t kmax = std::min<std::size_t>(k_war_goals_max, provs.size());
+            for (std::size_t k = 1; k <= kmax; ++k)
             {
-                have = true;
-                best = pick{ u, target, goals, g, a, s, p, x };
+                const std::vector<uint32_t> goals(provs.begin(), provs.begin() + static_cast<std::ptrdiff_t>(k));
+                if (!motive(goals))
+                    continue;
+                const war_price price = join_price(w, sp, key, nation, side, goals);
+                if (!price.valid)
+                    continue; // check_join refuses it (at war with a member across, a truce...)
+                const float p = price_term(price);
+                const float u = utility(k, p);
+                war_trace(tick, nation, target, war_ai_choice::join_candidate, u, g, a, s, p, x,
+                          static_cast<int>(k), false);
+                consider(pick{ u, target, goals, g, a, s, p, x, true, key, side });
             }
         }
     }
+    // BL-1706: a FRIEND's defence (RELATIONS.md § Who asks) - the defender's side only,
+    // naming ONE goal: the first declarer-side member's front province it borders, else
+    // the declarer's capital province, else its first unnamed one (the answer's fallback).
+    // No front gate: a friend's defence needs no supplied edge, but the edge it has toward
+    // the declarer still counts, and its own sentiment toward the declarer still weighs.
+    for (const auto& [key, war] : w.wars) // ascending
+    {
+        if (war.defender == nation || war_side(war, nation) >= 0 || !are_friends(w, nation, war.defender))
+            continue;
+        if (!joinable(key, war, 1))
+            continue;
+        std::vector<uint32_t> goal;
+        const auto& pfs = pair_fronts();
+        for (const entity_id m : war_side_members(war, 0))
+        {
+            if (const auto it = pfs.find(m); it != pfs.end())
+                for (const uint32_t pr : it->second.their_provs)
+                    if (war_goal_namer(war, 1, pr) == null_entity) { goal.push_back(pr); break; }
+            if (!goal.empty())
+                break;
+        }
+        if (goal.empty())
+        {
+            const auto dn = w.nations.find(war.declarer);
+            const uint32_t cp = dn != w.nations.end() && dn->second.capital_tile != null_entity
+                                    ? w.provinces.province_of(dn->second.capital_tile) : 0u;
+            if (cp != 0 && province_kind_of(w, cp) == province_kind::land && province_owner(w, cp) == war.declarer
+                && war_goal_namer(war, 1, cp) == null_entity)
+                goal.push_back(cp);
+            else
+                for (const uint32_t pr : owned_land_provinces(w, war.declarer)) // ascending
+                    if (war_goal_namer(war, 1, pr) == null_entity) { goal.push_back(pr); break; }
+        }
+        if (goal.empty())
+            continue;
+        const war_price price = join_price(w, sp, key, nation, 1, goal);
+        if (!price.valid)
+            continue;
+        const sentiment_value sv = sentiment_toward(w.sentiment, nation, war.declarer); // its OWN row
+        const float g    = std::max(0.0f, -sv.trust) / limit;
+        const float a    = std::max(0.0f, sv.alarm) / limit;
+        const float warm = std::max(0.0f, sv.trust) / limit;
+        float s = 0.0f;
+        if (const auto it = pfs.find(war.declarer); it != pfs.end())
+        {
+            war_pair_front fed = it->second;
+            fed.mine = it->second.mine_fed;
+            s = front_edge(fed);
+        }
+        const float x = trade_exposure(w, nation, war.declarer);
+        const float p = price_term(price);
+        const float u = k_war_ai_join_w_friend + k_war_ai_w_grievance * g + k_war_ai_w_alarm * a
+                      - k_war_ai_w_warmth * warm + k_war_ai_w_edge * s + k_war_ai_w_goal * 1.0f
+                      - k_war_ai_w_price * p - k_war_ai_w_trade * x - k_war_ai_w_exhaustion * exhaustion
+                      - k_war_ai_w_open_wars * static_cast<float>(open_wars);
+        war_trace(tick, nation, war.declarer, war_ai_choice::join_candidate, u, g, a, s, p, x, 1, false);
+        consider(pick{ u, war.declarer, goal, g, a, s, p, x, true, key, 1 });
+    }
     if (have && best.u > k_war_ai_declare_bar)
     {
-        const corp_command cmd = war_cmd(nation, tick, corp_verb::declare_war, best.t, best.goals);
+        corp_command cmd;
+        if (best.join)
+        {
+            // corp_command names a war by its two leaders: counterparty leads the side joined.
+            const war_record& war = w.wars.at(best.key);
+            cmd = war_cmd(nation, tick, corp_verb::request_join_war, war_leader(war, best.side), best.goals);
+            cmd.subject = war_leader(war, 1 - best.side);
+        }
+        else
+            cmd = war_cmd(nation, tick, corp_verb::declare_war, best.t, best.goals);
         const bool ok = apply_corp_command(w, reg, cmd) == corp_command_result::applied;
-        war_trace(tick, nation, best.t, war_ai_choice::declare, best.u, best.g, best.a, best.s, best.p,
-                  best.x, static_cast<int>(best.goals.size()), ok);
+        war_trace(tick, nation, best.t, best.join ? war_ai_choice::join : war_ai_choice::declare, best.u, best.g,
+                  best.a, best.s, best.p, best.x, static_cast<int>(best.goals.size()), ok);
     }
 }
 
