@@ -783,15 +783,15 @@
   ],
   [
    "gameplay.offer_peace",
-   "Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Wars tab, on a war the player is party to (ledger.diplomacy_offer_peace). A corp_verb (corp_verb::offer_peace, 49) on the command seam."
+   "Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Wars tab, on a war the player is party to (ledger.diplomacy_offer_peace). A corp_verb (corp_verb::offer_peace, 49) on the command seam. A separate peace, the player a joiner or a leader answering one: ledger.diplomacy_separate_peace."
   ],
   [
    "gameplay.accept_peace",
-   "Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Wars tab, on a war the player is party to (ledger.diplomacy_accept_peace). A corp_verb (corp_verb::accept_peace, 50) on the command seam."
+   "Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Wars tab, on a war the player is party to (ledger.diplomacy_accept_peace). A corp_verb (corp_verb::accept_peace, 50) on the command seam. A separate peace, the player a joiner or a leader answering one: ledger.diplomacy_separate_peace."
   ],
   [
    "gameplay.refuse_peace",
-   "Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Wars tab, on a war the player is party to (ledger.diplomacy_refuse_peace). A corp_verb (corp_verb::refuse_peace, 51) on the command seam."
+   "Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Wars tab, on a war the player is party to (ledger.diplomacy_refuse_peace). A corp_verb (corp_verb::refuse_peace, 51) on the command seam. A separate peace, the player a joiner or a leader answering one: ledger.diplomacy_separate_peace."
   ],
   [
    "gameplay.impose_peace",
@@ -799,19 +799,19 @@
   ],
   [
    "gameplay.request_join_war",
-   "No control issues it yet (the Diplomacy ledger's join press is a UI item of its own). A corp_verb (corp_verb::request_join_war, 66) on the command seam."
+   "Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Wars tab, on a war the player is not in: 'Ask to join' (ledger.diplomacy_ask_to_join). A corp_verb (corp_verb::request_join_war, 66) on the command seam."
   ],
   [
    "gameplay.accept_join",
-   "No control issues it yet. A corp_verb (corp_verb::accept_join, 67) on the command seam."
+   "Diplomacy ledger, Wars tab, 'Accept' under a request to join the side the player leads (ledger.diplomacy_join_request). A corp_verb (corp_verb::accept_join, 67) on the command seam."
   ],
   [
    "gameplay.refuse_join",
-   "No control issues it yet. A corp_verb (corp_verb::refuse_join, 68) on the command seam."
+   "Diplomacy ledger, Wars tab, 'Refuse' under a request to join the side the player leads (ledger.diplomacy_join_request). A corp_verb (corp_verb::refuse_join, 68) on the command seam."
   ],
   [
    "gameplay.capitulate",
-   "No control issues it yet. A corp_verb (corp_verb::capitulate, 69) on the command seam."
+   "Diplomacy ledger, Wars tab, 'Capitulate' on a war the player is in, leader or joiner (ledger.diplomacy_capitulate). A corp_verb (corp_verb::capitulate, 69) on the command seam."
   ],
   [
    "gameplay.set_embargo",
@@ -976,6 +976,30 @@
   [
    "ledger.diplomacy_refuse_peace",
    "Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Wars tab, 'Refuse' under a peace offer the other party made."
+  ],
+  [
+   "ledger.diplomacy_ask_to_join",
+   "Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Wars tab, on a war the player is not in: 'Ask to join' opens the request composer; '<leader>'s side' chooses the side; 'Ask' sends, 'Cancel' closes."
+  ],
+  [
+   "ledger.diplomacy_join_request",
+   "Diplomacy ledger, Wars tab, on a war whose side the player leads: '<nation> asks to join your side, naming <goals>.' with 'Accept' and 'Refuse'."
+  ],
+  [
+   "ledger.diplomacy_separate_peace",
+   "Diplomacy ledger, Wars tab. On a war the player joined: 'Separate peace' opens the composer ('They cede to you', 'You cede to them', 'Offer white peace', 'Offer cession', 'Close'); a pending offer from the other side's leader shows its terms with 'Accept' / 'Refuse'. On a war whose side the player leads: '<joiner> offers a separate peace: <terms>.' with 'Accept' / 'Refuse'."
+  ],
+  [
+   "ledger.diplomacy_capitulate",
+   "Diplomacy ledger, Wars tab, on a war the player is in (leader or joiner), beside the peace presses: 'Capitulate' opens the confirm; its 'Capitulate' sends, 'Cancel' closes."
+  ],
+  [
+   "ledger.diplomacy_war_expand",
+   "Diplomacy ledger, Wars tab: the sides line of a war the player is not in."
+  ],
+  [
+   "ledger.diplomacy_goal_row",
+   "Diplomacy ledger, Wars tab: a goal's row - its province, a state word and a progress bar - under 'Taking' / 'Defending' or a '<leader>'s side'."
   ],
   [
    "gameplay.space_launch",

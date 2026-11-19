@@ -3641,9 +3641,14 @@ void app::render()
             // defender's capital province when the stack stands off its own ground).
             // A player already declared on, and not yet answering, answers instead.
             const entity_id target = m_ui.pending_unit_order_declare;
-            const war_record* existing = war_between(m_world, m_world.player_entity, target);
+            // BL-1706: the war in which the two stand on OPPOSITE SIDES, leaders or
+            // joiners (`war_of_member`). Only the leaders' own unanswered war is answered;
+            // any other war already across makes them enemies, so the attack needs no
+            // declaration and none is sent (a second one would be refused).
+            const war_record* existing = war_of_member(m_world, m_world.player_entity, target);
             const bool answering = existing != nullptr && existing->defender == m_world.player_entity
-                                && !existing->answered;
+                                && existing->declarer == target && !existing->answered;
+            const bool already_across = existing != nullptr && !answering;
             corp_command cmd;
             cmd.tick         = tick;
             cmd.corp         = m_world.player_entity;
@@ -3658,11 +3663,12 @@ void app::render()
             else
                 for (std::size_t g = 0; g < m_ui.pending_unit_order_goals.size() && g < cmd.air_provinces.size(); ++g)
                     cmd.air_provinces[g] = m_ui.pending_unit_order_goals[g];
-            const corp_command_result r = cmd.air_provinces[0] == 0
+            const corp_command_result r = already_across ? corp_command_result::rejected_state
+                : cmd.air_provinces[0] == 0
                 ? corp_command_result::rejected_invalid
                 : player_command(cmd);
             // Already hostile (the declare raced another): the attack still stands.
-            go = r == corp_command_result::applied
+            go = r == corp_command_result::applied || already_across
               || is_hostile(m_world, m_world.player_entity, target);
             if (r == corp_command_result::applied)
             {
@@ -4146,6 +4152,20 @@ void app::render()
                 break;
             case corp_verb::refuse_peace:
                 m_ui.diplomacy.message = ok ? "You refused " + them + "'s offer." : "That offer is already gone.";
+                break;
+            // BL-1706 (RELATIONS.md § Joining a war): asking, answering a request, capitulating.
+            case corp_verb::request_join_war:
+                m_ui.diplomacy.message = ok ? "You asked " + them + " to take you into the war."
+                                            : "Couldn't ask to join that war.";
+                break;
+            case corp_verb::accept_join:
+                m_ui.diplomacy.message = ok ? them + " joined your side." : "That request no longer holds.";
+                break;
+            case corp_verb::refuse_join:
+                m_ui.diplomacy.message = ok ? "You turned " + them + " away." : "That request is already gone.";
+                break;
+            case corp_verb::capitulate:
+                m_ui.diplomacy.message = ok ? "You capitulated." : "Couldn't capitulate.";
                 break;
             case corp_verb::offer_friendship:
                 m_ui.diplomacy.message = ok ? "Friendship offered to " + them + "." : "Couldn't offer friendship.";
