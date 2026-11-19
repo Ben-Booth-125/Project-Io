@@ -86,7 +86,7 @@ void apply_canvas_command(const world& w, ui_state& ui, canvas_command cmd)
             // landing on its most informative rung (identical to double-click /
             // the panel's 'go to'). So single-click a body, then Enter, dives into
             // *that* body rather than dropping a rung on the previous anchor.
-            // Tiles/nations/corporations are excluded (a tile 'go to' is a no-op;
+            // Tiles/nations/corporations are excluded (a tile is already on screen;
             // corp/nation would open a ledger, not descend) and fall through to the
             // blind one-rung drop below, which also serves the no-selection case.
             const entity_id sel = ui.selected_entity;

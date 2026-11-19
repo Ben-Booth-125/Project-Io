@@ -81,11 +81,11 @@ void focus_on_entity(const world& w, ui_state& ui, entity_id entity)
     if (entity == null_entity)
         return;
 
+    // Every spatial kind lands ON its tile (Ben's 2026-11-19 playtest, BL-1693:
+    // a market's 'go to' framed the grid's centre instead of its own tile).
     if (w.tiles.count(entity))
     {
-        // A tile is selected from the surface it lives on, so 'go to' has nothing
-        // to descend to — the surface is already framed. Pan-to-tile is out of
-        // scope for now, so this is a deliberate no-op rather than a reframe.
+        focus_on_tile(w, ui, entity);
         return;
     }
     if (auto b = w.buildings.find(entity); b != w.buildings.end())
@@ -101,7 +101,11 @@ void focus_on_entity(const world& w, ui_state& ui, entity_id entity)
     }
     if (auto m = w.markets.find(entity); m != w.markets.end())
     {
-        focus_on_surface(w, ui, m->second.body);
+        // The market's centre tile; an unanchored market (no centre) frames its body.
+        if (m->second.centre_tile != null_entity && w.tiles.count(m->second.centre_tile))
+            focus_on_tile(w, ui, m->second.centre_tile);
+        else
+            focus_on_surface(w, ui, m->second.body);
         return;
     }
     if (w.bodies.count(entity))
