@@ -954,7 +954,7 @@
   "planetary_ground_master": {
    "surface": "The Planetary canvas ground at every zoom - one baked master per body, draped over a lit 3D surface under a camera whose tilt follows zoom",
    "answers": "What does this ground look like, at any zoom, the instant I look at it?",
-   "because": "Ben, 2026-10-09, after walking the sprint 51 build: the ground lag was off-putting, because every zoom step had been a fresh bake that arrived late and softer first. One 96 px/hex master (Ben, 2026-11-05) per body, pre-baked behind the handoff and held in RAM, makes every rung a downsample of the same picture: a rung change is final on arrival, and the baked detail never changes with zoom, only scale - so the player learns one picture of a world, not five. The two closest rungs add only a draw-time surface grain over it (Ben, 2026-11-15, BL-1658 (close-zoom detail layer)), which bakes nothing. The master is taken straight down and laid over the 3D ground (Ben, 2026-11-16: \"work with just 3D from now on\"; RENDERING.md \u00a7 The 3D ground), so the same picture serves every tilt: a zoom step tilts the camera, never re-bakes, and a lens toggle never moves the map under the cursor. It adds no chrome and no control: it replaces the per-rung tiers, the stand-in that hid their fills, the stepped tilt and the flat ground.",
+   "because": "Ben, 2026-10-09, after walking the sprint 51 build: the ground lag was off-putting, because every zoom step had been a fresh bake that arrived late and softer first. One 96 px/hex master (Ben, 2026-11-05) per body, pre-baked behind the handoff and held in RAM, makes every rung a downsample of the same picture: a rung change is final on arrival, and the baked detail never changes with zoom, only scale - so the player learns one picture of a world, not five. The two closest rungs add only a draw-time surface grain over it (Ben, 2026-11-15, BL-1658 (close-zoom detail layer)), which bakes nothing. The master is taken straight down and laid over the 3D ground (Ben, 2026-11-16: \"work with just 3D from now on\"; RENDERING.md § The 3D ground), so the same picture serves every tilt: a zoom step tilts the camera, never re-bakes, and a lens toggle never moves the map under the cursor. It adds no chrome and no control: it replaces the per-rung tiers, the stand-in that hid their fills, the stepped tilt and the flat ground.",
    "backlog_item": [
     "BL-1246"
    ],
@@ -1554,6 +1554,18 @@
    "files": [
     "src/ui/convoys_ledger.cpp",
     "src/core/session_history.cpp"
+   ],
+   "status": "drafted"
+  },
+  "selection_market_card": {
+   "surface": "Selection band - the market element (top goods | identity, catchment, your trades)",
+   "answers": "What is this market - where it is, whom it serves, what moves through it and at what price - and do any of my trades run through it?",
+   "because": "Ben, playtest 2026-11-19: a selected market showed only Go to and Trades, so selecting one told the player nothing the canvas glyph had not. Markets are the public intelligence channel (BL-068), so the card can say everything the Market ledger says, but the band asks a shorter question than the ledger: not the whole board, the six goods by volume with each price against its base and its move since last month, beside the three facts a glance needs - the body and the nation holding the centre, the settlements and people that clear here, and how many of the player's own trades touch it (a count that is also the door onto the ledger's Trades tab, where the old Trades button led). Go to is the header's own press, landing on the centre tile. The activity fog still gates the goods: a market outside the trade network names itself and its catchment but shows no prices.",
+   "backlog_item": [
+    "BL-1694"
+   ],
+   "files": [
+    "src/ui/selection_panel.cpp"
    ],
    "status": "drafted"
   }

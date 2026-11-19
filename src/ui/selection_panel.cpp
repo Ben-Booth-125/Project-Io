@@ -123,7 +123,14 @@ const char* selection_title(const world& w, selection_kind kind, entity_id id)
         case selection_kind::body:        return w.bodies.at(id).name.c_str();
         case selection_kind::building:    return building_type_name(w.buildings.at(id).type);
         case selection_kind::tile:        return "Tile";
-        case selection_kind::market:      return "Market";
+        case selection_kind::market:
+        {
+            // BL-1694: a market titles by its city (market_city_name), the name every
+            // other surface gives it. One buffer: the header reads it this frame only.
+            static std::string title;
+            title = market_city_name(w, id);
+            return title.c_str();
+        }
         case selection_kind::unit:        return "Unit";
         case selection_kind::nation:      return w.nations.at(id).name.c_str();
         case selection_kind::corporation: return "Corporation"; // BL-1407: never selected
@@ -600,25 +607,8 @@ void draw_selection_action(const world& w, const recipe_registry& reg,
         // the dedicated 3-column band (draw_unit_selection_body), same shape
         // as the building/tile cards.
 
-        case selection_kind::market:
-            ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Locate");
-            if (ImGui::Button("Go to"))
-                focus_on_entity(w, ui, sel);
-            ImGui::Separator();
-            // BL-1269: the convoy dispatch form retired with corporation pools —
-            // goods leave a market only by a TRADE (TRADE.md), and trades are
-            // set on the Market ledger's Trades tab. The card is the door onto
-            // it: the ledger follows the selected market, so it opens aimed.
-            ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Trade");
-            if (ImGui::Button("Trades"))
-            {
-                close_all_panels(ui);
-                ui.show_market_ledger = true;
-                ui.market_ledger_view = 1; // Trades
-                ui.market_ledger_focus = sel; // aim it even if the selection is unchanged
-            }
-            ImGui::SetItemTooltip("Open this market's trades in the Market ledger.");
-            break;
+        // selection_kind::market no longer routes here (BL-1694) — it takes its
+        // own two-column body (draw_market_selection_body).
 
         case selection_kind::nation:
         case selection_kind::corporation:
@@ -4901,6 +4891,236 @@ bool draw_front_selection(const world& w, ui_state& ui)
     return true;
 }
 
+// --- The market element (BL-1694; SELECTION.md § The market element) ---------
+// Ben's 2026-11-19 playtest: "Selecting a market ... should show more information
+// about the market, rather than just having Go to and Trades." Markets are the
+// sanctioned public channel, so every figure here is public; the activity fog still
+// gates the goods (an unknown body's market shows none).
+
+namespace {
+
+const market_plot_history* g_market_history = nullptr;
+
+struct market_catchment
+{
+    int       centres = 0;
+    long long people  = 0; ///< Thousands, as population_centre_component counts them.
+};
+
+/// The population centres whose tile clears to @p mid (`market_for_tile`), razed
+/// centres skipped. Cached against the econ tick: it moves only when the world does.
+market_catchment read_market_catchment(const world& w, entity_id mid)
+{
+    static entity_id        c_mid  = null_entity;
+    static int              c_tick = -1;
+    static std::size_t      c_n    = 0;
+    static market_catchment c{};
+    if (mid == c_mid && w.current_econ_tick == c_tick && w.population_centres.size() == c_n)
+        return c;
+    market_catchment out;
+    for (const auto& [cid, pc] : w.population_centres)
+    {
+        if (pc.razed)
+            continue;
+        const auto t = w.population_centre_tile.find(cid);
+        if (t == w.population_centre_tile.end() || market_for_tile(w, t->second) != mid)
+            continue;
+        ++out.centres;
+        out.people += pc.population;
+    }
+    c_mid = mid; c_tick = w.current_econ_tick; c_n = w.population_centres.size(); c = out;
+    return out;
+}
+
+/// A small filled triangle, up or down, or a short dash when flat — the price's move
+/// since the previous month. Drawn, not a font glyph, so it never falls back to '?'.
+void draw_trend_mark(int dir)
+{
+    const float  h  = ImGui::GetTextLineHeight();
+    const ImVec2 p  = ImGui::GetCursorScreenPos();
+    const ImVec2 c  = { p.x + h * 0.5f, p.y + h * 0.5f };
+    const float  r  = h * 0.28f;
+    ImDrawList*  dl = ImGui::GetWindowDrawList();
+    if (dir > 0)
+        dl->AddTriangleFilled({ c.x, c.y - r }, { c.x + r, c.y + r * 0.8f }, { c.x - r, c.y + r * 0.8f },
+                              value_colour(1.0));
+    else if (dir < 0)
+        dl->AddTriangleFilled({ c.x - r, c.y - r * 0.8f }, { c.x + r, c.y - r * 0.8f }, { c.x, c.y + r },
+                              value_colour(-1.0));
+    else
+        dl->AddLine({ c.x - r, c.y }, { c.x + r, c.y }, IM_COL32(150, 155, 165, 255), 1.5f);
+    ImGui::Dummy({ h, h });
+}
+
+/// A text-height colour pip, then SameLine (entity_summary.cpp's swatch idiom).
+void draw_swatch(ImU32 colour)
+{
+    const float  sw = ImGui::GetTextLineHeight();
+    const ImVec2 p  = ImGui::GetCursorScreenPos();
+    ImGui::GetWindowDrawList()->AddRectFilled(p, { p.x + sw, p.y + sw }, colour);
+    ImGui::Dummy({ sw, sw });
+    ImGui::SameLine();
+}
+
+void draw_market_selection_body(const world& w, ui_state& ui, entity_id mid)
+{
+    const auto mit = w.markets.find(mid);
+    if (mit == w.markets.end())
+        return;
+    const market_component& mk = mit->second;
+    const ImGuiStyle& style = ImGui::GetStyle();
+    const ImVec4 accent = ImGui::ColorConvertU32ToFloat4(palette::selection);
+
+    const float avail   = ImGui::GetContentRegionAvail().x;
+    const float goods_w = (avail - style.ItemSpacing.x) * 0.58f;
+
+    // ── Left: the goods it moves, by volume ──
+    ImGui::BeginChild("##mkt_goods", { goods_w, 0.0f }, false, ImGuiWindowFlags_NoSavedSettings);
+    ImGui::TextColored(accent, "Top goods");
+    const activity_vis av = body_activity_visibility(w, mk.body, w.current_day_tick);
+    if (av == activity_vis::unknown)
+        ImGui::TextDisabled("Outside your trade network - no market data.");
+    else
+    {
+        if (av == activity_vis::known_stale)
+            ImGui::TextDisabled("Route gone cold - last market read is stale.");
+        std::vector<std::size_t> order;
+        for (std::size_t r = 0; r < resource_count; ++r)
+            if (mk.supply[r] + mk.demand[r] > 0.0f)
+                order.push_back(r);
+        std::stable_sort(order.begin(), order.end(), [&](std::size_t a, std::size_t b) {
+            return mk.supply[a] + mk.demand[a] > mk.supply[b] + mk.demand[b];
+        });
+        if (order.size() > 6)
+            order.resize(6);
+        const std::array<resource_plot_series, resource_count>* hist = nullptr;
+        if (g_market_history != nullptr)
+            if (const auto h = g_market_history->find(mid); h != g_market_history->end())
+                hist = &h->second;
+        if (order.empty())
+            ImGui::TextDisabled("Nothing traded here yet.");
+        else if (ImGui::BeginTable("##mkt_goods_tbl", 4,
+                                   ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingStretchProp))
+        {
+            ImGui::TableSetupColumn("Good",    ImGuiTableColumnFlags_WidthStretch, 2.2f);
+            ImGui::TableSetupColumn("Volume",  ImGuiTableColumnFlags_WidthStretch, 1.0f);
+            ImGui::TableSetupColumn("Price",   ImGuiTableColumnFlags_WidthStretch, 1.0f);
+            ImGui::TableSetupColumn("vs base", ImGuiTableColumnFlags_WidthStretch, 1.3f);
+            ImGui::TableHeadersRow();
+            for (const std::size_t r : order)
+            {
+                const resource_presentation& rp = presentation_of(static_cast<resource_type>(r));
+                ImGui::TableNextRow();
+                ImGui::TableSetColumnIndex(0);
+                draw_swatch(rp.colour);
+                ImGui::TextUnformatted(rp.name);
+                ImGui::TableSetColumnIndex(1);
+                ImGui::Text("%.0f", mk.supply[r] + mk.demand[r]);
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip("Supply %.1f, demand %.1f at the last clear", mk.supply[r], mk.demand[r]);
+                ImGui::TableSetColumnIndex(2);
+                ImGui::Text("%.2f", mk.price[r]);
+                ImGui::TableSetColumnIndex(3);
+                const float base = mk.base_price[r];
+                const float pct  = base > 0.0f ? (mk.price[r] / base - 1.0f) * 100.0f : 0.0f;
+                int dir = 0;
+                if (hist != nullptr)
+                {
+                    const std::vector<float>& ps = (*hist)[r].price;
+                    if (ps.size() >= 2)
+                    {
+                        const float prev = ps[ps.size() - 2], now = ps.back();
+                        const float tol  = std::max(1e-4f, std::fabs(prev) * 0.005f);
+                        dir = now > prev + tol ? 1 : (now < prev - tol ? -1 : 0);
+                    }
+                }
+                draw_trend_mark(dir);
+                ImGui::SameLine(0.0f, style.ItemInnerSpacing.x);
+                ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(value_colour(static_cast<double>(pct))),
+                                   "%+.0f%%", pct);
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip("Price against its base of %.2f; the mark is its move since last month", base);
+            }
+            ImGui::EndTable();
+        }
+    }
+    ImGui::EndChild();
+
+    ImGui::SameLine();
+
+    // ── Right: what the market is, whom it serves, and the player's trades ──
+    ImGui::BeginChild("##mkt_facts", { 0.0f, 0.0f }, false, ImGuiWindowFlags_NoSavedSettings);
+    ImGui::PushTextWrapPos(0.0f);
+    ImGui::TextColored(accent, "Market");
+    {
+        const auto bit = w.bodies.find(mk.body);
+        const char* body_name = bit != w.bodies.end() ? bit->second.name.c_str() : "\xe2\x80\x94";
+        entity_id holder = null_entity;
+        if (mk.centre_tile != null_entity && w.tiles.count(mk.centre_tile))
+            holder = province_holder_for(w, w.provinces.province_of(mk.centre_tile));
+        const auto nit = w.nations.find(holder);
+        ImGui::Text("On %s", body_name);
+        if (nit != w.nations.end())
+        {
+            draw_swatch(palette::nation_colour(holder));
+            ImGui::Text("Held by %s", nit->second.name.c_str());
+        }
+        else
+            ImGui::TextDisabled("Held by no nation");
+    }
+    ImGui::Spacing();
+    ImGui::TextColored(accent, "Catchment");
+    {
+        const market_catchment c = read_market_catchment(w, mid);
+        if (c.centres == 0)
+            ImGui::TextDisabled("No settlement clears here.");
+        else
+        {
+            char people[32];
+            if (c.people >= 1000)
+                std::snprintf(people, sizeof people, "%.1fM", static_cast<double>(c.people) / 1000.0);
+            else
+                std::snprintf(people, sizeof people, "%lldk", c.people);
+            ImGui::Text("%d %s, %s people", c.centres, c.centres == 1 ? "settlement" : "settlements", people);
+        }
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("The settlements whose goods clear at this market, and their people");
+    }
+    ImGui::Spacing();
+    ImGui::TextColored(accent, "Your trades");
+    {
+        const entity_id me = player_actor(w);
+        int n = 0;
+        for (const standing_trade& t : w.trades)
+            if (t.owner == me && (t.from_market == mid || t.to_market == mid))
+                ++n;
+        char lbl[48];
+        if (n == 0)
+            std::snprintf(lbl, sizeof lbl, "None touch it##mkt_trades");
+        else
+            std::snprintf(lbl, sizeof lbl, "%d %s it##mkt_trades", n, n == 1 ? "touches" : "touch");
+        // The door onto the Market ledger's Trades tab, aimed at this market
+        // (BL-1269: goods leave a market only by a trade).
+        if (ImGui::Button(lbl))
+        {
+            close_all_panels(ui);
+            ui.show_market_ledger  = true;
+            ui.market_ledger_view  = 1; // Trades
+            ui.market_ledger_focus = mid;
+        }
+        ImGui::SetItemTooltip("Open this market's trades in the Market ledger.");
+    }
+    ImGui::PopTextWrapPos();
+    ImGui::EndChild();
+}
+
+} // namespace
+
+void set_selection_market_history(const market_plot_history* history)
+{
+    g_market_history = history;
+}
+
 void draw_selection_content(world& w, const recipe_registry& reg,
                             const economy_report& report, ui_state& ui)
 {
@@ -5098,6 +5318,13 @@ void draw_selection_content(world& w, const recipe_registry& reg,
     if (kind == selection_kind::unit)
     {
         draw_unit_selection_body(w, reg, ui);
+        return;
+    }
+    // A selected market shows what the market IS (BL-1694; SELECTION.md § The market
+    // element), not only its doors.
+    if (kind == selection_kind::market)
+    {
+        draw_market_selection_body(w, ui, ui.selected_entity);
         return;
     }
 

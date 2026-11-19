@@ -127,7 +127,7 @@ Each kind routes its 'go to' to the right place:
 | **Building** (any) | The host tile's card with this stack expanded in place, no header row — § The building element's layout. Player-owned and rival buildings alike. | | None: the tile element draws no go-to. |
 | **Unit** | Dedicated three-column band — § The unit element's layout. | | Canvas: entity's position. |
 | **Front** (non-entity) | Its own card — § The front element. | | None: a front is selected from its line on the canvas. |
-| **Market** | **Go to** — locate on the canvas. | (none) | Canvas: `focus_on_surface`. |
+| **Market** | § The market element. | | Canvas: `focus_on_tile` on the market's **centre tile** — the canvas lands on the market, not the grid's centre (Ben, 2026-11-19). An unanchored market (no centre) frames its body's surface. |
 | **Nation** | None — **"Open its ledger via [>]."** | (none) | A ledger (no canvas of its own). |
 | **Space asset** (a satellite or a station) | None. | The shared space-asset summary, the same the hover card draws: owner, role (a satellite) or modules and crew (a station), node, state. | None: it is pressed on the Circumplanetary rung it is drawn on. A station is selected by its core's id; its modules are not selectable on their own. |
 | **Space unit** (a ship; its fleet) | The player's own: **Move**, **Dock** / **Undock**, **Refuel**, **Bombard**; a Lander's **Embark colonists** and **Found base** — § The space-unit element. A rival's: none. | The shared space-unit summary, the same the hover card draws: hull, owner, node or transit, Δv budget, propellant, hull points, cargo, firepower. | None: it is pressed on the Circumplanetary or Solar rung it is drawn on. |
@@ -823,6 +823,28 @@ way every other selecting surface already does.
 - **The fee split** — deposit already paid versus the remainder still owed on completion, not just
   the total. "The fee is 400cr" hides the one number that matters mid-contract: how much is still
   at stake if the job goes wrong.
+
+### The market element (Ben, 2026-11-19)
+
+A selected **market** shows what the market *is*, not only its doors. The header titles it by its
+city (`market_city_name`, the name every surface gives it) and its `[>]` lands on the market's
+centre tile. Below, two columns:
+
+- **Top goods** (left, the wider). The six goods with the most volume (supply plus demand at the
+  last clear), each with its price, the price against its base as a percentage, and a **trend
+  mark**: a small triangle up or down for the price's move since last month, a dash when flat
+  (within half a percent). The move reads the app's market history; with fewer than two months of
+  it (a fresh load) the mark is a dash. The **activity fog** gates this column as it gates the body
+  card's pulse: an `unknown` body's market shows "Outside your trade network - no market data.",
+  and a `known_stale` one shows its last read under the stale note.
+- **Facts** (right). *Market* — the body it stands on, and the nation holding its centre tile's
+  province, with that nation's colour. *Catchment* — how many settlements clear here
+  (`market_for_tile` of each centre's tile, razed centres skipped) and their people. *Your
+  trades* — how many of the player's trades start or end here; the count is a press that opens the
+  Market ledger's Trades tab aimed at this market, the door the retired Trades button was.
+
+Markets are the public channel, so nothing here is private. The card does not rank or recommend:
+the goods are ordered by volume, a fact, not by what the player should do.
 
 ### Tile repeat-click selection cycle
 
