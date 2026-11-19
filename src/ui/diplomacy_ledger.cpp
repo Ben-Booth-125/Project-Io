@@ -531,10 +531,97 @@ struct declaration_preview
     int                   tick = 0;
     std::uint64_t         territory = 0, catchment = 0;
     std::size_t           embargoes = 0, wars = 0, history = 0, cessions = 0;
+    std::size_t           hostile = 0, friends = 0;
     war_price             price;
     std::array<bool, k_war_justification_count> just{};
+    /// BL-1705 (RELATIONS.md § 7, "The preview says whose opinion turns"): each nation
+    /// whose Trust or Alarm band toward the declarer the price would move, and the
+    /// nations that may join either side. Read from the same rows `declare_war` charges.
+    struct band_shift
+    {
+        entity_id nation  = null_entity;
+        bool      borders = false, target = false;
+        float     trust0 = 0.0f, trust1 = 0.0f, alarm0 = 0.0f, alarm1 = 0.0f;
+        int       steps = 0; ///< Band steps moved, Trust and Alarm summed.
+    };
+    std::vector<band_shift> shifts;
+    std::vector<entity_id>  join_them, join_you;
 };
 declaration_preview g_preview;
+
+/// The motive a rival's declaration needs: (adverse Trust + Alarm) / limit at this share,
+/// or a justification that holds. MIRRORS `k_war_ai_min_motive` in world/corp_ai.cpp,
+/// which is file-local there - the preview names who MAY join, and must read the same
+/// edge the scorer does. Change both together.
+constexpr float k_preview_motive_share = 0.025f;
+
+/// Alarm reads bad-high: a band word for Alarm is the band of its negation, so a
+/// rise reads toward the hostile end as a Trust fall does.
+sentiment_band alarm_band(float alarm, const sentiment_params& p) { return band_of(-alarm, p); }
+
+void fill_opinion(const world& w, const sentiment_params& sp, entity_id me, entity_id target,
+                  declaration_preview& c)
+{
+    c.shifts.clear();
+    c.join_them.clear();
+    c.join_you.clear();
+    if (!c.price.valid)
+        return;
+    const float lim = sp.limit > 0.0f ? sp.limit : 100.0f;
+    struct delta { float t = 0.0f, a = 0.0f; bool borders = false, target = false; };
+    std::map<entity_id, delta> by;
+    for (const war_price_row& r : c.price.rows)
+    {
+        delta& dl = by[r.observer];
+        dl.t += r.trust;
+        dl.a += r.alarm;
+        dl.borders = dl.borders || r.borders;
+        dl.target  = dl.target || r.kind == sentiment_factor_kind::hostility_declared;
+    }
+    for (const auto& [n, dl] : by)
+    {
+        const sentiment_value v = sentiment_toward(w.sentiment, n, me);
+        declaration_preview::band_shift b;
+        b.nation  = n;
+        b.borders = dl.borders;
+        b.target  = dl.target;
+        b.trust0  = v.trust;
+        b.trust1  = std::clamp(v.trust + dl.t, -lim, lim);
+        b.alarm0  = v.alarm;
+        b.alarm1  = std::clamp(v.alarm + dl.a, -lim, lim);
+        b.steps   = std::abs(static_cast<int>(band_of(b.trust1, sp)) - static_cast<int>(band_of(b.trust0, sp)))
+                  + std::abs(static_cast<int>(alarm_band(b.alarm1, sp)) - static_cast<int>(alarm_band(b.alarm0, sp)));
+        if (b.steps > 0)
+            c.shifts.push_back(b);
+    }
+    // Toward the hostile end first (every shift a declaration makes is toward it, so the
+    // larger move leads), neighbours first among equals, then the larger Trust fall.
+    std::stable_sort(c.shifts.begin(), c.shifts.end(), [](const auto& a, const auto& b) {
+        if (a.steps != b.steps) return a.steps > b.steps;
+        if (a.borders != b.borders) return a.borders;
+        return (a.trust1 - a.trust0) < (b.trust1 - b.trust0);
+    });
+    // Who may join (RELATIONS.md § Joining a war, "Who asks"): public facts only -
+    // stance, wars, and the sentiment toward you the ledger already shows.
+    for (const auto& [n, nat] : w.nations)
+    {
+        if (n == me || n == target || nat.ended || nat.tiles.empty())
+            continue;
+        const auto it = by.find(n);
+        const float t1 = sentiment_toward(w.sentiment, n, me).trust + (it == by.end() ? 0.0f : it->second.t);
+        const float a1 = sentiment_toward(w.sentiment, n, me).alarm + (it == by.end() ? 0.0f : it->second.a);
+        bool motive = (std::max(0.0f, -t1) + std::max(0.0f, a1)) / lim >= k_preview_motive_share;
+        if (!motive)
+        {
+            const auto j = war_justifications(w, sp, n, me, {});
+            motive = std::any_of(j.begin(), j.end(), [](bool x) { return x; });
+        }
+        if (are_friends(w, n, target) || motive)
+            c.join_them.push_back(n);
+        if (is_hostile(w, n, target) || at_war(w, n, target))
+            c.join_you.push_back(n);
+    }
+}
 
 /// The expanded row's front strengths, recomputed once a day (draw_expanded).
 /// Cleared by `reset_diplomacy_ui`: its key can repeat across worlds.
@@ -556,7 +643,8 @@ const declaration_preview& cached_preview(const world& w, const sentiment_params
     if (c.set && c.me == me && c.target == target && c.goals == goals && c.tick == w.current_econ_tick
         && c.territory == w.territory_generation && c.catchment == w.catchment_generation
         && c.embargoes == w.nation_embargoes.size() && c.wars == w.wars.size()
-        && c.history == w.war_history.size() && c.cessions == w.province_cessions.size())
+        && c.history == w.war_history.size() && c.cessions == w.province_cessions.size()
+        && c.hostile == w.corp_hostile_pairs.size() && c.friends == w.corp_friend_pairs.size())
         return c;
     c.set       = true;
     c.me        = me;
@@ -570,7 +658,10 @@ const declaration_preview& cached_preview(const world& w, const sentiment_params
     c.history   = w.war_history.size();
     c.cessions  = w.province_cessions.size();
     c.price     = declaration_price(w, sp, me, target, goals);
+    c.hostile   = w.corp_hostile_pairs.size();
+    c.friends   = w.corp_friend_pairs.size();
     c.just      = war_justifications(w, sp, me, target, goals);
+    fill_opinion(w, sp, me, target, c);
     return c;
 }
 
@@ -724,46 +815,68 @@ void draw_declaration(const world& w, const recipe_registry& reg, ui_state& s, e
                 ImGui::TextDisabled("  Nothing is charged while the world settles.");
             if (decide())
                 return;
-            // Per neighbour: the war_declared rows, bordering ones first, then the largest.
-            std::vector<const war_price_row*> rows;
+            // BL-1705 (diplomacy.md § The declaration, "Whose opinion turns"): one row per
+            // nation whose Trust or Alarm band toward you would change, in words; the
+            // figures are the row's hover. Then who may join either side.
+            d.decl_observers = 0;
             for (const war_price_row& r : price.rows)
                 if (r.kind == sentiment_factor_kind::war_declared)
-                    rows.push_back(&r);
-            d.decl_observers = static_cast<int>(rows.size());
-            std::stable_sort(rows.begin(), rows.end(), [](const war_price_row* a, const war_price_row* b) {
-                if (a->borders != b->borders) return a->borders;
-                return std::fabs(a->trust) > std::fabs(b->trust);
-            });
-            // A table, so a long nation name never pushes its figures off the column:
-            // the name column stretches and clips, the figures keep their width.
-            const std::size_t shown = std::min<std::size_t>(rows.size(), 6);
-            constexpr ImGuiTableFlags tf = ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_NoHostExtendX;
-            if (ImGui::BeginTable("##price", 3, tf, {ImGui::GetContentRegionAvail().x, 0.0f}))
+                    ++d.decl_observers;
+            const char* arrow = " \xE2\x86\x92 ";
+            ImGui::Text("Whose opinion turns");
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("Each nation whose Trust or Alarm band toward you the price would move. "
+                                  "Hover a row for the figures.\n* a neighbour of you or of %s: it watches "
+                                  "twice as hard.", name_of(w, target));
+            if (pv.shifts.empty())
+                ImGui::TextDisabled("  No nation's band would change.");
+            for (const declaration_preview::band_shift& b : pv.shifts)
             {
-                ImGui::TableSetupColumn("Nation", ImGuiTableColumnFlags_WidthStretch);
-                ImGui::TableSetupColumn("Trust", ImGuiTableColumnFlags_WidthFixed, ImGui::CalcTextSize("-00.0").x);
-                ImGui::TableSetupColumn("Alarm", ImGuiTableColumnFlags_WidthFixed, ImGui::CalcTextSize("+000.0").x);
-                ImGui::TableNextRow();
-                ImGui::TableNextColumn(); ImGui::TextDisabled("  Nation");
-                ImGui::TableNextColumn(); ImGui::TextDisabled("Trust");
-                ImGui::TableNextColumn(); ImGui::TextDisabled("Alarm");
-                const auto line = [&](const char* nm, const char* tag, float t, float a) {
-                    ImGui::TableNextRow();
-                    ImGui::TableNextColumn(); ImGui::TextDisabled("  %s%s", nm, tag);
-                    ImGui::TableNextColumn(); ImGui::Text("%+.1f", t);
-                    ImGui::TableNextColumn(); ImGui::Text("%+.1f", a);
-                };
-                for (const war_price_row& r : price.rows)
-                    if (r.kind == sentiment_factor_kind::hostility_declared)
-                        line(name_of(w, r.observer), " (target)", r.trust, r.alarm);
-                for (std::size_t i = 0; i < shown; ++i)
-                    line(name_of(w, rows[i]->observer), rows[i]->borders ? " *" : "", rows[i]->trust, rows[i]->alarm);
-                ImGui::EndTable();
+                ++d.decl_band_rows;
+                std::string line = std::string("  ") + name_of(w, b.nation) + (b.borders ? " *" : "")
+                                 + (b.target ? " (target)" : "") + ": ";
+                bool first = true;
+                if (band_of(b.trust0, sp) != band_of(b.trust1, sp))
+                {
+                    line += std::string("Trust ") + band_word(b.trust0, sp) + arrow + band_word(b.trust1, sp);
+                    first = false;
+                }
+                if (alarm_band(b.alarm0, sp) != alarm_band(b.alarm1, sp))
+                {
+                    if (!first) line += ", ";
+                    line += std::string("Alarm ") + band_word(-b.alarm0, sp) + arrow + band_word(-b.alarm1, sp);
+                }
+                ImGui::TextColored(col4(b.target ? palette::war_goal_chosen : palette::text_secondary), "%s",
+                                   line.c_str());
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip("%s toward you\nTrust %+.1f -> %+.1f (%+.1f)\nAlarm %+.1f -> %+.1f (%+.1f)%s",
+                                      name_of(w, b.nation), b.trust0, b.trust1, b.trust1 - b.trust0, b.alarm0,
+                                      b.alarm1, b.alarm1 - b.alarm0,
+                                      b.borders ? "\nA neighbour: it watches twice as hard." : "");
             }
-            if (rows.size() > shown)
-                ImGui::TextDisabled("  and %d more", static_cast<int>(rows.size() - shown));
-            if (ImGui::IsItemHovered() || ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
-                ImGui::SetTooltip("* a neighbour of you or of %s: it watches twice as hard.", name_of(w, target));
+            const auto join_list = [&](const char* head, const char* tip, const std::vector<entity_id>& ns, int& count) {
+                ImGui::Text("%s", head);
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip("%s", tip);
+                if (ns.empty())
+                    ImGui::TextDisabled("  None.");
+                for (const entity_id n : ns)
+                {
+                    ++count;
+                    ImGui::TextDisabled("  %s", name_of(w, n));
+                }
+            };
+            char them_tip[256];
+            std::snprintf(them_tip, sizeof them_tip,
+                          "Nations that may ask to join %s's side: its friends, and each nation whose opinion "
+                          "of you, once the price is charged, would give it a reason to fight you.",
+                          name_of(w, target));
+            char you_tip[200];
+            std::snprintf(you_tip, sizeof you_tip,
+                          "Nations that may ask to join your side: each one hostile to %s or already at war with it.",
+                          name_of(w, target));
+            join_list("May join them", them_tip, pv.join_them, d.decl_join_them);
+            join_list("May join you", you_tip, pv.join_you, d.decl_join_you);
         }
     }
     else
@@ -1979,6 +2092,8 @@ void draw_diplomacy_ledger(const world& w, const recipe_registry& reg, const eco
     }
     d.presses.clear();
     d.decl_goals = d.decl_candidates = d.decl_observers = 0;
+    d.decl_band_rows = d.decl_join_them = d.decl_join_you = 0;
+    d.goal_rows = 0;
     d.decl_valid = d.decl_justified = false;
     d.decl_trust = d.decl_alarm = 0.0f;
     d.war_rows = d.truce_rows = 0;
