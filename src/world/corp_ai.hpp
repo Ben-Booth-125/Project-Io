@@ -692,6 +692,12 @@ space_ground_pick score_nation_space_ground(world& w, const recipe_registry& reg
 /// unknown one, or while the settle gate is up. Called by run_corp_strategic_step for
 /// each due nation on a live tick; exported for harnesses.
 /// @p own_wars false skips its open wars (the daily declaration check runs only step 2).
+/// BL-1706 (wars draw in allies; "Rival nations join wars", Ben 2026-11-19): as a side's
+/// leader it also answers requests to join its side and separate-peace offers from
+/// joiners across; as a joiner it accepts, refuses or offers a separate peace with the
+/// other side's leader; as either it capitulates when losing badly and refused; and
+/// step 2 asks to join a war instead of declaring on a nation already at war, or to
+/// join a friend's defence.
 void score_nation_war(world& w, const recipe_registry& reg, entity_id nation, int tick,
                       bool spectating = false, bool own_wars = true);
 
@@ -746,6 +752,14 @@ enum class war_ai_choice : uint8_t
     accept,
     refuse,
     impose,
+    // BL-1706 (wars draw in allies; AI_OPPONENT.md § 11, "Rival nations join wars").
+    // Appended: a separate peace's offer / accept / refuse reuse the three rows above,
+    // with the other side's leader as the target.
+    join_candidate, ///< A join weighed (one war, one side, one goal count).
+    join,           ///< request_join_war filed.
+    accept_join,    ///< A leader accepted a request on its side.
+    refuse_join,    ///< A leader refused one.
+    capitulate,     ///< capitulate (RELATIONS.md § 7, Capitulation).
 };
 
 /// One row of the war pass's diagnostic trace. Written only while a harness holds
