@@ -118,8 +118,14 @@ int main()
                       && m.days_total == 90,
                   "Q1d the order names its base, owner and row, with the row's 90 muster days");
         }
-        advance_musters(f.w);
-        check(f.w.musters.empty() && f.w.units.size() == 1, "Q2a one tick later the muster has become a unit");
+        advance_musters_days(f.w, 89, 1089);
+        check(f.w.units.empty() && f.w.musters.size() == 1 && f.w.musters.front().days_remaining == 1,
+              "Q2a after 89 days it is still mustering, one day left");
+        advance_musters_days(f.w, 1, 1090);
+        check(f.w.musters.empty() && f.w.units.size() == 1, "Q2a' on its 90th day the muster has become a unit");
+        if (f.w.units.size() == 1)
+            check(f.w.units.begin()->second.tile_since_day == 1090,
+                  "Q2c the unit stands from the close of the day it was raised");
         if (f.w.units.size() == 1)
         {
             const unit_component& u = f.w.units.begin()->second;
@@ -145,11 +151,15 @@ int main()
         m.unit_type = static_cast<uint16_t>(tracked < 0 ? 0 : tracked);
         m.days_total = m.days_remaining = 180;
         f.w.musters.push_back(m);
-        advance_musters(f.w);
+        for (int day = 1; day <= 90; ++day)
+            advance_musters_days(f.w, 1, day);
         check(f.w.units.empty() && f.w.musters.size() == 1 && f.w.musters.front().days_remaining == 90,
-              "Q3b after one tick it is half mustered, no unit yet");
-        advance_musters(f.w);
-        check(f.w.musters.empty() && f.w.units.size() == 1, "Q3c after two it is a unit");
+              "Q3b after 90 single days it is half mustered, no unit yet");
+        advance_musters(f.w); // a whole month: 30 days
+        check(f.w.units.empty() && f.w.musters.size() == 1 && f.w.musters.front().days_remaining == 60,
+              "Q3c a month takes 30 days off it");
+        advance_musters_days(f.w, 60, 180);
+        check(f.w.musters.empty() && f.w.units.size() == 1, "Q3d at 180 days it is a unit");
     }
 
     std::printf("\nQ4 — a base gone drops its order\n");
@@ -192,8 +202,9 @@ int main()
         for (fixture* f : { &a, &b }) { hire(*f, reg, levy); hire(*f, reg, levy); }
         check(a.w.state_hash(1) == b.w.state_hash(1), "Q6a twin worlds with the same hires hash alike");
         check(a.w.state_hash(0) != never, "Q6b a queued hire moves the hash");
-        advance_musters(a.w); advance_musters(b.w);
-        check(a.w.state_hash(2) == b.w.state_hash(2), "Q6c and alike after the musters complete");
+        advance_musters_days(a.w, 90, 90); advance_musters_days(b.w, 90, 90);
+        check(a.w.units.size() == 2 && a.w.state_hash(2) == b.w.state_hash(2),
+              "Q6c and alike after the musters complete");
         fixture d;
         build(d);
         check(d.w.state_hash(0) == never, "Q6d an empty queue hashes as a world that never hired");
@@ -214,6 +225,48 @@ int main()
                   && back.musters.back().days_remaining == 45 && back.musters.front().base == f.base
                   && back.state_hash(4) == f.w.state_hash(4) && to_bytes(back) == bytes,
               "Q7a the queue and its next id round-trip by value (hash and bytes equal)");
+    }
+
+    std::printf("\nQ8 - the day walk raises on the muster's own day (BL-1704)\n");
+    {
+        // Three months of the walk, as the app's day loop or the step's catch-up runs
+        // them. `daily` walks one day per call (the app); the other hands each month to
+        // one call (the catch-up, whose quiet-world skip must stop on the raise day).
+        for (const bool daily : { true, false })
+        {
+            fixture f;
+            build(f);
+            hire(f, reg, levy);
+            int raised_on = -1;
+            for (int month = 0; month < 3 && raised_on < 0; ++month)
+            {
+                const int base = military_quarter_day_base(month);
+                f.w.construction_quarter_day = 0;
+                for (int d = daily ? 1 : k_construction_quarter_days; d <= k_construction_quarter_days; ++d)
+                {
+                    advance_quarter_to(f.w, reg, d, base, nullptr);
+                    if (raised_on < 0 && !f.w.units.empty())
+                        raised_on = base + d;
+                }
+            }
+            check(raised_on == military_quarter_day_base(2) + k_construction_quarter_days && f.w.musters.empty()
+                      && f.w.units.size() == 1,
+                  daily ? "Q8a walked day by day, the unit appears on day 90"
+                        : "Q8b walked a month a call, it appears by the close of day 90");
+            if (f.w.units.size() == 1)
+                check(f.w.units.begin()->second.tile_since_day == military_quarter_day_base(2) + k_construction_quarter_days,
+                      daily ? "Q8c stamped as standing from the close of day 90"
+                            : "Q8d the skipped walk stamps day 90 too");
+        }
+        // A muster that ends mid-month: the skip stops on its day, not the month's close.
+        fixture f;
+        build(f);
+        hire(f, reg, levy);
+        f.w.musters.front().days_remaining = 12;
+        f.w.construction_quarter_day = 0;
+        advance_quarter_to(f.w, reg, k_construction_quarter_days, military_quarter_day_base(0), nullptr);
+        check(f.w.units.size() == 1 && f.w.units.begin()->second.tile_since_day == military_quarter_day_base(0) + 12,
+              "Q8e a 12-day remainder walked as one month raises stamped day 12, not day 30");
     }
 
     std::printf("\n%d checks, %d failures\n", checks, failures);

@@ -210,10 +210,13 @@ int main()
         check(apply_corp_command(g.w, reg, m) != corp_command_result::rejected_state,
               "R4b the same march from a unit not refitting is not refused for its state");
 
-        advance_refits(f.w);
+        advance_refits_days(f.w, 89); // BL-1704: refits count down daily
+        check(unit_refitting(f.w.units.at(u)) && f.w.units.at(u).refit_days == 1,
+              "R2a' after 89 days it is still refitting, one day left");
+        advance_refits_days(f.w, 1);
         const unit_component& done = f.w.units.at(u);
         check(done.type == rifle && done.refit_type == k_no_refit && done.refit_days == 0,
-              "R2a one tick later it is Rifle Infantry, the refit cleared");
+              "R2a on its 90th day it is Rifle Infantry, the refit cleared");
         check(done.count == 37 && done.establishment == 50 && done.readiness_permille == 600
                   && done.morale_permille == 700 && done.position == f.home && done.owner == f.nation,
               "R2b men, establishment, readiness, morale, place and owner kept");
@@ -239,12 +242,12 @@ int main()
         check(near(paid, credits + 2.0f * hire_axis_cost * 10.0f),
               "R1g and pays the difference plus the goods (" + std::to_string(paid) + " cr)");
         check(f.w.units.at(u).refit_days == 135, "R1h artillery refits in 135 days");
-        advance_refits(f.w);
+        advance_refits(f.w); advance_refits(f.w); advance_refits(f.w); // three months
         check(f.w.units.at(u).type == breech && f.w.units.at(u).refit_days == 45,
-              "R2c after one tick it is still Breech Artillery, 45 days left");
-        advance_refits(f.w);
+              "R2c after three months it is still Breech Artillery, 45 days left");
+        advance_refits_days(f.w, 45);
         check(f.w.units.at(u).type == gun && !unit_refitting(f.w.units.at(u)),
-              "R2d after two it is a Field Gun Battery");
+              "R2d on day 135 it is a Field Gun Battery");
     }
 
     std::printf("\nR3 - refusals mutate nothing\n");

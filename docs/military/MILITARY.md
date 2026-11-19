@@ -1322,8 +1322,9 @@ checked before either is debited, so a refusal leaves the nation wholly uncharge
 a building enters construction, and becomes a unit when its muster completes; the Military
 ledger's **Recruit** tab (rail slot 7, `../ui/ledgers/military.md`) shows the queue and is the
 door to every hire. A muster takes **90 days** for infantry, motorised infantry and light armour,
-**135** for artillery and air defence, and **180** for mechanised infantry and armour — a month
-a tick, so one, two or two ticks (`muster_days_for`). A hire still mustering counts against a
+**135** for artillery and air defence, and **180** for mechanised infantry and armour (`muster_days_for`). **A muster progresses daily (Ben,
+2026-11-19):** each day of the walk takes one day off it, so a unit appears on the day its muster
+ends, not at the next month's close. A hire still mustering counts against a
 rival nation's force sizing (§ What a force costs). An order whose base is demolished or decommissioned is
 dropped with no unit, as a unit whose base is torn down is disbanded. On completion: a new unit entity at the muster tile with
 `count = hire_batch_manpower`, returned through `apply_corp_command`'s out-param. The verb records the base it was raised at as the unit's
@@ -1349,7 +1350,7 @@ row of the same class (`land_class_for`), newer — a later band, or the same ba
 `power_mod` — and one the nation can field now; an obsolete row is allowed, listed after the live
 ones. The unit must be the nation's own, out of battle, not already refitting, and standing on its
 own nation's ground. It pays at once: the hire price difference, floored at zero, plus the target's
-gated goods off the shelf as a hire buys them. It takes the target's muster days, a month a tick.
+gated goods off the shelf as a hire buys them. It takes the target's muster days, counted daily as a muster's are.
 Until then the unit keeps its old type, fights as it and is drawn into battles as it, but does not
 march: re-equipping is done in place, so a standing march order is cleared. On completion it takes
 the new type and keeps its men, establishment, readiness and morale. The press is on the unit card
