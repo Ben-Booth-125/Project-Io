@@ -1313,8 +1313,8 @@ checks, in order:
 5. The nation can pay **both** legs, else `rejected_funds`.
 
 The two payment legs. A **credit cost** of
-`hire_base_cost + hire_cost_per_power × row.power_mod` (economy.lua § military: 120 + 1.4 × power,
-BL-744 / NR-781, so Levy Spear costs 120, Rifle Regiment 652 and Rifle Infantry 736). Plus a **flat resource draw** of 5.0 per *gated*
+`hire_base_cost + hire_cost_per_power × row.power_mod` (economy.lua § military: 240 + 2.8 × power,
+doubled by Ben, 2026-11-19, because a large army was too quick to raise, so Levy Spear costs 240, Rifle Regiment 1304 and Rifle Infantry 1472; a ship's or aircraft's own `hire_cost` doubled with it). Plus a **flat resource draw** of 5.0 per *gated*
 axis, **bought** off the shelves of the markets the nation's buildings sit in, lowest market id first, at each
 shelf's posted price — a hire buys its kit like any buyer (`../economy/MARKETS.md` § The shelf
 economy).
@@ -1915,10 +1915,10 @@ The authored table, `scripts/economy.lua` § `economy.military.unit_upkeep`:
 
 | Rate | Authored | Meaning |
 |---|---|---|
-| `credits_per_head` | `0.0347` | Flat wage per head per tick |
-| `credits_per_head_per_power` | `0.0000233` | Wage scaled by the roster row's `power_mod` |
-| `goods_per_head.ordnance` | `0.00029167` | The **ordnance** draw |
-| `goods_per_head.food_rations` | `0.00208333` | The sanctioned second line |
+| `credits_per_head` | `0.1388` | Flat wage per head per tick (quadrupled by Ben, 2026-11-19, an army being near free to keep; the goods half quadrupled with it, so the value anchor holds) |
+| `credits_per_head_per_power` | `0.0000932` | Wage scaled by the roster row's `power_mod` |
+| `goods_per_head.ordnance` | `0.00116668` | The **ordnance** draw |
+| `goods_per_head.food_rations` | `0.00833332` | The sanctioned second line |
 | `supply_decay_permille` | `17` | The one decay subtraction, per tick |
 | `supply_recovery_permille` | `33` | Regained per tick while supplied |
 | `out_of_supply_reach` | `24.0` | Reach cost past which a unit is out of supply; ≤ 0 disables the trigger |
