@@ -198,6 +198,10 @@ bool wire_nation_verb(corp_verb v)
         case corp_verb::accept_peace:       // BL-1428
         case corp_verb::refuse_peace:       // BL-1428
         case corp_verb::impose_peace:       // BL-1428
+        case corp_verb::request_join_war:   // BL-1706: the war rides counterparty= + subject=, goals provinces=
+        case corp_verb::accept_join:        // BL-1706
+        case corp_verb::refuse_join:        // BL-1706
+        case corp_verb::capitulate:         // BL-1706
         case corp_verb::set_embargo:        // BL-1418: the actor's own embargo; on/off rides `order=`
         // BL-1407: every player verb is sent as the nation, these included.
         case corp_verb::survey:

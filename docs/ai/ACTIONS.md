@@ -24,7 +24,7 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 > **Generated file.** Produced by `node tools/session/render_actions.js`.
 > Edit the JSON, then re-run; hand edits here are overwritten.
 
-*287 entries — 85 gameplay · 45 canvas · 15 lens · 100 ledger · 42 chrome.*
+*291 entries — 89 gameplay · 45 canvas · 15 lens · 100 ledger · 42 chrome.*
 
 ---
 
@@ -965,6 +965,7 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 - A cession may take every province the loser owns, its last included (Ben, 2026-11-09, overturning NR-1102): the loser's nation then ends (NATIONS.md § Elimination).
 - A war stands between the pair and carries no pending offer (one per war) (rejected_state).
 - The actor's last offer in this war was not refused within the last 4 economy ticks (k_war_offer_cooldown_ticks; Ben, 2026-11-03, NR-1120) (rejected_state). A refusal mutates nothing.
+- BL-1706 (RELATIONS.md § Joining a war): between the war's two LEADERS this is the war's peace; between a JOINER and the other side's leader it is a SEPARATE peace (world::separate_peace_offers, one per joiner): white, or a cession of 1 to 3 goals the gainer itself named on the other's ground, held by the gainer's side. Between any other pair across, rejected_state. A leaders' cession may name any goal its side named (the leader's or a joiner's), held by any member of its side, on the ground of any member across.
 
 **Expected output.** The offer is filed (world::peace_offers, keyed by the war); a pending offer is not a peace. The counterparty accepts (gameplay.accept_peace) or refuses (gameplay.refuse_peace). Saved (world_save_version 69).
 
@@ -983,7 +984,7 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 - The counterparty has a pending offer on its war with the actor (rejected_state).
 - Its terms still hold now — every ceded province still held by the gainer and owned by the loser (rejected_state, the offer kept). A refusal mutates nothing.
 
-**Expected output.** The peace concludes: both hostility rows clear, the war record closes into world::war_history, any pending offer is erased, and a truce of 16 ticks (four years) bars either party declaring on the other. peace_concluded warms each party's row toward the other; a cession emits province_ceded on the loser's row toward the winner (magnitude = provinces ceded), records each province in world::province_cessions (a later LOST GROUND justification for the loser) and sets its holder to the gainer — the territorial move (tile_to_nation follows) is BL-1460's. A white peace hands every occupied goal's holder back to its owner. The loser's residual exhaustion carries out of the war and decays at peace. A cession that leaves the loser owning no land province ENDS its nation (war.hpp eliminate_nation; NATIONS.md § Elimination): its remaining ground (coastal water) passes to the gainer, its other wars close as white peace with no truce, its offers, hostility, friendship, embargo, sentiment rows and laws are removed, its units, wings, musters, convoys and trades end, a positive treasury passes to the gainer (a debt is written off), it is flagged ended (saved, world_save_version 83) and one history entry is written; an ended nation is refused as an actor by every verb (rejected_no_corp) and as a counterparty. Saved (world_save_version 69).
+**Expected output.** The peace concludes: both hostility rows clear, the war record closes into world::war_history, any pending offer is erased, and a truce of 16 ticks (four years) bars either party declaring on the other. peace_concluded warms each party's row toward the other; a cession emits province_ceded on the loser's row toward the winner (magnitude = provinces ceded), records each province in world::province_cessions (a later LOST GROUND justification for the loser) and sets its holder to the gainer — the territorial move (tile_to_nation follows) is BL-1460's. A white peace hands every occupied goal's holder back to its owner. The loser's residual exhaustion carries out of the war and decays at peace. A cession that leaves the loser owning no land province ENDS its nation (war.hpp eliminate_nation; NATIONS.md § Elimination): its remaining ground (coastal water) passes to the gainer, its other wars close as white peace with no truce, its offers, hostility, friendship, embargo, sentiment rows and laws are removed, its units, wings, musters, convoys and trades end, a positive treasury passes to the gainer (a debt is written off), it is flagged ended (saved, world_save_version 83) and one history entry is written; an ended nation is refused as an actor by every verb (rejected_no_corp) and as a counterparty. Saved (world_save_version 69). BL-1706: the leaders' peace ends the war for EVERY member: each ceded goal passes to the member of the winning side that NAMED it; every pair that stood across is truced and its hostility cleared (unless another open war keeps the pair across); pending join requests lapse. A separate peace takes the joiner alone out: truced with every member across, its hostility cleared, the goals named on its ground dropped from the war.
 
 **Reason to select.** Take the terms on the table.
 
@@ -999,7 +1000,7 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 - The actor is the nation (corp == as_nation, or as_nation unnamed); on the wire `COMMAND corp=<nation> nation=<nation> ...`, any other actor rejected_not_owner (BL-1406).
 - The counterparty has a pending offer on its war with the actor (rejected_state). A refusal mutates nothing.
 
-**Expected output.** The offer is erased and the refusal tick recorded (world::peace_refusals, keyed (offerer, receiver); saved, world_save_version 75); the war goes on. The refusing side may offer at once; the refused offerer may not offer again in this war for 4 economy ticks (NR-1120).
+**Expected output.** The offer is erased and the refusal tick recorded (world::peace_refusals, keyed (offerer, receiver); saved, world_save_version 75); the war goes on. The refusing side may offer at once; the refused offerer may not offer again in this war for 4 economy ticks (NR-1120). BL-1706: a separate peace offer (joiner and the other side's leader) is refused the same way.
 
 **Reason to select.** The terms are not good enough.
 
@@ -1019,10 +1020,82 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 - A cession's provinces are each a goal of the GAINING side, held by it now (world::province_holder) and owned by the losing side (rejected_state otherwise).
 - A cession may take every province the loser owns, its last included (Ben, 2026-11-09, overturning NR-1102): the loser's nation then ends (NATIONS.md § Elimination).
 - A war stands between the pair and its score stands at 100 in the actor's favour (+100 for the declarer, -100 for the defender; war.hpp war_score) (rejected_state). A refusal mutates nothing.
+- BL-1706: the war's two leaders only; a joiner may not impose (rejected_state).
 
 **Expected output.** As gameplay.accept_peace, without the other side's acceptance; any pending offer is erased.
 
 **Reason to select.** The war is won outright: dictate the terms.
+
+### `gameplay.request_join_war` — No control issues it yet (the Diplomacy ledger's join press is a UI item of its own). A corp_verb (corp_verb::request_join_war, 66) on the command seam.
+
+**Press.** Over the seam: COMMAND corp=<nation> nation=<nation> verb=66 counterparty=<leader of the side joined> subject=<leader of the other side> provinces=<id>[,<id>[,<id>]].
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `counterparty` | `entity_id (nation)` | The leader (declarer or defender) of the side the actor asks to join. |
+| `subject` | `entity_id (nation)` | The leader of the other side. The two leaders name the war. |
+| `provinces` | `1 to 3 province ids (corp_command::air_provinces; on the wire a comma list)` | The joiner's goals: land provinces owned by members of the other side (any member, leader or joiner), any order. |
+
+**Valid when:**
+- The actor is the nation (corp == as_nation, or as_nation unnamed); on the wire `COMMAND corp=<nation> nation=<nation> ...`, any other actor rejected_not_owner (BL-1406).
+- 1 to 3 distinct goals, each a land province a member of the other side owns (rejected_invalid). On the wire a malformed list refuses the whole command before the seam.
+- The two named nations lead an open war (rejected_state).
+- The actor is not a member of that war, is at war with no member of it on either side, and no truce stands between it and any member across (rejected_state).
+- No goal is one its side already named, no request of the actor's on that war is pending, and its last request there was not refused within 12 economy ticks (k_war_offer_cooldown_ticks) (rejected_state). A refusal mutates nothing.
+
+**Expected output.** The request is filed (world::join_requests, keyed (war, asker)); a pending request is not membership. The side's leader accepts (gameplay.accept_join) or refuses (gameplay.refuse_join). A request lapses when the war closes or the asker can no longer join (checked each tick). Its price is previewable (war.hpp join_price). Saved (world_save_version 97).
+
+**Reason to select.** Fight a nation already at war by joining the side against it, rather than declaring a smaller war of your own (RELATIONS.md § Joining a war).
+
+### `gameplay.accept_join` — No control issues it yet. A corp_verb (corp_verb::accept_join, 67) on the command seam.
+
+**Press.** Over the seam: COMMAND corp=<nation> nation=<nation> verb=67 counterparty=<asker>.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `counterparty` | `entity_id (nation)` | The nation whose pending request to join the actor's side is accepted. |
+
+**Valid when:**
+- The actor is the nation (corp == as_nation, or as_nation unnamed); on the wire `COMMAND corp=<nation> nation=<nation> ...`, any other actor rejected_not_owner (BL-1406).
+- The actor leads the side the counterparty asked to join, and the request is pending (the first in war order, if several) (rejected_state).
+- The request still holds now, by every check gameplay.request_join_war makes (rejected_state, the request kept; the tick's sweep lapses it). A refusal mutates nothing.
+
+**Expected output.** The joiner is written into the war (war_record::joiners, in join order): both hostility rows between it and every member across (friendships and offers between them dissolve). The join is CONDUCT, exactly war.hpp join_price: hostility_declared on each member across toward the joiner, and war_declared on every other nation, as a declaration on the opposing leader is priced (doubled bordering the joiner or that leader, +50% per goal past the first, halved when a justification holds; joining the defender's side as its friend holds 'a friend attacked'). The joiner is then at war with every member across (at_war), scores for its side (war_score: occupation and battles per side) and tires as a party (its own exhaustion). Saved (world_save_version 97).
+
+**Reason to select.** Take an ally into your war: its goals add to your side's, and its army fights the other side.
+
+### `gameplay.refuse_join` — No control issues it yet. A corp_verb (corp_verb::refuse_join, 68) on the command seam.
+
+**Press.** Over the seam: COMMAND corp=<nation> nation=<nation> verb=68 counterparty=<asker>.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `counterparty` | `entity_id (nation)` | The nation whose pending request to join the actor's side is refused. |
+
+**Valid when:**
+- The actor is the nation (corp == as_nation, or as_nation unnamed); on the wire `COMMAND corp=<nation> nation=<nation> ...`, any other actor rejected_not_owner (BL-1406).
+- The actor leads the side the counterparty asked to join, and the request is pending (rejected_state). A refusal mutates nothing.
+
+**Expected output.** The request is erased and the refusal tick recorded (world::join_refusals; saved, world_save_version 97): the asker may not ask again in that war for 12 economy ticks, a year.
+
+**Reason to select.** Keep a war yours: an ally's goals and conduct come with it.
+
+### `gameplay.capitulate` — No control issues it yet. A corp_verb (corp_verb::capitulate, 69) on the command seam.
+
+**Press.** Over the seam: COMMAND corp=<nation> nation=<nation> verb=69 counterparty=<any member across>.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `counterparty` | `entity_id (nation)` | Any nation the actor stands across from in the war it gives up (names the war). |
+
+**Valid when:**
+- The actor is the nation (corp == as_nation, or as_nation unnamed); on the wire `COMMAND corp=<nation> nation=<nation> ...`, any other actor rejected_not_owner (BL-1406).
+- The actor and the counterparty stand on opposite sides of an open war (rejected_state). A refusal mutates nothing.
+- Unilateral: nobody accepts it.
+
+**Expected output.** Every goal the other side named on the actor's ground, HELD OR NOT, passes to the member that named it (cede_provinces; province_ceded on the actor's row toward each namer). A leader's capitulation closes the war (world::war_history end 'capitulation', with what it ceded); its side's joiners leave with a white peace. A joiner's takes only it out. Truces follow as at any peace (16 ticks between every pair that stood across); peace_concluded warms the rows. A capitulation that hands over the actor's last province ends its nation (NATIONS.md § Elimination).
+
+**Reason to select.** The war is lost: give up the ground it was fought for and stop the bleeding now.
 
 ### `gameplay.set_embargo` — Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Nations tab, the chosen nation's Embargo / Lift toggle (ledger.diplomacy_embargo). A corp_verb (corp_verb::set_embargo, 53) on the command seam; a rival nation's scorer issues the same verb for itself (score_nation_embargo; AI_OPPONENT.md § 11, Ben 2026-11-03, NR-1117).
 

@@ -386,6 +386,11 @@ bool nation_self_shared_verb(corp_verb v)
         case corp_verb::accept_peace:
         case corp_verb::refuse_peace:
         case corp_verb::impose_peace:
+        // BL-1706 (RELATIONS.md § Joining a war): joining and capitulating act for a nation.
+        case corp_verb::request_join_war:
+        case corp_verb::accept_join:
+        case corp_verb::refuse_join:
+        case corp_verb::capitulate:
         // BL-1418 (RELATIONS.md § 3): a nation enacts its own embargo.
         case corp_verb::set_embargo:
             return true;
@@ -1660,6 +1665,39 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
 
         case corp_verb::refuse_peace:
             return map_war(refuse_peace(w, cmd.corp, cmd.counterparty));
+
+        // --- BL-1706 (wars draw in allies; RELATIONS.md § Joining a war) -----
+        // A war is named by its two leaders: `counterparty` leads the side joined,
+        // `subject` the other. The goal list is validated as it lands; war.cpp's
+        // verbs validate the rest before they mutate anything.
+        case corp_verb::request_join_war:
+        {
+            std::vector<uint32_t> goals;
+            if (!war_province_list(cmd, goals) || goals.empty())
+                return corp_command_result::rejected_invalid;
+            if (cmd.counterparty == null_entity || cmd.subject == null_entity
+                || cmd.counterparty == cmd.subject)
+                return corp_command_result::rejected_invalid;
+            if (w.wars.count({ cmd.counterparty, cmd.subject }) != 0)
+                return map_war(request_join_war(w, cmd.corp, { cmd.counterparty, cmd.subject }, 0, goals));
+            if (w.wars.count({ cmd.subject, cmd.counterparty }) != 0)
+                return map_war(request_join_war(w, cmd.corp, { cmd.subject, cmd.counterparty }, 1, goals));
+            return corp_command_result::rejected_state;
+        }
+
+        case corp_verb::accept_join:
+            return map_war(accept_join(w, reg.sentiment(), cmd.corp, cmd.counterparty));
+
+        case corp_verb::refuse_join:
+            return map_war(refuse_join(w, cmd.corp, cmd.counterparty));
+
+        case corp_verb::capitulate:
+        {
+            war_key_t key{};
+            if (cmd.corp == cmd.counterparty || war_of_member(w, cmd.corp, cmd.counterparty, &key) == nullptr)
+                return corp_command_result::rejected_state;
+            return map_war(capitulate(w, reg.sentiment(), cmd.corp, key));
+        }
 
         // --- BL-1418: the embargo (embargo.hpp) -------------------------------
         // The untrusted-boundary translation: `order` is the on/off byte and

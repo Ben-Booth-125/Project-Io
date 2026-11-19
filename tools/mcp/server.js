@@ -117,6 +117,10 @@ const VERBS = [
   'stock_interceptors',                                // BL-1431 -- buy unit_type interceptors into air defence unit subject's stock
   'fire_missile',                                      // BL-1431 -- launcher subject fires unit_type missiles of kind order at province, or building counterparty
   'queue_space_research', 'unqueue_space_research',    // BL-1613 -- the seat's nation's Early Space tail; order = Early Space node index
+  'request_join_war',                                  // BL-1706 -- ask to join the war of leaders counterparty and subject on counterparty's side, goals = provinces (1-3)
+  'accept_join',                                       // BL-1706 -- a war leader accepts counterparty's pending request to join its side
+  'refuse_join',                                       // BL-1706 -- a war leader refuses counterparty's pending request to join its side
+  'capitulate',                                        // BL-1706 -- capitulate in the war fought against counterparty
 ];
 
 // BL-1631: each tree's `node_count`, read from its generated header at start-up so the

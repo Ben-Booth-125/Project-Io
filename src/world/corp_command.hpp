@@ -265,6 +265,13 @@ enum class corp_verb : uint8_t
     // (run_nation_research_ai), never this verb.
     queue_space_research,   ///< The seat's nation queues Early Space node `order` with its unheld requirements ahead of it, on the Early Space tail (`enqueue_early_space_node`). rejected_invalid for an out-of-tree `order`; rejected_state when already held/queued, or locked (the gate into space unmet, or the node's branch not keyed). A refusal mutates nothing.
     unqueue_space_research, ///< The seat's nation takes queued Early Space node `order` off the tail with every later tail entry that needs it (the toggle). rejected_invalid for an out-of-tree `order`; rejected_state when the node is not queued.
+    // --- BL-1706 (wars draw in allies; RELATIONS.md § Joining a war) ---
+    // Appended after unqueue_space_research, same append-only rule. A nation acting for
+    // itself; war.hpp owns the checks. A war is named by its two LEADERS.
+    request_join_war,     ///< `corp` asks to join the war between `counterparty` and `subject` on `counterparty`'s side, naming goals `air_provinces` (1..3 provinces of members of `subject`'s side). Both must be that war's leaders. rejected_invalid (bad goals, unknown nation) / rejected_state (no such war, already a member, at war with a member, a truce across, a goal its side named, a request pending, a refusal cooling).
+    accept_join,          ///< `corp`, a war leader, accepts `counterparty`'s pending request to join its side: hostility both ways with every member across, the join's price charged. rejected_state (no such request, or it no longer holds).
+    refuse_join,          ///< `corp`, a war leader, refuses `counterparty`'s pending request to join its side; `counterparty` may not ask again in that war for 12 ticks. rejected_state (no such request).
+    capitulate,           ///< `corp` capitulates in the war it fights against `counterparty`: every goal the other side named on its ground passes to its namer, held or not; a leader's capitulation ends the war. rejected_state (not at war with `counterparty`).
 };
 
 /// One past the highest verb — the wire parser's range gate (BL-396: run_serve
@@ -274,7 +281,7 @@ enum class corp_verb : uint8_t
 /// appending a verb means moving this with it — and only this, since existing
 /// values never renumber.
 inline constexpr uint8_t corp_verb_count =
-    static_cast<uint8_t>(corp_verb::unqueue_space_research) + 1;
+    static_cast<uint8_t>(corp_verb::capitulate) + 1;
 
 /// `unqueue_research`'s "the last entry" sentinel for `corp_command::order`
 /// (the MCP boundary's -1). UINT32_MAX, never a node index.

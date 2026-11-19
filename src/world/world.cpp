@@ -1423,6 +1423,68 @@ uint64_t world::state_hash(int tick) const
             fnv1a_i32(h, tick);
         }
     }
+    // BL-1706 (wars draw in allies): the sides — joiners, departed losses, join
+    // requests and refusals, separate peace offers. Folded only when one exists, so a
+    // world whose wars never drew anyone in hashes as before.
+    {
+        bool any_side = !join_requests.empty() || !join_refusals.empty() || !separate_peace_offers.empty();
+        for (const auto& [key, r] : wars)
+            any_side = any_side || !r.joiners.empty() || r.departed_men_lost[0] != 0 || r.departed_men_lost[1] != 0;
+        if (any_side)
+        {
+            fnv1a_u32(h, 0x4A4F494Eu); // 'JOIN'
+            for (const auto& [key, r] : wars)
+            {
+                fnv1a_u32(h, key.first);
+                fnv1a_u32(h, key.second);
+                fnv1a_bytes(h, &r.departed_men_lost[0], sizeof r.departed_men_lost[0]);
+                fnv1a_bytes(h, &r.departed_men_lost[1], sizeof r.departed_men_lost[1]);
+                fnv1a_u32(h, static_cast<uint32_t>(r.joiners.size()));
+                for (const war_member& m : r.joiners)
+                {
+                    fnv1a_u32(h, m.nation);
+                    fnv1a_u32(h, m.side);
+                    fnv1a_bytes(h, &m.men_lost, sizeof m.men_lost);
+                    fnv1a_f32(h, m.exhaustion);
+                    fnv1a_f32(h, m.field_days);
+                    fnv1a_i32(h, m.joined_tick);
+                    fnv1a_u32(h, static_cast<uint32_t>(m.goals.size()));
+                    for (const uint32_t g : m.goals) fnv1a_u32(h, g);
+                }
+            }
+            fnv1a_u32(h, static_cast<uint32_t>(join_requests.size()));
+            for (const auto& [k, q] : join_requests)
+            {
+                fnv1a_u32(h, k.first.first);
+                fnv1a_u32(h, k.first.second);
+                fnv1a_u32(h, k.second);
+                fnv1a_u32(h, q.side);
+                fnv1a_i32(h, q.tick);
+                fnv1a_u32(h, static_cast<uint32_t>(q.goals.size()));
+                for (const uint32_t g : q.goals) fnv1a_u32(h, g);
+            }
+            fnv1a_u32(h, static_cast<uint32_t>(join_refusals.size()));
+            for (const auto& [k, t] : join_refusals)
+            {
+                fnv1a_u32(h, k.first.first);
+                fnv1a_u32(h, k.first.second);
+                fnv1a_u32(h, k.second);
+                fnv1a_i32(h, t);
+            }
+            fnv1a_u32(h, static_cast<uint32_t>(separate_peace_offers.size()));
+            for (const auto& [k, o] : separate_peace_offers)
+            {
+                fnv1a_u32(h, k.first);
+                fnv1a_u32(h, k.second);
+                fnv1a_u32(h, o.offerer);
+                fnv1a_i32(h, o.offered_tick);
+                fnv1a_u32(h, static_cast<uint32_t>(o.terms.kind));
+                fnv1a_u32(h, o.terms.gainer);
+                fnv1a_u32(h, static_cast<uint32_t>(o.terms.provinces.size()));
+                for (const uint32_t p : o.terms.provinces) fnv1a_u32(h, p);
+            }
+        }
+    }
     // The cessions feed a declaration's price (lost ground) and the history is the
     // record a war closes into: both are state a divergence would show in.
     if (!province_cessions.empty())

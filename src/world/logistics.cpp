@@ -1120,7 +1120,7 @@ entity_id lane_party(const world& w, entity_id owner)
     if (owner == null_entity || w.wars.empty())
         return null_entity;
     for (const auto& [key, rec] : w.wars) // a pure any-of
-        if (key.first == owner || key.second == owner)
+        if (war_side(rec, owner) >= 0) // BL-1706: a joiner is a party too
             return owner;
     return null_entity;
 }
@@ -1151,7 +1151,11 @@ void refresh_lane_caches(world& w)
     std::vector<std::pair<entity_id, entity_id>> wars;
     wars.reserve(w.wars.size());
     for (const auto& [key, rec] : w.wars) // std::map: ascending
+    {
         wars.push_back(key);
+        for (const war_member& m : rec.joiners) // BL-1706: who stands across moves the lanes too
+            wars.emplace_back(m.nation, static_cast<entity_id>(m.side));
+    }
     if (w.lane_cache_territory == w.territory_generation && w.lane_cache_wars == wars)
         return;
     w.lane_path_cache.clear();
