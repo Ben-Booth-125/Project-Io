@@ -3,7 +3,7 @@
 -- Calendar/pacing now lives in sim_loop (C++); Lua keeps only the starting speed.
 
 config = {
-    default_speed = 2,   -- initial time speed tier (I..V; 0 would start paused)
+    default_speed = 2,   -- the tier the first press of play starts (I..V); a game always opens paused
 }
 
 print(string.format("[Lua] init.lua loaded  default_speed=%d", config.default_speed))

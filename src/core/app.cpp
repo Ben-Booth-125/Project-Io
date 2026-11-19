@@ -179,8 +179,8 @@ static const std::array<key_binding, 24> s_bindings = {{
     {SDL_SCANCODE_SPACE,        false, ui::canvas_command::pause_toggle, "Pause / Resume",    "Space"},
     {SDL_SCANCODE_1,            false, ui::canvas_command::speed_1,      "Speed I  (0.25×)",  "1"},
     {SDL_SCANCODE_2,            false, ui::canvas_command::speed_2,      "Speed II (0.5×)",   "2"},
-    {SDL_SCANCODE_3,            false, ui::canvas_command::speed_3,      "Speed III (1×)",    "3"},
-    {SDL_SCANCODE_4,            false, ui::canvas_command::speed_4,      "Speed IV (4×)",     "4"},
+    {SDL_SCANCODE_3,            false, ui::canvas_command::speed_3,      "Speed III (3×)",    "3"},
+    {SDL_SCANCODE_4,            false, ui::canvas_command::speed_4,      "Speed IV (10×)",    "4"},
     {SDL_SCANCODE_5,            false, ui::canvas_command::speed_5,      "Speed V  (16×)",    "5"},
     // UI
     {SDL_SCANCODE_F5,           false, ui::canvas_command::quick_save,   "Quick save",        "F5"},
@@ -1814,7 +1814,12 @@ void app::start_new_game_prelude()
                               ? "nothing" : "a non-table value"));
         sol::table cfg = cfg_obj;
         m_sim_loop = sim_loop();
-        m_sim_loop.set_speed(cfg.get_or("default_speed", 2));
+        // A new game opens PAUSED (Ben, 2026-11-19; TIME_CONTROLS.md § Opening state):
+        // `default_speed` is the tier the first press of play starts, not a
+        // running clock the player lands into.
+        const int resume = std::clamp(cfg.get_or("default_speed", 2), 1, sim_loop::max_speed);
+        m_sim_loop.set_speed(0);
+        m_prev_speed = resume;
     }
 
     // --- BL-1085: THE PRESENTATION HALF, AND NOTHING THAT MOVES THE WORLD ----
@@ -2643,8 +2648,10 @@ bool app::load_game_from(const std::string& path, std::string* why_out)
     // persona bench. A fresh-process load had none of them.
     finish_economy_presentation();
 
-    m_sim_loop.restore(env.sim_tick, env.day_tick, env.econ_tick, env.elapsed_days, env.speed);
-    m_prev_speed     = (env.speed > 0) ? env.speed : 1;
+    // A load opens PAUSED too (Ben, 2026-11-19): every arrival in the game is
+    // stopped. The save's own speed is what the first press of play resumes.
+    m_sim_loop.restore(env.sim_tick, env.day_tick, env.econ_tick, env.elapsed_days, 0);
+    m_prev_speed     = (env.speed > 0) ? env.speed : 2;
     m_last_econ_tick = env.econ_tick;
     // `world::current_day_tick` is the mirror app refreshes each frame; seeding
     // it here means the activity fog reads the right age on the FIRST frame

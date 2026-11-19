@@ -35,8 +35,8 @@ const char* speed_rate_label(int speed)
     {
     case 1:  return "0.25×";
     case 2:  return "0.5×";
-    case 3:  return "1×";
-    case 4:  return "4×";
+    case 3:  return "3×";
+    case 4:  return "10×";
     case 5:  return "16×";
     default: return "Paused";
     }
