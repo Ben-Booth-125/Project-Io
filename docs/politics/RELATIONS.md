@@ -504,8 +504,10 @@ the test.
 **A war is a record that a declaration opens.** Hostility stays the gate every consumer reads (§ 1);
 the war gives it a purpose and an end. There is one war per pair, with a **declarer** and a
 **defender**. The record holds both sides' goals, the war score, each side's exhaustion and the day
-it opened, and it is in the world snapshot. A nation may be party to several wars at once. There are
-no alliances: a friend is never drawn in, though a friend attacked is a justification (below).
+it opened, and it is in the world snapshot. A nation may be party to several wars at once. A war
+has **two sides**, led by the declarer and the defender; other nations may **join** a side (§ Joining
+a war, Ben, 2026-11-19). This overturns the 2026-10-30 rule that a friend is never drawn in; a
+friend attacked is still a justification (below).
 
 **Declaring.** `declare_war(declarer, defender, goals)` writes **both** hostility rows and opens the
 record in one call: **a declaration of war makes both sides hostile (Ben, 2026-11-09).** The defender
@@ -549,7 +551,16 @@ opening set:
 | A friend attacked | the defender is the declarer in a war against the declarer's friend |
 
 Any one that holds **halves** the third-party price (Ben, 2026-10-30). The declaration shows which
-hold, and the price, before it is confirmed. This reads sentiment to **price** a declaration; it
+hold, and the price, before it is confirmed.
+
+**The preview says whose opinion turns (Ben, 2026-11-19).** Before a declaration is confirmed it lists
+each nation whose **band** of Trust or Alarm toward the declarer would change, as a shift in words
+(*Favourable → Wary*), read from the same rows `declare_war` will charge. The figures are the row's
+hover. It also lists the nations that **may join** either side under § Joining a war, read only from
+what the declarer can see. *May join them*: the target's friends, and each nation whose sentiment
+toward the declarer would hold a declaration's motive once the price is charged. *May join you*:
+each nation hostile to the target or already at war with it. A nation in neither list and whose band
+holds does not get a row. This reads sentiment to **price** a declaration; it
 never makes one, so the invariant holds.
 
 **War score.** One number from −100 to +100, positive in the declarer's favour, built from two parts:
@@ -574,6 +585,16 @@ and lives in its own table as friendship offers do (§ 1). There is one pending 
 
 - **White peace** — nothing changes hands.
 - **Cession** — named goals the receiving side holds pass to it. Only goals, and only held ones.
+
+**Capitulation (Ben, 2026-11-19).** A party may **capitulate**: it gives up every goal the other side
+named on its ground, **held or not**, and leaves the war at once, with no acceptance. Each goal passes
+to the member that named it, as a cession does, and with the same conduct (`province_ceded`). A
+leader's capitulation ends the war: it hands over the goals named on its own ground only, and its
+side's joiners leave with a white peace. A joiner's capitulation takes only it out of the war,
+handing over the goals named on its ground. Truces follow as at any peace. A capitulation that
+names a nation's last province ends it, as a cession would. A rival capitulates when its war is
+going badly and its last offer was refused; the threshold is the war scorer's calibration
+(`../ai/AI_OPPONENT.md` § 11, "Rival nations wage war whole").
 
 **A refused offer may not be repeated for four ticks** (Ben, 2026-11-03, NR-1120). Once the receiver
 refuses, the offerer may make no offer in that war for four ticks — one year; the side that refused
@@ -612,6 +633,53 @@ the player's nation is a party, the same event is raised as a dispatch on the ch
 (`../ui/CHAT.md`), so the player learns of a war on them from the feed, not only the ledger. A
 declaration on or by the player also raises a notice on the canvas (Ben, 2026-11-09;
 `../ui/LAYOUT.md` § War notice).
+
+### Joining a war (Ben, 2026-11-19)
+
+**A war grows by joining, not by a second declaration.** A nation may ask to join an open war on
+either side, making the conflict larger, rather than declaring its own smaller war on a party
+already fighting one.
+
+**Sides and leaders.** The declarer leads one side and the defender the other. A **joiner** belongs
+to one side. Every member of a side is at war with every member of the other: acceptance writes
+hostility both ways between the joiner and each member across, as a declaration does. A nation is a
+member of a war at most once, and never of both sides.
+
+**A war may be joined at any point while it stands (Ben, 2026-11-19)**, not only at its opening: a
+nation drawn in midway asks and is accepted exactly as one at the start.
+
+**Asking and accepting.** `request_join_war(war, side, goals)` names the side and one to three goals
+among the provinces of the other side's members. The request waits, one per nation per war, in its
+own table as a peace offer does. **The side's leader accepts or refuses.** Accepting writes the
+joiner in. A refused nation may not ask again in that war for twelve ticks, a year, as a refused
+peace offer may not be repeated. A request lapses when the war ends or the asker can no longer
+join. It is refused, mutating nothing, when the asker is already a member, a truce stands between
+it and any member across, or a goal is invalid.
+
+**Who asks.** A nation that holds a declaration's motive against a party already at war asks to
+join the other side, instead of declaring a war of its own. A friend of a war's defender may ask to
+join the defender's side. A rival declares a new war only on a nation at peace.
+
+**The price of joining.** Acceptance charges the conduct a declaration would: `hostility_declared`
+on each member across, toward the joiner, and `war_declared` on every other nation. Joining the
+defender's side holds the *a friend attacked* justification when the joiner is the defender's
+friend, and halves the price as it does for a declaration.
+
+**Score.** The war score is one number per war, built per **side**. Occupation is each side's goals
+held by that side, weighted by tiles, less the share of the other side's goals it holds. Battles are
+the strength each side destroyed of the other's, over the war. Exhaustion stays per nation.
+
+**Peace.** The leaders' peace ends the war for every member. At a cession, each goal the winning side
+holds passes to the member that named it. **A joiner may leave early** by a separate peace with the
+other side's leader, on the terms of any peace between the two: white, or cession of the goals one of
+them named on the other's ground that it holds. A nation already at war with a member across may not
+join; its own war goes on. Truces follow every peace between each pair that was across, and a
+separate peace truces the joiner with every member across. A leader whose nation ends hands its side
+to the member that joined earliest.
+
+**Who scores a joined war.** The player asks, accepts, refuses and makes a separate peace through the
+Diplomacy ledger. A rival does the same under the join grant (`../ai/AI_OPPONENT.md` § 11). No rival
+asks, accepts or refuses **for** the player's nation.
 
 ## Open questions
 
