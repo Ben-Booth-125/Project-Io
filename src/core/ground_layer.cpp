@@ -583,11 +583,20 @@ ground_layer::body_state* ground_layer::ensure_body(const world& w, entity_id id
     const auto bit = w.bodies.find(id);
     if (bit == w.bodies.end() || bit->second.grid_width <= 0 || bit->second.grid_height <= 0)
         return nullptr; // a gridless body (the star) has no ground to bake
+    body_state& b = make_body(id, bit->second.grid_width, bit->second.grid_height);
+    refresh_source(b, w);
+    return &b;
+}
+
+ground_layer::body_state& ground_layer::make_body(entity_id id, int gw, int gh)
+{
+    if (body_state* existing = find(id))
+        return *existing;
     auto bs = std::make_unique<body_state>();
     body_state& b = *bs;
     b.id = id;
-    b.gw = bit->second.grid_width;
-    b.gh = bit->second.grid_height;
+    b.gw = gw;
+    b.gh = gh;
     const gb::geometry m = gb::make_master_geometry(b.gw, b.gh, params.flat_master ? 1.0 : gb::k_tilt_sy);
     for (int l = 0; l < L; ++l)
     {
@@ -618,8 +627,7 @@ ground_layer::body_state* ground_layer::ensure_body(const world& w, entity_id id
     b.far_ch = (b.far_geom.H + gb::k_chunk_px - 1) / gb::k_chunk_px;
     b.far_jobs.assign(static_cast<std::size_t>(b.far_cw) * b.far_ch, 0);
     m_bodies.emplace(id, std::move(bs));
-    refresh_source(b, w);
-    return &b;
+    return b;
 }
 
 void ground_layer::refresh_source(body_state& b, const world& w)
@@ -861,6 +869,34 @@ void ground_layer::prebake(const world& w, entity_id body, bool assume_surveyed)
         b->reveal_all = assume_surveyed;
         refresh_source(*b, w);
     }
+    start_prebake(*b);
+}
+
+void ground_layer::prebake(entity_id body, std::shared_ptr<const gb::bake_source> src,
+                           bool assume_surveyed)
+{
+    if (body == null_entity || !src || src->gw <= 0 || src->gh <= 0)
+        return;
+    body_state& b = make_body(body, src->gw, src->gh);
+    if (b.gw != src->gw || b.gh != src->gh)
+        return; // a body of that id at another grid: not this source's
+    b.reveal_all = assume_surveyed;
+    // As refresh_source shapes a source the layer prepared itself (the land
+    // lift is re-stamped inside set_source).
+    if (m_hide_routes)
+    {
+        auto c = std::make_shared<gb::bake_source>(*src);
+        gb::strip_painted_routes(*c);
+        src = std::move(c);
+    }
+    set_source(b, std::move(src));
+    start_prebake(b);
+}
+
+void ground_layer::start_prebake(body_state& bs)
+{
+    body_state* const b = &bs;
+    const entity_id body = b->id;
     m_prebake = body;
     m_home = body; // the pre-bake target is the homeworld: pinned (BL-1259)
     b->last_visit = m_frame;
@@ -907,9 +943,13 @@ bool ground_layer::resnapshot(const world& w, bool assume_surveyed)
         || bit->second.grid_height != b->gh)
         return false; // the homeworld is not this one any more
     b->reveal_all = assume_surveyed;
-    land_boundary(*b, std::make_shared<const gb::bake_source>(
-                          gb::prepare_source(w, b->id, b->reveal_all, registry)),
-                  "round-boundary");
+    gb::bake_source src = gb::prepare_source(w, b->id, b->reveal_all, registry);
+    // As refresh_source does: under the Logistics lens the ground paints no
+    // routes, and a lens left on across a New Game must not open with them
+    // painted (the BL-1677 review).
+    if (m_hide_routes)
+        gb::strip_painted_routes(src);
+    land_boundary(*b, std::make_shared<const gb::bake_source>(std::move(src)), "round-boundary");
     return true;
 }
 
@@ -920,6 +960,12 @@ bool ground_layer::resnapshot(entity_id body, std::shared_ptr<const gb::bake_sou
     if (!b || !src || b->id != body || src->gw != b->gw || src->gh != b->gh)
         return false;
     b->reveal_all = assume_surveyed;
+    if (m_hide_routes) // as the landing's resnapshot (the BL-1677 review)
+    {
+        auto c = std::make_shared<gb::bake_source>(*src);
+        gb::strip_painted_routes(*c);
+        src = std::move(c);
+    }
     land_boundary(*b, std::move(src), "in-round (roads laid)");
     return true;
 }

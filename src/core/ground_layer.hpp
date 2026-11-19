@@ -113,6 +113,14 @@ public:
     /// finish (`init_survey_states`), and the home body is always surveyed in
     /// play, so its master is baked as play will show it.
     void prebake(const world& w, entity_id body, bool assume_surveyed = false);
+    /// BL-1677: the same, from a source a build WORKER prepared from its own
+    /// world (the cold build, right after the road network is laid), so the
+    /// master bakes while the search and the settle run. The main thread never
+    /// reads the world being built. @p src must be prepare_source of @p body
+    /// with reveal_all == @p assume_surveyed; the adoption's resnapshot then
+    /// re-bakes only what the search and the settle moved.
+    void prebake(entity_id body, std::shared_ptr<const ui::ground::bake_source> src,
+                 bool assume_surveyed);
     /// A ROUND BOUNDARY (STARTUP.md § Handoff): re-take the pre-bake target's
     /// source snapshot from @p w NOW, on the calling (main) thread, which must
     /// own @p w — a round's landed world, or the adopted one. The pre-bake
@@ -524,6 +532,11 @@ private:
     body_state* find(entity_id id);
     const body_state* find(entity_id id) const;
     body_state* ensure_body(const world& w, entity_id id);
+    /// ensure_body's storage half: the body's levels for a gw x gh grid, with
+    /// no source yet (the caller sets one). Returns the existing body if any.
+    body_state& make_body(entity_id id, int gw, int gh);
+    /// Both prebake overloads' tail: pin the body as the pre-bake target and feed.
+    void start_prebake(body_state& b);
     void alloc_master(body_state& b);
     void drop_master(body_state& b);
     void refresh_source(body_state& b, const world& w);

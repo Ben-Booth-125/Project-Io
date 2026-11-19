@@ -832,6 +832,11 @@ private:
     /// the same order round 6's worker makes (BL-1085) -- into a slot of the
     /// same shape Begin adopts from the wizard. Valid only while `building`.
     std::future<std::shared_ptr<wizard_world_cache>> m_worldgen_future;
+    /// BL-1677: the cold worker's slot, held by the main thread ONLY to take
+    /// its in-round ground snapshot (`ground_roads`, under `ground_mx`); the
+    /// main thread reads nothing else in it until the future lands. Released
+    /// once the snapshot is taken or the build lands.
+    std::shared_ptr<wizard_world_cache> m_cold_slot;
     /// Read every frame by the loading screen; written by the worker.
     generation_progress m_worldgen_progress;
     /// The config the worker was launched with — Lua is loaded on the MAIN
@@ -1283,6 +1288,14 @@ private:
     /// handed one over in @p c, re-take the wizard pre-bake's source from it.
     /// Main thread; once per run.
     void ground_take_roads_snapshot(wizard_world_cache& c);
+    /// BL-1677: the running pre-bake was started from the COLD build's
+    /// in-round snapshot (the roads laid, before the search and the settle);
+    /// the landing re-takes its source from the built world, so only what the
+    /// search and the settle moved re-bakes.
+    bool            m_ground_prebake_cold = false;
+    /// BL-1677: when the cold worker has handed its snapshot over, start the
+    /// home master from it. Main thread; once per build.
+    void ground_take_cold_snapshot();
     /// Leaving the wizard's homeworld (a new gate world is coming, or the
     /// menu): stop the wizard pre-bake. No-op when none runs.
     void drop_wizard_ground(const char* why);
