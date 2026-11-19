@@ -2247,7 +2247,7 @@
    "design": "PLAYTEST LANE A (shell & selection). Ben: \"When selecting a unit, the Assign to front spills over the pin button. We should make sure to reserve space for pins across the board.\" WORK: one shared rule for header rows that carry a pin - the pin's width is reserved before any other control lays out - applied to every selection kind and ledger header with a pin, not just the unit card."
   },
   {
-   "glyph": "~",
+   "glyph": "✓",
    "sprint": null,
    "version_goal": null,
    "written": "2026-11-19",
@@ -2259,15 +2259,15 @@
    "difficulty": 2,
    "files": [],
    "category": "UI",
-   "status": "design-owed",
+   "status": "designed",
    "authority_doc": "docs/ui/ledgers/construction.md",
    "id": "BL-1696",
    "short_name": "BUILDING_ROW_LIGHTS_TILE",
    "title": "Picking a building in the buildings list highlights its tile on the map",
-   "design": "PLAYTEST LANE B (ledgers). Ben: \"When selecting a building from the buildings list, we should also highlight the tile it's placed on.\" DESIGN OWED: the highlight form (reuse the selection outline? a pulse?) and whether it holds while the row is selected or only on hover. Authority doc is the buildings ledger's owner - confirm which ledgers/*.md owns the buildings tab."
+   "design": "PLAYTEST LANE B (ledgers). Ben: \"When selecting a building from the buildings list, we should also highlight the tile it's placed on.\" DESIGN OWED: the highlight form (reuse the selection outline? a pulse?) and whether it holds while the row is selected or only on hover. Authority doc is the buildings ledger's owner - confirm which ledgers/*.md owns the buildings tab. SETTLED 2026-11-19 (Ben): selection outline on the building tile while selected, hover outline on row hover, no camera move. construction.md section Idle on top, location below."
   },
   {
-   "glyph": "~",
+   "glyph": "✓",
    "sprint": null,
    "version_goal": null,
    "written": "2026-11-19",
@@ -2279,15 +2279,15 @@
    "difficulty": 3,
    "files": [],
    "category": "UI",
-   "status": "design-owed",
+   "status": "designed",
    "authority_doc": "docs/ui/ledgers/construction.md",
    "id": "BL-1697",
    "short_name": "BUILDINGS_GROUPED_BY_TYPE",
    "title": "The buildings tab groups by building type, then by location",
-   "design": "PLAYTEST LANE B (ledgers). Ben: \"We should group buildings in the buildings tab by their type, with subgroups for location.\" DESIGN OWED: what \"type\" is (building class? product chain? the build door's groups?) and what \"location\" is (province once BL-1708 names them, else body / market centre). Folded groups per DRILL_THROUGH.md."
+   "design": "PLAYTEST LANE B (ledgers). Ben: \"We should group buildings in the buildings tab by their type, with subgroups for location.\" DESIGN OWED: what \"type\" is (building class? product chain? the build door's groups?) and what \"location\" is (province once BL-1708 names them, else body / market centre). Folded groups per DRILL_THROUGH.md. SETTLED 2026-11-19 (Ben): type stays the Build door name; location = province, sub-headers only where a type spans 2+ provinces; label = province name, else around <largest centre>, else seat tile (one label fn, swaps when BL-1708 province names lands). construction.md section Idle on top, location below."
   },
   {
-   "glyph": "~",
+   "glyph": "✓",
    "sprint": null,
    "version_goal": null,
    "written": "2026-11-19",
@@ -2299,15 +2299,15 @@
    "difficulty": 2,
    "files": [],
    "category": "UI",
-   "status": "design-owed",
+   "status": "designed",
    "authority_doc": "docs/ui/ledgers/construction.md",
    "id": "BL-1698",
    "short_name": "IDLE_BUILDINGS_ON_TOP",
    "title": "Idle buildings get a reserved section at the top of the buildings tab",
-   "design": "PLAYTEST LANE B (ledgers). Ben: \"In the buildings tab, let's reserve space at the top for idle buildings, since it's currently hard to find them.\" DESIGN OWED: what counts as idle (no input, no labour, no buyer - one section or split by cause?) and whether the section shows the cause glyph. Lands with BL-1697 (buildings grouped by type)."
+   "design": "PLAYTEST LANE B (ledgers). Ben: \"In the buildings tab, let's reserve space at the top for idle buildings, since it's currently hard to find them.\" DESIGN OWED: what counts as idle (no input, no labour, no buyer - one section or split by cause?) and whether the section shows the cause glyph. Lands with BL-1697 (buildings grouped by type). SETTLED 2026-11-19 (Ben): idle = building_report::idle on a finished building; one Idle (N) section on top, cause word per row; idle buildings also stay in their type group. construction.md section Idle on top, location below."
   },
   {
-   "glyph": "~",
+   "glyph": "✓",
    "sprint": null,
    "version_goal": null,
    "written": "2026-11-19",
@@ -2319,15 +2319,15 @@
    "difficulty": 3,
    "files": [],
    "category": "UI",
-   "status": "design-owed",
+   "status": "designed",
    "authority_doc": "docs/economy/TRADE.md",
    "id": "BL-1699",
    "short_name": "TRADES_BOTH_DIRECTIONS",
    "title": "The Trades view shows potential imports and exports, to and from this market",
-   "design": "PLAYTEST LANE B (ledgers). Ben: \"Trades should show potential imports and exports. Both from and to this market.\" DESIGN OWED: what a \"potential\" trade is (a price gap above haulage cost within reach? capacity left?) and how it is ranked. TRADE.md owns trades; ledgers/market.md owns the view."
+   "design": "PLAYTEST LANE B (ledgers). Ben: \"Trades should show potential imports and exports. Both from and to this market.\" DESIGN OWED: what a \"potential\" trade is (a price gap above haulage cost within reach? capacity left?) and how it is ranked. TRADE.md owns trades; ledgers/market.md owns the view. SETTLED 2026-11-19 (Ben): potential = a route rank_trade_routes would consider, read from either end; ONE merged list with a Dir column (Out/In), profit-per-point order; + gated on points at the route source. TRADE.md section Auto and reserved trade; market.md section 2b."
   },
   {
-   "glyph": "~",
+   "glyph": "✓",
    "sprint": null,
    "version_goal": null,
    "written": "2026-11-19",
@@ -2339,12 +2339,12 @@
    "difficulty": 1,
    "files": [],
    "category": "UI",
-   "status": "design-owed",
+   "status": "designed",
    "authority_doc": "docs/ui/ledgers/market.md",
    "id": "BL-1700",
    "short_name": "MARKET_LEDGER_TABS_HIGHER",
    "title": "The market ledger's header shrinks so Goods and Trades sit higher",
-   "design": "PLAYTEST LANE B (ledgers). Ben: \"The market ledger also reserves too much space for information about the markets, the 'Goods' and 'Trades' tabs should be higher up.\" WORK: compress the market header block; measure the current header height in px and report before/after."
+   "design": "PLAYTEST LANE B (ledgers). Ben: \"The market ledger also reserves too much space for information about the markets, the 'Goods' and 'Trades' tabs should be higher up.\" WORK: compress the market header block; measure the current header height in px and report before/after. SETTLED 2026-11-19 (Ben): top section content-sized (metrics vs nations list capped at 4 rows, then scrolls). market.md section 2."
   },
   {
    "glyph": "✓",

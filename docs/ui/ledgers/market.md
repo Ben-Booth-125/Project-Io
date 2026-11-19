@@ -31,11 +31,14 @@ belongs to `SUPPLY.md`.
 | View | Answers (one question) | Content |
 |---|---|---|
 | **Goods** *(default)* | What is each good worth here, and which way is it moving? | A table, one row per traded good: **item glyph · name · shelf · price · price vs base · 8-quarter graph**, the graph flattened INTO the row rather than stacked under it. Every row is drawn against a **shared `price / base_price` axis with a 1.0 baseline**, which is what makes goods comparable; direction is carried by the line's colour. **`body_average_price` does not fit and is dropped** — see below |
-| **Trades** | What am I moving in and out of this market, how much of my trade capacity do I steer, and what could I be moving? | **Five headed sections** in one scroller, the long ones bounded and scrolling inside themselves (`TRADE.md`): **Trade points** (made / manual / auto, the reserve field and **Set reserve**); **My trades** (the player's trades through this market, an `x` per row, the **Add a trade** form folded under it); **Automatic Trades**, the cargo auto trade has in transit to or from this market, gated on the player owning a building on the body; **Potential trades**, the trade pass's own ranking from this market, highest profit first, listed whatever trade points the acting nation has, a `+` per row that fills the form and is disabled where it has none here; and **Recent exchanges**, over the exchange record. See § 2b |
+| **Trades** | What am I moving in and out of this market, how much of my trade capacity do I steer, and what could I be moving? | **Five headed sections** in one scroller, the long ones bounded and scrolling inside themselves (`TRADE.md`): **Trade points** (made / manual / auto, the reserve field and **Set reserve**); **My trades** (the player's trades through this market, an `x` per row, the **Add a trade** form folded under it); **Automatic Trades**, the cargo auto trade has in transit to or from this market, gated on the player owning a building on the body; **Potential trades**, the trade pass's own ranking of routes leaving or landing on this market, exports and imports in one list with a direction column, highest profit first, listed whatever trade points the acting nation has, a `+` per row that fills the form and is disabled where it has none here; and **Recent exchanges**, over the exchange record. See § 2b |
 
 **Above the tabs, below the selectors: the market's top section** (Ben, 2026-10-13, superseding
-the 2026-08-29 chip row). It takes about **2/7 of the column's height**, leaving about **5/7 to the
-Goods and Trades tabs**, and splits left and right:
+the 2026-08-29 chip row). **It is as tall as its content, no taller** (Ben, 2026-11-19, superseding
+the fixed 2/7 of the column: *"the market ledger also reserves too much space for information about
+the markets, the 'Goods' and 'Trades' tabs should be higher up"*): the taller of the three metric
+lines and the nations list, the list showing **at most four rows** and scrolling inside the section
+past that. Everything below it goes to the Goods and Trades tabs. It splits left and right:
 
 - **Left 3/5 — the nations in this market, by full name.** A list, one row per nation operating
   here (`nations_in_market`: a nation is present exactly when its ground clears here), each row a
@@ -103,7 +106,7 @@ of my trade capacity do I steer, and what could I be moving?"**
 | **Trade points** | The acting nation's `trade_points` made on the last pass, its `trade_reserve` as used (clamped to what it makes), and the rest — auto. The reserve field and its **Set reserve** press (`set_trade_reserve`); a warning when the reserve exceeds what is made, or the manual trades ask for more than it covers | `Made X pts · manual Y · auto Z` |
 | **My trades** | The acting nation's manual trades (`world::trades`) that **leave or land on the selected market**, in placement order — the order the reserve is spent in. A count of its trades elsewhere; the **Add a trade** fold (good, from, to, points → `set_trade`); the seam's answer to the last trade press | Good · Route (`from > to`, by city) · Pts · `x` (`clear_trade`); units a tick on hover |
 | **Automatic Trades** | Every nation's auto-trade cargo in transit to or from this market, one row per owner, route and good, largest first (Ben, 2026-11-09) | Good · Holder · Route · Units; convoys on hover |
-| **Potential trades** | **Every route leaving this market, whatever trade points the acting nation has (Ben, 2026-11-09).** The trade pass's own ranking (`rank_trade_routes`) of routes leaving this market: only goods trade carries, a source shelf that holds the good under the fair-price ceiling, a margin above `dispatch_margin()` of the source price. Ordered by profit, highest first | Good · To · Profit · `+` (fills the Add a trade form, disabled without points here); buy, sell, haul, margin per unit and profit per point on hover, and why a row cannot be taken |
+| **Potential trades** | **Every route leaving or landing on this market, whatever trade points the acting nation has (Ben, 2026-11-09; both directions Ben, 2026-11-19).** The trade pass's own ranking (`rank_trade_routes`) of routes with this market at either end: only goods trade carries, a source shelf that holds the good under the fair-price ceiling, a margin above `dispatch_margin()` of the source price. **One list**, exports and imports merged, ordered by profit, highest first | Good · **Dir** (`Out` an export from here, `In` an import to here) · With (the other market) · Profit · `+` (fills the Add a trade form, disabled without points at the route's source); buy, sell, haul, margin per unit and profit per point on hover, and why a row cannot be taken |
 | **Recent exchanges** | The exchange record filtered to this market, newest first | mo · Good · With · **Revenue** |
 
 **A trade lists under both of its markets.** It leaves one and lands on the other, and the
@@ -125,11 +128,18 @@ for the trades that replaced it). Shut, the section says so in words — "You ho
 route, never *listing* it: a market where the acting nation makes none still shows every route
 that leaves it, each row saying why on hover and its `+` disabled, and the section says so in its
 own line. A trade spends the points of the market it leaves, so the points that bind a row are
-the nation's `market_trade_points` at this market. Zero there is what disables the row, which also
-keeps `trade_is_valid`'s source rule, so a live `+` is never an offer the verb refuses. The gate sits in
-this surface and not in `rank_trade_routes`, which the trade pass and the AI scorer share. The
-restrictions that remain are not about points: the route leaves the selected market, and the
-ranking's own conditions below hold.
+the nation's `market_trade_points` at the route's **source**: this market for an export, the other
+market for an import. Zero there is what disables the row, which also keeps `trade_is_valid`'s
+source rule, so a live `+` is never an offer the verb refuses. The gate sits in this surface and not
+in `rank_trade_routes`, which the trade pass and the AI scorer share. The restrictions that remain
+are not about points: the route has the selected market at one end, and the ranking's own
+conditions below hold.
+
+**Imports and exports are one list (Ben, 2026-11-19: *"Trades should show potential imports and
+exports. Both from and to this market."*).** Both directions answer the same question — what could
+move through here — and sort on the same key, so they merge, highest profit first, and a **Dir**
+column (`Out`, `In`) says which end this market is. Two lists would split one ranking in two and
+leave the player to compare the heads by eye.
 
 **Profit is the ranking's own figure (Ben, 2026-11-09): margin per trade point**, per-unit margin
 × the good's capacity, what one point earns on the route. The column a player reads is the key the
@@ -138,7 +148,8 @@ column).
 
 **Potential trades are the trade pass's own ranking, not a second model.** Each row is an offer
 from `rank_trade_routes` (`TRADE.md` § Auto and reserved trade) — the ranking auto trade spends by —
-asked one destination at a time and kept where the source is this market. So the buy is the
+asked one destination at a time and kept where this market is the source (an export) or the
+destination (an import). So the buy is the
 source's **posted** price, the haul is `trade_haul_per_unit`'s, a shelf that holds none of the good
 or that the fair-price ceiling refuses produces no row, and a route whose margin does not clear
 `dispatch_margin()` of the source price produces none either: a row is a route the pass itself would
