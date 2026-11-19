@@ -291,7 +291,7 @@ and market combos). **Raise is a press, not a toggle** — it has no active stat
    - **C — a free designer.** Choose chassis, weapon and armour, and the stats follow. The deepest,
      and the one the research note flagged as a skill wall in comparable games.
 3. **Is hiring instant?** Today a hire places a unit at once. A muster time (the Force branch's
-   *Helicopter Lift* and *Proven Readiness* already promise "muster time -10% / -20%") would give
+   quest *Proven Readiness* already promises "muster time -20%") would give
    Recruit a queue like Construction's.
 4. **Where do fronts live** once BL-1427 exists — a third tab here, or the canvas only?
 5. **Manpower.** Answered (Ben, 2026-10-30): Recruit heads each theatre with its recruit pool; moved to the header (Ben, 2026-11-02).

@@ -285,33 +285,39 @@ void rows_r6(const recipe_registry& reg)
     }
 
     {
-        // Relief moves the choice: home petroleum sites make Drill-Bit
-        // Metallurgy (Oil Platforms +5%) beat Seismic Survey (unread) at equal cost.
-        const int t1 = node("DG-PR-EX-T1"), t2 = node("DG-PR-EX-T2");
-        const int a1 = node("DG-PR-EX-A1"), a2 = node("DG-PR-EX-A2");
+        // Relief moves the choice: home water sites make Desalination (Water
+        // extraction +10%) beat Rock Bolting (unread) at equal cost - two ring-3
+        // minors of Extraction, one on each arm. (BL-1712: the ring-1 pair this row
+        // first used, Drill-Bit Metallurgy and Seismic Survey, is one minor now.)
+        const int b2 = node("DG-PR-EX-B2"), c2 = node("DG-PR-EX-C2");
         fixture f = make();
         nation_budget nb;
         nb.weights[static_cast<std::size_t>(budget_priority::charters)]     = 0.5f;
         nb.weights[static_cast<std::size_t>(budget_priority::public_works)] = 0.5f;
         f.w.nation_budgets[f.nation] = nb;
-        f.w.nation_tech[f.nation].held.set(static_cast<std::size_t>(t1));
-        f.w.nation_tech[f.nation].held.set(static_cast<std::size_t>(t2));
+        for (const char* id : {"DG-PR-EX-T1", "DG-PR-EX-A1", "DG-PR-EX-A", "DG-PR-EX-T3", "DG-PR-EX-T5"})
+            f.w.nation_tech[f.nation].held.set(static_cast<std::size_t>(node(id)));
         fixture bare = f;
         for (int i = 0; i < 4; ++i)
         {
             const entity_id t = add_tile(f.w, f.body, f.nation);
             const entity_id b = add_building(f.w, f.corp, t, building_type::extraction_site, 0, false);
-            f.w.buildings.at(b).target_resource = resource_type::petroleum;
+            f.w.buildings.at(b).target_resource = resource_type::water;
         }
         const research_ai_pick with = choose_research_node(f.w, reg, f.nation, reg.nation_ai());
         const research_ai_pick none = choose_research_node(bare.w, reg, bare.nation, reg.nation_ai());
-        std::printf("     with 4 home oil sites: %s (relief %lld); with none: %s (relief %lld)\n",
+        std::printf("     with 4 home water sites: %s (relief %lld); with none: %s (relief %lld)\n",
                     pick_id(with.node).c_str(), static_cast<long long>(with.relief_milli),
                     pick_id(none.node).c_str(), static_cast<long long>(none.relief_milli));
-        check(with.node == a2 && with.relief_milli > 0 && with.score_milli == with.relief_milli - with.cost_milli,
-              "R6g relief to the home industry picks the node that moves it (A2 over the unread A1)");
-        check(none.node == a1 && none.relief_milli < with.relief_milli,
-              "R6h ...and with no home industry the two minors tie on their share of the major (lower index)");
+        check(with.node == c2 && with.relief_milli > 0 && with.score_milli == with.relief_milli - with.cost_milli,
+              "R6g relief to the home industry picks the node that moves it (Desalination over the unread Rock Bolting)");
+        // BL-1712: with no home industry Desalination still wins, on its life-support
+        // space key, so the trimmed tree has no pair where water sites flip the pick.
+        // The row now asserts what the sites do: they add the water term to the relief.
+        // The lower-index tie rule is covered by R6r0.
+        (void)b2;
+        check(none.node == c2 && none.relief_milli < with.relief_milli,
+              "R6h ...and with no home industry the water term drops out of Desalination's relief");
     }
 
     {
@@ -437,8 +443,9 @@ void rows_r6(const recipe_registry& reg)
 
     {
         // BL-1486 (Ben, 2026-11-04, AI_OPPONENT.md § 11, "A node that opens kit
-        // is worth that kit"): DG-ST-FO-D1 (Assault Rifles: three kit rows, nothing
-        // else) against DG-PR-EN-M (one unread row) — both cost 4 units. Every
+        // is worth that kit"): DG-ST-FO-D1 (Assault Rifles: six kit rows since the
+        // BL-1712 trim folded Body Armour in, nothing else) against DG-PR-EN-M (one
+        // unread row) — both cost 4 units. Every
         // other node is held, so the two are the only candidates and no open major
         // lends either a route share: what separates them is the kit alone.
         const int kit = node("DG-ST-FO-D1"), plain = node("DG-PR-EN-M");
@@ -522,11 +529,11 @@ void rows_r6(const recipe_registry& reg)
         check(kit >= 0 && plain >= 0 && plain < kit
                   && io::dg::nodes[static_cast<std::size_t>(kit)].cost_units
                          == io::dg::nodes[static_cast<std::size_t>(plain)].cost_units
-                  && kit_items == 3 && rows_total(kit) == kit_items
+                  && kit_items == 6 && rows_total(kit) == kit_items
                   && rows_total(plain) > 0 && rows_of(plain, io::dg::effect_kind::unread) == rows_total(plain)
                   && plain_zero,
               "R6r0 the kit row's pair: equal cost units, the plain node at the lower index (a tie takes it); "
-              "DG-ST-FO-D1 carries only unlock_kit rows (3), DG-PR-EN-M only unread rows, and its relief is 0 in every case");
+              "DG-ST-FO-D1 carries only unlock_kit rows (6), DG-PR-EN-M only unread rows, and its relief is 0 in every case");
         check(fielding.both.candidates == 2 && fielding.both.node == kit
                   && fielding.kit_only.relief_milli > fielding.plain_only.relief_milli
                   && fielding.kit_only.cost_milli == fielding.plain_only.cost_milli,
@@ -626,9 +633,9 @@ void rows_r1()
               && f.w.nation_tech.at(f.other).pool_milli == milli(50.0),
           "R1d ...and they accrue RP with an empty queue, at no treasury cost");
 
-    // Quarter 2: queue the DG-PR-EX-A path (18 units = 1800 RP). Owed 1800 -
-    // pool 150 - free 150 = 1500 RP = 125 credits at 12 RP/credit, well under
-    // the 1000-credit share: the line pays the bill, not the share.
+    // Quarter 2: queue the DG-PR-EX-A path (15 units = 1500 RP since the BL-1712
+    // trim: T1, A1, A). Owed 1500 - pool 150 - free 150 = 1200 RP = 100 credits at
+    // 12 RP/credit, well under the 1000-credit share: the line pays the bill, not the share.
     enqueue_node(f.w, f.nation, node("DG-PR-EX-A"));
     rows.clear();
     advance_research(f.w, p, &rows);
@@ -636,12 +643,12 @@ void rows_r1()
     std::printf("     quarter 2: share %.1f  owed %lld milli  spend %.3f  RP %lld milli  completed %d\n",
                 a->line_share, static_cast<long long>(a->owed_milli), a->line_spend,
                 static_cast<long long>(a->rp_milli), a->completed);
-    check(std::fabs(a->line_spend - 125.0f) < 1e-3f
-              && std::fabs(f.w.nations.at(f.nation).treasury - 29875.0f) < 1e-2f,
-          "R1e the line pays min(share, what the queue owes): 125 of a 1000 share");
-    check(a->completed == 5 && f.w.nation_tech.at(f.nation).pool_milli == 0
+    check(std::fabs(a->line_spend - 100.0f) < 1e-3f
+              && std::fabs(f.w.nations.at(f.nation).treasury - 29900.0f) < 1e-2f,
+          "R1e the line pays min(share, what the queue owes): 100 of a 1000 share");
+    check(a->completed == 3 && f.w.nation_tech.at(f.nation).pool_milli == 0
               && f.w.nation_tech.at(f.nation).held.test(static_cast<std::size_t>(node("DG-PR-EX-A"))),
-          "R1f ...exactly enough: the five-node path completes with nothing left over");
+          "R1f ...exactly enough: the three-node path completes with nothing left over");
 
     // A long queue on a poor nation: the share caps the spend.
     {
@@ -718,13 +725,13 @@ void rows_r2()
         const auto& q = f.w.nation_tech[f.nation].queue;
         std::printf("     queue after enqueue(DG-PR-EX-A): %s\n", queue_ids(q).c_str());
         check(r == enqueue_result::queued && queue_ids(q) ==
-                  "DG-PR-EX-T1 DG-PR-EX-T2 DG-PR-EX-A1 DG-PR-EX-A2 DG-PR-EX-A",
+                  "DG-PR-EX-T1 DG-PR-EX-A1 DG-PR-EX-A",
               "R2a requirements queue ahead, every AND group, in order");
         check(enqueue_node(f.w, f.nation, node("DG-PR-EX-A")) == enqueue_result::already_queued
-                  && q.size() == 5,
+                  && q.size() == 3,
               "R2b re-queuing a queued node changes nothing");
         check(enqueue_node(f.w, f.nation, node("DG-PR-EX-T3")) == enqueue_result::queued
-                  && q.size() == 6 && io::dg::nodes[q.back()].id == std::string("DG-PR-EX-T3"),
+                  && q.size() == 4 && io::dg::nodes[q.back()].id == std::string("DG-PR-EX-T3"),
               "R2c a requirement already queued is not queued twice");
         check(enqueue_node(f.w, null_entity, node("DG-PR-EX-A")) == enqueue_result::invalid
                   && enqueue_node(f.w, f.nation, io::dg::node_count) == enqueue_result::invalid,
@@ -759,16 +766,21 @@ void rows_r2()
 
     {
         fixture f = make_fixture();
-        enqueue_node(f.w, f.nation, node("DG-PR-EX-A1")); // T1 T2 A1
+        // BL-1712: Travel II is merged into I, so the queue is T1, A1, then a third
+        // entry for the remainder to wait on.
+        enqueue_node(f.w, f.nation, node("DG-PR-EX-A1")); // T1 A1
+        enqueue_node(f.w, f.nation, node("DG-NE-FR-T1"));
         nation_tech_state& st = f.w.nation_tech[f.nation];
-        st.pool_milli = milli(100.0 + 100.0 + 50.0); // T1 and T2, and 50 over
+        const std::int64_t fr = node_cost_milli(node("DG-NE-FR-T1"), p);
+        st.pool_milli = node_cost_milli(node("DG-PR-EX-T1"), p) + node_cost_milli(node("DG-PR-EX-A1"), p)
+                      + milli(50.0); // T1 and A1, and 50 over
         const int done = flow_research_queue(f.w, f.nation, p);
         check(done == 2 && st.held.test(static_cast<std::size_t>(node("DG-PR-EX-T1")))
-                  && st.held.test(static_cast<std::size_t>(node("DG-PR-EX-T2"))),
+                  && st.held.test(static_cast<std::size_t>(node("DG-PR-EX-A1"))),
               "R2k RP flow to the head; each node completes when its cost is met");
-        check(st.pool_milli == milli(50.0) && st.queue.size() == 1,
-              "R2l the remainder stays with the next entry (A1 at 200 waits with 50)");
-        st.pool_milli += milli(150.0);
+        check(st.pool_milli == milli(50.0) && st.queue.size() == 1 && fr > milli(50.0),
+              "R2l the remainder stays with the next entry (Route Planning I waits with 50)");
+        st.pool_milli += fr - milli(50.0);
         check(flow_research_queue(f.w, f.nation, p) == 1 && st.pool_milli == 0 && st.queue.empty(),
               "R2m ...and completes it once the remainder plus new RP cover its cost");
         // Small increments are not lost: 10,000 thousandths make ten RP exactly.
@@ -784,14 +796,13 @@ void rows_r2()
         enqueue_node(f.w, f.nation, node("DG-PR-EX-T3"));
         nation_tech_state& st = f.w.nation_tech[f.nation];
         std::int64_t path = 0;
-        for (const char* id : {"DG-PR-EX-T1", "DG-PR-EX-T2", "DG-PR-EX-A1", "DG-PR-EX-A2",
-                               "DG-PR-EX-A", "DG-PR-EX-T3"})
+        for (const char* id : {"DG-PR-EX-T1", "DG-PR-EX-A1", "DG-PR-EX-A", "DG-PR-EX-T3"})
             path += node_cost_milli(node(id), p);
         st.pool_milli = path + node_cost_milli(q, p);
         check(!deed_met(f.w, f.nation, q) && io::dg::nodes[static_cast<std::size_t>(q)].deed_waits_on[0] != '\0',
               "R2o a deed declared unread reads unmet");
         const int done = flow_research_queue(f.w, f.nation, p);
-        check(done == 6 && st.held.test(static_cast<std::size_t>(node("DG-PR-EX-T3")))
+        check(done == 4 && st.held.test(static_cast<std::size_t>(node("DG-PR-EX-T3")))
                   && !st.held.test(static_cast<std::size_t>(q)),
               "R2p the deed-unmet quest is passed over: RP flow past it to T3");
         check(st.queue.size() == 1 && st.queue[0] == q && st.pool_milli == node_cost_milli(q, p),
@@ -1323,13 +1334,13 @@ void rows_t2(const recipe_registry& reg)
         site.workforce_assigned = 0.5f;
         const float before_a = extraction_nominal(f.w, reg, site, 1.0f, f.corp);
         const float before_b = extraction_nominal(f.w, reg, site, 1.0f, f.corp2);
-        f.w.nation_tech[f.nation].held.set(static_cast<std::size_t>(node("DG-PR-EX-A2"))); // Oil Platforms +5%
+        f.w.nation_tech[f.nation].held.set(static_cast<std::size_t>(node("DG-PR-EX-A"))); // Oil Platforms +25% (BL-1712: Drill-Bit Metallurgy merged in)
         const float after_a = extraction_nominal(f.w, reg, site, 1.0f, f.corp);
         const float after_b = extraction_nominal(f.w, reg, site, 1.0f, f.corp2);
         std::printf("     petroleum site: holder %.4f -> %.4f, other nation %.4f -> %.4f\n",
                     before_a, after_a, before_b, after_b);
-        check(before_a > 0.0f && after_a == before_a * 1.05f && after_b == before_b,
-              "T2c Drill-Bit Metallurgy: an Oil Platform of the holder's corp draws x1.05; the other nation's draws the same");
+        check(before_a > 0.0f && after_a == before_a * 1.25f && after_b == before_b,
+              "T2c Offshore Drilling: an Oil Platform of the holder's corp draws x1.25; the other nation's draws the same");
         site.target_resource = resource_type::coal;
         f.w.tiles[t1].resource_deposit[static_cast<std::size_t>(resource_type::coal)] = 50.0f;
         check(extraction_nominal(f.w, reg, site, 1.0f, f.corp) == extraction_nominal(f.w, reg, site, 1.0f, f.corp2),
@@ -1345,14 +1356,14 @@ void rows_t2(const recipe_registry& reg)
         p.rp_per_university           = 100.0f;
         fixture f = make_fixture(0.0f);
         f.w.nation_tech[f.nation].held.set(static_cast<std::size_t>(node("DG-NE-SO-A")));  // national research +15%
-        f.w.nation_tech[f.other].held.set(static_cast<std::size_t>(node("DG-NE-SO-T1"))); // +1%, to show the sum is per nation
+        f.w.nation_tech[f.other].held.set(static_cast<std::size_t>(node("DG-NE-SO-T1"))); // +2%, to show the sum is per nation
         std::vector<research_accrual> rows;
         advance_research(f.w, p, &rows);
         const research_accrual* a = row_for(rows, f.nation);
         const research_accrual* b = row_for(rows, f.other);
         check(a && b && a->multiplier == 1.15f && a->rp_milli == milli(115.0)
-                  && b->multiplier == 1.01f && b->rp_milli == milli(101.0),
-              "T2e national research: Mainframe Computing +15% scales the holder's RP x1.15; the other nation's own +1% only");
+                  && b->multiplier == 1.02f && b->rp_milli == milli(102.0),
+              "T2e national research: Mainframe Computing +15% scales the holder's RP x1.15; the other nation's own +2% only");
 
         fixture g = make_fixture(0.0f);
         const entity_id home = add_tile(g.w, g.body, g.nation);
@@ -1360,18 +1371,18 @@ void rows_t2(const recipe_registry& reg)
         add_building(g.w, g.corp, home, building_type::university, 0, false);
         add_building(g.w, g.corp2, away, building_type::university, 0, false);
         g.w.nation_tech[g.nation].held.set(static_cast<std::size_t>(node("DG-NE-SO-A2"))); // universities +20%
-        g.w.nation_tech[g.nation].held.set(static_cast<std::size_t>(node("DG-NE-SO-T1"))); // +1%, must not double into the University term
+        g.w.nation_tech[g.nation].held.set(static_cast<std::size_t>(node("DG-NE-SO-T1"))); // +2%, must not double into the University term
         rows.clear();
         advance_research(g.w, p, &rows);
         a = row_for(rows, g.nation);
         b = row_for(rows, g.other);
         std::printf("     University term: holder %lld milli, other %lld milli\n",
                     static_cast<long long>(a ? a->rp_milli : -1), static_cast<long long>(b ? b->rp_milli : -1));
-        check(a && b && a->rp_milli == milli((100.0 + 120.0) * 1.01) && b->rp_milli == milli(200.0),
-              "T2f Universities +20%: the holder's University term x1.2 inside its x1.01 total; the other nation's x1");
+        check(a && b && a->rp_milli == milli((100.0 + 120.0) * 1.02) && b->rp_milli == milli(200.0),
+              "T2f Universities +20%: the holder's University term x1.2 inside its x1.02 total; the other nation's x1");
     }
 
-    // (d) Farms are the Farm (BL-1274 review #5): Hybrid Seed moves a Farm's
+    // (d) Farms are the Farm (BL-1274 review #5): Green Revolution moves a Farm's
     // draw, not a Fishing Wharf's, though both draw produce.
     {
         fixture f = make_fixture();
@@ -1383,11 +1394,11 @@ void rows_t2(const recipe_registry& reg)
         farm.target_resource    = resource_type::agricultural_produce;
         farm.workforce_assigned = 0.5f;
         const float before = extraction_nominal(f.w, reg, farm, 1.0f, f.corp);
-        f.w.nation_tech[f.nation].held.set(static_cast<std::size_t>(node("DG-PR-EX-C1"))); // Farms +5%
+        f.w.nation_tech[f.nation].held.set(static_cast<std::size_t>(node("DG-PR-EX-C"))); // Farms +25% (BL-1712: Hybrid Seed merged in)
         const float after = extraction_nominal(f.w, reg, farm, 1.0f, f.corp);
-        check(before > 0.0f && after == before * 1.05f
+        check(before > 0.0f && after == before * 1.25f
                   && extraction_nominal(f.w, reg, farm, 1.0f, f.corp2) == before,
-              "T2g Hybrid Seed: a Farm (produce from a deposit) of the holder's corp draws x1.05; the other nation's the same");
+              "T2g Green Revolution: a Farm (produce from a deposit) of the holder's corp draws x1.25; the other nation's the same");
         effect_target wharf;
         wharf.resource = static_cast<int>(resource_type::agricultural_produce);
         wharf.site     = extraction_site_name(resource_type::agricultural_produce, /*depositless=*/true);
@@ -1823,7 +1834,7 @@ bool rows_t2_live(std::uint32_t seed, bool overland_rows)
     const float held_cost = reprice(overland).cost;
     std::printf("     overland leg: base %.4f  holder %.4f  (node held elsewhere: %.4f)\n",
                 overland.leg.cost, held_cost, other_cost);
-    check(held_cost == overland.leg.cost * 0.99f, "T2p Freight Practice I: the holder's corp prices an overland leg x0.99");
+    check(held_cost == overland.leg.cost * 0.98f, "T2p Route Planning I (-2% since the BL-1712 trim): the holder's corp prices an overland leg x0.98");
     check(other_cost == overland.leg.cost, "T2q ...and the node held by another nation moves the leg nothing");
     }
 
@@ -1854,7 +1865,7 @@ bool rows_t2_live(std::uint32_t seed, bool overland_rows)
     w.nation_tech[ported.corp].held.set(static_cast<std::size_t>(fr));
     const float p_after = reprice(ported).cost;
     const double handling = static_cast<double>(reg.port_handling()) * 2.0 * qty; // two ports
-    const double expect   = (static_cast<double>(ported.leg.cost) - handling) * 0.99 + handling;
+    const double expect   = (static_cast<double>(ported.leg.cost) - handling) * 0.98 + handling;
     std::printf("     ported leg: base %.4f  holder %.4f  expected haul-only %.4f (handling %.4f)\n",
                 ported.leg.cost, p_after, expect, handling);
     check(std::fabs(static_cast<double>(p_after) - expect) <= 1e-4 * std::max(1.0, expect),

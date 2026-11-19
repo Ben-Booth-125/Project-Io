@@ -1280,8 +1280,10 @@ int main()
             const entity_id a = nids[0];
             const entity_id b = nids[1];
             nation_tech_state& sa = m.nation_tech[a];
-            sa.held.set(static_cast<std::size_t>(io::dg::find_node("DG-PR-EX-T1")));
-            sa.held.set(static_cast<std::size_t>(io::dg::find_node("DG-PR-EX-T2")));
+            // BL-1712: the trim left the Extraction major three nodes from the root
+            // (T1, A1, A), so A holds two Energy nodes and queues that whole path.
+            sa.held.set(static_cast<std::size_t>(io::dg::find_node("DG-PR-EN-T1")));
+            sa.held.set(static_cast<std::size_t>(io::dg::find_node("DG-PR-EN-A1")));
             sa.pool_milli = 137250;
             enqueue_node(m, a, io::dg::find_node("DG-PR-EX-A"));
             enqueue_node(m, b, io::dg::find_node("DG-ST-AC-C"));
@@ -1301,7 +1303,7 @@ int main()
             check(same, "P5 held set, pool and queue survive the load exactly, per nation");
             check(ok && !back.nation_tech.at(b).queue.empty()
                       && back.nation_tech.at(a).queue.size() == 3,
-                  "P5 the queues are not vacuous (A1, A2, then the major; B's path)");
+                  "P5 the queues are not vacuous (T1, A1, then the major; B's path)");
             std::printf("     nation %u: held %zu, pool %lld milli-RP, queue %zu | nation %u: queue %zu\n",
                         (unsigned)a, m.nation_tech.at(a).held.count(), static_cast<long long>(m.nation_tech.at(a).pool_milli),
                         m.nation_tech.at(a).queue.size(), (unsigned)b,
@@ -2318,7 +2320,8 @@ int main()
         // and v88 is read as its strict prefix; every PG size below adds that section.
         // The space merge: today is v93 (every space section after the missiles); v89 is read
         // as its prefix less the space sections.
-        static_assert(world_save_version == k_world_save_version_launch_boost && k_world_save_version_launch_boost == 96 // BL-1637: the pad-boost tail
+        static_assert(world_save_version == k_world_save_version_tree_trim && k_world_save_version_tree_trim == 97 // BL-1712: the trimmed tree, v96's layout
+                          && k_world_save_version_launch_boost == 96 // BL-1637: the pad-boost tail
                           && k_world_save_version_monthly == 95
                           && k_world_save_version_one_product == 94
                           && k_world_save_version_space_merge == 93 && k_world_save_version_stacked == 88
@@ -2415,13 +2418,13 @@ int main()
 
         // The space merge gave v84..v87 and v90..v92 the space line's layouts, so no version
         // in 81..93 is unclaimed any more; a stream stamped past today is refused.
-        for (const uint32_t v : {97u, 98u}) // BL-1637: v96 is today (the pad's boost)
+        for (const uint32_t v : {98u, 99u}) // BL-1712: v97 is today (the tree trim)
         {
             std::string other = b88;
             std::memcpy(&other[4], &v, sizeof v);
             world sentinel;
             check(!from_bytes(other, sentinel) && sentinel.tiles.empty(),
-                  "PG a stream stamped past today (v97, v98) is REFUSED");
+                  "PG a stream stamped past today (v98, v99) is REFUSED");
         }
     }
 
@@ -2434,7 +2437,7 @@ int main()
     {
         // BL-1641: v94 (one building per product) adds no section, nor does v95 (BL-1642, the
         // monthly tick), so today's stream is v93's layout.
-        static_assert(world_save_version == 96 /* BL-1637: v96 appends the pad-boost tail */ && k_world_save_version_space_merge == 93
+        static_assert(world_save_version == 97 /* BL-1712: v97 is v96's layout (the pad-boost tail), the trimmed tree */ && k_world_save_version_space_merge == 93
                           && k_world_save_version_pre_space_merge == 89,
                       "PH pins v93 as the space merge over main's v89");
         static_assert(world_stream_is_space_line(84) && world_stream_is_space_line(87)

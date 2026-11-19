@@ -56,8 +56,11 @@ names a branch of this age that a Digitisation quest keys; it holds no node, so 
 opens nothing. The store lists them (`reserved_branches`), and the check holds the authored and
 reserved branches together to exactly the Digitisation tree's `keys_next_branch` names.
 
-**Every branch is the seventeen-node spine** (`DIGITISATION_TREE.md` § One branch, node by node).
-Space Force carries one kit cluster on its left arm, *Orbital Bombardment*, so its arm runs
+**Every branch is the seventeen-node spine**: Travel I → Travel II → the first cluster's two minors
+→ its major → two arms, Travel III and Travel V → Travel IV and Travel VI → each arm's two minors →
+each arm's major → the mastery. This is the spine `../RESEARCH.md`'s grammar had before the
+Digitisation trim (Ben, 2026-11-19: three travel nodes a branch, a cluster of one minor or two);
+whether this tree takes the same cut is BL-1713 (Early Space trim). Space Force carries one kit cluster on its left arm, *Orbital Bombardment*, so its arm runs
 Travel III → the cluster → Travel IV → the battery: 20 nodes. No node requires a node of another
 branch. The tree has no joints, pairs or placeholders.
 

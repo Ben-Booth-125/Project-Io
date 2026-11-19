@@ -1427,6 +1427,19 @@ bool save_world_predates_monthly_tick(std::istream& in)
     return read && magic == world_save_magic && version < k_world_save_version_monthly;
 }
 
+/// BL-1712: does the world stream at @p in's position predate the trimmed tech tree
+/// (world v97)? Its research names the untrimmed store's node indices. Puts the
+/// position back, as above.
+bool save_world_predates_tree_trim(std::istream& in)
+{
+    const std::streampos at = in.tellg();
+    uint32_t magic = 0, version = 0;
+    const bool read = r_u32(in, magic) && r_u32(in, version);
+    in.clear();
+    in.seekg(at);
+    return read && magic == world_save_magic && version < k_world_save_version_tree_trim;
+}
+
 } // namespace
 
 std::string save_game_refusal_reason(const std::string& path)
@@ -1441,6 +1454,9 @@ std::string save_game_refusal_reason(const std::string& path)
     if (save_world_predates_monthly_tick(in))
         return "this save is from before the monthly tick (a turn is now a month, not a "
                "quarter) and cannot be opened; start a new game";
+    if (save_world_predates_tree_trim(in))
+        return "this save is from before the tech tree was trimmed (its research names "
+               "nodes that moved or no longer exist) and cannot be opened; start a new game";
     return {};
 }
 
@@ -1488,6 +1504,16 @@ bool read_save_game(const std::string& path, world& w, save_envelope& env,
                                  "before the monthly tick (v%u) cannot be loaded\n",
                          path.c_str(), static_cast<unsigned>(world_version),
                          static_cast<unsigned>(k_world_save_version_monthly));
+            return false;
+        }
+        // BL-1712: a stream before the trimmed tree names research by the old node
+        // indices; refused whole, as above.
+        if (world_version < k_world_save_version_tree_trim)
+        {
+            std::fprintf(stderr, "[save] %s: saved under the untrimmed tech tree (world v%u); a "
+                                 "save from before the trim (v%u) cannot be loaded\n",
+                         path.c_str(), static_cast<unsigned>(world_version),
+                         static_cast<unsigned>(k_world_save_version_tree_trim));
             return false;
         }
         in.seekg(at);

@@ -74,12 +74,12 @@ constexpr kit_item k_items[] = {
     // --- Infantry: Weapon (0) · Armour (1) ---------------------------------
     base ("inf.weapon.battle_rifle",          "Battle rifle",                      lc::infantry, 0),
     later("inf.weapon.assault_rifle",         "Assault rifle",                     lc::infantry, 0, {10, 0, 0, 0, 0}, "DG-ST-FO-D1", SA(2)),
-    later("inf.weapon.light_mortar",          "Light mortar",                      lc::infantry, 0, {20, 0, 0, 0, 0}, "DG-ST-FO-E1", SA(2), AP(1)),
+    later("inf.weapon.light_mortar",          "Light mortar",                      lc::infantry, 0, {20, 0, 0, 0, 0}, "DG-ST-FO-G1", SA(2), AP(1)),
     later("inf.weapon.wire_guided_atgm",      "Wire-guided anti-tank missile",     lc::infantry, 0, {0, 25, 0, 0, 0}, "DG-ST-FO-D", SA(1), GW(2)),
     later("inf.weapon.fire_and_forget_atgm",  "Fire-and-forget anti-tank missile", lc::infantry, 0, {0, 40, 0, 0, 0}, "DG-ST-FO-E", SA(1), GW(3), E(1)),
     base ("inf.armour.steel_helmet",          "Steel helmet",                      lc::infantry, 1),
-    later("inf.armour.flak_vest",             "Flak vest",                         lc::infantry, 1, {0, 0, 0, 10, 0, 0, 5}, "DG-ST-FO-D2", SA(1)),
-    later("inf.armour.ceramic_plates",        "Ceramic plate carrier",             lc::infantry, 1, {0, 0, 0, 20, 0, 0, 10}, "DG-PR-PC-D2", SA(2), E(1)),
+    later("inf.armour.flak_vest",             "Flak vest",                         lc::infantry, 1, {0, 0, 0, 10, 0, 0, 5}, "DG-ST-FO-D1", SA(1)),
+    later("inf.armour.ceramic_plates",        "Ceramic plate carrier",             lc::infantry, 1, {0, 0, 0, 20, 0, 0, 10}, "DG-PR-PC-D1", SA(2), E(1)),
     later("inf.armour.networked_kit",         "Networked soldier kit",             lc::infantry, 1, {10, 0, 0, 15, 10, 10, 15}, "DG-NE-SO-G", SA(2), E(3)),
 
     // --- Motorised infantry: Weapon (0) · Armour (1) · Vehicle (2) ---------
@@ -87,8 +87,8 @@ constexpr kit_item k_items[] = {
     later("mot.weapon.assault_rifle",         "Assault rifle",                     lc::motorised, 0, {10, 0, 0, 0, 0}, "DG-ST-FO-D1", SA(2)),
     later("mot.weapon.wire_guided_atgm",      "Wire-guided anti-tank missile",     lc::motorised, 0, {0, 25, 0, 0, 0}, "DG-ST-FO-D", SA(1), GW(2)),
     base ("mot.armour.steel_helmet",          "Steel helmet",                      lc::motorised, 1),
-    later("mot.armour.flak_vest",             "Flak vest",                         lc::motorised, 1, {0, 0, 0, 10, 0, 0, 5}, "DG-ST-FO-D2", SA(1)),
-    later("mot.armour.ceramic_plates",        "Ceramic plate carrier",             lc::motorised, 1, {0, 0, 0, 20, 0, 0, 10}, "DG-PR-PC-D2", SA(2), E(1)),
+    later("mot.armour.flak_vest",             "Flak vest",                         lc::motorised, 1, {0, 0, 0, 10, 0, 0, 5}, "DG-ST-FO-D1", SA(1)),
+    later("mot.armour.ceramic_plates",        "Ceramic plate carrier",             lc::motorised, 1, {0, 0, 0, 20, 0, 0, 10}, "DG-PR-PC-D1", SA(2), E(1)),
     base ("mot.vehicle.trucks",               "Trucks",                            lc::motorised, 2),
     later("mot.vehicle.protected_trucks",     "Protected trucks",                  lc::motorised, 2, {0, 0, 150, 10, 0}, "DG-ST-FO-A1", AV(1)),
     later("mot.vehicle.wheeled_carriers",     "Wheeled carriers",                  lc::motorised, 2, {0, 0, 250, 0, 15}, "DG-ST-FO-H1", AV(2), E(1)),
@@ -98,8 +98,8 @@ constexpr kit_item k_items[] = {
     later("mech.weapon.assault_rifle",        "Assault rifle",                     lc::mechanised, 0, {10, 0, 0, 0, 0}, "DG-ST-FO-D1", SA(2)),
     later("mech.weapon.fire_and_forget_atgm", "Fire-and-forget anti-tank missile", lc::mechanised, 0, {0, 40, 0, 0, 0}, "DG-ST-FO-E", SA(1), GW(3), E(1)),
     base ("mech.armour.steel_helmet",         "Steel helmet",                      lc::mechanised, 1),
-    later("mech.armour.flak_vest",            "Flak vest",                         lc::mechanised, 1, {0, 0, 0, 10, 0, 0, 5}, "DG-ST-FO-D2", SA(1)),
-    later("mech.armour.ceramic_plates",       "Ceramic plate carrier",             lc::mechanised, 1, {0, 0, 0, 20, 0, 0, 10}, "DG-PR-PC-D2", SA(2), E(1)),
+    later("mech.armour.flak_vest",            "Flak vest",                         lc::mechanised, 1, {0, 0, 0, 10, 0, 0, 5}, "DG-ST-FO-D1", SA(1)),
+    later("mech.armour.ceramic_plates",       "Ceramic plate carrier",             lc::mechanised, 1, {0, 0, 0, 20, 0, 0, 10}, "DG-PR-PC-D1", SA(2), E(1)),
     base ("mech.vehicle.apc",                 "Armoured personnel carrier",        lc::mechanised, 2),
     later("mech.vehicle.ifv_autocannon",      "Infantry fighting vehicle (autocannon)", lc::mechanised, 2, {20, 15, 0, 0, 0}, "DG-ST-FO-A", AV(2)),
     later("mech.vehicle.ifv_missiles",        "Fighting vehicle with missiles",    lc::mechanised, 2, {20, 30, 0, 0, 0}, "DG-ST-FO-E", AV(3), GW(1), E(1)),
@@ -139,20 +139,20 @@ constexpr kit_item k_items[] = {
     base ("art.munitions.he_shells",          "High-explosive shells",             lc::artillery, 1),
     // BL-1643: guided shells ARE the precision shells of the ruling: more of each strike lands.
     art(later("art.munitions.guided_shells",  "Precision guided shells",           lc::artillery, 1, {20, 20, 0, 0, 0}, "DG-ST-FO-B2", GW(1)), 0, k_art_precision),
-    later("art.munitions.submunitions",       "Anti-armour submunitions",          lc::artillery, 1, {0, 40, 0, 0, 0}, "DG-ST-FO-F2", GW(2), E(1)),
+    later("art.munitions.submunitions",       "Anti-armour submunitions",          lc::artillery, 1, {0, 40, 0, 0, 0}, "DG-ST-FO-F", GW(2), E(1)),
     later("art.munitions.loitering_drones",   "Loitering drones",                  lc::artillery, 1, {20, 40, 0, 0, 0, 25, 0}, "DG-NE-SO-F", DR(3), E(2)),
     base ("art.tow.gun_tractor",              "Gun tractor",                       lc::artillery, 2),
     // BL-1643: a self-propelled chassis IS the self-propelled gun of the ruling: the battery
     // marches as fast as the force it supports.
     art(later("art.tow.self_propelled",       "Self-propelled chassis",            lc::artillery, 2, {0, 0, 300, 0, 15}, "DG-ST-FO-G2", AV(2)), 0, k_art_keeps_pace),
-    art(later("art.tow.armoured_sp",          "Armoured self-propelled chassis",   lc::artillery, 2, {0, 0, 400, 10, 15}, "DG-ST-FO-H2", AV(3), E(1)), 0, k_art_keeps_pace),
+    art(later("art.tow.armoured_sp",          "Armoured self-propelled chassis",   lc::artillery, 2, {0, 0, 400, 10, 15}, "DG-ST-FO-H", AV(3), E(1)), 0, k_art_keeps_pace),
 
     // --- Air defence: Launcher (0) · Fire control (1) · Vehicle (2) --------
     // Its kit is mostly for the air theatre (BL-1429); the ground effects stay small.
     base ("ad.launcher.radar_guns",           "Radar-directed guns",               lc::air_defence, 0),
     later("ad.launcher.short_range",          "Short-range missiles",              lc::air_defence, 0, {0, 5, 0, 0, 0}, "DG-ST-FO-E2", GW(2)),
     later("ad.launcher.medium_range",         "Medium-range missiles",             lc::air_defence, 0, {0, 10, 0, 0, 0}, "DG-ST-FO-F1", GW(3), E(1)),
-    later("ad.launcher.layered",              "Layered defence with counter-drone", lc::air_defence, 0, {5, 10, 0, 0, 0}, "DG-NE-SO-F2", GW(3), DR(1), E(2)),
+    later("ad.launcher.layered",              "Layered defence with counter-drone", lc::air_defence, 0, {5, 10, 0, 0, 0}, "DG-NE-SO-F", GW(3), DR(1), E(2)),
     base ("ad.fire_control.optical",          "Optical",                           lc::air_defence, 1),
     later("ad.fire_control.search_radar",     "Search radar",                      lc::air_defence, 1, {0, 0, 0, 5, 0, 5, 0}, "DG-ST-FO-A2", E(2)),
     later("ad.fire_control.integrated",       "Integrated network",                lc::air_defence, 1, {0, 0, 0, 10, 0, 10, 0}, "DG-NE-SO-E", E(3)),
@@ -175,7 +175,7 @@ constexpr kit_item k_items[] = {
     // RADAR, the gun slot's fourth later item. APPENDED, as the drones above. A howitzer
     // laid by a radar that tracks the shells fired at it: the long barrel's reach, and the
     // battery answers hostile artillery in range before anything else.
-    art(later("art.gun.radar_laid",           "Radar-laid howitzer (counter-battery radar)", lc::artillery, 0, {20, 0, 0, 0, 0, 5, 0}, "DG-ST-FO-G3", AP(2), E(2)), 1, k_art_counter_battery),
+    art(later("art.gun.radar_laid",           "Radar-laid howitzer (counter-battery radar)", lc::artillery, 0, {20, 0, 0, 0, 0, 5, 0}, "DG-ST-FO-B2", AP(2), E(2)), 1, k_art_counter_battery),
 };
 
 constexpr std::size_t k_item_count = sizeof(k_items) / sizeof(k_items[0]);
@@ -654,7 +654,7 @@ constexpr air_kit_item k_air_items[] = {
     // --- Attack helicopter ----------------------------------------------------
     abase ("hel.airframe.utility_gunship", "Utility gunship",                      ac::helicopter, 0),
     alater("hel.airframe.attack",          "Dedicated attack helicopter",          ac::helicopter, 0, {15, 0, 0, 20, 0, 0, 1}, "DG-ST-FO-B", AF(1)),
-    alater("hel.airframe.armoured",        "Armoured tandem-seat helicopter",      ac::helicopter, 0, {25, 0, 0, 30, 0, 0, 1}, "DG-PR-PC-E2", AF(2)),
+    alater("hel.airframe.armoured",        "Armoured tandem-seat helicopter",      ac::helicopter, 0, {25, 0, 0, 30, 0, 0, 1}, "DG-PR-PC-E1", AF(2)),
     abase ("hel.armament.rockets",         "Rockets and door guns",                ac::helicopter, 1),
     alater("hel.armament.wire_guided",     "Wire-guided anti-tank missiles",       ac::helicopter, 1, {0, 0, 0, 40, 0, 0, 0}, "DG-ST-FO-D", GW(2)),
     alater("hel.armament.fire_and_forget", "Fire-and-forget anti-tank missiles",   ac::helicopter, 1, {0, 0, 10, 70, 0, 0, 0}, "DG-ST-FO-E", GW(3), EL(1)),
@@ -665,13 +665,13 @@ constexpr air_kit_item k_air_items[] = {
     // --- Strike drone ---------------------------------------------------------
     abase ("drn.airframe.target_drone",    "Converted target drone",               ac::drone, 0),
     alater("drn.airframe.long_endurance",  "Medium-altitude long-endurance drone", ac::drone, 0, {15, 0, 0, 0, 0, 0, 4}, "DG-NE-SO-D2", DR(2), EL(1)),
-    alater("drn.airframe.jet_combat",      "Jet-powered combat drone",             ac::drone, 0, {20, 0, 0, 0, 0, 0, 6}, "DG-NE-SO-E2", DR(3), EL(2)),
+    alater("drn.airframe.jet_combat",      "Jet-powered combat drone",             ac::drone, 0, {20, 0, 0, 0, 0, 0, 6}, "DG-NE-SO-E", DR(3), EL(2)),
     abase ("drn.armament.light_rockets",   "Light guided rockets",                 ac::drone, 1),
     alater("drn.armament.guided_missiles", "Guided missiles",                      ac::drone, 1, {0, 0, 20, 25, 0, 0, 0}, "DG-ST-FO-B2", GW(2)),
     alater("drn.armament.loitering",       "Loitering munitions",                  ac::drone, 1, {0, 0, 30, 40, 0, 0, 0}, "DG-NE-SO-F", DR(2), EL(1)),
     abase ("drn.avionics.line_of_sight",   "Line-of-sight datalink",               ac::drone, 2),
     alater("drn.avionics.satellite_link",  "Satellite datalink",                   ac::drone, 2, {0, 0, 0, 0, 0, 50, 6}, "DG-NE-SO-D2", EL(2)),
-    alater("drn.avionics.autonomous",      "Autonomous targeting",                 ac::drone, 2, {0, 0, 10, 10, 0, 50, 0}, "DG-NE-SO-G1", EL(3)),
+    alater("drn.avionics.autonomous",      "Autonomous targeting",                 ac::drone, 2, {0, 0, 10, 10, 0, 50, 0}, "DG-NE-SO-G", EL(3)),
 
     // --- Recon / AWACS --------------------------------------------------------
     abase ("rcn.airframe.recon_jet",       "Reconnaissance jet",                   ac::recon, 0),
@@ -940,13 +940,13 @@ constexpr ship_kit_item slater(const char* id, const char* name, sc c, uint8_t s
 constexpr ship_kit_item k_ship_items[] = {
     // --- Submarine: Hull (0) · Armament (1) · Sensors (2) ----------------------
     sbase ("sub.hull.diesel",          "Diesel-electric hull",            sc::submarine, 0),
-    slater("sub.hull.snorkel",         "Streamlined snorkel hull",        sc::submarine, 0, {10, 0, 0, 100, -50, 0, 0},  "DG-ST-NV-A2", SH(2)),
+    slater("sub.hull.snorkel",         "Streamlined snorkel hull",        sc::submarine, 0, {10, 0, 0, 100, -50, 0, 0},  "DG-ST-NV-A1", SH(2)),
     slater("sub.hull.reactor",         "Reactor pressure hull",           sc::submarine, 0, {20, 0, 0, 150, -200, 0, 0}, "DG-ST-NV-A",  SH(4), EL(2)),
     sbase ("sub.armament.straight",    "Straight-running torpedoes",      sc::submarine, 1),
-    slater("sub.armament.homing",      "Homing torpedoes",                sc::submarine, 1, {0, 800, 0, 0, 0, 0, 0},     "DG-ST-NV-B2", GW(1)),
+    slater("sub.armament.homing",      "Homing torpedoes",                sc::submarine, 1, {0, 800, 0, 0, 0, 0, 0},     "DG-ST-NV-B1", GW(1)),
     slater("sub.armament.hunter",      "Wire-guided hunter torpedoes",    sc::submarine, 1, {0, 1500, 0, 0, 0, 0, k_hits_submarine}, "DG-ST-NV-B", GW(3), EL(1)),
     sbase ("sub.sensors.hydrophone",   "Hydrophones",                     sc::submarine, 2),
-    slater("sub.sensors.passive",      "Passive sonar array",             sc::submarine, 2, {0, 0, 20, 0, 0, 0, 0},      "DG-ST-NV-C2", EL(1)),
+    slater("sub.sensors.passive",      "Passive sonar array",             sc::submarine, 2, {0, 0, 20, 0, 0, 0, 0},      "DG-ST-NV-C1", EL(1)),
     slater("sub.sensors.towed",        "Towed sonar array",               sc::submarine, 2, {0, 0, 60, 0, 0, 0, 0},      "DG-ST-NV-C",  EL(3)),
     // --- Destroyer ------------------------------------------------------------
     sbase ("des.hull.flush_deck",      "Flush-deck hull",                 sc::destroyer, 0),

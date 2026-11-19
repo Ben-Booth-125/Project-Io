@@ -82,10 +82,6 @@
    ]
   }
  ],
- "placeholders": {
-  "espionage": "the espionage system — not yet designed",
-  "politics": "the politics system — not yet designed"
- },
  "nodes": [
   {
    "id": "DG-PR-EX-T1",
@@ -95,38 +91,14 @@
    "tree": "PR",
    "branch": "PR-EX",
    "requires": [],
-   "advantage": "+1% extraction rate at every extraction building",
+   "advantage": "+2% extraction rate at every extraction building",
    "effects": [
     {
      "kind": "modifier",
      "subject": "extraction_rate",
      "scope": "all",
      "op": "multiply",
-     "value": 1.01
-    }
-   ],
-   "cost_units": 1
-  },
-  {
-   "id": "DG-PR-EX-T2",
-   "name": "Field Practice II",
-   "tier": "travel",
-   "ring": 1,
-   "tree": "PR",
-   "branch": "PR-EX",
-   "requires": [
-    [
-     "DG-PR-EX-T1"
-    ]
-   ],
-   "advantage": "+1% extraction rate at every extraction building",
-   "effects": [
-    {
-     "kind": "modifier",
-     "subject": "extraction_rate",
-     "scope": "all",
-     "op": "multiply",
-     "value": 1.01
+     "value": 1.02
     }
    ],
    "cost_units": 1
@@ -140,7 +112,7 @@
    "branch": "PR-EX",
    "requires": [
     [
-     "DG-PR-EX-T2"
+     "DG-PR-EX-T1"
     ]
    ],
    "advantage": "deposits in your provinces reveal 1 province further; Survey satellites may be launched",
@@ -159,30 +131,6 @@
    "cost_units": 2
   },
   {
-   "id": "DG-PR-EX-A2",
-   "name": "Drill-Bit Metallurgy",
-   "tier": "minor",
-   "ring": 1,
-   "tree": "PR",
-   "branch": "PR-EX",
-   "requires": [
-    [
-     "DG-PR-EX-T2"
-    ]
-   ],
-   "advantage": "Oil Platforms +5% extraction rate",
-   "effects": [
-    {
-     "kind": "modifier",
-     "subject": "extraction_rate",
-     "scope": "resource:petroleum",
-     "op": "multiply",
-     "value": 1.05
-    }
-   ],
-   "cost_units": 2
-  },
-  {
    "id": "DG-PR-EX-A",
    "name": "Offshore Drilling",
    "tier": "major",
@@ -192,9 +140,6 @@
    "requires": [
     [
      "DG-PR-EX-A1"
-    ],
-    [
-     "DG-PR-EX-A2"
     ]
    ],
    "advantage": "Oil Platforms may be placed on shelf sea; Oil Platforms +25% extraction rate",
@@ -216,6 +161,30 @@
   },
   {
    "id": "DG-PR-EX-T3",
+   "name": "Field Practice II",
+   "tier": "travel",
+   "ring": 2,
+   "tree": "PR",
+   "branch": "PR-EX",
+   "requires": [
+    [
+     "DG-PR-EX-A"
+    ]
+   ],
+   "advantage": "+2% extraction rate at every extraction building",
+   "effects": [
+    {
+     "kind": "modifier",
+     "subject": "extraction_rate",
+     "scope": "all",
+     "op": "multiply",
+     "value": 1.02
+    }
+   ],
+   "cost_units": 2
+  },
+  {
+   "id": "DG-PR-EX-T5",
    "name": "Field Practice III",
    "tier": "travel",
    "ring": 2,
@@ -226,120 +195,17 @@
      "DG-PR-EX-A"
     ]
    ],
-   "advantage": "+1% extraction rate at every extraction building",
+   "advantage": "+2% extraction rate at every extraction building",
    "effects": [
     {
      "kind": "modifier",
      "subject": "extraction_rate",
      "scope": "all",
      "op": "multiply",
-     "value": 1.01
+     "value": 1.02
     }
    ],
    "cost_units": 2
-  },
-  {
-   "id": "DG-PR-EX-T4",
-   "name": "Field Practice IV",
-   "tier": "travel",
-   "ring": 3,
-   "tree": "PR",
-   "branch": "PR-EX",
-   "requires": [
-    [
-     "DG-PR-EX-T3"
-    ]
-   ],
-   "advantage": "+1% extraction rate at every extraction building",
-   "effects": [
-    {
-     "kind": "modifier",
-     "subject": "extraction_rate",
-     "scope": "all",
-     "op": "multiply",
-     "value": 1.01
-    }
-   ],
-   "cost_units": 3
-  },
-  {
-   "id": "DG-PR-EX-T5",
-   "name": "Field Practice V",
-   "tier": "travel",
-   "ring": 2,
-   "tree": "PR",
-   "branch": "PR-EX",
-   "requires": [
-    [
-     "DG-PR-EX-A"
-    ]
-   ],
-   "advantage": "+1% extraction rate at every extraction building",
-   "effects": [
-    {
-     "kind": "modifier",
-     "subject": "extraction_rate",
-     "scope": "all",
-     "op": "multiply",
-     "value": 1.01
-    }
-   ],
-   "cost_units": 2
-  },
-  {
-   "id": "DG-PR-EX-T6",
-   "name": "Field Practice VI",
-   "tier": "travel",
-   "ring": 3,
-   "tree": "PR",
-   "branch": "PR-EX",
-   "requires": [
-    [
-     "DG-PR-EX-T5"
-    ]
-   ],
-   "advantage": "+1% extraction rate at every extraction building",
-   "effects": [
-    {
-     "kind": "modifier",
-     "subject": "extraction_rate",
-     "scope": "all",
-     "op": "multiply",
-     "value": 1.01
-    }
-   ],
-   "cost_units": 3
-  },
-  {
-   "id": "DG-PR-EX-B1",
-   "name": "Mine Ventilation",
-   "tier": "minor",
-   "ring": 3,
-   "tree": "PR",
-   "branch": "PR-EX",
-   "requires": [
-    [
-     "DG-PR-EX-T4"
-    ]
-   ],
-   "advantage": "Mines +5% extraction rate",
-   "effects": [
-    {
-     "kind": "modifier",
-     "subject": "extraction_rate",
-     "scope": [
-      "resource:iron_ore",
-      "resource:coal",
-      "resource:silica",
-      "resource:copper_ore",
-      "resource:rare_earth_ore",
-      "resource:peat"
-     ],
-     "op": "multiply",
-     "value": 1.05
-    }
-   ],
-   "cost_units": 6
   },
   {
    "id": "DG-PR-EX-B2",
@@ -350,7 +216,7 @@
    "branch": "PR-EX",
    "requires": [
     [
-     "DG-PR-EX-T4"
+     "DG-PR-EX-T3"
     ]
    ],
    "advantage": "Mine maintenance -10%",
@@ -371,9 +237,6 @@
    "tree": "PR",
    "branch": "PR-EX",
    "requires": [
-    [
-     "DG-PR-EX-B1"
-    ],
     [
      "DG-PR-EX-B2"
     ]
@@ -403,30 +266,6 @@
    "cost_units": 24
   },
   {
-   "id": "DG-PR-EX-C1",
-   "name": "Hybrid Seed",
-   "tier": "minor",
-   "ring": 3,
-   "tree": "PR",
-   "branch": "PR-EX",
-   "requires": [
-    [
-     "DG-PR-EX-T6"
-    ]
-   ],
-   "advantage": "Farms +5% output",
-   "effects": [
-    {
-     "kind": "modifier",
-     "subject": "extraction_rate",
-     "scope": "site:farm",
-     "op": "multiply",
-     "value": 1.05
-    }
-   ],
-   "cost_units": 6
-  },
-  {
    "id": "DG-PR-EX-C2",
    "name": "Desalination",
    "tier": "minor",
@@ -435,7 +274,7 @@
    "branch": "PR-EX",
    "requires": [
     [
-     "DG-PR-EX-T6"
+     "DG-PR-EX-T5"
     ]
    ],
    "advantage": "coastal Water extraction sites; Water extraction +10%; station Life support modules may be fitted",
@@ -468,9 +307,6 @@
    "tree": "PR",
    "branch": "PR-EX",
    "requires": [
-    [
-     "DG-PR-EX-C1"
-    ],
     [
      "DG-PR-EX-C2"
     ]
@@ -566,65 +402,17 @@
    "tree": "PR",
    "branch": "PR-PC",
    "requires": [],
-   "advantage": "+1% output per batch at every processing building",
+   "advantage": "+2% output per batch at every processing building",
    "effects": [
     {
      "kind": "modifier",
      "subject": "processing_yield",
      "scope": "all",
      "op": "multiply",
-     "value": 1.01
+     "value": 1.02
     }
    ],
    "cost_units": 1
-  },
-  {
-   "id": "DG-PR-PC-T2",
-   "name": "Shop-Floor Practice II",
-   "tier": "travel",
-   "ring": 1,
-   "tree": "PR",
-   "branch": "PR-PC",
-   "requires": [
-    [
-     "DG-PR-PC-T1"
-    ]
-   ],
-   "advantage": "+1% output per batch at every processing building",
-   "effects": [
-    {
-     "kind": "modifier",
-     "subject": "processing_yield",
-     "scope": "all",
-     "op": "multiply",
-     "value": 1.01
-    }
-   ],
-   "cost_units": 1
-  },
-  {
-   "id": "DG-PR-PC-A1",
-   "name": "Catalysts",
-   "tier": "minor",
-   "ring": 1,
-   "tree": "PR",
-   "branch": "PR-PC",
-   "requires": [
-    [
-     "DG-PR-PC-T2"
-    ]
-   ],
-   "advantage": "Propellant Plants +5% output per batch",
-   "effects": [
-    {
-     "kind": "modifier",
-     "subject": "processing_yield",
-     "scope": "group:Propellant Plant",
-     "op": "multiply",
-     "value": 1.05
-    }
-   ],
-   "cost_units": 2
   },
   {
    "id": "DG-PR-PC-A2",
@@ -635,7 +423,7 @@
    "branch": "PR-PC",
    "requires": [
     [
-     "DG-PR-PC-T2"
+     "DG-PR-PC-T1"
     ]
    ],
    "advantage": "plastics recipe inputs -10%; station Habitation modules may be fitted",
@@ -662,9 +450,6 @@
    "branch": "PR-PC",
    "requires": [
     [
-     "DG-PR-PC-A1"
-    ],
-    [
      "DG-PR-PC-A2"
     ]
    ],
@@ -687,6 +472,30 @@
   },
   {
    "id": "DG-PR-PC-T3",
+   "name": "Shop-Floor Practice II",
+   "tier": "travel",
+   "ring": 2,
+   "tree": "PR",
+   "branch": "PR-PC",
+   "requires": [
+    [
+     "DG-PR-PC-A"
+    ]
+   ],
+   "advantage": "+2% output per batch at every processing building",
+   "effects": [
+    {
+     "kind": "modifier",
+     "subject": "processing_yield",
+     "scope": "all",
+     "op": "multiply",
+     "value": 1.02
+    }
+   ],
+   "cost_units": 2
+  },
+  {
+   "id": "DG-PR-PC-T5",
    "name": "Shop-Floor Practice III",
    "tier": "travel",
    "ring": 2,
@@ -697,111 +506,17 @@
      "DG-PR-PC-A"
     ]
    ],
-   "advantage": "+1% output per batch at every processing building",
+   "advantage": "+2% output per batch at every processing building",
    "effects": [
     {
      "kind": "modifier",
      "subject": "processing_yield",
      "scope": "all",
      "op": "multiply",
-     "value": 1.01
+     "value": 1.02
     }
    ],
    "cost_units": 2
-  },
-  {
-   "id": "DG-PR-PC-T4",
-   "name": "Shop-Floor Practice IV",
-   "tier": "travel",
-   "ring": 3,
-   "tree": "PR",
-   "branch": "PR-PC",
-   "requires": [
-    [
-     "DG-PR-PC-D"
-    ]
-   ],
-   "advantage": "+1% output per batch at every processing building",
-   "effects": [
-    {
-     "kind": "modifier",
-     "subject": "processing_yield",
-     "scope": "all",
-     "op": "multiply",
-     "value": 1.01
-    }
-   ],
-   "cost_units": 3
-  },
-  {
-   "id": "DG-PR-PC-T5",
-   "name": "Shop-Floor Practice V",
-   "tier": "travel",
-   "ring": 2,
-   "tree": "PR",
-   "branch": "PR-PC",
-   "requires": [
-    [
-     "DG-PR-PC-A"
-    ]
-   ],
-   "advantage": "+1% output per batch at every processing building",
-   "effects": [
-    {
-     "kind": "modifier",
-     "subject": "processing_yield",
-     "scope": "all",
-     "op": "multiply",
-     "value": 1.01
-    }
-   ],
-   "cost_units": 2
-  },
-  {
-   "id": "DG-PR-PC-T6",
-   "name": "Shop-Floor Practice VI",
-   "tier": "travel",
-   "ring": 3,
-   "tree": "PR",
-   "branch": "PR-PC",
-   "requires": [
-    [
-     "DG-PR-PC-E"
-    ]
-   ],
-   "advantage": "+1% output per batch at every processing building",
-   "effects": [
-    {
-     "kind": "modifier",
-     "subject": "processing_yield",
-     "scope": "all",
-     "op": "multiply",
-     "value": 1.01
-    }
-   ],
-   "cost_units": 3
-  },
-  {
-   "id": "DG-PR-PC-B1",
-   "name": "Clean Rooms",
-   "tier": "minor",
-   "ring": 3,
-   "tree": "PR",
-   "branch": "PR-PC",
-   "requires": [
-    [
-     "DG-PR-PC-T4"
-    ]
-   ],
-   "advantage": "microchip recipe +10% yield",
-   "effects": [
-    {
-     "kind": "unread",
-     "what": "microchip recipe +10% yield",
-     "waits_on": "microchip recipe"
-    }
-   ],
-   "cost_units": 6
   },
   {
    "id": "DG-PR-PC-B2",
@@ -812,7 +527,7 @@
    "branch": "PR-PC",
    "requires": [
     [
-     "DG-PR-PC-T4"
+     "DG-PR-PC-D"
     ]
    ],
    "advantage": "Silicon Works +5%, Rare Earth Refineries +5% and Electronics Labs +5% output per batch; station Power modules may be fitted",
@@ -854,9 +569,6 @@
    "tree": "PR",
    "branch": "PR-PC",
    "requires": [
-    [
-     "DG-PR-PC-B1"
-    ],
     [
      "DG-PR-PC-B2"
     ]
@@ -901,7 +613,7 @@
    "branch": "PR-PC",
    "requires": [
     [
-     "DG-PR-PC-T6"
+     "DG-PR-PC-E"
     ]
    ],
    "advantage": "Machine Works +5%, Alloy Works +5%, Ordnance Works +5% and Spacecraft Assembly Plants +5% output per batch; opens lightweight composite tracks (armour); station grids may be upgraded to 7 x 5",
@@ -949,28 +661,6 @@
    "cost_units": 6
   },
   {
-   "id": "DG-PR-PC-C2",
-   "name": "Process Automation",
-   "tier": "minor",
-   "ring": 3,
-   "tree": "PR",
-   "branch": "PR-PC",
-   "requires": [
-    [
-     "DG-PR-PC-T6"
-    ]
-   ],
-   "advantage": "wages in processing buildings -5%",
-   "effects": [
-    {
-     "kind": "unread",
-     "what": "wages in processing buildings -5%",
-     "waits_on": "wage_floor"
-    }
-   ],
-   "cost_units": 6
-  },
-  {
    "id": "DG-PR-PC-C",
    "name": "Industrial Robotics",
    "tier": "major",
@@ -980,9 +670,6 @@
    "requires": [
     [
      "DG-PR-PC-C1"
-    ],
-    [
-     "DG-PR-PC-C2"
     ]
    ],
    "advantage": "every processing building +20% output per batch and wages -10%; station Microgravity factory modules may be fitted",
@@ -1087,33 +774,11 @@
    "tree": "PR",
    "branch": "PR-EN",
    "requires": [],
-   "advantage": "-1% fuel draw at every building",
+   "advantage": "-2% fuel draw at every building",
    "effects": [
     {
      "kind": "unread",
-     "what": "-1% fuel draw at every building",
-     "waits_on": "building fuel draw"
-    }
-   ],
-   "cost_units": 1
-  },
-  {
-   "id": "DG-PR-EN-T2",
-   "name": "Fuel Economy II",
-   "tier": "travel",
-   "ring": 1,
-   "tree": "PR",
-   "branch": "PR-EN",
-   "requires": [
-    [
-     "DG-PR-EN-T1"
-    ]
-   ],
-   "advantage": "-1% fuel draw at every building",
-   "effects": [
-    {
-     "kind": "unread",
-     "what": "-1% fuel draw at every building",
+     "what": "-2% fuel draw at every building",
      "waits_on": "building fuel draw"
     }
    ],
@@ -1128,7 +793,7 @@
    "branch": "PR-EN",
    "requires": [
     [
-     "DG-PR-EN-T2"
+     "DG-PR-EN-T1"
     ]
    ],
    "advantage": "fuel logistics cost -10%",
@@ -1148,28 +813,6 @@
    "cost_units": 2
   },
   {
-   "id": "DG-PR-EN-A2",
-   "name": "Heat Recovery",
-   "tier": "minor",
-   "ring": 1,
-   "tree": "PR",
-   "branch": "PR-EN",
-   "requires": [
-    [
-     "DG-PR-EN-T2"
-    ]
-   ],
-   "advantage": "fuel draw of processing buildings -5%",
-   "effects": [
-    {
-     "kind": "unread",
-     "what": "fuel draw of processing buildings -5%",
-     "waits_on": "building fuel draw"
-    }
-   ],
-   "cost_units": 2
-  },
-  {
    "id": "DG-PR-EN-A",
    "name": "Catalytic Cracking",
    "tier": "major",
@@ -1179,9 +822,6 @@
    "requires": [
     [
      "DG-PR-EN-A1"
-    ],
-    [
-     "DG-PR-EN-A2"
     ]
    ],
    "advantage": "Refineries +20% refined fuel per batch",
@@ -1198,6 +838,28 @@
   },
   {
    "id": "DG-PR-EN-T3",
+   "name": "Fuel Economy II",
+   "tier": "travel",
+   "ring": 2,
+   "tree": "PR",
+   "branch": "PR-EN",
+   "requires": [
+    [
+     "DG-PR-EN-A"
+    ]
+   ],
+   "advantage": "-2% fuel draw at every building",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "-2% fuel draw at every building",
+     "waits_on": "building fuel draw"
+    }
+   ],
+   "cost_units": 2
+  },
+  {
+   "id": "DG-PR-EN-T5",
    "name": "Fuel Economy III",
    "tier": "travel",
    "ring": 2,
@@ -1208,81 +870,15 @@
      "DG-PR-EN-A"
     ]
    ],
-   "advantage": "-1% fuel draw at every building",
+   "advantage": "-2% fuel draw at every building",
    "effects": [
     {
      "kind": "unread",
-     "what": "-1% fuel draw at every building",
+     "what": "-2% fuel draw at every building",
      "waits_on": "building fuel draw"
     }
    ],
    "cost_units": 2
-  },
-  {
-   "id": "DG-PR-EN-T4",
-   "name": "Fuel Economy IV",
-   "tier": "travel",
-   "ring": 3,
-   "tree": "PR",
-   "branch": "PR-EN",
-   "requires": [
-    [
-     "DG-PR-EN-T3"
-    ]
-   ],
-   "advantage": "-1% fuel draw at every building",
-   "effects": [
-    {
-     "kind": "unread",
-     "what": "-1% fuel draw at every building",
-     "waits_on": "building fuel draw"
-    }
-   ],
-   "cost_units": 3
-  },
-  {
-   "id": "DG-PR-EN-T5",
-   "name": "Fuel Economy V",
-   "tier": "travel",
-   "ring": 2,
-   "tree": "PR",
-   "branch": "PR-EN",
-   "requires": [
-    [
-     "DG-PR-EN-A"
-    ]
-   ],
-   "advantage": "-1% fuel draw at every building",
-   "effects": [
-    {
-     "kind": "unread",
-     "what": "-1% fuel draw at every building",
-     "waits_on": "building fuel draw"
-    }
-   ],
-   "cost_units": 2
-  },
-  {
-   "id": "DG-PR-EN-T6",
-   "name": "Fuel Economy VI",
-   "tier": "travel",
-   "ring": 3,
-   "tree": "PR",
-   "branch": "PR-EN",
-   "requires": [
-    [
-     "DG-PR-EN-T5"
-    ]
-   ],
-   "advantage": "-1% fuel draw at every building",
-   "effects": [
-    {
-     "kind": "unread",
-     "what": "-1% fuel draw at every building",
-     "waits_on": "building fuel draw"
-    }
-   ],
-   "cost_units": 3
   },
   {
    "id": "DG-PR-EN-B1",
@@ -1293,7 +889,7 @@
    "branch": "PR-EN",
    "requires": [
     [
-     "DG-PR-EN-T4"
+     "DG-PR-EN-T3"
     ]
    ],
    "advantage": "each Nuclear Plant raises rivals’ Alarm by 1 instead of 2",
@@ -1315,7 +911,7 @@
    "branch": "PR-EN",
    "requires": [
     [
-     "DG-PR-EN-T4"
+     "DG-PR-EN-T3"
     ]
    ],
    "advantage": "Nuclear Plant output +25%",
@@ -1367,7 +963,7 @@
    "branch": "PR-EN",
    "requires": [
     [
-     "DG-PR-EN-T6"
+     "DG-PR-EN-T5"
     ]
    ],
    "advantage": "propellant holding losses -50%; station Fuel depot modules may be fitted",
@@ -1386,30 +982,6 @@
    "cost_units": 6
   },
   {
-   "id": "DG-PR-EN-C2",
-   "name": "Rocket-Fuel Chemistry",
-   "tier": "minor",
-   "ring": 3,
-   "tree": "PR",
-   "branch": "PR-EN",
-   "requires": [
-    [
-     "DG-PR-EN-T6"
-    ]
-   ],
-   "advantage": "propellant recipes +5% yield",
-   "effects": [
-    {
-     "kind": "modifier",
-     "subject": "processing_yield",
-     "scope": "resource:propellant",
-     "op": "multiply",
-     "value": 1.05
-    }
-   ],
-   "cost_units": 6
-  },
-  {
    "id": "DG-PR-EN-C",
    "name": "Propellant Synthesis",
    "tier": "major",
@@ -1419,9 +991,6 @@
    "requires": [
     [
      "DG-PR-EN-C1"
-    ],
-    [
-     "DG-PR-EN-C2"
     ]
    ],
    "advantage": "propellant recipes +20% yield",
@@ -1500,63 +1069,17 @@
    "tree": "NE",
    "branch": "NE-SO",
    "requires": [],
-   "advantage": "+1% national research",
+   "advantage": "+2% national research",
    "effects": [
     {
      "kind": "modifier",
      "subject": "national_research",
      "scope": "all",
      "op": "add",
-     "value": 0.01
+     "value": 0.02
     }
    ],
    "cost_units": 1
-  },
-  {
-   "id": "DG-NE-SO-T2",
-   "name": "Research Grant II",
-   "tier": "travel",
-   "ring": 1,
-   "tree": "NE",
-   "branch": "NE-SO",
-   "requires": [
-    [
-     "DG-NE-SO-T1"
-    ]
-   ],
-   "advantage": "+1% national research",
-   "effects": [
-    {
-     "kind": "modifier",
-     "subject": "national_research",
-     "scope": "all",
-     "op": "add",
-     "value": 0.01
-    }
-   ],
-   "cost_units": 1
-  },
-  {
-   "id": "DG-NE-SO-A1",
-   "name": "Telex Network",
-   "tier": "minor",
-   "ring": 1,
-   "tree": "NE",
-   "branch": "NE-SO",
-   "requires": [
-    [
-     "DG-NE-SO-T2"
-    ]
-   ],
-   "advantage": "rivals’ prices and stocks seen 3 months fresher",
-   "effects": [
-    {
-     "kind": "unread",
-     "what": "rivals’ prices and stocks seen 3 months fresher",
-     "waits_on": "activity fog"
-    }
-   ],
-   "cost_units": 2
   },
   {
    "id": "DG-NE-SO-A2",
@@ -1567,7 +1090,7 @@
    "branch": "NE-SO",
    "requires": [
     [
-     "DG-NE-SO-T2"
+     "DG-NE-SO-T1"
     ]
    ],
    "advantage": "universities +20% research; the Astronaut Training Centre may be built",
@@ -1596,13 +1119,10 @@
    "branch": "NE-SO",
    "requires": [
     [
-     "DG-NE-SO-A1"
-    ],
-    [
      "DG-NE-SO-A2"
     ]
    ],
-   "advantage": "national research +15%",
+   "advantage": "national research +15%; rivals’ prices and stocks seen 3 months fresher",
    "effects": [
     {
      "kind": "modifier",
@@ -1610,12 +1130,41 @@
      "scope": "all",
      "op": "add",
      "value": 0.15
+    },
+    {
+     "kind": "unread",
+     "what": "rivals’ prices and stocks seen 3 months fresher",
+     "waits_on": "activity fog"
     }
    ],
    "cost_units": 12
   },
   {
    "id": "DG-NE-SO-T3",
+   "name": "Research Grant II",
+   "tier": "travel",
+   "ring": 2,
+   "tree": "NE",
+   "branch": "NE-SO",
+   "requires": [
+    [
+     "DG-NE-SO-A"
+    ]
+   ],
+   "advantage": "+2% national research",
+   "effects": [
+    {
+     "kind": "modifier",
+     "subject": "national_research",
+     "scope": "all",
+     "op": "add",
+     "value": 0.02
+    }
+   ],
+   "cost_units": 2
+  },
+  {
+   "id": "DG-NE-SO-T5",
    "name": "Research Grant III",
    "tier": "travel",
    "ring": 2,
@@ -1626,89 +1175,17 @@
      "DG-NE-SO-A"
     ]
    ],
-   "advantage": "+1% national research",
+   "advantage": "+2% national research",
    "effects": [
     {
      "kind": "modifier",
      "subject": "national_research",
      "scope": "all",
      "op": "add",
-     "value": 0.01
+     "value": 0.02
     }
    ],
    "cost_units": 2
-  },
-  {
-   "id": "DG-NE-SO-T4",
-   "name": "Research Grant IV",
-   "tier": "travel",
-   "ring": 3,
-   "tree": "NE",
-   "branch": "NE-SO",
-   "requires": [
-    [
-     "DG-NE-SO-D"
-    ]
-   ],
-   "advantage": "+1% national research",
-   "effects": [
-    {
-     "kind": "modifier",
-     "subject": "national_research",
-     "scope": "all",
-     "op": "add",
-     "value": 0.01
-    }
-   ],
-   "cost_units": 3
-  },
-  {
-   "id": "DG-NE-SO-T5",
-   "name": "Research Grant V",
-   "tier": "travel",
-   "ring": 2,
-   "tree": "NE",
-   "branch": "NE-SO",
-   "requires": [
-    [
-     "DG-NE-SO-A"
-    ]
-   ],
-   "advantage": "+1% national research",
-   "effects": [
-    {
-     "kind": "modifier",
-     "subject": "national_research",
-     "scope": "all",
-     "op": "add",
-     "value": 0.01
-    }
-   ],
-   "cost_units": 2
-  },
-  {
-   "id": "DG-NE-SO-T6",
-   "name": "Research Grant VI",
-   "tier": "travel",
-   "ring": 3,
-   "tree": "NE",
-   "branch": "NE-SO",
-   "requires": [
-    [
-     "DG-NE-SO-E"
-    ]
-   ],
-   "advantage": "+1% national research",
-   "effects": [
-    {
-     "kind": "modifier",
-     "subject": "national_research",
-     "scope": "all",
-     "op": "add",
-     "value": 0.01
-    }
-   ],
-   "cost_units": 3
   },
   {
    "id": "DG-NE-SO-B1",
@@ -1719,7 +1196,7 @@
    "branch": "NE-SO",
    "requires": [
     [
-     "DG-NE-SO-T4"
+     "DG-NE-SO-D"
     ]
    ],
    "advantage": "Launchpad build cost -25%",
@@ -1728,28 +1205,6 @@
      "kind": "unread",
      "what": "Launchpad build cost -25%",
      "waits_on": "construction cost by nation"
-    }
-   ],
-   "cost_units": 6
-  },
-  {
-   "id": "DG-NE-SO-B2",
-   "name": "Guidance Systems",
-   "tier": "minor",
-   "ring": 3,
-   "tree": "NE",
-   "branch": "NE-SO",
-   "requires": [
-    [
-     "DG-NE-SO-T4"
-    ]
-   ],
-   "advantage": "launch propellant -5%",
-   "effects": [
-    {
-     "kind": "unread",
-     "what": "launch propellant -5%",
-     "waits_on": "launch draw by nation"
     }
    ],
    "cost_units": 6
@@ -1764,9 +1219,6 @@
    "requires": [
     [
      "DG-NE-SO-B1"
-    ],
-    [
-     "DG-NE-SO-B2"
     ]
    ],
    "advantage": "the Launchpad may operate (with the staffed pad and propellant reserve); convoys may dispatch to other bodies; station cores may be launched",
@@ -1780,78 +1232,6 @@
      "kind": "mechanic",
      "key": "space_station_core",
      "what": "station cores may be launched"
-    }
-   ],
-   "cost_units": 24
-  },
-  {
-   "id": "DG-NE-SO-C1",
-   "name": "Reserved minor",
-   "tier": "minor",
-   "ring": 4,
-   "tree": "NE",
-   "branch": "NE-SO",
-   "requires": [
-    [
-     "DG-NE-SO-F"
-    ]
-   ],
-   "placeholder": "espionage",
-   "advantage": "reserved for espionage: signals intelligence",
-   "effects": [
-    {
-     "kind": "unread",
-     "what": "reserved for espionage: signals intelligence",
-     "waits_on": "espionage"
-    }
-   ],
-   "cost_units": 8
-  },
-  {
-   "id": "DG-NE-SO-C2",
-   "name": "Reserved minor",
-   "tier": "minor",
-   "ring": 4,
-   "tree": "NE",
-   "branch": "NE-SO",
-   "requires": [
-    [
-     "DG-NE-SO-F"
-    ]
-   ],
-   "placeholder": "espionage",
-   "advantage": "reserved for espionage: signals intelligence",
-   "effects": [
-    {
-     "kind": "unread",
-     "what": "reserved for espionage: signals intelligence",
-     "waits_on": "espionage"
-    }
-   ],
-   "cost_units": 8
-  },
-  {
-   "id": "DG-NE-SO-C",
-   "name": "[Espionage]",
-   "tier": "major",
-   "ring": 4,
-   "tree": "NE",
-   "branch": "NE-SO",
-   "requires": [
-    [
-     "DG-NE-SO-C1"
-    ],
-    [
-     "DG-NE-SO-C2"
-    ]
-   ],
-   "placeholder": "espionage",
-   "advantage": "placeholder cluster: signals intelligence; effects authored when the espionage system exists",
-   "effects": [
-    {
-     "kind": "unread",
-     "what": "placeholder cluster: signals intelligence; effects authored when the espionage system exists",
-     "waits_on": "espionage"
     }
    ],
    "cost_units": 24
@@ -1927,59 +1307,15 @@
    "tree": "NE",
    "branch": "NE-MK",
    "requires": [],
-   "advantage": "+1% trade capacity at every Marketplace",
+   "advantage": "+2% trade capacity at every Marketplace",
    "effects": [
     {
      "kind": "unread",
-     "what": "+1% trade capacity at every Marketplace",
+     "what": "+2% trade capacity at every Marketplace",
      "waits_on": "Marketplace trade capacity"
     }
    ],
    "cost_units": 1
-  },
-  {
-   "id": "DG-NE-MK-T2",
-   "name": "Trade Desk II",
-   "tier": "travel",
-   "ring": 1,
-   "tree": "NE",
-   "branch": "NE-MK",
-   "requires": [
-    [
-     "DG-NE-MK-T1"
-    ]
-   ],
-   "advantage": "+1% trade capacity at every Marketplace",
-   "effects": [
-    {
-     "kind": "unread",
-     "what": "+1% trade capacity at every Marketplace",
-     "waits_on": "Marketplace trade capacity"
-    }
-   ],
-   "cost_units": 1
-  },
-  {
-   "id": "DG-NE-MK-A1",
-   "name": "Commodity Futures",
-   "tier": "minor",
-   "ring": 1,
-   "tree": "NE",
-   "branch": "NE-MK",
-   "requires": [
-    [
-     "DG-NE-MK-T2"
-    ]
-   ],
-   "advantage": "trade capacity +5% at your Marketplaces",
-   "effects": [
-    {
-     "kind": "unread",
-     "what": "trade capacity +5% at your Marketplaces",
-     "waits_on": "Marketplace trade capacity"
-    }
-   ],
-   "cost_units": 2
   },
   {
    "id": "DG-NE-MK-A2",
@@ -1990,7 +1326,7 @@
    "branch": "NE-MK",
    "requires": [
     [
-     "DG-NE-MK-T2"
+     "DG-NE-MK-T1"
     ]
    ],
    "advantage": "household demand in your markets +3%",
@@ -2011,9 +1347,6 @@
    "tree": "NE",
    "branch": "NE-MK",
    "requires": [
-    [
-     "DG-NE-MK-A1"
-    ],
     [
      "DG-NE-MK-A2"
     ]
@@ -2040,6 +1373,28 @@
   },
   {
    "id": "DG-NE-MK-T3",
+   "name": "Trade Desk II",
+   "tier": "travel",
+   "ring": 2,
+   "tree": "NE",
+   "branch": "NE-MK",
+   "requires": [
+    [
+     "DG-NE-MK-A"
+    ]
+   ],
+   "advantage": "+2% trade capacity at every Marketplace",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "+2% trade capacity at every Marketplace",
+     "waits_on": "Marketplace trade capacity"
+    }
+   ],
+   "cost_units": 2
+  },
+  {
+   "id": "DG-NE-MK-T5",
    "name": "Trade Desk III",
    "tier": "travel",
    "ring": 2,
@@ -2050,81 +1405,15 @@
      "DG-NE-MK-A"
     ]
    ],
-   "advantage": "+1% trade capacity at every Marketplace",
+   "advantage": "+2% trade capacity at every Marketplace",
    "effects": [
     {
      "kind": "unread",
-     "what": "+1% trade capacity at every Marketplace",
+     "what": "+2% trade capacity at every Marketplace",
      "waits_on": "Marketplace trade capacity"
     }
    ],
    "cost_units": 2
-  },
-  {
-   "id": "DG-NE-MK-T4",
-   "name": "Trade Desk IV",
-   "tier": "travel",
-   "ring": 3,
-   "tree": "NE",
-   "branch": "NE-MK",
-   "requires": [
-    [
-     "DG-NE-MK-T3"
-    ]
-   ],
-   "advantage": "+1% trade capacity at every Marketplace",
-   "effects": [
-    {
-     "kind": "unread",
-     "what": "+1% trade capacity at every Marketplace",
-     "waits_on": "Marketplace trade capacity"
-    }
-   ],
-   "cost_units": 3
-  },
-  {
-   "id": "DG-NE-MK-T5",
-   "name": "Trade Desk V",
-   "tier": "travel",
-   "ring": 2,
-   "tree": "NE",
-   "branch": "NE-MK",
-   "requires": [
-    [
-     "DG-NE-MK-A"
-    ]
-   ],
-   "advantage": "+1% trade capacity at every Marketplace",
-   "effects": [
-    {
-     "kind": "unread",
-     "what": "+1% trade capacity at every Marketplace",
-     "waits_on": "Marketplace trade capacity"
-    }
-   ],
-   "cost_units": 2
-  },
-  {
-   "id": "DG-NE-MK-T6",
-   "name": "Trade Desk VI",
-   "tier": "travel",
-   "ring": 3,
-   "tree": "NE",
-   "branch": "NE-MK",
-   "requires": [
-    [
-     "DG-NE-MK-T5"
-    ]
-   ],
-   "advantage": "+1% trade capacity at every Marketplace",
-   "effects": [
-    {
-     "kind": "unread",
-     "what": "+1% trade capacity at every Marketplace",
-     "waits_on": "Marketplace trade capacity"
-    }
-   ],
-   "cost_units": 3
   },
   {
    "id": "DG-NE-MK-B1",
@@ -2135,7 +1424,7 @@
    "branch": "NE-MK",
    "requires": [
     [
-     "DG-NE-MK-T4"
+     "DG-NE-MK-T3"
     ]
    ],
    "advantage": "activity fog lifts on every market you trade with; Comms satellites may be launched",
@@ -2144,28 +1433,6 @@
      "kind": "mechanic",
      "key": "space_role_comms",
      "what": "Comms satellites may be launched; while one is active, the activity fog lifts on every market you trade with"
-    }
-   ],
-   "cost_units": 6
-  },
-  {
-   "id": "DG-NE-MK-B2",
-   "name": "Just-in-Time Inventory",
-   "tier": "minor",
-   "ring": 3,
-   "tree": "NE",
-   "branch": "NE-MK",
-   "requires": [
-    [
-     "DG-NE-MK-T4"
-    ]
-   ],
-   "advantage": "stock holding cost and spoilage -20%",
-   "effects": [
-    {
-     "kind": "unread",
-     "what": "stock holding cost and spoilage -20%",
-     "waits_on": "holding losses by nation"
     }
    ],
    "cost_units": 6
@@ -2180,12 +1447,9 @@
    "requires": [
     [
      "DG-NE-MK-B1"
-    ],
-    [
-     "DG-NE-MK-B2"
     ]
    ],
-   "advantage": "trade capacity +30% at every Marketplace; national research +10%; station Comms relay modules may be fitted",
+   "advantage": "trade capacity +30% at every Marketplace; national research +10%; station Comms relay modules may be fitted; stock holding cost and spoilage -20%",
    "effects": [
     {
      "kind": "unread",
@@ -2203,78 +1467,11 @@
      "kind": "mechanic",
      "key": "space_module_comms_relay",
      "what": "Comms relay modules may be fitted"
-    }
-   ],
-   "cost_units": 24
-  },
-  {
-   "id": "DG-NE-MK-C1",
-   "name": "Reserved minor",
-   "tier": "minor",
-   "ring": 3,
-   "tree": "NE",
-   "branch": "NE-MK",
-   "requires": [
-    [
-     "DG-NE-MK-T6"
-    ]
-   ],
-   "placeholder": "politics",
-   "advantage": "reserved for politics: lobbying and market regulation",
-   "effects": [
+    },
     {
      "kind": "unread",
-     "what": "reserved for politics: lobbying and market regulation",
-     "waits_on": "politics"
-    }
-   ],
-   "cost_units": 6
-  },
-  {
-   "id": "DG-NE-MK-C2",
-   "name": "Reserved minor",
-   "tier": "minor",
-   "ring": 3,
-   "tree": "NE",
-   "branch": "NE-MK",
-   "requires": [
-    [
-     "DG-NE-MK-T6"
-    ]
-   ],
-   "placeholder": "politics",
-   "advantage": "reserved for politics: lobbying and market regulation",
-   "effects": [
-    {
-     "kind": "unread",
-     "what": "reserved for politics: lobbying and market regulation",
-     "waits_on": "politics"
-    }
-   ],
-   "cost_units": 6
-  },
-  {
-   "id": "DG-NE-MK-C",
-   "name": "[Politics]",
-   "tier": "major",
-   "ring": 4,
-   "tree": "NE",
-   "branch": "NE-MK",
-   "requires": [
-    [
-     "DG-NE-MK-C1"
-    ],
-    [
-     "DG-NE-MK-C2"
-    ]
-   ],
-   "placeholder": "politics",
-   "advantage": "placeholder cluster: lobbying and market regulation; effects authored when the politics system exists",
-   "effects": [
-    {
-     "kind": "unread",
-     "what": "placeholder cluster: lobbying and market regulation; effects authored when the politics system exists",
-     "waits_on": "politics"
+     "what": "stock holding cost and spoilage -20%",
+     "waits_on": "holding losses by nation"
     }
    ],
    "cost_units": 24
@@ -2343,63 +1540,17 @@
    "tree": "NE",
    "branch": "NE-FR",
    "requires": [],
-   "advantage": "-1% logistics cost",
+   "advantage": "-2% logistics cost",
    "effects": [
     {
      "kind": "modifier",
      "subject": "logistics_cost",
      "scope": "all",
      "op": "multiply",
-     "value": 0.99
+     "value": 0.98
     }
    ],
    "cost_units": 1
-  },
-  {
-   "id": "DG-NE-FR-T2",
-   "name": "Route Planning II",
-   "tier": "travel",
-   "ring": 1,
-   "tree": "NE",
-   "branch": "NE-FR",
-   "requires": [
-    [
-     "DG-NE-FR-T1"
-    ]
-   ],
-   "advantage": "-1% logistics cost",
-   "effects": [
-    {
-     "kind": "modifier",
-     "subject": "logistics_cost",
-     "scope": "all",
-     "op": "multiply",
-     "value": 0.99
-    }
-   ],
-   "cost_units": 1
-  },
-  {
-   "id": "DG-NE-FR-A1",
-   "name": "Pallet Standards",
-   "tier": "minor",
-   "ring": 1,
-   "tree": "NE",
-   "branch": "NE-FR",
-   "requires": [
-    [
-     "DG-NE-FR-T2"
-    ]
-   ],
-   "advantage": "handling cost -5%",
-   "effects": [
-    {
-     "kind": "unread",
-     "what": "handling cost -5%",
-     "waits_on": "port handling by nation"
-    }
-   ],
-   "cost_units": 2
   },
   {
    "id": "DG-NE-FR-A2",
@@ -2410,7 +1561,7 @@
    "branch": "NE-FR",
    "requires": [
     [
-     "DG-NE-FR-T2"
+     "DG-NE-FR-T1"
     ]
    ],
    "advantage": "Port throughput +10%; station Dock modules may be fitted",
@@ -2437,9 +1588,6 @@
    "branch": "NE-FR",
    "requires": [
     [
-     "DG-NE-FR-A1"
-    ],
-    [
      "DG-NE-FR-A2"
     ]
    ],
@@ -2465,6 +1613,30 @@
   },
   {
    "id": "DG-NE-FR-T3",
+   "name": "Route Planning II",
+   "tier": "travel",
+   "ring": 2,
+   "tree": "NE",
+   "branch": "NE-FR",
+   "requires": [
+    [
+     "DG-NE-FR-A"
+    ]
+   ],
+   "advantage": "-2% logistics cost",
+   "effects": [
+    {
+     "kind": "modifier",
+     "subject": "logistics_cost",
+     "scope": "all",
+     "op": "multiply",
+     "value": 0.98
+    }
+   ],
+   "cost_units": 2
+  },
+  {
+   "id": "DG-NE-FR-T5",
    "name": "Route Planning III",
    "tier": "travel",
    "ring": 2,
@@ -2475,89 +1647,17 @@
      "DG-NE-FR-A"
     ]
    ],
-   "advantage": "-1% logistics cost",
+   "advantage": "-2% logistics cost",
    "effects": [
     {
      "kind": "modifier",
      "subject": "logistics_cost",
      "scope": "all",
      "op": "multiply",
-     "value": 0.99
+     "value": 0.98
     }
    ],
    "cost_units": 2
-  },
-  {
-   "id": "DG-NE-FR-T4",
-   "name": "Route Planning IV",
-   "tier": "travel",
-   "ring": 3,
-   "tree": "NE",
-   "branch": "NE-FR",
-   "requires": [
-    [
-     "DG-NE-FR-T3"
-    ]
-   ],
-   "advantage": "-1% logistics cost",
-   "effects": [
-    {
-     "kind": "modifier",
-     "subject": "logistics_cost",
-     "scope": "all",
-     "op": "multiply",
-     "value": 0.99
-    }
-   ],
-   "cost_units": 3
-  },
-  {
-   "id": "DG-NE-FR-T5",
-   "name": "Route Planning V",
-   "tier": "travel",
-   "ring": 2,
-   "tree": "NE",
-   "branch": "NE-FR",
-   "requires": [
-    [
-     "DG-NE-FR-A"
-    ]
-   ],
-   "advantage": "-1% logistics cost",
-   "effects": [
-    {
-     "kind": "modifier",
-     "subject": "logistics_cost",
-     "scope": "all",
-     "op": "multiply",
-     "value": 0.99
-    }
-   ],
-   "cost_units": 2
-  },
-  {
-   "id": "DG-NE-FR-T6",
-   "name": "Route Planning VI",
-   "tier": "travel",
-   "ring": 3,
-   "tree": "NE",
-   "branch": "NE-FR",
-   "requires": [
-    [
-     "DG-NE-FR-T5"
-    ]
-   ],
-   "advantage": "-1% logistics cost",
-   "effects": [
-    {
-     "kind": "modifier",
-     "subject": "logistics_cost",
-     "scope": "all",
-     "op": "multiply",
-     "value": 0.99
-    }
-   ],
-   "cost_units": 3
   },
   {
    "id": "DG-NE-FR-B1",
@@ -2568,7 +1668,7 @@
    "branch": "NE-FR",
    "requires": [
     [
-     "DG-NE-FR-T4"
+     "DG-NE-FR-T3"
     ]
    ],
    "advantage": "road maintenance -10%",
@@ -2577,28 +1677,6 @@
      "kind": "unread",
      "what": "road maintenance -10%",
      "waits_on": "roads"
-    }
-   ],
-   "cost_units": 6
-  },
-  {
-   "id": "DG-NE-FR-B2",
-   "name": "Trucking Fleets",
-   "tier": "minor",
-   "ring": 3,
-   "tree": "NE",
-   "branch": "NE-FR",
-   "requires": [
-    [
-     "DG-NE-FR-T4"
-    ]
-   ],
-   "advantage": "inland convoy capacity +10%",
-   "effects": [
-    {
-     "kind": "unread",
-     "what": "inland convoy capacity +10%",
-     "waits_on": "convoy cargo capacity"
     }
    ],
    "cost_units": 6
@@ -2613,9 +1691,6 @@
    "requires": [
     [
      "DG-NE-FR-B1"
-    ],
-    [
-     "DG-NE-FR-B2"
     ]
    ],
    "advantage": "road-tier upgrades cost -30%; road travel time -15%",
@@ -2629,28 +1704,6 @@
    "cost_units": 24
   },
   {
-   "id": "DG-NE-FR-C1",
-   "name": "Air Cargo Hubs",
-   "tier": "minor",
-   "ring": 3,
-   "tree": "NE",
-   "branch": "NE-FR",
-   "requires": [
-    [
-     "DG-NE-FR-T6"
-    ]
-   ],
-   "advantage": "high-value convoy capacity +10%",
-   "effects": [
-    {
-     "kind": "unread",
-     "what": "high-value convoy capacity +10%",
-     "waits_on": "convoy cargo capacity"
-    }
-   ],
-   "cost_units": 6
-  },
-  {
    "id": "DG-NE-FR-C2",
    "name": "Satellite Navigation",
    "tier": "minor",
@@ -2659,7 +1712,7 @@
    "branch": "NE-FR",
    "requires": [
     [
-     "DG-NE-FR-T6"
+     "DG-NE-FR-T5"
     ]
    ],
    "advantage": "travel time -5% everywhere; Navigation satellites may be launched",
@@ -2685,9 +1738,6 @@
    "tree": "NE",
    "branch": "NE-FR",
    "requires": [
-    [
-     "DG-NE-FR-C1"
-    ],
     [
      "DG-NE-FR-C2"
     ]
@@ -2768,33 +1818,11 @@
    "tree": "ST",
    "branch": "ST-FO",
    "requires": [],
-   "advantage": "+1% strength for every unit",
+   "advantage": "+2% strength for every unit",
    "effects": [
     {
      "kind": "unread",
-     "what": "+1% strength for every unit",
-     "waits_on": "unit strength"
-    }
-   ],
-   "cost_units": 1
-  },
-  {
-   "id": "DG-ST-FO-T2",
-   "name": "Drill & Training II",
-   "tier": "travel",
-   "ring": 1,
-   "tree": "ST",
-   "branch": "ST-FO",
-   "requires": [
-    [
-     "DG-ST-FO-T1"
-    ]
-   ],
-   "advantage": "+1% strength for every unit",
-   "effects": [
-    {
-     "kind": "unread",
-     "what": "+1% strength for every unit",
+     "what": "+2% strength for every unit",
      "waits_on": "unit strength"
     }
    ],
@@ -2809,7 +1837,7 @@
    "branch": "ST-FO",
    "requires": [
     [
-     "DG-ST-FO-T2"
+     "DG-ST-FO-T1"
     ]
    ],
    "advantage": "land unit upkeep -5%; opens protected trucks, the truck-mounted air-defence carrier and spaced light armour",
@@ -2839,7 +1867,7 @@
    "branch": "ST-FO",
    "requires": [
     [
-     "DG-ST-FO-T2"
+     "DG-ST-FO-T1"
     ]
    ],
    "advantage": "home-province defence +10%; opens search radar (air-defence fire control)",
@@ -2897,6 +1925,28 @@
   },
   {
    "id": "DG-ST-FO-T3",
+   "name": "Drill & Training II",
+   "tier": "travel",
+   "ring": 2,
+   "tree": "ST",
+   "branch": "ST-FO",
+   "requires": [
+    [
+     "DG-ST-FO-A"
+    ]
+   ],
+   "advantage": "+2% strength for every unit",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "+2% strength for every unit",
+     "waits_on": "unit strength"
+    }
+   ],
+   "cost_units": 2
+  },
+  {
+   "id": "DG-ST-FO-T5",
    "name": "Drill & Training III",
    "tier": "travel",
    "ring": 2,
@@ -2907,103 +1957,15 @@
      "DG-ST-FO-A"
     ]
    ],
-   "advantage": "+1% strength for every unit",
+   "advantage": "+2% strength for every unit",
    "effects": [
     {
      "kind": "unread",
-     "what": "+1% strength for every unit",
+     "what": "+2% strength for every unit",
      "waits_on": "unit strength"
     }
    ],
    "cost_units": 2
-  },
-  {
-   "id": "DG-ST-FO-T4",
-   "name": "Drill & Training IV",
-   "tier": "travel",
-   "ring": 3,
-   "tree": "ST",
-   "branch": "ST-FO",
-   "requires": [
-    [
-     "DG-ST-FO-E"
-    ]
-   ],
-   "advantage": "+1% strength for every unit",
-   "effects": [
-    {
-     "kind": "unread",
-     "what": "+1% strength for every unit",
-     "waits_on": "unit strength"
-    }
-   ],
-   "cost_units": 3
-  },
-  {
-   "id": "DG-ST-FO-T5",
-   "name": "Drill & Training V",
-   "tier": "travel",
-   "ring": 2,
-   "tree": "ST",
-   "branch": "ST-FO",
-   "requires": [
-    [
-     "DG-ST-FO-A"
-    ]
-   ],
-   "advantage": "+1% strength for every unit",
-   "effects": [
-    {
-     "kind": "unread",
-     "what": "+1% strength for every unit",
-     "waits_on": "unit strength"
-    }
-   ],
-   "cost_units": 2
-  },
-  {
-   "id": "DG-ST-FO-T6",
-   "name": "Drill & Training VI",
-   "tier": "travel",
-   "ring": 3,
-   "tree": "ST",
-   "branch": "ST-FO",
-   "requires": [
-    [
-     "DG-ST-FO-G"
-    ]
-   ],
-   "advantage": "+1% strength for every unit",
-   "effects": [
-    {
-     "kind": "unread",
-     "what": "+1% strength for every unit",
-     "waits_on": "unit strength"
-    }
-   ],
-   "cost_units": 3
-  },
-  {
-   "id": "DG-ST-FO-B1",
-   "name": "Helicopter Lift",
-   "tier": "minor",
-   "ring": 3,
-   "tree": "ST",
-   "branch": "ST-FO",
-   "requires": [
-    [
-     "DG-ST-FO-T4"
-    ]
-   ],
-   "advantage": "muster time -10%",
-   "effects": [
-    {
-     "kind": "unread",
-     "what": "muster time -10%",
-     "waits_on": "muster time"
-    }
-   ],
-   "cost_units": 6
   },
   {
    "id": "DG-ST-FO-B2",
@@ -3014,10 +1976,10 @@
    "branch": "ST-FO",
    "requires": [
     [
-     "DG-ST-FO-T4"
+     "DG-ST-FO-E"
     ]
    ],
-   "advantage": "units +10% strength when attacking; opens guided shells, laser-guided and guided bombs, and drone guided missiles",
+   "advantage": "units +10% strength when attacking; opens guided shells, laser-guided and guided bombs, and drone guided missiles; opens the radar-laid howitzer (artillery gun): counter-battery radar finds hostile artillery in range and answers it first",
    "effects": [
     {
      "kind": "unread",
@@ -3032,6 +1994,12 @@
       "bmr.armament.guided_bombs",
       "drn.armament.guided_missiles"
      ]
+    },
+    {
+     "kind": "unlock_kit",
+     "items": [
+      "art.gun.radar_laid"
+     ]
     }
    ],
    "cost_units": 6
@@ -3044,9 +2012,6 @@
    "tree": "ST",
    "branch": "ST-FO",
    "requires": [
-    [
-     "DG-ST-FO-B1"
-    ],
     [
      "DG-ST-FO-B2"
     ]
@@ -3063,78 +2028,6 @@
      "items": [
       "hel.airframe.attack"
      ]
-    }
-   ],
-   "cost_units": 24
-  },
-  {
-   "id": "DG-ST-FO-C1",
-   "name": "Reserved minor",
-   "tier": "minor",
-   "ring": 4,
-   "tree": "ST",
-   "branch": "ST-FO",
-   "requires": [
-    [
-     "DG-ST-FO-H"
-    ]
-   ],
-   "placeholder": "espionage",
-   "advantage": "reserved for espionage: covert operations",
-   "effects": [
-    {
-     "kind": "unread",
-     "what": "reserved for espionage: covert operations",
-     "waits_on": "espionage"
-    }
-   ],
-   "cost_units": 8
-  },
-  {
-   "id": "DG-ST-FO-C2",
-   "name": "Reserved minor",
-   "tier": "minor",
-   "ring": 4,
-   "tree": "ST",
-   "branch": "ST-FO",
-   "requires": [
-    [
-     "DG-ST-FO-H"
-    ]
-   ],
-   "placeholder": "espionage",
-   "advantage": "reserved for espionage: covert operations",
-   "effects": [
-    {
-     "kind": "unread",
-     "what": "reserved for espionage: covert operations",
-     "waits_on": "espionage"
-    }
-   ],
-   "cost_units": 8
-  },
-  {
-   "id": "DG-ST-FO-C",
-   "name": "[Espionage]",
-   "tier": "major",
-   "ring": 4,
-   "tree": "ST",
-   "branch": "ST-FO",
-   "requires": [
-    [
-     "DG-ST-FO-C1"
-    ],
-    [
-     "DG-ST-FO-C2"
-    ]
-   ],
-   "placeholder": "espionage",
-   "advantage": "placeholder cluster: covert operations; effects authored when the espionage system exists",
-   "effects": [
-    {
-     "kind": "unread",
-     "what": "placeholder cluster: covert operations; effects authored when the espionage system exists",
-     "waits_on": "espionage"
     }
    ],
    "cost_units": 24
@@ -3203,59 +2096,15 @@
    "tree": "ST",
    "branch": "ST-OR",
    "requires": [],
-   "advantage": "-1% unrest in every province",
+   "advantage": "-2% unrest in every province",
    "effects": [
     {
      "kind": "unread",
-     "what": "-1% unrest in every province",
+     "what": "-2% unrest in every province",
      "waits_on": "unrest"
     }
    ],
    "cost_units": 1
-  },
-  {
-   "id": "DG-ST-OR-T2",
-   "name": "Civil Service II",
-   "tier": "travel",
-   "ring": 1,
-   "tree": "ST",
-   "branch": "ST-OR",
-   "requires": [
-    [
-     "DG-ST-OR-T1"
-    ]
-   ],
-   "advantage": "-1% unrest in every province",
-   "effects": [
-    {
-     "kind": "unread",
-     "what": "-1% unrest in every province",
-     "waits_on": "unrest"
-    }
-   ],
-   "cost_units": 1
-  },
-  {
-   "id": "DG-ST-OR-A1",
-   "name": "Public Housing",
-   "tier": "minor",
-   "ring": 1,
-   "tree": "ST",
-   "branch": "ST-OR",
-   "requires": [
-    [
-     "DG-ST-OR-T2"
-    ]
-   ],
-   "advantage": "unrest -3% in every province",
-   "effects": [
-    {
-     "kind": "unread",
-     "what": "unrest -3% in every province",
-     "waits_on": "unrest"
-    }
-   ],
-   "cost_units": 2
   },
   {
    "id": "DG-ST-OR-A2",
@@ -3266,7 +2115,7 @@
    "branch": "ST-OR",
    "requires": [
     [
-     "DG-ST-OR-T2"
+     "DG-ST-OR-T1"
     ]
    ],
    "advantage": "tax yield +3%",
@@ -3288,9 +2137,6 @@
    "branch": "ST-OR",
    "requires": [
     [
-     "DG-ST-OR-A1"
-    ],
-    [
      "DG-ST-OR-A2"
     ]
    ],
@@ -3311,6 +2157,28 @@
   },
   {
    "id": "DG-ST-OR-T3",
+   "name": "Civil Service II",
+   "tier": "travel",
+   "ring": 2,
+   "tree": "ST",
+   "branch": "ST-OR",
+   "requires": [
+    [
+     "DG-ST-OR-A"
+    ]
+   ],
+   "advantage": "-2% unrest in every province",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "-2% unrest in every province",
+     "waits_on": "unrest"
+    }
+   ],
+   "cost_units": 2
+  },
+  {
+   "id": "DG-ST-OR-T5",
    "name": "Civil Service III",
    "tier": "travel",
    "ring": 2,
@@ -3321,81 +2189,15 @@
      "DG-ST-OR-A"
     ]
    ],
-   "advantage": "-1% unrest in every province",
+   "advantage": "-2% unrest in every province",
    "effects": [
     {
      "kind": "unread",
-     "what": "-1% unrest in every province",
+     "what": "-2% unrest in every province",
      "waits_on": "unrest"
     }
    ],
    "cost_units": 2
-  },
-  {
-   "id": "DG-ST-OR-T4",
-   "name": "Civil Service IV",
-   "tier": "travel",
-   "ring": 3,
-   "tree": "ST",
-   "branch": "ST-OR",
-   "requires": [
-    [
-     "DG-ST-OR-T3"
-    ]
-   ],
-   "advantage": "-1% unrest in every province",
-   "effects": [
-    {
-     "kind": "unread",
-     "what": "-1% unrest in every province",
-     "waits_on": "unrest"
-    }
-   ],
-   "cost_units": 3
-  },
-  {
-   "id": "DG-ST-OR-T5",
-   "name": "Civil Service V",
-   "tier": "travel",
-   "ring": 2,
-   "tree": "ST",
-   "branch": "ST-OR",
-   "requires": [
-    [
-     "DG-ST-OR-A"
-    ]
-   ],
-   "advantage": "-1% unrest in every province",
-   "effects": [
-    {
-     "kind": "unread",
-     "what": "-1% unrest in every province",
-     "waits_on": "unrest"
-    }
-   ],
-   "cost_units": 2
-  },
-  {
-   "id": "DG-ST-OR-T6",
-   "name": "Civil Service VI",
-   "tier": "travel",
-   "ring": 3,
-   "tree": "ST",
-   "branch": "ST-OR",
-   "requires": [
-    [
-     "DG-ST-OR-T5"
-    ]
-   ],
-   "advantage": "-1% unrest in every province",
-   "effects": [
-    {
-     "kind": "unread",
-     "what": "-1% unrest in every province",
-     "waits_on": "unrest"
-    }
-   ],
-   "cost_units": 3
   },
   {
    "id": "DG-ST-OR-B1",
@@ -3406,7 +2208,7 @@
    "branch": "ST-OR",
    "requires": [
     [
-     "DG-ST-OR-T4"
+     "DG-ST-OR-T3"
     ]
    ],
    "advantage": "unrest forecast 6 months ahead",
@@ -3476,78 +2278,6 @@
    "excludes": "DG-ST-OR-Ba"
   },
   {
-   "id": "DG-ST-OR-C1",
-   "name": "Reserved minor",
-   "tier": "minor",
-   "ring": 3,
-   "tree": "ST",
-   "branch": "ST-OR",
-   "requires": [
-    [
-     "DG-ST-OR-T6"
-    ]
-   ],
-   "placeholder": "politics",
-   "advantage": "reserved for politics: regime, elections, succession",
-   "effects": [
-    {
-     "kind": "unread",
-     "what": "reserved for politics: regime, elections, succession",
-     "waits_on": "politics"
-    }
-   ],
-   "cost_units": 6
-  },
-  {
-   "id": "DG-ST-OR-C2",
-   "name": "Reserved minor",
-   "tier": "minor",
-   "ring": 3,
-   "tree": "ST",
-   "branch": "ST-OR",
-   "requires": [
-    [
-     "DG-ST-OR-T6"
-    ]
-   ],
-   "placeholder": "politics",
-   "advantage": "reserved for politics: regime, elections, succession",
-   "effects": [
-    {
-     "kind": "unread",
-     "what": "reserved for politics: regime, elections, succession",
-     "waits_on": "politics"
-    }
-   ],
-   "cost_units": 6
-  },
-  {
-   "id": "DG-ST-OR-C",
-   "name": "[Politics]",
-   "tier": "major",
-   "ring": 4,
-   "tree": "ST",
-   "branch": "ST-OR",
-   "requires": [
-    [
-     "DG-ST-OR-C1"
-    ],
-    [
-     "DG-ST-OR-C2"
-    ]
-   ],
-   "placeholder": "politics",
-   "advantage": "placeholder cluster: regime, elections, succession; effects authored when the politics system exists",
-   "effects": [
-    {
-     "kind": "unread",
-     "what": "placeholder cluster: regime, elections, succession; effects authored when the politics system exists",
-     "waits_on": "politics"
-    }
-   ],
-   "cost_units": 24
-  },
-  {
    "id": "DG-ST-OR-M",
    "name": "Civic Trust",
    "tier": "travel",
@@ -3613,38 +2343,14 @@
    "tree": "ST",
    "branch": "ST-AC",
    "requires": [],
-   "advantage": "-1% Alarm toward you",
+   "advantage": "-2% Alarm toward you",
    "effects": [
     {
      "kind": "modifier",
      "subject": "alarm_toward",
      "scope": "all",
      "op": "multiply",
-     "value": 0.99
-    }
-   ],
-   "cost_units": 1
-  },
-  {
-   "id": "DG-ST-AC-T2",
-   "name": "Diplomatic Corps II",
-   "tier": "travel",
-   "ring": 1,
-   "tree": "ST",
-   "branch": "ST-AC",
-   "requires": [
-    [
-     "DG-ST-AC-T1"
-    ]
-   ],
-   "advantage": "-1% Alarm toward you",
-   "effects": [
-    {
-     "kind": "modifier",
-     "subject": "alarm_toward",
-     "scope": "all",
-     "op": "multiply",
-     "value": 0.99
+     "value": 0.98
     }
    ],
    "cost_units": 1
@@ -3658,7 +2364,7 @@
    "branch": "ST-AC",
    "requires": [
     [
-     "DG-ST-AC-T2"
+     "DG-ST-AC-T1"
     ]
    ],
    "advantage": "sentiment +5 with every nation you trade with",
@@ -3743,6 +2449,31 @@
   },
   {
    "id": "DG-ST-AC-T3",
+   "name": "Diplomatic Corps II",
+   "tier": "travel",
+   "ring": 2,
+   "tree": "ST",
+   "branch": "ST-AC",
+   "requires": [
+    [
+     "DG-ST-AC-Aa",
+     "DG-ST-AC-Ab"
+    ]
+   ],
+   "advantage": "-2% Alarm toward you",
+   "effects": [
+    {
+     "kind": "modifier",
+     "subject": "alarm_toward",
+     "scope": "all",
+     "op": "multiply",
+     "value": 0.98
+    }
+   ],
+   "cost_units": 2
+  },
+  {
+   "id": "DG-ST-AC-T5",
    "name": "Diplomatic Corps III",
    "tier": "travel",
    "ring": 2,
@@ -3754,90 +2485,17 @@
      "DG-ST-AC-Ab"
     ]
    ],
-   "advantage": "-1% Alarm toward you",
+   "advantage": "-2% Alarm toward you",
    "effects": [
     {
      "kind": "modifier",
      "subject": "alarm_toward",
      "scope": "all",
      "op": "multiply",
-     "value": 0.99
+     "value": 0.98
     }
    ],
    "cost_units": 2
-  },
-  {
-   "id": "DG-ST-AC-T4",
-   "name": "Diplomatic Corps IV",
-   "tier": "travel",
-   "ring": 3,
-   "tree": "ST",
-   "branch": "ST-AC",
-   "requires": [
-    [
-     "DG-ST-AC-T3"
-    ]
-   ],
-   "advantage": "-1% Alarm toward you",
-   "effects": [
-    {
-     "kind": "modifier",
-     "subject": "alarm_toward",
-     "scope": "all",
-     "op": "multiply",
-     "value": 0.99
-    }
-   ],
-   "cost_units": 3
-  },
-  {
-   "id": "DG-ST-AC-T5",
-   "name": "Diplomatic Corps V",
-   "tier": "travel",
-   "ring": 2,
-   "tree": "ST",
-   "branch": "ST-AC",
-   "requires": [
-    [
-     "DG-ST-AC-Aa",
-     "DG-ST-AC-Ab"
-    ]
-   ],
-   "advantage": "-1% Alarm toward you",
-   "effects": [
-    {
-     "kind": "modifier",
-     "subject": "alarm_toward",
-     "scope": "all",
-     "op": "multiply",
-     "value": 0.99
-    }
-   ],
-   "cost_units": 2
-  },
-  {
-   "id": "DG-ST-AC-T6",
-   "name": "Diplomatic Corps VI",
-   "tier": "travel",
-   "ring": 3,
-   "tree": "ST",
-   "branch": "ST-AC",
-   "requires": [
-    [
-     "DG-ST-AC-T5"
-    ]
-   ],
-   "advantage": "-1% Alarm toward you",
-   "effects": [
-    {
-     "kind": "modifier",
-     "subject": "alarm_toward",
-     "scope": "all",
-     "op": "multiply",
-     "value": 0.99
-    }
-   ],
-   "cost_units": 3
   },
   {
    "id": "DG-ST-AC-B1",
@@ -3848,7 +2506,7 @@
    "branch": "ST-AC",
    "requires": [
     [
-     "DG-ST-AC-T4"
+     "DG-ST-AC-T3"
     ]
    ],
    "advantage": "Alarm spikes decay 20% faster",
@@ -3920,28 +2578,6 @@
    "excludes": "DG-ST-AC-Ba"
   },
   {
-   "id": "DG-ST-AC-C1",
-   "name": "Inspection Regimes",
-   "tier": "minor",
-   "ring": 3,
-   "tree": "ST",
-   "branch": "ST-AC",
-   "requires": [
-    [
-     "DG-ST-AC-T6"
-    ]
-   ],
-   "advantage": "Alarm raised by your visible capability -10%",
-   "effects": [
-    {
-     "kind": "unread",
-     "what": "Alarm raised by your visible capability -10%",
-     "waits_on": "Alarm"
-    }
-   ],
-   "cost_units": 6
-  },
-  {
    "id": "DG-ST-AC-C2",
    "name": "Confidence Measures",
    "tier": "minor",
@@ -3950,7 +2586,7 @@
    "branch": "ST-AC",
    "requires": [
     [
-     "DG-ST-AC-T6"
+     "DG-ST-AC-T5"
     ]
    ],
    "advantage": "Alarm toward you -5%",
@@ -3973,9 +2609,6 @@
    "tree": "ST",
    "branch": "ST-AC",
    "requires": [
-    [
-     "DG-ST-AC-C1"
-    ],
     [
      "DG-ST-AC-C2"
     ]
@@ -4058,243 +2691,6 @@
    "cost_units": 6
   },
   {
-   "id": "DG-J-PREX-PRPC",
-   "name": "Integrated Mills",
-   "tier": "travel",
-   "joint": true,
-   "ring": 3,
-   "tree": "PR",
-   "branch": null,
-   "requires": [
-    [
-     "DG-PR-EX-T6"
-    ],
-    [
-     "DG-PR-PC-T4"
-    ]
-   ],
-   "advantage": "+1% extraction rate and +1% processing output",
-   "effects": [
-    {
-     "kind": "modifier",
-     "subject": "extraction_rate",
-     "scope": "all",
-     "op": "multiply",
-     "value": 1.01
-    },
-    {
-     "kind": "modifier",
-     "subject": "processing_yield",
-     "scope": "all",
-     "op": "multiply",
-     "value": 1.01
-    }
-   ],
-   "cost_units": 3
-  },
-  {
-   "id": "DG-J-PRPC-PREN",
-   "name": "Cogeneration",
-   "tier": "travel",
-   "joint": true,
-   "ring": 3,
-   "tree": "PR",
-   "branch": null,
-   "requires": [
-    [
-     "DG-PR-PC-T6"
-    ],
-    [
-     "DG-PR-EN-T4"
-    ]
-   ],
-   "advantage": "+1% processing output and -1% fuel draw",
-   "effects": [
-    {
-     "kind": "modifier",
-     "subject": "processing_yield",
-     "scope": "all",
-     "op": "multiply",
-     "value": 1.01
-    },
-    {
-     "kind": "unread",
-     "what": "-1% fuel draw",
-     "waits_on": "building fuel draw"
-    }
-   ],
-   "cost_units": 3
-  },
-  {
-   "id": "DG-J-PREN-NESO",
-   "name": "Launch Logistics",
-   "tier": "travel",
-   "joint": true,
-   "ring": 3,
-   "tree": "PR+NE",
-   "branch": null,
-   "requires": [
-    [
-     "DG-PR-EN-T6"
-    ],
-    [
-     "DG-NE-SO-T4"
-    ]
-   ],
-   "advantage": "+2% propellant output and +1% national research",
-   "effects": [
-    {
-     "kind": "modifier",
-     "subject": "processing_yield",
-     "scope": "resource:propellant",
-     "op": "multiply",
-     "value": 1.02
-    },
-    {
-     "kind": "modifier",
-     "subject": "national_research",
-     "scope": "all",
-     "op": "add",
-     "value": 0.01
-    }
-   ],
-   "cost_units": 3
-  },
-  {
-   "id": "DG-J-NESO-NEMK",
-   "name": "Market Data",
-   "tier": "travel",
-   "joint": true,
-   "ring": 3,
-   "tree": "NE",
-   "branch": null,
-   "requires": [
-    [
-     "DG-NE-SO-T6"
-    ],
-    [
-     "DG-NE-MK-T4"
-    ]
-   ],
-   "advantage": "+1% national research and +1% trade capacity",
-   "effects": [
-    {
-     "kind": "modifier",
-     "subject": "national_research",
-     "scope": "all",
-     "op": "add",
-     "value": 0.01
-    },
-    {
-     "kind": "unread",
-     "what": "+1% trade capacity",
-     "waits_on": "Marketplace trade capacity"
-    }
-   ],
-   "cost_units": 3
-  },
-  {
-   "id": "DG-J-NEFR-STFO",
-   "name": "Military Logistics",
-   "tier": "travel",
-   "joint": true,
-   "ring": 3,
-   "tree": "NE+ST",
-   "branch": null,
-   "requires": [
-    [
-     "DG-NE-FR-T6"
-    ],
-    [
-     "DG-ST-FO-T4"
-    ]
-   ],
-   "advantage": "+3% unit movement and -1% logistics cost",
-   "effects": [
-    {
-     "kind": "unread",
-     "what": "+3% unit movement",
-     "waits_on": "unit movement"
-    },
-    {
-     "kind": "modifier",
-     "subject": "logistics_cost",
-     "scope": "all",
-     "op": "multiply",
-     "value": 0.99
-    }
-   ],
-   "cost_units": 3
-  },
-  {
-   "id": "DG-J-STOR-STAC",
-   "name": "Public Diplomacy",
-   "tier": "travel",
-   "joint": true,
-   "ring": 3,
-   "tree": "ST",
-   "branch": null,
-   "requires": [
-    [
-     "DG-ST-OR-T6"
-    ],
-    [
-     "DG-ST-AC-T4"
-    ]
-   ],
-   "advantage": "-1% unrest and -1% Alarm toward you",
-   "effects": [
-    {
-     "kind": "unread",
-     "what": "-1% unrest",
-     "waits_on": "unrest"
-    },
-    {
-     "kind": "modifier",
-     "subject": "alarm_toward",
-     "scope": "all",
-     "op": "multiply",
-     "value": 0.99
-    }
-   ],
-   "cost_units": 3
-  },
-  {
-   "id": "DG-J-STAC-PREX",
-   "name": "Resource Diplomacy",
-   "tier": "travel",
-   "joint": true,
-   "ring": 3,
-   "tree": "ST+PR",
-   "branch": null,
-   "requires": [
-    [
-     "DG-ST-AC-T6"
-    ],
-    [
-     "DG-PR-EX-T4"
-    ]
-   ],
-   "advantage": "+1% extraction rate and -1% Alarm toward you",
-   "effects": [
-    {
-     "kind": "modifier",
-     "subject": "extraction_rate",
-     "scope": "all",
-     "op": "multiply",
-     "value": 1.01
-    },
-    {
-     "kind": "modifier",
-     "subject": "alarm_toward",
-     "scope": "all",
-     "op": "multiply",
-     "value": 0.99
-    }
-   ],
-   "cost_units": 3
-  },
-  {
    "id": "DG-ST-FO-D1",
    "name": "Assault Rifles",
    "tier": "minor",
@@ -4306,7 +2702,7 @@
      "DG-ST-FO-T3"
     ]
    ],
-   "advantage": "opens the assault rifle (infantry, motorised and mechanised weapon)",
+   "advantage": "opens the assault rifle (infantry, motorised and mechanised weapon); opens the flak vest (infantry, motorised and mechanised armour)",
    "effects": [
     {
      "kind": "unlock_kit",
@@ -4315,24 +2711,7 @@
       "mot.weapon.assault_rifle",
       "mech.weapon.assault_rifle"
      ]
-    }
-   ],
-   "cost_units": 4
-  },
-  {
-   "id": "DG-ST-FO-D2",
-   "name": "Body Armour",
-   "tier": "minor",
-   "ring": 2,
-   "tree": "ST",
-   "branch": "ST-FO",
-   "requires": [
-    [
-     "DG-ST-FO-T3"
-    ]
-   ],
-   "advantage": "opens the flak vest (infantry, motorised and mechanised armour)",
-   "effects": [
+    },
     {
      "kind": "unlock_kit",
      "items": [
@@ -4354,9 +2733,6 @@
    "requires": [
     [
      "DG-ST-FO-D1"
-    ],
-    [
-     "DG-ST-FO-D2"
     ]
    ],
    "advantage": "opens the wire-guided anti-tank missile (infantry and motorised weapon, helicopter armament)",
@@ -4371,29 +2747,6 @@
     }
    ],
    "cost_units": 12
-  },
-  {
-   "id": "DG-ST-FO-E1",
-   "name": "Light Mortars",
-   "tier": "minor",
-   "ring": 2,
-   "tree": "ST",
-   "branch": "ST-FO",
-   "requires": [
-    [
-     "DG-ST-FO-D"
-    ]
-   ],
-   "advantage": "opens the light mortar (infantry weapon)",
-   "effects": [
-    {
-     "kind": "unlock_kit",
-     "items": [
-      "inf.weapon.light_mortar"
-     ]
-    }
-   ],
-   "cost_units": 4
   },
   {
    "id": "DG-ST-FO-E2",
@@ -4429,9 +2782,6 @@
    "branch": "ST-FO",
    "requires": [
     [
-     "DG-ST-FO-E1"
-    ],
-    [
      "DG-ST-FO-E2"
     ]
    ],
@@ -4462,13 +2812,19 @@
      "DG-ST-FO-T5"
     ]
    ],
-   "advantage": "opens the smoothbore tank gun and the long-barrel howitzer",
+   "advantage": "opens the smoothbore tank gun and the long-barrel howitzer; opens the light mortar (infantry weapon)",
    "effects": [
     {
      "kind": "unlock_kit",
      "items": [
       "arm.armament.smoothbore_gun",
       "art.gun.long_barrel"
+     ]
+    },
+    {
+     "kind": "unlock_kit",
+     "items": [
+      "inf.weapon.light_mortar"
      ]
     }
    ],
@@ -4535,7 +2891,7 @@
    "branch": "ST-FO",
    "requires": [
     [
-     "DG-ST-FO-T6"
+     "DG-ST-FO-G"
     ]
    ],
    "advantage": "opens medium-range missiles (air defence launcher, fighter beyond-visual-range armament)",
@@ -4551,29 +2907,6 @@
    "cost_units": 6
   },
   {
-   "id": "DG-ST-FO-F2",
-   "name": "Submunitions",
-   "tier": "minor",
-   "ring": 3,
-   "tree": "ST",
-   "branch": "ST-FO",
-   "requires": [
-    [
-     "DG-ST-FO-T6"
-    ]
-   ],
-   "advantage": "opens anti-armour submunitions (artillery munitions)",
-   "effects": [
-    {
-     "kind": "unlock_kit",
-     "items": [
-      "art.munitions.submunitions"
-     ]
-    }
-   ],
-   "cost_units": 6
-  },
-  {
    "id": "DG-ST-FO-F",
    "name": "Long-Range Precision Strike",
    "tier": "major",
@@ -4583,12 +2916,9 @@
    "requires": [
     [
      "DG-ST-FO-F1"
-    ],
-    [
-     "DG-ST-FO-F2"
     ]
    ],
-   "advantage": "opens guided long-range rockets, precision stand-off weapons and air-launched cruise missiles",
+   "advantage": "opens guided long-range rockets, precision stand-off weapons and air-launched cruise missiles; opens anti-armour submunitions (artillery munitions)",
    "effects": [
     {
      "kind": "unlock_kit",
@@ -4596,6 +2926,12 @@
       "art.gun.guided_rockets",
       "mr.armament.standoff",
       "bmr.armament.cruise_missiles"
+     ]
+    },
+    {
+     "kind": "unlock_kit",
+     "items": [
+      "art.munitions.submunitions"
      ]
     }
    ],
@@ -4626,29 +2962,6 @@
    "cost_units": 8
   },
   {
-   "id": "DG-ST-FO-H2",
-   "name": "Armoured Self-Propelled Guns",
-   "tier": "minor",
-   "ring": 4,
-   "tree": "ST",
-   "branch": "ST-FO",
-   "requires": [
-    [
-     "DG-ST-FO-F"
-    ]
-   ],
-   "advantage": "opens the armoured self-propelled chassis (artillery tow)",
-   "effects": [
-    {
-     "kind": "unlock_kit",
-     "items": [
-      "art.tow.armoured_sp"
-     ]
-    }
-   ],
-   "cost_units": 8
-  },
-  {
    "id": "DG-ST-FO-H",
    "name": "Active Protection",
    "tier": "major",
@@ -4658,18 +2971,21 @@
    "requires": [
     [
      "DG-ST-FO-H1"
-    ],
-    [
-     "DG-ST-FO-H2"
     ]
    ],
-   "advantage": "opens active protection (armour, the heavy fighting vehicle)",
+   "advantage": "opens active protection (armour, the heavy fighting vehicle); opens the armoured self-propelled chassis (artillery tow)",
    "effects": [
     {
      "kind": "unlock_kit",
      "items": [
       "arm.armour.active_protection",
       "mech.vehicle.heavy_ifv"
+     ]
+    },
+    {
+     "kind": "unlock_kit",
+     "items": [
+      "art.tow.armoured_sp"
      ]
     }
    ],
@@ -4687,7 +3003,7 @@
      "DG-PR-PC-T3"
     ]
    ],
-   "advantage": "opens composite armour (armour, the light-armour applique)",
+   "advantage": "opens composite armour (armour, the light-armour applique); opens the ceramic plate carrier (infantry, motorised and mechanised armour)",
    "effects": [
     {
      "kind": "unlock_kit",
@@ -4695,24 +3011,7 @@
       "arm.armour.composite",
       "lt.armour.composite_applique"
      ]
-    }
-   ],
-   "cost_units": 4
-  },
-  {
-   "id": "DG-PR-PC-D2",
-   "name": "Ceramic Plates",
-   "tier": "minor",
-   "ring": 2,
-   "tree": "PR",
-   "branch": "PR-PC",
-   "requires": [
-    [
-     "DG-PR-PC-T3"
-    ]
-   ],
-   "advantage": "opens the ceramic plate carrier (infantry, motorised and mechanised armour)",
-   "effects": [
+    },
     {
      "kind": "unlock_kit",
      "items": [
@@ -4734,9 +3033,6 @@
    "requires": [
     [
      "DG-PR-PC-D1"
-    ],
-    [
-     "DG-PR-PC-D2"
     ]
    ],
    "advantage": "opens reactive armour (armour)",
@@ -4762,7 +3058,7 @@
      "DG-PR-PC-T5"
     ]
    ],
-   "advantage": "opens jet airframes (the twin-engine fighter, the multirole, the supersonic bomber, the high-altitude recon aircraft)",
+   "advantage": "opens jet airframes (the twin-engine fighter, the multirole, the supersonic bomber, the high-altitude recon aircraft); opens the armoured tandem-seat helicopter (helicopter airframe)",
    "effects": [
     {
      "kind": "unlock_kit",
@@ -4772,24 +3068,7 @@
       "bmr.airframe.supersonic",
       "rcn.airframe.high_altitude"
      ]
-    }
-   ],
-   "cost_units": 4
-  },
-  {
-   "id": "DG-PR-PC-E2",
-   "name": "Armoured Helicopters",
-   "tier": "minor",
-   "ring": 2,
-   "tree": "PR",
-   "branch": "PR-PC",
-   "requires": [
-    [
-     "DG-PR-PC-T5"
-    ]
-   ],
-   "advantage": "opens the armoured tandem-seat helicopter (helicopter airframe)",
-   "effects": [
+    },
     {
      "kind": "unlock_kit",
      "items": [
@@ -4809,9 +3088,6 @@
    "requires": [
     [
      "DG-PR-PC-E1"
-    ],
-    [
-     "DG-PR-PC-E2"
     ]
    ],
    "advantage": "opens low-observable airframes (fighter, strike, bomber)",
@@ -4941,29 +3217,6 @@
    "cost_units": 4
   },
   {
-   "id": "DG-NE-SO-E2",
-   "name": "Jet Combat Drones",
-   "tier": "minor",
-   "ring": 2,
-   "tree": "NE",
-   "branch": "NE-SO",
-   "requires": [
-    [
-     "DG-NE-SO-T5"
-    ]
-   ],
-   "advantage": "opens the jet-powered combat drone (drone airframe)",
-   "effects": [
-    {
-     "kind": "unlock_kit",
-     "items": [
-      "drn.airframe.jet_combat"
-     ]
-    }
-   ],
-   "cost_units": 4
-  },
-  {
    "id": "DG-NE-SO-E",
    "name": "Integrated Air Defence",
    "tier": "major",
@@ -4973,12 +3226,9 @@
    "requires": [
     [
      "DG-NE-SO-E1"
-    ],
-    [
-     "DG-NE-SO-E2"
     ]
    ],
-   "advantage": "opens the integrated air-defence network and the airborne early-warning aircraft; station Defence modules may be fitted",
+   "advantage": "opens the integrated air-defence network and the airborne early-warning aircraft; station Defence modules may be fitted; opens the jet-powered combat drone (drone airframe)",
    "effects": [
     {
      "kind": "unlock_kit",
@@ -4991,32 +3241,15 @@
      "kind": "mechanic",
      "key": "space_module_defence",
      "what": "Defence modules may be fitted"
-    }
-   ],
-   "cost_units": 18
-  },
-  {
-   "id": "DG-NE-SO-G1",
-   "name": "Autonomous Targeting",
-   "tier": "minor",
-   "ring": 3,
-   "tree": "NE",
-   "branch": "NE-SO",
-   "requires": [
-    [
-     "DG-NE-SO-T6"
-    ]
-   ],
-   "advantage": "opens autonomous targeting (drone avionics)",
-   "effects": [
+    },
     {
      "kind": "unlock_kit",
      "items": [
-      "drn.avionics.autonomous"
+      "drn.airframe.jet_combat"
      ]
     }
    ],
-   "cost_units": 6
+   "cost_units": 18
   },
   {
    "id": "DG-NE-SO-G2",
@@ -5027,7 +3260,7 @@
    "branch": "NE-SO",
    "requires": [
     [
-     "DG-NE-SO-T6"
+     "DG-NE-SO-E"
     ]
    ],
    "advantage": "opens electronic warfare (air-defence fire control, bomber countermeasures, towed decoys, the signals-intelligence suite)",
@@ -5053,19 +3286,22 @@
    "branch": "NE-SO",
    "requires": [
     [
-     "DG-NE-SO-G1"
-    ],
-    [
      "DG-NE-SO-G2"
     ]
    ],
-   "advantage": "opens networked soldier kit and gun-launched missiles with networked fire control",
+   "advantage": "opens networked soldier kit and gun-launched missiles with networked fire control; opens autonomous targeting (drone avionics)",
    "effects": [
     {
      "kind": "unlock_kit",
      "items": [
       "inf.armour.networked_kit",
       "arm.armament.gun_missiles"
+     ]
+    },
+    {
+     "kind": "unlock_kit",
+     "items": [
+      "drn.avionics.autonomous"
      ]
     }
    ],
@@ -5096,29 +3332,6 @@
    "cost_units": 8
   },
   {
-   "id": "DG-NE-SO-F2",
-   "name": "Counter-Drone Defence",
-   "tier": "minor",
-   "ring": 4,
-   "tree": "NE",
-   "branch": "NE-SO",
-   "requires": [
-    [
-     "DG-NE-SO-G"
-    ]
-   ],
-   "advantage": "opens layered defence with counter-drone (air defence launcher)",
-   "effects": [
-    {
-     "kind": "unlock_kit",
-     "items": [
-      "ad.launcher.layered"
-     ]
-    }
-   ],
-   "cost_units": 8
-  },
-  {
    "id": "DG-NE-SO-F",
    "name": "Loitering Munitions",
    "tier": "major",
@@ -5128,18 +3341,21 @@
    "requires": [
     [
      "DG-NE-SO-F1"
-    ],
-    [
-     "DG-NE-SO-F2"
     ]
    ],
-   "advantage": "opens loitering drones (artillery munitions, drone armament)",
+   "advantage": "opens loitering drones (artillery munitions, drone armament); opens layered defence with counter-drone (air defence launcher)",
    "effects": [
     {
      "kind": "unlock_kit",
      "items": [
       "art.munitions.loitering_drones",
       "drn.armament.loitering"
+     ]
+    },
+    {
+     "kind": "unlock_kit",
+     "items": [
+      "ad.launcher.layered"
      ]
     }
    ],
@@ -5177,33 +3393,11 @@
    "tree": "ST",
    "branch": "ST-NV",
    "requires": [],
-   "advantage": "+1% strength for every ship",
+   "advantage": "+2% strength for every ship",
    "effects": [
     {
      "kind": "unread",
-     "what": "+1% strength for every ship",
-     "waits_on": "ship strength"
-    }
-   ],
-   "cost_units": 1
-  },
-  {
-   "id": "DG-ST-NV-T2",
-   "name": "Seamanship II",
-   "tier": "travel",
-   "ring": 1,
-   "tree": "ST",
-   "branch": "ST-NV",
-   "requires": [
-    [
-     "DG-ST-NV-T1"
-    ]
-   ],
-   "advantage": "+1% strength for every ship",
-   "effects": [
-    {
-     "kind": "unread",
-     "what": "+1% strength for every ship",
+     "what": "+2% strength for every ship",
      "waits_on": "ship strength"
     }
    ],
@@ -5218,10 +3412,10 @@
    "branch": "ST-NV",
    "requires": [
     [
-     "DG-ST-NV-T2"
+     "DG-ST-NV-T1"
     ]
    ],
-   "advantage": "opens gas-turbine hull, compartmented hull, roll-on assault hull",
+   "advantage": "opens gas-turbine hull, compartmented hull, roll-on assault hull; opens streamlined snorkel hull",
    "effects": [
     {
      "kind": "unlock_kit",
@@ -5230,24 +3424,7 @@
       "cap.hull.compartmented",
       "tra.hull.roll_on"
      ]
-    }
-   ],
-   "cost_units": 2
-  },
-  {
-   "id": "DG-ST-NV-A2",
-   "name": "Streamlined Hulls",
-   "tier": "minor",
-   "ring": 1,
-   "tree": "ST",
-   "branch": "ST-NV",
-   "requires": [
-    [
-     "DG-ST-NV-T2"
-    ]
-   ],
-   "advantage": "opens streamlined snorkel hull",
-   "effects": [
+    },
     {
      "kind": "unlock_kit",
      "items": [
@@ -5267,9 +3444,6 @@
    "requires": [
     [
      "DG-ST-NV-A1"
-    ],
-    [
-     "DG-ST-NV-A2"
     ]
    ],
    "advantage": "opens reactor pressure hull, quieted composite hull, reactor capital hull, fast sealift hull",
@@ -5288,6 +3462,28 @@
   },
   {
    "id": "DG-ST-NV-T3",
+   "name": "Seamanship II",
+   "tier": "travel",
+   "ring": 2,
+   "tree": "ST",
+   "branch": "ST-NV",
+   "requires": [
+    [
+     "DG-ST-NV-A"
+    ]
+   ],
+   "advantage": "+2% strength for every ship",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "+2% strength for every ship",
+     "waits_on": "ship strength"
+    }
+   ],
+   "cost_units": 2
+  },
+  {
+   "id": "DG-ST-NV-T5",
    "name": "Seamanship III",
    "tier": "travel",
    "ring": 2,
@@ -5298,81 +3494,15 @@
      "DG-ST-NV-A"
     ]
    ],
-   "advantage": "+1% strength for every ship",
+   "advantage": "+2% strength for every ship",
    "effects": [
     {
      "kind": "unread",
-     "what": "+1% strength for every ship",
+     "what": "+2% strength for every ship",
      "waits_on": "ship strength"
     }
    ],
    "cost_units": 2
-  },
-  {
-   "id": "DG-ST-NV-T4",
-   "name": "Seamanship IV",
-   "tier": "travel",
-   "ring": 3,
-   "tree": "ST",
-   "branch": "ST-NV",
-   "requires": [
-    [
-     "DG-ST-NV-T3"
-    ]
-   ],
-   "advantage": "+1% strength for every ship",
-   "effects": [
-    {
-     "kind": "unread",
-     "what": "+1% strength for every ship",
-     "waits_on": "ship strength"
-    }
-   ],
-   "cost_units": 3
-  },
-  {
-   "id": "DG-ST-NV-T5",
-   "name": "Seamanship V",
-   "tier": "travel",
-   "ring": 2,
-   "tree": "ST",
-   "branch": "ST-NV",
-   "requires": [
-    [
-     "DG-ST-NV-A"
-    ]
-   ],
-   "advantage": "+1% strength for every ship",
-   "effects": [
-    {
-     "kind": "unread",
-     "what": "+1% strength for every ship",
-     "waits_on": "ship strength"
-    }
-   ],
-   "cost_units": 2
-  },
-  {
-   "id": "DG-ST-NV-T6",
-   "name": "Seamanship VI",
-   "tier": "travel",
-   "ring": 3,
-   "tree": "ST",
-   "branch": "ST-NV",
-   "requires": [
-    [
-     "DG-ST-NV-T5"
-    ]
-   ],
-   "advantage": "+1% strength for every ship",
-   "effects": [
-    {
-     "kind": "unread",
-     "what": "+1% strength for every ship",
-     "waits_on": "ship strength"
-    }
-   ],
-   "cost_units": 3
   },
   {
    "id": "DG-ST-NV-B1",
@@ -5383,10 +3513,10 @@
    "branch": "ST-NV",
    "requires": [
     [
-     "DG-ST-NV-T4"
+     "DG-ST-NV-T3"
     ]
    ],
-   "advantage": "opens anti-submarine rockets, radar-laid main battery",
+   "advantage": "opens anti-submarine rockets, radar-laid main battery; opens homing torpedoes",
    "effects": [
     {
      "kind": "unlock_kit",
@@ -5394,24 +3524,7 @@
       "des.armament.rocket",
       "cap.armament.rifled"
      ]
-    }
-   ],
-   "cost_units": 6
-  },
-  {
-   "id": "DG-ST-NV-B2",
-   "name": "Homing Torpedoes",
-   "tier": "minor",
-   "ring": 3,
-   "tree": "ST",
-   "branch": "ST-NV",
-   "requires": [
-    [
-     "DG-ST-NV-T4"
-    ]
-   ],
-   "advantage": "opens homing torpedoes",
-   "effects": [
+    },
     {
      "kind": "unlock_kit",
      "items": [
@@ -5431,9 +3544,6 @@
    "requires": [
     [
      "DG-ST-NV-B1"
-    ],
-    [
-     "DG-ST-NV-B2"
     ]
    ],
    "advantage": "opens wire-guided hunter torpedoes, anti-ship missiles, vertical-launch missile cells",
@@ -5458,10 +3568,10 @@
    "branch": "ST-NV",
    "requires": [
     [
-     "DG-ST-NV-T6"
+     "DG-ST-NV-T5"
     ]
    ],
-   "advantage": "opens variable-depth sonar, surface search radar, warning radar",
+   "advantage": "opens variable-depth sonar, surface search radar, warning radar; opens passive sonar array",
    "effects": [
     {
      "kind": "unlock_kit",
@@ -5470,24 +3580,7 @@
       "cap.sensors.search",
       "tra.sensors.warning"
      ]
-    }
-   ],
-   "cost_units": 6
-  },
-  {
-   "id": "DG-ST-NV-C2",
-   "name": "Passive Sonar",
-   "tier": "minor",
-   "ring": 3,
-   "tree": "ST",
-   "branch": "ST-NV",
-   "requires": [
-    [
-     "DG-ST-NV-T6"
-    ]
-   ],
-   "advantage": "opens passive sonar array",
-   "effects": [
+    },
     {
      "kind": "unlock_kit",
      "items": [
@@ -5507,9 +3600,6 @@
    "requires": [
     [
      "DG-ST-NV-C1"
-    ],
-    [
-     "DG-ST-NV-C2"
     ]
    ],
    "advantage": "opens towed sonar array, towed array and data link, phased-array radar, convoy data link",
@@ -5578,63 +3668,6 @@
     }
    ],
    "keys_next_branch": "Orbital Fleet",
-   "cost_units": 6
-  },
-  {
-   "id": "DG-J-STNV-STOR",
-   "name": "Coastal Security",
-   "tier": "travel",
-   "joint": true,
-   "ring": 3,
-   "tree": "ST",
-   "branch": null,
-   "requires": [
-    [
-     "DG-ST-NV-T6"
-    ],
-    [
-     "DG-ST-OR-T4"
-    ]
-   ],
-   "advantage": "+1% strength for every ship and -1% unrest",
-   "effects": [
-    {
-     "kind": "unread",
-     "what": "+1% strength for every ship",
-     "waits_on": "ship strength"
-    },
-    {
-     "kind": "unread",
-     "what": "-1% unrest",
-     "waits_on": "unrest"
-    }
-   ],
-   "cost_units": 3
-  },
-  {
-   "id": "DG-ST-FO-G3",
-   "name": "Counter-Battery Radar",
-   "tier": "minor",
-   "ring": 3,
-   "tree": "ST",
-   "branch": "ST-FO",
-   "requires": [
-    [
-     "DG-ST-FO-G1"
-    ],
-    [
-     "DG-ST-FO-A2"
-    ]
-   ],
-   "advantage": "opens the radar-laid howitzer (artillery gun): counter-battery radar finds hostile artillery in range and answers it first",
-   "effects": [
-    {
-     "kind": "unlock_kit",
-     "items": [
-      "art.gun.radar_laid"
-     ]
-    }
-   ],
    "cost_units": 6
   }
  ]

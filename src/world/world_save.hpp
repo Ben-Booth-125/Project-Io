@@ -822,7 +822,24 @@ inline constexpr uint32_t k_world_save_version_one_product = 94;
 /// MERGE NOTE: a parallel lane's bump renumbers this block (this paragraph, the
 /// constants below, the accepted-version line in `read_world_snapshot`, the tail table
 /// and the one section at the end of the writer and reader).
-inline constexpr uint32_t world_save_version = 96;
+///
+/// **97 (BL-1712, the tech tree trim; Ben, 2026-11-19) - THE TRIMMED TREE.** No section
+/// is added or moved and no record grows: v97's layout IS v96's. What moved is MEANING -
+/// the nation tech record's held bitset and queue name Digitisation nodes by store index
+/// (`io::dg`), and the trim removed 81 nodes from the middle of the store, so every
+/// index past the first removed node names a different node. A game save
+/// (`read_save_game`, src/core) refuses any world stream below v97 whole, with no
+/// migration (`save_game_refusal_reason` says why). The world reader still DECODES v96
+/// and older for the layout harness rows; an old stream whose tech count exceeds this
+/// tree is refused by `r_nation_tech` on its own terms.
+/// MERGE NOTE: a parallel lane's bump renumbers this block (this paragraph, the
+/// constants below, the accepted-version line in `read_world_snapshot`, the
+/// static_assert under the tail table, and the game load's refusal in save_game.cpp).
+inline constexpr uint32_t world_save_version = 97;
+
+/// BL-1712: the first stream of the trimmed Digitisation tree. Every game save below it
+/// is refused (`read_save_game`).
+inline constexpr uint32_t k_world_save_version_tree_trim = 97;
 
 /// BL-1637: the first version carrying the pad-boost section (see above).
 inline constexpr uint32_t k_world_save_version_launch_boost = 96;

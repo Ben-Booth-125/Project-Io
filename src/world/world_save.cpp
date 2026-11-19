@@ -810,7 +810,8 @@ bool r_law(std::istream& i, law& l)
 // queue. The held set is written as the node count it was written under, then
 // that many bits packed into 32-bit words, so a store that APPENDS nodes (the
 // store is append-only: gen_tech_tree_table.js) still reads an older bitset —
-// the new tail reads unheld. Refused whole, never repaired: a count past this
+// the new tail reads unheld. A store that REMOVES nodes re-points every index and
+// bumps the version instead (BL-1712, v97: the game refuses an older save). Refused whole, never repaired: a count past this
 // build's tree, a set bit past the count, a negative pool, a queue entry
 // outside the tree, a duplicate queue entry, a queued node already held, and
 // both sides of a pick-one pair held or queued together — every one of them a
@@ -3593,7 +3594,9 @@ std::size_t tail_bytes_after_key(int version, const world& w)
     // monthly tick), so the table ends at v92's. v95 does GROW one record: each off-world
     // base carries its loss carry (16 bytes, was 12) - the v90 row above counts today's
     // stream, which is what a tail "after" an older version is measured in.
-    static_assert(world_save_version == k_world_save_version_launch_boost,
+    // BL-1712: v97 (the trimmed tree) adds no section either; it moves what a node index means.
+    static_assert(world_save_version == k_world_save_version_tree_trim
+                      && k_world_save_version_tree_trim == k_world_save_version_launch_boost + 1,
                   "BL-1632: a new trailing section joins world_save_tail_bytes_after's table");
     assert(version >= static_cast<int>(k_world_save_version_pre_tax)); // older tails are not today's
     std::size_t n = 0;
@@ -3680,6 +3683,7 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
     // of v48.
     if (!r_u32(in, version)
         || (version != world_save_version && version != k_world_save_version_pre_lp
+            && version != k_world_save_version_launch_boost // BL-1712: v96, v97's layout, the untrimmed tree
             && version != k_world_save_version_pre_launch_boost // BL-1637: v95, no pad boost
             && version != k_world_save_version_one_product // v94: v95's layout, the quarter tick (BL-1642)
             && version != k_world_save_version_space_merge // BL-1641: v93, the same layout as v94
