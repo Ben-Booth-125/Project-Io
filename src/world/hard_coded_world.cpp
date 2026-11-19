@@ -3932,6 +3932,11 @@ void run_tail(generation_cursor& c)
     // here is the only generation-time write.
     seed_province_holders(w);
 
+    // BL-1708 (Ben, 2026-11-19; PROVINCES.md § A province's name): every province of
+    // the canonical partition is named, now that it and every centre exist. A pure
+    // function of the names and tongues already made: it draws from no stream.
+    name_provinces(w, kepler, home_grid_width, kepler_settlement, kepler_creeds);
+
     // BL-571: nation garrisons — capital plus grudge-border provinces, sized
     // off each nation's treasury. Runs LAST of the three, because it reads
     // both `w.provinces` (just built) and `province_holder_for` (just

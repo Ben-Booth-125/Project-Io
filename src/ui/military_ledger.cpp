@@ -155,25 +155,14 @@ void row_card_tooltip(const ui_state& s, const char* grid_id, const char* name, 
     });
 }
 
-/// Where a tile is, in the glossary's words: the population centre its province
-/// holds (a province has no name of its own — GLOSSARY.md § Province), as the
-/// site finder names a row; "Province N" where no centre stands in it.
+/// Where a tile is: its province's name (BL-1708; PROVINCES.md § A province's
+/// name) - the centre's name where the province holds one, as the site finder
+/// names a row.
 std::string place_of(const world& w, entity_id tile)
 {
     const std::uint32_t pid = w.provinces.province_of(tile);
     if (pid != 0)
-    {
-        // The lowest centre id in the province, so the name is one answer.
-        entity_id best = null_entity;
-        for (const auto& [cid, ctile] : w.population_centre_tile)
-            if (w.provinces.province_of(ctile) == pid && (best == null_entity || cid < best))
-                best = cid;
-        if (best != null_entity)
-            if (const auto nm = w.population_centre_name.find(best);
-                nm != w.population_centre_name.end() && !nm->second.empty())
-                return nm->second;
-        return "Province " + std::to_string(pid);
-    }
+        return province_display_name(w, pid);
     if (const auto t = w.tiles.find(tile); t != w.tiles.end())
         return "Tile " + std::to_string(t->second.grid_x) + "," + std::to_string(t->second.grid_y);
     return "Unknown ground";

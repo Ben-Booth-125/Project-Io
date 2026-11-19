@@ -24,19 +24,54 @@ is named, that name is the one in the code.
 **A province is a deterministic, seeded partition of a body's tiles into small, contiguous, purely
 spatial cells.** Every tile on every body belongs to exactly one.
 
-> **It is NOT a region.** No name, no culture, no economy of its own.
+> **It is NOT a region.** A name, but no culture and no economy of its own.
 
 **Provinces are always parts of a nation** (Ben, 2026-08-22, design register). Ownership is not
 the axis the restraint is about — a province sits inside a nation's territory like every other
-piece of ground. What a province lacks is a **name, a culture and an economy of its own**; what it
-has is a place in the political map. `world::tile_to_nation` gives every tile an owner, so a
-province's owner is **derived from its tiles** and needs no field of its own.
+piece of ground. What a province lacks is **a culture and an economy of its own**; what it has is
+a place in the political map and a name (§ A province's name). `world::tile_to_nation` gives
+every tile an owner, so a province's owner is **derived from its tiles** and needs no field of its
+own.
 
 That restraint is the design. The province exists because **a battle needs an engagement
 envelope with a stable identity** (BL-467, battle state) — something a battle can happen *in*,
 whose id can be folded into the battle's seed stream. Everything else it carries sits on top of
-that one requirement, and any of a name, a culture or an economy would be a new system, not a
-field.
+that one requirement, and a culture or an economy would be a new system, not a field.
+
+### A province's name
+
+**Every province has a name (Ben, 2026-11-19, overturning "no name" of 2026-08-22).** His reason:
+*"Buildings should be named by their province rather than coordinate pairs. We should
+procedurally generate province names."* A grid position is an address only the map can read; a
+place name is one the player can hold. BL-1708 (province names) owns it.
+
+- **A province that holds a population centre takes the centre's name.** Where it holds two, the
+  lowest centre id names it, so the answer is one. Centre names are unique on their body
+  (`city_names.hpp`), so these province names are too, and the player meets one word for a
+  city and the ground around it.
+- **Every other province coins its own** — a sea province, a pocket no centre anchors, a province
+  on a body nobody settled. The name is coined in **the tongue of the people whose ground it is**:
+  the nearest region's plurality culture, the same "whose ground" rule a city is named by
+  (`name_population_centres`). A body with no settlement record speaks a tongue rolled from the
+  body's own id. The coining is a **pure function of the tongue and the province id**, on
+  `coin_realm_name`'s footing, so naming draws from no generation stream and moves nothing else
+  the seed produces. Sci-fi by construction: the words come from the tongue's own phoneme
+  inventory and coined morphemes, never an Earth list.
+- **Unique on its body.** A coined name that collides with a centre's or an earlier province's
+  name (ascending id order) lengthens by another root of the same tongue until it is fresh.
+- **Fixed at generation, kept for life.** Names are written once the canonical partition is drawn
+  and saved with the world (`world::province_name`). A province that absorbs another in play (an
+  abandoned centre, POPULATION.md § Growth, decline and razing) keeps its own name; the absorbed
+  name goes with the absorbed id. A conquest does not rename ground.
+
+**A building is named by its province (Ben, 2026-11-19).** Its display name is the province's
+name, then the good it works or makes, then what it is: *"Velka Copper Mine"*, *"Velka Steel
+Works"*. A building with no good (a hub, a base, an institute) is the province's name and its
+type: *"Velka Logistics Hub"*. **Two that would read the same are told apart by a numeral in build
+order** — ascending entity id — so the second is *"Velka Copper Mine II"*. The name is computed on
+demand, never stored, so demolishing the first renumbers the rest; that is accepted, because the
+numeral only exists to make two rows of one list distinct. Nothing that names a building prints a
+grid position in its place.
 
 **A province READS a culture; it still does not own one (Ben, 2026-09-15).** The culture lens
 shows a primary culture per province (`INDUSTRIALISATION.md` § 4. A culture lens at province grain). The

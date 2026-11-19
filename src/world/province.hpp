@@ -1003,6 +1003,12 @@ private:
 ///          replaced.
 void seed_province_holders(world& w);
 
+/// BL-1708 (PROVINCES.md § A province's name): the name of province @p pid -
+/// `world::province_name`'s entry; else (a world saved before v97, or a fixture that
+/// never ran `name_provinces`) the name of the lowest-id population centre standing in
+/// it, which is what generation would have written; else "Province N". Empty never.
+std::string province_display_name(const world& w, std::uint32_t pid);
+
 /// THE PROVINCE ANCHOR, ONE DERIVATION (BL-611; shared since the BL-1146 review,
 /// 2026-09-27). A province's anchor is the tile carrying the highest SUMMED
 /// centre scale standing in it — the scales of every `population_centres` entry

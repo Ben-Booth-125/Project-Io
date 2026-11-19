@@ -374,7 +374,7 @@ cultures at 20% and 19% in a many-peopled province checker as surely as 50% and 
 
 | Ruling | Where | Answer |
 |---|---|---|
-| A province has *no name, no culture, no economy of its own* | `PROVINCES.md` § What a province is | A province **reads** culture, it does not own it — the same idiom as its owner, derived from its tiles |
+| A province has *no culture and no economy of its own* (its name, Ben 2026-11-19, is the one thing it carries) | `PROVINCES.md` § What a province is | A province **reads** culture, it does not own it — the same idiom as its owner, derived from its tiles |
 | Every fill lens blends across province vertices | `PROVINCES.md` § Every lens blends across provinces | The primary fill blends; the checker is a hard pattern and is the exception, as the border band is |
 | Many culture colours on one map read as plaid | `../ui/STARTUP.md` § Rounds (round 3) | The checker marks contested ground only; the lineage palette keeps kin in one hue family |
 

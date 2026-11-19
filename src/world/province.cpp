@@ -3,6 +3,8 @@
 #include "hex_neighbors.hpp"
 #include "logistics.hpp" // body_tile_grid — the raster index every body-grid pass walks
 #include "placement_rules.hpp" // the anchor site score's gate and deposit list (BL-1382)
+#include "world.hpp"           // province_display_name reads the centre and name stores (BL-1708)
+#include <string>
 
 #include <algorithm>
 #include <cmath>
@@ -1890,4 +1892,21 @@ int province_buildings_standing(const world& w, uint32_t province_id)
         if (w.provinces.province_of(bc.tile) == province_id)
             ++n;
     return n;
+}
+
+// BL-1708 (Ben, 2026-11-19; PROVINCES.md § A province's name).
+std::string province_display_name(const world& w, std::uint32_t pid)
+{
+    if (const auto it = w.province_name.find(pid); it != w.province_name.end() && !it->second.empty())
+        return it->second;
+    // A world named before v97: the rule generation applies to a centre's province.
+    entity_id best = null_entity;
+    for (const auto& [cid, ctile] : w.population_centre_tile) // order-free: a minimum
+        if (w.provinces.province_of(ctile) == pid && (best == null_entity || cid < best))
+            best = cid;
+    if (best != null_entity)
+        if (const auto nm = w.population_centre_name.find(best);
+            nm != w.population_centre_name.end() && !nm->second.empty())
+            return nm->second;
+    return "Province " + std::to_string(pid);
 }

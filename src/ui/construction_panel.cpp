@@ -646,10 +646,10 @@ void draw_queue_section(const world& w, const recipe_registry& reg, ui_state& ui
         row.ident = row.makes ? row.good : b.target_resource;
         if (const auto tit = w.tiles.find(b.tile); tit != w.tiles.end())
         {
+            // BL-1708: the place is the province's name, never a grid position.
             const auto bod = w.bodies.find(tit->second.body);
-            row.where = (bod != w.bodies.end() ? bod->second.name : std::string("off map"))
-                      + " [" + std::to_string(tit->second.grid_x) + ", "
-                      + std::to_string(tit->second.grid_y) + "]";
+            row.where = province_display_name(w, w.provinces.province_of(b.tile))
+                      + ", " + (bod != w.bodies.end() ? bod->second.name : std::string("off map"));
         }
         rows.push_back(std::move(row));
     }
@@ -868,7 +868,7 @@ void draw_queue_section(const world& w, const recipe_registry& reg, ui_state& ui
 
 // --- The Buildings view: the player's estate, grouped by type -----------------
 
-// One line per building inside an expanded group: its tile and its own net, with a
+// One line per building inside an expanded group: its name (BL-1708) and its own net, with a
 // press that SELECTS it. Returns true when pressed.
 //
 // Selecting from a row is the existing idiom, not a new one — the corporations table
@@ -876,22 +876,18 @@ void draw_queue_section(const world& w, const recipe_registry& reg, ui_state& ui
 // this view's empty state can be better than the Construction view's: listing the
 // buildings behind a count the header has already asserted is NAVIGATION, and decides
 // nothing. Ranking tiles the player could build on would have been the other thing.
-bool draw_group_member_row(const world& w, entity_id id, float net, bool known,
+bool draw_group_member_row(const world& w, const recipe_registry& reg, entity_id id, float net, bool known,
                            bool selected, float name_w)
 {
     const auto bit = w.buildings.find(id);
     if (bit == w.buildings.end())
         return false;
 
-    char label[96];
-    const auto tit = w.tiles.find(bit->second.tile);
-    if (tit != w.tiles.end())
-        std::snprintf(label, sizeof label, "[%d, %d]###m%u",
-                      tit->second.grid_x, tit->second.grid_y, static_cast<unsigned>(id));
-    else
-        std::snprintf(label, sizeof label, "(off map)###m%u", static_cast<unsigned>(id));
+    // BL-1708 (Ben, 2026-11-19): a building is named by its province, not its grid
+    // position - "Velka Copper Mine II".
+    const std::string label = building_place_name(w, reg, id) + "###m" + std::to_string(static_cast<unsigned>(id));
 
-    const bool pressed = ImGui::Selectable(label, selected, 0, {name_w, 0.0f});
+    const bool pressed = ImGui::Selectable(label.c_str(), selected, 0, {name_w, 0.0f});
 
     // The member's own net, right-aligned against the group total above it: the
     // column exists so the header's total is VISIBLY the sum of these, not a figure
@@ -1034,7 +1030,7 @@ void draw_buildings_view(world& w, const recipe_registry& reg,
                 const building_profit p = estimate_building_reading(w, reg, report, id);
                 const ImVec2 mp = ImGui::GetCursorScreenPos();
                 const bool pressed = draw_group_member_row(
-                    w, id, p.has_data ? p.net() : 0.0f, p.has_data,
+                    w, reg, id, p.has_data ? p.net() : 0.0f, p.has_data,
                     ui.selected_entity == id,
                     std::max(ui::px(40.0f), name_w - ImGui::GetStyle().IndentSpacing));
                 if (!published_member)
@@ -1089,6 +1085,40 @@ std::string building_group_name(const world& w, const recipe_registry& reg, cons
         return building_type_name(b.type);
     }
     return building_type_name(b.type);
+}
+
+namespace {
+/// II, III ... X, then the arabic numeral: a disambiguator, not a count.
+std::string build_order_numeral(int n)
+{
+    static const char* const k_roman[] = { "", "I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X" };
+    if (n >= 1 && n <= 10)
+        return k_roman[n];
+    return std::to_string(n);
+}
+} // namespace
+
+std::string building_place_name(const world& w, const recipe_registry& reg, entity_id id)
+{
+    const auto bit = w.buildings.find(id);
+    if (bit == w.buildings.end())
+        return "a building since removed";
+    const building_component& b = bit->second;
+    const std::string what = building_group_name(w, reg, b);
+    const std::uint32_t pid = w.provinces.province_of(b.tile);
+    if (pid == 0)
+        return what; // a building on no province's ground (off map): its kind alone
+
+    // Build order among the namesakes in this province: only buildings standing in
+    // the same province are asked their group name, so the walk stays cheap.
+    int rank = 1;
+    for (const auto& [oid, ob] : w.buildings) // order-free: a count
+        if (oid < id && w.provinces.province_of(ob.tile) == pid && building_group_name(w, reg, ob) == what)
+            ++rank;
+    std::string name = province_display_name(w, pid) + " " + what;
+    if (rank > 1)
+        name += " " + build_order_numeral(rank);
+    return name;
 }
 
 std::vector<building_group> player_building_groups(const world& w,
