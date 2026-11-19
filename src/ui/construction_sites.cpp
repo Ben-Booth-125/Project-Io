@@ -1624,7 +1624,7 @@ std::vector<site_option> site_options(const world& w, const recipe_registry& reg
         {building_type::port, "Port"},
         {building_type::planetary_marketplace, "Planetary Marketplace"},
         {building_type::launchpad, "Launchpad"},
-        {building_type::inland_logistics_hub, "Inland Logistics Hub"},
+        {building_type::inland_logistics_hub, "Truck Depot"},
         {building_type::military_base, "Military Base"},
         {building_type::airbase, "Airbase"},
         {building_type::bunker, "Bunker"}, // BL-1426
@@ -2326,7 +2326,7 @@ void draw_site_finder(world& w, const recipe_registry& reg, ui_state& ui)
                         ? "Cover 0%: no Logistic Points operate here. A source reaches it but is not tied to "
                           "the capital. It would build, and not run."
                         : "Cover 0%: no Logistic Points operate here, and no source reaches it. It would build, "
-                          "and not run until a hub, station or port does.";
+                          "and not run until a truck depot, station or port does.";
                 else
                 {
                     char buf[200];

@@ -59,7 +59,7 @@ Layer 5 of the economy is the **convoy layer** — the mechanism that couples bo
 **What ships.** A trade decides — manual routes the owner sets, and auto, which spends the unreserved trade points on the best-margin routes each tick (`docs/economy/TRADE.md` § Auto and reserved trade). A trade between bodies needs the trader's staffed Launchpad on the source body, and each launch spends that pad's boost (`docs/economy/SPACE_ASSETS.md` § Boost).
 
 **Infrastructure gates per mode.**
-- **Land** — ungated; always available across contiguous land on a body. Roads are a per-tile cost-reducer: the three-tier Track/Road/Highway ladder (BL-146–149, road network + hubs; generated lattice in `src/world/road_generation.cpp` plus player placement; `tile_component.road_level` discounts A* traversal).
+- **Land** — ungated; always available across contiguous land on a body. Roads are a per-tile cost-reducer: the three-tier Track/Road/Highway ladder (BL-146–149, road network + depots; generated lattice in `src/world/road_generation.cpp` plus player placement; `tile_component.road_level` discounts A* traversal).
 - **Sea** — gated on a **Port** building at both endpoints.
 - **Air** — gated on an **Airfield** building at both endpoints.
 - **Space** — gated on a **Launchpad** at the origin and an **Orbital Port** at the destination; requires **Era 1** (per `docs/economy/ERAS.md`).

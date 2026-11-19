@@ -76,7 +76,7 @@ a nation owns tiles and never buildings.
   maintenance are paid from it.
 - **A losing building idles.** When its costs exceed what the treasury can pay, a building stops
   producing and paying until the treasury can pay again. The nation never runs into debt. **Network
-  nodes are paid first (Ben, 2026-10-22):** when the treasury cannot pay for everything, its hubs,
+  nodes are paid first (Ben, 2026-10-22):** when the treasury cannot pay for everything, its depots,
   stations and ports are funded before any other building, so the points its industry produces with
   come before the industry that draws them.
 - **It builds what it pays for.** Construction is paid from the treasury. A building opens with no
@@ -100,7 +100,7 @@ a nation owns tiles and never buildings.
 
 **A nation builds only on its own ground**: never on another nation's tiles, and never on ground no
 nation owns. The rule binds every building a nation may place — production, logistics sources
-(hubs, stations, ports) and rail alike.
+(depots, stations, ports) and rail alike.
 
 - **A road is the one reach across.** It may be laid one crossing *into* foreign ground, so that two
   nations' networks can join; never laid *from* foreign ground (`../economy/LOGISTICS.md` § 4).
@@ -293,7 +293,7 @@ indexed by them):
 
 | Line | What it buys |
 |---|---|
-| `logistics_maintenance` | keeping the road/hub network standing (LOGISTICS.md) |
+| `logistics_maintenance` | keeping the road/depot network standing (LOGISTICS.md) |
 | `schooling` | population capability |
 | `military_research` | force-side research; a force's wages are a flat bill and no line's share (MILITARY.md § What a force costs) |
 | `academic_research` | nothing: research is free and no credit buys RP (Ben, 2026-11-13; `../economy/RESEARCH.md` § Research points). The line keeps its slot and its weight, which reads only as the nation's appetite for research buildings; it spends nothing |
@@ -325,7 +325,7 @@ banks the difference, and fires later.
 
 `logistics_maintenance`'s consumer is `derive_network_upkeep_claims` / `settle_network_purchases`
 (`src/world/network_upkeep.{hpp,cpp}`; BL-643, network upkeep draws): each tick the nation's road
-network — road tiles by level plus active ports and hubs, tallied from the world, never stored —
+network — road tiles by level plus active ports and depots, tallied from the world, never stored —
 bills stone and timber at authored rates ([`LOGISTICS.md`](../economy/LOGISTICS.md) § 4 owns the
 channel). The same state-purchase shape as the space programme below, with one deliberate
 difference: the claim is **unearmarked**, so rule 3's pro-rata fill applies — upkeep is continuous,

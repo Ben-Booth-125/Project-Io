@@ -394,7 +394,7 @@ Each is owned by the doc that owns its actor; this table is the index, not the d
 | **Household** | population centres, by stratum | centre scale × era | [`POPULATION.md`](POPULATION.md) |
 | **Industry** | every building, as operating upkeep | building count | [`FINANCE.md`](FINANCE.md) |
 | **Construction** | anything being built; centres as they grow | build rate, population | [`PRODUCTION.md`](PRODUCTION.md) |
-| **Infrastructure** | roads, ports and hubs, kept standing | network size | [`LOGISTICS.md`](LOGISTICS.md) |
+| **Infrastructure** | roads, ports and depots, kept standing | network size | [`LOGISTICS.md`](LOGISTICS.md) |
 | **State** | nations, through budget lines | treasury × weight | [`../politics/NATIONS.md`](../politics/NATIONS.md) |
 | **Research** | the tech ladder | research rate | [`RESEARCH.md`](RESEARCH.md) |
 | **Conflict** | battles, burning what they fire | war | [`../military/MILITARY.md`](../military/MILITARY.md) |

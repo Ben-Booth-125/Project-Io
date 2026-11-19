@@ -28,7 +28,7 @@ const char* placement_reason_text(placement_reason r)
         case placement_reason::no_tile:           return "No such tile";
         case placement_reason::already_road:      return "This tile already has an equal or better road";
         case placement_reason::deposit_present:   return "This terrain already supports a Farm — no Hydroponics Bay needed here";
-        case placement_reason::out_of_logistics_range: return "Too far from a city, port or logistics hub to be supplied";
+        case placement_reason::out_of_logistics_range: return "Too far from a city, port or truck depot to be supplied";
         case placement_reason::tech_locked: return "Locked - the technology that permits this has not been researched";
         case placement_reason::province_full: return "This land already sustains as much as it can - improve it, or build elsewhere";
         case placement_reason::needs_centre: return "Must be built in a population centre";

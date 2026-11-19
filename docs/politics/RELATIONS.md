@@ -521,7 +521,7 @@ defender's provinces — **any** of them, with no reach rule, and the capital in
 
 **Ceding a capital moves it (Ben, 2026-10-30, NR-1102).** A nation whose capital province is ceded
 takes as its new capital the remaining province with the largest population centre, ties to the
-lower province id; the capital's free logistics hub moves with it.
+lower province id; the capital's free truck depot moves with it.
 
 **A nation's last province may be ceded, and the nation ends (Ben, 2026-11-09).** This overturns
 NR-1102's refusal; newest-dated wins. A peace may name every province the loser still owns, and

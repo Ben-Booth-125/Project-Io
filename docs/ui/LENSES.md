@@ -922,7 +922,7 @@ it along the chains of `LOGISTICS.md` § How a tile's points get to it:
   this tick × its reach at the tile, summed. **A source also supplies the tile it stands on,
   and stacked sources supply together** (Ben, 2026-10-26): every connected source standing on
   the tile counts there at full reach whether or not a request's nearest-first route picked
-  it, and wherever one hub of a stack carries a request, every hub of that stack's network
+  it, and wherever one depot of a stack carries a request, every depot of that stack's network
   on its tile carries it too. Supply can therefore exceed the request, which
   is what the scale below needs; what the resolver actually **granted** those requests is
   kept beside it on the hover card.
@@ -1015,7 +1015,7 @@ LP/tick*, then *granted G* — then what the tile's buildings consumed, then the
 the network that reaches it best, its cost to the nearest source, and full reach or fade
 (`TOOLTIP.md` § Ground).
 
-**The marks** are that nation's **sources** — each running logistics hub, railway station
+**The marks** are that nation's **sources** — each running truck depot, railway station
 and port with the points it actually makes, upkeep folded in, read off the economy step's
 own resolve. **A city is not a source** (`LOGISTICS.md` § Logistic Points, "Cities make
 none"), nor is one on ground no nation holds, nor one on a neighbour's.

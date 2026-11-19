@@ -350,11 +350,11 @@ pick the capital garrison's post and the province holder read) — **on the capi
 group**: a province can hold an islet across a strait, and the move must not seat a capital on a
 speck the rule above kept it off. Where the province has no centre on that group, the group's
 largest centre is the seat. It is set once the province partition and its anchor foundings exist,
-before roads, industry or the Logistic Point hub read the capital (`seat_capitals_on_centres`).
+before roads, industry or the truck depot read the capital (`seat_capitals_on_centres`).
 Only the tile moves: the territory and every cession stand. Every land province holds a centre at
 generation, so a land group without a city is a defect to count, not a case to design for; such a
 seat keeps the tile chosen above. The capital's tile is a city tile, and a city tile takes the
-Logistic Point hub every capital holds like any other building (its stack cap is twelve).
+truck depot every capital holds like any other building (its stack cap is twelve).
 
 **An exclave is ceded, not kept.** A group that does not reach the core is an **exclave**, and it is
 **split among the nations that border it** (Ben, 2026-10-18): each part goes to the bordering
@@ -640,8 +640,8 @@ nation and sees its starting credits, so a median nation opening on a fraction o
 defect, not a skew to report. The lever is **the history banks more**: polities earn and keep more
 across the spans, so chests grow everywhere in-world rather than by a larger conversion or a reserve
 granted at the handoff. **No major leaves generation on a zero treasury (Ben, 2026-10-19):** a major
-owns every building on its ground, its hubs among them (Ben, 2026-10-23), and a nation that
-cannot fund its hubs idles every one at the first tick and starves the industry that draws their
+owns every building on its ground, its depots among them (Ben, 2026-10-23), and a nation that
+cannot fund its depots idles every one at the first tick and starves the industry that draws their
 Logistic Points. Two rules hold it there. **A state founding leaves a year of the node bill in the
 chest, counted from the game's opening** (Ben, 2026-10-19; read since 2026-10-23 as the network-node
 bill the treasury pays first, `../politics/NATIONS.md` § What a nation owns): the twelve settle ticks

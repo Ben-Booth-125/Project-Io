@@ -343,7 +343,7 @@ differently.
 
 ### 4.7 Logistics
 
-Roads come in three tiers and are generated as a per-nation lattice; cities are free logistics hubs.
+Roads come in three tiers and are generated as a per-nation lattice; cities are free truck depots.
 A trade's convoys carry goods between markets at a cost weighted by terrain, and distance costs both money
 and **time**.
 

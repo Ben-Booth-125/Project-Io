@@ -78,7 +78,7 @@ end
 -- prints whether the worst case was exercised at all.
 local wrapped_names, elided_names = 0, 0
 -- MEASURED 2026-10-17: 15 of the build list's names use the second line and one
--- ("Inland Logistics Hub", three words in a ~70 px column) does not fit even two,
+-- ("Truck Depot", three words in a ~70 px column) does not fit even two,
 -- so it still elides - with the full string on its own tooltip. That is the honest
 -- limit of a two-line budget, not a defect in the wrap, so the assertion is the
 -- CONTRACT rather than "never elides": an elision may only happen after BOTH lines
@@ -349,11 +349,11 @@ print(string.format("construction_progress: %d row name(s) wrapped to the second
 -- by count, because the count depends on which rows the picked tile lists: the
 -- door lists one extraction row per deposit the tile carries. MEASURED 2026-10-25
 -- on the player's own iron ground (the pick above): "Woodcutter's Camp" joins
--- "Inland Logistics Hub" - "Woodcutter'" alone fills the ~70 px column, so the name
+-- "Truck Depot" - "Woodcutter'" alone fills the ~70 px column, so the name
 -- breaks inside the word and "Camp" is still left over after two lines. The tile
 -- the 2026-10-17 measurement used carried no timber, so that row was not drawn.
 -- Any OTHER name eliding is a failure, on any tile.
-local k_may_outrun = { ["Inland Logistics Hub"] = true, ["Woodcutter's Camp"] = true }
+local k_may_outrun = { ["Truck Depot"] = true, ["Woodcutter's Camp"] = true }
 local function check_outrun(what, rows)
     for _, r in ipairs(rows) do
         if r.name_elided then

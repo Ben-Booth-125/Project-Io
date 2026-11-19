@@ -610,7 +610,7 @@ existing scorer grant (§ 11), not a new behaviour.
 **Own buildings live, every other building nominal (Ben, 2026-11-04; BL-1485, power grid
 measure).** The nation reads its own buildings as the grid runs them: their need is their actual
 draw, each at its output share, none for a building its funding gate idled or for the capital's
-free hub (`../economy/LOGISTICS.md`, "The capital's source runs free"), and their output is each
+free depot (`../economy/LOGISTICS.md`, "The capital's source runs free"), and their output is each
 of its generators at the rate its own staffing and supply run it, one under construction at the
 staffing construction gives it. Every other nation's buildings on the grid are read only as what is
 public of them — that they exist, their type and their recipe — at the nominal reading: a type's
@@ -2071,7 +2071,7 @@ boilerplate: pure, seeded, deterministic, replayable, legal verbs only, never a 
   above — deterministic, seeded, scored-utility, legal verbs only, never a planner. (1)
 
 
-  `place_road`, plus port / inland-hub build candidates scored like any building: the
+  `place_road`, plus port / truck-depot build candidates scored like any building: the
 
 
   generator half of Logistic Points' constraint 5 (`docs/economy/LOGISTICS.md` § Logistic
@@ -2092,7 +2092,7 @@ boilerplate: pure, seeded, deterministic, replayable, legal verbs only, never a 
   spend. Raised on the form rather than assumed (the NR-517 precedent); fresh authoring — the
 
 
-  purged BL-447 prose is reference only. Owners: BL-599 (rival roads and hubs), BL-600
+  purged BL-447 prose is reference only. Owners: BL-599 (rival roads and depots), BL-600
 
 
   (rival directed dispatch).
@@ -2307,26 +2307,26 @@ boilerplate: pure, seeded, deterministic, replayable, legal verbs only, never a 
   only, never a planner.
 
   **AI builds logistics sources where it builds — granted (Ben, 2026-10-15; `../economy/LOGISTICS.md`
-  § One pool).** Rival corporations and AI nations may build a hub, station or port to bring a building
+  § One pool).** Rival corporations and AI nations may build a depot, station or port to bring a building
   they are placing into Logistic Point reach, scored like any build over the same legal verbs. **Not
   admitted:** any build for the player's nation or champion; any source built for reach the scorer
   does not itself need. Pure, seeded, deterministic, replayable, legal verbs only, never a planner.
 
-  **AI lays a hub chain to reach the capital — granted (Ben, 2026-10-21, NR-1059;
+  **AI lays a depot chain to reach the capital — granted (Ben, 2026-10-21, NR-1059;
   `../economy/LOGISTICS.md` § How a tile's points get to it).** A widening of the grant above, and
-  its own subject: since BL-1356 a hub delivers only when it chains back to its nation's capital, so
-  one hub beside a far site can cost upkeep and cover nothing. A rival corporation or AI nation may
-  therefore price a build at the WHOLE chain of hubs it needs to be covered, and lay that chain, as
+  its own subject: since BL-1356 a depot delivers only when it chains back to its nation's capital, so
+  one depot beside a far site can cost upkeep and cover nothing. A rival corporation or AI nation may
+  therefore price a build at the WHOLE chain of depots it needs to be covered, and lay that chain, as
   the same scored choice over the same legal verbs. **The chain is one decision:** priced and laid
   in the tick the build is chosen, from the world as it stands; nothing is carried to a later tick,
   and a chain the scorer cannot afford in that tick is not started. **Not admitted:** any chain for
-  the player's nation or champion; a chain laid for ground the scorer is not building on; any hub
+  the player's nation or champion; a chain laid for ground the scorer is not building on; any depot
   on ground the builder may not build on. Pure, seeded, deterministic, replayable, legal verbs
   only, never a planner.
 
   **No rival builds on the player's nation's ground (Ben, 2026-10-23, NR-1060).** A narrowing,
   not a grant: it takes behaviour away. No rival corporation's scorer places anything on ground
-  the player's nation owns — no production building, and no hub, station or port. So the
+  the player's nation owns — no production building, and no depot, station or port. So the
   exclusions above read as both **builder** and **ground**: a rival lays a chain only where it
   may build, and it may not build there.
 
@@ -2373,7 +2373,7 @@ boilerplate: pure, seeded, deterministic, replayable, legal verbs only, never a 
   builds, runs and trades the whole of its own industry through one scored-utility build layer, paid
   from its treasury. Every grant above whose subject was a rival or background corporation's
   decision — what to build, which recipe, where to sell, hiring, the Marketplace, logistics sources
-  and hub chains — **carries over to the nation unchanged in its terms**, and its corporation reading
+  and depot chains — **carries over to the nation unchanged in its terms**, and its corporation reading
   is retired. The nation is one actor: its budget scorer and its build scorer are two faculties of it,
   each over its own verbs.
 

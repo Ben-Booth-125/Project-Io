@@ -1279,7 +1279,7 @@ owns.
 come from, and the only place they come from.
 
 **The building.** A tile-occupying installation on any non-ocean land tile, with no deposit
-requirement. It produces nothing and staffs at zero, like the port and the logistics hub.
+requirement. It produces nothing and staffs at zero, like the port and the truck depot.
 
 It obeys the ordinary reach rule at the world level and earns **no anchor exemption** — see
 § One reach field. Its glyph is the filled shield in `icons::building`; `scripts/economy.lua`
@@ -1728,7 +1728,7 @@ capital rule. Neither post is the province's lowest-id tile, which is its id rat
 (BL-1145, a province's readers take its anchor).
 
 **Posts bend to supply (Ben, 2026-11-07).** Where a border post cannot be fed whole, the post moves and
-the network does not: no hub is added to reach it, so a border can open thinner than it would be guarded.
+the network does not: no depot is added to reach it, so a border can open thinner than it would be guarded.
 
 **A garrison is posted only where its network feeds it whole (Ben, 2026-10-29; "whole", 2026-11-05).**
 Each post above is chosen among the province's tiles where its nation's supply claim is met in full
@@ -1993,11 +1993,11 @@ reach."*
 envelope was overridden. `body_reach_field` — the economic logistics network — *is* the military
 supply envelope.
 
-Its anchors are cities, and built active ports and inland logistics hubs
+Its anchors are cities, and built active ports and truck depots
 (`is_supply_anchor`, `src/world/logistics.hpp`). **A `military_base` is not an anchor and extends
 nothing**, which is why it earns no exemption from the reach rule that governs its own placement.
 
-**To project force further, you extend the same road and hub network everyone else uses.** There is
+**To project force further, you extend the same road and depot network everyone else uses.** There is
 one distance metric in the game and armies pay it: a march spends its days against the same
 traversal cost a convoy does, a unit's monthly supply is drawn on that network at its tile, and a
 unit beyond the envelope takes the upkeep pass's decay
@@ -2095,7 +2095,7 @@ nothing, and an order given mid-month moves at once, on the day loop's path too.
 the day of contact. D6: battle length in days by force ratio. D7: twice-equal. D8: a save mid-march
 round-trips and marches on identically. D9: a month walked day by day and one caught up by the
 economy step hash alike. D10: the loader rejects a non-positive, non-finite or unknown entry. D11:
-supply is drawn where the unit stands — the request is the supplies' quantity, a unit on its hub's
+supply is drawn where the unit stands — the request is the supplies' quantity, a unit on its depot's
 tile is granted it whole and keeps full supply, one past the network is granted nothing and decays a
 step a month by the one rule. D12: a unit a battle kills is gone that day, and no battle names it.
 D13: readiness and morale recover a step a day out of contact, and not in it.

@@ -34,7 +34,7 @@ Two consequences that shape every design downstream:
 
 - **A `military_base` is not a supply anchor and extends nothing.** Which is why it earns no
   exemption from the reach rule governing its own placement.
-- **To project force further, you extend the same road and hub network everyone else uses.** There
+- **To project force further, you extend the same road and depot network everyone else uses.** There
   is one distance metric in the game and armies pay it.
 
 This is why logistics is load-bearing rather than plumbing: it is the single system both pillars —
@@ -112,13 +112,13 @@ placement constraint is BL-323 (buildings rework) S2.
 `body_reach_field` is one multi-source Dijkstra from every **supply anchor**, giving each tile its
 weighted cost to the nearest one. Infinity where none is reachable.
 
-**An anchor is a city, or a built and active port or inland logistics hub.** These are exactly the
+**An anchor is a city, or a built and active port or truck depot.** These are exactly the
 logistics nodes of BL-148/BL-149 (logistics nodes) — the places a convoy can already start cheaply —
 *"so reach inherits that vocabulary rather than introducing a rival one."*
 
 **The first-anchor bootstrap:** on a body with no anchor at all, an anchor-type placement skips the
 reach rule; committing that first anchor immediately makes the body anchored, so the exemption
-cannot be used twice while the first hub is still building.
+cannot be used twice while the first depot is still building.
 
 `tile_reach_cost` is the const read: **−1 means "not computed", infinity means "computed and
 unreachable"** — a distinction a UI holding a `const world&` needs, because it must not trigger the
@@ -509,7 +509,7 @@ pays into, and it gives a nation its first failure state — BL-550 (national in
 **The tax buys materials — the Infrastructure demand channel** (BL-643, network upkeep draws;
 `src/world/network_upkeep.{hpp,cpp}`). Each economy tick a nation's network bills **stone and
 timber** at authored per-element rates (`economy.network_upkeep`, scripts/economy.lua): every road
-tile in its territory by level, plus every active port and inland hub standing on its ground. The
+tile in its territory by level, plus every active port and truck depot standing on its ground. The
 bill is **geography, never population** — network size is derived from the world each tick, so the
 channel scales exactly as MARKETS.md § Demand channels property 1 demands. The purchase is the
 state-purchase shape (NATIONS.md § A budget): bought off the market's shelf at its posted price,
@@ -731,7 +731,7 @@ per-frame reads."* That premise fails in a world where the AI builds every tick 
 generated sites complete through the warm start: the caches clear every econ tick, and the rebuilds
 — per-pair Dijkstras over 45,240 tiles plus the reach field — *become* the tick.
 
-So sim-rate call sites gate on `building_affects_logistics`: **only a port or inland hub can change
+So sim-rate call sites gate on `building_affects_logistics`: **only a port or truck depot can change
 the anchor set**, and no building type changes traversal cost (that is `road_level`, and
 `place_road` clears unconditionally). Player-rate UI sites keep the unconditional clear —
 over-clearing at click rate is free.
@@ -809,7 +809,7 @@ The player is a nation, so Logistic Points are **one resource held by each natio
 into passive and active. What follows replaces the bifold model, the city generation and the
 "ambient vs owned" table below; that text stands as history.
 
-- **Made only by buildings, each on its own network.** A **logistics hub** makes points carried
+- **Made only by buildings, each on its own network.** A **truck depot** makes points carried
   along **roads** (further on higher road tiers); a **railway station** along **rail**; a **port**
   over **sea**. Cities make none. Any nation may build them, on its own ground (Ben, 2026-10-23).
 - **Reach fades with distance, and a better road reaches further (Ben, 2026-10-16).** A source's
@@ -817,7 +817,7 @@ into passive and active. What follows replaces the bifold model, the city genera
   double that distance**, so a nation needs several sources to cover its ground. The threshold is
   the **road tier's**, which is what makes an upgrade worth paying for: **Track 6 tiles, Road 8,
   Highway 10** at full strength, nothing left by 12, 16 and 20. **The network is the roads and the
-  rail (Ben, 2026-10-24):** a hub's points travel only along roaded edges and never step off them,
+  rail (Ben, 2026-10-24):** a depot's points travel only along roaded edges and never step off them,
   so no tile a road or a line does not lead to is reached. Off the networks, only units are
   supplied (NR-1050).
 - **A port stretches fifty tiles over water (Ben, 2026-10-21).** A port's points reach **full
@@ -831,10 +831,10 @@ into passive and active. What follows replaces the bifold model, the city genera
   they **land only on a port tile** where a lane ends beside it — the coastal road that port stands
   on. The fifty and the hundred are counted along the lanes. Open water no lane crosses carries
   nothing, and a coast with no port on it is not landed on, so a port's points reach another port
-  and nothing else at sea; the ground behind each port is the hubs'. Because every pair of ports
+  and nothing else at sea; the ground behind each port is the depots'. Because every pair of ports
   within fifty is laned, a port still reaches every port it reached across open water, at about the
   same distance. The port itself remains the landing: a port joins the chain through a connected
-  hub whose road reach covers its tile, or through a connected port its lanes land on. *Delegated
+  depot whose road reach covers its tile, or through a connected port its lanes land on. *Delegated
   reading (2026-10-25) of the two rulings together:* points live on network tiles, and on the
   water the lane is the network tile, so the port's reach is the lane network rather than the any-water
   walk it replaces. Superseded: the any-water walk that landed on every shore (BL-1396, Ben
@@ -855,7 +855,7 @@ into passive and active. What follows replaces the bifold model, the city genera
   (Ben, 2026-10-23), so there is nothing to share points among. The share is mechanical, never a
   scored choice: every claim is met while points suffice, and when they fall short every claim is
   **one queue**, served in the routed order of § How a tile's points get to it (Ben, 2026-10-20).
-- **A source's points dim with its upkeep (Ben, 2026-10-14).** A hub, station or port makes points in
+- **A source's points dim with its upkeep (Ben, 2026-10-14).** A depot, station or port makes points in
   proportion to the upkeep goods it actually receives — half its stone, half its points — never
   zeroed by a shortfall.
 - **Trade points stay separate** (`TRADE.md`): how much an owner can ship, beside the capacity to
@@ -866,9 +866,9 @@ into passive and active. What follows replaces the bifold model, the city genera
 **A nation's logistics field peaks at its capital and thins outward, and buildings further out are
 what extend it.** Generation seeds the sources hierarchically rather than evenly: the strongest
 source stands at the **capital**, lesser ones at the nation's other **market centres**, and the
-periphery is left uncovered on purpose — ground a player or a rival covers later by building a hub,
+periphery is left uncovered on purpose — ground a player or a rival covers later by building a depot,
 a station or a port where it is wanted. The field is therefore a slope away from the capital, not a
-blanket, and an outlying hub reads as a deliberate reach into thin ground.
+blanket, and an outlying depot reads as a deliberate reach into thin ground.
 
 **Logistics serves the armies from generation (Ben, 2026-10-29).** The seeding counts every
 garrison post standing as it runs — the capital's and each border post facing a neighbour — as a
@@ -886,7 +886,7 @@ Three things follow, and each is a check rather than a preference:
   generation defect, not a poor nation. **The capital's source runs free (Ben, 2026-10-29,
   overturning the 2026-10-22 dark exception):** the one source standing on a nation's capital carries
   no upkeep bill and the funding gate never idles it, so a capital is never dark however poor its
-  nation. Every other source, a second hub stacked on the capital included, is billed as before.
+  nation. Every other source, a second depot stacked on the capital included, is billed as before.
   It counts toward the capital tile's stack cap like any building (`PRODUCTION.md`, Ben,
   2026-11-05), so what generation lays before it leaves it room.
 - **The capital is the peak of its own nation's field.** No other tile of that nation may hold more
@@ -917,10 +917,10 @@ source runs free"), so no capital is dark however short its treasury. The covera
 rules on every curated seed, reads them through the funding gate, reports dark capitals, and fails
 when a capital holds no source or a consumer is uncovered for a reason the seeding did not count.
 
-**The chain is laid outward from the capital (BL-1356).** A hub covers a consumer only where it is
+**The chain is laid outward from the capital (BL-1356).** A depot covers a consumer only where it is
 connected to its nation's capital (§ How a tile's points get to it), so generation reaches an
-outlying consumer by laying hubs outward: where one tile both carries the consumer at full
-strength and touches the chain, one hub there; otherwise a hub on the chain's edge nearest the
+outlying consumer by laying depots outward: where one tile both carries the consumer at full
+strength and touches the chain, one depot there; otherwise a depot on the chain's edge nearest the
 consumer, joining the chain and carrying it closer, until the consumer is covered. The chain is
 steered by the walk over the nation's own dry ground, not by straight-line distance, so it never
 heads for ground it could not reach. Ground near on the grid can be far by road, and points travel
@@ -944,7 +944,7 @@ it rather than placing a source that would deliver nothing.
 nations").** A nation's buildings on ground its capital's road network cannot reach — water wider
 than the bridge cap lies between — are joined to it by a **port link**: a port on each coast, joined
 by sea, and **each port roaded into the network on its own coast**. Points travel only along roads
-and rail, so a port no road reaches is a port no hub's points reach, and the link would carry
+and rail, so a port no road reaches is a port no depot's points reach, and the link would carry
 nothing. The home port's road joins the capital's network (or, island-hopping, the network of an
 island linked before); the overseas port's road joins the network its buildings stand on. Both are
 laid the way a site's road is — a Track over the nation's own ground, a bridge only within the cap
@@ -955,20 +955,20 @@ Points from the capital's chain. The ports are the nation's own buildings on its
 bridge cap is unchanged: the link is how a nation crosses water a bridge may not span. Ground with
 no coast, or no own-ground road to one, gets no link and is counted.
 
-**Hubs stack where the need warrants, the capital first (Ben, 2026-10-26: "allow multiple levels
-of logistics hubs from generation, especially at the capital").** Several logistics hubs may
-stand on one tile, each a source of its own adding its points to the pool; stacked hubs share
+**Depots stack where the need warrants, the capital first (Ben, 2026-10-26: "allow multiple levels
+of logistics hubs from generation, especially at the capital").** Several truck depots may
+stand on one tile, each a source of its own adding its points to the pool; stacked depots share
 one field, so wherever routing carries one of them, the points of all of them pass. After the
 rules above have placed one source per place, generation reads the requests routed across the
 capital — what the Logistics lens reads as *requested* — against what the chain makes available
-there, and stands as many more hubs on the capital as the shortfall takes, one per hub's points.
-It then does the same at each market centre already holding a connected hub. Two limits bind it,
+there, and stands as many more depots on the capital as the shortfall takes, one per depot's points.
+It then does the same at each market centre already holding a connected depot. Two limits bind it,
 and neither is a target: the tile's **stack cap** (the non-extraction cap every building obeys —
-a city tile takes twelve), and the nation's **funding** — a stacked hub is stood only while the
-treasury still carries the nation's whole first-tick state bill with the hub added, so the funding
-gate funds the hub and idles nothing it funded before (nodes are paid first, so a hub the bill
+a city tile takes twelve), and the nation's **funding** — a stacked depot is stood only while the
+treasury still carries the nation's whole first-tick state bill with the depot added, so the funding
+gate funds the depot and idles nothing it funded before (nodes are paid first, so a depot the bill
 could not carry would idle a producer instead). A capital the treasury cannot stack is left with
-the hub it has.
+the depot it has.
 
 How many sources, at what tier, and how the lesser centres are ranked are **in-band calibration**:
 chosen against these three rules, logged, and re-measured by the coverage census rather than fixed
@@ -982,8 +982,8 @@ once — and a path is a connection along a network, land or sea.
 
 **A tile must be connected to its nation's capital, not merely near a source.** A source that
 reaches the tile fills part of its request only if that source is itself connected **back to the
-capital** — so points arrive along a chain the capital anchors, and a hub dropped in isolation
-supplies nothing. This is what makes an outlying hub an *extension* of a network rather than an
+capital** — so points arrive along a chain the capital anchors, and a depot dropped in isolation
+supplies nothing. This is what makes an outlying depot an *extension* of a network rather than an
 island. (Ben, 2026-10-21: "Logistics should centre on the capital for all." It replaces the
 market centre as the anchor; see the first of the four rules below.)
 
@@ -1000,21 +1000,21 @@ requests) and BL-1361 (a shipment draws points).
   of the nation whose ground the tile is (`nation_component::capital_tile`): its own reach, on its
   own network, touches the capital, or touches the tile of a source that is itself connected —
   and so on outward. **A link counts in either direction (Ben, 2026-10-21, NR-1058):** a source
-  also joins when a connected source's reach touches *its* tile, so a station a connected road hub
+  also joins when a connected source's reach touches *its* tile, so a station a connected road depot
   covers is on the chain, though a station's own field holds only other stations.
   Every nation's network centres on its capital, whatever market a tile
-  clears in. A hub dropped in isolation, touching neither the capital nor the chain, supplies
-  nothing; a hub that extends the chain extends the network. Ground whose nation has no capital
+  clears in. A depot dropped in isolation, touching neither the capital nor the chain, supplies
+  nothing; a depot that extends the chain extends the network. Ground whose nation has no capital
   on this body has nothing to be connected back to here, so every source passes the test there.
   *Two same-day readings were measured and replaced.* A **direct** rule (a source's own reach had
-  to touch the anchor) left about a quarter of generated consumers unreachable by any hub, and G1
+  to touch the anchor) left about a quarter of generated consumers unreachable by any depot, and G1
   fell from 96.0 to 71.2. A chain anchored at **the tile's market centre** still stranded about a
   sixth, almost all of them (171 of 173) in markets centred on another nation's ground, where a
-  nation's own hubs cannot stand. Generation lays hubs outward along the chain to every consumer
+  nation's own depots cannot stand. Generation lays depots outward along the chain to every consumer
   it can reach (§ Where generation puts the sources).
 - **One nation pool, of CONNECTED sources; routing decides who qualifies and in what order.**
   Points stay one stock per nation, and **only a source on the chain adds to it (Ben, 2026-10-21,
-  NR-1057)**: a hub with no chain back to the capital makes nothing anyone can draw, so it is
+  NR-1057)**: a depot with no chain back to the capital makes nothing anyone can draw, so it is
   worthless until connected — what "supplies nothing" means, read strictly. Ground whose nation has
   no capital on that body passes every source, as above. Routing does not give a source its own
   budget; it decides **how much** of a request may
@@ -1133,10 +1133,10 @@ LP is the pipe; the tanks are separate.
 | Owned? | ambient — the network's | **owned**, and not a rival's to use |
 
 **Cities generate it.** That answers two constraints at once: a node-generated rate is real from
-turn one because cities are generated in the hundreds, where no corp is seeded a hub; and a city is
+turn one because cities are generated in the hundreds, where no corp is seeded a depot; and a city is
 a spatial locus — LP is *"how much can move through HERE"*, never a per-corp haul allowance.
 
-**The split is what stops free-riding.** Ben, on whether rivals should build hubs: *"the passive /
+**The split is what stops free-riding.** Ben, on whether rivals should build depots: *"the passive /
 active split explains how we would be unable to use rival active LP."* Ambient throughput serves
 everyone; directed throughput is yours. It also dissolves the asymmetry of a rival paying LP it
 cannot generate, since the half that serves trade is not owned by anybody.
@@ -1211,11 +1211,11 @@ Each rejected an earlier cut. Two are structural.
    **For a shipment, distance does not count (Ben, 2026-11-07):** it pays where it leaves
    (§ A shipment draws points again), so the draw is decided by what the cargo is, never by how far
    it goes.
-4. **The base allowance must not be the whole mechanic.** No corp is seeded a hub, so "your own
+4. **The base allowance must not be the whole mechanic.** No corp is seeded a depot, so "your own
    nodes decide how much you may move" is fictional; city generation is what makes the rate real.
 5. **A rival must be able to build the generator.** `corp_ai.cpp`'s scorer carries `place_road`
-   and a port / inland-hub build candidate (Ben, 2026-08-22: yes, and before LP lands; BL-599
-   (rival roads and hubs) is the scorer's road/anchor item), so the rate is not an asymmetric tax
+   and a port / truck-depot build candidate (Ben, 2026-08-22: yes, and before LP lands; BL-599
+   (rival roads and depots) is the scorer's road/anchor item), so the rate is not an asymmetric tax
    on rivals.
 6. **No reserved military share.** Two budgets means guns and butter stop competing, which is the
    whole point of one rate.

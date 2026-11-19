@@ -209,7 +209,7 @@ a tile keep the shared header (§ Layout & chrome).
      number of logistics points provided, and the number consumed by that tile"). Owned by
      BL-1354 (tile logistics section). Two figures under a *Logistic Points* label, read off the
      tick's own resolve (`LOGISTICS.md` § Logistic Points), never re-derived:
-     - **Makes** — what a source standing on this tile (hub, station or port) makes this tick,
+     - **Makes** — what a source standing on this tile (depot, station or port) makes this tick,
        upkeep folded in; *none* where no source stands.
      - **Uses** — the points granted to this tile's producing buildings, **out of** what they
        need, so a shortfall reads as one (drawn in the warning colour when granted falls short).
@@ -429,7 +429,7 @@ The preview and the province card do not move; two columns change.
 
    **Every card shows its method and status line, always** — before the first month, and for
    a building with no recipe. A building with no recipe names what it does instead (a Port: the
-   trade points it makes; a hub: the haul it discounts). The profit and workforce rows are drawn
+   trade points it makes; a depot: the haul it discounts). The profit and workforce rows are drawn
    for the player's own completed building; **a fresh campaign opens with them filled**, from the
    settle's months (`STARTUP.md` § Handoff, Ben 2026-10-13: *"the first few ticks in
    generation … pass their data to the live game"*). A building with no output still has costs:

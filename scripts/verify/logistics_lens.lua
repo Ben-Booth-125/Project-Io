@@ -58,13 +58,13 @@ local sx, sy, stype = nil, nil, nil
 local cs = verify.capital_stars()
 if cs.has_capital and cs.body == home_body
    and verify.stage_building(cs.x, cs.y, "logistics_hub") ~= 0 then
-  sx, sy, stype = cs.x, cs.y, "Inland Logistics Hub"
+  sx, sy, stype = cs.x, cs.y, "Truck Depot"
   print("[logistics_lens] staged the chain's root: a logistics hub on the capital")
 end
 for _, b in ipairs(verify.buildings()) do
   if sx then break end
   if b.body == home_body and b.complete
-     and (b.type == "Inland Logistics Hub" or b.type == "Port"
+     and (b.type == "Truck Depot" or b.type == "Port"
           or b.type == "Railway Station") then
     sx, sy, stype = b.x, b.y, b.type
     break

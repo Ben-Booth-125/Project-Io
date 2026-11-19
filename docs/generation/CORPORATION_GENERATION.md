@@ -45,7 +45,7 @@ the nation's.
 
 **Own ground binds every placement (Ben, 2026-10-23).** A charter is placed only on its centre's
 nation's tiles — never another nation's, never ground no nation owns (`../politics/NATIONS.md`
-§ Own ground). That binds production, the logistics sources (hubs, stations, ports) and rail alike.
+§ Own ground). That binds production, the logistics sources (depots, stations, ports) and rail alike.
 
 **Starting assets reflect tile reality.** A building lands where its ground supports it: an
 extractor on a deposit, a processor where its inputs are within reach, a depot near traffic.
@@ -145,7 +145,7 @@ small and thematically tight — a foothold in one slice of one chain.
   (`../economy/LOGISTICS.md` § 4, *A site's road joins its own nation's network*). Roads do not
   move during the walk, so a nation's field is read once.
   It is honest and conservative. It never credits a point the seeding may not place. It does not
-  foresee the hubs a chain lays between the capital and a far centre, nor those laid outward to a
+  foresee the depots a chain lays between the capital and a far centre, nor those laid outward to a
   consumer. Generation covers every consumer in the end, so the finished world's cover cannot rank
   deposits: measured, every extractor opens at full cover.
 - **Cluster around the anchor.** The remaining slots fill the nearest valid tiles of the same nation
@@ -455,12 +455,12 @@ ladder, in order:
    other. A processor takes the feasible recipe nearest its feed, by § Pass 3's bend rule.
 3. **The nearest category.** An extraction slot becomes another flex slot. A processing slot
    becomes the feasible processor nearest its feed whose output is wanted. A `port` on coastless
-   ground becomes a second `railway_station`, and a station without track becomes a hub.
+   ground becomes a second `railway_station`, and a station without track becomes a depot.
 
 A slot nothing on the ladder can place stays unbuilt and is recorded on the generation report, by
 slot and reason, as a measured fact of that ground. Nothing is minted for it.
 
-**Logistics slots count the standing nodes, and the count is a cap (Ben, 2026-11-03).** The ports, stations and hubs the history and the fold
+**Logistics slots count the standing nodes, and the count is a cap (Ben, 2026-11-03).** The ports, stations and depots the history and the fold
 left on a major's ground fill its logistics slots first. **The nodes that cover the kit come first
 (Ben, 2026-11-04).** The standing node that brings the most kit buildings under Logistic Point cover
 is kept, again and again while one adds any. Cover is read over the kept nodes alone, on the chain to
