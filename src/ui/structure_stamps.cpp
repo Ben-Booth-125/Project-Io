@@ -1269,13 +1269,18 @@ struct town_form
     int   ftower;      ///< Storeys of a heart tower (0: none).
     int   stacks;      ///< Chimney stacks in the works quarter.
 };
+// BL-1711 (Ben, 2026-11-19; RENDERING.md § Installations, the band table): each
+// size band draws a different group on its one tile, and each band's tallest
+// standing thing clears the band below's - village houses ~0.05, a town's spire
+// ~0.24, a city's stacks ~0.45, a metropolis's towers ~0.50+, a megacity's
+// skyline ~0.86 - so the bands part by silhouette at any camera.
 constexpr town_form k_town[6] = {
     { 0, 0, 0, 0, 0, 0, 0, 0 },
-    { 0.27f, 0.00f, 0.000f, 0.000f, 1,  2,  0, 0 }, // Outpost: a hamlet round a yard
-    { 0.44f, 0.20f, 0.024f, 0.034f, 1,  2,  0, 0 },
-    { 0.58f, 0.22f, 0.026f, 0.040f, 1,  4,  0, 1 },
-    { 0.72f, 0.23f, 0.027f, 0.042f, 2,  5, 10, 2 },
-    { 0.84f, 0.24f, 0.028f, 0.044f, 2,  7, 16, 3 },
+    { 0.30f, 0.00f, 0.000f, 0.000f, 1,  1,  0, 0 }, // Village: pitched houses round a yard
+    { 0.46f, 0.20f, 0.024f, 0.034f, 1,  2,  0, 0 }, // Town: a loose pitched-roof grid, a spire
+    { 0.62f, 0.22f, 0.026f, 0.040f, 2,  4,  0, 1 }, // City: flat-roofed blocks, works, a civic dome
+    { 0.80f, 0.23f, 0.027f, 0.042f, 3,  6, 14, 2 }, // Metropolis: mid-rise, a tower cluster
+    { 0.92f, 0.24f, 0.028f, 0.044f, 4,  8, 24, 3 }, // Megacity: built to the edge, a skyline
 };
 constexpr float k_storey = 0.036f; ///< One storey, canonical.
 
@@ -1403,7 +1408,9 @@ void form_settlement(builder& b, int scale, std::uint32_t seed, int cw, int r,
                 const std::uint32_t bsalt = static_cast<std::uint32_t>((j + 64) * 131 + (i + 64));
                 const float bh = h01(cw * 131 + i, r * 97 + j, 0x5E72u + bsalt);
                 // A heart tower: one tall block standing back from its block's edges.
-                if (T.ftower > 0 && bd < (scale >= 5 ? 0.50f : 0.36f) && bh > (scale >= 5 ? 0.38f : 0.55f))
+                // BL-1711: a metropolis's towers cluster at the heart; a megacity's
+                // skyline spreads over a wide core.
+                if (T.ftower > 0 && bd < (scale >= 5 ? 0.62f : 0.40f) && bh > (scale >= 5 ? 0.30f : 0.50f))
                 {
                     lot L{ bcx, bcy, static_cast<float>((bx1 - bx0) * 0.5 * 0.78),
                            static_cast<float>((by1 - by0) * 0.5 * 0.78), bd, bsalt, 1 };
@@ -1452,8 +1459,8 @@ void form_settlement(builder& b, int scale, std::uint32_t seed, int cw, int r,
             if (w >= 0)
                 lots[static_cast<std::size_t>(w)].kind = 2;
         }
-        // The landmark at the heart: a civic dome or a spire.
-        if (scale >= 3)
+        // The landmark at the heart: a town's spire, a city's civic dome (BL-1711).
+        if (scale >= 2)
         {
             const int l = nearest(ox + P * 0.5, -P * 0.5);
             if (l >= 0)
@@ -1500,7 +1507,7 @@ void form_settlement(builder& b, int scale, std::uint32_t seed, int cw, int r,
             case 3: // the landmark
             {
                 const float rr = std::min(L.hw, L.hd);
-                if ((seed & 1) || scale >= 4)
+                if (scale >= 3) // BL-1711: a city and up keep a civic dome; a town a spire
                 {
                     b.box(L.x, L.y, L.hw, L.hd, 0.06f + 0.01f * scale, C_stone_pale, C_stone_pale * 0.92f);
                     b.out.back().storey = k_storey;
@@ -1513,7 +1520,8 @@ void form_settlement(builder& b, int scale, std::uint32_t seed, int cw, int r,
                 else
                 {
                     b.gable(L.x, L.y + L.hd * 0.3, L.hw, L.hd * 0.6, 0.10, 0.05, C_slate, C_stone_pale);
-                    b.cyl(L.x - L.hw * 0.4, L.y - L.hd * 0.4, rr * 0.36, 0.34 + 0.06 * scale, top::cone,
+                    // The spire tops out ~0.24: over the town's two storeys, under a city's stacks.
+                    b.cyl(L.x - L.hw * 0.4, L.y - L.hd * 0.4, rr * 0.36, 0.24, top::cone,
                           0.14, C_slate, C_stone_pale);
                 }
                 break;
@@ -1544,7 +1552,7 @@ void form_settlement(builder& b, int scale, std::uint32_t seed, int cw, int r,
                     st = std::min(st, 2);
                 const float h = st * k_storey;
                 const bool gabled = scale == 2 ? hr < 0.75f || st <= 1
-                                  : scale == 3 ? st <= 2 && hr < 0.55f
+                                  : scale == 3 ? st <= 2 && L.d > 0.80f && hr < 0.30f // BL-1711: a city is flat-roofed
                                                : st <= 3 && L.d > 0.75f && hr < 0.45f;
                 if (gabled)
                 {
