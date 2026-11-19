@@ -65,19 +65,6 @@ float selection_band_height(float disp_x, float disp_y);
 /// coordination. Pure function of `ImGui::GetIO().DisplaySize`.
 foldout_rect foldout_column_rect();
 
-/// The comms dock (BL-227) — the bottom-left tile of the screen's bottom strip,
-/// sharing the Selection band's top edge and height so the two read as ONE
-/// horizontal bar rather than two stacked things.
-///
-/// Occupies the fold-out column's x-range (`[nav_pane_width, W]`), NOT the full
-/// shell column: the icon rail keeps its full height and runs down the left edge
-/// past the dock. That is a measured constraint, not a preference — at the
-/// 1280x720 floor (DEVELOPMENT_PRACTICES § Display environment, BL-215) a
-/// shortened rail would have `720 - 92 - 340 = 288` px for nine ~44 px slots plus
-/// spacing (~428 px needed), so spanning the dock across the rail would clip two
-/// of them. `foldout_column_rect` shortens to clear this dock, which is what makes
-/// "the menu and ledgers are always shorter" true.
-foldout_rect comms_dock_rect();
 
 /// The canvas region — BL-265's task 1: "there is currently no canvas rect in
 /// the codebase to take." Bounded by the shell column on the left, the header

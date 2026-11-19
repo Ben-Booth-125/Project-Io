@@ -266,7 +266,7 @@ The minimap box's geometry, with the chrome accounted for:
   title bar and lens mode bar are exempt (always shown).
 - **Coupling:** the bottom strip's `selection_band_height` is **derived from the
   minimap height** — `minimap_height + chrome_margin` in `foldout_column.cpp` —
-  so the Selection band and comms dock top-align with the minimap by
+  so the Selection band top-aligns with the minimap by
   construction. A minimap sizing change ripples into the whole bottom strip; do
   not break this derivation by hard-coding either side.
 

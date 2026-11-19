@@ -1,6 +1,6 @@
 #pragma once
 
-#include "foldout_column.hpp" // foldout_rect, shell_column_width, minimap_*, comms_dock_rect
+#include "foldout_column.hpp" // foldout_rect, shell_column_width, minimap_*
 #include "ui_scale.hpp" // BL-1495: px, px_const
 
 #include <imgui.h>
@@ -17,9 +17,8 @@ namespace ui {
 /// four following. Adding a region on top of that guarantees the next drift, so the
 /// algebra lives here and the call sites ask for a rect.
 ///
-/// This module **consumes** `shell_column_width` / `foldout_column_rect` /
-/// `comms_dock_rect` (which stay in `foldout_column.hpp`, where the bottom strip's
-/// height is derived) rather than duplicating them — the same rule it exists to
+/// This module **consumes** `shell_column_width` / `foldout_column_rect` (which stay
+/// in `foldout_column.hpp`, where the bottom strip's height is derived) rather than duplicating them — the same rule it exists to
 /// enforce on its callers.
 ///
 /// Every width is rounded to a whole pixel by the function it comes from, so each
@@ -69,19 +68,10 @@ shell_rect minimap_rect(ImVec2 disp);
 /// measures it and passes it in; only the x/width/margin algebra belongs here.
 shell_rect time_panel_rect(ImVec2 disp, float time_h);
 
-/// Total horizontal budget (px) of the screen's **bottom strip** — the run the comms
-/// dock and the Selection band share, from the icon rail's right edge to the right
-/// chrome column.
-///
-/// Starts at `nav_pane_width`, not `shell_column_width`: BL-227 docked comms inside
-/// the fold-out column's x-range (the icon rail keeps its full height and runs down
-/// past the strip), so the strip begins at the rail's edge.
-float bottom_band_budget(ImVec2 disp);
-
-/// The Selection band — the bottom strip's right tile, from the comms dock's right
+/// The Selection band — the bottom strip's left tile, from the shell column's right
 /// edge to the right chrome column. Flush against both by design: the strip carries
 /// no internal gutter, and introducing the shell's only gap here would read as a
-/// mistake. Height and top edge are `selection_band_height`'s, shared with the dock.
+/// mistake. Height and top edge are `selection_band_height`'s, the minimap's top.
 shell_rect selection_band_rect(ImVec2 disp);
 
 /// **The lens chrome region** (BL-602) — the ONE home for everything a lens puts
@@ -118,9 +108,7 @@ shell_rect selection_band_rect(ImVec2 disp);
 ///                the space between the ceiling and the minimap, never beyond it.
 shell_rect lens_chrome_rect(ImVec2 disp, float time_h, float want_h);
 
-/// The **freed centre-right slot** (BL-216) — the exact rect the comms log vacated
-/// when BL-227 moved it to the bottom strip, now the home of the pinned-items watch
-/// list. Sits between the time panel and the minimap; the right column's split stays
+/// The **centre-right slot** (BL-216) — the home of the pinned-items watch list. Sits between the time panel and the minimap; the right column's split stays
 /// two-way elastic (content-derived time panel, ratio-locked minimap, pins take the
 /// whole residual), so the minimap does not move.
 ///

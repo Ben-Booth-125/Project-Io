@@ -4,7 +4,7 @@
 > sits · which region owns the rect algebra and how the top and bottom bands share
 > their edges · what hosts a fold-out ledger and how wide that column gets · which
 > container vocabulary a new surface should reach for.
-> **Not here:** what any one panel says (HEADER, PROFILE, TIME_CONTROLS, CHAT) ·
+> **Not here:** what any one panel says (HEADER, PROFILE, TIME_CONTROLS) ·
 > which ledgers the rail holds (MENU) · what the canvases draw (CANVASES) · what a
 > click selects (SELECTION) · the lens mode bar and the region above the minimap
 > (MINIMAP) · how much of a surface is shown at once (DRILL_THROUGH).
@@ -27,14 +27,13 @@ The prototype UI is built with Dear ImGui (see TECH_FOUNDATIONS). Everything her
 │ rail│ column:    │                             │ PINNED ITEMS │
 │ ▢   │ ledger     │       Primary canvas        │ (watch list) │
 │ ▢   │            │ (Solar / Circumpl./Surface) │              │
-│ ▢ … │ (stops at  │                             │ [lens legend]│
-│ ▦   │ the comms  │                             ├──────────────┤
-│ ▢ … │ dock's top │                             │   Minimap    │
-│ ▢   │ edge)      │                             │  [lens bar]  │
-│     ├────────────┴──────┬──────────────────────┤              │
-│     │ COMMS DOCK        │ SELECTION BAND (fixed│              │
-│     │ (channel chat)    │ action/facts or tile)│              │
-└─────┴───────────────────┴──────────────────────┴──────────────┘
+│ ▢ … │ (runs to   │                             │ [lens legend]│
+│ ▦   │ the screen │                             ├──────────────┤
+│ ▢ … │ bottom)    │                             │   Minimap    │
+│ ▢   │            ├─────────────────────────────┤  [lens bar]  │
+│     │            │ SELECTION BAND (fixed;      │              │
+│     │            │ action/facts or tile)       │              │
+└─────┴────────────┴─────────────────────────────┴──────────────┘
 ```
 
 **The top band is one row of three tiles sharing a bottom edge** — profile, balance bar, time
@@ -46,13 +45,12 @@ balance bar"*. The gap that used to sit between the balance bar and the time pan
 shell's only internal one, which is the argument `selection_band_rect` already made for the
 bottom band — *"introducing the shell's only gap here would read as a mistake"*.
 
-The nav rail runs the **full screen height**. The screen's **bottom strip** is one
-solid band, all three tiles sharing a top edge that lands exactly on the minimap's:
-the **comms dock** bottom-left (`comms_dock_rect`, three quarters of the fold-out
-column's width), the **Selection band** from the dock's right edge to the right
-chrome column, and the **minimap** in the corner. The fold-out column stops at the
-dock's top edge, so every ledger is shorter by the strip's height — see *Selection
-band* and *Comms dock* below.
+The nav rail and the fold-out column both run the **full screen height**. The screen's
+**bottom strip** is one solid band of two tiles sharing a top edge that lands exactly on
+the minimap's: the **Selection band** from the shell column's right edge
+(`shell_column_width`) to the right chrome column, and the **minimap** in the corner. A
+ledger runs from the identity tile to the screen's bottom edge — see *Selection band* and
+*The comms dock is retired* below.
 
 The **right chrome column** splits two ways and elastically: the content-derived
 **time panel** on top, the ratio-locked **minimap** at the foot, and the whole
@@ -71,7 +69,7 @@ every call site asks it for a rect: `right_chrome_width` / `right_chrome_left`,
 `minimap_rect`, `time_panel_rect`, `bottom_band_budget`, `selection_band_rect`,
 `pinned_panel_rect`. It **consumes** `foldout_column.hpp`'s primitives
 (`shell_column_width`, `minimap_width`/`_height`, `selection_band_height`,
-`foldout_column_rect`, `comms_dock_rect`) rather than duplicating them — the split
+`foldout_column_rect`) rather than duplicating them — the split
 is primitives there, composed rects here. Widths round to whole pixels, so every
 region edge lands on a pixel boundary.
 
@@ -84,7 +82,7 @@ region edge lands on a pixel boundary.
 Two layers compose the screen:
 
 - **Background** — the canvases, drawn edge-to-edge via the ImGui background draw list.
-- **Foreground** — the ImGui panels below (profile, header, nav pane, comms dock, time column, minimap, ledger windows), drawn on top of the canvases.
+- **Foreground** — the ImGui panels below (profile, header, nav pane, time column, minimap, ledger windows), drawn on top of the canvases.
 
 ---
 
@@ -100,9 +98,9 @@ range. The column is reserved down the whole left edge:
 - The **identity tile** (profile) caps it at top, taking the full width `W`.
 - The narrow **icon nav rail** (56 px) runs down its left sub-edge, full height.
 - A **fold-out ledger** fills the rest of the column (`[nav_pane_width, W]`, below the
-  identity tile) when a nav slot is active — see *Ledger windows*. The column **stops at
-  the comms dock's top edge** (`foldout_column_rect`), so every ledger is shorter by the
-  bottom strip's height.
+  identity tile) when a nav slot is active — see *Ledger windows*. The column **runs to the
+  screen's bottom edge** (`foldout_column_rect`): the bottom strip starts at the column's
+  right edge, so a ledger loses no height to it (Ben, 2026-11-19).
 - The **balance bar** (header) starts at `x = W` permanently, whether or not any fold-out is
   open, so it always clears the column.
 
@@ -239,8 +237,8 @@ A fixed inset in the bottom-right corner showing the **zoom-out neighbour** of t
 **Spec: `SELECTION.md`**
 
 The Selection info element lives in a **fixed band at the bottom of the screen** — the
-middle tile of the bottom strip, between the **comms dock** on its left (the band starts
-at the dock's right edge) and the **minimap** on its right. Its height is
+left tile of the bottom strip, from the **shell column's right edge** (`shell_column_width`,
+so an open ledger sits beside it, never under it) to the **minimap** on its right. Its height is
 `selection_band_height` (`src/ui/foldout_column.{hpp,cpp}`), **derived from the minimap
 height** plus `chrome_margin` so the whole strip's top edge lands on the minimap's. The
 band always occupies the same rect — it is never click-anchored. Ben's call: *"doing/
@@ -281,45 +279,22 @@ A single panel in the top-right corner, the same width as the minimap so the rig
 
 - A **pause button** — a drawn filled square while running (deliberately not "||", which read as the Roman numeral II beside the tiers), flipping to a play "**>**" while paused — then speed tiers **I–V** in Roman numerals. The active speed is highlighted; each tier names its real rate on hover.
 
-The clock has three layers — sim tick → day → economy tick — paced so that 1× ≈ 6 s/day and 3× ≈ 2 s/day. The economy resolves monthly. The authoritative calendar/pacing constants live in `src/core/sim_loop.hpp` and are deliberately tentative.
+The clock has three layers — sim tick → day → economy tick — paced so that tier III (3×) runs a day in 2 s (`TIME_CONTROLS.md` § Speed curve). The economy resolves monthly. The authoritative calendar/pacing constants live in `src/core/sim_loop.hpp` and are deliberately tentative.
 
 ---
 
-## Comms dock — bottom-left
-**Spec: `CHAT.md`**
+## The comms dock is retired (Ben, 2026-11-19)
 
-The channel-based **comms chat log**: the Public channel plus arbitrary player-created
-nation groups, fed by deterministic sim events (the agency reflexes) and player messages
-(`src/ui/chat_panel.cpp`).
+The bottom-left comms dock — the channel chat log with its Public, Field and Counsel channels
+and player-made groups — is **retired outright**, with every feed that posted to it. Its tile
+goes to the fold-out column, which now runs to the screen's bottom, and the Selection band
+starts at the column's right edge rather than the dock's.
 
-It docks in the **bottom-left tile of the bottom strip** (`comms_dock_rect`,
-`src/ui/foldout_column.{hpp,cpp}`): the fold-out column's x-range, three quarters of the
-column's width, sharing the Selection band's top edge and height so the two read as one
-bar. Comms is ambient chatter, not a decision surface, so it does not hold the prime
-right-edge slot under the time panel; the month-width it gives back goes to the
-Selection band. The icon rail keeps its full height past the dock — at the 1280×720 floor
-a shortened rail would clip two slots.
-
-**The Field channel** (BL-468, dispatch stream) is the dock's second standing channel,
-appended after Public — *appended*, never inserted, because `m_counsel_channel` caches an
-index into the channel list. It carries battle traffic for **the player's own fights**: one
-dispatch line per battle per tick, plus the aftermath line of any that concluded.
-Rival-vs-rival fights are skipped, on the precedent that rivals' internals stay out of comms so
-a rival's internals do not leak through it — they are seen as a canvas marker instead, which
-says *where* without saying how it is going (NR-470). It is separate from Public because its
-volume is driven by **simulation intensity** rather than by scripted events — a running war
-is several lines a tick, which mixed into Public would bury everything else. It is also the
-only place the aftermath can live at all: a concluded battle is erased at the end of the tick
-it ends, so no state-reading surface can still see who held the ground by the time the
-player looks. There is no per-channel mute (NR-471).
-
-The diplomacy-as-communication principle behind the surface: `docs/ai/AI_OPPONENT.md` § 7.
-
-Inside the dock, **rows are the scarce axis, not width** — it is `selection_band_height`
-tall (260 px at 1280–1920). The log's message form, channel selector and group popup are
-laid out for that; see `CHAT.md` § Layout in the dock.
-
----
+Nothing it carried moves to another surface. What the player must know already has a home
+that does not scroll away: a war opened on them is the **war notice** and the **alert strip**
+(above); a war's record is the History ledger's; a battle is its marker on the canvas and its
+own card. Ambient lines — a rival nation's heaviest event of the month, a persona's counsel —
+and the quick save's "Saved to" line go with the dock.
 
 ## Pinned items — right column, middle
 
@@ -345,8 +320,7 @@ visible while the player works elsewhere.
 - **The lens key yields nothing.** A count-driven lens key grows up from the minimap into
   the same residual (`MINIMAP.md` § Lens chrome); the pins stop one margin above it.
 - **No nav-rail slot.** Fixed shell chrome, not a ledger — absent from
-  `close_all_panels` / `any_panel_open`, exactly like the comms dock and the Selection
-  band.
+  `close_all_panels` / `any_panel_open`, exactly like the Selection band.
 
 The panel, its pin toggle and the pin glyph are BL-216's pinned-items slice.
 
@@ -437,9 +411,9 @@ work lands in one of these ten rather than inventing an eleventh.
 
 | # | Container | Sizing | Text policy | Overflow |
 |---|---|---|---|---|
-| 1 | **Fixed shell column / dock** — three instances: the **fold-out ledger column** (`foldout_begin`, `foldout_column.cpp`), the **comms dock** (`chat_panel.cpp`) and the **pinned items panel** | Fixed-width rect. The ledger column is `[nav_pane_width, W]`, from below the identity tile to the **comms dock's top edge**; the dock and the pins panel take their rects from `shell_metrics.hpp` | Wrap to inner width | Vertical scroll |
+| 1 | **Fixed shell column / dock** — two instances: the **fold-out ledger column** (`foldout_begin`, `foldout_column.cpp`) and the **pinned items panel** | Fixed-width rect. The ledger column is `[nav_pane_width, W]`, from below the identity tile to the screen's bottom edge; the pins panel takes its rect from `shell_metrics.hpp` | Wrap to inner width | Vertical scroll |
 | 2 | **Lens legend box** (draw-list, `body_surface_canvas.cpp`) | Fit-to-content — gradient keys sized from their own entries; count-driven keys take the right-column width and wrap labels | Guaranteed-fit (gradient keys) / wrap (count-driven rows) | Gradient keys grow to fit; count-driven keys scroll inside the box |
-| 3 | **Selection band** (`draw_selection_band`, `selection_card.cpp` framing `draw_selection_content`, `selection_panel.cpp`) | Fixed rect — comms dock's right edge to the right chrome column, `selection_band_height` tall (minimap-derived) | Wrap | Vertical scroll |
+| 3 | **Selection band** (`draw_selection_band`, `selection_card.cpp` framing `draw_selection_content`, `selection_panel.cpp`) | Fixed rect — the shell column's right edge to the right chrome column, `selection_band_height` tall (minimap-derived) | Wrap | Vertical scroll |
 | 4 | **Header / balance strip** (`header_panel.cpp`) **and the identity tile** (`profile_panel.cpp`) | Stretch-to-width (strip) / fixed card (tile), fixed height | Guaranteed-fit — segments measured, never wraps | Elide-with-tooltip, only as a last resort; never silent truncation |
 | 5 | **Time panel** (`app.cpp`) | Fixed width (shares the minimap's), content-derived height | Guaranteed-fit — authored to fit | None |
 | 6 | **Hover card** (`draw_hover_card`, `hover_card.cpp`) | Fit-to-content, capped at 200 px max width, auto height | Wrap at the max width | Grows vertically |
@@ -448,9 +422,9 @@ work lands in one of these ten rather than inventing an eleventh.
 | 9 | **ImGui table** (ledgers) | Stretch columns with per-column min widths | Per-cell guaranteed-fit (clip + tooltip) for numeric/identity columns, wrap for description columns | Horizontal scroll on the table; never silent truncation of a load-bearing value |
 | 10 | **Hand-drawn chart plot** (draw-list, `charts.cpp`) | Host-supplied screen-space box, measured before it is reserved | Guaranteed-fit, **reflowing** — labels measured, the plot's own geometry yields to them | Legend reflows below the plot, then elide-with-record; never silent truncation of a plotted value |
 
-The **comms dock** and the **pinned items panel** are both fixed-rect docked panels obeying
-container 1's policy (wrap, vertical scroll) — which is why row 1 is named for the *policy*
-rather than for the fold-out column alone.
+The **pinned items panel** is a fixed-rect docked panel obeying container 1's policy (wrap,
+vertical scroll) — which is why row 1 is named for the *policy* rather than for the fold-out
+column alone.
 
 This table is the baseline the text-wrap render audit consumes (BL-215, text-wrap render
 audit) — an audit of every container's *rendered* wrap behaviour against the policy declared
@@ -516,4 +490,3 @@ The **hover card** is the glance-then-stick card on the Planetary surface, frame
 | Drill-through / disclosure | `DRILL_THROUGH.md` |
 | Discovery / fog surfaces | `DISCOVERY.md` |
 | Time column | `TIME_CONTROLS.md` |
-| Comms dock | `CHAT.md` |

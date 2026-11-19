@@ -132,7 +132,6 @@ tiles**, of which roughly 18,000 are land.
 | **Lens bar** (under the minimap) | Map overlays. One click applies a lens; clicking the active one clears it. |
 | **Selection band** (bottom) | Detail on whatever is currently selected, and the actions available on it. A live battle of yours selects ahead of everything else, as a battle card. |
 | **Time column** (top right) | The clock, the pause control and the speed tiers. |
-| **Comms dock** (bottom) | Messages and channels. The **Field** channel carries one dispatch per battle of yours per tick. |
 
 ### 2.3 Your first ten minutes
 
@@ -373,7 +372,7 @@ share a province — declared hostility between nations — and plays out over t
 rounds, with withdrawal priced rather than free.
 Each round resolves unit class matchup by formation doctrine, modified by terrain, supply state and
 season. Winter costs the attacker attrition and the defender readiness. Your own battles show as a
-battle card and post a dispatch to the Field channel every tick.
+marker on the map and a battle card.
 
 *Authority: `docs/military/MILITARY.md`; the rival's decisions are `docs/ai/AI_OPPONENT.md`.*
 

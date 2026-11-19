@@ -35,7 +35,6 @@
 #include "ui/missile_panel.hpp"   // BL-1431: missile_order_answer
 #include "world/sea_combat.hpp"   // BL-1534: ship_crew, for the hire's refusal
 #include "ui/market_ledger.hpp"
-#include "ui/chat_panel.hpp"
 #include "ui/fonts.hpp"
 #include "ui/ui_scale.hpp"
 #include "ui/generation_charts.hpp" // the shared chain-stage charts (BL-211)
@@ -617,13 +616,9 @@ int app::run(autostart_mode autostart)
             const long long into = static_cast<long long>(m_sim_loop.day_tick()) - base;
             if (into > 0)
             {
-                std::vector<battle_dispatch> dispatches;
                 advance_quarter_to(m_world, m_registry,
                                    static_cast<int>(std::min<long long>(into, sim_loop::econ_tick_days)),
-                                   military_quarter_day_base(static_cast<int>(m_econ_steps)), &dispatches);
-                // BL-468: the day's battle traffic to the Field channel, as it happens.
-                session_history::post_battle_dispatches(m_world, dispatches, m_chat,
-                                                        static_cast<int>(m_sim_loop.day_tick()));
+                                   military_quarter_day_base(static_cast<int>(m_econ_steps)));
             }
         };
         // Mirror the day tick onto the world BEFORE the day loop, so read-only UI
@@ -1831,9 +1826,9 @@ void app::start_new_game_prelude()
     // here until 2026-09-24 (~20 s on the UI thread, BL-1078's freeze) and the
     // batched validation run poll_worldgen ran after it are gone, obsoleted
     // (Ben, 2026-09-24). What remains is what STARTUP.md § Handoff item 2
-    // names: the epoch formatter, the chat line, zoom/focus/frame, the
-    // registry's presentation half (reach budget, works, tech tree, the
-    // unpriced-basket report, the persona bench). The balance series from the
+    // names: the epoch formatter, zoom/focus/frame, the registry's
+    // presentation half (reach budget, works, tech tree, the
+    // unpriced-basket report). The balance series from the
     // filed returns is seeded in finish_new_game, once the seat is known.
     setup_presentation(m_pending_world_params);
     mark("setup_presentation");
@@ -2079,20 +2074,6 @@ void app::finish_economy_presentation()
             std::fflush(stderr);
     }
 
-    // Seat the persona counsel mountain bench (BL-207 slice 1). Every non-player
-    // corp seats the same bench this slice (bench diversity by industrial focus
-    // is later polish); a load failure (missing/malformed pack) disables counsel
-    // rather than aborting the session — the chat's agency-event feed (BL-205)
-    // stands on its own regardless.
-    try
-    {
-        m_persona_bench = persona::load_bench();
-    }
-    catch (const std::exception& e)
-    {
-        std::fprintf(stderr, "ProjectIo: persona counsel packs disabled: %s\n", e.what());
-        m_persona_bench.clear();
-    }
 }
 
 void app::step_economy()
@@ -2139,32 +2120,15 @@ void app::step_economy()
     m_last_corp_standings = std::move(tick.standings);
     const auto& flows     = tick.flows;
 
-    // Post-step presentation (BL-361: extracted to core/session_history.cpp):
-    // the nation-voiced agency comms (BL-212), the persona counsel posts
-    // (BL-207), and the per-tick history recorders behind the header sparkline,
-    // ledger graphs and resource drill-downs. Nothing here feeds back into the
-    // simulation.
+    // Post-step presentation (BL-361: extracted to core/session_history.cpp): the
+    // convoy-loss notes and the per-tick history recorders behind the header
+    // sparkline, ledger graphs and resource drill-downs. Nothing here feeds back
+    // into the simulation. The comms feeds that sat here retired with the dock
+    // (Ben, 2026-11-19; LAYOUT.md), so phases [6] and [7] now read ~0.
     {
-        const int day = static_cast<int>(m_sim_loop.day_tick());
-        session_history::post_nation_agency_comms(m_world, m_last_econ_report, m_chat, day);
-        lap(6); // agency comms
-        // BL-468: battle traffic to the Field channel. The settle never comes
-        // through here (it runs inside the worker, BL-1085), so nothing
-        // pre-game posts lines the player never saw.
-        session_history::post_battle_dispatches(m_world, m_last_econ_report, m_chat, day);
-        session_history::post_interceptions(m_world, m_last_econ_report, m_chat, day); // BL-1529
+        lap(6);
         session_history::note_convoy_losses(m_world, m_last_econ_report, m_ui);       // BL-1534
-        // BL-1480 (NR-1120): a declaration or peace the player is party to - the rival's
-        // pass above, or the player's own press since the last step.
-        session_history::post_war_dispatches(m_world, m_war_log_cursor, m_chat, day);
-        // BL-1605: a solar storm that struck the player's assets, or an Observatory's warning.
-        session_history::post_solar_storm_notices(m_world, m_last_econ_report, m_chat, day);
-        // Persona counsel: ~1.05 s/tick measured 2026-08-12 (NR-210 records
-        // the open in-game hitch). It was suppressed through the old validation
-        // run; the settle now has no presentation half at all.
-        session_history::post_persona_counsel(m_world, m_persona_bench,
-                                              m_counsel_channel, m_chat, day);
-        lap(7); // persona counsel
+        lap(7);
         session_history::history_stores h{
             m_balance_history, m_income_history, m_expenditure_history,
             m_market_history, m_building_rank_hist };
@@ -2243,17 +2207,8 @@ void app::setup_presentation(const world_params& params)
     // it. Display only — nothing simulated reads it back.
     ui::fmt::set_campaign_epoch_year(static_cast<int>(params.epoch_year));
 
-    // Open the comms log with a deterministic epoch line (BL-205): the Public
-    // channel exists from campaign start, so the panel is never an empty shell.
-    // BL-212: the channel is nation-voiced, so the epoch line counts nations,
-    // not the corporations operating quietly beneath them.
-    m_chat = ui::chat_state{};
-    m_war_log_cursor = m_world.history_log.size(); // BL-1480: no dispatch for what came before
     m_ui.war_notices = war_notice_state{}; // no notice for what came before
     m_ui.pinned = pinned_items_state{};    // a new world's ids name nothing of the old one's
-    ui::chat_post(m_chat, 0, null_entity, 0,
-                  std::to_string(m_world.nations.size()) +
-                      " nations on the public channel.");
 
     // Set the initial solar zoom so the default view covers roughly 5 AU.
     // The auto-fit scale at zoom 1 shows max_radius_au; dividing it by 5 zooms
@@ -2577,9 +2532,8 @@ bool app::save_game_to(const std::string& path)
     if (ok)
         m_last_save_day = static_cast<long long>(m_sim_loop.day_tick());
 
-    ui::chat_post(m_chat, static_cast<int>(m_sim_loop.day_tick()), null_entity,
-                  ui::chat_state::k_field_channel,
-                  ok ? ("Saved to " + path) : ("SAVE FAILED: could not write " + path));
+    if (!ok)
+        std::fprintf(stderr, "ProjectIo: SAVE FAILED: could not write %s\n", path.c_str());
     return ok;
 }
 
@@ -2610,8 +2564,7 @@ bool app::load_game_from(const std::string& path, std::string* why_out)
     // world predates the split is refused whole, not migrated, and says why.
     if (const std::string why = save_game_refusal_reason(path); !why.empty())
     {
-        ui::chat_post(m_chat, static_cast<int>(m_sim_loop.day_tick()), null_entity,
-                      ui::chat_state::k_field_channel, "LOAD FAILED: " + path + ": " + why);
+        std::fprintf(stderr, "ProjectIo: LOAD FAILED: %s: %s\n", path.c_str(), why.c_str());
         if (why_out != nullptr)
             *why_out = why; // the main menu shows it (startup_screens.cpp)
         return false;
@@ -2619,9 +2572,8 @@ bool app::load_game_from(const std::string& path, std::string* why_out)
     if (!read_save_game(path, w, env, &m_registry.military(), // BL-1455: legacy step-offs read the walls
                         &m_worldgen_cfg.kepler_base_price))
     {
-        ui::chat_post(m_chat, static_cast<int>(m_sim_loop.day_tick()), null_entity,
-                      ui::chat_state::k_field_channel,
-                      "LOAD FAILED: " + path + " is missing, corrupt, or from another version");
+        std::fprintf(stderr, "ProjectIo: LOAD FAILED: %s is missing, corrupt, or from another version\n",
+                     path.c_str());
         return false;
     }
 
@@ -2644,8 +2596,8 @@ bool app::load_game_from(const std::string& path, std::string* why_out)
     // not earn.
     m_registry.set_era(campaign_band_from_world(m_world)); // BL-1101: the one band body, on load as on a new game
     // And the registry's presentation half, as load_economy runs it after its band:
-    // the reach mirror the placement surfaces filter on, the works table, the
-    // persona bench. A fresh-process load had none of them.
+    // the reach mirror the placement surfaces filter on, the works table. A
+    // fresh-process load had none of them.
     finish_economy_presentation();
 
     // A load opens PAUSED too (Ben, 2026-11-19): every arrival in the game is
@@ -2729,9 +2681,6 @@ bool app::load_game_from(const std::string& path, std::string* why_out)
     }
     open_play_log(path);
 
-    ui::chat_post(m_chat, static_cast<int>(env.day_tick), null_entity,
-                  ui::chat_state::k_field_channel, "Loaded " + path);
-    m_war_log_cursor = m_world.history_log.size(); // BL-1480: a loaded log's wars are past
     m_ui.war_notices = war_notice_state{}; // a loaded world's wars are not news
     m_last_save_day  = static_cast<long long>(env.day_tick);
     m_menu_message.clear();
@@ -2794,7 +2743,6 @@ void app::exit_to_menu()
     m_expenditure_history.clear();
     m_market_history.clear();
     m_building_rank_hist.clear();
-    m_chat = ui::chat_state{};
 
     // Every ledger, selection and takeover: a fresh session opens with ledgers closed
     // (MENU.md § Policy). What the launch set and the player's F11 stay.
@@ -2813,7 +2761,6 @@ void app::exit_to_menu()
     m_econ_steps      = 0;
     m_last_orbit_days = 0.0;
     m_last_survey_day = 0;
-    m_war_log_cursor  = 0;
     m_show_options    = false;
     m_show_help       = false;
     m_menu_was_open   = false;
@@ -3116,20 +3063,6 @@ void app::render()
         }
     }
 
-    // Comms chat log (BL-205) — BL-227 re-homed it from the right chrome column
-    // (where it sat between the time panel and the minimap) to the BOTTOM-LEFT,
-    // sharing the Selection band's top edge and exact height so the bottom of the
-    // screen reads as one horizontal strip: [comms][selection band].
-    //
-    // Comms is ambient — nation-voiced public chatter you read when you notice it
-    // (BL-212), not a decision surface — so it does not need the prime right-edge
-    // space directly under the time panel. The fold-out column shortens to clear
-    // it, which is why every menu and ledger is now permanently shorter.
-    {
-        const ui::foldout_rect c = ui::comms_dock_rect();
-        ui::draw_chat_panel(m_world, m_chat, static_cast<int>(m_sim_loop.day_tick()),
-                            c.x, c.y, c.w, c.h);
-    }
 
     // Left navigation pane and the menus it opens. Starts below the profile.
     ui::draw_nav_pane(m_ui, ui::profile_panel_height);

@@ -46,7 +46,7 @@ Subject is therefore the **sibling axis**, not a competitor and not folded in.
 — centre), not to the display (Ben: *"full
 screen should actually just take the place of a canvas, rather than the entire view. I would
 prefer to see consistency in the UI really."*). The nav rail, identity tile, header, clock,
-comms dock, Selection band and minimap all survive a takeover, and the player never loses
+fold-out column, Selection band and minimap all survive a takeover, and the player never loses
 their selection to open a chart.
 
 The argument is consistency and it is the good one: the canvas region is already the app's

@@ -769,8 +769,8 @@ is the one you need the card for (NR-468).
 #### What the card carries, and why each part earns its place
 
 - **The phase word** — `battle_phase_word(read_battle_phase(…))`. Rounds are mechanically uniform;
-  the phase is a *reading* of one. It is derived **once, in the world layer**, precisely so this
-  card and the Field-channel dispatch stream (CHAT.md) cannot describe the same fight differently.
+  the phase is a *reading* of one. It is derived **once, in the world layer**, so every surface
+  that names a fight's phase reads the same word.
 - **Per-unit strength bars, both sides.** "I am at 60%" does not say whether that is one broken
   formation or five even ones, which is the difference between staying and leaving.
 - **The withdrawal price, with its three terms separated** — base, per-round, pursuit — quoted from
@@ -939,15 +939,15 @@ element does not call them.
 ## Layout & chrome
 
 **The Selection band.** The element lives in a **fixed band at the bottom of the screen**. Its
-left neighbour is the **comms dock** (`comms_dock_rect` in `src/ui/foldout_column.{hpp,cpp}`);
-its right neighbour is the right chrome column (time panel + minimap). Dock and band share one
-top edge and one height, so the screen's bottom row reads as a single solid strip. Ben's
+left neighbour is the **fold-out column**, which runs to the screen's bottom (Ben, 2026-11-19:
+the comms dock that sat there retired); its right neighbour is the right chrome column (time
+panel + minimap). Band and minimap share one top edge, so the screen's bottom row reads as a
+single solid strip. Ben's
 ruling (2026-07-28): *"menus that are to do with doing/building need space at the bottom of
 the screen, rather than floating with the cursor."* The band is:
 
-- **Fixed, not click-anchored.** Always the same rect — left edge at the **comms dock's right
-  edge** (the dock takes three quarters of the fold-out column's width; the band takes the
-  month it gives back), right edge at the right chrome column, bottom-anchored at
+- **Fixed, not click-anchored.** Always the same rect — left edge at the **shell column's right
+  edge** (`shell_column_width`), right edge at the right chrome column, bottom-anchored at
   `selection_band_height` tall (`app.cpp`'s band block; the frame is
   `src/ui/selection_card.{hpp,cpp}`) — regardless of where the selecting click landed. The
   player's eye never has to re-find it.

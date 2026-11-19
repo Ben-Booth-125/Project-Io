@@ -21,8 +21,6 @@
 
 #include "ui/canvas_command.hpp"
 #include "ui/history_lapse.hpp"    // BL-829/BL-860: the lapse rounds' time-lapse record
-#include "scripting/persona_pack.hpp"
-#include "ui/chat_panel.hpp"
 #include "ui/plot_history.hpp"
 #include "ui/strategy_readout.hpp"
 #include "world/market_clearing.hpp"
@@ -1042,8 +1040,8 @@ private:
     /// thread. The load resets the band to `any`; the caller bands.
     void load_recipe_registry();
     /// The presentation half of the economy load (the reach budget mirrored
-    /// onto ui_state, the works and tech tables, the unpriced-basket report,
-    /// the persona bench) -- everything in `load_economy` that is not the
+    /// onto ui_state, the works and tech tables, the unpriced-basket report)
+    /// -- everything in `load_economy` that is not the
     /// registry, its band or the recipe pass. Begin runs it on the registry
     /// the worker handed over; `load_economy` (the verify path) after its own.
     void finish_economy_presentation();
@@ -1346,10 +1344,6 @@ private:
     works_registry  m_works;             ///< BL-321 Era -1 works table, loaded from scripts/works.lua at startup.
     economy_report  m_last_econ_report;  ///< Most recent economy-step report; read by the ledgers. Its read slice is saved (save_game.hpp part 5).
     std::vector<corp_standing> m_last_corp_standings; ///< Per-corp standing profile (BL-262 first slice), recomputed each econ tick from m_last_econ_report's cash flow; read by the Corporations panel. Saved in the envelope with m_last_econ_report's read slice (save_game.hpp part 5, v27).
-    ui::chat_state  m_chat;              ///< Comms log state (BL-205): channels, messages, drafts.
-    std::vector<persona::pack> m_persona_bench; ///< Seated mountain bench (BL-207 slice 1); empty if load_bench() failed.
-    std::unordered_map<entity_id, int> m_counsel_channel; ///< corp -> its lazily-created Counsel chat_channel index.
-    std::size_t m_war_log_cursor = 0; ///< BL-1480: history_log entries already read for war dispatches.
     uint64_t        m_last_econ_tick = 0; ///< econ_tick() at the previous step; drives the boundary detection in run().
     /// Count of economy ticks this campaign -- the settle's twelve (run inside
     /// the worker, so Begin sets this to `k_campaign_settle_ticks`) plus every
@@ -1446,7 +1440,7 @@ ui::frame_stats& frame_stats_instance();
 
 /// Process-lifetime per-phase accumulators for app::step_economy (ms):
 /// [0] convoys, [1] run_economy_step, [2] clear_markets, [3] apply_budget,
-/// [4] tech gates, [5] standings+credit, [6] agency comms, [7] persona counsel,
+/// [4] tech gates, [5] standings+credit, [6] and [7] retired with the comms feeds (read ~0),
 /// [8] history recorders. Dumped by finish_new_game's validation-run timing
 /// (the 2026-08-12 stall hunt).
 ///

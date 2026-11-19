@@ -1019,9 +1019,9 @@
     "docs/ui/LAYOUT.md § Container vocabulary",
     "src/ui/foldout_column.hpp"
    ],
-   "summary": "The shared chrome every rail-hosted ledger draws through (foldout_begin/foldout_end): one fixed-width rect, one border policy, stopping at the comms dock's top edge since BL-227.",
-   "interesting_question": "BL-227 (comms dock) made every ledger in this column permanently shorter by the bottom strip's height — was that height tax weighed against ledger content density, or purely a placement call?",
-   "resolution": "Named as Ben's deliberate call, not a byproduct: LAYOUT.md's Comms dock section states 'every menu and ledger in the fold-out column is permanently shorter by exactly the Selection band's height. Deliberate (Ben's call, 2026-07-30), not a regression' — with no accompanying content-density analysis cited.",
+   "summary": "The shared chrome every rail-hosted ledger draws through (foldout_begin/foldout_end): one fixed-width rect, one border policy, running from below the header to the screen's bottom edge.",
+   "interesting_question": "The column once stopped at the comms dock's top edge, a height tax on every ledger. What did the dock's retirement give back?",
+   "resolution": "The whole tile: the comms dock is retired outright and its tile goes to the fold-out column, which now runs to the screen's bottom (Ben, 2026-11-19; LAYOUT.md § The comms dock is retired).",
    "checks": [
     "foldout_shell",
     "drill_through_fold"
@@ -1073,55 +1073,6 @@
    "resolution": "Accepted, disambiguated by call-site type: ICONS.md states the two are 'same name, disambiguated by the final argument type and by context (strip vs. canvas pip)' — treated as settled, not flagged as a naming hazard to fix.",
    "checks": [
     "icon_silhouettes"
-   ]
-  },
-  {
-   "id": "UI-064",
-   "name": "Comms dock",
-   "kind": "panel",
-   "parent": null,
-   "source": [
-    "docs/ui/CHAT.md",
-    "docs/ui/LAYOUT.md § Comms dock",
-    "src/ui/chat_panel.hpp",
-    "src/ui/chat_panel.cpp"
-   ],
-   "summary": "The bottom-left tile of the screen's bottom strip: a channel-based chat log (Public + player-created groups) fed by deterministic sim events and player input, the surface of the diplomacy-as-communication principle.",
-   "interesting_question": "Player messages typed into this panel currently have 'no mechanical effect yet — the AI C-route hook' — so what does a player actually gain by typing here today, versus just watching the ambient nation-voiced lines?",
-   "resolution": "Named openly as pre-wired scaffolding: CHAT.md's message-sources table marks player input as 'No mechanical effect yet — the AI C-route hook,' i.e. the surface is built ahead of the AI system (BL-202+) that will make it consequential.",
-   "checks": [
-    "chat_panel",
-    "history_ledger_and_comms"
-   ]
-  },
-  {
-   "id": "UI-065",
-   "name": "Public channel",
-   "kind": "sub-element",
-   "parent": "UI-064",
-   "source": [
-    "docs/ui/CHAT.md § Channels"
-   ],
-   "summary": "Channel 0, always present; since BL-212 the only speakers are nations, never individual corporations, each posting at most one aggregated event per (nation, tick).",
-   "interesting_question": "Why aggregate to one heaviest event per (nation, tick) and post it in first person with no building/corp specifics, rather than the earlier per-corp/per-building reflex lines?",
-   "resolution": "Explicitly a correctness fix, not a style choice: CHAT.md states the old per-corp lines 'were a standing violation of DISCOVERY.md's competitor-visibility rule (they leaked rival internals)' — the aggregation exists specifically to stop leaking private rival state through chat.",
-   "checks": [
-    "history_ledger_and_comms"
-   ]
-  },
-  {
-   "id": "UI-066",
-   "name": "Group channels",
-   "kind": "sub-element",
-   "parent": "UI-064",
-   "source": [
-    "docs/ui/CHAT.md § Channels"
-   ],
-   "summary": "Arbitrary player-created channels over any corp subset (name + member checkboxes), session-local in the shipped slice; AI-created groups unreadable by the player are a named future extension.",
-   "interesting_question": "n/a — a straightforward, already-scoped feature slice.",
-   "resolution": "n/a",
-   "checks": [
-    "chat_panel"
    ]
   },
   {
@@ -1762,7 +1713,7 @@
     "src/ui/selection.hpp",
     "src/ui/selection_card.cpp"
    ],
-   "summary": "The Selection band's content for a battle in progress, plus the Field dispatch channel that narrates it.",
+   "summary": "The Selection band's content for a battle in progress, its phase word read through the same battle_phase_word the dispatch text uses.",
    "interesting_question": "Every other thing the Selection band shows is an entity with an id. A battle is not. How does selection hold something that cannot be selected?",
    "resolution": "By not pretending: selection.hpp states a battle \"has no entity id to select\" and lives in its own ui_state fields rather than going through selection_kind_of. The header calls this the point rather than an omission (BL-469).",
    "checks": [
@@ -2259,8 +2210,8 @@
     "src/ui/alerts.cpp"
    ],
    "summary": "Top centre of the canvas area, below the alert strip: one notice per war the player's nation has become party to, by either side's declaration, naming both parties, with Dismiss and a door to answering or to the Wars tab. It pauses nothing and changes nothing.",
-   "interesting_question": "The alert strip already says At war and the chat already logs the declaration. What does a notice add that those do not?",
-   "resolution": "The strip names no one and a chat line scrolls away at 16x. The notice names both parties, waits to be dismissed, and is the door to the free answer. It draws only for a war that opened in this session, so a loaded war is not news.",
+   "interesting_question": "The alert strip already says At war. What does a notice add that the strip does not?",
+   "resolution": "The strip names no one. The notice names both parties, waits to be dismissed, and is the door to the free answer. It draws only for a war that opened in this session, so a loaded war is not news.",
    "checks": [
     "war_notice"
    ]

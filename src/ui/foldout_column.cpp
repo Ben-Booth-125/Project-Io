@@ -3,7 +3,7 @@
 #include "header_panel.hpp"  // header_panel_height
 #include "nav_pane.hpp"      // nav_pane_width
 #include "profile_panel.hpp" // profile_panel_height
-#include "selection_card.hpp" // selection_band_height (the comms dock shares it)
+#include "selection_card.hpp" // selection_band_height
 
 #include "ui_scale.hpp"     // px: the column scales with the UI (BL-1495)
 
@@ -70,30 +70,10 @@ foldout_rect foldout_column_rect()
         nav_pane_width,                       // x: right of the icon rail
         profile_panel_height,                 // y: below the identity tile
         W - nav_pane_width,                   // w: rail edge -> column edge
-        // h: down to the TOP OF THE COMMS DOCK, not the bottom margin (BL-227).
-        //    The dock owns the bottom-left tile of the screen's bottom strip, so
-        //    every menu and ledger in this column is now permanently shorter by
-        //    exactly the Selection band's height. Ben's call, 2026-07-30.
-        std::max(0.0f, disp.y - profile_panel_height - selection_band_height(disp.x, disp.y)),
-    };
-}
-
-foldout_rect comms_dock_rect()
-{
-    const ImVec2 disp = ImGui::GetIO().DisplaySize;
-    const float  W    = shell_column_width(disp.x);
-    const float  h    = selection_band_height(disp.x, disp.y);
-    // Three quarters of the fold-out column's width (Ben, 2026-07-30). Comms is
-    // ambient chatter, not a decision surface, so it does not need to hold the
-    // full column width down here — the quarter it gives back goes to the
-    // Selection band, which starts at this dock's right edge rather than at the
-    // shell column edge, so the bottom strip stays SOLID with no canvas sliver
-    // punched between the two.
-    return {
-        nav_pane_width,                            // x: right of the icon rail
-        disp.y - h,                                // y: shares the Selection band's top edge
-        (W - nav_pane_width) * 0.75f,              // w: three quarters of the column
-        h,                                         // h: identical to the band, by design
+        // h: to the SCREEN'S BOTTOM EDGE (Ben, 2026-11-19). The comms dock that
+        //    held the bottom-left tile retired; the bottom strip now starts at
+        //    this column's right edge, so a ledger loses no height to it.
+        std::max(0.0f, disp.y - profile_panel_height),
     };
 }
 

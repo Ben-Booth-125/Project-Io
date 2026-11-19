@@ -174,9 +174,7 @@ call only, and `world/*`, `survey_tile_visible`, `body_activity_visibility` and
 (Ben, 2026-08-06: *"No additional information for the AI."*). God view grants **sight,
 never hands**: rival controls (Mothball / Dismantle / Auto, Method's recipe switch) stay
 disabled under it. With the flag off, every gated surface renders byte-identical to a
-played session. The comms-feed redaction (`post_nation_agency_comms`'s
-one-nation-line-per-tick throttle) is outside the flag's reach by construction — a post-time
-store, not a draw-time read — so lifting it is its own design, not a flag read.
+played session.
 
 ---
 

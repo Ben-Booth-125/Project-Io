@@ -9,7 +9,7 @@ space**, with the backlog item that demanded it. The pair is required. Enforceme
 authorship, not machinery — there is deliberately no audit check against this file
 (BL-260, Ben 2026-08-01: *"the docs are the audit"*).
 
-**96 surfaces** — 4 settled, 92 awaiting Ben's wording.
+**94 surfaces** — 4 settled, 90 awaiting Ben's wording.
 
 ---
 
@@ -75,14 +75,6 @@ alphabetical order.
 **Because:** The capital is the anchor every Logistic Point chain runs back to (LOGISTICS.md, the chain centres on the capital), the seat a war is decided at, and the one place on a nation's ground the player must find at once; with the HQ retired nothing on the canvas marked it, so a chain's root, and the enemy's seat, were invisible. A star is the cartographer's mark for a seat of government and needs no key. Every nation's, in its identity colour - a capital is public, as the border band already is - with the player's drawn larger inside a pale ring so the seat reads first. It shows on the plain canvas and under every lens whose subject is not the ground itself (Logistics, Market, Scarcity, Industry, Trade-flow, Supply-routes, Nations), and is HIDDEN under Resource, Continent and Population, where a political mark competes with the field the lens is about. Drawn over a pale star-shaped casing so a dark identity colour still reads on dark ground, and floored at 7 px so it stays a star at the widest rung, capped at 14 px so it never swallows the city it marks.
 
 *Demanded by Ben's live look at the Logistics lens, 2026-10-25 (three rulings; no backlog id yet) · `src/ui/body_surface_canvas.cpp`, `src/ui/icons.cpp`, `docs/ui/PLANETARY.md`, `docs/ui/ICONS.md` · id `capital_star`*
-
-### Comms dock
-
-**Answers:** What has happened that I did not watch happen?
-
-**Because:** The simulation runs while the player is looking elsewhere. Without a log, events are only discoverable by noticing a changed number, which is the failure mode the alerts work (BL-261) also targets.
-
-*Demanded by BL-212, BL-216 · `src/ui/chat_panel.cpp` · id `chat_panel`*
 
 ### Near-space hazard marks: a debris mark (three shards) beside each node whose debris is above zero, with the level on the node's hover card; a storm bolt on a satellite gone dark or a station stormed by an active solar storm, with a line on its card
 
@@ -156,14 +148,6 @@ alphabetical order.
 
 *Demanded by BL-577 · `src/ui/selection.hpp`, `src/ui/selection_panel.cpp`, `src/ui/ui_state.hpp` · id `contract_card`*
 
-### Public channel (comms dock) — mercenary-contract dispatches
-
-**Answers:** What is happening to the mercenary work I have taken or am chasing, without me having to hold the ledger open?
-
-**Because:** CONTRACTS.md's EVENTS.md-derived rule is that an event lands with its message in the SAME change: offer issued, accepted, completed, failed and abandoned are the five moments a contract's money and reputation actually move, and none of them had a surface before this — a completed contract paid out silently. The Public channel is the only correct home rather than a new channel of its own (unlike the battle dispatch stream): CHAT.md already settles Public as nation-voiced, and a contract's counterparty on the client side IS a nation, so the wording is the SAME first-person register post_nation_agency_comms already established, not a new voice to learn. Phrase selection folds the record's own stable id with the event kind (the BL-290 tongue-bank idiom battle_dispatch_line already uses), so replays read identically and no RNG draw is spent narrating a fact the simulation already decided.
-
-*Demanded by BL-577 · `src/core/battle_dispatch_text.cpp`, `src/core/session_history.cpp`, `src/world/nation_step.cpp`, `src/world/nation_step.hpp` · id `contract_events_public_channel`*
-
 ### Convoy marker (Planetary canvas, at a lane's head) and the Convoy card (Selection band, convoy kind)
 
 **Answers:** What is moving on this ground, whose is it, what does it carry, where is it bound and when does it land?
@@ -211,14 +195,6 @@ alphabetical order.
 **Because:** A player must be able to reach save, settings and the way out without knowing a hotkey (BL-070), and leaving a campaign has to be a thing the game can do short of closing the window: until this surface a campaign had no way back to the main menu, and the save it could write had no door on the screen a player would look for it on. It takes the whole canvas rather than a corner popup because it is the pause screen (Ben, 2026-11-05): the world under it has stopped, so the map earns nothing while it is up. It says when the campaign was last saved, because that is the one fact the choice in front of the player turns on. Both exits warn every time, not only when the world moved, because a paused player can still place a build and 'nothing changed' is a claim the surface cannot make. The main menu gains Load because Exit to Menu must not strand a save (STARTUP.md § Main menu). Ben, 2026-11-09: it covers the whole window, shell included, so a pause screen reads as one; Save asks for a name and Load lists saves by name, because a campaign worth keeping is worth more than one slot, and the name is the file name, so a save stays a file the player can recognise.
 
 *Demanded by BL-1519 · `src/ui/time_panel.cpp`, `src/ui/startup_screens.cpp`, `src/core/save_names.hpp`, `src/core/app.cpp`, `src/ui/icons.cpp` · id `escape_menu`*
-
-### Field channel (comms dock)
-
-**Answers:** What happened in my fights while I was looking somewhere else?
-
-**Because:** A battle resolves several rounds per tick and a concluded one is ERASED at the end of the tick it ends — so the aftermath, which is the single line a player most needs (who held the ground, what it cost), is unreachable from any state-reading surface by the time they could look. The dispatch stream is the only place it can live. It is a SEPARATE channel rather than more traffic in Public because its volume is driven by simulation intensity, not by scripted events: a war is several lines a tick, and mixing that into Public would bury everything else. The phase vocabulary is shared verbatim with the battle card (battle_phase_word), so the two surfaces cannot drift into describing the same fight differently.
-
-*Demanded by BL-468 · `src/core/battle_dispatch_text.cpp`, `src/core/session_history.cpp`, `src/ui/chat_panel.hpp` · id `field_channel`*
 
 ### Selection band - Front card (a front of the player nation, selected from its line on the Planetary canvas)
 
@@ -505,6 +481,14 @@ THE SEAM'S ANSWER IS SHOWN, because set_trade validates what the form cannot (bo
 **Because:** A building is not a layout of its own (Ben, 2026-10-13, BL-1312 (tile card split)): selecting one draws its host tile's card with that building's stack expanded in the tile column, the preview and the province card unmoved, so 'what is this building' is always read beside 'what is this ground'. Round 2 (same day) gave the card its order: an unlabelled back control, the name and the stack count; the production method and the status line (running state with its reason, never a bare 'Operating.'); a profit row - a short net-over-time chart beside net profit per month and expenses per month as two figures, the expenses hover splitting input cost / maintenance / wages - because one coloured number says what the revenue-against-stacked-expenses columns said in a fraction of the height; and the workforce target as a read-only bar. The method and status line is drawn always, and a building with no recipe names what it does (a Port its trade points, a hub its haul discount); a fresh campaign opens with the profit row filled from the settle's last month (BL-1321). The card holds ONE lever, the method (Ben, 2026-11-11, BL-1641 (one building per product)): every processing building makes one product, so its methods are only ever upgrades or variants of the same product, and the change has a clear home on the building's own card - the one exception to the 2026-08-29 centre-presents-only ruling. Beneath the method line, one press per legal step from the stack's method says what it is and what it costs the whole stack, because a step moves every building of the product on the tile; a building with one method shows none. The press is the ledger grid's own, so the two cannot disagree. The workforce slider it carried briefly in round 2 stays retired with player workforce control (Ben, 2026-10-13, BL-1322). A rival's card is the header, owner and 'private', by a short-circuit that never reaches the player's sections; god view opens the sight, never a lever. The recipe rows (Ben, 2026-11-05, BL-1514 (building recipe rows)) answer the playtest's question at the building itself: the status line named one short input, and a plant's whole appetite had to be pieced together from the ledger. They keep what is known apart from what is worked out, because the sim reports a single binding input: everything else is labelled an estimate, and an empty report after a load reads as no quarter yet, never as zero.
 
 *Demanded by BL-683, BL-682, BL-431, BL-430, BL-074, BL-1312, BL-1514, BL-1641 · `src/ui/selection_panel.cpp`, `src/ui/selection_panel.hpp`, `src/ui/ui_state.hpp`, `src/ui/building_state.cpp` · id `selection_building_card`*
+
+### Selection band - the market element (top goods | identity, catchment, your trades)
+
+**Answers:** What is this market - where it is, whom it serves, what moves through it and at what price - and do any of my trades run through it?
+
+**Because:** Ben, playtest 2026-11-19: a selected market showed only Go to and Trades, so selecting one told the player nothing the canvas glyph had not. Markets are the public intelligence channel (BL-068), so the card can say everything the Market ledger says, but the band asks a shorter question than the ledger: not the whole board, the six goods by volume with each price against its base and its move since last month, beside the three facts a glance needs - the body and the nation holding the centre, the settlements and people that clear here, and how many of the player's own trades touch it (a count that is also the door onto the ledger's Trades tab, where the old Trades button led). Go to is the header's own press, landing on the centre tile. The activity fog still gates the goods: a market outside the trade network names itself and its catchment but shows no prices.
+
+*Demanded by BL-1694 · `src/ui/selection_panel.cpp` · id `selection_market_card`*
 
 ### Selection element
 

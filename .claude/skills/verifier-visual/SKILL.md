@@ -294,8 +294,7 @@ runs capture-only.
   helpers), confirm it captures what the requirement needs, then run it through
   this skill — that is how a check becomes a permanent, reusable asset.
 
-- **`battle_card.lua`** (BL-468/BL-469, 2026-08-21) — the battle card and the Field
-  dispatch channel. **Read it before writing any check that needs a simulation state
+- **`battle_card.lua`** (BL-468/BL-469, 2026-08-21) — the battle card. **Read it before writing any check that needs a simulation state
   the script must CREATE rather than find.** Most checks here open a panel and look;
   this one has to stage a fight: identify the player corp from the buildings table's
   own `player` flag (never a hard-coded corp id), declare hostility in both
@@ -317,7 +316,7 @@ runs capture-only.
 ## The shell pass (2026-08-24)
 
 **`shell_pass.lua`** — the ubiquitous-chrome review: profile tile, header strip, time panel, nav
-rail and its tooltip, comms dock, Selection band in three kinds, minimap at each rung of the
+rail and its tooltip, Selection band in three kinds, minimap at each rung of the
 ladder, the lens region, the hover card, the launch screen, the in-session system menu, and each
 of the thirteen rail ledgers. 30 captures from one world. (The band's fourth kind was the
 **province**; BL-598 folded it into the tile element as accordion sections, so the two captures
@@ -335,9 +334,8 @@ Two things about it are worth copying, and one is worth not copying.
 - **Do not copy the load.** `ui_shell_fixture.lua` writes a snapshot and captures both sides of
   the round trip, and that pair is the evidence that opening one is *not* equivalent to staging
   one: the canvas comes back dimmed (the day-tick mirror is re-seeded from a sim loop
-  `verify.econ_step` never advanced, so the activity fog ages everything as stale — NR-608) and
-  the comms dock comes back empty (the chat log is not in the save envelope — NR-609). Until those
-  are ruled on, stage rather than load.
+  `verify.econ_step` never advanced, so the activity fog ages everything as stale — NR-608).
+  Until that is ruled on, stage rather than load.
 
 **What it found the first time it ran**, as the argument for pointing a capture pass at surfaces
 nobody has scripted: nav slot 8 had no `show_panel` name, so no script could ever open it — and it

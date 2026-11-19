@@ -142,7 +142,7 @@ owning doc(s) for a source file, ranked by how often work on it cited each — t
 | `docs/ui/ICONS.md` | The glyph vocabulary (`src/ui/icons.*` is the source of truth). |
 | `docs/ui/DISCOVERY.md` | The two fogs: survey (geographic) and activity (commercial), competitor visibility, trade routes. |
 | `docs/ui/STARTUP.md` | Menu → wizard → generation → in-game. |
-| `docs/ui/MENU.md`, `HEADER.md`, `PROFILE.md`, `TIME_CONTROLS.md`, `CHAT.md`, `EXPLORER.md` | The shell's fixed panels, one each. |
+| `docs/ui/MENU.md`, `HEADER.md`, `PROFILE.md`, `TIME_CONTROLS.md`, `EXPLORER.md` | The shell's fixed panels, one each. |
 | `docs/ui/ledgers/*.md` | One design Q&A per fold-out ledger (`README.md` gives the five axes). |
 | `docs/ui/question_log.json` → `QUESTION_LOG.md` | Every surface's question, justification and demanding item. **Required on every surface**; regenerate with `render_question_log.js`; never build a check against it (Ben, 2026-08-01). |
 | `docs/ui/ui_elements.json` | The surface inventory — every canvas, ledger, panel and chrome element that exists, with its `checks`. The spine a UI pass scopes off. **Query, don't load.** |

@@ -162,9 +162,6 @@ Rival nations, majors and minors, act (Ben, 2026-10-23): narrow per-building ref
 
 Above that core sits the **language layer** (direction settled 2026-08-03): a small local model playing through the word interface below, socketed by the Io MCP server (BL-278). Cloud models generate the fine-tuning corpus (BL-279); they never play, and the engine ships no network client. Authority: `docs/ai/AI_OPPONENT.md` § 10; the scoped limits live in `.claude/rules/io-standing-rules.md`.
 
-### Comms
-The channel-based chat log — the surface of the diplomacy-as-communication principle: since every rival is AI, coordination between nations happens in a visible medium, and the mechanical actions of rival nations surface as messages first. `src/ui/chat_panel.{hpp,cpp}`; authority: `docs/ui/CHAT.md`.
-
 ---
 
 ## The progression chain

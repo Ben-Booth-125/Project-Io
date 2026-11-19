@@ -135,14 +135,3 @@ verify.day_step(3)
 assert(verify.select_battle(theirs.col, theirs.row), "the battle closed within three days of opening")
 verify.capture("battle_card_stepped")
 
--- The Field channel (BL-468). Channel 1 is Field — appended after Public, never
--- inserted, because the counsel channel caches an index into that list.
-local field_lines = 0
-for _, line in ipairs(verify.chat_lines()) do
-    if line:match("^1:") then field_lines = field_lines + 1 end
-end
-assert(field_lines > 0, "the fight produced no Field-channel dispatches")
-
--- The comms dock is chrome, not a panel: it is always on screen, so there is
--- nothing to open before capturing it.
-verify.capture("battle_dispatches")

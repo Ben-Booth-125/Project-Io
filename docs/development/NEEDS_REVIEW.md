@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*117 entries — 60 open, 57 resolved.*
+*119 entries — 62 open, 57 resolved.*
 
 ---
 
@@ -683,6 +683,16 @@ market_viability full tier, startups off: G1 82.2 (FAILS 85), G1t50 80.2 (FAILS 
 - D: the kit opens arms works only where a hire will soon want them (undoes part of BL-1551 force equipment)
 
 > **Recommendation:** C is done. Between A and B: A if the works should make arms ahead of war (the dial then staffs them on refill draw); B if BL-1551 meant them as a standing reserve that idles in peace. Either clears G1t50 by the reading above.
+
+### NR-1250 — EVENTS.md lost its default surface with the comms dock: an event now lands on the surface it concerns
+*decision taken on your behalf · raised 2026-11-19 · from BL-1692 (retire comms dock), lane A doc sweep*
+
+EVENTS.md held that an event lands with its message in the same change, and named the comms dock as the surface. With the dock retired outright (Ben, 2026-11-19), the rule was kept and its surface rewritten: the message lands on the alert strip (needs attention now), the war notice (a war on the player), or otherwise the ledger or card that owns the event's subject; an event with no owning surface is not ready to land. AI_OPPONENT.md § 7 keeps diplomacy-as-messaging as a principle a future diplomacy surface answers to, with no surface in the shell today.
+
+### NR-1251 — Three things only the comms dock told the player now tell nobody: solar storm strikes and Observatory warnings, quick save/load outcome
+*question · raised 2026-11-19 · from BL-1692 (retire comms dock)*
+
+Retiring every comms feed (Ben's pick: retire everything outright) removed: (1) the solar storm notice when a storm strikes the player's satellites or stations; (2) an Observatory's warning of next month's storm - the Observatory's whole player-facing payoff (EVENTS.md § Solar storms still says the owner is told and warned); (3) the quick save (F5) and quick load outcome lines - a failed quick save is now silent except stderr. Named saves still report failure in their form, and the escape menu shows the last save date. Wars, battles and convoy losses already have other homes (war notice, alert strip, battle card, Convoys ledger Lost heading).
 
 ---
 

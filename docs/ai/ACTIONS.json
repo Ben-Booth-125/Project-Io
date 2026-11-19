@@ -1311,67 +1311,6 @@
    "reason_to_select": "Will eventually set corporate wage policy; today it is display-only."
   },
   {
-   "id": "ledger.chat_channel_tab",
-   "family": "ledger",
-   "surface": "Comms dock (bottom-left), channel button row",
-   "press": "Click a channel's name button (e.g. 'Public' or a created group)",
-   "args": [
-    {
-     "name": "channel",
-     "type": "string",
-     "meaning": "Which chat channel to make active"
-    }
-   ],
-   "preconditions": [
-    "In-game (the comms dock is permanent chrome)"
-   ],
-   "expected_output": "Switches the dock's log and input to that channel; the active channel's button renders pressed. A plain selector - clicking the active channel again does not close the dock (the dock has no open/closed state).",
-   "reason_to_select": "Chooses which conversation to read or post into - Public carries nation-voiced public communications (BL-212); groups are player-scoped. It does NOT carry rival corp reflex events — those were removed as a competitor-visibility violation."
-  },
-  {
-   "id": "ledger.chat_message_input",
-   "family": "ledger",
-   "surface": "Comms dock, message input line at the bottom",
-   "press": "Type a message and press Enter",
-   "args": [
-    {
-     "name": "text",
-     "type": "string",
-     "meaning": "The message to post"
-    }
-   ],
-   "preconditions": [
-    "In-game",
-    "Message is non-empty"
-   ],
-   "expected_output": "Posts the message into the active channel's log under the player's name. HONESTLY: no mechanical effect yet - it is the hook the future AI conversation route consumes; today nothing answers.",
-   "reason_to_select": "Speaks into the world's comms - currently expressive only, later the way to address rival corporations."
-  },
-  {
-   "id": "ledger.chat_new_group",
-   "family": "ledger",
-   "surface": "Comms dock, '+' button and the NEW GROUP popup it opens",
-   "press": "Click '+', type a group name, tick member corporations, click 'Create'",
-   "args": [
-    {
-     "name": "name",
-     "type": "string",
-     "meaning": "The new group channel's name"
-    },
-    {
-     "name": "members",
-     "type": "list of corporations",
-     "meaning": "Which corporations to include (the player is an implicit member)"
-    }
-   ],
-   "preconditions": [
-    "In-game",
-    "Create enables only once a name is typed and at least one member is ticked"
-   ],
-   "expected_output": "Creates a new chat channel with those members and adds its button to the channel row. Clicking away dismisses the popup without creating. Chat-only structure - no economic or diplomatic effect.",
-   "reason_to_select": "Sets up a scoped conversation with specific rivals - the substrate the future AI communication route (diplomacy-as-communication) will read."
-  },
-  {
    "id": "ledger.construction_view_tab",
    "family": "ledger",
    "surface": "Construction ledger, view tab strip",
@@ -2228,7 +2167,7 @@
    "preconditions": [
     "App is in game; the exit warning is up."
    ],
-   "expected_output": "Exit to Menu ends the campaign and opens the main menu: workers joined, the play log and the agent seam closed, the world and every ledger, selection and comms line dropped. Exit Game quits the application. Neither saves; display settings already live in options.cfg.",
+   "expected_output": "Exit to Menu ends the campaign and opens the main menu: workers joined, the play log and the agent seam closed, the world and every ledger and selection dropped. Exit Game quits the application. Neither saves; display settings already live in options.cfg.",
    "reason_to_select": "To leave the campaign for good."
   },
   {
@@ -2240,7 +2179,7 @@
    "preconditions": [
     "App is in game; the escape menu is open; no exit warning is up."
    ],
-   "expected_output": "Opens the name form on the menu: a name field offering the last saved or loaded name, or quicksave, with Save and Cancel. Save writes <name>.iosave beside the executable, posts 'Saved to ...' to the Field channel, updates the 'Last saved' line and returns to the presses; the menu stays open. A name the file system could not hold exactly is refused with the reason and Save is disabled. A name already on disk asks first (Overwrite / Cancel).",
+   "expected_output": "Opens the name form on the menu: a name field offering the last saved or loaded name, or quicksave, with Save and Cancel. Save writes <name>.iosave beside the executable, updates the 'Last saved' line and returns to the presses; the menu stays open. A name the file system could not hold exactly is refused with the reason and Save is disabled. A name already on disk asks first (Overwrite / Cancel).",
    "reason_to_select": "To keep the campaign before leaving it."
   },
   {
@@ -2738,7 +2677,7 @@
    "preconditions": [
     "The app is in-game and no ImGui text field has keyboard focus."
    ],
-   "expected_output": "Writes the whole campaign to the quick-save slot — a single file `quicksave.iosave` beside the executable, overwritten each time without a prompt. The file carries the world snapshot (every component store, the order book, procurement, stance, laws, research, battles in progress, the province partition and the history log) plus the app envelope (sim clock, world_params, the full generation report, the per-tick histories, and the view slice: rung, framing, lens, selection). The outcome is posted to the Field comms channel either way — a save that silently did nothing is worse than one that says it failed. The sim, view and selection are otherwise untouched.",
+   "expected_output": "Writes the whole campaign to the quick-save slot — a single file `quicksave.iosave` beside the executable, overwritten each time without a prompt. The file carries the world snapshot (every component store, the order book, procurement, stance, laws, research, battles in progress, the province partition and the history log) plus the app envelope (sim clock, world_params, the full generation report, the per-tick histories, and the view slice: rung, framing, lens, selection). No line reports the outcome: the comms dock that carried it is retired (Ben, 2026-11-19). The sim, view and selection are otherwise untouched.",
    "reason_to_select": "Fix a point to come back to before doing something irreversible, or before a long run whose outcome you may want to compare against a re-run from here."
   },
   {
@@ -2751,7 +2690,7 @@
     "The app is in-game and no ImGui text field has keyboard focus.",
     "A quick-save exists (F5 has been pressed at least once in some session)."
    ],
-   "expected_output": "Replaces the live campaign with the quick-save slot's contents, restoring the world, the clock, the generation report, the histories and the view exactly as saved. NO CONFIRMATION PROMPT — the current campaign is discarded. If the file is missing, corrupt, or written by a build with a different save-format version, the load is REFUSED and the running campaign is left completely untouched, with the reason posted to the Field comms channel; a refused load costs nothing. Panel open/closed state is not restored, deliberately.",
+   "expected_output": "Replaces the live campaign with the quick-save slot's contents, restoring the world, the clock, the generation report, the histories and the view exactly as saved. NO CONFIRMATION PROMPT — the current campaign is discarded. If the file is missing, corrupt, or written by a build with a different save-format version, the load is REFUSED and the running campaign is left completely untouched; a refused load costs nothing. Panel open/closed state is not restored, deliberately.",
    "reason_to_select": "Return to the last fixed point — undo a run of decisions wholesale, or re-open the same starting position to try a different line from it."
   },
   {

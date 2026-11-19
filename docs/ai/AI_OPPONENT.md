@@ -1135,21 +1135,24 @@ diplomacy is *legible messaging*, not behind-the-scenes flags. This is a better 
 principle than invisible opinion modifiers — and in multiplayer the same channels carry human
 players, so the medium is actor-agnostic.
 
-- **Surface**: the **chat panel** (`src/ui/chat_panel.{hpp,cpp}`; BL-205, corp chat log) in the
-  right shell band, middle slot. Channels: **Public** (every nation), plus **arbitrary groups** (any
-  subset of nations, created from the panel). The player reads Public and any group they belong to.
+- **Surface**: **none in the shell.** The comms dock that carried the channels is retired
+  outright, with every feed that posted to it, and nothing it carried moves to another surface
+  (Ben, 2026-11-19; `../ui/LAYOUT.md` § The comms dock is retired). The medium below is the
+  principle a future diplomacy surface answers to, not a panel the player has: channels are
+  **Public** (every nation) plus **arbitrary groups** (any subset of nations).
 - **Stage A**: messages are **templated, deterministic renderings of the decision log** — the
   reflex-tier agency events ("Meridian idled Ironworks — sustained losses") and the strategic
-  tier's command stream. The chat is the AI-observability surface first; personality prose is
-  Stage C's.
+  tier's command stream. The world history log (§ 8a, `agency` and `decision` topics) is the
+  AI-observability record; personality prose is Stage C's.
 - **Stage C** (BL-334, Stage C dialogue layer): a small model speaks in-character in channels,
   conditioned on the scorer's decisions (§ 10g); AI↔AI private groups form plans the player
   cannot read — which is principled, because the *medium* is uniform and an intelligence mechanic
   (Discovery-model extension) can expose intercepts as content.
 - **Determinism**: stage-A message text derives purely from deterministic events. Free-text model
   chat arrives only under the C-route rules (out-of-process, coarse-grained, replay-logged).
-- **Player input**: a message box posts to the selected channel. It has **no mechanical effect**
-  — it is the hook Stage C consumes (the player negotiating with AI nations in language).
+- **Player input**: when a diplomacy surface exists, a message posted to a channel has **no
+  mechanical effect** — it is the hook Stage C consumes (the player negotiating with AI nations
+  in language).
 
 ---
 
@@ -1162,7 +1165,7 @@ The build work of BL-199 is carried by:
 | **BL-202** (corp AI scored utility) | Stage A: the scorer, the corp-command seam + decision log, the state export |
 | **BL-203** (corp AI predictive spending) | Stage B: strategy layer, priority buckets, spending forecast — the solvency answer (§ 2B) |
 | **BL-204** (AI skill harness) | Seed-set skill-regression harness (bot-vs-bot goldens: solvency, net-worth curves) + the tick-boundary **state hash** (doubles as the multiplayer desync primitive) |
-| **BL-205** (corp chat log) | The § 7 surface: chat panel, channels + groups, agency-event feed |
+| **BL-205** (corp chat log) | The § 7 surface as first built: chat panel, channels + groups, agency-event feed — retired with the comms dock (Ben, 2026-11-19) |
 
 Economics the scorer prices, settled alongside: **BL-153** (convoy pay by distance) and
 **BL-193** (building stacks); **BL-160** (auto exchange policy) / **BL-161**
@@ -1220,8 +1223,7 @@ and `trade_routes` keep their own readers unchanged):
   applied `corp_decision` (verb + reason + score). `corp_decision_ring` is untouched.
 - **agency** — both the reflex tier (`economy_system.cpp`'s recipe-rescue and idle-a-loser sites)
   and the strategic tier (`corp_ai.cpp`) log a narrated `agency` entry. The narration knows every
-  verb; verbs the chat feed has no vocabulary for (the procurement triple, the convoy pair) are
-  logged here and pushed to no feed event, rather than mis-narrated as the feed's kind 0.
+  verb, the procurement triple and the convoy pair included; no feed reads it.
 - **trade_route** — `supply_system.cpp`'s `credit_arrived_convoys` logs only when a body-pair lane
   is **first established**, never on a repeat completion (which only bumps the existing
   `trade_route`). `world::trade_routes` and `body_activity_visibility` are untouched.
@@ -1247,8 +1249,8 @@ and `trade_routes` keep their own readers unchanged):
   event (Ben, 2026-11-03, NR-1120; `../politics/RELATIONS.md` § 7, The public record). The same
   two-entry shape as a route, for the same reason: a war has two parties and the entry one tag, so
   one entry is pushed per party — declarer then defender — tagged by that party's nation in `corp`,
-  carrying the same narration. The chat's war dispatch to the player reads exactly the entries
-  tagged by the player's nation. Timestamp: the sim day tick.
+  carrying the same narration. The History ledger reads the entries tagged by the
+  player's nation. Timestamp: the sim day tick.
 
 **Serialisation** (`write_history_log`/`read_history_log`): a leading 4-byte magic (`"IOHL"`) plus
 a `uint32_t` version (BL-107's magic-and-version rule), then an entry count, then each entry

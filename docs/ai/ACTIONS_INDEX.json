@@ -274,18 +274,6 @@
    "Balance Ledger (Budget), 'Wages' tier control"
   ],
   [
-   "ledger.chat_channel_tab",
-   "Comms dock (bottom-left), channel button row"
-  ],
-  [
-   "ledger.chat_message_input",
-   "Comms dock, message input line at the bottom"
-  ],
-  [
-   "ledger.chat_new_group",
-   "Comms dock, '+' button and the NEW GROUP popup it opens"
-  ],
-  [
    "ledger.construction_view_tab",
    "Construction ledger, view tab strip"
   ],

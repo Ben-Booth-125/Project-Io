@@ -28,8 +28,8 @@ already paid. Held convoys and stalled convoys say so on the bar rather than in 
 (what arrived, when, and what haulage ate) — both wanted, neither backed by a store today.
 
 **A cargo that leaves the list unarrived states why (LOGISTICS.md § 7).** Above the rows, under a
-**Lost** heading, each cargo of the player's that was cut, raided or refused stays for a few ticks in the Field channel's own
-words, newest first: what it was, and who took it, "an unseen raider" where the owner has not found the ship.
+**Lost** heading, each cargo of the player's that was cut, raided or refused stays for a few ticks,
+newest first: what it was, and who took it, "an unseen raider" where the owner has not found the ship.
 
 **Cross-cutting selector (NOT a view, toggle-exempt):** none at first. The Market ledger's Body
 and Market combos do **not** come with it: a convoy is a route between two places and is not
