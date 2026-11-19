@@ -281,10 +281,15 @@ std::string war_context(const world& w, entity_id a, entity_id b)
     for (auto it = w.war_history.rbegin(); it != w.war_history.rend(); ++it)
         if ((it->declarer == a && it->defender == b) || (it->declarer == b && it->defender == a))
         {
-            const char* how = it->end == war_end::white_peace     ? "a white peace"
-                            : it->end == war_end::cession         ? "a cession"
-                            : it->end == war_end::imposed_white   ? "an imposed white peace"
-                                                                  : "an imposed cession";
+            const char* how = "an imposed cession";
+            switch (it->end) // every end named: a ternary chain let a new end fall through
+            {
+            case war_end::white_peace:     how = "a white peace"; break;
+            case war_end::cession:         how = "a cession"; break;
+            case war_end::imposed_white:   how = "an imposed white peace"; break;
+            case war_end::imposed_cession: how = "an imposed cession"; break;
+            case war_end::capitulation:    how = "a capitulation"; break;
+            }
             std::snprintf(line, sizeof line, "Last war: %s on %s, ticks %d-%d, ended in %s.",
                           name_of(w, it->declarer), name_of(w, it->defender), it->opened_tick,
                           it->closed_tick, how);
@@ -917,7 +922,7 @@ void draw_expanded(const world& w, const recipe_registry& reg, const std::vector
     {
         const war_record* war = war_between(w, me, them);
         const int sc = war ? war_score(w, *war) : 0;
-        const int mine = (war && war->declarer == me) ? sc : -sc;
+        const int mine = (war && war_side(*war, me) == 0) ? sc : -sc; // per side (BL-1706)
         ImGui::Text("War score %+d", mine);
         ImGui::SameLine();
         if (press(d, "Offer peace", "peace_open", them, true, {}, "Open the war in the Wars tab."))
@@ -1162,31 +1167,46 @@ void draw_peace(const world& w, ui_state& s, const war_record& war, entity_id me
             d.peace_with = other;
             d.peace_gain.clear();
             d.peace_give.clear();
+            d.capitulate_key = {null_entity, null_entity}; // one composer at a time
+            d.join_key       = {null_entity, null_entity};
         }
         return;
     }
 
     // The composer. Goals they would cede to you (yours, held by you, still theirs),
     // or goals you would cede (theirs, held by them, still yours). One side at a time.
-    const std::vector<uint32_t>& my_goals    = war.declarer == me ? war.declarer_goals : war.defender_goals;
-    const std::vector<uint32_t>& their_goals = war.declarer == me ? war.defender_goals : war.declarer_goals;
+    // BL-1706 (RELATIONS.md § Joining a war): the leaders' peace is per SIDE — goals any
+    // member of the winning side named, held by any of its members, on the ground of any
+    // member of the losing side (`check_peace_terms`).
+    const int my_side = war_side(war, me);
+    const std::vector<uint32_t> my_goals    = war_side_goals(war, my_side);
+    const std::vector<uint32_t> their_goals = war_side_goals(war, 1 - my_side);
+    const std::vector<entity_id> my_members    = war_side_members(war, my_side);
+    const std::vector<entity_id> their_members = war_side_members(war, 1 - my_side);
+    const auto member_of = [](const std::vector<entity_id>& v, entity_id n) {
+        return n != null_entity && std::find(v.begin(), v.end(), n) != v.end();
+    };
     // Land provinces each side owns: a peace that cedes all of the loser's ends its
     // nation (Ben, 2026-11-09; NATIONS.md § Elimination). Water does not count.
     const auto owned = [&](entity_id n) { return land_provinces_owned(w, d, n); };
     const auto pick_list = [&](const char* head, const std::vector<uint32_t>& goals, entity_id gainer,
                                entity_id loser, std::vector<uint32_t>& chosen, std::vector<uint32_t>& other_side) {
+        const std::vector<entity_id>& winners = gainer == me ? my_members : their_members;
+        const std::vector<entity_id>& losers  = gainer == me ? their_members : my_members;
+        const auto qualifies = [&](uint32_t pid) {
+            return member_of(winners, province_holder_for(w, pid)) && member_of(losers, province_owner(w, pid));
+        };
         // A ticked province that no longer qualifies (retaken, or no longer the
         // loser's) drops out, so the offer is never stuck disabled on a box the
         // list no longer draws.
         chosen.erase(std::remove_if(chosen.begin(), chosen.end(), [&](uint32_t pid) {
-                         return std::find(goals.begin(), goals.end(), pid) == goals.end()
-                             || province_holder_for(w, pid) != gainer || province_owner(w, pid) != loser;
+                         return std::find(goals.begin(), goals.end(), pid) == goals.end() || !qualifies(pid);
                      }),
                      chosen.end());
         bool any = false;
         for (const uint32_t pid : goals)
         {
-            if (province_holder_for(w, pid) != gainer || province_owner(w, pid) != loser)
+            if (!qualifies(pid))
                 continue;
             if (!any) { ImGui::TextDisabled("%s", head); any = true; }
             const bool on = std::binary_search(chosen.begin(), chosen.end(), pid);
@@ -1275,56 +1295,552 @@ void draw_peace(const world& w, ui_state& s, const war_record& war, entity_id me
         d.peace_with = null_entity;
 }
 
+// ── Joined wars (BL-1706; RELATIONS.md § Joining a war) ─────────────────────
+
+using war_pair = std::pair<entity_id, entity_id>;
+const war_pair k_no_war{null_entity, null_entity};
+
+/// One composer open at a time: opening any of them closes the others.
+void close_composers(diplomacy_ledger_state& d)
+{
+    d.peace_with     = null_entity;
+    d.peace_gain.clear();
+    d.peace_give.clear();
+    d.join_key       = k_no_war;
+    d.join_side      = -1;
+    d.join_goals.clear();
+    d.capitulate_key = k_no_war;
+    d.separate_key   = k_no_war;
+    d.separate_gain.clear();
+    d.separate_give.clear();
+}
+
+/// The members of one side, by name: "Arn, Bel".
+std::string side_names(const world& w, const war_record& war, int side)
+{
+    std::string out;
+    for (const entity_id m : war_side_members(war, side))
+    {
+        if (!out.empty()) out += ", ";
+        out += name_of(w, m);
+    }
+    return out;
+}
+
+/// Months left on a cooldown that started at @p tick.
+int months_left(const world& w, int32_t tick)
+{
+    return std::max(1, tick + k_war_offer_cooldown_ticks - w.current_econ_tick);
+}
+
+std::string months_words(int n)
+{
+    return std::to_string(n) + (n == 1 ? " month" : " months");
+}
+
+/// `join_price` walks the border test, so it runs once per change, not every frame;
+/// the key is everything it reads that can move under an open composer. Never saved;
+/// cleared by `reset_diplomacy_ui`.
+struct join_preview
+{
+    bool                  set = false;
+    war_pair              key{null_entity, null_entity};
+    int                   side = -1;
+    std::vector<uint32_t> goals;
+    int                   tick = 0;
+    std::uint64_t         territory = 0, catchment = 0;
+    std::size_t           wars = 0, requests = 0, refusals = 0, truces = 0;
+    war_result            check = war_result::rejected_state;
+    war_price             price;
+};
+join_preview g_join;
+
+const join_preview& cached_join(const world& w, const sentiment_params& sp, const war_pair& key, int side,
+                                entity_id me, const std::vector<uint32_t>& goals)
+{
+    join_preview& c = g_join;
+    if (c.set && c.key == key && c.side == side && c.goals == goals && c.tick == w.current_econ_tick
+        && c.territory == w.territory_generation && c.catchment == w.catchment_generation
+        && c.wars == w.wars.size() && c.requests == w.join_requests.size()
+        && c.refusals == w.join_refusals.size() && c.truces == w.truces.size())
+        return c;
+    c.set       = true;
+    c.key       = key;
+    c.side      = side;
+    c.goals     = goals;
+    c.tick      = w.current_econ_tick;
+    c.territory = w.territory_generation;
+    c.catchment = w.catchment_generation;
+    c.wars      = w.wars.size();
+    c.requests  = w.join_requests.size();
+    c.refusals  = w.join_refusals.size();
+    c.truces    = w.truces.size();
+    c.check     = check_join(w, key, me, static_cast<uint8_t>(side), goals);
+    c.price     = join_price(w, sp, key, me, static_cast<uint8_t>(side), goals);
+    return c;
+}
+
+/// Why `check_join` would refuse the player joining @p side, in words.
+std::string join_refusal(const world& w, const war_record& war, int side, entity_id me)
+{
+    for (const entity_id x : war_side_members(war, 1 - side))
+    {
+        if (at_war(w, me, x))
+            return std::string("You are already at war with ") + name_of(w, x) + ".";
+        if (truce_between(w, me, x))
+            return std::string("A truce stands with ") + name_of(w, x) + ".";
+    }
+    for (const entity_id y : war_side_members(war, side))
+        if (at_war(w, me, y))
+            return std::string("You are at war with ") + name_of(w, y) + ", on that side.";
+    return "The request would be refused.";
+}
+
+/// "Ask to join" on a war the player is not in: a side, one to three goals among the
+/// provinces of the other side's members, and the join's price before it is sent.
+void draw_join(const world& w, const recipe_registry& reg, ui_state& s, const war_pair& key,
+               const war_record& war, entity_id me)
+{
+    diplomacy_ledger_state& d = s.diplomacy;
+    const entity_id lead0 = war_leader(war, 0), lead1 = war_leader(war, 1);
+    if (const auto rq = w.join_requests.find({key, me}); rq != w.join_requests.end())
+    {
+        ImGui::TextDisabled("Your request to join %s's side waits on its answer.",
+                            name_of(w, war_leader(war, rq->second.side)));
+        return;
+    }
+    std::string cooling;
+    if (join_cooling(w, key, me))
+    {
+        const auto r = w.join_refusals.find({key, me});
+        cooling = "Your last request was refused: you may ask again in "
+                + months_words(r == w.join_refusals.end() ? 1 : months_left(w, r->second)) + ".";
+    }
+    if (d.join_key != key)
+    {
+        if (press(d, "Ask to join", "join_open", lead0, cooling.empty(), cooling,
+                  "Ask a side's leader to take you in. You name your goals and see the price first."))
+        {
+            close_composers(d);
+            d.join_key = key;
+        }
+        return;
+    }
+
+    // The composer.
+    ImGui::TextColored(col4(palette::war_goal_chosen), "Ask to join");
+    // The side: a choice whose active state is visible, so a toggle - pressing the
+    // chosen side again clears it.
+    for (int side = 0; side < 2; ++side)
+    {
+        if (side == 1) ImGui::SameLine();
+        const bool on = d.join_side == side;
+        if (on) ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
+        char label[128];
+        std::snprintf(label, sizeof label, "%s's side##side%d", name_of(w, side == 0 ? lead0 : lead1), side);
+        const bool hit = press(d, label, side == 0 ? "join_side0" : "join_side1", side == 0 ? lead0 : lead1, true, {},
+                               on ? "Press again to clear the side." : "Join this side: you go to war with the other.");
+        if (on) ImGui::PopStyleColor();
+        if (hit)
+        {
+            d.join_side = on ? -1 : side;
+            d.join_goals.clear();
+        }
+    }
+    if (d.join_side < 0)
+        ImGui::TextDisabled("  Choose a side.");
+    else
+    {
+        const int side = d.join_side;
+        const std::vector<entity_id> across = war_side_members(war, 1 - side);
+        // The candidates: land provinces of members across that this side has not named.
+        std::vector<uint32_t> cands;
+        for (const auto& [pid, o] : d.province_owners)
+            if (std::find(across.begin(), across.end(), o) != across.end()
+                && province_kind_of(w, pid) == province_kind::land && war_goal_namer(war, side, pid) == null_entity)
+                cands.push_back(pid);
+        d.join_goals.erase(std::remove_if(d.join_goals.begin(), d.join_goals.end(), [&](uint32_t g) {
+                               return !std::binary_search(cands.begin(), cands.end(), g);
+                           }),
+                           d.join_goals.end());
+        ImGui::Text("Goals (%d of %d)", static_cast<int>(d.join_goals.size()), static_cast<int>(k_war_goals_max));
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("Provinces of %s, not already named by your side.", side_names(w, war, 1 - side).c_str());
+        if (cands.empty())
+            ImGui::TextDisabled("  No province is left to name.");
+        else
+        {
+            const float rows_h = std::min(static_cast<float>(cands.size()), 6.0f) * ImGui::GetFrameHeightWithSpacing();
+            if (ImGui::BeginChild("##join_goals", {0.0f, rows_h}, false))
+            {
+                for (const uint32_t pid : cands)
+                {
+                    const bool on   = std::binary_search(d.join_goals.begin(), d.join_goals.end(), pid);
+                    const bool full = !on && d.join_goals.size() >= k_war_goals_max;
+                    ImGui::PushID(static_cast<int>(pid));
+                    bool v = on;
+                    if (full) ImGui::BeginDisabled();
+                    char label[160];
+                    std::snprintf(label, sizeof label, "%s (%s)", province_label(w, pid).c_str(),
+                                  name_of(w, province_owner(w, pid)));
+                    if (ImGui::Checkbox(label, &v))
+                    {
+                        if (v) d.join_goals.push_back(pid);
+                        else   d.join_goals.erase(std::find(d.join_goals.begin(), d.join_goals.end(), pid));
+                        std::sort(d.join_goals.begin(), d.join_goals.end());
+                    }
+                    if (full) ImGui::EndDisabled();
+                    if (full && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+                        ImGui::SetTooltip("At most three goals.");
+                    ImGui::PopID();
+                }
+            }
+            ImGui::EndChild();
+        }
+    }
+
+    // The price: what accepting would charge you, as a declaration's.
+    std::string why;
+    if (d.join_side < 0)
+        why = "Choose a side.";
+    else if (d.join_goals.empty())
+        why = "Tick at least one goal.";
+    if (why.empty())
+    {
+        const join_preview& pv = cached_join(w, reg.sentiment(), key, d.join_side, me, d.join_goals);
+        if (pv.check != war_result::applied || !pv.price.valid)
+            why = join_refusal(w, war, d.join_side, me);
+        else
+        {
+            ImGui::Text("Price");
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("Charged when the leader accepts, as a declaration's: every member across "
+                                  "turns hostile, and every other nation's Trust falls and Alarm rises.");
+            ImGui::TextColored(col4(palette::negative), "  Trust %+.1f   Alarm %+.1f  (all nations)",
+                               pv.price.sum_trust, pv.price.sum_alarm);
+            if (pv.price.justified)
+                ImGui::TextColored(col4(palette::positive), "  Justified: the price is halved.");
+            if (!pv.price.charged)
+                ImGui::TextDisabled("  Nothing is charged while the world settles.");
+        }
+    }
+    if (press(d, "Ask", "join_send", lead0, why.empty(), why,
+              "Send the request. The side's leader accepts or refuses."))
+    {
+        corp_command c = command_for(w, corp_verb::request_join_war, war_leader(war, d.join_side));
+        c.subject = war_leader(war, 1 - d.join_side);
+        put_provinces(c, d.join_goals);
+        d.pending.push_back(c);
+        close_composers(d);
+        return;
+    }
+    ImGui::SameLine();
+    if (press(d, "Cancel", "join_cancel", lead0, true, {}, "Close the request. Nothing is sent."))
+        close_composers(d);
+}
+
+/// Requests to join the player's side, which the player leads: Accept or Refuse.
+void draw_join_requests(const world& w, ui_state& s, const war_pair& key, const war_record& war, entity_id me)
+{
+    diplomacy_ledger_state& d = s.diplomacy;
+    const int side = war_side(war, me);
+    if (war_leader(war, side) != me)
+        return;
+    for (const auto& [jk, req] : w.join_requests)
+    {
+        if (jk.first != key || req.side != side)
+            continue;
+        const entity_id asker = jk.second;
+        ImGui::PushID(static_cast<int>(asker));
+        ImGui::TextWrapped("%s asks to join your side, naming %s.", name_of(w, asker),
+                           goals_line(w, req.goals, me).c_str());
+        if (press(d, "Accept", "accept_join", asker, true, {},
+                  "Take them in: they go to war with every member across, and pay a declaration's price."))
+            d.pending.push_back(command_for(w, corp_verb::accept_join, asker));
+        ImGui::SameLine();
+        if (press(d, "Refuse", "refuse_join", asker, true, {},
+                  "Turn them away. They may not ask again in this war for a year."))
+            d.pending.push_back(command_for(w, corp_verb::refuse_join, asker));
+        ImGui::PopID();
+    }
+}
+
+/// Separate peace offers made to the player, as a side's leader, by joiners across.
+void draw_separate_offers_in(const world& w, ui_state& s, const war_record& war, entity_id me)
+{
+    diplomacy_ledger_state& d = s.diplomacy;
+    const int side = war_side(war, me);
+    if (war_leader(war, side) != me)
+        return;
+    for (const entity_id j : war_side_members(war, 1 - side))
+    {
+        if (j == war_leader(war, 1 - side))
+            continue;
+        const auto o = w.separate_peace_offers.find({j, me});
+        if (o == w.separate_peace_offers.end() || o->second.offerer != j)
+            continue;
+        ImGui::PushID(static_cast<int>(j));
+        ImGui::TextWrapped("%s offers a separate peace: %s.", name_of(w, j), terms_line(w, o->second.terms).c_str());
+        if (press(d, "Accept", "accept_separate", j, true, {}, "They leave the war on these terms; it goes on without them."))
+            d.pending.push_back(command_for(w, corp_verb::accept_peace, j));
+        ImGui::SameLine();
+        if (press(d, "Refuse", "refuse_separate", j, true, {}, "Refuse; they stay in the war."))
+            d.pending.push_back(command_for(w, corp_verb::refuse_peace, j));
+        ImGui::PopID();
+    }
+}
+
+/// A separate peace, the player a joiner: with the other side's leader, white or a
+/// cession of goals one of the two named on the other's ground that its side holds.
+void draw_separate_peace(const world& w, ui_state& s, const war_pair& key, const war_record& war, entity_id me)
+{
+    diplomacy_ledger_state& d = s.diplomacy;
+    const int side = war_side(war, me);
+    const entity_id lead = war_leader(war, 1 - side);
+    if (const auto o = w.separate_peace_offers.find({me, lead}); o != w.separate_peace_offers.end())
+    {
+        if (o->second.offerer == lead)
+        {
+            ImGui::TextWrapped("%s offers you a separate peace: %s.", name_of(w, lead),
+                               terms_line(w, o->second.terms).c_str());
+            if (press(d, "Accept", "accept_separate", lead, true, {}, "Leave the war on their terms."))
+                d.pending.push_back(command_for(w, corp_verb::accept_peace, lead));
+            ImGui::SameLine();
+            if (press(d, "Refuse", "refuse_separate", lead, true, {}, "Refuse; you stay in the war."))
+                d.pending.push_back(command_for(w, corp_verb::refuse_peace, lead));
+        }
+        else
+            ImGui::TextDisabled("Your separate peace offer stands: %s.", terms_line(w, o->second.terms).c_str());
+        return;
+    }
+    std::string cooling;
+    if (peace_offer_cooling(w, me, lead))
+    {
+        const auto r = w.peace_refusals.find({me, lead});
+        cooling = "Your last offer was refused: you may offer again in "
+                + months_words(r == w.peace_refusals.end() ? 1 : months_left(w, r->second)) + ".";
+    }
+    if (d.separate_key != key)
+    {
+        char tip[160];
+        std::snprintf(tip, sizeof tip, "Leave this war alone, by a peace with %s. The war goes on without you.",
+                      name_of(w, lead));
+        if (press(d, "Separate peace", "separate_open", lead, cooling.empty(), cooling, tip))
+        {
+            close_composers(d);
+            d.separate_key = key;
+        }
+        return;
+    }
+
+    const std::vector<entity_id> mine_side = war_side_members(war, side), their_side = war_side_members(war, 1 - side);
+    const auto in = [](const std::vector<entity_id>& v, entity_id n) {
+        return n != null_entity && std::find(v.begin(), v.end(), n) != v.end();
+    };
+    const auto pick = [&](const char* head, entity_id gainer, std::vector<uint32_t>& chosen, std::vector<uint32_t>& other) {
+        const entity_id loser = gainer == me ? lead : me;
+        const std::vector<uint32_t>* goals = war_member_goals(war, gainer);
+        const std::vector<entity_id>& holders = gainer == me ? mine_side : their_side;
+        const auto ok = [&](uint32_t pid) {
+            return in(holders, province_holder_for(w, pid)) && province_owner(w, pid) == loser
+                && goals != nullptr && std::binary_search(goals->begin(), goals->end(), pid);
+        };
+        chosen.erase(std::remove_if(chosen.begin(), chosen.end(), [&](uint32_t pid) { return !ok(pid); }), chosen.end());
+        bool any = false;
+        if (goals == nullptr)
+            return false;
+        for (const uint32_t pid : *goals)
+        {
+            if (!ok(pid))
+                continue;
+            if (!any) { ImGui::TextDisabled("%s", head); any = true; }
+            const bool on   = std::binary_search(chosen.begin(), chosen.end(), pid);
+            const bool full = !on && chosen.size() >= k_war_goals_max;
+            ImGui::PushID(static_cast<int>(pid));
+            bool v = on;
+            if (full) ImGui::BeginDisabled();
+            if (ImGui::Checkbox(province_label(w, pid).c_str(), &v))
+            {
+                other.clear();
+                if (v) chosen.push_back(pid);
+                else   chosen.erase(std::find(chosen.begin(), chosen.end(), pid));
+                std::sort(chosen.begin(), chosen.end());
+            }
+            if (full) ImGui::EndDisabled();
+            ImGui::PopID();
+        }
+        return any;
+    };
+    const bool g = pick("They cede to you", me, d.separate_gain, d.separate_give);
+    const bool v = pick("You cede to them", lead, d.separate_give, d.separate_gain);
+    if (!g && !v)
+        ImGui::TextDisabled("No goal of yours or theirs is held: only a white peace.");
+    if (press(d, "Offer white peace", "separate_white", lead, true, {}, "Leave the war; nothing changes hands."))
+    {
+        corp_command c = command_for(w, corp_verb::offer_peace, lead);
+        c.order = 0;
+        d.pending.push_back(c);
+        close_composers(d);
+        return;
+    }
+    const bool gain = !d.separate_gain.empty();
+    const std::vector<uint32_t>& provs = gain ? d.separate_gain : d.separate_give;
+    ImGui::SameLine();
+    if (press(d, "Offer cession", "separate_cession", lead, !provs.empty(), "Tick the provinces to be ceded."))
+    {
+        corp_command c = command_for(w, corp_verb::offer_peace, lead);
+        c.order = gain ? 1 : 2;
+        put_provinces(c, provs);
+        d.pending.push_back(c);
+        close_composers(d);
+        return;
+    }
+    ImGui::SameLine();
+    if (ImGui::SmallButton("Close"))
+        close_composers(d);
+}
+
+/// Capitulate: the confirm lists every goal the other side named on the player's
+/// ground, held or not, and who takes each (RELATIONS.md § 7, Capitulation).
+void draw_capitulate(const world& w, ui_state& s, const war_pair& key, const war_record& war, entity_id me)
+{
+    diplomacy_ledger_state& d = s.diplomacy;
+    const int side = war_side(war, me);
+    const entity_id lead_across = war_leader(war, 1 - side);
+    const bool leader = war_leader(war, side) == me;
+    if (d.capitulate_key != key)
+    {
+        if (press(d, "Capitulate", "capitulate_open", lead_across, true, {},
+                  leader ? "Give up every goal named on your ground and end the war at once."
+                         : "Give up every goal named on your ground and leave the war at once."))
+        {
+            close_composers(d);
+            d.capitulate_key = key;
+        }
+        return;
+    }
+    ImGui::TextColored(col4(palette::negative), "Capitulate");
+    std::vector<uint32_t> ceded;
+    for (const uint32_t g : war_side_goals(war, 1 - side))
+        if (province_owner(w, g) == me)
+            ceded.push_back(g);
+    if (ceded.empty())
+        ImGui::TextDisabled("  No goal is named on your ground: nothing is ceded.");
+    else
+    {
+        ImGui::TextDisabled("You cede, held or not:");
+        for (const uint32_t g : ceded)
+        {
+            const entity_id to = war_goal_namer(war, 1 - side, g);
+            const entity_id h  = province_holder_for(w, g);
+            ImGui::BulletText("%s to %s%s", province_label(w, g).c_str(), name_of(w, to),
+                              (h != null_entity && war_side(war, h) == 1 - side) ? " (held by them)" : "");
+        }
+    }
+    int land = 0;
+    for (const uint32_t g : ceded)
+        if (province_kind_of(w, g) == province_kind::land)
+            ++land;
+    if (land > 0 && land_provinces_owned(w, d, me) <= land)
+    {
+        ImGui::PushStyleColor(ImGuiCol_Text, col4(palette::negative));
+        ImGui::TextWrapped("This cedes your last province: your nation ends and the campaign is lost.");
+        ImGui::PopStyleColor();
+    }
+    ImGui::TextWrapped("%s", leader ? "The war ends. Your side's members leave it with a white peace."
+                                    : "You alone leave the war; it goes on without you.");
+    if (press(d, "Capitulate##confirm", "capitulate", lead_across, true, {}, "No acceptance is needed."))
+    {
+        d.pending.push_back(command_for(w, corp_verb::capitulate, lead_across));
+        close_composers(d);
+        return;
+    }
+    ImGui::SameLine();
+    if (press(d, "Cancel##capitulate", "capitulate_cancel", lead_across, true, {}, "Close. Nothing is sent."))
+        close_composers(d);
+}
+
+/// A composer whose war has closed, or that the player has since joined or left, goes.
+void drop_stale_composers(const world& w, diplomacy_ledger_state& d, entity_id me)
+{
+    const auto gone = [&](const war_pair& k, bool want_member) {
+        if (k == k_no_war)
+            return false;
+        const auto it = w.wars.find(k);
+        return it == w.wars.end() || (war_side(it->second, me) >= 0) != want_member;
+    };
+    if (gone(d.join_key, false) || gone(d.capitulate_key, true) || gone(d.separate_key, true))
+        close_composers(d);
+}
+
 void draw_wars(const world& w, const recipe_registry& reg, ui_state& s, entity_id me)
 {
     diplomacy_ledger_state& d = s.diplomacy;
-    std::vector<const war_record*> wars;
+    std::vector<std::pair<war_pair, const war_record*>> wars;
     for (const auto& [key, war] : w.wars)
-        wars.push_back(&war);
-    // The player's first; then the map's own (declarer, defender) order.
-    std::stable_sort(wars.begin(), wars.end(), [me](const war_record* a, const war_record* b) {
-        const bool pa = a->declarer == me || a->defender == me;
-        const bool pb = b->declarer == me || b->defender == me;
-        return pa && !pb;
+        wars.push_back({key, &war});
+    // The player's first (a member of either side); then the map's own key order.
+    std::stable_sort(wars.begin(), wars.end(), [me](const auto& a, const auto& b) {
+        return war_side(*a.second, me) >= 0 && war_side(*b.second, me) < 0;
     });
     if (wars.empty())
         ImGui::TextDisabled("No war is being fought.");
+    drop_stale_composers(w, d, me);
 
-    for (const war_record* war : wars)
+    for (const auto& [key, wp] : wars)
     {
-        ImGui::PushID(static_cast<int>(war->declarer)); // two pushes: no signed-overflow product
-        ImGui::PushID(static_cast<int>(war->defender));
+        const war_record& war = *wp;
+        ImGui::PushID(static_cast<int>(war.declarer)); // two pushes: no signed-overflow product
+        ImGui::PushID(static_cast<int>(war.defender));
         ++d.war_rows;
-        const bool mine = war->declarer == me || war->defender == me;
+        const int  my_side = war_side(war, me);
+        const bool mine    = my_side >= 0;
+        const bool leader  = mine && war_leader(war, my_side) == me;
         ImGui::TextColored(col4(mine ? palette::selection : palette::text_secondary), "%s  vs  %s",
-                           name_of(w, war->declarer), name_of(w, war->defender));
-        const int days = (w.current_econ_tick - war->opened_tick) * k_construction_quarter_days
-                       + (w.construction_quarter_day - war->opened_day);
+                           side_names(w, war, 0).c_str(), side_names(w, war, 1).c_str());
+        const int days = (w.current_econ_tick - war.opened_tick) * k_construction_quarter_days
+                       + (w.construction_quarter_day - war.opened_day);
         ImGui::SameLine();
         ImGui::TextDisabled("  %d days", std::max(0, days));
-        score_bar(war_score(w, *war));
+        score_bar(war_score(w, war));
         if (ImGui::IsItemHovered())
             ImGui::SetTooltip("War score, from %s's side: half occupation of its goals, half battles.",
-                              name_of(w, war->declarer));
-        ImGui::TextWrapped("%s's goals: %s", name_of(w, war->declarer),
-                           goals_line(w, war->declarer_goals, me).c_str());
-        ImGui::TextWrapped("%s's goals: %s", name_of(w, war->defender),
-                           war->answered ? goals_line(w, war->defender_goals, me).c_str() : "not yet answered");
-        ImGui::Text("Exhaustion  %.0f / %.0f", war->declarer_exhaustion, war->defender_exhaustion);
+                              name_of(w, war.declarer));
+        ImGui::TextWrapped("%s's side's goals: %s", name_of(w, war.declarer),
+                           goals_line(w, war_side_goals(war, 0), me).c_str());
+        const std::vector<uint32_t> dgoals = war_side_goals(war, 1);
+        ImGui::TextWrapped("%s's side's goals: %s", name_of(w, war.defender),
+                           (war.answered || !dgoals.empty()) ? goals_line(w, dgoals, me).c_str() : "not yet answered");
+        ImGui::Text("Exhaustion  %.0f / %.0f", war.declarer_exhaustion, war.defender_exhaustion);
 
         if (mine)
         {
-            if (war->defender == me && !war->answered)
+            const bool answering = d.declare_target == war.declarer && d.declare_answer;
+            if (war.defender == me && !war.answered)
             {
-                if (d.declare_target == war->declarer && d.declare_answer)
+                if (answering)
                     draw_declaration(w, reg, s, me);
-                else if (press(d, "Answer", "answer_open", war->declarer, true, {},
+                else if (press(d, "Answer", "answer_open", war.declarer, true, {},
                                "Name up to three of their provinces as your goals. Answering is free."))
-                    open_declaration(w, s, war->declarer);
+                    open_declaration(w, s, war.declarer);
             }
-            if (s.diplomacy.declare_target != war->declarer || !s.diplomacy.declare_answer)
-                draw_peace(w, s, *war, me);
+            if (!answering)
+            {
+                if (leader)
+                {
+                    draw_join_requests(w, s, key, war, me);
+                    draw_separate_offers_in(w, s, war, me);
+                    draw_peace(w, s, war, me);
+                }
+                else
+                    draw_separate_peace(w, s, key, war, me);
+                // Capitulate stands beside the peace presses, not inside an open composer.
+                if (d.peace_with == null_entity && d.separate_key == k_no_war)
+                    draw_capitulate(w, s, key, war, me);
+            }
         }
+        else
+            draw_join(w, reg, s, key, war, me);
         ImGui::Separator();
         ImGui::PopID();
         ImGui::PopID();
@@ -1393,6 +1909,7 @@ void reset_diplomacy_ui(ui_state& s)
     s.diplomacy = diplomacy_ledger_state{};
     s.pending_unit_order_goals.clear();
     g_preview = declaration_preview{};
+    g_join    = join_preview{};
     g_fronts  = front_read{};
     g_province_names.clear();
 }

@@ -718,6 +718,24 @@ struct diplomacy_ledger_state
     std::vector<uint32_t> peace_gain;
     std::vector<uint32_t> peace_give;
 
+    // ── JOINED WARS (BL-1706; RELATIONS.md § Joining a war) ──────────────────
+    /// Wars (keyed (declarer, defender)) the player is NOT in whose rows are expanded
+    /// in the Wars tab (diplomacy.md § Wars — the rows: one line, a press expands it).
+    std::set<std::pair<entity_id, entity_id>> wars_open;
+    /// The Ask to join composer: the war it is open on (null pair = closed), the side
+    /// chosen (-1 none, 0 the declarer's, 1 the defender's), the goals ticked (ascending).
+    std::pair<entity_id, entity_id> join_key{null_entity, null_entity};
+    int                             join_side = -1;
+    std::vector<uint32_t>           join_goals;
+    /// The Capitulate confirm: the war it is open on (null pair = closed).
+    std::pair<entity_id, entity_id> capitulate_key{null_entity, null_entity};
+    /// The separate-peace composer (the player a joiner): the war it is open on (null
+    /// pair = closed), and the provinces it would cede to the player (`separate_gain`)
+    /// or by it (`separate_give`), ascending. One side at a time.
+    std::pair<entity_id, entity_id> separate_key{null_entity, null_entity};
+    std::vector<uint32_t> separate_gain;
+    std::vector<uint32_t> separate_give;
+
     /// Presses queued for app::render, which sends each through `player_command`
     /// (declare_war, answer_war, the peace verbs, offer/accept friendship,
     /// return_to_neutral) and words the result in `message`.
@@ -800,7 +818,11 @@ struct diplomacy_ledger_state
     bool  decl_valid = false, decl_justified = false;
     float decl_trust = 0.0f, decl_alarm = 0.0f;
     int   decl_observers = 0;
+    /// BL-1705: the declaration's "whose opinion turns" rows as drawn — band shifts,
+    /// and the May join them / May join you lists.
+    int   decl_band_rows = 0, decl_join_them = 0, decl_join_you = 0;
     int   war_rows = 0, truce_rows = 0;  ///< Wars tab rows drawn.
+    int   goal_rows = 0;                 ///< BL-1709: goal rows drawn in the Wars tab.
 };
 
 /// BL-1450: the wing card (SELECTION.md; military.md § Grouped by theatre) and the
