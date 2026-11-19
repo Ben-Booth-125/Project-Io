@@ -822,7 +822,27 @@ inline constexpr uint32_t k_world_save_version_one_product = 94;
 /// MERGE NOTE: a parallel lane's bump renumbers this block (this paragraph, the
 /// constants below, the accepted-version line in `read_world_snapshot`, the tail table
 /// and the one section at the end of the writer and reader).
-inline constexpr uint32_t world_save_version = 96;
+///
+/// **97 (BL-1706 wars draw in allies; RELATIONS.md § Joining a war) - THE SIDES.** No
+/// trailing section: each open war's record in v69's war section GROWS, after its
+/// defender goals, by (i64 declarer-side departed men lost, i64 defender-side departed
+/// men lost; u32 n, n x joiner (nation, u8 side, u32 g + g x u32 goals, i64 men lost, f32
+/// exhaustion, f32 field days, i32 joined tick); u32 r, r x join request (asker, u8 side,
+/// u32 g + g x u32 goals, i32 tick); u32 f, f x join refusal (asker, i32 tick); u32 s, s x
+/// separate peace offer (joiner, offerer, i32 tick, u8 kind, gainer, u32 g + g x u32
+/// provinces))) - 32 bytes for a war with none. Joined there, before the refusals (v75),
+/// the occupation (v78) and the ended nations (v83), which read "at war" across sides.
+/// From v97 a leader's goal list may be empty and an answered defender's too (goals named
+/// on a departed member's ground drop), and a closed war's ceded list may pass three (a
+/// capitulation). v96 is read too (`k_world_save_version_pre_war_joiners`), as a world in
+/// which no war has a joiner.
+inline constexpr uint32_t world_save_version = 97;
+
+/// BL-1706: the first version whose war records carry their sides (see above).
+inline constexpr uint32_t k_world_save_version_war_joiners = 97;
+
+/// BL-1706: v96, the same layout less the per-war sides.
+inline constexpr uint32_t k_world_save_version_pre_war_joiners = k_world_save_version_war_joiners - 1;
 
 /// BL-1637: the first version carrying the pad-boost section (see above).
 inline constexpr uint32_t k_world_save_version_launch_boost = 96;
@@ -1189,6 +1209,9 @@ inline constexpr bool world_stream_has_space_firsts(uint32_t v) { return world_s
 inline constexpr bool world_stream_has_transit_origin(uint32_t v) { return world_stream_has_space_section(v, k_world_save_version_transit_origin); }
 /// BL-1637: from v96 the stream ends with the pad-boost section.
 inline constexpr bool world_stream_has_launch_boost(uint32_t v) { return v >= k_world_save_version_launch_boost && !world_stream_is_space_line(v); }
+/// BL-1706: from v97 each war record carries its sides (joiners, requests, refusals,
+/// separate offers).
+inline constexpr bool world_stream_has_war_joiners(uint32_t v) { return v >= k_world_save_version_war_joiners && !world_stream_is_space_line(v); }
 
 /// BL-1539: the first version carrying the research-books section (see above).
 inline constexpr uint32_t k_world_save_version_research_books = 80;
@@ -1421,6 +1444,8 @@ std::size_t world_save_alarm_section_bytes(const world& w);
 /// BL-1459: the byte length of the v69 war section `w` writes — 24 for six empty
 /// counts, plus each record's length. The LAST section of a v69 stream.
 std::size_t world_save_war_section_bytes(const world& w);
+/// BL-1706 (v97): the sides blocks inside the war records, which v69..v96 lack.
+std::size_t world_save_war_sides_bytes(const world& w);
 
 /// BL-1418: the byte length of the v70 embargo section `w` writes — 4 for the count
 /// plus 8 an embargo. The last section of a v70 stream.

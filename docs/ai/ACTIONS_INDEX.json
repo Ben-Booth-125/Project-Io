@@ -798,6 +798,22 @@
    "Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Wars tab, on a war the player is party to (ledger.diplomacy_impose_peace). A corp_verb (corp_verb::impose_peace, 52) on the command seam."
   ],
   [
+   "gameplay.request_join_war",
+   "No control issues it yet (the Diplomacy ledger's join press is a UI item of its own). A corp_verb (corp_verb::request_join_war, 66) on the command seam."
+  ],
+  [
+   "gameplay.accept_join",
+   "No control issues it yet. A corp_verb (corp_verb::accept_join, 67) on the command seam."
+  ],
+  [
+   "gameplay.refuse_join",
+   "No control issues it yet. A corp_verb (corp_verb::refuse_join, 68) on the command seam."
+  ],
+  [
+   "gameplay.capitulate",
+   "No control issues it yet. A corp_verb (corp_verb::capitulate, 69) on the command seam."
+  ],
+  [
    "gameplay.set_embargo",
    "Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Nations tab, the chosen nation's Embargo / Lift toggle (ledger.diplomacy_embargo). A corp_verb (corp_verb::set_embargo, 53) on the command seam; a rival nation's scorer issues the same verb for itself (score_nation_embargo; AI_OPPONENT.md § 11, Ben 2026-11-03, NR-1117)."
   ],

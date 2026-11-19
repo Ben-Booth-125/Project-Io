@@ -524,7 +524,8 @@ int main()
                   && old.war_history.empty() && old.province_cessions.empty()
                   && b67.size() == b.size() - world_save_war_section_bytes(w)
                                               - world_save_embargo_section_bytes(w) - world_save_gen_capital_section_bytes(w) - world_save_recruits_section_bytes(w) - world_save_sea_recruits_section_bytes(w) - world_save_refusals_section_bytes(w) /* BL-1480 (v75) */ - tail_after_refusals(w) /* v77..v83 */ // BL-1418 (v70)
-                                              - world_save_kit_goods_bytes(w), // BL-1422: arrays 49 wide before v74
+                                              - world_save_kit_goods_bytes(w) // BL-1422: arrays 49 wide before v74
+                                              + world_save_war_sides_bytes(w), // BL-1706: the kit figure already carries v97's war sides
               "R4l a v68 stream (today's less the war section and every later one) loads with no wars");
         // Untrusted: an answered byte of 2 is refused whole.
         std::string bad = b;

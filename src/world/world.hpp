@@ -1388,6 +1388,15 @@ struct world
     /// k_war_offer_cooldown_ticks`. Erased when the war closes. Saved (v75).
     std::map<std::pair<entity_id, entity_id>, int32_t> peace_refusals;
 
+    /// BL-1706 (wars draw in allies; RELATIONS.md § Joining a war): pending requests
+    /// to join a war, keyed (war key, asker); refused requests' ticks, keyed the same
+    /// (cooldown `k_war_offer_cooldown_ticks`); and pending SEPARATE peace offers
+    /// between a joiner and the other side's leader, keyed (joiner, leader). Each
+    /// erased when its war closes or its joiner leaves. Saved (world_save_version 97).
+    std::map<war_join_key_t, join_request> join_requests;
+    std::map<war_join_key_t, int32_t> join_refusals;
+    std::map<std::pair<entity_id, entity_id>, peace_offer> separate_peace_offers;
+
     /// Closed wars, in close order — the record a peace closes into. Saved (v69).
     std::vector<war_history_entry> war_history;
 

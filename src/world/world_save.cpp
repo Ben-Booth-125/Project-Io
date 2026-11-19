@@ -1127,6 +1127,38 @@ std::vector<entity_id> saved_interceptor_stocks(const world& w)
     return v;
 }
 
+// BL-1706 (v97): a war's own join requests, join refusals and separate peace
+// offers, each in its table's key order.
+std::vector<std::pair<entity_id, const join_request*>> war_join_requests_of(const world& w, const war_key_t& key)
+{
+    std::vector<std::pair<entity_id, const join_request*>> out;
+    for (const auto& [k, q] : w.join_requests)
+        if (k.first == key)
+            out.emplace_back(k.second, &q);
+    return out;
+}
+
+std::vector<std::pair<entity_id, int32_t>> war_join_refusals_of(const world& w, const war_key_t& key)
+{
+    std::vector<std::pair<entity_id, int32_t>> out;
+    for (const auto& [k, t] : w.join_refusals)
+        if (k.first == key)
+            out.emplace_back(k.second, t);
+    return out;
+}
+
+std::vector<std::pair<entity_id, const peace_offer*>> war_separate_offers_of(const world& w, const war_record& r)
+{
+    std::vector<std::pair<entity_id, const peace_offer*>> out;
+    for (const auto& [k, o] : w.separate_peace_offers)
+    {
+        const int s = war_side(r, k.first);
+        if (s >= 0 && k.first != r.declarer && k.first != r.defender && k.second == war_leader(r, 1 - s))
+            out.emplace_back(k.first, &o);
+    }
+    return out;
+}
+
 } // namespace
 
 // ---------------------------------------------------------------------------
@@ -2007,6 +2039,49 @@ void write_world_snapshot_at(const world& w, std::ostream& out, uint32_t version
             w_f32(out, r.defender_field_days);
             w_provs(r.declarer_goals);
             w_provs(r.defender_goals);
+            if (world_stream_has_war_joiners(version)) // BL-1706 (v97): the sides
+            {
+                w_i64(out, r.departed_men_lost[0]);
+                w_i64(out, r.departed_men_lost[1]);
+                w_u32(out, static_cast<uint32_t>(r.joiners.size()));
+                for (const war_member& m : r.joiners)
+                {
+                    w_id(out, m.nation);
+                    w_u8(out, m.side);
+                    w_provs(m.goals);
+                    w_i64(out, m.men_lost);
+                    w_f32(out, m.exhaustion);
+                    w_f32(out, m.field_days);
+                    w_i32(out, m.joined_tick);
+                }
+                const auto reqs = war_join_requests_of(w, key);
+                w_u32(out, static_cast<uint32_t>(reqs.size()));
+                for (const auto& [asker, q] : reqs)
+                {
+                    w_id(out, asker);
+                    w_u8(out, q->side);
+                    w_provs(q->goals);
+                    w_i32(out, q->tick);
+                }
+                const auto refs = war_join_refusals_of(w, key);
+                w_u32(out, static_cast<uint32_t>(refs.size()));
+                for (const auto& [asker, tick] : refs)
+                {
+                    w_id(out, asker);
+                    w_i32(out, tick);
+                }
+                const auto seps = war_separate_offers_of(w, r);
+                w_u32(out, static_cast<uint32_t>(seps.size()));
+                for (const auto& [joiner, o] : seps)
+                {
+                    w_id(out, joiner);
+                    w_id(out, o->offerer);
+                    w_i32(out, o->offered_tick);
+                    w_u8(out, static_cast<uint8_t>(o->terms.kind));
+                    w_id(out, o->terms.gainer);
+                    w_provs(o->terms.provinces);
+                }
+            }
         }
         w_u32(out, static_cast<uint32_t>(w.truces.size()));
         for (const auto& [pair, expiry] : w.truces)
@@ -2853,6 +2928,8 @@ std::size_t world_save_ship_hulls_bytes(const world& w)
     return wide.str().size() - narrow.str().size() - world_save_ships_section_bytes(w)
          - world_save_missile_section_bytes(w)
          - world_save_space_tail_bytes_after(80, w); // the space merge: and every space section
+    // BL-1706: v97's war sides (world_save_war_sides_bytes) are NOT subtracted - the figure
+    // carries them, so a sum of later sections that omits the war section stays exact.
 }
 
 void write_world_snapshot_pre_ships(const world& w, std::ostream& out)
@@ -3254,9 +3331,27 @@ void write_world_snapshot_pre_war(const world& w, std::ostream& out)
     write_world_snapshot_at(w, out, k_world_save_version_pre_war);
 }
 
+std::size_t world_save_war_sides_bytes(const world& w)
+{
+    // BL-1706 (v97): every war record's sides block, which v69..v96 records lack.
+    std::size_t n = 0;
+    for (const auto& [key, r] : w.wars)
+    {
+        n += 8 + 8 + 4 + 4 + 4 + 4;
+        for (const war_member& m : r.joiners)
+            n += 4 + 1 + 4 + 4 * m.goals.size() + 8 + 4 + 4 + 4;
+        for (const auto& [asker, q] : war_join_requests_of(w, key))
+            n += 4 + 1 + 4 + 4 * q->goals.size() + 4;
+        n += 8 * war_join_refusals_of(w, key).size();
+        for (const auto& [joiner, o] : war_separate_offers_of(w, r))
+            n += 4 + 4 + 4 + 1 + 4 + 4 + 4 * o->terms.provinces.size();
+    }
+    return n;
+}
+
 std::size_t world_save_war_section_bytes(const world& w)
 {
-    std::size_t n = 6 * 4;
+    std::size_t n = 6 * 4 + world_save_war_sides_bytes(w); // BL-1706 (v97): plus the sides
     for (const auto& [key, r] : w.wars)
         n += 4 + 4 + 1 + 4 + 4 + 8 + 8 + 4 + 4 + 4 + 4 + 4 + 4 * r.declarer_goals.size() + 4
            + 4 * r.defender_goals.size();
@@ -3593,7 +3688,9 @@ std::size_t tail_bytes_after_key(int version, const world& w)
     // monthly tick), so the table ends at v92's. v95 does GROW one record: each off-world
     // base carries its loss carry (16 bytes, was 12) - the v90 row above counts today's
     // stream, which is what a tail "after" an older version is measured in.
-    static_assert(world_save_version == k_world_save_version_launch_boost,
+    // BL-1706: v97 adds no trailing section (its sides grow the v69 war records,
+    // counted in world_save_war_section_bytes).
+    static_assert(world_save_version == k_world_save_version_war_joiners,
                   "BL-1632: a new trailing section joins world_save_tail_bytes_after's table");
     assert(version >= static_cast<int>(k_world_save_version_pre_tax)); // older tails are not today's
     std::size_t n = 0;
@@ -3680,6 +3777,7 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
     // of v48.
     if (!r_u32(in, version)
         || (version != world_save_version && version != k_world_save_version_pre_lp
+            && version != k_world_save_version_pre_war_joiners // BL-1706: v96, no war has a joiner
             && version != k_world_save_version_pre_launch_boost // BL-1637: v95, no pad boost
             && version != k_world_save_version_one_product // v94: v95's layout, the quarter tick (BL-1642)
             && version != k_world_save_version_space_merge // BL-1641: v93, the same layout as v94
@@ -5063,6 +5161,7 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
         uint32_t nw = 0;
         if (!r_u32(in, nw) || nw > pairs_max)
             return false;
+        const bool sides = world_stream_has_war_joiners(version); // BL-1706 (v97)
         for (uint32_t k = 0; k < nw; ++k)
         {
             war_record r;
@@ -5072,14 +5171,105 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
                 || !r_i64(in, r.declarer_men_lost) || !r_i64(in, r.defender_men_lost)
                 || !r_f32(in, r.declarer_exhaustion) || !r_f32(in, r.defender_exhaustion)
                 || !r_f32(in, r.declarer_field_days) || !r_f32(in, r.defender_field_days)
-                || !r_provs(r.declarer_goals, 1, k_war_goals_max)
+                || !r_provs(r.declarer_goals, sides ? 0 : 1, k_war_goals_max)
                 || !r_provs(r.defender_goals, 0, k_war_goals_max))
                 return false;
+            // BL-1706 (v97): the sides. Untrusted: a joiner is a nation of the stream,
+            // not a leader, once, side 0 or 1, goals 0..3 strictly ascending, losses >= 0,
+            // exhaustion and field days in range, joined ticks non-decreasing; a request's
+            // asker is no member, side 0 or 1, goals 1..3, askers strictly ascending; a
+            // refusal's asker no member, strictly ascending, tick >= 0; a separate offer's
+            // joiner a joiner of THIS war, strictly ascending, offered by it or the other
+            // side's leader, its terms legal-shaped; every pair across hostile both ways.
+            if (sides)
+            {
+                if (!r_i64(in, r.departed_men_lost[0]) || !r_i64(in, r.departed_men_lost[1])
+                    || r.departed_men_lost[0] < 0 || r.departed_men_lost[1] < 0)
+                    return false;
+                uint32_t nj = 0;
+                if (!r_u32(in, nj) || nj > s.nations.size())
+                    return false;
+                for (uint32_t j = 0; j < nj; ++j)
+                {
+                    war_member m;
+                    if (!r_id(in, m.nation) || !r_u8(in, m.side) || !r_provs(m.goals, 0, k_war_goals_max)
+                        || !r_i64(in, m.men_lost) || !r_f32(in, m.exhaustion) || !r_f32(in, m.field_days)
+                        || !r_i32(in, m.joined_tick))
+                        return false;
+                    if (!nation_ok(m.nation) || m.side > 1 || war_side(r, m.nation) >= 0 || m.men_lost < 0
+                        || !exh_ok(m.exhaustion) || !days_ok(m.field_days)
+                        || (!r.joiners.empty() && m.joined_tick < r.joiners.back().joined_tick))
+                        return false;
+                    r.joiners.push_back(std::move(m));
+                }
+                const std::pair<entity_id, entity_id> wkey{ r.declarer, r.defender };
+                uint32_t nq = 0;
+                if (!r_u32(in, nq) || nq > s.nations.size())
+                    return false;
+                entity_id prev = null_entity;
+                for (uint32_t j = 0; j < nq; ++j)
+                {
+                    entity_id asker = null_entity;
+                    join_request q;
+                    if (!r_id(in, asker) || !r_u8(in, q.side) || !r_provs(q.goals, 1, k_war_goals_max)
+                        || !r_i32(in, q.tick))
+                        return false;
+                    if (!nation_ok(asker) || q.side > 1 || war_side(r, asker) >= 0 || (j > 0 && asker <= prev))
+                        return false;
+                    prev = asker;
+                    s.join_requests.emplace(war_join_key_t{ wkey, asker }, std::move(q));
+                }
+                uint32_t nf = 0;
+                if (!r_u32(in, nf) || nf > s.nations.size())
+                    return false;
+                for (uint32_t j = 0; j < nf; ++j)
+                {
+                    entity_id asker = null_entity;
+                    int32_t tick = 0;
+                    if (!r_id(in, asker) || !r_i32(in, tick) || !nation_ok(asker) || tick < 0
+                        || war_side(r, asker) >= 0 || (j > 0 && asker <= prev))
+                        return false;
+                    prev = asker;
+                    s.join_refusals.emplace(war_join_key_t{ wkey, asker }, tick);
+                }
+                uint32_t ns = 0;
+                if (!r_u32(in, ns) || ns > r.joiners.size())
+                    return false;
+                for (uint32_t j = 0; j < ns; ++j)
+                {
+                    entity_id joiner = null_entity;
+                    peace_offer o;
+                    uint8_t kind = 0;
+                    if (!r_id(in, joiner) || !r_id(in, o.offerer) || !r_i32(in, o.offered_tick)
+                        || !r_u8(in, kind) || !r_id(in, o.terms.gainer)
+                        || !r_provs(o.terms.provinces, 0, k_war_goals_max))
+                        return false;
+                    const int js = war_side(r, joiner);
+                    if (js < 0 || joiner == r.declarer || joiner == r.defender || kind > peace_kind_max
+                        || (j > 0 && joiner <= prev))
+                        return false;
+                    prev = joiner;
+                    const entity_id leader = war_leader(r, 1 - js);
+                    o.terms.kind = static_cast<peace_kind>(kind);
+                    const bool shape_ok = o.terms.kind == peace_kind::white
+                        ? (o.terms.gainer == null_entity && o.terms.provinces.empty())
+                        : ((o.terms.gainer == joiner || o.terms.gainer == leader) && !o.terms.provinces.empty());
+                    if (!shape_ok || (o.offerer != joiner && o.offerer != leader))
+                        return false;
+                    s.separate_peace_offers.emplace(std::make_pair(joiner, leader), std::move(o));
+                }
+                for (const war_member& m : r.joiners)
+                    for (const entity_id x : war_side_members(r, 1 - m.side))
+                        if (s.corp_hostile_pairs.count({ m.nation, x }) == 0
+                            || s.corp_hostile_pairs.count({ x, m.nation }) == 0)
+                            return false;
+            }
             if (answered > 1 || !nation_ok(r.declarer) || !nation_ok(r.defender)
                 || r.declarer == r.defender || r.declarer_men_lost < 0 || r.defender_men_lost < 0
                 || !exh_ok(r.declarer_exhaustion) || !exh_ok(r.defender_exhaustion)
                 || !days_ok(r.declarer_field_days) || !days_ok(r.defender_field_days)
-                || (answered == 1) != !r.defender_goals.empty())
+                || (sides ? (answered == 0 && !r.defender_goals.empty())
+                          : ((answered == 1) != !r.defender_goals.empty())))
                 return false;
             // A war's hostility is its gate (RELATIONS.md § 7): the declarer's row
             // toward the defender always stands, and the defender's once it answered.
@@ -5114,6 +5304,15 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
         for (const auto& [key, r] : s.wars)
             if (s.wars.count({key.second, key.first}) != 0)
                 return false;
+        // BL-1706: a pair stands across in at most one war.
+        {
+            std::set<std::pair<entity_id, entity_id>> across;
+            for (const auto& [key, r] : s.wars)
+                for (const entity_id a : war_side_members(r, 0))
+                    for (const entity_id b : war_side_members(r, 1))
+                        if (!across.insert({ std::min(a, b), std::max(a, b) }).second)
+                            return false;
+        }
 
         uint32_t nt = 0;
         if (!r_u32(in, nt) || nt > pairs_max)
@@ -5167,7 +5366,8 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
             uint8_t end = 0;
             if (!r_id(in, h.declarer) || !r_id(in, h.defender) || !r_i32(in, h.opened_tick)
                 || !r_i32(in, h.closed_tick) || !r_u8(in, end) || !r_id(in, h.gainer)
-                || !r_i32(in, h.final_score) || !r_provs(h.ceded, 0, k_war_goals_max))
+                || !r_i32(in, h.final_score)
+                || !r_provs(h.ceded, 0, sides ? std::size_t{ 1 } << 16 : k_war_goals_max)) // BL-1706: a capitulation may hand more
                 return false;
             if (end > war_end_max || !nation_ok(h.declarer) || !nation_ok(h.defender)
                 || h.declarer == h.defender || h.final_score < -100 || h.final_score > 100)
@@ -5336,7 +5536,7 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
     if (version >= k_world_save_version_refusals)
     {
         uint32_t count = 0;
-        if (!r_u32(in, count) || count > 2 * s.wars.size())
+        if (!r_u32(in, count) || count > 2 * s.nations.size() * s.nations.size()) // BL-1706: pairs across
             return false;
         for (uint32_t k = 0; k < count; ++k)
         {
@@ -5347,7 +5547,7 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
             const std::pair<entity_id, entity_id> key{ a, b };
             if (a == null_entity || b == null_entity || a == b || tick < 0
                 || s.nations.count(a) == 0 || s.nations.count(b) == 0
-                || (s.wars.count({ a, b }) == 0 && s.wars.count({ b, a }) == 0)
+                || !at_war(s, a, b) // BL-1706: across in a war, leaders or joiners
                 || (!s.peace_refusals.empty() && !(s.peace_refusals.rbegin()->first < key)))
                 return false;
             s.peace_refusals.emplace(key, tick);
@@ -5382,8 +5582,7 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
                 || (is_water(occupied_tile->second.substrate) && !tile_has_road(occupied_tile->second))
                 || own == s.tile_to_nation.end() || own->second == occupier
                 || s.nations.count(occupier) == 0
-                || (s.wars.count({ occupier, own->second }) == 0
-                    && s.wars.count({ own->second, occupier }) == 0)
+                || !at_war(s, occupier, own->second) // BL-1706: across in a war
                 || (!s.tile_occupier.empty() && !(s.tile_occupier.rbegin()->first < tile)))
                 return false;
             s.tile_occupier.emplace(tile, occupier);
@@ -5815,7 +6014,13 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
                 if (u.owner == nid)
                     return false;
             for (const auto& [key, war] : s.wars)
-                if (key.first == nid || key.second == nid)
+                if (war_side(war, nid) >= 0) // BL-1706: a joiner too
+                    return false;
+            for (const auto& [k, q] : s.join_requests)
+                if (k.second == nid)
+                    return false;
+            for (const auto& [k, t] : s.join_refusals)
+                if (k.second == nid)
                     return false;
             const auto names = [nid](const std::pair<entity_id, entity_id>& k) {
                 return k.first == nid || k.second == nid;
@@ -5826,6 +6031,9 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
                     if (names(k))
                         return false;
             for (const auto& [k, o] : s.peace_offers)
+                if (names(k))
+                    return false;
+            for (const auto& [k, o] : s.separate_peace_offers)
                 if (names(k))
                     return false;
             for (const auto& [k, v] : s.sentiment.pairs)
