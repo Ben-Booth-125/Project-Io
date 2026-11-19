@@ -838,6 +838,13 @@ inline constexpr float k_population_scale_max = 5.0f;
 /// So at 12.6468 the ceilings total 157.58% of the pooled per-tile capacity —
 /// no longer a redistribution of it. Still binding on nothing: 5,631 buildings
 /// against 1,433,325 ceiling slots (0.393%).
+///
+/// BL-1710 (Ben, 2026-11-19): the tile caps DOUBLED (`k_tile_capacity_multiplier`)
+/// and k was deliberately left where it is, so the pooled per-tile capacity doubled
+/// under an unchanged ceiling. `province_capacity_probe 8` (seeds 0-7): aggregate
+/// 2.9499 -> 5.9004, so the ceilings went from 428.71% to 214.34% of the pooled
+/// per-tile capacity (the 157.58% above predates the partition's later moves).
+/// Still binding on nothing: 4,803 buildings against 3,899,146 ceiling slots.
 inline constexpr float k_province_buildings_per_sustain_unit = 12.6468f;
 
 /// The heuristic's working, kept whole so the probe can report each term rather

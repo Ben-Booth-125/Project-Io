@@ -419,12 +419,22 @@ placement_result can_place_in_world(const world& w, entity_id tile_id,
 
 /// Deposit richness that buys one additional extraction site. Deposits generate in
 /// the 0-250 band (tile_generation.cpp § generate_deposits), so this puts a thin
-/// seam at 1 site and the richest tiles at 5.
+/// seam at 1 site and the richest tiles at 5 - before `k_tile_capacity_multiplier`
+/// doubles both (2 and 10).
 ///
 /// SETTLED (BL-193, 2026-07-26). Kept at 50 deliberately: with shared depletion
 /// carrying the economics, the ceiling is a **legibility** bound — how many
 /// markers a tile can host and a player can reason about — not the balance lever.
 inline constexpr float k_richness_per_site = 50.0f;
+
+/// EVERY TILE HOLDS TWICE THE BUILDINGS (Ben, 2026-11-19, BL-1710 tile capacity doubled:
+/// "We should raise the tile capacity for buildings to 2x"). One multiplier over BOTH tile
+/// caps - the extraction stack (`k_richness_per_site`) and the non-extraction cap
+/// (`non_extraction_stack_cap`) - so the two keep their ratio and the ruling lives in one
+/// place. Generation obeys it like play (PRODUCTION.md § Building stacks, "no exemptions").
+/// The province ceiling's `k` did NOT move with it (Ben, same day): the land, not the tile,
+/// is now the tighter regime in aggregate (PRODUCTION.md § The province building ceiling).
+inline constexpr int k_tile_capacity_multiplier = 2;
 
 /// Output multiplier for the @p rank-th site of a stack. RETIRED to the identity
 /// (Ben, 2026-10-26: "There's already depletion"): every site yields in full, so

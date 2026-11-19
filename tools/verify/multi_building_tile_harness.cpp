@@ -56,7 +56,15 @@ int main()
     // number BL-366 authored, and if the decomposition drifts, these fail.
     using su = terrain_substrate;
     using cv = terrain_cover;
-    auto cap = [](su s, cv c) { return placement_rules::non_extraction_stack_cap(s, c); };
+    // BL-1710 (Ben, 2026-11-19): every tile holds twice the buildings. The table
+    // keeps BL-366's single numbers and reads them through the multiplier, so the
+    // split's regression meaning survives the doubling.
+    constexpr int x2 = placement_rules::k_tile_capacity_multiplier;
+    auto cap = [](su s, cv c) { return placement_rules::non_extraction_stack_cap(s, c) / x2; };
+    check(placement_rules::non_extraction_stack_cap(su::sedimentary, cv::grass) == 12,
+          "R1 BL-1710: grassland holds 12 (6 doubled)");
+    check(placement_rules::non_extraction_stack_cap(su::volcanic, cv::none) == 4,
+          "R1 BL-1710: the thinnest ground holds 4 (2 doubled)");
     check(cap(su::sedimentary, cv::grass)  == 6,  "R1 grassland (grass on soil) cap == 6");
     check(cap(su::sedimentary, cv::forest) == 6,  "R1 forest (forest on soil) cap == 6");
     check(cap(su::sedimentary, cv::marsh)  == 6,  "R1 wetland (marsh on soil) cap == 6");
@@ -107,7 +115,10 @@ int main()
 
     // military_base is excluded — it is tech-gated (BL-344's `garrison` gate),
     // and this harness's corp earns no tech, so it would spuriously refuse.
-    const building_type mix[6] = {
+    const building_type mix[12] = { // BL-1710: grassland's cap is 12 (6 doubled)
+        building_type::processing_facility, building_type::processing_facility,
+        building_type::inland_logistics_hub, building_type::inland_logistics_hub,
+        building_type::research_institute, building_type::processing_facility,
         building_type::processing_facility, building_type::processing_facility,
         building_type::inland_logistics_hub, building_type::inland_logistics_hub,
         building_type::research_institute, building_type::processing_facility,
@@ -122,7 +133,7 @@ int main()
           "R5 setup: pre-transform extraction site placed");
 
     construction_result last_mix_result = construction_result::placed;
-    for (int i = 0; i < 6; ++i)
+    for (int i = 0; i < 12; ++i)
     {
         entity_id b = null_entity;
         last_mix_result = construct_building(w, reg, corp, tile, mix[i],
@@ -130,13 +141,13 @@ int main()
         check(last_mix_result == construction_result::placed, "R2 mixed-type placement succeeds pre-cap");
     }
     check(w.tiles[tile].cover == terrain_cover::urban,
-          "R2 6th mixed non-extraction building (aggregate cap 6) fires urban transform");
+          "R2 12th mixed non-extraction building (aggregate cap 12) fires urban transform");
 
-    // R3: urban's own cap (12) is higher — a 7th non-extraction placement still succeeds.
+    // R3: urban's own cap (24) is higher — a 13th non-extraction placement still succeeds.
     entity_id seventh = null_entity;
     auto r7 = construct_building(w, reg, corp, tile, building_type::processing_facility,
                                  resource_type::iron_ore, seventh);
-    check(r7 == construction_result::placed, "R3 7th non-extraction placement succeeds on urban (cap 12)");
+    check(r7 == construction_result::placed, "R3 13th non-extraction placement succeeds on urban (cap 24)");
 
     // R4: a NEW extraction site is refused on the now-urban tile, even though the
     // tile carries a real seeded deposit.
@@ -165,7 +176,7 @@ int main()
         t.habitability = 0.95f;
         w.tiles[high_hab_tile] = t;
     }
-    for (int i = 0; i < 6; ++i)
+    for (int i = 0; i < 12; ++i)
     {
         entity_id b = null_entity;
         construct_building(w, reg, corp, high_hab_tile, building_type::processing_facility,
@@ -179,10 +190,10 @@ int main()
     // R8: extraction stacking itself is unaffected — richness/50 rule still governs.
     {
         tile_component richness_tc{};
-        richness_tc.resource_deposit[ri(resource_type::iron_ore)] = 125.0f; // -> cap 2 (125/50 = 2.5 -> 2)
+        richness_tc.resource_deposit[ri(resource_type::iron_ore)] = 125.0f; // -> cap 4 (125/50 = 2.5 -> 2, doubled: BL-1710)
         const int cap = placement_rules::stack_capacity(richness_tc, building_type::extraction_site,
                                                          resource_type::iron_ore);
-        check(cap == 2, "R8 extraction stack_capacity still richness/50-bound (unchanged by BL-366)");
+        check(cap == 4, "R8 extraction stack_capacity still richness/50-bound, doubled (BL-1710)");
     }
 
     std::printf(g_failures == 0 ? "\nALL PASS\n" : "\n%d FAILURE(S)\n", g_failures);

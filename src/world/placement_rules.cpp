@@ -774,7 +774,7 @@ int stack_capacity(const tile_component& tc, building_type type, resource_type t
 
     const float richness = tc.resource_deposit[static_cast<std::size_t>(target)];
     const int   cap      = static_cast<int>(richness / k_richness_per_site);
-    return cap < 1 ? 1 : cap;
+    return k_tile_capacity_multiplier * (cap < 1 ? 1 : cap); // BL-1710: doubled (Ben, 2026-11-19)
 }
 
 // BL-366's non-extraction ceiling, SPLIT BY MEANING (BL-519).
@@ -814,8 +814,8 @@ int non_extraction_stack_cap(terrain_substrate sub, terrain_cover cov)
     // geology the city happens to stand on.
     if (is_water(sub)) // BL-516: every water kind takes nothing
         return 0;
-    if (cov == terrain_cover::urban)
-        return 12; // Soft-bounded in practice by workforce contention, not this number.
+    if (cov == terrain_cover::urban) // Soft-bounded in practice by workforce contention, not this number.
+        return k_tile_capacity_multiplier * 12; // BL-1710: 24 (Ben, 2026-11-19)
 
     int base = 4;
     switch (sub)
@@ -851,7 +851,9 @@ int non_extraction_stack_cap(terrain_substrate sub, terrain_cover cov)
         case terrain_cover::none:
         case terrain_cover::urban:  mod = 0; break;
     }
-    return std::max(1, base + mod);
+    // BL-1710 (Ben, 2026-11-19): the single table above, doubled - floored at 1
+    // BEFORE the doubling, so the thinnest buildable ground holds 2.
+    return k_tile_capacity_multiplier * std::max(1, base + mod);
 }
 
 int capital_source_slot_held(const world& w, entity_id tile_id)
