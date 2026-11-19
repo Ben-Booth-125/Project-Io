@@ -2125,6 +2125,52 @@
     "scripts/verify/unit_counter.lua"
    ],
    "design": "SELECTION.md § Multi-building tiles (Ben, 2026-10-13, BL-1312): a canvas press on a building selects the TILE; the Building rung is reached by the repeat-click cycle, ledger rows and the grid. Three checks still assert the older rule and fail on the flat path and the 3D ground alike (measured 2026-11-17, a flat control run with IO_NO_GPU_RENDERER=1 against the GPU run): click_injection.lua C3b, C3d and C4 (the first press \"resolved the BUILDING marker\"), and ground_bake.lua's nine \"a press on a single-building tile selects the building\" asserts. WORK: restate each against the tile-first rule (first press = the tile; the repeat press = the next live rung). SEPARATELY: unit_counter.lua errors in lib.lua raise_player_force - \"no roster row could be hired onto it: rejected_no_recruits x16\" - a world-side fixture fault, not the canvas; find why the muster base has no recruits."
+  },
+  {
+   "glyph": "~",
+   "sprint": null,
+   "version_goal": null,
+   "written": "2026-11-19",
+   "parked": false,
+   "blocked_on": null,
+   "requires": [],
+   "author": "Claude (Ben, 2026-11-19: generation speed ideas; \"file 1 and 4\")",
+   "category": "Generation",
+   "status": "proposed",
+   "priority": "B",
+   "authority_doc": "docs/generation/GENERATION_STRATEGY.md",
+   "id": "BL-1676",
+   "short_name": "SEARCH_SCORED_AHEAD",
+   "difficulty": 3,
+   "title": "Score the landscape search's proposals ahead, in parallel, so \"Placing buildings\" waits on one evaluation instead of four",
+   "files": [
+    "src/world/landscape_search.cpp",
+    "src/world/finish_campaign_world.hpp"
+   ],
+   "design": "MEASURED 2026-11-19 (seed 0, Release): \"Placing buildings\" is ~10.8 s, of which ~8.1 s is four landscape evaluations run one after another (the seed candidate and three placement rounds, ~2.0 s each); the rest is the winner's apply, the majors reconcile and the retrofit. The walk is serial in its DECISIONS, not its candidates: a round's proposal is perturb_placement(incumbent, axis_rng(seed, round)), keyed not sequenced, so after k rounds the incumbent is one of at most 2^k candidates and the whole proposal tree for the next D rounds is known before any is scored. WORK: score that tree at once (2^D - 1 proposals, plus the seed in the first wave) on up to k_campaign_search_threads workers, then REPLAY the serial walk over the stored scores - same comparisons, same order - so the winner, every score and the path are bit-identical; the branch not taken is scored and discarded. Raise k_campaign_search_threads from 2 to 8 (D = 3: the seed and seven proposals in one wave). A worker that cannot start or throws leaves its jobs to a serial pass. The inner bar counts every evaluation run over all planned. EXPECTED ~-6 s on seed 0, no re-bless. COSTS: up to 8 world copies held at once (measure peak memory first; cap the workers if it is too high), ~2x the CPU. CHECK: the finished state hash is unchanged on seeds 0, 5, 28, 40, and landscape_search_harness --check-threads agrees with the serial walk. RISK: scoring has not run truly concurrently since the walk went placement-only (2026-11-12) - one proposal per round meant one worker - so audit the apply/score path for shared mutable state (the static logs in corp_ai.cpp are on the settle path, not this one) and repeat each seed twice. Also considered and set aside: pre-building route maps on the base world, which each evaluation's apply would invalidate anyway."
+  },
+  {
+   "glyph": "~",
+   "sprint": null,
+   "version_goal": null,
+   "written": "2026-11-19",
+   "parked": false,
+   "blocked_on": null,
+   "requires": [],
+   "author": "Claude (Ben, 2026-11-19: generation speed ideas; \"file 1 and 4\")",
+   "category": "Generation",
+   "status": "proposed",
+   "priority": "B",
+   "authority_doc": "docs/ui/RENDERING.md",
+   "id": "BL-1677",
+   "short_name": "TEXTURES_DURING_SETTLE",
+   "difficulty": 3,
+   "title": "Bake the ground textures while the settle runs, so \"Loading textures\" overlaps \"Settling industry\"",
+   "files": [
+    "src/core/app.cpp",
+    "src/world/finish_campaign_world.cpp"
+   ],
+   "design": "The ground textures need only the finished tiles, not the settled economy, yet \"Loading textures\" starts after \"Settling industry\" ends. WORK: once the search's winner is applied and every step that writes the ground (roads, ports, installations laid before the settle) is done, start the bake against a snapshot of what it reads, on its own thread, and join it after the settle. EXPECTED: hide ~1-2 s of the paint step behind the settle. FIRST: list exactly what the bake reads (tiles, road field, installations, ownership tint?) and confirm the settle writes none of it - if the settle lays roads or buildings, the bake must either take a post-settle pass for the touched chunks or stay after the settle. CHECK: the baked chunks are byte-identical to today's (hash the textures on seeds 0 and 28), the bar's weights still sum to the wall time, and a live New Game shows no texture pop-in."
   }
  ]
 }
