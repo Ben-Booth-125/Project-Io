@@ -5,6 +5,8 @@
 
 #include <cstdint>
 #include <map>
+#include <set>
+#include <utility>
 #include <vector>
 
 struct world;
@@ -48,6 +50,8 @@ class recipe_registry;
 // inside the span; every tie goes to the lower tile id.
 // ---------------------------------------------------------------------------
 
+struct unit_draw_memo; // nation_generation.hpp: the cover memo a push read keeps (BL-1707)
+
 struct front
 {
     entity_id              nation    = null_entity; ///< The nation the front belongs to.
@@ -63,6 +67,10 @@ struct front_cache
     bool          built = false;
     std::uint64_t territory_generation = 0; ///< `world::territory_generation` at derivation.
     std::map<entity_id, std::vector<front>> by_nation; ///< Nations with no front are absent.
+    /// BL-1707 (MILITARY.md § Fronts, "A push stops where supply stops"): the (nation, key)
+    /// of every front `advance_fronts` last found set to push with a target across it but
+    /// none its units would be fed on. What the front card reads; derived like the rest.
+    std::set<std::pair<entity_id, entity_id>> push_halted_supply;
 };
 
 /// Every front of `nation`, ordered by (neighbour, key). Empty for a nation with
@@ -146,6 +154,17 @@ entity_id front_push_target(const world& w, const front& f, int64_t* defence = n
 /// march path cache: the same ranking and the same `march_check` the step asks.
 std::vector<entity_id> front_push_tiles(world& w, const recipe_registry& reg, const front& f,
                                         const std::vector<entity_id>& members);
+
+/// BL-1707 (MILITARY.md § Fronts, "A push stops where supply stops"; Ben, 2026-11-19): may a
+/// push of @p nation march onto @p tile? Only where its units would be fed: the nation's own
+/// cover there (`unit_tile_cover_permille`) at or past break-even, the same "fed" the
+/// declaration's supplied-front test reads. Memoised in @p memo for one pass.
+bool push_target_fed(world& w, const recipe_registry& reg, unit_draw_memo& memo, entity_id nation,
+                     entity_id tile);
+
+/// BL-1707: has the front keyed @p key of @p nation halted its push for supply, as of the last
+/// `advance_fronts`? Read-only, for the front card.
+bool front_push_halted_for_supply(const world& w, entity_id nation, entity_id key);
 
 /// BL-1540: hex steps between two tiles of one body, the straight read a scorer may take of a
 /// march. No path is solved.

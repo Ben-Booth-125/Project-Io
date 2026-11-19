@@ -673,8 +673,9 @@ rule keeps the rest, so the nation is still reached a little inside each side.
    disabled toward a neighbour the nation is not hostile to**, and the card says *Not hostile*
    beneath the pair. **Declared on and not yet answered, it says *War unanswered* instead and
    offers the free **Answer** (Ben, 2026-11-09; `../politics/RELATIONS.md` § 7)**: a defender has
-   no hostility of its own until it answers. A press sends `set_front_order` through the player's
-   seat.
+   no hostility of its own until it answers. **A push with no ground across that its units would
+   be fed on says *Halted: no supply beyond* (Ben, 2026-11-19; `../military/MILITARY.md` §
+   Fronts).** A press sends `set_front_order` through the player's seat.
 
 **Assign to front** is on the unit card (the action grid's sixth cell) and on the header of a
 group of the player's own units. It opens a menu of the units' own nation's fronts **on the body

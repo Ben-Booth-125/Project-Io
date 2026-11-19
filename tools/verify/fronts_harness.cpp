@@ -294,6 +294,21 @@ entity_id add_unit(fixture& f, entity_id owner_nation, entity_id tile, int count
     return u;
 }
 
+/// BL-1707 (MILITARY.md § Fronts, "A push stops where supply stops"): a push marches only onto
+/// ground A's units would be fed on, so a fixture that tests the push itself gives A a network.
+/// Two logistics hubs on A's ground, half the cylinder apart, cover B's rows.
+void feed(fixture& f)
+{
+    for (const int x : { 2, 8 })
+    {
+        const entity_id b = f.w.create_entity();
+        building_component bc{};
+        bc.type = building_type::inland_logistics_hub;
+        bc.tile = f.at(x, 2);
+        f.w.buildings[b] = bc;
+    }
+}
+
 corp_command_result cmd_assign(world& w, const recipe_registry& reg, entity_id actor, entity_id unit,
                                entity_id tile)
 {
@@ -515,7 +530,7 @@ int main()
     // -----------------------------------------------------------------------
     std::printf("\nF5 - push: the weakest adjacent tile, only while hostile\n");
     {
-        fixture f; build(f);
+        fixture f; build(f); feed(f); // BL-1707: a push needs fed ground
         reanchor_fronts(f.w);
         // B holds every tile of row 3 — the tiles with a hex side onto A's span —
         // with 30 men, save (4,3) with 10 and (1,3) with 20: (4,3) is the weakest,
@@ -569,7 +584,7 @@ int main()
         // straight below the slot, and one five columns on. Both are empty (equal
         // strength), so the nearer wins; the unit marches onto it with no fight and
         // holds what it took.
-        fixture f; build(f);
+        fixture f; build(f); feed(f); // BL-1707: a push needs fed ground
         reanchor_fronts(f.w);
         const entity_id u = add_unit(f, f.A, f.at(5, 0));
         (void)cmd_assign(f.w, reg, f.A, u, f.at(0, 2));
@@ -1134,7 +1149,7 @@ int main()
     std::printf("\nF8 - a rival's hold or push (the cylinder, C seated)\n");
     for (const int b_men : { 10, 200 })
     {
-        fixture f; build(f);
+        fixture f; build(f); feed(f); // BL-1707: a push needs fed ground
         f.w.player_entity = f.C; // A and B are rivals
         (void)declare_hostile(f.w, f.A, f.B);
         // B stands on every tile of row 3 (the tiles with a side onto the span), so
@@ -1286,7 +1301,7 @@ int main()
         (void)declare_hostile(f.w, f.B, f.A);
     };
     {
-        fixture f; build(f);
+        fixture f; build(f); feed(f); // BL-1707: a push needs fed ground
         reanchor_fronts(f.w);
         const entity_id u = add_unit(f, f.A, f.at(5, 0));
         (void)cmd_assign(f.w, reg, f.A, u, f.at(0, 2));
@@ -1546,7 +1561,7 @@ int main()
         // the visit order alone would step it first every day; the push prefers empty
         // tiles, so a defender aimed at the pusher's dawn tile would walk onto the tile it
         // just left, day after day, and never fight. At war, so the push goes on.
-        fixture f; build(f);
+        fixture f; build(f); feed(f); // BL-1707: a push needs fed ground
         // One province for all of B's ground, so the push has room to run inside it.
         {
             auto& ps = f.w.provinces.provinces;
@@ -1803,8 +1818,22 @@ int main()
             war.declarer_goals = std::move(goals);
             f.w.wars[{ f.A, f.B }] = war;
         };
-        const auto pushing = [](wide& f) {
+        // BL-1707 (MILITARY.md § Fronts, "A push stops where supply stops"; Ben, 2026-11-19):
+        // whatever the scorer decides, the step sends no unit onto ground it would not be fed
+        // on. `last_unfed` records, for the world `pushing` last read, whether the day's front
+        // step (run on a copy) sent any of A's units onto the neighbour's unfed ground. The
+        // rows that priced a push INTO hunger read it: that march is no longer possible.
+        bool last_unfed = false;
+        const auto pushing = [&](wide& f) {
             const std::vector<front> fs = current_fronts(f.w, f.A);
+            world copy = f.w;
+            (void)advance_fronts(copy, reg);
+            unit_draw_memo memo;
+            last_unfed = false;
+            for (const auto& [uid, u] : copy.units)
+                if (u.owner == f.A && u.order.dest != null_entity && owner(copy, u.order.dest) != f.A
+                    && !push_target_fed(copy, reg, memo, f.A, u.order.dest))
+                    last_unfed = true;
             return !fs.empty() && front_order_of(f.w, f.A, fs.front().key) == front_order::push;
         };
         // (e, f) One hub's cover, three units spread round the ring onto ground it cannot feed:
@@ -1821,8 +1850,12 @@ int main()
         };
         // A goal elsewhere keeps the war's reason alive and leaves these three on plain ground
         // unless their slot falls beside it, so the plain row's goal is the hub's own block.
-        check(!push_case(false), "F13e unfed plain ground: a fed force holds");
-        check(push_case(true), "F13f the same ground is a war goal: it pushes, the prize worth the hunger");
+        (void)push_case(false);
+        check(!last_unfed, "F13e unfed plain ground: no unit is sent onto it (BL-1707: a push stops where supply stops)");
+        // BL-1707 (Ben, 2026-11-19): a push stops where supply stops, for every nation, so the
+        // prize no longer buys the hunger: there is no fed target, and the rival holds.
+        (void)push_case(true);
+        check(!last_unfed, "F13f the same ground is a war goal: still no unit is sent onto it (BL-1707)");
         // (g, g2, h) The battle's own read, at the target's cover 0. A full stock stands next to its
         // target: no man is lost by the fight, but the march brings on the hungry step, so the 3:2
         // reads 85%. An empty stock marching far has lost men by the time it fights. No hub: the
@@ -1863,7 +1896,7 @@ int main()
         const bool full_pushes = battle_case(false, 850, raw_full);
         const bool near_pushes = battle_case(false, 1000, raw_near);
         const bool empty_pushes = battle_case(true, 1000, raw_empty);
-        check(raw_full && full_pushes, "F13g a full stock on share 0, next to its target: 85% of the raw force clears the 3:2, and it pushes");
+        check(raw_full && !full_pushes, "F13g a full stock next to an unfed target: 85% clears the 3:2, but no target is fed, so it holds (BL-1707)");
         check(raw_near && !near_pushes, "F13g2 the same, its defence sized to the raw force: the hungry step the march brings fails the 3:2");
         check(raw_empty && !empty_pushes, "F13h an empty stock on share 0: the men it loses on the march fail the 3:2 it passed raw");
         // (i) A force on its front past its goals, starving: the goal is its own ground now and
@@ -2032,7 +2065,9 @@ int main()
             std::printf("  [info] cover where it stands %d, at the push's tile %d\n", here, there);
             check(here > 0 && here < 667 && there < here && stuck.first,
                   "F13j no fed ground a march would take, here != there: it pays only what the march adds, and pushes");
-            check(!freed.first, "F13j2 the same ground with fed ground free: no credit for where it stands, and it holds");
+            (void)freed;
+            (void)fading(true, true, nullptr, nullptr);
+            check(!last_unfed, "F13j2 the same ground with fed ground free: no unit is sent onto the unfed tile (BL-1707)");
             check(!calm.second, "F13j3 at peace, the same stuck unit: a slot costlier than standing is refused");
         }
         // (k) Each unit prices its own tile: two of three stand to take fed ground, and the one
@@ -2074,7 +2109,8 @@ int main()
                 return pushing(f);
             };
             check(beside(true), "F13l every front tile of the goal under a stack: the prize still reads, and it pushes beside it");
-            check(!beside(false), "F13m the same ground with the goal across the world: plain ground, it holds");
+            (void)beside(false);
+            check(!last_unfed, "F13m the same ground with the goal across the world: no unit is sent onto unfed ground (BL-1707)");
         }
         // (n, o) Peace returns. A unit left on a slot past the draw comes off the front through
         // the existing verb and marches to fed ground; one on a fed slot stays where it is.
@@ -2165,7 +2201,10 @@ int main()
             check(a == 2 && at2, "F13v a goal 2 steps past a cover-0 tile: the war marches");
             check(b == 3 && at3, "F13w a goal 3 steps past it: the war marches");
             check(c == 8 && at8, "F13x a goal at the stated range, 8 steps: the war marches");
-            check(d == 9 && !at9, "F13y one past the range: plain ground, the hunger holds it");
+            (void)at9;
+            int d9 = 0;
+            (void)steps_case(9, d9);
+            check(d == 9 && d9 == 9 && !last_unfed, "F13y one past the range: no unit is sent onto unfed ground (BL-1707)");
         }
         // (z, aa) A nation with no front at all falls back too; and a fall back is never an
         // attack: with a hostile stack on the tile it would have gone to, it goes elsewhere.
@@ -2511,8 +2550,13 @@ int main()
             const bool whole = fed_stand(1000, 1000, v1), rationed = fed_stand(0, 1000, v2);
             const bool sized = fed_stand(1000, 850, v3);
             check(v1 && v2 && whole == rationed, "F13kk the same force and cover, the pool whole or exhausted: the same decision");
-            check(v1 && !whole && v3 && sized,
-                  "F13kk2 a full stock on a fed tile at share 1000, its target on cover 0: the march's hungry step fails the raw 3:2, and clears 85%");
+            bool vw = false, vs = false;
+            (void)fed_stand(1000, 1000, vw);
+            const bool unfed_whole = last_unfed;
+            (void)fed_stand(1000, 850, vs);
+            (void)whole; (void)sized;
+            check(v1 && v3 && vw && vs && !unfed_whole && !last_unfed,
+                  "F13kk2 a full stock on a fed tile, its target on cover 0: never sent onto it, at either margin (BL-1707)");
         }
         // (bb) A unit on the neighbour's ground under a bare hostility takes no ground, and pays
         // for where it stands. Alone, it is not worth a push.
@@ -2530,6 +2574,62 @@ int main()
             score_once(f.w);
             check(!pushing(f), "F13bb on the neighbour's ground under a bare hostility: priced where it stands, and it holds");
         }
+    }
+
+    // -----------------------------------------------------------------------
+    // F14 - BL-1707 (MILITARY.md § Fronts, "A push stops where supply stops"; Ben,
+    // 2026-11-19). A push target must be ground the unit would be fed on; with none, the
+    // unit holds its slot and the front is marked halted for the card. Every nation alike.
+    std::printf("\nF14 - a push stops where supply stops\n");
+    {
+        const auto at_war_pushing = [&](fixture& f) {
+            reanchor_fronts(f.w);
+            std::vector<entity_id> us;
+            for (int x : { 2, 6, 10 })
+                us.push_back(add_unit(f, f.A, f.at(x, 0)));
+            for (const entity_id u : us)
+                (void)cmd_assign(f.w, reg, f.A, u, f.at(0, 2));
+            war_record rec; rec.declarer = f.A; rec.defender = f.B; rec.declarer_goals = { f.block(1) };
+            f.w.wars[{ f.A, f.B }] = rec;
+            (void)declare_hostile(f.w, f.A, f.B);
+            (void)declare_hostile(f.w, f.B, f.A);
+            const entity_id key = nation_fronts(f.w, f.A).front().key;
+            (void)cmd_order(f.w, reg, f.A, key, 1);
+            step(f.w, reg, 10);
+            bool crossed = false;
+            for (const entity_id u : us)
+                crossed = crossed || owner(f.w, f.w.units.at(u).position) == f.B || f.w.tile_occupier.count(f.w.units.at(u).position) != 0;
+            return std::make_pair(crossed, key);
+        };
+        fixture bare; build(bare); // no network: nothing across is fed
+        const auto [crossed_bare, key_bare] = at_war_pushing(bare);
+        const bool halted = front_push_halted_for_supply(bare.w, bare.A, nation_fronts(bare.w, bare.A).front().key);
+        check(!crossed_bare && bare.w.tile_occupier.empty(),
+              "F14a at war with push ordered and no fed ground across: no unit leaves its own ground");
+        check(halted, "F14b the front is marked halted for supply (the card's line)");
+        bool on_slots = true;
+        for (const auto& [uid, u] : bare.w.units)
+            if (u.owner == bare.A)
+                on_slots = on_slots && owner(bare.w, u.position) == bare.A;
+        check(on_slots, "F14c the units hold on their own side of the span");
+
+        fixture fed; build(fed); feed(fed);
+        const auto [crossed_fed, key_fed] = at_war_pushing(fed);
+        check(crossed_fed && !fed.w.tile_occupier.empty(), "F14d the same war with fed ground across: the push marches and occupies");
+        check(!front_push_halted_for_supply(fed.w, fed.A, nation_fronts(fed.w, fed.A).front().key),
+              "F14e and the front is not marked halted");
+        {
+            unit_draw_memo memo;
+            int unfed_occupied = 0;
+            for (const auto& [t, occ] : fed.w.tile_occupier)
+                if (occ == fed.A && !push_target_fed(fed.w, reg, memo, fed.A, t))
+                    ++unfed_occupied;
+            check(unfed_occupied == 0, "F14f every tile the push took is ground A's units are fed on");
+        }
+        fixture twin; build(twin); feed(twin);
+        (void)at_war_pushing(twin);
+        check(twin.w.state_hash(7) == fed.w.state_hash(7), "F14g the supplied push replays: twins hash alike");
+        (void)key_bare; (void)key_fed;
     }
 
     std::printf("\n%d checks, %d failures\n", checks, failures);

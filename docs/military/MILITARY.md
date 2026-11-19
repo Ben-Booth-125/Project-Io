@@ -574,6 +574,14 @@ stand on is taken, not a target. Marching onto a held tile is an attack (§ Batt
 toward the neighbour, which is the battle trigger's one-way test. If that hostility ends, the stored
 push acts as hold until it returns.
 
+**A push stops where supply stops (Ben, 2026-11-19).** A push target must be ground the pushing
+unit would be fed on: its nation's cover there at or past **break-even**, the share at which food
+holds steady (§ Carried supplies). This is the cover the declaration's supplied-front test reads
+(`../politics/RELATIONS.md` § Who declares). A target below it is skipped like a walled one. A unit
+with no fed target holds its slot on the span, so a push halts at the edge of its network and
+resumes the day roads or Logistic Points reach further. The rule is the front's, so it binds every
+nation's fronts alike. The front card says when a push has halted for supply.
+
 **When the border moves.** Fronts re-derive from the territory map and the occupation layer. An assignment or order follows
 its key. If the key no longer names a front, it moves to the front toward the **same neighbour**
 whose span now holds the key tile. Failing that, it goes to the front toward that neighbour nearest
@@ -608,7 +616,8 @@ priced and no such ground in reach, pays only what an order adds over where it s
 
 A push is scored unit by unit, at the tile that unit would march onto: its strength x (worth - price). Ground
 is worth half of the men who take it. A goal the neighbour still holds, under a stack or not, and the ground
-within 8 steps of it, is worth all of them, so a cover-0 price scores nothing against it and the war marches. The
+within 8 steps of it, is worth all of them, so a cover-0 price scores nothing against it and the war marches, as far as
+the push's own supply edge lets it (§ The push target). The
 8 steps are straight hex distance, ignoring water and walls: a cheap radial read, not a route. The price takes no credit for where the unit stands if it can stand fed: a starving force is weighed as a
 fed one is. A unit a push would leave on the neighbour's ground, with no war to take it, is priced where it stands,
 for no ground. The front pushes when the sum is not negative and the 3:2 passes. The 3:2 reads each unit's

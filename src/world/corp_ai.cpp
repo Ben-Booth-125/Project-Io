@@ -2142,7 +2142,10 @@ void score_nation_fronts(world& w, const recipe_registry& reg, entity_id nation,
                 }
                 const bool raw  = strength[i] * k_front_push_margin_den > defence * k_front_push_margin_num;
                 const bool land = force * k_front_push_margin_den > defence * k_front_push_margin_num;
-                push = score >= 0 && land;
+                // BL-1707 (MILITARY.md § Fronts, "A push stops where supply stops"): the step
+                // marches only onto fed ground, so a front none of whose units has a fed target
+                // would push nowhere. It holds rather than store a push nobody can walk.
+                push = any_target && score >= 0 && land;
                 if (tally != nullptr)
                 {
                     if (push)
