@@ -24,7 +24,7 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 > **Generated file.** Produced by `node tools/session/render_actions.js`.
 > Edit the JSON, then re-run; hand edits here are overwritten.
 
-*295 entries — 89 gameplay · 45 canvas · 15 lens · 104 ledger · 42 chrome.*
+*297 entries — 89 gameplay · 45 canvas · 15 lens · 106 ledger · 42 chrome.*
 
 ---
 
@@ -3607,7 +3607,7 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 **Valid when:**
 - The Diplomacy ledger is open.
 
-**Expected output.** Switches the view; re-clicking the active tab closes the ledger. WARS: every open war in the world, the player's first - 'declarer vs defender', days since it opened, the war score as a centred bar from the declarer's side (half occupation of its goals, half battles), each side's goals with who holds each, 'not yet answered' for an unanswered defender, and each side's exhaustion. Each side is its leader then its joiners ('Arn, Bel  vs  Kesh'). On the player's wars: Answer (ledger.diplomacy_answer); as a side's leader, requests to join its side (ledger.diplomacy_join_request), separate peace offers from joiners across, and the peace presses (ledger.diplomacy_offer_peace / ledger.diplomacy_impose_peace) or a pending offer's terms with Accept / Refuse; as a joiner, the separate peace (ledger.diplomacy_separate_peace); and Capitulate (ledger.diplomacy_capitulate). On any other war: Ask to join (ledger.diplomacy_ask_to_join). Then every standing truce with its ticks left.
+**Expected output.** Switches the view; re-clicking the active tab closes the ledger. WARS: every open war in the world, the player's first. Each side is its leader then its joiners ('Arn, Bel  vs  Kesh'), with the war score as a centred bar (from your side on your war, else the declarer's); the bar's hover gives the score, the days since the war opened and every member's exhaustion. A war the player is not in is ONE LINE, its sides and its score bar; pressing the sides expands it (ledger.diplomacy_war_expand). The player's war, and an expanded one, list the goals as rows (ledger.diplomacy_goal_row): on the player's war under 'Taking' (its side's goals) and 'Defending' (the other side's), on any other under each '<leader>'s side'; 'Not yet answered.' for an unanswered defender. On the player's wars: Answer (ledger.diplomacy_answer); as a side's leader, requests to join its side (ledger.diplomacy_join_request), separate peace offers from joiners across, and the peace presses (ledger.diplomacy_offer_peace / ledger.diplomacy_impose_peace) or a pending offer's terms with Accept / Refuse; as a joiner, the separate peace (ledger.diplomacy_separate_peace); and Capitulate (ledger.diplomacy_capitulate). On an expanded war the player is not in: Ask to join (ledger.diplomacy_ask_to_join). Then every standing truce with its ticks left.
 
 **Reason to select.** Wars answers 'who is fighting whom, and how is each war going?'; Nations is the default.
 
@@ -3815,7 +3815,7 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 
 ### `ledger.diplomacy_ask_to_join` — Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Wars tab, on a war the player is not in: 'Ask to join' opens the request composer; '<leader>'s side' chooses the side; 'Ask' sends, 'Cancel' closes.
 
-**Press.** Press 'Ask to join'. Press one side's '<leader>'s side' (pressing the chosen side again clears it), tick 1 to 3 provinces under 'Goals', read the price, press 'Ask'.
+**Press.** Expand the war (ledger.diplomacy_war_expand), press 'Ask to join'. Press one side's '<leader>'s side' (pressing the chosen side again clears it), tick 1 to 3 provinces under 'Goals', read the price, press 'Ask'.
 
 | Arg | Type | Meaning |
 |---|---|---|
@@ -3881,6 +3881,36 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 **Expected output.** The confirm lists every goal the other side named on your ground, held or not, each 'to <namer>' and '(held by them)' where they hold it ('No goal is named on your ground: nothing is ceded.' when none); says the war ends with your side's members leaving at a white peace (a leader) or that you alone leave (a joiner); and warns 'This cedes your last province: your nation ends and the campaign is lost.' when it would. The confirm issues gameplay.capitulate. The press queues a corp_command that app::render sends at the frame's end through player_command - the same apply_corp_command an agent reaches, with its full re-validation; the result is the line at the ledger's head. Landed: 'You capitulated.'.
 
 **Reason to select.** The war is lost: give up the ground it was fought for and stop the bleeding now.
+
+### `ledger.diplomacy_war_expand` — Diplomacy ledger, Wars tab: the sides line of a war the player is not in.
+
+**Press.** Press the sides ('<declarer side>  vs  <defender side>').
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `war` | `the war's two leaders` | The war. |
+
+**Valid when:**
+- The player is not a member of the war (its own war is always drawn whole).
+
+**Expected output.** A toggle: expands the war in place to its goal rows under each '<leader>'s side' and its Ask to join press; pressing it again folds it to one line (and closes an open request composer on it). Sends nothing.
+
+**Reason to select.** See what another war is being fought for, before joining it or not.
+
+### `ledger.diplomacy_goal_row` — Diplomacy ledger, Wars tab: a goal's row - its province, a state word and a progress bar - under 'Taking' / 'Defending' or a '<leader>'s side'.
+
+**Press.** Press the province's name.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `province` | `province id` | The goal. |
+
+**Valid when:**
+- The war is the player's, or is expanded.
+
+**Expected output.** Centres the Planetary canvas on the province (its anchor tile; the canvas descends to that body's surface). The row reads 'Held' (green) when the side that named it holds the province (province_holder, the war score's read), 'Contested' (amber) when that side controls some of its tiles, 'Not held' otherwise; the bar and its percentage are the share of the province's tiles that side controls (tile_controller: the occupier, else the owner). The hover names who named it, on whose ground, and the tiles held of the total. Sends nothing.
+
+**Reason to select.** See how each goal stands and go to it.
 
 ### `ledger.military_space_design` — Military ledger (nav rail slot 7), Design tab, Space theatre: one row per hull class - Hauler, Lander, Tug, Frigate, Cruiser - with its live design's delta-v, cargo, firepower, armour and hull points, or 'No live design' (the Cruiser 'built at a Shipyard only').
 

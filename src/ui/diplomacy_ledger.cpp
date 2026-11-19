@@ -6,6 +6,7 @@
 #include "format.hpp"       // fmt::credits / fmt::percent
 #include "nav_pane.hpp"     // close_all_panels — open_declaration takes the column
 #include "player_side.hpp"  // owner_display_name
+#include "view_nav.hpp"     // focus_on_tile - a goal row centres the map (BL-1709)
 #include "presentation.hpp"
 
 #include "world/embargo.hpp"         // embargoes — the Embargo / Lift toggle
@@ -1199,8 +1200,9 @@ void draw_nations(const world& w, const recipe_registry& reg, const std::vector<
 
 // ── Wars ────────────────────────────────────────────────────────────────────
 
-/// The war score as a centred bar from the declarer's side.
-void score_bar(int score)
+/// The war score as a centred bar, positive to the side it is read from. True while the
+/// bar or its figure is hovered (BL-1709: the hover carries exhaustion and days).
+bool score_bar(int score)
 {
     const float  h  = ImGui::GetTextLineHeight() * 0.62f;
     const float  bw = std::max(ui::px(60.0f), ImGui::GetContentRegionAvail().x - ui::px(50.0f));
@@ -1215,8 +1217,10 @@ void score_bar(int score)
                           score > 0 ? palette::positive : palette::negative, 1.0f);
     dl->AddLine({cx, y0 - 2.0f}, {cx, y0 + h + 2.0f}, palette::text_secondary, 1.0f);
     ImGui::Dummy({bw, ImGui::GetTextLineHeight()});
+    bool hovered = ImGui::IsItemHovered();
     ImGui::SameLine();
     ImGui::Text("%+d", score);
+    return hovered || ImGui::IsItemHovered();
 }
 
 std::string terms_line(const world& w, const peace_terms& t)
@@ -1886,6 +1890,71 @@ void drop_stale_composers(const world& w, diplomacy_ledger_state& d, entity_id m
         close_composers(d);
 }
 
+/// BL-1709 (diplomacy.md § Wars — the rows, "Goals are rows, one each"): a goal's
+/// province, its state word and a bar of the share of its tiles the side that named it
+/// controls (`tile_controller`: the occupier, else the owner). Held when that side holds
+/// the province (`province_holder`, the war score's own read), Contested when it controls
+/// some of its tiles, Not held otherwise. Pressing the row centres the map on it.
+void goal_row(const world& w, ui_state& s, const war_record& war, int side, uint32_t g, entity_id me)
+{
+    diplomacy_ledger_state& d = s.diplomacy;
+    const province* pr = w.provinces.find(g);
+    int total = 0, held_tiles = 0;
+    if (pr != nullptr)
+        for (const entity_id t : pr->tiles)
+        {
+            ++total;
+            const entity_id c = w.tile_controller(t);
+            if (c != null_entity && war_side(war, c) == side)
+                ++held_tiles;
+        }
+    const entity_id holder = province_holder_for(w, g);
+    const bool  held  = holder != null_entity && war_side(war, holder) == side;
+    const float share = total > 0 ? static_cast<float>(held_tiles) / static_cast<float>(total) : 0.0f;
+    const char* word  = held ? "Held" : held_tiles > 0 ? "Contested" : "Not held";
+    const ImU32 wc    = held ? palette::positive : held_tiles > 0 ? palette::front_neutral : palette::neutral;
+    const entity_id namer = war_goal_namer(war, side, g);
+    ++d.goal_rows;
+
+    ImGui::PushID(static_cast<int>(g));
+    const float x0     = ImGui::GetCursorPosX();
+    const float avail  = ImGui::GetContentRegionAvail().x;
+    const float name_w = std::max(ui::px(70.0f), avail * 0.42f);
+    const float word_w = ImGui::CalcTextSize("Contested").x + ui::px(8.0f);
+    if (ImGui::Selectable(province_label(w, g).c_str(), false, 0, {name_w, 0.0f}) && pr != nullptr)
+    {
+        const entity_id anchor = province_anchor_tile(w, *pr);
+        if (anchor != null_entity)
+            focus_on_tile(w, s, anchor);
+    }
+    const ImVec2 mn = ImGui::GetItemRectMin(), mx = ImGui::GetItemRectMax();
+    d.presses.push_back({"goal", namer, (mn.x + mx.x) * 0.5f, (mn.y + mx.y) * 0.5f, pr != nullptr, {}});
+    if (ImGui::IsItemHovered())
+    {
+        const entity_id owner = province_owner(w, g);
+        ImGui::SetTooltip("%s\nNamed by %s, on %s's ground.\n%d of %d tiles held by that side.\n"
+                          "Press to centre the map on it.",
+                          province_label(w, g).c_str(), namer == me ? "you" : name_of(w, namer),
+                          owner == me ? "your" : name_of(w, owner), held_tiles, total);
+    }
+    ImGui::SameLine(x0 + name_w + ui::px(6.0f));
+    ImGui::TextColored(col4(wc), "%s", word);
+    ImGui::SameLine(x0 + name_w + ui::px(6.0f) + word_w);
+    // The progress bar: the share of the province's tiles the naming side controls.
+    const float  bw = std::max(ui::px(30.0f), ImGui::GetContentRegionAvail().x - ui::px(40.0f));
+    const float  h  = ImGui::GetTextLineHeight() * 0.62f;
+    const ImVec2 p0 = ImGui::GetCursorScreenPos();
+    const float  y0 = p0.y + (ImGui::GetTextLineHeight() - h) * 0.5f;
+    ImDrawList*  dl = ImGui::GetWindowDrawList();
+    dl->AddRectFilled({p0.x, y0}, {p0.x + bw, y0 + h}, palette::sentiment_track, 2.0f);
+    if (share > 0.0f)
+        dl->AddRectFilled({p0.x, y0}, {p0.x + std::max(2.0f, bw * share), y0 + h}, wc, 1.0f);
+    ImGui::Dummy({bw, ImGui::GetTextLineHeight()});
+    ImGui::SameLine();
+    ImGui::Text("%d%%", static_cast<int>(std::lround(share * 100.0f)));
+    ImGui::PopID();
+}
+
 void draw_wars(const world& w, const recipe_registry& reg, ui_state& s, entity_id me)
 {
     diplomacy_ledger_state& d = s.diplomacy;
@@ -1899,6 +1968,8 @@ void draw_wars(const world& w, const recipe_registry& reg, ui_state& s, entity_i
     if (wars.empty())
         ImGui::TextDisabled("No war is being fought.");
     drop_stale_composers(w, d, me);
+    for (auto it = d.wars_open.begin(); it != d.wars_open.end();) // a closed war's fold goes with it
+        it = w.wars.count(*it) == 0 ? d.wars_open.erase(it) : std::next(it);
 
     for (const auto& [key, wp] : wars)
     {
@@ -1909,22 +1980,98 @@ void draw_wars(const world& w, const recipe_registry& reg, ui_state& s, entity_i
         const int  my_side = war_side(war, me);
         const bool mine    = my_side >= 0;
         const bool leader  = mine && war_leader(war, my_side) == me;
-        ImGui::TextColored(col4(mine ? palette::selection : palette::text_secondary), "%s  vs  %s",
-                           side_names(w, war, 0).c_str(), side_names(w, war, 1).c_str());
-        const int days = (w.current_econ_tick - war.opened_tick) * k_construction_quarter_days
-                       + (w.construction_quarter_day - war.opened_day);
-        ImGui::SameLine();
-        ImGui::TextDisabled("  %d days", std::max(0, days));
-        score_bar(war_score(w, war));
-        if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("War score, from %s's side: half occupation of its goals, half battles.",
-                              name_of(w, war.declarer));
-        ImGui::TextWrapped("%s's side's goals: %s", name_of(w, war.declarer),
-                           goals_line(w, war_side_goals(war, 0), me).c_str());
-        const std::vector<uint32_t> dgoals = war_side_goals(war, 1);
-        ImGui::TextWrapped("%s's side's goals: %s", name_of(w, war.defender),
-                           (war.answered || !dgoals.empty()) ? goals_line(w, dgoals, me).c_str() : "not yet answered");
-        ImGui::Text("Exhaustion  %.0f / %.0f", war.declarer_exhaustion, war.defender_exhaustion);
+        // BL-1709 (diplomacy.md § Wars — the rows): the player's war is drawn whole; any
+        // other war is one line, its sides and its score bar, and a press expands it.
+        bool open_row = mine || d.wars_open.count(key) != 0;
+        const std::string sides = side_names(w, war, 0) + "  vs  " + side_names(w, war, 1);
+        if (mine)
+        {
+            ImGui::TextColored(col4(palette::selection), "%s", sides.c_str());
+        }
+        else
+        {
+            // The fold: its open state is visible (the row's goals below it), so it is a
+            // toggle - pressing an open row folds it.
+            const float name_w = std::max(ui::px(80.0f), ImGui::GetContentRegionAvail().x * 0.5f);
+            if (ImGui::Selectable((sides + "##fold").c_str(), open_row, 0, {name_w, 0.0f}))
+            {
+                if (open_row)
+                {
+                    d.wars_open.erase(key);
+                    if (d.join_key == key)
+                        close_composers(d);
+                }
+                else
+                    d.wars_open.insert(key);
+                open_row = !open_row;
+            }
+            const ImVec2 mn = ImGui::GetItemRectMin(), mx = ImGui::GetItemRectMax();
+            d.presses.push_back({"war_expand", war.declarer, (mn.x + mx.x) * 0.5f, (mn.y + mx.y) * 0.5f, true, {}});
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("%s\n%s", sides.c_str(), open_row ? "Press to fold." : "Press for its goals.");
+            ImGui::SameLine();
+        }
+
+        // The score bar: from the player's side on its own war, else the declarer's.
+        // Each member's exhaustion and the days since it opened are its hover.
+        const int sc       = war_score(w, war);
+        const int view     = mine ? my_side : 0;
+        const int shown_sc = view == 0 ? sc : -sc;
+        if (score_bar(shown_sc))
+        {
+            const int days = (w.current_econ_tick - war.opened_tick) * k_construction_quarter_days
+                           + (w.construction_quarter_day - war.opened_day);
+            std::string tip;
+            char line[200];
+            std::snprintf(line, sizeof line,
+                          "War score %+d, from %s side: half occupation of its goals, half battles.\n"
+                          "%d days since it opened.\nExhaustion",
+                          shown_sc, mine ? "your" : (std::string(name_of(w, war.declarer)) + "'s").c_str(),
+                          std::max(0, days));
+            tip = line;
+            for (int side = 0; side < 2; ++side)
+            {
+                if (side == 1) tip += "\n  against";
+                for (const entity_id m : war_side_members(war, side))
+                {
+                    float e = 0.0f;
+                    if (m == war.declarer)      e = war.declarer_exhaustion;
+                    else if (m == war.defender) e = war.defender_exhaustion;
+                    else
+                        for (const war_member& j : war.joiners)
+                            if (j.nation == m) e = j.exhaustion;
+                    std::snprintf(line, sizeof line, "\n  %s %.0f", m == me ? "You" : name_of(w, m), e);
+                    tip += line;
+                }
+            }
+            ImGui::SetTooltip("%s", tip.c_str());
+        }
+
+        if (open_row)
+        {
+            ImGui::Indent(ui::px(8.0f));
+            const auto group = [&](const char* head, int side) {
+                ImGui::TextDisabled("%s", head);
+                const std::vector<uint32_t> goals = war_side_goals(war, side);
+                if (goals.empty())
+                    ImGui::TextDisabled("  %s", (side == 1 && !war.answered) ? "Not yet answered." : "No goal named.");
+                for (const uint32_t g : goals)
+                    goal_row(w, s, war, side, g, me);
+            };
+            if (mine)
+            {
+                group("Taking", my_side);
+                group("Defending", 1 - my_side);
+            }
+            else
+            {
+                const std::string h0 = std::string(name_of(w, war.declarer)) + "'s side";
+                const std::string h1 = std::string(name_of(w, war.defender)) + "'s side";
+                group(h0.c_str(), 0);
+                group(h1.c_str(), 1);
+            }
+            ImGui::Unindent(ui::px(8.0f));
+        }
 
         if (mine)
         {
@@ -1952,7 +2099,7 @@ void draw_wars(const world& w, const recipe_registry& reg, ui_state& s, entity_i
                     draw_capitulate(w, s, key, war, me);
             }
         }
-        else
+        else if (open_row)
             draw_join(w, reg, s, key, war, me);
         ImGui::Separator();
         ImGui::PopID();

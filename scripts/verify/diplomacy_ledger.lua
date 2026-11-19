@@ -13,6 +13,8 @@
 --    through the corp-command seam so the list is more than the player's own),
 --    with score, exhaustion and goals; the peace composer opens on the player's.
 -- 6. The toggle rule: re-pressing the active tab closes the ledger.
+-- 7. BL-1706 / BL-1709: goal rows, another war's fold, Ask to join, a request to
+--    join the player's side with Accept, and the Capitulate confirm (5b-5e).
 --
 -- Every press aims at the point the ledger published (verify.diplomacy_ledger).
 -- The goal click aims at a rival unit's tile, read off verify.units() — the
@@ -248,6 +250,12 @@ print("diplomacy_ledger: goals " .. d.goals .. ", price valid=" .. tostring(d.pr
       .. " trust " .. string.format("%.2f", d.price_trust) .. " alarm " .. string.format("%.2f", d.price_alarm)
       .. " over " .. d.observers .. " observers, justified=" .. tostring(d.justified))
 if d.goals >= 1 then ok("a canvas click chose a goal") else fail("no goal chosen on the canvas") end
+-- BL-1705: whose opinion turns, and who may join either side.
+print("diplomacy_ledger: opinion rows " .. tostring(d.band_rows) .. ", may join them " .. tostring(d.join_them)
+      .. ", may join you " .. tostring(d.join_you))
+if d.price_valid and d.observers > 0 and d.band_rows == 0 then
+    print("diplomacy_ledger: note - a valid price moved no nation's band")
+end
 if theirs ~= nil then
     local p = verify.tile_screen(theirs.col, theirs.row)
     verify.hover(p.x + 1, p.y + 1, 2) -- the pick's hover line in the capture
@@ -302,6 +310,136 @@ print("diplomacy_ledger: Wars rows " .. d.war_rows .. " of " .. d.wars .. " wars
 assert(d.war_rows == d.wars, "Wars does not list every war")
 ok("Wars lists every war")
 verify.capture("diplomacy_wars")
+
+-- 5b. BL-1709: the player's war lists its goals as rows (Taking / Defending), each a
+--     press that centres the map on its province.
+d = led()
+print("diplomacy_ledger: goal rows " .. d.goal_rows)
+if d.goal_rows >= 1 then ok("the player's war draws its goals as rows") else fail("no goal rows on the player's war") end
+local gp = press_of("goal", nil)
+if gp ~= nil then
+    click(gp.x, gp.y)
+    assert(open_panel() == "diplomacy", "pressing a goal row closed the ledger")
+    ok("a goal row's press centres the map and leaves the ledger open")
+    verify.capture("diplomacy_goal_centred")
+end
+
+-- 5c. Another war is one line; a press expands it to its goal rows and Ask to join
+--     (BL-1706), and pressing it again folds it (a toggle).
+if a ~= nil and b ~= nil then
+    local ex = press_of("war_expand", a.owner)
+    if ex == nil then
+        fail("the rival war drew no expand press")
+    else
+        local g0 = led().goal_rows
+        click(ex.x, ex.y)
+        local g1 = led().goal_rows
+        print("diplomacy_ledger: expanding the rival war, goal rows " .. g0 .. " -> " .. g1)
+        if g1 > g0 then ok("a press expands another war to its goal rows") else fail("expanding drew no goal rows") end
+        verify.capture("diplomacy_wars_expanded")
+        local aj = press_of("join_open", a.owner)
+        if aj == nil then
+            fail("no Ask to join on the expanded war")
+        elseif not aj.enabled then
+            print("diplomacy_ledger: Ask to join disabled: " .. aj.reason)
+        else
+            click(aj.x, aj.y)
+            assert(led().joining == a.owner, "Ask to join did not open the composer")
+            local s1 = press_of("join_side1", b.owner)
+            assert(s1 ~= nil, "the composer drew no side press")
+            click(s1.x, s1.y)
+            assert(led().join_side == 1, "the side press did not choose the side")
+            local send = press_of("join_send", nil)
+            assert(send ~= nil and not send.enabled, "Ask is live with no goal ticked")
+            print("diplomacy_ledger: Ask disabled until a goal: '" .. send.reason .. "'")
+            verify.capture("diplomacy_join_composer")
+            s1 = press_of("join_side1", b.owner)
+            click(s1.x, s1.y)
+            assert(led().join_side == -1, "re-pressing the chosen side did not clear it")
+            ok("the join composer opens, chooses a side, and the side is a toggle")
+            local jc = press_of("join_cancel", nil)
+            click(jc.x, jc.y)
+            assert(led().joining == 0, "Cancel did not close the join composer")
+        end
+        ex = press_of("war_expand", a.owner)
+        click(ex.x, ex.y)
+        assert(led().goal_rows == g0, "re-pressing an expanded war did not fold it")
+        ok("re-pressing an expanded war folds it")
+    end
+end
+
+-- 5d. A request to join the player's side (staged through the seam, corp_verb 66):
+--     the player, its leader, sees it with Accept / Refuse; Accept takes the joiner in.
+local me_nation = nil
+for _, u in ipairs(verify.units()) do
+    if u.player then me_nation = u.owner break end
+end
+local goal_pid = nil
+if theirs ~= nil then
+    verify.center_tile(theirs.col, theirs.row, 8.0)
+    verify.frames(2)
+    local p = verify.tile_screen(theirs.col, theirs.row)
+    verify.hover(p.x, p.y, 2)
+    goal_pid = verify.pointer_target().hovered_province
+end
+local asker, ask_pid = nil, nil
+for _, u in ipairs(verify.units()) do
+    if u.col ~= nil and not u.player and u.owner ~= target and (a == nil or u.owner ~= a.owner)
+       and (b == nil or u.owner ~= b.owner) then
+        asker = u
+        break
+    end
+end
+for _, u in ipairs(verify.units()) do
+    if u.col ~= nil and u.owner == target then
+        verify.center_tile(u.col, u.row, 8.0)
+        verify.frames(2)
+        local p = verify.tile_screen(u.col, u.row)
+        verify.hover(p.x, p.y, 2)
+        local pid = verify.pointer_target().hovered_province
+        if pid ~= nil and pid ~= 0 and pid ~= goal_pid then ask_pid = pid break end
+    end
+end
+verify.mouse(-1, -1)
+verify.goto_surface("home")
+verify.frames(2)
+if me_nation ~= nil and asker ~= nil and ask_pid ~= nil then
+    local res = verify.corp_command({verb = 66, corp = asker.owner, counterparty = me_nation, subject = target,
+                                     provinces = {ask_pid}})
+    print("diplomacy_ledger: staged " .. asker.owner .. " asking to join your side, goal " .. ask_pid .. ": " .. res)
+    verify.frames(2)
+    local acc = press_of("accept_join", asker.owner)
+    if res == "applied" then
+        assert(acc ~= nil and press_of("refuse_join", asker.owner) ~= nil, "the request drew no Accept / Refuse")
+        ok("a request to join the player's side shows Accept / Refuse")
+        verify.capture("diplomacy_join_request")
+        click(acc.x, acc.y)
+        verify.frames(2)
+        print("diplomacy_ledger: after Accept: '" .. led().message .. "'")
+        assert(string.find(led().message, "joined your side", 1, true) ~= nil, "Accept did not take the joiner in")
+        ok("Accept takes the joiner into the war")
+        verify.capture("diplomacy_joined_war")
+    end
+else
+    print("diplomacy_ledger: no third nation or second target province to stage a join request")
+end
+
+-- 5e. Capitulate opens a confirm listing what it cedes; Cancel sends nothing.
+local cap = press_of("capitulate_open", nil)
+if cap ~= nil then
+    click(cap.x, cap.y)
+    assert(led().capitulating ~= 0, "Capitulate did not open the confirm")
+    assert(press_of("capitulate", nil) ~= nil, "the confirm drew no Capitulate press")
+    ok("Capitulate opens its confirm")
+    verify.capture("diplomacy_capitulate_confirm")
+    local cc = press_of("capitulate_cancel", nil)
+    local wars_before = led().wars
+    click(cc.x, cc.y)
+    assert(led().capitulating == 0 and led().wars == wars_before, "Cancel did not close the confirm untouched")
+    ok("Cancel closes the confirm, nothing sent")
+else
+    fail("no Capitulate press on the player's war")
+end
 
 local po = press_of("peace_open", target)
 if po ~= nil then

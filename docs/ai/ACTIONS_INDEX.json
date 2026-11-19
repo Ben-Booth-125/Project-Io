@@ -994,6 +994,14 @@
    "Diplomacy ledger, Wars tab, on a war the player is in (leader or joiner), beside the peace presses: 'Capitulate' opens the confirm; its 'Capitulate' sends, 'Cancel' closes."
   ],
   [
+   "ledger.diplomacy_war_expand",
+   "Diplomacy ledger, Wars tab: the sides line of a war the player is not in."
+  ],
+  [
+   "ledger.diplomacy_goal_row",
+   "Diplomacy ledger, Wars tab: a goal's row - its province, a state word and a progress bar - under 'Taking' / 'Defending' or a '<leader>'s side'."
+  ],
+  [
    "gameplay.space_launch",
    "The Space ledger (nav rail slot 9): ledger.space_launch. In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam — a sibling of corp_command, because the template verbs carry a name and a layout the fixed corp_command record cannot. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed)."
   ],

@@ -3139,11 +3139,21 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         out["price_trust"]    = d.decl_trust;
         out["price_alarm"]    = d.decl_alarm;
         out["observers"]      = d.decl_observers;
+        // BL-1705: the declaration's "whose opinion turns" rows and May join lists, as drawn.
+        out["band_rows"]      = d.decl_band_rows;
+        out["join_them"]      = d.decl_join_them;
+        out["join_you"]       = d.decl_join_you;
         out["war_rows"]       = d.war_rows;
+        out["goal_rows"]      = d.goal_rows; // BL-1709: goal rows drawn in the Wars tab
         out["truce_rows"]     = d.truce_rows;
         out["wars"]           = static_cast<int>(m_world.wars.size());
         out["message"]        = d.message;
         out["peace_with"]     = static_cast<unsigned>(d.peace_with);
+        // BL-1706: which joined-war composer is open, by its war's declarer (0 = closed).
+        out["joining"]        = static_cast<unsigned>(d.join_key.first);
+        out["join_side"]      = d.join_side;
+        out["capitulating"]   = static_cast<unsigned>(d.capitulate_key.first);
+        out["separating"]     = static_cast<unsigned>(d.separate_key.first);
         // BL-1511: the selector as drawn, and its open list's items.
         out["combo_x"] = d.combo_x;
         out["combo_y"] = d.combo_y;
