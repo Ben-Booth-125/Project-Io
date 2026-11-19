@@ -12,6 +12,7 @@
 #include "world/embargo.hpp"         // embargoes — the Embargo / Lift toggle
 #include "world/building_profit.hpp" // estimate_building_profit — the GDP read (seat_screen's)
 #include "world/fronts.hpp"          // current_fronts — front strength
+#include "world/nation_ai.hpp"       // nation_land_borders - who may join on motive
 #include "world/province.hpp"        // province_holder_for
 #include "world/sentiment.hpp"
 #include "world/stance.hpp"
@@ -603,7 +604,11 @@ void fill_opinion(const world& w, const sentiment_params& sp, entity_id me, enti
         return (a.trust1 - a.trust0) < (b.trust1 - b.trust0);
     });
     // Who may join (RELATIONS.md § Joining a war, "Who asks"): public facts only -
-    // stance, wars, and the sentiment toward you the ledger already shows.
+    // stance, wars, and the sentiment toward you the ledger already shows. A motive alone
+    // is not enough: the scorer asks to join only across a supplied land front, so a
+    // nation that does not border you never asks on motive - the map shows who borders.
+    const auto land = nation_land_borders(w);
+    const auto mine = land.find(me);
     for (const auto& [n, nat] : w.nations)
     {
         if (n == me || n == target || nat.ended || nat.tiles.empty())
@@ -611,8 +616,9 @@ void fill_opinion(const world& w, const sentiment_params& sp, entity_id me, enti
         const auto it = by.find(n);
         const float t1 = sentiment_toward(w.sentiment, n, me).trust + (it == by.end() ? 0.0f : it->second.t);
         const float a1 = sentiment_toward(w.sentiment, n, me).alarm + (it == by.end() ? 0.0f : it->second.a);
-        bool motive = (std::max(0.0f, -t1) + std::max(0.0f, a1)) / lim >= k_preview_motive_share;
-        if (!motive)
+        const bool borders_me = mine != land.end() && mine->second.count(n) > 0;
+        bool motive = borders_me && (std::max(0.0f, -t1) + std::max(0.0f, a1)) / lim >= k_preview_motive_share;
+        if (!motive && borders_me)
         {
             const auto j = war_justifications(w, sp, n, me, {});
             motive = std::any_of(j.begin(), j.end(), [](bool x) { return x; });
