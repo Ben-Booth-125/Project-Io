@@ -2123,7 +2123,7 @@
    "id": "NR-1252",
    "title": "Upkeep x4 quadrupled the goods draw as well as the wage, to keep the value anchor",
    "kind": "decision",
-   "what": "Ben ruled upkeep x4 against the wage figure (Rifle Infantry 2.25 -> 9 cr/month). Quadrupling the wage alone put every roster row out of the value anchor's band (equipment about twice the wage, Ben 2026-08-22): value_anchor R1a, 26 of 26 rows out, ratio 0.20-0.27. TAKEN: the goods half (ordnance 0.00029167 -> 0.00116668, food_rations 0.00208333 -> 0.00833332 per head per tick) quadrupled with it, so upkeep is x4 in both halves and the anchor holds (26/26 in band). This also quadruples army demand for ordnance and rations on the markets.",
+   "what": "Ben ruled upkeep x4 against the wage figure (Rifle Infantry 2.25 -> 9 cr/month). Quadrupling the wage alone put every roster row out of the value anchor's band (equipment about twice the wage, Ben 2026-08-22): value_anchor R1a, 26 of 26 rows out, ratio 0.20-0.27. TAKEN: the goods half (ordnance 0.00029167 -> 0.00116668, food_rations 0.00208333 -> 0.00833332 per head per tick) quadrupled with it, so upkeep is x4 in both halves and the anchor holds (26/26 in band). This also quadruples army demand for ordnance and rations on the markets. MEASURED with BL-1713 as a whole (rebless_shape_probe, 16 seeds at the seat): rival units -21%, nation treasuries -15%, rivals with a negative balance 0 -> 5; opening_parity 20:4 five years: majors losing money on average 1/64 -> 9/64, none under 100 cr.",
    "why_it_matters": "The goods half moves market demand, which the wage alone did not. The alternative was to amend the anchor ruling.",
    "options": [
     "Keep: upkeep x4 in both halves, anchor holds (taken)",
