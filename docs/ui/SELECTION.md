@@ -943,6 +943,15 @@ the screen, rather than floating with the cursor."* The band is:
   square for building, outlined square for tile, pentagon otherwise), then the title line
   (name · type), then a right-aligned **`[>]`** ('go to') button. There is no close button
   (see § Always open).
+- **The pin's space is reserved (Ben, 2026-11-19).** The pin toggle stands immediately left of
+  `[>]` on every pinnable kind. Every header row reserves its width (`pin_header_reserve`, the pin
+  square plus its gap) *before* laying out any other right-hand control, so a press like **Assign
+  to front** or **< Group** sits left of the pin and can never spill under it. A card with no
+  header row (the tile, an expanded building) reserves the same width at the right end of the row
+  the pin is anchored to.
+- **Every spatial 'go to' lands on its tile.** A building, a unit and a market centre the
+  Planetary canvas on their own tile (`focus_on_tile`); a body frames its surface. None of them
+  frames the grid's middle and leaves the player to find the thing.
 - **Always open.** The band never hides: there is no `[x]` button, no Esc hide rung (Esc clears
   the selection, and the band rests on the player's nation), and no hidden state. With the shell filling the perimeter, a hidden band reads as a hole in the
   frame (Ben, NR-017).

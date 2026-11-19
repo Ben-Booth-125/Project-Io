@@ -23,6 +23,7 @@
 #include "icons.hpp"
 #include "market_ledger.hpp"   // market_city_name — a building's market, by city
 #include "nav_pane.hpp"        // close_all_panels — the card's doors onto the fold-out column
+#include "pinned_panel.hpp"     // pin_header_reserve — BL-1695, header rows keep the pin clear
 #include "presentation.hpp"
 #include "selection.hpp"
 #include "text_fit.hpp"
@@ -2054,7 +2055,9 @@ void draw_unit_group_selection(const world& w, const recipe_registry& reg, ui_st
             const char* dlb = "Defend";
             const float dw  = ui::fit_width(dlb) + pad;
             // Defend province (Ben, 2026-11-09): the group's own press, as the card's is.
-            ImGui::SameLine(bar_w - frame_h - gap - bw - gap - dw);
+            // BL-1695: both presses stand clear of the pin toggle, left of 'go to'.
+            const float right = bar_w - frame_h - pin_header_reserve();
+            ImGui::SameLine(right - bw - gap - dw);
             const bool group_defending = units_all_defending(w, group);
             if (group_defending)
                 ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
@@ -2065,7 +2068,7 @@ void draw_unit_group_selection(const world& w, const recipe_registry& reg, ui_st
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip(group_defending ? "Defending their provinces - press to clear the orders"
                                                   : "Every unit of this group defends the province it stands in");
-            ImGui::SameLine(bar_w - frame_h - gap - bw);
+            ImGui::SameLine(right - bw);
             if (ImGui::Button("Assign to front##unit_group_front", {bw, frame_h}))
                 ImGui::OpenPopup("unit_group_front_menu");
             if (ImGui::IsItemHovered())
@@ -3581,7 +3584,8 @@ void draw_expanded_building_card(world& w, const recipe_registry& reg,
         const float cnt_w = cnt[0] ? ImGui::CalcTextSize(cnt).x : 0.0f;
         ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(palette::selection));
         fit_text(text_box::table_cell, "selection.building.title", name.c_str(),
-                 std::max(ui::px(24.0f), ImGui::GetContentRegionAvail().x - cnt_w));
+                 std::max(ui::px(24.0f), ImGui::GetContentRegionAvail().x - cnt_w
+                                         - pin_header_reserve())); // BL-1695: clear of the pin
         ImGui::PopStyleColor();
         if (cnt[0])
         {
@@ -5073,7 +5077,7 @@ void draw_selection_content(world& w, const recipe_registry& reg,
             char back[32];
             std::snprintf(back, sizeof back, "< Group (%d)", static_cast<int>(unit_group.size()));
             const float back_w = ImGui::CalcTextSize(back).x + style.FramePadding.x * 2.0f;
-            ImGui::SameLine(bar_w - btn - style.ItemSpacing.x - back_w);
+            ImGui::SameLine(bar_w - btn - pin_header_reserve() - back_w); // BL-1695: clear of the pin
             if (ImGui::Button(back, {back_w, btn}))
                 ui.selection_unit_group = true;
             if (ImGui::IsItemHovered())

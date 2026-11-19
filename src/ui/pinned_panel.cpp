@@ -512,6 +512,13 @@ void draw_pinned_panel(const world& w, ui_state& ui, ImVec2 disp)
     ImGui::PopStyleVar();
 }
 
+float pin_header_reserve()
+{
+    // The toggle is one frame-height square, set 4 px left of 'go to' (or of the
+    // anchor a header-less card names) — see draw_pin_toggle's placement below.
+    return ImGui::GetFrameHeight() + 4.0f + ImGui::GetStyle().ItemSpacing.x;
+}
+
 void draw_pin_toggle(const world& w, ui_state& ui, ImVec2 band_origin, ImVec2 band_size)
 {
     ui.pinned.drawn.toggle_x = ui.pinned.drawn.toggle_y = -1.0f;
