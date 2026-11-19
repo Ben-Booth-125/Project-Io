@@ -555,6 +555,12 @@ int main(int argc, char** argv)
                         "%d evaluations\n",
                         finish_s, static_cast<long long>(fin.ms_search),
                         static_cast<long long>(fin.ms_settle), fin.search.evaluations);
+        // The finished world's state hash: a speed change must leave it unmoved
+        // (the A/B a byte-identical optimisation is proved by, BL-1676).
+        if (finish)
+            std::printf("  STATE_HASH %016llx tick %d buildings %zu\n",
+                        static_cast<unsigned long long>(w.state_hash(w.current_econ_tick)),
+                        w.current_econ_tick, w.buildings.size());
         std::printf("  weight total %lld (plan)\n",
                     static_cast<long long>(prog->weight_total.load()));
         for (const std::string& s : caption_trail) std::printf("  %s\n", s.c_str());
