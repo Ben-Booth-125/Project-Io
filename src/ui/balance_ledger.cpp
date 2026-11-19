@@ -1,4 +1,5 @@
 #include "balance_ledger.hpp"
+#include "hover_card.hpp" // glyph_tooltip / glyph_text (TOOLTIP.md § The symbols)
 #include "ui_scale.hpp" // BL-1495: px, px_const
 
 #include "foldout_column.hpp" // shell fold-out column host (BL-122)
@@ -149,8 +150,7 @@ int draw_tier_control(const char* label, int tier, const char* what_it_does, boo
     // honest caveat second.
     const auto note = [what_it_does, wired] {
         if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
-            ImGui::SetTooltip("%s\n\nRaising a tier moves it up, lowering it down.%s", what_it_does,
-                              wired ? "" : "\nNot yet wired to the economy.");
+            glyph_tooltip("%s%s", what_it_does, wired ? "" : "\n\xe2\x9a\xa0 Not wired to the economy yet.");
     };
 
     int want = tier;
@@ -308,10 +308,8 @@ void draw_balance_ledger(const world& w, const recipe_registry& reg,
                                  + std::max(0.0f, (ImGui::GetContentRegionAvail().x - dts.x) * 0.5f));
             ImGui::TextColored(col, "%s", dbuf);
             if (ImGui::IsItemHovered())
-                ImGui::SetTooltip("Your population's mood toward its taxes, 0-100%%.\n"
-                                  "Tier IV raises it 6.25%% every three months, V 12.5%%; III holds it;\n"
-                                  "II and I lower it. Above 50%% it cuts the output of every\n"
-                                  "building on your nation's ground, up to 15%% at 100%%.");
+                glyph_tooltip("{t} 3 mo: V \xe2\x96\xb2" "12.5%%, IV \xe2\x96\xb2" "6.25%%, I-II \xe2\x96\xbc\n"
+                              "Over 50%%: all output \xe2\x96\xbc, up to 15%%.");
         }
     }
     ImGui::Spacing();

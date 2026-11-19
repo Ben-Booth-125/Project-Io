@@ -1,6 +1,7 @@
 # Project Io — Hover Card
 
 > **Settles:** what the shared hover card is and which pointer state it serves ·
+> how long any tooltip may be and which quantities it writes as a symbol ·
 > when it appears, how long it stays, and what makes it stick · what draws its
 > frame and what fills its content under a given lens · which surfaces get a hover
 > readout and which answer hovering some other way.
@@ -64,6 +65,50 @@ absent across the whole body while one of them is active. The card answers the q
 is asking; a lens with no question about this ground gets no answer. **Logistics is the
 exception:** its field resolves to the ground, so it shows a card and still takes no click (Ben,
 2026-10-20; SELECTION.md owns the rule).
+
+---
+
+## The budget (Ben, 2026-11-19)
+
+**A tooltip names and measures; it does not explain.** Every tooltip is held to one budget. It
+covers the lightweight chrome tooltip on a control, and every line of the hover card and the
+freezable tooltip. Owned by BL-1703 (terse tooltips).
+
+- **At most two lines, at most eight words a line.** A number with its glyph counts as one word.
+- **Line one is what it is, or what the press does**, verb first for a control ("Fire one
+  warhead."). **Line two, if any, is the one consequence, cost or blocker.**
+- **A blocked control says what it lacks in one line**: `Needs: X, Y`.
+- **Numbers over words.** "▲6%" rather than "raises it 6%"; "{cr} 120" rather than "costs 120
+  credits".
+- **What does not fit is cut, not moved** (Ben, 2026-11-19). A rule's mechanics, its history and
+  its rationale are not a tooltip's job; they are not re-homed into a second band or the manual.
+- **The hover card keeps its shape** — a title, one or two stat lines, one dimmed why-line — with
+  each line inside the eight words. Its title line counts toward nothing.
+- **Exempt:** a freezable tooltip's glyph grid (each cell is already a glyph and a number); its
+  nested glyph-name tooltips are one line by construction.
+
+### The symbols
+
+A quantity in a tooltip is written as its **symbol and its number**. Five are drawn glyphs from
+the icon vocabulary ([ICONS.md](ICONS.md)), placed inline by a `{token}` in the string; three are
+font characters typed as they are.
+
+| Quantity | Write | Draws |
+|---|---|---|
+| Money | `{cr}` | The coin (ICONS.md § 2) |
+| Time | `{t}` | The clock (ICONS.md § 2) |
+| Labour | `{lab}` | The Population lens's figure |
+| A good | `{good:<name>}` | That good's item glyph (ICONS.md § 2b); `<name>` is its code name, `iron_ore` |
+| Logistic Points | `{lp}` | The Logistics lens's truck |
+| Rise / fall | `▲` `▼` | Font characters |
+| Warning | `⚠` | Font character |
+| Met / unmet | `✓` `✗` | Font characters |
+
+**The writer is `glyph_text` / `glyph_tooltip`** (`hover_card.hpp`): `glyph_tooltip` is the
+drop-in for `ImGui::SetTooltip` — a printf format, then the tokens drawn inline at text height in
+the text colour, a good's glyph in its own colour. A token it does not know prints as written, so
+a typo is visible rather than silent. The font loads the Geometric Shapes, Miscellaneous Symbols
+and Dingbats blocks so the font characters render.
 
 ---
 

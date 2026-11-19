@@ -1,4 +1,5 @@
 #include "corporation_dashboard.hpp"
+#include "hover_card.hpp" // glyph_tooltip / glyph_text (TOOLTIP.md § The symbols)
 #include "ui_scale.hpp" // BL-1495: px
 
 #include "charts.hpp"
@@ -63,8 +64,7 @@ void balance_body(const corp_rollups& r)
         ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::positive),
                            "Refunds: %+.1f (not earnings)", static_cast<double>(r.refunds));
         if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("Construction cancelled when this seat was taken,\n"
-                              "credited back at what it had paid. Not counted as earnings.");
+            glyph_tooltip("Building cancelled when this seat was taken.\n{cr} paid back; not earnings.");
     }
 
     // BL-454's force line. The UNMET part is called out explicitly: an army
@@ -179,7 +179,7 @@ void standing_body(const world& w, const recipe_registry& reg, const economy_rep
         if (ImGui::IsItemHovered())
         {
             const char* leader_name = owner_display_name(w, leader_id);
-            ImGui::SetTooltip("%s\nThe bar is yours against the leader, %s: %.1f.", tip,
+            ImGui::SetTooltip("%s\nYours against the leader, %s: %.1f.", tip,
                               leader_name != nullptr ? leader_name : "-", leader);
         }
     };

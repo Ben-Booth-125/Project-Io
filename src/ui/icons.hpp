@@ -464,6 +464,16 @@ void strategy(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
 /// @param colour Stroke colour of the axis and fill of the bars.
 void readout(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
 
+/// Draw the **coin** — money, the tooltip `{cr}` token (TOOLTIP.md § The symbols, Ben
+/// 2026-11-19): a stroked circle with a vertical bar through its centre that overruns
+/// the rim top and bottom. Stroke family; @p colour is the line colour.
+void coin(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
+
+/// Draw the **clock** — time, a duration, the tooltip `{t}` token (TOOLTIP.md § The
+/// symbols): a stroked circle with a long hand to twelve and a short hand to three.
+/// Stroke family; @p colour is the line colour.
+void clock(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
+
 /// Draw the Diplomacy nav-rail glyph — two overlapping circle outlines (a
 /// two-parties-meeting motif) — in @p colour. Distinct from the single
 /// market-centre circle and the concentric activity pulse because the overlap

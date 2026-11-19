@@ -102,4 +102,19 @@ bool freezable_tooltip(const char* id, float dt, const std::function<void()>& co
 /// verify reads.
 bool freezable_tooltip_frozen(unsigned* owner = nullptr);
 
+/// Draw tooltip text with its SYMBOLS inline (TOOLTIP.md § The symbols, Ben 2026-11-19).
+/// `{cr}` money, `{t}` time, `{lab}` labour, `{lp}` Logistic Points and `{good:<name>}` a
+/// good are drawn as their icon glyphs at text height - the first four in the text colour,
+/// a good in its own. Everything else, the font symbols ▲ ▼ ⚠ ✓ ✗ included, is text. A
+/// newline starts a new line. An unknown token prints as written, so a typo shows.
+void glyph_text(const char* text);
+
+/// The drop-in for `ImGui::SetTooltip` that draws symbols: printf-formats @p fmt, then
+/// draws it with `glyph_text` inside a tooltip. Call where `SetTooltip` was called.
+void glyph_tooltip(const char* fmt, ...) IM_FMTARGS(1);
+
+/// `glyph_tooltip` gated on the last item being hovered for a tooltip - the drop-in for
+/// `ImGui::SetItemTooltip`.
+void glyph_item_tooltip(const char* fmt, ...) IM_FMTARGS(1);
+
 } // namespace ui
