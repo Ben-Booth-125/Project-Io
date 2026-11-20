@@ -13,6 +13,7 @@
 #include "world/air_combat.hpp"
 #include "world/components.hpp"
 #include "world/resource_names.hpp"
+#include "world/recipe_registry.hpp" // the processing card names its recipe
 #include "world/logistics.hpp" // landform_logistics_cost — the landform's real cost (BL-232)
 #include "world/logistic_points.hpp" // BL-1353: lp_full_reach / lp_fade_length for the ground card
 
@@ -264,9 +265,13 @@ void hover_building_detail(const world& w, const recipe_registry* reg,
         glyph_text(line.c_str()); // TOOLTIP.md § The symbols
     }
     else if (b.type == building_type::processing_facility)
-        ImGui::TextUnformatted("Processing facility");
-    else
-        ImGui::TextUnformatted(building_type_name(b.type));
+    {
+        // What it makes - the title already says it is a processing facility.
+        const recipe* rc = reg ? reg->get_recipe(b.recipe) : nullptr;
+        if (rc != nullptr)
+            ImGui::TextUnformatted(rc->display_name.c_str());
+    }
+    // Any other type: the title already names it (TOOLTIP.md § The budget).
 
     // Stat line 2: workforce (proxy for output rate).
     {

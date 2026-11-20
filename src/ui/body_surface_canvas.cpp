@@ -24,6 +24,7 @@
 #include "road_tool.hpp"        // BL-1370: the crossings an armed road press may reach
 #include "shell_metrics.hpp"     // right chrome column + minimap rect (BL-533 legend home)
 #include "ground_bake.hpp"
+#include "structure_stamps.hpp" // installation_stack_spots: hover the structure under the pointer
 #include "world/battle_system.hpp" // first_battle_in (BL-469 battle rung)
 #include "world/economy_system.hpp" // march_hop_fraction: the glide reads the march's own bank (BL-1507)
 #include "world/hex_neighbors.hpp"   // canonical odd-r neighbour offsets (BL-363)
@@ -9230,6 +9231,35 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         if (hovered_tile != null_entity)
             if (const auto tb = tile_to_bld.find(hovered_tile); tb != tile_to_bld.end())
                 tile_bld = tb->second;
+        // ...and on a tile standing several stacks, to the stack whose STRUCTURE stands
+        // nearest the pointer (TOOLTIP.md, Ben 2026-11-20): the slot layout the bake
+        // stood them by, read off the same snapshot, so each structure can be hovered.
+        // `hover_offset` is the cursor less the hex centre in ground px, and `hit_r` the
+        // hex circumradius there - one canonical unit.
+        if (tile_bld != null_entity && gview.src && gview.body == state.active_body && hit_r > 0.0f)
+        {
+            const tile_component& ht = w.tiles.at(hovered_tile);
+            const std::size_t ri = static_cast<std::size_t>(ht.grid_y) * static_cast<std::size_t>(gw)
+                                 + static_cast<std::size_t>(ht.grid_x);
+            ui::ground::stack_spot spots[ui::ground::tile_installation::k_max_stacks];
+            const int n = ui::ground::installation_stack_spots(*gview.src, ri, spots);
+            if (n > 1)
+            {
+                const double px = hover_offset.x / hit_r, py = hover_offset.y / hit_r;
+                double best = std::numeric_limits<double>::max();
+                for (int j = 0; j < n; ++j)
+                {
+                    const double dx = px - spots[j].x, dy = py - spots[j].y;
+                    const double d2 = dx * dx + dy * dy;
+                    if (spots[j].building != null_entity && w.buildings.count(spots[j].building)
+                        && d2 < best)
+                    {
+                        best     = d2;
+                        tile_bld = spots[j].building;
+                    }
+                }
+            }
+        }
 
         entity_id hover_eid = null_entity;
         if (state.overlay != overlay_mode::none)
@@ -9262,7 +9292,10 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             hover_eid = (state.hovered_structure_kind != structure_kind::none)
                         ? hovered_tile : null_entity;
         }
-        else if (marker_hover != null_entity)
+        // A stacked tile's own hit zone (BL-367) names the TILE so a PRESS lands on its
+        // building grid; the hover skips it so the structure under the pointer is what
+        // the card is about (TOOLTIP.md, Ben 2026-11-20).
+        else if (marker_hover != null_entity && marker_hover != hovered_tile)
             hover_eid = marker_hover;
         else if (tile_bld != null_entity)
             hover_eid = tile_bld;

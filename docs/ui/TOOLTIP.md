@@ -45,6 +45,14 @@ See also: [LAYOUT.md](LAYOUT.md) (where the card sits in the shell),
   lightweight chrome tooltip. Instant identity labels on chrome, not entity
   readouts — the instant-vs-delayed split survives exactly here.
 
+**On a built tile the card is about the STRUCTURE under the pointer** (Ben, 2026-11-20). A tile
+standing several stacks stands one structure per stack, up to three, at the fixed in-tile layout
+the installation pass places them by (RENDERING.md § Installations). The hover resolves to the
+stack whose structure stands nearest the pointer and shows that stack's lowest-id building, so
+every structure drawn on a hex can be hovered. A fourth stack and beyond draws no structure and
+has no hover; the tile card's building grid reaches it. This is the hover only: a press still
+selects the tile (SELECTION.md § Multi-building tiles).
+
 **Under a lens the card is about the LENS'S STRUCTURE, not the tile.** Owned by BL-673 (per-lens
 hover cards). The card reads `hovered_structure` / `hovered_structure_kind` — what the resolver
 already decided this frame — so its subject cannot disagree with what a click at the same pixel

@@ -1806,7 +1806,7 @@ void extract_installations(const world& w, entity_id body, const recipe_registry
         while (e < recs.size() && recs[e].tile == recs[a].tile)
             ++e;
         struct stk { building_type type; resource_type target; const std::string* product;
-                     const building_component* rep; bool all_building; };
+                     const building_component* rep; bool all_building; entity_id rep_id; };
         std::vector<stk> stacks;
         for (std::size_t k = a; k < e; ++k)
         {
@@ -1829,7 +1829,8 @@ void extract_installations(const world& w, entity_id body, const recipe_registry
                     break;
                 }
             if (!found)
-                stacks.push_back({ bc.type, bc.target_resource, product, &bc, bc.ticks_remaining > 0 });
+                stacks.push_back({ bc.type, bc.target_resource, product, &bc, bc.ticks_remaining > 0,
+                                   recs[k].id });
         }
         tile_installation& ti = s.inst.list[slot_of(recs[a].tile)];
         ti.n_stacks = static_cast<std::uint8_t>(
@@ -1851,6 +1852,7 @@ void extract_installations(const world& w, entity_id body, const recipe_registry
                     rc ? family_of_group(rc->group) : processing_family::general);
             }
             ti.stacks[j] = key;
+            ti.rep[j]    = st.rep_id; // ascending ids: the stack's lowest member
         }
         a = e;
     }
@@ -2421,6 +2423,35 @@ const char* stamp_name(const stamp_key& k)
         case stamp_subject::building:   return "building";
         default:                        return "none";
     }
+}
+
+int installation_stack_spots(const bake_source& src, std::size_t i,
+                             stack_spot (&out)[tile_installation::k_max_stacks])
+{
+    if (i >= src.inst.of_tile.size())
+        return 0;
+    const std::int32_t li = src.inst.of_tile[i];
+    if (li < 0)
+        return 0;
+    const tile_installation& ti = src.inst.list[static_cast<std::size_t>(li)];
+    const int ns = ti.n_stacks;
+    if (ns <= 0)
+        return 0;
+    // The same placement stamp_installations draws by: the slot table for this many
+    // stacks (the settled one beside a town), shifted and scaled by the roaded plan.
+    const bool settled = ti.settlement.subject != stamp_subject::none;
+    const road_plan plan = tile_road_plan(src, i);
+    const double ckx = plan.roaded ? plan.kx : 0.0, cky = plan.roaded ? plan.ky : 0.0;
+    const double csc = plan.roaded ? plan.scale : 1.0;
+    for (int j = 0; j < ns; ++j)
+    {
+        const slot& sl = slot_for(ns, j, settled);
+        out[j].x        = ckx + sl.x * csc;
+        out[j].y        = cky + sl.y * csc;
+        out[j].r        = 0.5 * sl.size * csc;
+        out[j].building = ti.rep[j];
+    }
+    return ns;
 }
 
 } // namespace ui::ground
