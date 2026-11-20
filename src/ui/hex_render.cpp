@@ -380,12 +380,12 @@ ImVec2 hex_local_centre(int col, int row, float hex_size)
 
 namespace {
 
-/// A linear 0..1 colour as display RGB, scaled by @p shade (the plan view's light).
+/// A part's 0..1 colour as RGB, scaled by @p shade (the plan view's light). Taken
+/// straight, as the 3D ground takes it: a gamma lift here washed the parts out.
 ImU32 solid_colour(const float* c, float shade, int alpha = 255)
 {
     const auto ch = [&](float v) {
-        const float s = std::pow(std::clamp(v * shade, 0.0f, 1.0f), 1.0f / 2.2f);
-        return static_cast<int>(s * 255.0f + 0.5f);
+        return static_cast<int>(std::clamp(v * shade, 0.0f, 1.0f) * 255.0f + 0.5f);
     };
     return IM_COL32(ch(c[0]), ch(c[1]), ch(c[2]), alpha);
 }
@@ -417,7 +417,7 @@ void draw_neighbourhood_solids(ImDrawList* dl, const ui::ground::bake_source& sr
         const float t = std::clamp(q.z0 + q.h, 0.0f, 1.2f) * 0.55f * s;
         return ImVec2{ t, t * 0.8f };
     };
-    constexpr ImU32 shadow = IM_COL32(0, 0, 0, 70);
+    constexpr ImU32 shadow = IM_COL32(0, 0, 0, 120);
 
     for (const K& q : solids)
     {
@@ -446,7 +446,7 @@ void draw_neighbourhood_solids(ImDrawList* dl, const ui::ground::bake_source& sr
     for (const K& q : solids)
     {
         const ImVec2 p = at(q.x, q.y);
-        const ImU32 edge = solid_colour(q.wall, 0.55f);
+        const ImU32 edge = solid_colour(q.wall, 0.4f);
         switch (q.kind)
         {
         case K::box:
