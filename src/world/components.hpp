@@ -2151,12 +2151,40 @@ struct unit_component
     int32_t   ammo_remainder = 0;
     int32_t   equipment_remainder = 0;
 
-    /// ONLY THE ROAD GAP STARVES (Ben, 2026-10-29; MILITARY.md § Carried supplies): the
+    /// THE ROAD SHARE (Ben, 2026-10-29; MILITARY.md § Carried supplies): the
     /// Logistic Point share, per-mille, the unit's supply request was granted at its
     /// tile this quarter (`lp_tick::supply_share`, written by the quarterly garrison
     /// upkeep). It — not `supply_factor_permille`, which an unpaid wage or an unmet
-    /// goods draw also lowers — is the share that resupplies the three stocks.
+    /// goods draw also lowers — is the road half of the share that resupplies the stocks;
+    /// the bought share below is the other, and the lower of the two refills (BL-1678).
     int32_t   lp_share_permille = 1000;
+
+    // BL-1678 (stocks are bought; MILITARY.md § Carried supplies, Ben 2026-11-19): the
+    // FUEL stock and each stock's BOUGHT share. Saved (world_save_version 97, the unit
+    // stocks section, only off these defaults) and hashed only off them.
+
+    /// Carried fuel, per-mille. Only a class its roster row gates on energy carries it
+    /// (`unit_carries_fuel`); every other unit holds 1000 and never moves it. Scales every
+    /// combat stat as ammunition does; at 0 the unit may not march.
+    int32_t   fuel_permille = 1000;
+    int32_t   fuel_remainder = 0;
+
+    /// The share of last month's purchase for each stock that the shelf met, per-mille
+    /// (`run_unit_upkeep`). A stock refills at the LOWER of this and the road share.
+    int32_t   food_bought_permille = 1000;
+    int32_t   ammo_bought_permille = 1000;
+    int32_t   equipment_bought_permille = 1000;
+    int32_t   fuel_bought_permille = 1000;
+
+    /// ON ACCOUNT: what each stock was delivered since the last purchase BEYOND its camp
+    /// drain, in thousandths of a per-mille (negative when it was delivered less). The
+    /// monthly purchase bills a month's camp drain plus this, then zeroes it - so a fight,
+    /// a march or a refill is paid for in the month after it is delivered, and a quiet unit
+    /// at full stock never moves it.
+    int32_t   food_owed = 0;
+    int32_t   ammo_owed = 0;
+    int32_t   equipment_owed = 0;
+    int32_t   fuel_owed = 0;
 
     /// BL-1531 (MILITARY.md § Sea, landings): THE SURF. The transport a unit is landing from,
     /// while it fights for the shore from the water beside it; null otherwise, which is every
@@ -2171,6 +2199,16 @@ inline bool unit_supplies_full(const unit_component& u)
     return u.food_permille == 1000 && u.ammo_permille == 1000 && u.equipment_permille == 1000
         && u.starvation_carry == 0 && u.food_remainder == 0 && u.ammo_remainder == 0
         && u.equipment_remainder == 0 && u.lp_share_permille == 1000;
+}
+
+/// BL-1678: true when the fuel stock and the four bought shares sit at their defaults —
+/// the state the v97 unit stocks section and the hash leave out.
+inline bool unit_stocks_bought_default(const unit_component& u)
+{
+    return u.fuel_permille == 1000 && u.fuel_remainder == 0 && u.food_bought_permille == 1000
+        && u.ammo_bought_permille == 1000 && u.equipment_bought_permille == 1000
+        && u.fuel_bought_permille == 1000 && u.food_owed == 0 && u.ammo_owed == 0
+        && u.equipment_owed == 0 && u.fuel_owed == 0;
 }
 
 /// `unit_component::refit_type`'s "not refitting" sentinel. Never a roster index.

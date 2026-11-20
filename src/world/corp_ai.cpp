@@ -1555,12 +1555,14 @@ void score_nation_defence(world& w, const recipe_registry& reg, entity_id nation
 }
 
 /// BL-1540: what @p tile costs a unit holding @p food_permille: the cover its claim would get
-/// there, through the stock's own days (`carried_hunger_price_permille`).
+/// there, through the stock's own days (`carried_hunger_price_permille`). BL-1678: the cover is
+/// the lower of the road's and the share of its rations the shelf last sold it (@p food_bought),
+/// the rule the day refills by.
 int march_price_permille(world& w, const recipe_registry& reg, unit_draw_memo& memo, entity_id nation,
-                         entity_id tile, int food_permille)
+                         entity_id tile, int food_permille, int food_bought = 1000)
 {
     return carried_hunger_price_permille(reg.military().supplies, food_permille,
-                                         unit_tile_cover_permille(w, memo, nation, tile));
+                                         std::min(unit_tile_cover_permille(w, memo, nation, tile), food_bought));
 }
 
 /// BL-1540: @p nation's goal provinces in a war with @p neighbour; empty when it has none.
@@ -1668,7 +1670,7 @@ entity_id nearest_fed_ground(world& w, const recipe_registry& reg, unit_draw_mem
     for (const auto& [d, t] : order)
     {
         int& spent = asked[d >= k_home_last ? 1 : 0];
-        if (spent == k_asks_per_tier || march_price_permille(w, reg, memo, nation, t, u.food_permille) != 0)
+        if (spent == k_asks_per_tier || march_price_permille(w, reg, memo, nation, t, u.food_permille, u.food_bought_permille) != 0)
             continue;
         if (march_check(w, nation, uid, t, null_entity, nullptr, &reg.military()) == corp_command_result::applied)
             return t;
@@ -1789,7 +1791,7 @@ void score_nation_fronts(world& w, const recipe_registry& reg, entity_id nation,
     };
     const auto can_stand_fed = [&](entity_id uid) {
         const unit_component& u = w.units.at(uid);
-        return march_price_permille(w, reg, supply_memo, nation, u.position, u.food_permille) == 0
+        return march_price_permille(w, reg, supply_memo, nation, u.position, u.food_permille, u.food_bought_permille) == 0
                || fed_ground_of(uid) != null_entity;
     };
 
@@ -1828,7 +1830,7 @@ void score_nation_fronts(world& w, const recipe_registry& reg, entity_id nation,
             const unit_component& mu = w.units.at(members[m]);
             const entity_id slot = slots[m];
             sum += march_price_permille(w, reg, supply_memo, nation, slot != null_entity ? slot : mu.position,
-                                        mu.food_permille);
+                                        mu.food_permille, mu.food_bought_permille);
         }
         return sum;
     };
@@ -1850,10 +1852,10 @@ void score_nation_fronts(world& w, const recipe_registry& reg, entity_id nation,
             // fed pays only what the slot adds over that.
             const entity_id slot = hold_slots(fronts[i], members)[m];
             const int64_t own = march_price_permille(w, reg, supply_memo, nation, slot != null_entity ? slot : u.position,
-                                                     u.food_permille);
+                                                     u.food_permille, u.food_bought_permille);
             if (own == 0
                 || (!can_stand_fed(uid)
-                    && own <= march_price_permille(w, reg, supply_memo, nation, u.position, u.food_permille)))
+                    && own <= march_price_permille(w, reg, supply_memo, nation, u.position, u.food_permille, u.food_bought_permille)))
                 continue;
             const int64_t s = unit_strength(w, u);
             corp_command off;
@@ -1951,7 +1953,7 @@ void score_nation_fronts(world& w, const recipe_registry& reg, entity_id nation,
         // order; the first reachable wins, and a unit that reaches none stays idle.
         // BL-1540: what joining each front would cost (header above).
         std::vector<int64_t> hunger(fronts.size(), 0);
-        const int64_t here = march_price_permille(w, reg, supply_memo, nation, u.position, u.food_permille);
+        const int64_t here = march_price_permille(w, reg, supply_memo, nation, u.position, u.food_permille, u.food_bought_permille);
         std::vector<char> tried(fronts.size(), 0);
         for (std::size_t i = 0; i < fronts.size(); ++i)
         {
@@ -1971,7 +1973,7 @@ void score_nation_fronts(world& w, const recipe_registry& reg, entity_id nation,
             // zero when one more unit respaces the others) or by what it does to the others.
             const entity_id slot = hold_slots(fronts[i], joined)[m];
             const int64_t own = march_price_permille(w, reg, supply_memo, nation, slot != null_entity ? slot : u.position,
-                                                     u.food_permille);
+                                                     u.food_permille, u.food_bought_permille);
             if ((own > 0 || hunger[i] > 0) && std::max(own, hunger[i]) > (can_stand_fed(uid) ? 0 : here))
             {
                 tried[i] = 1;
@@ -2094,10 +2096,10 @@ void score_nation_fronts(world& w, const recipe_registry& reg, entity_id nation,
                 // The price, with no credit for where the unit stands if it can stand fed.
                 const auto extra_at = [&](entity_id uid, entity_id tile) -> int64_t {
                     const unit_component& mu = w.units.at(uid);
-                    const int64_t there = march_price_permille(w, reg, supply_memo, nation, tile, mu.food_permille);
+                    const int64_t there = march_price_permille(w, reg, supply_memo, nation, tile, mu.food_permille, mu.food_bought_permille);
                     if (there == 0 || can_stand_fed(uid))
                         return there;
-                    return std::max<int64_t>(0, there - march_price_permille(w, reg, supply_memo, nation, mu.position, mu.food_permille));
+                    return std::max<int64_t>(0, there - march_price_permille(w, reg, supply_memo, nation, mu.position, mu.food_permille, mu.food_bought_permille));
                 };
                 for (std::size_t m = 0; m < assigned[i].size(); ++m)
                 {
@@ -2123,7 +2125,8 @@ void score_nation_fronts(world& w, const recipe_registry& reg, entity_id nation,
                     // the target (the price's own read; the pool is not read), over the straight
                     // march. `unit_strength` already reads any hunger it has now; the flat step
                     // counts only if the march brings it on.
-                    const int cover = unit_tile_cover_permille(w, supply_memo, nation, t);
+                    const int cover = std::min(unit_tile_cover_permille(w, supply_memo, nation, t),
+                                               u.food_bought_permille); // BL-1678: road and shelf
                     const int days = static_cast<int>(std::ceil(
                         static_cast<float>(tile_hex_steps(w, u.position, t)) * march_days_per_tile(reg.military(), u.type)));
                     const int loss = carried_hunger_loss_permille(sp, u.food_permille, cover, days);
@@ -2922,7 +2925,7 @@ void score_nation_sea(world& w, const recipe_registry& reg, entity_id nation, in
 // ---------------------------------------------------------------------------
 namespace {
 
-constexpr float k_force_base_share = 0.20f;  ///< Of income, with no neighbour stronger. First cut.
+constexpr float k_force_base_share = 0.30f;  ///< Of income, with no neighbour stronger (Ben, 2026-11-18: x1.5 of the first cut 0.20).
 constexpr float k_force_threat_span = 3.0f;  ///< Threat over 1 that reaches the ceiling. First cut.
 constexpr int   k_force_income_returns = 12; ///< Returns averaged: a year of months (BL-1642; was 4 quarters).
 
@@ -2952,16 +2955,22 @@ float goods_at_price(const world& w, entity_id nation, const std::array<float, r
 }
 
 /// The running cost of ONE land unit of @p heads men: its wage and its goods at posted prices.
+/// BL-1678 (Ben, 2026-11-19): the goods are what the unit BUYS - a month's peace drain of its
+/// four carried stocks (`carried_month_drain`), turned into goods by the one conversion the
+/// monthly draw uses (`carried_stock_goods`), at the base kit a hire of this row takes.
 float land_unit_running(const world& w, const recipe_registry& reg, entity_id nation, uint16_t type, int heads)
 {
     const unit_upkeep_params& up = reg.military().upkeep;
     const auto& table = unit_roster_table();
     const float power = type < table.size() ? static_cast<float>(table[type].power_mod) : 0.0f;
-    float per_head = up.credits_per_head + up.credits_per_head_per_power * power;
-    for (std::size_t g = 0; g < resource_count; ++g)
-        if (up.goods_per_head[g] > 0.0f)
-            per_head += up.goods_per_head[g] * nation_good_price(w, nation, g);
-    return per_head * static_cast<float>(heads);
+    float wage = (up.credits_per_head + up.credits_per_head_per_power * power) * static_cast<float>(heads);
+    unit_component probe;
+    probe.type  = type;
+    probe.owner = nation;
+    probe.count = heads;
+    const carried_supply_params& sp = reg.military().supplies;
+    const std::array<int, 4> drain = carried_month_drain(sp, probe);
+    return wage + goods_at_price(w, nation, carried_stock_goods(w, sp, probe, drain[0], drain[1], drain[2], drain[3]));
 }
 
 float wing_running(const world& w, const recipe_registry& reg, entity_id nation, uint16_t type)
@@ -3756,7 +3765,8 @@ std::map<entity_id, war_pair_front> war_pair_fronts(world& w, const recipe_regis
                 const int64_t st = unit_strength(w, u);
                 force[{ p, u.owner }] += st;
                 if (u.owner == nation
-                    && carried_hunger_price_permille(sup, 1000, unit_tile_cover_permille(w, memo, nation, u.position)) == 0)
+                    && carried_hunger_price_permille(sup, 1000, std::min(unit_tile_cover_permille(w, memo, nation, u.position),
+                                                                         u.food_bought_permille)) == 0) // BL-1678
                 {
                     fed_force[p] += st;
                     ++fed_at[u.position];

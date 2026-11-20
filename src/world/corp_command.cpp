@@ -16,6 +16,7 @@
 // provinces over the water, so the check is back — but it asks the PROVINCE its
 // domain (`province_kind_of`, province.hpp) rather than asking a tile its
 // substrate, so placement_rules is still not a dependency of this file.
+#include "carried_supplies.hpp" // BL-1678: unit_out_of_fuel - an empty tank cannot march
 #include "province.hpp"       // BL-511: march_unit's destination is a province
 #include "recipe_registry.hpp"
 #include "state_industry.hpp" // BL-1296: state_runs (the state build/retool doors)
@@ -993,6 +994,10 @@ corp_command_result march_check(world& w, entity_id actor, entity_id unit, entit
         return corp_command_result::rejected_state;
     // BL-1531: a unit in the surf comes ashore by winning, or goes back aboard.
     if (uit->second.landing_ship != null_entity)
+        return corp_command_result::rejected_state;
+    // BL-1678 (Ben, 2026-11-19; MILITARY.md § Carried supplies): a unit whose fuel is gone
+    // cannot march until it is resupplied.
+    if (unit_out_of_fuel(uit->second))
         return corp_command_result::rejected_state;
 
     // EVERY MARCH GOES TO A TILE (Ben, 2026-10-27: "all marches go to a

@@ -2125,6 +2125,112 @@
     "scripts/verify/unit_counter.lua"
    ],
    "design": "SELECTION.md § Multi-building tiles (Ben, 2026-10-13, BL-1312): a canvas press on a building selects the TILE; the Building rung is reached by the repeat-click cycle, ledger rows and the grid. Three checks still assert the older rule and fail on the flat path and the 3D ground alike (measured 2026-11-17, a flat control run with IO_NO_GPU_RENDERER=1 against the GPU run): click_injection.lua C3b, C3d and C4 (the first press \"resolved the BUILDING marker\"), and ground_bake.lua's nine \"a press on a single-building tile selects the building\" asserts. WORK: restate each against the tile-first rule (first press = the tile; the repeat press = the next live rung). SEPARATELY: unit_counter.lua errors in lib.lua raise_player_force - \"no roster row could be hired onto it: rejected_no_recruits x16\" - a world-side fixture fault, not the canvas; find why the muster base has no recruits."
+  },
+  {
+   "glyph": "~",
+   "sprint": null,
+   "version_goal": null,
+   "written": "2026-11-18",
+   "parked": false,
+   "blocked_on": null,
+   "requires": [],
+   "author": "Claude (found building kit wear for NR-1238, 2026-11-18)",
+   "category": "Economy",
+   "status": "designed",
+   "authority_doc": "docs/military/MILITARY.md",
+   "id": "BL-1675",
+   "short_name": "UNIT_UPKEEP_GOODS_UNDRAWN",
+   "priority": "B",
+   "difficulty": 3,
+   "title": "Nation units never buy their upkeep ordnance and rations: the goods half of unit upkeep is priced but not drawn",
+   "files": [
+    "src/world/economy_system.cpp",
+    "src/world/nation_step.cpp",
+    "src/world/corp_ai.cpp"
+   ],
+   "design": "MILITARY.md § Upkeep: upkeep is credits AND goods - goods_per_head (ordnance 0.00029167, food_rations 0.00208333 per head per tick) bought off the shelf of the market the unit stands in by draw_goods_or_bid, an unmet draw weakening the unit by the one decay rule. In the code every unit is a nation's (BL-1407), and run_unit_upkeep skips every unit before its goods draw (an always-true block, economy_system.cpp); run_nation_garrison_upkeep charges the credit wage only. So no unit has bought ordnance or rations since the corporations retired, while the rival force sizing (land_unit_running) still prices them as a running cost and unit_supply_need still counts them in the supply claim. WORK: decide the one path (run the goods half for nation units through draw_goods_or_bid, as the 2026-11-18 kit wear now does, with the decay rule reading its met share) or narrow the doc; then measure the economy move (ordnance and rations demand appear at every garrison's market) before the digests are re-pinned. Moves the world: the market gate and digests both."
+  },
+  {
+   "glyph": "~",
+   "sprint": null,
+   "version_goal": null,
+   "written": "2026-11-19",
+   "parked": false,
+   "blocked_on": null,
+   "requires": [],
+   "author": "Claude (Ben, 2026-11-19: \"a small stockpile per unit for equipment and fuel, bought from the market, using logistics points\")",
+   "category": "Military",
+   "status": "designed",
+   "authority_doc": "docs/military/MILITARY.md",
+   "id": "BL-1678",
+   "short_name": "STOCKS_ARE_BOUGHT",
+   "priority": "A",
+   "difficulty": 4,
+   "title": "The carried stocks are bought: each month a unit pays for what its stocks were delivered; a fuel stock for the fuelled vehicles",
+   "files": [
+    "src/world/carried_supplies.cpp",
+    "src/world/carried_supplies.hpp",
+    "src/world/components.hpp",
+    "src/world/economy_system.cpp",
+    "src/world/corp_ai.cpp",
+    "src/world/corp_command.cpp",
+    "src/world/world_save.cpp",
+    "src/world/world_save.hpp",
+    "src/world/world.cpp",
+    "src/world/recipe_registry.cpp",
+    "scripts/economy.lua",
+    "tools/verify/carried_supplies_harness.cpp"
+   ],
+   "design": "MILITARY.md § Carried supplies, 'The stocks are bought' (Ben, 2026-11-19, overturning 2026-10-29's 'only the road gap starves'). Rulings: food is bought like the rest (an unbought ration starves); a fuel stock for the energy-gated vehicle classes; an empty tank scales combat like ammunition and cannot march; a stock refills at the lower of the road share and the bought share. Equipment wears 5% a month (Ben, 2026-11-18) and the wear is the equipment stock's drain. WORK: the monthly purchase (run_unit_upkeep), the bought shares and the per-stock accounts, the fuel stock and its march gate, save v97, the hash, the rival force sizing priced on the stocks' goods, the harness (carried_supplies_harness S16). Closes BL-1675 (unit upkeep goods undrawn): the stocks' purchase is the one goods path for a land unit."
+  },
+  {
+   "glyph": "~",
+   "sprint": null,
+   "version_goal": null,
+   "written": "2026-11-19",
+   "parked": false,
+   "blocked_on": null,
+   "requires": [
+    "BL-1678"
+   ],
+   "author": "Claude (cold review of BL-1678, 2026-11-19)",
+   "category": "UI",
+   "status": "designed",
+   "authority_doc": "docs/military/MILITARY.md",
+   "id": "BL-1679",
+   "short_name": "FUEL_ON_THE_STAT_GRID",
+   "priority": "B",
+   "difficulty": 2,
+   "title": "The unit stat grid shows the fuel stock, and a refused march says the tank is empty",
+   "files": [
+    "src/ui/stat_grid.cpp",
+    "docs/ui/question_log.json",
+    "docs/ai/ACTIONS.json"
+   ],
+   "design": "MILITARY.md § Carried supplies: a fuelled vehicle carries a fourth stock, and an empty tank cannot march. The stat grid (src/ui/stat_grid.cpp) shows food, ammunition and equipment only, so a player's armour march is refused (rejected_state) with nothing on screen saying why. WORK: a fuel row beside the three (hidden for a unit that carries none), the bought shares if the row has room, and the march refusal's reason; question_log entry; a live click."
+  },
+  {
+   "glyph": "~",
+   "sprint": null,
+   "version_goal": null,
+   "written": "2026-11-19",
+   "parked": false,
+   "blocked_on": null,
+   "requires": [],
+   "author": "Claude (found running nation_tech_harness for BL-1678, 2026-11-19)",
+   "category": "Research",
+   "status": "designed",
+   "authority_doc": "docs/economy/RESEARCH.md",
+   "id": "BL-1714",
+   "short_name": "RESEARCH_PACING_REGRESSED",
+   "priority": "A",
+   "difficulty": 2,
+   "title": "Research pacing regressed on main: almost no nation reaches its first ring-2 major inside the window",
+   "files": [
+    "tools/verify/nation_tech_harness.cpp",
+    "src/world/nation_tech.cpp"
+   ],
+   "design": "RESEARCH.md § Cost (Ruling 2026-11-13, 6f433135: median first ring-2 major ~112 months, R0g-i passing). At HEAD 47bb959f nation_tech_harness R0g FAILS: 2 of 480 nations reach DG-PR-EX-A within 96 quarters, median 97 (= never), live RP/quarter p50 100. Measured identically with and without BL-1678 (stocks are bought), so it predates that work; 45 commits on main since the re-pin. WORK: bisect 6f433135..47bb959f with nation_tech_harness (one run ~10 min), name the mover, then fix the cause or bring Ben the re-pin. Never weaken R0g to pass."
   }
  ]
 }

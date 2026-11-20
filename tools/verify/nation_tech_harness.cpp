@@ -1101,7 +1101,7 @@ void rows_es()
 
         // Byte tampers on the tail itself. The section: count 0, then record 0 at 4 as
         // (id 4, node count 8, held words 12...).
-        const std::size_t sec = bytes.size() - world_save_early_space_section_bytes(f.w) - (world_save_space_node_section_bytes(f.w) + (world_save_space_unit_section_bytes(f.w) + (world_save_space_battle_section_bytes(f.w) + (world_save_prospecting_section_bytes(f.w) + (world_save_space_convoy_section_bytes(f.w) + (world_save_debris_section_bytes(f.w) + (world_save_space_bombard_section_bytes(f.w) + (world_save_offworld_base_section_bytes(f.w) + (world_save_space_firsts_section_bytes(f.w) + world_save_transit_origin_section_bytes(f.w) + world_save_launch_boost_section_bytes(f.w))))))))));
+        const std::size_t sec = bytes.size() - world_save_early_space_section_bytes(f.w) - (world_save_space_node_section_bytes(f.w) + (world_save_space_unit_section_bytes(f.w) + (world_save_space_battle_section_bytes(f.w) + (world_save_prospecting_section_bytes(f.w) + (world_save_space_convoy_section_bytes(f.w) + (world_save_debris_section_bytes(f.w) + (world_save_space_bombard_section_bytes(f.w) + (world_save_offworld_base_section_bytes(f.w) + (world_save_space_firsts_section_bytes(f.w) + world_save_transit_origin_section_bytes(f.w) + (world_save_launch_boost_section_bytes(f.w) + world_save_unit_stocks_section_bytes(f.w)))))))))));
         auto tampered = [&](std::size_t off, std::uint32_t v) {
             std::string tb = bytes;
             std::memcpy(&tb[off], &v, 4);

@@ -822,10 +822,28 @@ inline constexpr uint32_t k_world_save_version_one_product = 94;
 /// MERGE NOTE: a parallel lane's bump renumbers this block (this paragraph, the
 /// constants below, the accepted-version line in `read_world_snapshot`, the tail table
 /// and the one section at the end of the writer and reader).
-inline constexpr uint32_t world_save_version = 96;
+///
+/// **97 (BL-1678; MILITARY.md § Carried supplies, "The stocks are bought") - THE UNIT
+/// STOCKS.** Appended last, after v96's pad boost, after a u32 count: every land unit -
+/// standing (`world::units`) or aboard a ship (`ship_component::aboard`) - whose fuel stock
+/// or bought shares are off their defaults (`unit_stocks_bought_default`), ascending id, as
+/// (id, i32 fuel_permille, i32 fuel_remainder, i32 food_bought, i32 ammo_bought, i32
+/// equipment_bought, i32 fuel_bought, i32 food_owed, i32 ammo_owed, i32 equipment_owed, i32
+/// fuel_owed) - 44 bytes. Untrusted: ids strictly ascending, each a unit in the stream, every
+/// per-mille in [0, 1000], the remainder in [0, 10^6) and 0 on a full stock, each account in
+/// [-10^8, 10^8] thousandths, no record at the defaults. Refused whole otherwise. v96 is a STRICT PREFIX
+/// of v97 and is read too (`k_world_save_version_pre_unit_stocks`), as a world whose units
+/// hold full fuel and bought every stock in full.
+inline constexpr uint32_t world_save_version = 97;
 
 /// BL-1637: the first version carrying the pad-boost section (see above).
 inline constexpr uint32_t k_world_save_version_launch_boost = 96;
+
+/// BL-1678: the first version carrying the unit stocks section (see above).
+inline constexpr uint32_t k_world_save_version_unit_stocks = 97;
+
+/// BL-1678: v96, a strict prefix of v97.
+inline constexpr uint32_t k_world_save_version_pre_unit_stocks = k_world_save_version_unit_stocks - 1;
 
 /// BL-1637: v95, a strict prefix of v96.
 inline constexpr uint32_t k_world_save_version_pre_launch_boost = k_world_save_version_launch_boost - 1;
@@ -1189,6 +1207,8 @@ inline constexpr bool world_stream_has_space_firsts(uint32_t v) { return world_s
 inline constexpr bool world_stream_has_transit_origin(uint32_t v) { return world_stream_has_space_section(v, k_world_save_version_transit_origin); }
 /// BL-1637: from v96 the stream ends with the pad-boost section.
 inline constexpr bool world_stream_has_launch_boost(uint32_t v) { return v >= k_world_save_version_launch_boost && !world_stream_is_space_line(v); }
+/// BL-1678: from v97 the stream ends with the unit stocks section.
+inline constexpr bool world_stream_has_unit_stocks(uint32_t v) { return v >= k_world_save_version_unit_stocks && !world_stream_is_space_line(v); }
 
 /// BL-1539: the first version carrying the research-books section (see above).
 inline constexpr uint32_t k_world_save_version_research_books = 80;
@@ -1512,6 +1532,12 @@ void write_world_snapshot_pre_launch_boost(const world& w, std::ostream& out);
 
 /// BL-1637: the v96 section's bytes (4 + 8 per pad holding boost).
 std::size_t world_save_launch_boost_section_bytes(const world& w);
+
+/// BL-1678, VERIFICATION ONLY: the v96 stream shape - no unit stocks section.
+void write_world_snapshot_pre_unit_stocks(const world& w, std::ostream& out);
+
+/// BL-1678: the v97 section's bytes (4 + 44 per unit, standing or aboard, off the defaults).
+std::size_t world_save_unit_stocks_section_bytes(const world& w);
 
 /// BL-1632: the byte lengths of the v57..v66 trailing sections `w` writes, each
 /// mirroring its writer block field for field - the construction days (v57), the unit

@@ -868,7 +868,7 @@ int main()
         // Tamper the tail. Station record 0 starts the section: id 0, owner 4, core 8,
         // body 12, kind 16, level 17, count 18, slots 22.
         const std::size_t sec = b.size() - world_save_station_section_bytes(w2) - world_save_early_space_section_bytes(w2)
-                              - (world_save_space_node_section_bytes(w2) + (world_save_space_unit_section_bytes(w2) + (world_save_space_battle_section_bytes(w2) + (world_save_prospecting_section_bytes(w2) + (world_save_space_convoy_section_bytes(w2) + (world_save_debris_section_bytes(w2) + (world_save_space_bombard_section_bytes(w2) + (world_save_offworld_base_section_bytes(w2) + (world_save_space_firsts_section_bytes(w2) + world_save_transit_origin_section_bytes(w2) + world_save_launch_boost_section_bytes(w2)))))))))); // v82 + v83 follow
+                              - (world_save_space_node_section_bytes(w2) + (world_save_space_unit_section_bytes(w2) + (world_save_space_battle_section_bytes(w2) + (world_save_prospecting_section_bytes(w2) + (world_save_space_convoy_section_bytes(w2) + (world_save_debris_section_bytes(w2) + (world_save_space_bombard_section_bytes(w2) + (world_save_offworld_base_section_bytes(w2) + (world_save_space_firsts_section_bytes(w2) + world_save_transit_origin_section_bytes(w2) + (world_save_launch_boost_section_bytes(w2) + world_save_unit_stocks_section_bytes(w2))))))))))); // v82 + v83 follow
         const std::size_t r0 = sec + 4;
         auto refused = [&](std::size_t off, const void* v, std::size_t n) {
             std::string tb = b;
@@ -916,7 +916,7 @@ int main()
         // The astronaut part: the last 4 + 8n bytes; the last record's count.
         const std::int32_t over = k_astronaut_pool_max + 1, zero = 0;
         const std::size_t pools_end = b.size() - world_save_early_space_section_bytes(w2)
-                                    - (world_save_space_node_section_bytes(w2) + (world_save_space_unit_section_bytes(w2) + (world_save_space_battle_section_bytes(w2) + (world_save_prospecting_section_bytes(w2) + (world_save_space_convoy_section_bytes(w2) + (world_save_debris_section_bytes(w2) + (world_save_space_bombard_section_bytes(w2) + (world_save_offworld_base_section_bytes(w2) + (world_save_space_firsts_section_bytes(w2) + world_save_transit_origin_section_bytes(w2) + world_save_launch_boost_section_bytes(w2)))))))))); // v82 + v83 follow
+                                    - (world_save_space_node_section_bytes(w2) + (world_save_space_unit_section_bytes(w2) + (world_save_space_battle_section_bytes(w2) + (world_save_prospecting_section_bytes(w2) + (world_save_space_convoy_section_bytes(w2) + (world_save_debris_section_bytes(w2) + (world_save_space_bombard_section_bytes(w2) + (world_save_offworld_base_section_bytes(w2) + (world_save_space_firsts_section_bytes(w2) + world_save_transit_origin_section_bytes(w2) + (world_save_launch_boost_section_bytes(w2) + world_save_unit_stocks_section_bytes(w2))))))))))); // v82 + v83 follow
         check(refused(pools_end - 4, &over, 4), "S12", "a pool past the ceiling refuses the stream whole");
         check(refused(pools_end - 4, &zero, 4), "S12", "a listed pool of 0 refuses the stream whole");
         {

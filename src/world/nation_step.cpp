@@ -487,9 +487,9 @@ void run_nation_garrison_upkeep(world& w, const recipe_registry& reg, const lp_t
             int target = unmet ? 0 : 1000;
             if (lp_known)
             {
-                // BL-1452 (Ben, 2026-10-29: only the road gap starves): the road share
-                // alone is what resupplies the carried stocks — stored as granted, never
-                // stepped, and never lowered by the bill. A unit the resolver holds no
+                // BL-1452: the road share resupplies the carried stocks, with the shelf's
+                // bought share beside it (BL-1678: the lower of the two) — stored as granted,
+                // never stepped, and never lowered by the bill. A unit the resolver holds no
                 // row for asked for nothing, and is whole.
                 int share = 1000;
                 if (const auto it = lp->supply_share.find(uid); it != lp->supply_share.end())

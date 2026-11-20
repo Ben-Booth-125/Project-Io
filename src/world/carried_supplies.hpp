@@ -8,12 +8,15 @@
 //
 //   drain     food: `food_per_day` every day (the ration);
 //             ammunition: `ammo_per_battle_day` on a day the unit fought;
-//             equipment: `equipment_attrition_per_day` every day, plus
-//             `equipment_per_battle_day` on a day it fought;
+//             equipment: a thirtieth of `equipment_attrition_per_month` every day,
+//             plus `equipment_per_battle_day` on a day it fought;
+//             fuel (BL-1678, a class gated on energy only): `fuel_per_day`, plus
+//             `fuel_per_march_day` with an order in flight, plus `fuel_per_battle_day`;
 //   resupply  share x (today's spend + restock) (Ben, 2026-10-29: "Delivery is share x
 //             (daily need + a restock rate); half cover then drains more slowly, full
-//             cover refills"), capped at full. The share is the unit's ROAD share,
-//             `lp_share_permille` (Ben, 2026-10-29: only the road gap starves); the
+//             cover refills"), capped at full. The share is the LOWER of the unit's
+//             road share, `lp_share_permille`, and the stock's BOUGHT share, the part of
+//             last month's purchase the shelf sold (BL-1678, Ben 2026-11-19); the
 //             restock is `restock_permille` of the stock's FULL daily rate (food: the
 //             ration; ammunition: a battle day; equipment: attrition + a battle day).
 //             At the authored half, full cover refills an empty stock at half its rate a
@@ -39,6 +42,7 @@
 
 #include "components.hpp"
 
+#include <array>
 #include <set>
 
 struct world;
@@ -51,13 +55,49 @@ struct carried_supply_params
 {
     int food_per_day                = 33; ///< The ration: a full stock feeds ~30 days unsupplied.
     int ammo_per_battle_day         = 50; ///< Spent per day fighting: 20 days of fire, floor aside.
-    int equipment_attrition_per_day = 1;  ///< Wear on the march and in camp.
+    /// Wear on the march and in camp, per-mille of a full stock A MONTH (Ben, 2026-11-18:
+    /// "5% of a unit's kit per month"); the day drains 1/30 of it, in thousandths of a
+    /// per-mille (`equipment_attrition_milli_per_day`).
+    int equipment_attrition_per_month = 50;
     int equipment_per_battle_day    = 10; ///< Lost to battle, per day fighting.
+    /// BL-1678 (Ben, 2026-11-19): THE FUEL STOCK, carried only by a class its roster row
+    /// gates on energy (`unit_carries_fuel`). Drained every day in camp, more on a day on
+    /// the march (an order in flight) and on a day fighting.
+    int fuel_per_day                = 2;
+    int fuel_per_march_day          = 20;
+    int fuel_per_battle_day         = 30;
     /// The restock, per-mille of each stock's full daily rate, delivered at the share on
     /// top of today's need. 500: full cover refills at half a day's rate, and the break-
     /// even cover against a full-rate spend is 1000 / 1.5 = 667‰.
     int restock_permille            = 500;
+
+    /// BL-1678 (stocks are bought; Ben, 2026-11-19): the goods ONE MAN's full stock takes,
+    /// bought off the shelf the unit's supply is paid at. Food takes rations, ammunition
+    /// ordnance, fuel refined fuel; equipment takes the man's kit (`refill_goods_per_man`,
+    /// the goods a refill brings him), so it is not authored here. Finite, >= 0.
+    float food_fill_rations_per_head      = 0.00208333f; ///< One month's ration (goods_per_head).
+    float ammo_fill_ordnance_per_head     = 0.0035f;     ///< Twelve months of the old training fire.
+    float fuel_fill_refined_fuel_per_head = 0.1f;        ///< The energy axis's hire cost per man.
 };
+
+/// The day's equipment wear in thousandths of a per-mille: the month's rate over the
+/// month's days, rounded.
+int equipment_attrition_milli_per_day(const carried_supply_params& p);
+
+/// BL-1678: does @p u carry a fuel stock? A class its roster row gates on energy (the
+/// fuelled vehicles; MILITARY.md § The roster: infantry is ungated) does.
+bool unit_carries_fuel(const unit_component& u);
+
+/// BL-1678: THE ONE CONVERSION from per-mille of a stock to goods. The goods @p u buys to
+/// put @p food, @p ammo, @p equip and @p fuel per-mille into its four stocks, at its men
+/// (`count`). Fuel reads 0 for a unit that carries none.
+std::array<float, resource_count> carried_stock_goods(const world& w, const carried_supply_params& p,
+                                                      const unit_component& u, int food, int ammo,
+                                                      int equip, int fuel);
+
+/// BL-1678: the per-mille a month at peace drains from each stock - the steady want a
+/// full unit buys each month. Index 0 food, 1 ammunition, 2 equipment, 3 fuel.
+std::array<int, 4> carried_month_drain(const carried_supply_params& p, const unit_component& u);
 
 /// A stock's remainder is kept in these sub-per-mille units: one per-mille of stock is
 /// this many (share ‰ x need ‰ x 1000 is the day's delivery in them, exactly).
@@ -87,6 +127,10 @@ int carried_hunger_price_permille(const carried_supply_params& p, int food_permi
 
 /// True when the unit's food is below full: the flat hunger step applies.
 inline bool unit_hungry(const unit_component& u) { return u.food_permille < 1000; }
+
+/// BL-1678 (Ben, 2026-11-19): true when a fuel carrier's fuel is gone - it may not march
+/// (`march_check` refuses the order; `run_unit_march` holds one in flight).
+bool unit_out_of_fuel(const unit_component& u);
 
 /// True when the unit's food is gone: it starves.
 inline bool unit_starving(const unit_component& u) { return u.food_permille <= 0; }

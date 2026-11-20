@@ -2446,6 +2446,12 @@ boilerplate: pure, seeded, deterministic, replayable, legal verbs only, never a 
   marches is not idle when they look. (6) The scorer checks goods: a ship or land hire is scored only
   when the seam's own goods reading says the shelves hold its hull or row goods with its live
   design's kit. The economy is unchanged; a nation that cannot buy them hires nothing.
+  **Rival nations hold larger forces — granted (Ben, 2026-11-18; `../military/MILITARY.md` § Force
+  sizing).** *"Grant the AI to build more military units, increasing the army size and draw of
+  equipment."* The sizing grant's base share and ceiling rise by half. Nothing it may read or do
+  widens; it hires more under the same reading. The ceiling also caps a minor's generated garrison,
+  so generated worlds move with it. Pure, seeded, deterministic, replayable, legal verbs only, never
+  a planner.
   **Rival nations size their forces to income and threat — granted (Ben, 2026-11-08;
   `../military/MILITARY.md` § Force sizing).** A new subject, a relation rather than an action: the
   soft caps of three (land, wings, ships) are replaced by a target share of the nation's own income.

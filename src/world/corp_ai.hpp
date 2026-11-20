@@ -596,7 +596,7 @@ void score_nation_air(world& w, const recipe_registry& reg, entity_id nation, in
 int64_t rival_air_province_score(const world& w, entity_id nation, air_mission m, uint32_t province);
 
 /// BL-1552 (MILITARY.md § Force sizing): the most of its income a nation's force may cost.
-inline constexpr float k_force_max_share = 0.50f; ///< The ceiling threat climbs to. First cut.
+inline constexpr float k_force_max_share = 0.75f; ///< The ceiling threat climbs to (Ben, 2026-11-18: x1.5 of the first cut 0.50).
 /// Its operating surplus before military pay, averaged over a year of returns; never negative.
 float nation_force_income(const nation_component& nc);
 /// BL-1651: a month's running bill - expenditure, maintenance and wages - averaged over a

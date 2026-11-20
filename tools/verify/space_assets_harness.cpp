@@ -575,7 +575,7 @@ int main()
                                + world_save_ships_section_bytes(w) + world_save_growth_carry_section_bytes(w) // the space merge: main's v81..v83
                                + world_save_ended_section_bytes(w) + world_save_missile_section_bytes(w)     // and v89, before the space sections
                                + world_save_station_section_bytes(w) + world_save_early_space_section_bytes(w) // BL-1583 (v81), BL-1612 (v82)
-                               + (world_save_space_node_section_bytes(w) + (world_save_space_unit_section_bytes(w) + (world_save_space_battle_section_bytes(w) + (world_save_prospecting_section_bytes(w) + (world_save_space_convoy_section_bytes(w) + (world_save_debris_section_bytes(w) + (world_save_space_bombard_section_bytes(w) + (world_save_offworld_base_section_bytes(w) + (world_save_space_firsts_section_bytes(w) + world_save_transit_origin_section_bytes(w) + world_save_launch_boost_section_bytes(w)))))))))); // BL-1581 (v83); BL-1637 (v96) last
+                               + (world_save_space_node_section_bytes(w) + (world_save_space_unit_section_bytes(w) + (world_save_space_battle_section_bytes(w) + (world_save_prospecting_section_bytes(w) + (world_save_space_convoy_section_bytes(w) + (world_save_debris_section_bytes(w) + (world_save_space_bombard_section_bytes(w) + (world_save_offworld_base_section_bytes(w) + (world_save_space_firsts_section_bytes(w) + world_save_transit_origin_section_bytes(w) + (world_save_launch_boost_section_bytes(w) + world_save_unit_stocks_section_bytes(w))))))))))); // BL-1581 (v83); BL-1637 (v96) last
         // BL-1582: the launch-gate staging (a gridless tile, its pad, the shelf) predates
         // v53 tiles; the v50 rows read the world without it.
         const auto unstaged = [](world x) {
@@ -858,7 +858,7 @@ int main()
                       && back.space_orders[0].cmd.role == retask.role && back.next_space_order_id == kw.next_space_order_id
                       && back.state_hash(0) == kw.state_hash(0) && to_bytes(back) == b,
                   "A14", "a pending order round-trips (fields, equal state_hash, byte-identical re-serialise)");
-            const std::size_t sec = b.size() - (world_save_space_node_section_bytes(kw) + (world_save_space_unit_section_bytes(kw) + (world_save_space_battle_section_bytes(kw) + (world_save_prospecting_section_bytes(kw) + (world_save_space_convoy_section_bytes(kw) + (world_save_debris_section_bytes(kw) + (world_save_space_bombard_section_bytes(kw) + (world_save_offworld_base_section_bytes(kw) + (world_save_space_firsts_section_bytes(kw) + world_save_transit_origin_section_bytes(kw) + world_save_launch_boost_section_bytes(kw))))))))));
+            const std::size_t sec = b.size() - (world_save_space_node_section_bytes(kw) + (world_save_space_unit_section_bytes(kw) + (world_save_space_battle_section_bytes(kw) + (world_save_prospecting_section_bytes(kw) + (world_save_space_convoy_section_bytes(kw) + (world_save_debris_section_bytes(kw) + (world_save_space_bombard_section_bytes(kw) + (world_save_offworld_base_section_bytes(kw) + (world_save_space_firsts_section_bytes(kw) + world_save_transit_origin_section_bytes(kw) + (world_save_launch_boost_section_bytes(kw) + world_save_unit_stocks_section_bytes(kw)))))))))));
             const std::size_t ord = sec + 4 + kw.space_assets.size() * 10 + 4 + 4; // the first order
             auto refused = [&](std::size_t off, const void* v, std::size_t n) {
                 std::string t = b;
@@ -1061,6 +1061,7 @@ int main()
                           static_cast<unsigned>(world_save_version)));
         const std::size_t sec = world_save_transit_origin_section_bytes(x.w);
         const std::size_t lb  = world_save_launch_boost_section_bytes(x.w); // BL-1637 (v96), after it
+        const std::size_t us  = world_save_unit_stocks_section_bytes(x.w);  // BL-1678 (v97), last
         std::ostringstream o89(std::ios::binary);
         write_world_snapshot_pre_transit_origin(x.w, o89);
         world old;
@@ -1070,7 +1071,7 @@ int main()
         cleared.space_assets.at(sid).depart_tick  = 0;
         for (auto& [bid, bb] : cleared.buildings) // BL-1637: a v89 stream predates the boost
             bb.boost = 0.0f;
-        check(sec == 4 + 13 && o89.str().size() + world_save_space_line_gap_bytes(x.w) /* the space merge: main's naval..missile sections */ + sec + lb == b.size() && ok89
+        check(sec == 4 + 13 && o89.str().size() + world_save_space_line_gap_bytes(x.w) /* the space merge: main's naval..missile sections */ + sec + lb + us == b.size() && ok89
                   && !space_asset_has_transit_origin(old.space_assets.at(sid))
                   && old.state_hash(0) == cleared.state_hash(0) && cleared.state_hash(0) != x.w.state_hash(0),
               "A15c", fmt("the section is the tail (v89 %zu + %zu == %zu); a v89 stream reads with no origin, "
@@ -1078,7 +1079,7 @@ int main()
                           o89.str().size(), sec, b.size()));
 
         // Tampered tails are refused whole, destination untouched.
-        const std::size_t s0 = b.size() - lb - sec;
+        const std::size_t s0 = b.size() - lb - us - sec;
         const auto refused = [&](const std::string& bad) {
             world t;
             t.nations.emplace(999, nation_component{});
@@ -1134,12 +1135,12 @@ int main()
                 for (const auto& [bid, bb] : w95.buildings)
                     empty95 = empty95 && bb.boost == 0.0f;
             check(!padded.empty() && lb == 4 + 8 * padded.size() && ok95 && empty95
-                      && o95.str().size() + lb == b.size() && w95.state_hash(0) == drained.state_hash(0)
+                      && o95.str().size() + lb + us == b.size() && w95.state_hash(0) == drained.state_hash(0)
                       && drained.state_hash(0) != x.w.state_hash(0),
                   "A16a", fmt("v96: %zu pads hold boost (section %zu bytes, the tail); a v95 stream reads with every "
                               "pad empty, hashing as the drained world", padded.size(), lb));
 
-            const std::size_t at = b.size() - lb; // count, then (id, boost) per pad, ascending
+            const std::size_t at = b.size() - lb - us; // count, then (id, boost) per pad, ascending
             entity_id not_pad = null_entity;
             for (const auto& [bid, bb] : x.w.buildings)
                 if (bb.type != building_type::launchpad && (not_pad == null_entity || bid < not_pad))

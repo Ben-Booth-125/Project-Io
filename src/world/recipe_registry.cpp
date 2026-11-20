@@ -892,15 +892,38 @@ void recipe_registry::load_from_lua(lua_state& lua)
             const std::vector<std::pair<const char*, int*>> keys = {
                 { "food_per_day",                &mp.supplies.food_per_day },
                 { "ammo_per_battle_day",         &mp.supplies.ammo_per_battle_day },
-                { "equipment_attrition_per_day", &mp.supplies.equipment_attrition_per_day },
+                { "equipment_attrition_per_month", &mp.supplies.equipment_attrition_per_month },
                 { "equipment_per_battle_day",    &mp.supplies.equipment_per_battle_day },
                 { "restock_permille",            &mp.supplies.restock_permille },
+                { "fuel_per_day",                &mp.supplies.fuel_per_day },
+                { "fuel_per_march_day",          &mp.supplies.fuel_per_march_day },
+                { "fuel_per_battle_day",         &mp.supplies.fuel_per_battle_day },
+            };
+            // BL-1678: the goods one man's full stock takes - a quantity, not a rate, so
+            // its own check: finite and >= 0, else a throw naming it.
+            const std::vector<std::pair<const char*, float*>> fills = {
+                { "food_fill_rations_per_head",      &mp.supplies.food_fill_rations_per_head },
+                { "ammo_fill_ordnance_per_head",     &mp.supplies.ammo_fill_ordnance_per_head },
+                { "fuel_fill_refined_fuel_per_head", &mp.supplies.fuel_fill_refined_fuel_per_head },
             };
             for (const auto& kv : *cs)
             {
                 if (kv.first.get_type() != sol::type::string)
                     throw std::runtime_error(ctx + " has a non-string key");
                 const std::string key = kv.first.as<std::string>();
+                if (const auto fi = std::find_if(fills.begin(), fills.end(),
+                                                 [&](const auto& k) { return key == k.first; });
+                    fi != fills.end())
+                {
+                    if (kv.second.get_type() != sol::type::number)
+                        throw std::runtime_error(ctx + "." + key + " must be a number");
+                    const double f = kv.second.as<double>();
+                    if (!std::isfinite(f) || f < 0.0 || f > 1000.0)
+                        throw std::runtime_error(ctx + "." + key + " = " + std::to_string(f)
+                                                 + " is not a finite quantity in [0, 1000]");
+                    *fi->second = static_cast<float>(f);
+                    continue;
+                }
                 const auto it = std::find_if(keys.begin(), keys.end(),
                                              [&](const auto& k) { return key == k.first; });
                 if (it == keys.end())
