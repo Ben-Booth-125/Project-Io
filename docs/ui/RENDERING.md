@@ -856,7 +856,8 @@ zoom; the two closest rungs add a draw-time detail texture (Ben, 2026-11-15, bel
   ground reads as noise: every feature the bake carries is a pixel or two. So the whole-grid
   rung trades the painting for a cartographic read, as a strategy map's far zoom does.
   - **What it shows.** Land is flat **paper**, tinted toward its **nation's colour**
-    (unclaimed land stays paper); all water — sea, coast and lake tiles — is one flat, deep
+    (unclaimed land stays paper; under the **Market lens** all land stays paper, so the
+    catchment wash is the only colour — Ben, 2026-11-20); all water — sea, coast and lake tiles — is one flat, deep
     blue. **Coastlines are inked**: a dark line on the hex side between a land tile and a
     water tile. **Rivers are lines**: each land tile draws its half of the course, centre to
     the midpoint of each river side, in a darker blue. No terrain colours, relief or paper

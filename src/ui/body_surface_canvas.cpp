@@ -5233,7 +5233,10 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                     ImU32 col = k_map_paper;
                     if ((slice_tiles[ci] & 0xFFu) == 0u)
                         col = k_map_water;
-                    else if (const entity_id nat = nation_rc(c, r); nat != null_entity)
+                    // Under the Market lens the far map paints no nation (Ben, 2026-11-20): the
+                    // nation hue under the catchment wash read as many more markets than exist.
+                    else if (const entity_id nat = nation_rc(c, r);
+                             nat != null_entity && state.overlay != overlay_mode::market)
                         col = lerp_colour(k_map_paper, palette::nation_colour(nat), k_map_nation_share);
                     const unsigned a = 128u | (static_cast<unsigned>(t->river_edges) & 0x3Fu);
                     map_table[ci] = (col & ~IM_COL32_A_MASK) | (a << IM_COL32_A_SHIFT);

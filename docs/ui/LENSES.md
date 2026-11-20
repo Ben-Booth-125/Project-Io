@@ -380,6 +380,8 @@ Supply — Supply shows flow, Market shows the markets that drive it.
   tile clears against the nearest centre's market — its *catchment*,
   `market_for_tile` in `src/world/market_clearing.cpp` — so the tint is uniform
   within a catchment and changes at its edge.
+  At the far zoom the flat map paints no nation colour under this lens (Ben,
+  2026-11-20): a nation hue under the wash read as more markets than there are.
 
 **Colour.** One identity colour per market (`market_catchment_colour`), not a
 price ramp: the Planetary surface is about *which* market, and the strip carries
@@ -390,7 +392,7 @@ selector (`lens_resource`).
 Distinct from the supply horizontal pair and the resource horizontal strata
 (market bars are vertical and outlined).
 
-**Legend.** Strip glyph highlight + tooltip ("Market catchment boundaries") plus a
+**Legend.** Strip glyph highlight + tooltip ("Markets", Ben 2026-11-20) plus a
 city-name swatch key (`draw_market_key`) in the shared lens chrome region, the
 good-selector combo directly above its header bar (§ Legend placement).
 
