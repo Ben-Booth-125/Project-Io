@@ -1451,14 +1451,27 @@ void draw_site_grid(const world& w, const recipe_registry& reg, ui_state& ui)
             std::string why;
             if (can_build)
             {
+                // THE HOVER IS THE COST (Ben, 2026-11-19: "the construct tooltip should
+                // show the cost of construction rather than explaining its effect"). The
+                // credit figure is `construction_capex` at the best site - the one figure
+                // the door's treasury gate prices a build at - and the materials line is
+                // the registry's own row, which that figure prices at the local market.
                 const tile_component& bt = w.tiles.at(c.build_tile);
-                char buf[200];
-                std::snprintf(buf, sizeof buf,
-                              "Construct %s at its best site, tile [%d, %d]: the highest Net, then the most "
-                              "Logistic Point cover%s.",
-                              o.name.c_str(), bt.grid_x, bt.grid_y,
-                              sf.scope_province != 0 ? ", in this province" : "");
-                why = buf;
+                why = fmt::credits(static_cast<double>(
+                    construction_capex(w, reg, c.build_tile, o.type, o.target, o.recipe)));
+                const auto& mats = reg.resource_build_cost_for(o.type, o.target, o.recipe);
+                for (std::size_t r = 0; r < resource_count; ++r)
+                {
+                    if (!(mats[r] > 0.0f))
+                        continue;
+                    char qty[64];
+                    std::snprintf(qty, sizeof qty, "\n%.0f %s", static_cast<double>(mats[r]),
+                                  resource_name(static_cast<resource_type>(r)));
+                    why += qty;
+                }
+                char at[48];
+                std::snprintf(at, sizeof at, "\nTile [%d, %d]", bt.grid_x, bt.grid_y);
+                why += at;
             }
             else if (c.unaffordable > 0)
                 why = "Can't afford it: every site costs more than the treasury holds.";

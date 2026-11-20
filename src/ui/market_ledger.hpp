@@ -218,8 +218,10 @@ trade_points_record collect_trade_points(const world& w);
 /// store behind it.
 ///
 /// A ROW IS A `trade_route_offer` FROM `rank_trade_routes` (trade.hpp) — the
-/// ranking the trade pass's auto trade spends by — kept where the source is the
-/// selected market. So `buy_price` is the source's POSTED price, `haulage` is
+/// ranking the trade pass's auto trade spends by — kept where the selected market
+/// is the source (an EXPORT) or the destination (an IMPORT): both directions in
+/// one list (Ben, 2026-11-19; ledgers/market.md § 2b). So `buy_price` is the
+/// source's POSTED price, `haulage` is
 /// `trade_haul_per_unit`'s, `sell_price` the destination's dispatch price, and
 /// `margin` (`sell - buy - haulage`, per unit) clears `dispatch_margin()` of the
 /// source price; a source shelf the fair-price ceiling refuses, or that holds
@@ -230,9 +232,12 @@ struct potential_trade_record
 {
     resource_type resource     = resource_type::iron_ore;
     const char*   name         = "";
+    bool          import       = false;        ///< The route LANDS here (else it leaves here).
+    entity_id     source_market = null_entity; ///< Where the route leaves: its points bind the `+`.
     entity_id     dest_market  = null_entity;
     std::string   dest_name;                   ///< `market_city_name` of the destination.
-    float         buy_price    = 0.0f;         ///< POSTED price at the SELECTED market.
+    std::string   other_name;                  ///< `market_city_name` of the far end: the With column.
+    float         buy_price    = 0.0f;         ///< POSTED price at the route's SOURCE.
     float         sell_price   = 0.0f;         ///< The destination's dispatch price.
     float         haulage      = 0.0f;         ///< `trade_haul_per_unit` on the route.
     float         margin       = 0.0f;         ///< sell - buy - haulage, per unit.

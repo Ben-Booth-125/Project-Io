@@ -117,6 +117,14 @@ and propellant (`LOGISTICS.md`, `SUPPLY.md`). The same reach binds manual and au
   trade did not spend stay reserved: they are held back from every market in proportion to what
   it has left. Deterministic: candidates in a fixed order, ties broken by market and resource id.
 
+**A potential trade is a route this ranking would consider** (Ben, 2026-11-19): a good trade
+carries, a source shelf holding it under the fair-price ceiling, and a margin per unit above the
+dispatch margin of the source price, ranked by margin per trade point. Seen from one market it
+has two directions — an **export**, the route leaving it, and an **import**, the route landing on
+it — and both are the same ranking read from either end, not a second model. Listing a potential
+trade asks nothing of trade points; taking one spends the points of the market it leaves
+(`../ui/ledgers/market.md` § 2b).
+
 **Who may trade (Ben, 2026-10-10; re-subjected Ben, 2026-10-23).** The player's nation and every
 AI nation. An AI nation may set **manual** trades as well as run auto, and may **build a Planetary
 Marketplace** — two grants in `../ai/AI_OPPONENT.md` § 11, carried over from the corporation

@@ -28,7 +28,7 @@ Three views behind a `nav_button` strip (`construction.panel_view`), inside `fol
 
 | View | Answers (one question) | Content |
 |---|---|---|
-| **Buildings** *(default)* | "What do I own, and how much is each kind of it making me?" | One row per building **type** the player owns at least one of — the type's display name, its **count**, and the **summed per-month net** of its members, sign-coloured. The list takes the **whole height of the tab**, less exactly what the levers below it need, scrolling only past that (Ben, 2026-10-26). **Expanding a row** lists that type's own buildings, one line each carrying the tile and that building's own net, visibly summing to the header's total; **pressing one selects it**, and its **levers** draw below the roster. One group open at a time (an accordion). |
+| **Buildings** *(default)* | "What do I own, and how much is each kind of it making me?" | One row per building **type** the player owns at least one of — the type's display name, its **count**, and the **summed per-month net** of its members, sign-coloured. The list takes the **whole height of the tab**, less exactly what the levers below it need, scrolling only past that (Ben, 2026-10-26). **Expanding a row** lists that type's own buildings, grouped by province, one line each carrying the building's **name** (§ Idle on top, location below) and that building's own net, visibly summing to the header's total; **pressing one selects it**, its tile takes the selection outline on the map, and its **levers** draw below the roster. One group open at a time (an accordion). Above the types, an **Idle** section lists every idle building (§ Idle on top, location below). |
 | **Construction** | "What's in flight, what is it costing, and what could I put on this tile?" | A **collapsible** queue header carrying **N cr / mo** (`estimated_quarterly_construction_cost`, a month's figure under its kept name — `compute_building_opex` maintenance + wages summed over every player building with `ticks_remaining > 0`, the same formula the budget loop uses), then, when expanded, one row per in-progress build with a progress cell colour-coded dim (<25 %) / mid (25–75 %) / high (>75 %). Below it the **tile build bar** (`draw_construction_ledger_body`, `selection_panel.cpp`): manual construction on the selected tile, with no caption of its own and no treasury figure, the header carrying the treasury and each column's hover its explanation (Ben, 2026-11-09). |
 | **Site Finder** | "What would earn most on my ground, and where would it go?" | The **site finder** — a grid of buildings with their estimated returns and, with a building chosen, the **site ledger** (§ The site ledger, `construction_sites.cpp`). It has its own tab so it does not hide manual construction (Ben, 2026-11-09). |
 
@@ -48,6 +48,33 @@ and the build bar below it is what a player meets; open it says when things land
 - **Buildings, a type row expanded** → the type's **own buildings**, each pressable. It lists what
   the player already owns, in a group whose count has already asserted they exist — navigation. It
   also removes a dead end: the buildings behind a count are the set the ledger has in hand.
+
+### Idle on top, location below (Ben, 2026-11-19)
+
+*"In the buildings tab, let's reserve space at the top for idle buildings, since it's currently hard
+to find them."* · *"We should group buildings in the buildings tab by their type, with subgroups for
+location."* · *"When selecting a building from the buildings list, we should also highlight the tile
+it's placed on."*
+
+- **Idle is "produced nothing last month".** A finished building is idle when the economy report
+  marks it so (`building_report::idle`): no workforce, a spent deposit, no input, an unfunded state
+  building, or one switched off. A building still under construction is not idle; it is in the
+  queue. One section, **Idle (N)**, heads the roster, drawn only when N > 0, open by default and a
+  toggle like every header. Each row carries the building's type, its name and the **cause** in one
+  short word (*no labour*, *spent*, *no input*, *unfunded*, *off*, else *idle*). An idle building
+  **also stays in its type group**, so a group's total stays the visible sum of its members.
+- **Location is the province, and a building is named by it, never placed by coordinates** (Ben,
+  2026-11-19: *"We're still seeing coordinate pairs. Instead we should just show the province
+  (city) name and I, II, III, IV, and so on."*). The name is the province's, with a numeral where
+  two would read the same (`../../generation/PROVINCES.md` § A province's name). Inside an
+  expanded type the rows stand together by province, each province's in the group's net order;
+  there are **no sub-headers**, since every row's name already says where it is. The same name
+  stands wherever the roster names a building: the type rows, the Idle section and the levers'
+  heading.
+- **A pressed row lights its tile.** Selecting a building — from a row here, the Idle section, or
+  anywhere else — draws the map's **selection outline** on the building's tile for as long as the
+  building stays selected. **Hovering** a row draws the hover outline on its tile, the same one the
+  cursor draws on the map. The camera does not move.
 
 ### The site ledger — building first (Ben, 2026-10-25)
 
@@ -94,7 +121,10 @@ answer, whatever the order the tiles were priced in. It goes through the map pre
 pending construction `construct_nation` runs, with its own treasury test), so it can never build
 where the map press would not. Under the province scope it builds inside that province. It is
 disabled where no listed tile takes it; its hover then says
-why (the treasury, or the commonest refusal), and when live names the tile it will build on. It is a
+why (the treasury, or the commonest refusal). **Live, its hover is the cost (Ben, 2026-11-19:
+*"the construct tooltip should show the cost of construction rather than explaining its effect"*):**
+the build cost at the best site, money first, then each material and its quantity, and the tile it
+will build on; no sentence about what the press does. It is a
 door, not a toggle: nothing about it stays lit.
 
 **A building that makes nothing to sell has no figure.** Infrastructure and military types, whose

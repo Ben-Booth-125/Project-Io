@@ -170,6 +170,27 @@ if c2.member_ok then
     verify.expect(c3.levers_ok and c3.levers_for == picked, string.format(
         "C4 the levers are drawn FOR THAT BUILDING: levers_for=%d, expected %d",
         c3.levers_for, picked))
+
+    -- C4b (Ben, 2026-11-19): the picked building's TILE takes the selection
+    -- outline on the map, and a hovered row rings its tile with the hover outline.
+    -- (The ring itself is asserted in C5, on a building the camera is centred on: the
+    -- canvas only outlines tiles in view, and this row's tile need not be.)
+    print(string.format("  MEASURED C4b: building ring drawn=%s (tile may be off-screen)", tostring(c3.building_ringed)))
+    local c3b = verify.construction_controls()
+    verify.hover(c3b.member_x, c3b.member_y, 3)
+    local c3h = verify.construction_controls()
+    print(string.format("  MEASURED C4b: row hover ringed=%s", tostring(c3h.row_hover_ringed)))
+end
+
+-- C4c (Ben, 2026-11-19): idle on top, location below. What the roster drew.
+do
+    local ci = verify.construction_controls()
+    print(string.format("  MEASURED C4c: %d idle rows (first cause '%s'); open type spans %d provinces",
+        ci.idle_rows, ci.first_idle_cause, ci.provinces_spanned))
+    if ci.idle_rows > 0 then
+        verify.expect(ci.first_idle_cause ~= "", "C4c every idle row carries a cause word")
+    end
+    -- A row's NAME (no coordinate pair) is BL-1708's, lane E's, and its check.
 end
 
 verify.capture("construction_tabs_05_buildings_selected")
@@ -195,6 +216,14 @@ if map_pick then
     verify.show_panel("construction", true)
     verify.construction_view(1)
     verify.frames(3)
+
+    -- C4b (Ben, 2026-11-19): a selected BUILDING lights its tile with the selection
+    -- outline, whoever selected it. Centred so the tile is in view.
+    verify.center_tile(map_pick.x, map_pick.y)
+    verify.frames(3)
+    local cring = verify.construction_controls()
+    print(string.format("  MEASURED C4b: building ring drawn=%s (centred)", tostring(cring.building_ringed)))
+    verify.expect(cring.building_ringed, "C4b the selected building's tile takes the selection outline on the map")
 
     local c4 = verify.construction_controls()
     local g4 = verify.building_groups()

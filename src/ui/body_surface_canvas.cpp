@@ -3242,6 +3242,27 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         }
     }
 
+    // A SELECTED BUILDING LIGHTS ITS TILE (Ben, 2026-11-19: "When selecting a
+    // building from the buildings list, we should also highlight the tile it's
+    // placed on"; ledgers/construction.md § Idle on top, location below). The
+    // tile passes outline `selected_entity` when it IS a tile; a building selected
+    // from a ledger row (or anywhere) is not one, so its ground drew nothing. The
+    // building's tile now takes the same selection outline, whoever selected it.
+    entity_id selected_building_tile = null_entity;
+    if (const auto sb = w.buildings.find(state.selected_entity); sb != w.buildings.end())
+        selected_building_tile = sb->second.tile;
+    // ...and a HOVERED roster row lights its tile with the hover ring. The ledger
+    // publishes the tile each frame it is hovered; read once and cleared here, so a
+    // closed ledger leaves nothing lit.
+    const entity_id row_hover_tile = state.construction_ui.row_hover_tile;
+    state.construction_ui.row_hover_tile      = null_entity;
+    state.construction_ui.building_ring_drawn = false;
+    state.construction_ui.row_hover_drawn     = null_entity;
+    const auto is_selected_ground = [&](entity_id tid) {
+        return tid == state.selected_entity
+               || (selected_building_tile != null_entity && tid == selected_building_tile);
+    };
+
     // Clip to the grid area so hexes don't overdraw the title bar or the solar canvas.
     dl->PushClipRect(grid_area_origin, grid_area_origin + grid_area_size, true);
 
@@ -4821,7 +4842,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                                                   || corp_it->second == w.player_entity);
         (void)is_player_tile;
 
-        const bool   selected  = (id == state.selected_entity);
+        const bool   selected  = is_selected_ground(id);
 
         // Placement-suitability overlay (BL-010): active only in construction mode.
         // Invalid tiles (can't build) darken; affine tiles (the armed target is their
@@ -6413,7 +6434,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         // they are map lookups, not the colour derivation.
         const bool is_player_tile = has_owner && (corp_it->second == player_owner
                                                   || corp_it->second == w.player_entity);
-        const bool selected       = (id == state.selected_entity);
+        const bool selected       = is_selected_ground(id);
         const bool surveyed = survey_tile_visible(body.survey, gw, gh, t_col, t_row);
         const bool revealed = surveyed || god_view_lift;
         const float vision  = vision_rc(t_col, t_row);
@@ -7159,8 +7180,15 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             pm.mark(canvas_pass_meter::markers, dl);
             // Selection outline is drawn on every visible copy of the selected
             // tile; hover is deferred to a single nearest copy, resolved below.
+            // A hovered Buildings-roster row rings its tile on every copy: the
+            // pointer is in the ledger, so there is no nearest copy to prefer.
+            const bool row_hovered = (row_hover_tile != null_entity && id == row_hover_tile);
+            if (row_hovered)
+                state.construction_ui.row_hover_drawn = id;
+            if (selected && id == selected_building_tile && selected_building_tile != null_entity)
+                state.construction_ui.building_ring_drawn = true;
             draw_hex_highlight(dl, verts,
-                resolve_highlight(selected, /*hovered=*/false, /*pinned=*/false));
+                resolve_highlight(selected, row_hovered, /*pinned=*/false));
 
             // BL-1370: A LEGAL CROSSING, OFFERED. While a road row is armed every
             // tile the rules admit a crossing to is outlined in the road ladder's

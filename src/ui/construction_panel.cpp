@@ -6,6 +6,7 @@
 #include <cmath>   // std::ceil (construction ETA, BL-095)
 #include <string>  // status strings (BL-095)
 
+#include "building_state.hpp"  // classify_building_running - the Idle section reads the one shared verdict
 #include "charts.hpp"          // draw_value_bar - the queue row's progress column (BL-1365)
 #include "construction_sites.hpp" // the site finder: the building-first lens and ledger (Ben, 2026-10-25)
 #include "foldout_column.hpp"  // shell fold-out column host (BL-122) + nav_button (the tab strip)
@@ -23,6 +24,7 @@
 #include "world/construction.hpp"      // construction_capex / construction_build_ticks (the progress denominator, BL-1343)
 #include "world/market_clearing.hpp"   // market_for_tile (build-rate read, BL-095)
 #include "world/placement_rules.hpp"   // is_well_site - the Well's roster name (BL-1198)
+#include "world/province.hpp"          // province_of - a building is named by its province (Ben, 2026-11-19)
 #include "world/recipe_registry.hpp"
 
 #include <cstdio>
@@ -949,10 +951,73 @@ void draw_building_levers(world& w, const recipe_registry& reg, const economy_re
     (void)draw_workforce_bar(bit->second);
 }
 
+// --- Idle on top, location below (Ben, 2026-11-19; ledgers/construction.md) ------
+
+/// The Idle section's cause, in one short word (construction.md § Idle on top). The
+/// classification is `classify_building_running`'s — the one the hover card, the tile
+/// element and the building card read — so no surface disagrees about why.
+const char* idle_cause_word(const building_component& b, const building_running_state& s)
+{
+    if (b.state_idle)
+        return "unfunded";
+    if (s.kind == building_run_kind::mothballed)
+        return "off";
+    switch (s.reason)
+    {
+        case building_run_reason::labour_short:  return "no labour";
+        case building_run_reason::input_short:   return "no input";
+        case building_run_reason::deposit_spent: return "spent";
+        case building_run_reason::no_deposit:    return "no deposit";
+        case building_run_reason::no_method:     return "no method";
+        default:                                 return "idle";
+    }
+}
+
+struct idle_row
+{
+    entity_id   id = null_entity;
+    std::string type;
+    const char* cause = "idle";
+    std::string why;  ///< The full running-state line, for the hover.
+};
+
+/// Every idle building the player owns, in roster order (type, then net): finished,
+/// and either idled by the tick (`classify_building_running` says idle) or switched
+/// off. Under construction is not idle; it is in the queue.
+std::vector<idle_row> player_idle_rows(const world& w, const recipe_registry& reg,
+                                       const economy_report& report,
+                                       const std::vector<building_group>& groups)
+{
+    std::vector<idle_row> out;
+    for (const building_group& g : groups)
+        for (const entity_id id : g.members)
+        {
+            const auto bit = w.buildings.find(id);
+            if (bit == w.buildings.end() || bit->second.ticks_remaining > 0)
+                continue;
+            const building_running_state s = classify_building_running(w, &reg, &report, id, bit->second);
+            if (s.kind != building_run_kind::idle && s.kind != building_run_kind::mothballed
+                && !bit->second.state_idle)
+                continue;
+            idle_row r;
+            r.id    = id;
+            r.type  = g.name;
+            r.cause = idle_cause_word(bit->second, s);
+            r.why   = bit->second.state_idle
+                      ? std::string("Idle - the treasury could not pay its costs this month.")
+                      : running_state_text(s);
+            out.push_back(std::move(r));
+        }
+    return out;
+}
+
 void draw_buildings_view(world& w, const recipe_registry& reg,
                          const economy_report& report, ui_state& ui)
 {
     const std::vector<building_group> groups = player_building_groups(w, reg, report);
+    ui.construction_ui.idle_rows        = 0;
+    ui.construction_ui.location_headers = 0;
+    ui.construction_ui.first_idle_cause.clear();
     if (groups.empty())
     {
         ImGui::TextDisabled("You own no buildings.");
@@ -986,6 +1051,45 @@ void draw_buildings_view(world& w, const recipe_registry& reg,
     const float avail  = ImGui::GetContentRegionAvail().x;
     const float net_w  = ImGui::CalcTextSize("-000.0k").x + ImGui::GetStyle().ItemSpacing.x;
     const float name_w = std::max(ui::px(40.0f), avail - net_w);
+
+    // IDLE ON TOP (Ben, 2026-11-19: "reserve space at the top for idle buildings,
+    // since it's currently hard to find them"). Drawn only when something is idle;
+    // open by default, and a header, so it toggles. Each idle building ALSO stays in
+    // its type group below, so every group total is still the sum of its rows.
+    const std::vector<idle_row> idle = player_idle_rows(w, reg, report, groups);
+    ui.construction_ui.idle_rows = static_cast<int>(idle.size());
+    if (!idle.empty())
+    {
+        ui.construction_ui.first_idle_cause = idle.front().cause;
+        char ihdr[64];
+        std::snprintf(ihdr, sizeof ihdr, "Idle  (%d)###idle", static_cast<int>(idle.size()));
+        ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(running_state_colour(building_run_kind::idle)));
+        const bool idle_open = ImGui::CollapsingHeader(ihdr, ImGuiTreeNodeFlags_DefaultOpen);
+        ImGui::PopStyleColor();
+        if (idle_open)
+        {
+            ImGui::Indent();
+            const float cause_w = ImGui::CalcTextSize("no deposit").x + ImGui::GetStyle().ItemSpacing.x;
+            const float row_w   = std::max(ui::px(40.0f), avail - ImGui::GetStyle().IndentSpacing - cause_w);
+            for (const idle_row& r : idle)
+            {
+                const auto bit = w.buildings.find(r.id);
+                // BL-1708 (Ben, 2026-11-19): named by its province, as every buildings row.
+                const std::string label = building_place_name(w, reg, r.id) + "###idle" + std::to_string(static_cast<unsigned>(r.id));
+                if (ImGui::Selectable(label.c_str(), ui.selected_entity == r.id, 0, {row_w, 0.0f}))
+                    ui.selected_entity = r.id;
+                if (ImGui::IsItemHovered())
+                {
+                    ui.construction_ui.row_hover_tile = bit->second.tile;
+                    ImGui::SetTooltip("%s", r.why.c_str());
+                }
+                ImGui::SameLine();
+                ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(running_state_colour(building_run_kind::idle)),
+                                   "%s", r.cause);
+            }
+            ImGui::Unindent();
+        }
+    }
 
     bool published_group = false;
     for (const building_group& g : groups)
@@ -1026,25 +1130,43 @@ void draw_buildings_view(world& w, const recipe_registry& reg,
         if (open)
         {
             ImGui::Indent();
-            bool published_member = false;
+            // LOCATION BELOW TYPE (Ben, 2026-11-19: "group buildings ... by their
+            // type, with subgroups for location"). The location is the PROVINCE: a
+            // type's buildings stand together by province (ascending id, a stable
+            // order), each province's keeping the group's own net order. No
+            // sub-headers - each row's NAME says where (BL-1708, Ben 2026-11-19).
+            std::map<uint32_t, std::vector<entity_id>> by_pid;
             for (const entity_id id : g.members)
             {
-                const building_profit p = estimate_building_reading(w, reg, report, id);
-                const ImVec2 mp = ImGui::GetCursorScreenPos();
-                const bool pressed = draw_group_member_row(
-                    w, reg, id, p.has_data ? p.net() : 0.0f, p.has_data,
-                    ui.selected_entity == id,
-                    std::max(ui::px(40.0f), name_w - ImGui::GetStyle().IndentSpacing));
-                if (!published_member)
-                {
-                    ui.construction_ui.member_x = mp.x + ui::px(20.0f);
-                    ui.construction_ui.member_y = mp.y + ImGui::GetTextLineHeight() * 0.5f;
-                    ui.construction_ui.member   = id;
-                    published_member = true;
-                }
-                if (pressed)
-                    ui.selected_entity = id;
+                const auto bit = w.buildings.find(id);
+                by_pid[(bit != w.buildings.end()) ? w.provinces.province_of(bit->second.tile) : 0u].push_back(id);
             }
+            ui.construction_ui.location_headers = static_cast<int>(by_pid.size()); // provinces the type spans
+            const float member_w = std::max(ui::px(40.0f), name_w - ImGui::GetStyle().IndentSpacing);
+            bool published_member = false;
+            for (const auto& [pid, ids] : by_pid)
+                for (const entity_id id : ids)
+                {
+                    const building_profit p = estimate_building_reading(w, reg, report, id);
+                    const ImVec2 mp = ImGui::GetCursorScreenPos();
+                    const bool pressed = draw_group_member_row(
+                        w, reg, id, p.has_data ? p.net() : 0.0f, p.has_data,
+                        ui.selected_entity == id, member_w);
+                    // A hovered row rings its tile on the map (Ben, 2026-11-19); the
+                    // canvas reads and clears this. Tested on the row's own rect.
+                    if (ImGui::IsMouseHoveringRect(mp, {mp.x + member_w, mp.y + ImGui::GetTextLineHeight()}))
+                        if (const auto bit = w.buildings.find(id); bit != w.buildings.end())
+                            ui.construction_ui.row_hover_tile = bit->second.tile;
+                    if (!published_member)
+                    {
+                        ui.construction_ui.member_x = mp.x + ui::px(20.0f);
+                        ui.construction_ui.member_y = mp.y + ImGui::GetTextLineHeight() * 0.5f;
+                        ui.construction_ui.member   = id;
+                        published_member = true;
+                    }
+                    if (pressed)
+                        ui.selected_entity = id;
+                }
             ImGui::Unindent();
         }
         ImGui::PopID();
