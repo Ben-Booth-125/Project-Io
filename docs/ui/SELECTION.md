@@ -153,8 +153,11 @@ a tile keep the shared header (§ Layout & chrome).
 
 1. **Preview — the zoomed hex neighbourhood, drawn in the locator.** A bordered render of the selected tile and its
    immediate ring (`draw_tile_neighbourhood`, radius 2), the selected tile picked out, drawn
-   from the **baked neighbourhood page** — the same ground, structures and grade the canvas
-   draws. **Until that page is ready for this tile, the box shows a loading bar**, not flat
+   from the **baked neighbourhood page** — the same ground and grade the canvas draws. The
+   canvas stands its buildings as 3D geometry, which a flat page cannot hold, so the view draws
+   the **same standing parts seen from above** over the page: each roof, tank and stack in its
+   own colours, lit from the north-west, its shadow cast south-east (Ben, 2026-11-20). A plan of
+   the 3D buildings, never a bare pad where a building stands. **Until that page is ready for this tile, the box shows a loading bar**, not flat
    per-hex colour fills. The fills read as a second, strategic-looking map of the same ground,
    which is a claim about what the tile looks like that the bake then contradicts a moment
    later. A bar says the true thing: the picture is coming.

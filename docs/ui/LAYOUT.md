@@ -291,7 +291,8 @@ the selection** (`draw_selection_locator`): the selected tile, a building's or a
 market's capital, a nation's capital — the player's own capital at rest. It is the tile card's
 former first column, moved out so the Selection band has the width and the corner the comms dock
 left is not an empty tile. A selection with no one tile (a convoy, a deposit, a plate, a front)
-leaves it dark; a battle's card shows the battle's ground there.
+leaves it dark; a battle's card shows the battle's ground there. It is a plan view: the canvas's
+3D buildings appear in it seen from above (`SELECTION.md` § the tile element, Preview).
 
 **A ledger covers it.** With a ledger open the column runs to the screen's bottom over the
 locator, which is not drawn; it returns when the ledger closes. It takes no input.

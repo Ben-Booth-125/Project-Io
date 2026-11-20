@@ -1,5 +1,7 @@
 #include "hex_render.hpp"
 #include "presentation.hpp" // palette — the loading bar (BL-1313)
+#include "ground_bake.hpp"      // bake_source — the buildings seen from above
+#include "structure_stamps.hpp" // installation_solids — the same parts the 3D ground stands
 
 #include "terrain_palette.hpp" // BL-732: the pure palette both this and ground_bake read
 #include "ui_state.hpp" // ground_view — the baked neighbourhood page (BL-1241)
@@ -8,6 +10,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <vector>
 
 namespace ui {
 
@@ -375,6 +378,141 @@ ImVec2 hex_local_centre(int col, int row, float hex_size)
     };
 }
 
+namespace {
+
+/// A linear 0..1 colour as display RGB, scaled by @p shade (the plan view's light).
+ImU32 solid_colour(const float* c, float shade, int alpha = 255)
+{
+    const auto ch = [&](float v) {
+        const float s = std::pow(std::clamp(v * shade, 0.0f, 1.0f), 1.0f / 2.2f);
+        return static_cast<int>(s * 255.0f + 0.5f);
+    };
+    return IM_COL32(ch(c[0]), ch(c[1]), ch(c[2]), alpha);
+}
+
+/// The plan of every standing part on the tiles within @p radius + 1 of (@p c0, @p r0):
+/// shadows first, then the parts lowest-topped first so a tall part covers a short one.
+void draw_neighbourhood_solids(ImDrawList* dl, const ui::ground::bake_source& src,
+                               int c0, int r0, int radius, ImVec2 off, float hex_sz)
+{
+    using K = ui::ground::structure_solid;
+    std::vector<K> solids;
+    const int reach = radius + 1;
+    for (int r = r0 - reach; r <= r0 + reach; ++r)
+    {
+        if (r < 0 || r >= src.gh)
+            continue;
+        for (int c = c0 - reach - 1; c <= c0 + reach + 1; ++c)
+            ui::ground::installation_solids(src, c, r, solids);
+    }
+    if (solids.empty())
+        return;
+    std::stable_sort(solids.begin(), solids.end(),
+                     [](const K& a, const K& b) { return a.z0 + a.h < b.z0 + b.h; });
+
+    const auto at = [&](float x, float y) { return ImVec2{ off.x + x * hex_sz, off.y + y * hex_sz }; };
+    const float s = hex_sz;
+    // The shadow falls south-east by the part's height (a fixed low sun, as the canvas).
+    const auto shadow_of = [&](const K& q) {
+        const float t = std::clamp(q.z0 + q.h, 0.0f, 1.2f) * 0.55f * s;
+        return ImVec2{ t, t * 0.8f };
+    };
+    constexpr ImU32 shadow = IM_COL32(0, 0, 0, 70);
+
+    for (const K& q : solids)
+    {
+        const ImVec2 d = shadow_of(q);
+        const ImVec2 p = at(q.x, q.y);
+        switch (q.kind)
+        {
+        case K::box: case K::gable: case K::saw:
+            dl->AddRectFilled({ p.x - q.hw * s + d.x, p.y - q.hd * s + d.y },
+                              { p.x + q.hw * s + d.x, p.y + q.hd * s + d.y }, shadow);
+            break;
+        case K::beam:
+            dl->AddLine({ p.x + d.x, p.y + d.y }, { at(q.x2, q.y2).x + d.x, at(q.x2, q.y2).y + d.y },
+                        shadow, std::max(1.0f, q.w * s));
+            break;
+        case K::ring:
+            dl->AddLine({ p.x - q.hw * s + d.x, p.y + d.y }, { p.x + q.hw * s + d.x, p.y + d.y },
+                        shadow, std::max(1.0f, q.w * s));
+            break;
+        default:
+            dl->AddCircleFilled({ p.x + d.x, p.y + d.y }, std::max(q.hw, q.hd) * s, shadow, 16);
+            break;
+        }
+    }
+
+    for (const K& q : solids)
+    {
+        const ImVec2 p = at(q.x, q.y);
+        const ImU32 edge = solid_colour(q.wall, 0.55f);
+        switch (q.kind)
+        {
+        case K::box:
+        {
+            const ImVec2 a{ p.x - q.hw * s, p.y - q.hd * s }, b{ p.x + q.hw * s, p.y + q.hd * s };
+            dl->AddRectFilled(a, b, solid_colour(q.roof, 1.0f));
+            dl->AddRect(a, b, edge);
+            break;
+        }
+        case K::gable: case K::saw:
+        {
+            // The ridge runs east-west: the north slope takes the light, the south the shade.
+            const ImVec2 a{ p.x - q.hw * s, p.y - q.hd * s }, b{ p.x + q.hw * s, p.y + q.hd * s };
+            dl->AddRectFilled(a, { b.x, p.y }, solid_colour(q.roof, 1.05f));
+            dl->AddRectFilled({ a.x, p.y }, b, solid_colour(q.roof, 0.72f));
+            if (q.kind == K::saw)
+            {
+                const int teeth = std::clamp(static_cast<int>(q.rh), 2, 8);
+                for (int i = 1; i < teeth; ++i)
+                {
+                    const float x = a.x + (b.x - a.x) * i / teeth;
+                    dl->AddLine({ x, a.y }, { x, b.y }, edge);
+                }
+            }
+            dl->AddLine({ a.x, p.y }, { b.x, p.y }, solid_colour(q.roof, 0.5f));
+            dl->AddRect(a, b, edge);
+            break;
+        }
+        case K::cyl:
+        {
+            const float rb = std::max(q.hw, 0.004f) * s, rt = std::max(q.hd, 0.004f) * s;
+            if (q.cap == 3) // open: a rim of wall
+            {
+                dl->AddCircle(p, rt, solid_colour(q.wall, 0.9f), 20, std::max(1.0f, rt * 0.25f));
+                break;
+            }
+            if (rb > rt) // the flaring base shows as a wall ring
+                dl->AddCircleFilled(p, rb, solid_colour(q.wall, 0.75f), 20);
+            dl->AddCircleFilled(p, rt, solid_colour(q.roof, 1.0f), 20);
+            if (q.cap == 1 || q.cap == 2) // a dome or cone: lit to the north-west
+                dl->AddCircleFilled({ p.x - rt * 0.3f, p.y - rt * 0.3f }, rt * 0.45f,
+                                    solid_colour(q.roof, 1.25f), 12);
+            dl->AddCircle(p, rt, edge, 20);
+            break;
+        }
+        case K::dome: case K::heap: case K::sphere:
+        {
+            const float r = std::max(q.hw, 0.004f) * s;
+            dl->AddCircleFilled(p, r, solid_colour(q.roof, 0.8f), 20);
+            dl->AddCircleFilled({ p.x - r * 0.25f, p.y - r * 0.25f }, r * 0.6f, solid_colour(q.roof, 1.1f), 16);
+            dl->AddCircle(p, r, edge, 20);
+            break;
+        }
+        case K::beam:
+            dl->AddLine(p, at(q.x2, q.y2), solid_colour(q.wall, 1.0f), std::max(1.0f, q.w * s));
+            break;
+        case K::ring:
+            dl->AddLine({ p.x - q.hw * s, p.y }, { p.x + q.hw * s, p.y }, solid_colour(q.wall, 1.0f),
+                        std::max(1.0f, q.w * s));
+            break;
+        }
+    }
+}
+
+} // namespace
+
 void draw_tile_neighbourhood(ImDrawList* dl, world& w, entity_id centre_tile,
                              ImVec2 origin, ImVec2 size, int radius, const ground_view* ground)
 {
@@ -438,6 +576,13 @@ void draw_tile_neighbourhood(ImDrawList* dl, world& w, entity_id centre_tile,
     dl->AddImage((ImTextureID)(intptr_t)ground->neigh.tex,
                  { off.x + ground->neigh.x0 * hex_sz, off.y + ground->neigh.y0 * hex_sz },
                  { off.x + ground->neigh.x1 * hex_sz, off.y + ground->neigh.y1 * hex_sz });
+
+    // The buildings, seen from above (Ben, 2026-11-20). The canvas stands them as 3D
+    // geometry (RENDERING.md § The 3D ground) and the page holds only their ground
+    // pads, so the view draws each standing part's plan here: the same parts, from
+    // the same source, a roof seen from overhead with its shadow cast south-east.
+    if (ground->src)
+        draw_neighbourhood_solids(dl, *ground->src, cx0, cy0, radius, off, hex_sz);
 
     constexpr ImU32 hl_col = IM_COL32(250, 235, 140, 255); // centre-tile highlight ring
     ImVec2 hl_verts[6];
