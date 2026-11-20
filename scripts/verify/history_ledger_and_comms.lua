@@ -1,10 +1,10 @@
--- BL-211 (player-facing History ledger) + BL-212 (nation-voiced Public comms).
+-- BL-211 (player-facing History ledger).
 -- Opens the History nav-rail slot (the "Tile Ledger" window) on Kepler and walks
 -- its two views: Story (the oral-history biography) and Chain (the generation
 -- charts, one collapsing accordion per stage, captured for each of the three
 -- rounds). The third view, Tiles, was retired by BL-281 — its capture came down
--- with it. Then captures the Comms panel to confirm the Public channel is
--- nation-authored.
+-- with it. (The comms capture that closed this script retired
+-- with the comms dock, Ben 2026-11-19.)
 verify.goto_surface("home")
 verify.show_panel("tile", true)
 
@@ -35,4 +35,3 @@ end
 
 verify.panel_view("history", 0)
 verify.show_panel("tile", false)
-verify.capture("comms_public_nation_voiced")

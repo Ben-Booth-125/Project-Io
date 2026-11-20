@@ -55,15 +55,11 @@ shell_rect time_panel_rect(ImVec2 disp, float time_h)
     return { right_chrome_left(disp), 0.0f, right_chrome_width(disp), time_h };
 }
 
-float bottom_band_budget(ImVec2 disp)
-{
-    return std::max(0.0f, right_chrome_left(disp) - nav_pane_width);
-}
-
 shell_rect selection_band_rect(ImVec2 disp)
 {
-    const foldout_rect dock  = comms_dock_rect();
-    const float        left  = dock.x + dock.w;      // flush against the dock, no gutter
+    // From the shell column's right edge (Ben, 2026-11-19): the comms dock that sat
+    // left of the band retired, and the ledger column runs to the screen's bottom.
+    const float        left  = shell_column_width(disp.x); // flush against the column, no gutter
     const float        right = right_chrome_left(disp);
     const float        h     = selection_band_height(disp.x, disp.y);
     return { left, disp.y - h, std::max(0.0f, right - left), h };

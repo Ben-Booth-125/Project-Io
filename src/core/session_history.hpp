@@ -2,14 +2,12 @@
 
 /// @file session_history.hpp
 /// The post-step presentation work app::step_economy runs after the economy
-/// resolves (BL-361 extraction): the nation-voiced agency comms lines (BL-212),
-/// the persona counsel posts (BL-207), and the per-tick history recorders that
-/// feed the header sparkline, ledger graphs and resource drill-downs. None of
+/// resolves (BL-361 extraction): the convoy-loss notes (BL-1534) and the per-tick
+/// history recorders that feed the header sparkline, ledger graphs and resource
+/// drill-downs. None of
 /// this touches the simulation — it reads the tick's results into presentation
 /// state the UI surfaces consume. Bodies moved verbatim from app.cpp.
 
-#include "scripting/persona_pack.hpp"
-#include "ui/chat_panel.hpp"
 #include "ui/plot_history.hpp"
 #include "world/battle_system.hpp" // battle_dispatch (BL-1445: the per-day overload)
 #include "world/market_clearing.hpp"
@@ -41,72 +39,10 @@ struct history_stores
     std::deque<std::unordered_map<entity_id, int>>&       building_rank; ///< app::m_building_rank_hist
 };
 
-/// Surface this tick's background-corp agency actions (BL-079) as NATION-voiced
-/// Public comms lines (BL-212) — one line per nation, its heaviest event only.
-void post_nation_agency_comms(const world& w, const economy_report& report,
-                              ui::chat_state& chat, int day_tick);
-
-/// Battle dispatches (BL-468): one comms line per battle per tick, posted to the
-/// standing **Field** channel (index `k_field_channel`).
-///
-/// The world already reported these — `economy_report::battle_dispatches`, filled
-/// in sorted (province, attacker, defender) order and INCLUDING battles that
-/// concluded this tick, which `world::battles` no longer holds. This turns them
-/// into words. It draws nothing, decides nothing and touches no simulation state;
-/// the wording itself lives in `core/battle_dispatch_text.{hpp,cpp}`, in its own
-/// translation unit so it can be harnessed (this file cannot — it reaches
-/// <SDL3/SDL.h> through app.hpp).
-///
-/// DO NOT re-sort or re-key the records. They arrive deterministic, and routing
-/// them through an unordered container is exactly the trap
-/// `post_nation_agency_comms` has to work around with its own explicit sort.
-void post_battle_dispatches(const world& w, const economy_report& report,
-                            ui::chat_state& chat, int day_tick);
-
-/// The same, for the dispatches one DAY of the military pass produced (BL-1445: battles
-/// step daily, from the app's day loop, so their traffic is posted the day it happens).
-void post_battle_dispatches(const world& w, const std::vector<battle_dispatch>& dispatches,
-                            ui::chat_state& chat, int day_tick);
-
-/// BL-1529 (LOGISTICS.md § 7): a line on the Field channel for each convoy of the player's
-/// cut, raided or lost this tick, and each the player took. Presentation only.
-void post_interceptions(const world& w, const economy_report& report, ui::chat_state& chat, int day_tick);
-
 /// BL-1534 (LOGISTICS.md § 7): keep this tick's interceptions the player is party to for a few
 /// ticks, so the Convoys ledger states a lost cargo's cause and the canvas marks its tile. View
 /// state only; older ones drop here.
 void note_convoy_losses(const world& w, const economy_report& report, ::ui_state& ui_s);
-
-/// War dispatches (BL-1480; Ben, 2026-11-03, NR-1120; RELATIONS.md § 7): every
-/// declaration and peace the player's nation is party to, raised as one line on the
-/// Field channel. Read from the world history log's `war` entries - one per party,
-/// tagged by its nation - appended since @p cursor, which then advances to the log's
-/// end. Presentation only: it reads the log and touches no simulation state. The app
-/// sets @p cursor to the log's length when a world is set up or loaded, so a loaded
-/// campaign never re-announces its past wars.
-void post_war_dispatches(const world& w, std::size_t& cursor, ui::chat_state& chat, int day_tick);
-
-/// Solar storm notices (BL-1605; EVENTS.md § Solar storms): the player's nation is
-/// told, as a system line on the Field channel, when a storm strikes its satellites
-/// or stations this quarter, and when a working Observatory of its sees next
-/// quarter's. Only its own row of `report.solar_storms`: a rival's assets stay in
-/// the fog. Presentation only.
-void post_solar_storm_notices(const world& w, const economy_report& report,
-                              ui::chat_state& chat, int day_tick);
-
-/// Persona counsel (BL-207 slice 1): every corp due at this strategic-eval
-/// boundary gets its seated bench's read of its own blackboard, posted to a
-/// per-corp Counsel channel (lazily created on first use). Advisory only.
-/// A pack that throws on live data clears the bench (BL-353) — hence non-const.
-///
-/// BL-398: the channel is created for every due corp, but only the corp whose
-/// channel is currently OPEN (`chat.active_channel`) is actually evaluated —
-/// the rest would write lines with no reader at ~1 s/tick. Presentation-only,
-/// so the skip touches no simulation state. Splits its own cost into
-/// step_economy_phase_ms()[9] (blackboard export) and [10] (pack evaluation).
-void post_persona_counsel(const world& w, std::vector<persona::pack>& bench,
-                          std::unordered_map<entity_id, int>& counsel_channel,
-                          ui::chat_state& chat, int day_tick);
 
 /// The per-tick history recorders: player balance/income/expenditure (BL-063),
 /// the building profit-rank snapshot (BL-171), market price/supply/demand

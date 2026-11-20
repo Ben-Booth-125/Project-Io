@@ -646,12 +646,12 @@ presentation half:
    `m_generation_report`, which a save carries in full in the app envelope
    (`../tech/TECH_FOUNDATIONS.md` § What a save contains) — what lets a load re-pin the nation
    colours and replay the rounds.
-2. **Set up the presentation:** the epoch formatter, the chat line, zoom/focus/frame;
+2. **Set up the presentation:** the epoch formatter, zoom/focus/frame;
    `m_econ_steps = 12`; the tech tree and the persona bench; the balance series from the
    returns the settle filed. The recipe registry is loaded from Lua on the main thread before
    round 6 launches and a copy handed to the worker, which bands it industrial;
    Begin moves that banded copy into `m_registry`. The twelve pre-game ticks have no
-   presentation half of their own — no agency comms, history samples or last report come from
+   presentation half of their own — no history samples or last report come from
    them (delegated reading, 2026-09-24, NEEDS_REVIEW): the ticks have no calendar and no
    seated nation, so nothing they emit has a reader.
    **Their READINGS do have a reader** (Ben, 2026-10-13: *"since we simulate a few economy
@@ -659,7 +659,7 @@ presentation half:
    an economy tick to update"*). This REVERSES the 2026-09-24 reading for every per-month
    figure a surface shows — a market's sales and trade values, a building's profit, a price
    series, the balance series: a fresh campaign opens on the last settle tick's values, never
-   on a "no data yet" dash. Calendar-dated records (comms, history samples) still take nothing
+   on a "no data yet" dash. Calendar-dated records (history samples) still take nothing
    from the settle, since its ticks have no date.
 **The ground pre-bakes behind the wizard** (Ben, 2026-10-09; started at the Life round on
 Ben's ruling the same day, after the first build measured 36-55 s when the bake began at

@@ -10,8 +10,8 @@ sim_loop::sim_loop()
 
 double sim_loop::speed_multiplier(int s)
 {
-    // Non-linear curve: 0.25× / 0.5× / 1× / 4× / 16×
-    static constexpr double table[max_speed + 1] = { 0.0, 0.25, 0.5, 1.0, 4.0, 16.0 };
+    // Non-linear curve: 0.25× / 0.5× / 5× / 10× / 16× (III and IV raised, Ben 2026-11-19; III to 5×, 2026-11-20).
+    static constexpr double table[max_speed + 1] = { 0.0, 0.25, 0.5, 5.0, 10.0, 16.0 };
     if (s <= 0 || s > max_speed) return 0.0;
     return table[s];
 }

@@ -85,7 +85,7 @@ main thread before the round launches; Begin adopts the banded copy with the wor
 path — the menu's Begin with no wizard, or `--autostart` — makes the same call in the same order
 after the same build, so an adopted world and a cold build open on one state hash, and Begin
 pressed while the round's worker is still running **waits on it** rather than building a second
-world. What stays at Begin is presentation and the seat: the epoch formatter, the chat line, the
+world. What stays at Begin is presentation and the seat: the epoch formatter, the
 zoom and frame, the tech tree and persona bench, the balance series from filed returns,
 `take_seat` and the clock rebase (`../ui/STARTUP.md` § Handoff). The round's record lands at the
 1960 close and plays back while the worker builds this tail behind it, captioned by the step under

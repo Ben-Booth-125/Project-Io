@@ -1018,9 +1018,6 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     // are part of what gets restored.
     const world    pristine_world = m_world;
     const ui_state pristine_ui    = m_ui;
-    // The comms log is snapshotted rather than value-reset: its channel list is
-    // seeded at setup and must survive; only the accumulated messages must not.
-    const ui::chat_state pristine_chat = m_chat;
 
     // Expose the `verify` API. Each function writes ui_state directly — the
     // "direct state manipulation" driver — so captures are reproducible without
@@ -1349,21 +1346,6 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
                       static_cast<unsigned long long>(
                           m_world.state_hash(m_world.current_day_tick)));
         return std::string(buf);
-    });
-    // Dump the comms log as strings (channel:day:from:text), so an equivalence
-    // hunt can diff feed CONTENT rather than pixels.
-    v.set_function("chat_lines", [this]() {
-        sol::state& s = m_lua.state();
-        sol::table out = s.create_table();
-        int idx = 0;
-        for (const auto& msg : m_chat.messages)
-        {
-            char head[48];
-            std::snprintf(head, sizeof head, "%d:d%d:%llu: ", msg.channel, msg.day,
-                          static_cast<unsigned long long>(msg.from));
-            out[++idx] = std::string(head) + msg.text;
-        }
-        return out;
     });
     v.set_function("capture", [this](const std::string& name) { capture_frame(name); });
     // Render N frames WITHOUT capturing (BL-228). capture() composits exactly one
@@ -1958,15 +1940,10 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         {
             if (m_world.construction_quarter_day >= k_construction_quarter_days)
                 step_economy(); // closes the quarter, as econ_step does
-            // A day passes, as the live loop's day tick does (BL-1453 cold review), so
-            // the day's Field dispatches carry its own stamp.
+            // A day passes, as the live loop's day tick does (BL-1453 cold review).
             ++m_world.current_day_tick;
-            std::vector<battle_dispatch> dispatches;
             advanced += advance_quarter_to(m_world, m_registry, m_world.construction_quarter_day + 1,
-                                           military_quarter_day_base(static_cast<int>(m_econ_steps)),
-                                           &dispatches);
-            session_history::post_battle_dispatches(m_world, dispatches, m_chat,
-                                                    m_world.current_day_tick);
+                                           military_quarter_day_base(static_cast<int>(m_econ_steps)));
             SDL_PumpEvents(); // heartbeat, as econ_step's
         }
         return advanced;
@@ -9913,7 +9890,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         // bless every golden on cold frame-1 windows — a warm window carries
         // the prior script's content shape into this script's first capture.
         // Measured: with everything else proven identical (per-tick state_hash,
-        // the full comms message list), the comms child still rendered with the
+        // the full comms message list), the retired comms child still rendered with the
         // previous script's scrollbar/wrap, diffing 1.2% against its solo
         // golden. Rebuilding the context reproduces frame-1 conditions exactly;
         // the font-atlas rebuild it costs is milliseconds against the ~38 s
@@ -9943,8 +9920,6 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             m_world = std::move(fresh_world);
             ui_state fresh_ui = pristine_ui;
             m_ui = std::move(fresh_ui);
-            ui::chat_state fresh_chat = pristine_chat;
-            m_chat = std::move(fresh_chat);
         }
         m_screen = app_screen::in_game;
         reset_verify_transients();

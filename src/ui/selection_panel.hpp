@@ -1,5 +1,6 @@
 #pragma once
 
+#include "plot_history.hpp"
 #include "ui_state.hpp"
 #include "world/economy_system.hpp"
 #include "world/recipe_registry.hpp"
@@ -62,6 +63,17 @@ void draw_building_profit(const world& w, const recipe_registry& reg,
 ///                 the close button (hide), and the tile "Construct Buildings" button.
 void draw_selection_content(world& w, const recipe_registry& reg,
                             const economy_report& report, ui_state& ui);
+
+/// The market history the market element reads its price trend from (BL-1694); the
+/// app's own `m_market_history`, set each frame before the band draws. Null: no marks.
+void set_selection_market_history(const market_plot_history* history);
+
+/// The LOCATOR (Ben, 2026-11-20; LAYOUT.md § Bottom strip): the zoomed map of the ground
+/// under the selection — a tile, a building's or unit's tile, a market's or nation's
+/// capital — in the bottom-left tile. Draw it after the band, and only while no ledger
+/// holds the column (a ledger covers it). A battle's card has already asked for its
+/// ground page, and the locator shows that same ground.
+void draw_selection_locator(world& w, ui_state& ui, ImVec2 origin, ImVec2 size);
 
 /// Real name lookup for a unit's roster type (`unit_component::type` indexes
 /// `unit_roster_table()` directly). An out-of-range index falls back to the

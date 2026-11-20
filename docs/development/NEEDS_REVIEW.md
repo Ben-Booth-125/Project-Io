@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*118 entries — 61 open, 57 resolved.*
+*121 entries — 64 open, 57 resolved.*
 
 ---
 
@@ -696,8 +696,6 @@ Ben ruled upkeep x4 against the wage figure (Rifle Infantry 2.25 -> 9 cr/month).
 
 > **Recommendation:** Keep. 'Upkeep x4' reads naturally as both halves, and the anchor is a standing ruling.
 
----
-
 ### NR-1260 — Tech tree trim: seven calls taken inside 'accept all as proposed', and one pacing miss to rule
 *decision · raised 2026-11-19 · from BL-1712 (trim the tech tree) step 2, lane F of the 2026-11-19 playtest*
 
@@ -712,6 +710,16 @@ Ben accepted the scored trim whole (213 -> 132 nodes). Applying it needed calls 
 > **Recommendation:** Calls 1-7: keep as built; re-price in play per the tree's placeholder-numbers rule (Ben, 2026-10-10). Call 8: A, since the trim's stated aim is fewer nodes each felt, not a faster climb.
 
 *Files: `docs/economy/tech/digitisation_tree.json`, `docs/economy/RESEARCH.md`, `docs/economy/tech/DIGITISATION_TREE.md`, `src/world/world_save.hpp`, `src/core/save_game.cpp`*
+
+### NR-1250 — EVENTS.md lost its default surface with the comms dock: an event now lands on the surface it concerns
+*decision taken on your behalf · raised 2026-11-19 · from BL-1692 (retire comms dock), lane A doc sweep*
+
+EVENTS.md held that an event lands with its message in the same change, and named the comms dock as the surface. With the dock retired outright (Ben, 2026-11-19), the rule was kept and its surface rewritten: the message lands on the alert strip (needs attention now), the war notice (a war on the player), or otherwise the ledger or card that owns the event's subject; an event with no owning surface is not ready to land. AI_OPPONENT.md § 7 keeps diplomacy-as-messaging as a principle a future diplomacy surface answers to, with no surface in the shell today.
+
+### NR-1251 — Three things only the comms dock told the player now tell nobody: solar storm strikes and Observatory warnings, quick save/load outcome
+*question · raised 2026-11-19 · from BL-1692 (retire comms dock)*
+
+Retiring every comms feed (Ben's pick: retire everything outright) removed: (1) the solar storm notice when a storm strikes the player's satellites or stations; (2) an Observatory's warning of next month's storm - the Observatory's whole player-facing payoff (EVENTS.md § Solar storms still says the owner is told and warned); (3) the quick save (F5) and quick load outcome lines - a failed quick save is now silent except stderr. Named saves still report failure in their form, and the escape menu shows the last save date. Wars, battles and convoy losses already have other homes (war notice, alert strip, battle card, Convoys ledger Lost heading).
 
 ---
 

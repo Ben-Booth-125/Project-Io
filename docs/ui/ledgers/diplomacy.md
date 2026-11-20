@@ -155,6 +155,6 @@ while active lifts it. Cancel or Escape closes the declaration without effect.
 ## Open questions for Ben
 
 1. The trend window (four ticks) and the trade-exposure window (four ticks) are strawman.
-2. A declaration and a peace the player is party to each raise a dispatch on the chat's Field
-   channel (Ben, 2026-11-03, NR-1120; RELATIONS § 7, The public record). Should a pending peace
-   offer *to* the player raise one too?
+2. A declaration the player is party to raises the war notice (RELATIONS § 7, The public
+   record; `../LAYOUT.md` § War notice). Should a pending peace offer *to* the player raise one
+   too?

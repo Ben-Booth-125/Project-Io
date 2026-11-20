@@ -45,7 +45,7 @@ const char* overlay_mode_name(overlay_mode m)
     switch (m)
     {
         case overlay_mode::supply:      return "Supply routes";
-        case overlay_mode::market:      return "Market catchment boundaries";
+        case overlay_mode::market:      return "Markets"; // Ben, 2026-11-20
         case overlay_mode::resource:    return "Resource deposits";
         case overlay_mode::population:  return "Workforce efficiency";
         case overlay_mode::scarcity:    return "Market scarcity";

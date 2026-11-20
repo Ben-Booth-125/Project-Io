@@ -72,7 +72,7 @@ asserts it in isolation.
 roll, so the same forces on the same ground with the same supply fight the same battle, and the
 same save replays it. The battle's identity is still folded into a **seed** —
 `campaign_battle_identity`, `{attacker, defender, tile, tick, world_seed}`, the pair packed in role
-order — but nothing in the fight reads it: it only varies the wording of the battle's dispatches
+order — but nothing in the fight reads it: it only varies the wording of the battle's phase lines
 (§ Dispatches and the card). `world_seed` is the province partition's seed — `world` carries none
 of its own, and the partition's is stable for the world's lifetime.
 
@@ -1704,12 +1704,14 @@ across the batch, either side), `wavering` (a side's readiness at or below `wave
 against the parameter so the word stays true if it is tuned), `broke_off`, `concluded`. Later
 readings are the more urgent ones and win.
 
-**The Field-channel dispatch** (BL-468, battle dispatches). `src/core/battle_dispatch_text.cpp`
+**The phase words** (BL-468, battle dispatches). `src/core/battle_dispatch_text.cpp`
 turns a record into a line by folding the record's `stream_seed` with the round index — the BL-290
 tongue-bank idiom — so wording varies between fights, replays identically, and **consumes no
 draw**. The text is a pure function of the record plus the battle identity, which is what makes the
 dispatch layer structurally unable to move the simulation. Every phase has a bank and no bank has a
-hole. See [`docs/ui/LAYOUT.md`](../ui/LAYOUT.md) § Comms dock.
+hole. The battle card reads its phase word through the same `battle_phase_word`, so card and text
+never disagree. No dispatch posts to a feed: the comms dock is retired (Ben, 2026-11-19;
+[`docs/ui/LAYOUT.md`](../ui/LAYOUT.md) § The comms dock is retired).
 
 **The battle card** (BL-469, battle card). The Selection element has a **battle kind**, dispatched
 ahead of province and kind resolution, with per-unit strength bars for both sides and the

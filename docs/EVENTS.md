@@ -196,8 +196,12 @@ precedent below.
 > to a player's economy without them pressing anything.*
 
 That is the strongest available argument for a rule this system adopts outright: **an event lands
-with its message, in the same change.** Io already has the surface — the comms dock
-(`CHAT.md`) — so this costs a channel, not a system.
+with its message, in the same change.** The message lands on the surface the event concerns:
+the **alert strip** for what wants attention now, the **war notice** for a war opened on the
+player (`ui/LAYOUT.md` § Alert strip, § War notice), and otherwise the ledger or card that owns the
+event's subject. There is no general feed to post into — the comms dock is retired, and nothing it
+carried moved to another surface (Ben, 2026-11-19) — so each event names its surface when it is
+designed, and an event with no owning surface is not ready to land.
 
 ### Symmetric
 
@@ -289,14 +293,14 @@ event record carries a successor and a chain-grain cooldown.
 
 | The seeded-stream precedent | `src/world/campaign_battle.cpp` |
 | Solar storms | `src/world/solar_storm.{hpp,cpp}` |
-| The surface | `src/ui/chat_panel.cpp` (the comms dock) |
+| The surface | the alert strip, the war notice, or the ledger or card owning the subject (`ui/LAYOUT.md`) |
 | Authored event data | `scripts/`, alongside the recipes and the tech tree |
 | The trigger | the economy tick, once per scope in sorted order |
 
 **Related authorities.** [`META_LAYER.md`](META_LAYER.md) (two thirds of an event),
 [`PEOPLE.md`](PEOPLE.md) (the personal family), [`generation/CIVILISATION.md`](generation/CIVILISATION.md)
 (the Era −1 counterpart, which shares this vocabulary),
-[`ui/CHAT.md`](ui/CHAT.md) (where an event is told), [`economy/LOGISTICS.md`](economy/LOGISTICS.md)
+[`ui/LAYOUT.md`](ui/LAYOUT.md) (§ Alert strip and § War notice, where an event is told), [`economy/LOGISTICS.md`](economy/LOGISTICS.md)
 (§ Interdiction, the cautionary precedent for a consequence with no message).
 
 **Backlog.** **BL-548 (event system)** owns this document. **BL-289 (sky events)** is the specific

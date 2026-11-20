@@ -81,8 +81,8 @@ slot.
 The slots are derived from the game systems (`docs/SYSTEMS.md`), filtered through the
 **menus-are-broad-ledgers** rule above: each slot is a broad overview surface, never a targeted
 action. The order is a **curated player-facing sequence** — a deliberate gameplay order, not
-strict SYSTEMS.md tier order. The curated set is **ten slots**: Exploration is not on the rail (the
-comms surface is `CHAT.md`; there is no Explorer, `EXPLORER.md`). The `tier-idx` column records
+strict SYSTEMS.md tier order. The curated set is **ten slots**: Exploration is not on the rail
+(there is no Explorer, `EXPLORER.md`). The `tier-idx` column records
 each slot's position in the SYSTEMS.md tier list, so the curation is auditable.
 
 | # | Slot | tier-idx | System / source |
@@ -266,8 +266,7 @@ and from the session menu above.
 
 - **All menus dock.** Every ledger folds out into the shell column (BL-122, docked ledgers). No
   floating ledgers.
-- **No Explorer.** Exploration stays off the rail; the comms surface (`CHAT.md`) took the
-  Explorer's place (`EXPLORER.md`).
+- **No Explorer.** Exploration stays off the rail (`EXPLORER.md`).
 
 ## Related
 
@@ -275,4 +274,3 @@ and from the session menu above.
 - `LAYOUT.md` — placement in the shell.
 - `CANVASES.md` and `SELECTION.md` — where the per-body buildings read lives: the canvas, and
   the Selection element.
-- `CHAT.md` — the comms surface.

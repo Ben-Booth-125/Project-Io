@@ -1,5 +1,7 @@
 #include "view_nav.hpp"
 
+#include "market_ledger.hpp" // market_naming_centre: a market's capital
+
 namespace ui {
 
 namespace {
@@ -66,7 +68,14 @@ void focus_on_tile(const world& w, ui_state& ui, entity_id tile)
     if (it == w.tiles.end())
         return;
 
+    // A 'go to' moves the view and never its zoom (Ben, 2026-11-20): already on a
+    // surface, the player's zoom carries over; arriving from space, the surface opens
+    // at its default framing.
+    const bool  on_surface = ui.primary_level == canvas_level::planetary;
+    const float keep_zoom  = ui.planetary_zoom;
     focus_on_surface(w, ui, it->second.body);
+    if (on_surface)
+        ui.planetary_zoom = keep_zoom;
 
     // Land ON the tile (Ben's 2026-11-09 playtest): focus_on_surface alone resets the
     // pan to the grid's centre, so a 'go to' framed whatever tile sits there. The
@@ -81,11 +90,11 @@ void focus_on_entity(const world& w, ui_state& ui, entity_id entity)
     if (entity == null_entity)
         return;
 
+    // Every spatial kind lands ON its tile (Ben's 2026-11-19 playtest, BL-1693:
+    // a market's 'go to' framed the grid's centre instead of its own tile).
     if (w.tiles.count(entity))
     {
-        // A tile is selected from the surface it lives on, so 'go to' has nothing
-        // to descend to — the surface is already framed. Pan-to-tile is out of
-        // scope for now, so this is a deliberate no-op rather than a reframe.
+        focus_on_tile(w, ui, entity);
         return;
     }
     if (auto b = w.buildings.find(entity); b != w.buildings.end())
@@ -101,7 +110,17 @@ void focus_on_entity(const world& w, ui_state& ui, entity_id entity)
     }
     if (auto m = w.markets.find(entity); m != w.markets.end())
     {
-        focus_on_surface(w, ui, m->second.body);
+        // The market's CAPITAL (Ben, 2026-11-20): the population centre it is named
+        // for. Its clearing centre_tile is a trade site near it, not the city. A
+        // market no centre names falls back to that tile, an unanchored one to its body.
+        const entity_id pc = market_naming_centre(w, entity);
+        if (auto ct = w.population_centre_tile.find(pc);
+            pc != null_entity && ct != w.population_centre_tile.end() && w.tiles.count(ct->second))
+            focus_on_tile(w, ui, ct->second);
+        else if (m->second.centre_tile != null_entity && w.tiles.count(m->second.centre_tile))
+            focus_on_tile(w, ui, m->second.centre_tile);
+        else
+            focus_on_surface(w, ui, m->second.body);
         return;
     }
     if (w.bodies.count(entity))
@@ -109,7 +128,13 @@ void focus_on_entity(const world& w, ui_state& ui, entity_id entity)
         focus_on_surface(w, ui, entity);
         return;
     }
-    // Nations: no ledger yet — no-op (nation ledger is deferred).
+    // A nation goes to its capital (Ben, 2026-11-20).
+    if (auto n = w.nations.find(entity); n != w.nations.end())
+    {
+        if (n->second.capital_tile != null_entity && w.tiles.count(n->second.capital_tile))
+            focus_on_tile(w, ui, n->second.capital_tile);
+        return;
+    }
 }
 
 } // namespace ui

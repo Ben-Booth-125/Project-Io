@@ -8,9 +8,9 @@
 
 ## Headline
 
-**138 elements. 2 committed goldens in the whole repo** (icon_silhouettes_overview.png, icon_silhouettes_supply_lens.png).
+**135 elements. 2 committed goldens in the whole repo** (icon_silhouettes_overview.png, icon_silhouettes_supply_lens.png).
 
-**59 of 138 elements can be changed without any check going red.**
+**56 of 135 elements can be changed without any check going red.**
 That is the number that matters to a UI pass: the re-verification cost is near zero,
 and so is the safety net.
 
@@ -19,7 +19,7 @@ and so is the safety net.
 | **GOLDEN** | 3 | A committed `scripts/verify/golden/*.png` diffs this element on every run. It fails by itself. |
 | **ASSERTED** | 76 | No golden, but a covering check calls `verify.expect` on real content. It fails by itself. |
 | **CLIP-ONLY** | 12 | The only assertion reaching it is `expect_no_clipping`. Green means "no string overran its box", not "this element is right". |
-| **CAPTURE-ONLY** | 39 | A check frames it and saves a PNG. Nothing fails. A human eye is the entire check. |
+| **CAPTURE-ONLY** | 36 | A check frames it and saves a PNG. Nothing fails. A human eye is the entire check. |
 | **NONE** | 8 | No verify script drives this element at all. |
 
 ## GOLDEN (3)
@@ -69,8 +69,8 @@ and so is the safety net.
 | `UI-080` Market Ledger | ledger | `market_ledger`, `lens_structure_pivot`, `goods_table`, `lens_ledger_pairs`, `market_names` | 44 | 1 | 8 |
 | `UI-081` Market Ledger > Goods table | view | `market_ledger`, `goods_table`, `item_glyphs`, `market_density` | 36 | 1 | 1 |
 | `UI-082` Market Ledger > Trades view | view | `trade_offers_sourced`, `market_ledger`, `trades_tab` | 59 | 1 | 2 |
-| `UI-091` Main Menu | view | `main_menu`, `planetology_generation`, `quick_start`, `setup_round`, `shell_pass` | 23 | 1 | 8 |
-| `UI-092` New World wizard | view | `history_lapse_press`, `planetology_generation`, `setup_round`, `wizard_fit` | 53 | 0 | 8 |
+| `UI-091` Main Menu | view | `main_menu`, `planetology_generation`, `quick_start`, `setup_round`, `shell_pass` | 16 | 1 | 7 |
+| `UI-092` New World wizard | view | `history_lapse_press`, `planetology_generation`, `setup_round`, `wizard_fit` | 45 | 0 | 7 |
 | `UI-093` New World wizard > Wizard planetology round (System or Life) | sub-element | `planetology_generation`, `life_to_people` | 9 | 1 | 0 |
 | `UI-096` Planetary Canvas > National border band | sub-element | `border_band` | 6 | 0 | 3 |
 | `UI-097` Planetary Canvas > Province render and selection | sub-element | `province_render`, `lens_structure_pivot` | 10 | 0 | 1 |
@@ -78,7 +78,7 @@ and so is the safety net.
 | `UI-122` Lens system (overlay_mode family) > Nations lens | sub-element | `nations_lens` | 4 | 0 | 1 |
 | `UI-100` Nation overview | ledger | `corp_dashboard`, `nation_seat_ui` | 26 | 1 | 0 |
 | `UI-105` Generation Ledger | ledger | `save_load`, `generation_ledger` | 6 | 1 | 5 |
-| `UI-108` Research panel | ledger | `tech_tree_panel`, `wind_power_links` | 21 | 0 | 2 |
+| `UI-108` Research panel | ledger | `tech_tree_panel`, `wind_power_links` | 23 | 0 | 3 |
 | `UI-148` Research panel > Research panel: Early Space tree | view | `early_space_tree` | 18 | 0 | 4 |
 | `UI-111` Spectator god view | element | `spectator_god_view` | 1 | 0 | 0 |
 | `UI-112` Market Ledger > Market top section | sub-element | `goods_table` | 33 | 1 | 1 |
@@ -88,18 +88,18 @@ and so is the safety net.
 | `UI-119` New World wizard > Wizard lapse-round top-sixteen board (rounds 4 and 5) | sub-element | `history_lapse`, `history_lapse_press` | 38 | 1 | 4 |
 | `UI-120` New World wizard > Wizard pass round (one of three) | sub-element | `history_lapse_press` | 38 | 0 | 4 |
 | `UI-121` New World wizard > Wizard lapse-round legend (rounds 3-6) | sub-element | `round_legends`, `sea_lanes` | 5 | 0 | 0 |
-| `UI-122` New World wizard > Wizard setup round (round 2) | sub-element | `setup_round`, `quick_start` | 23 | 0 | 7 |
-| `UI-124` Nation selection screen (Begin, before play) | view | `nation_select`, `seat_pick`, `quick_start` | 45 | 0 | 3 |
+| `UI-122` New World wizard > Wizard setup round (round 2) | sub-element | `setup_round`, `quick_start` | 16 | 0 | 6 |
+| `UI-124` Nation selection screen (Begin, before play) | view | `nation_select`, `seat_pick`, `quick_start` | 46 | 0 | 3 |
 | `UI-125` Nation selection screen (Begin, before play) > Nation card (seven parts) | sub-element | `nation_select` | 11 | 0 | 0 |
 | `UI-126` Construction Ledger > Rail rows | sub-element | `rail_construction`, `construction_folds` | 40 | 0 | 9 |
-| `UI-127` Construction Ledger > Site ledger (the site finder) | sub-element | `construction_sites`, `site_grid`, `site_picker_glyphs`, `shelf_runway_warning` | 110 | 0 | 11 |
-| `UI-128` Planetary Canvas > Placement lens | sub-element | `construction_sites` | 29 | 0 | 1 |
+| `UI-127` Construction Ledger > Site ledger (the site finder) | sub-element | `construction_sites`, `site_grid`, `site_picker_glyphs`, `shelf_runway_warning` | 112 | 0 | 11 |
+| `UI-128` Planetary Canvas > Placement lens | sub-element | `construction_sites` | 31 | 0 | 1 |
 | `UI-132` Unit designer | view | `unit_designer`, `stat_grid` | 4 | 0 | 41 |
 | `UI-135` Planetary Canvas > Marching unit counter | sub-element | `unit_glide` | 1 | 0 | 2 |
 | `UI-136` Planetary Canvas > Convoy marker and card | sub-element | `convoy_map` | 5 | 1 | 4 |
 | `UI-137` Planetary Canvas > Drag-select units | control | `drag_select` | 9 | 1 | 3 |
 | `UI-138` Nation overview Standing | sub-element | `corp_dashboard` | 17 | 1 | 0 |
-| `UI-140` Construction Ledger > Site Finder tab (Construction ledger) | sub-element | `site_grid`, `site_picker_glyphs`, `construction_sites` | 80 | 0 | 11 |
+| `UI-140` Construction Ledger > Site Finder tab (Construction ledger) | sub-element | `site_grid`, `site_picker_glyphs`, `construction_sites` | 82 | 0 | 11 |
 | `UI-143` Pinned items panel | panel | `pinned_panel` | 17 | 0 | 6 |
 | `UI-146` Space ledger | ledger | `space_ledger` | 1 | 0 | 1 |
 | `UI-144` Selection band > Pin toggle | control | `pinned_panel` | 17 | 0 | 6 |
@@ -128,7 +128,7 @@ and so is the safety net.
 | `UI-116` History Ledger (Story/Chain/Ages/Tectonics) > Ages view | view | `ages_replay` | 0 | 1 | 0 |
 | `UI-115` History Ledger (Story/Chain/Ages/Tectonics) > Tectonics view | view | `ledger_pass` | 0 | 1 | 0 |
 
-## CAPTURE-ONLY (39)
+## CAPTURE-ONLY (36)
 
 | Element | Kind | Covering checks | expect | clip | clicks |
 |---|---|---|---|---|---|
@@ -145,9 +145,6 @@ and so is the safety net.
 | `UI-053` Header Panel > Cargo valuation figure | sub-element | `header` | 0 | 0 | 0 |
 | `UI-054` Header Panel > Net in brackets + trend tooltip | sub-element | `header` | 0 | 0 | 0 |
 | `UI-060` Fold-out ledger column | element | `foldout_shell`, `drill_through_fold` | 0 | 0 | 0 |
-| `UI-064` Comms dock | panel | `chat_panel`, `history_ledger_and_comms` | 0 | 0 | 0 |
-| `UI-065` Comms dock > Public channel | sub-element | `history_ledger_and_comms` | 0 | 0 | 0 |
-| `UI-066` Comms dock > Group channels | sub-element | `chat_panel` | 0 | 0 | 0 |
 | `UI-068` Time panel > Calendar block | sub-element | `time_controls` | 0 | 0 | 0 |
 | `UI-069` Time panel > Speed controls | sub-element | `time_controls` | 0 | 0 | 0 |
 | `UI-070` Balance Ledger | ledger | `balance_ledger`, `budget_ledger_ranked`, `debt_interest` | 0 | 0 | 0 |
@@ -193,6 +190,7 @@ staleness detector — a non-empty list means the UI grew and the spine did not.
 - `border_hard_edges` (4 captures, 1 expects) — BL-1292 (borders hard edges) — the plain canvas at the three widest rungs, framed
 - `campaign_lapse` (4 captures, 1 expects) — campaign_lapse — BL-723's visual half: the spectated campaign as a film strip.
 - `canvas_vector_perf` (1 captures, 0 expects) — The Planetary canvas's vector layer at every rung (sprint 51; PLANETARY.md
+- `chat_panel` (1 captures, 0 expects) — Verify the comms chat log (BL-205 R1) — the panel that replaced the Explorer.
 - `construct_tooltip` (2 captures, 1 expects) — Verify a disabled Construct button says why on hover (Ben, 2026-11-09: "When clicking on a
 - `construction_sites_ties` (0 captures, 0 expects) — How often the site ledger's rows TIE on estimated net (Ben, 2026-10-25). A
 - `culture_overrun` (6 captures, 2 expects) — BL-1092 R4 -- THE 400 BCE CLAMP on an OVERRUN seed (Ben, 2026-09-24,
@@ -233,6 +231,6 @@ staleness detector — a non-empty list means the UI grew and the spine did not.
 - `turbulence_lean` (5 captures, 1 expects) — Verification for BL-839 — the historical turbulence lean, in the wizard.
 - `ui_scale_down` (8 captures, 0 expects) — BL-1495 (UI scale down): the default 12 px UI, side by side with the 16 px step.
 - `unit_counter` (8 captures, 0 expects) — Verify the land unit counter, the unit card and the unit group (BL-1425 R1-R3,
-- ` 0 ` (0 captures, 0 expects) — Do units survive the months in the --verify world?
+- `units_survive_quarters` (0 captures, 0 expects) — Do units survive the quarters in the --verify world?
 - `wharf_on_shore` (5 captures, 0 expects) — BL-1218 (wharf placed on shore): the construction ledger offers a Fishing
 

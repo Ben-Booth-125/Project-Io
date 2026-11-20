@@ -35,34 +35,11 @@ const char* speed_rate_label(int speed)
     {
     case 1:  return "0.25×";
     case 2:  return "0.5×";
-    case 3:  return "1×";
-    case 4:  return "4×";
+    case 3:  return "5×";
+    case 4:  return "10×";
     case 5:  return "16×";
     default: return "Paused";
     }
-}
-
-/// The speed tier's real-time cost of one economic quarter, as a compact human
-/// string (BL-178). Computed from the sim-loop constants rather than authored, so
-/// retuning `seconds_per_day_1x` or the multiplier curve updates the label:
-/// one quarter is `econ_tick_days` in-game days, and one in-game day costs
-/// `seconds_per_day_1x / multiplier` real seconds.
-const char* speed_quarter_label(int speed)
-{
-    const double mult = sim_loop::speed_multiplier(speed);
-    if (mult <= 0.0) return "—";
-
-    const double secs = (sim_loop::econ_tick_days * sim_loop::seconds_per_day_1x) / mult;
-
-    // Static buffers per tier: the caller treats the result as a stable literal,
-    // and there are only five tiers, so this stays trivially safe.
-    static char buf[sim_loop::max_speed + 1][24] = {};
-    char* out = buf[speed < 0 ? 0 : (speed > sim_loop::max_speed ? 0 : speed)];
-    if (secs < 60.0)
-        std::snprintf(out, 24, "~%ds", static_cast<int>(std::lround(secs)));
-    else
-        std::snprintf(out, 24, "~%dm", static_cast<int>(std::lround(secs / 60.0)));
-    return out;
 }
 
 } // namespace
@@ -248,10 +225,9 @@ void draw_time_panel(ui_state& state, sim_loop& sim, int& prev_speed, const ImVe
                 if (speeds[i] == 0)
                     ImGui::SetItemTooltip("%s (Space)", sim.paused() ? "Resume" : "Pause");
                 else
-                    ImGui::SetItemTooltip("Speed %s — %s\n%s per month (%d)",
+                    ImGui::SetItemTooltip("Speed %s — %s (%d)",
                                           labels[i],
                                           speed_rate_label(speeds[i]),
-                                          speed_quarter_label(speeds[i]),
                                           speeds[i]);
                 if (i + 1 < n)
                     ImGui::SameLine();
@@ -286,18 +262,8 @@ void draw_time_panel(ui_state& state, sim_loop& sim, int& prev_speed, const ImVe
         // clipping region, so GetContentRegionAvail() would still measure the
         // whole window (the BL-313 bug this whole block was rewritten to avoid).
         {
-            char rate[64];
-            if (sim.paused())
-                std::snprintf(rate, sizeof(rate), "Paused");
-            else
-                std::snprintf(rate, sizeof(rate), "%s  ·  %s per month",
-                              speed_rate_label(sim.speed()),
-                              speed_quarter_label(sim.speed()));
-
-            if (!sim.paused() && ImGui::CalcTextSize(rate).x > ctrl_avail)
-                std::snprintf(rate, sizeof(rate), "%s",
-                              speed_rate_label(sim.speed()));
-            ImGui::TextDisabled("%s", rate);
+            // The rate alone (Ben, 2026-11-20: the "per month" explainer went).
+            ImGui::TextDisabled("%s", sim.paused() ? "Paused" : speed_rate_label(sim.speed()));
         }
         ImGui::EndGroup();
 

@@ -38,8 +38,8 @@ enum class canvas_command
     pause_toggle, ///< Toggle pause / resume (restores previous speed on resume).
     speed_1,      ///< Set speed to tier I (0.25×).
     speed_2,      ///< Set speed to tier II (0.5×).
-    speed_3,      ///< Set speed to tier III (1×, normal-play reference).
-    speed_4,      ///< Set speed to tier IV (4×).
+    speed_3,      ///< Set speed to tier III (5×).
+    speed_4,      ///< Set speed to tier IV (10×).
     speed_5,      ///< Set speed to tier V (16×, fast-forward).
 
     // Save / load (BL-536). In the shared vocabulary rather than handled as raw

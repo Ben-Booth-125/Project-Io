@@ -292,9 +292,6 @@ A view which provides a report on a sub-system to give detail for decision makin
 **Drill-through**
 The single progressive-disclosure idiom intended to be shared by every dense surface — a summarised figure opens the detail that produced it, rather than each panel inventing its own. The term is BL-214's (drill-through concept).
 
-**Comms (comms log)**
-The channel-based chat panel — the surface of the diplomacy-as-communication principle, where the mechanical actions of AI corps surface as messages before any AI "speaks" for real. Docked bottom-left of the shell at the Selection-band height (BL-227, comms dock; `src/ui/chat_panel.{hpp,cpp}`). See `docs/ui/CHAT.md`.
-
 **Recipe**
 The configured input/output specification of a processing building — in play, a **method**. Every recipe is a method of one **product building**, and a building's methods all make its one product; the active method is set per stack. Recipe conversion rates are authored in Lua.
 

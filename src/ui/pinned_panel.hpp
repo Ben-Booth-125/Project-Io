@@ -82,4 +82,11 @@ void draw_pinned_panel(const world& w, ui_state& ui, ImVec2 disp);
 /// header row. Drawn only when `pin_subject` names something.
 void draw_pin_toggle(const world& w, ui_state& ui, ImVec2 band_origin, ImVec2 band_size);
 
+/// The width the pin toggle takes at the right end of a header row, gap to its right
+/// neighbour included (BL-1695; SELECTION.md § The pin's space is reserved). Every
+/// header row that carries a pin lays its own right-hand controls out from
+/// `row_right - [>] - pin_header_reserve()`, so no control can spill under the pin.
+/// A row with no 'go to' (the tile and building cards) reserves it from its own right edge.
+float pin_header_reserve();
+
 } // namespace ui

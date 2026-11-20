@@ -629,10 +629,10 @@ otherwise a war against it would never be answered and never end.
 
 **The public record** (Ben, 2026-11-03, NR-1120). Every declaration and every peace writes an entry
 in the world history log (`../ai/AI_OPPONENT.md` § 8a), one per party, tagged by its nation. When
-the player's nation is a party, the same event is raised as a dispatch on the chat's Field channel
-(`../ui/CHAT.md`), so the player learns of a war on them from the feed, not only the ledger. A
-declaration on or by the player also raises a notice on the canvas (Ben, 2026-11-09;
-`../ui/LAYOUT.md` § War notice).
+the player's nation is a party, a declaration on or by the player raises a notice on the canvas
+and the alert strip's **Wars** alert (Ben, 2026-11-09; `../ui/LAYOUT.md` § War notice, § Alert
+strip), so the player learns of a war on them there, not only from the ledger. There is no chat
+feed: the comms dock is retired (Ben, 2026-11-19).
 
 ### Joining a war (Ben, 2026-11-19)
 

@@ -85,8 +85,8 @@ A story's **coverage** is its *served-state* — whether the goal has a working 
 clusters, every story requirement-linked.* This baselines the shipped player-facing features.
 Secondary stories and the coverage-audit tool are the next passes.
 
-> **Gap-note (2026-07-31, doc sweep — for BL-098, the UX user-story review).** Five landed
-> player-facing surfaces have **no story trace**: the comms dock (BL-227), hover glance-then-stick
+> **Gap-note (2026-07-31, doc sweep — for BL-098, the UX user-story review).** Four landed
+> player-facing surfaces have **no story trace**: hover glance-then-stick
 > (BL-230), the continent lens (BL-226), the landform render + spanning markers (BL-231/232), and
 > the New World wizard (BL-167). Candidates for the `orient` / `find` clusters. And the `contest`
 > cluster — "post-prototype, unpopulated" above — now has **landed code** (`terrain_combat`,
