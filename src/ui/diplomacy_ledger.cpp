@@ -7,6 +7,7 @@
 #include "nav_pane.hpp"     // close_all_panels — open_declaration takes the column
 #include "player_side.hpp"  // owner_display_name
 #include "view_nav.hpp"     // focus_on_tile - a goal row centres the map (BL-1709)
+#include "body_surface_canvas.hpp" // planetary_zoom_stepped - a goal press zooms in
 #include "presentation.hpp"
 
 #include "world/embargo.hpp"         // embargoes — the Embargo / Lift toggle
@@ -853,8 +854,11 @@ void draw_declaration(const world& w, const recipe_registry& reg, ui_state& s, e
                     if (!first) line += ", ";
                     line += std::string("Alarm ") + band_word(-b.alarm0, sp) + arrow + band_word(-b.alarm1, sp);
                 }
-                ImGui::TextColored(col4(b.target ? palette::war_goal_chosen : palette::text_secondary), "%s",
-                                   line.c_str());
+                // Wrapped (Ben's 2026-11-19 live click): a long name with both bands spilled
+                // off the ledger's edge. Indented under the name so a wrapped row reads as one.
+                ImGui::PushStyleColor(ImGuiCol_Text, col4(b.target ? palette::war_goal_chosen : palette::text_secondary));
+                ImGui::TextWrapped("%s", line.c_str());
+                ImGui::PopStyleColor();
                 if (ImGui::IsItemHovered())
                     ImGui::SetTooltip("%s toward you\nTrust %+.1f -> %+.1f (%+.1f)\nAlarm %+.1f -> %+.1f (%+.1f)%s",
                                       name_of(w, b.nation), b.trust0, b.trust1, b.trust1 - b.trust0, b.alarm0,
@@ -1931,7 +1935,15 @@ void goal_row(const world& w, ui_state& s, const war_record& war, int side, uint
     {
         const entity_id anchor = province_anchor_tile(w, *pr);
         if (anchor != null_entity)
+        {
+            const float was = s.planetary_zoom; // focus_on_surface resets it to the default
             focus_on_tile(w, s, anchor);
+            // Zoom in on it (Ben's 2026-11-19 live click): focus_on_tile frames the body at
+            // its default zoom, where a province is a few pixels. Two rungs in (x4.28) frames
+            // a province and its neighbours; a view already closer keeps its own zoom.
+            const float close = planetary_zoom_stepped(planetary_zoom_stepped(s.planetary_zoom, +1), +1);
+            s.planetary_zoom = std::max(was, close);
+        }
     }
     const ImVec2 mn = ImGui::GetItemRectMin(), mx = ImGui::GetItemRectMax();
     d.presses.push_back({"goal", namer, (mn.x + mx.x) * 0.5f, (mn.y + mx.y) * 0.5f, pr != nullptr, {}});
