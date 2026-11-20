@@ -453,6 +453,23 @@ uint64_t world::state_hash(int tick) const
                 fnv1a_i32(h, u.equipment_remainder);
                 fnv1a_i32(h, u.lp_share_permille);
             }
+            // BL-1678 (stocks are bought): the fuel stock and the four bought shares, folded
+            // only off their defaults, behind their own marker, so a world whose stocks sit at
+            // them keeps every hash.
+            if (!unit_stocks_bought_default(u))
+            {
+                fnv1a_u32(h, 0x46554C42u); // "FULB"
+                fnv1a_i32(h, u.fuel_permille);
+                fnv1a_i32(h, u.fuel_remainder);
+                fnv1a_i32(h, u.food_bought_permille);
+                fnv1a_i32(h, u.ammo_bought_permille);
+                fnv1a_i32(h, u.equipment_bought_permille);
+                fnv1a_i32(h, u.fuel_bought_permille);
+                fnv1a_i32(h, u.food_owed);
+                fnv1a_i32(h, u.ammo_owed);
+                fnv1a_i32(h, u.equipment_owed);
+                fnv1a_i32(h, u.fuel_owed);
+            }
             // BL-1434 (unit designs): the recorded design and a refit's target design,
             // each folded only when not base kit, behind its own marker, so a world of
             // base-kit units keeps every hash.
@@ -735,6 +752,23 @@ uint64_t world::state_hash(int tick) const
                     fnv1a_i32(h, u.ammo_remainder);
                     fnv1a_i32(h, u.equipment_remainder);
                     fnv1a_i32(h, u.lp_share_permille);
+                    // BL-1678 (stocks are bought): the fuel stock and the four bought shares, folded
+                    // only off their defaults, behind their own marker, so a world whose stocks sit at
+                    // them keeps every hash.
+                    if (!unit_stocks_bought_default(u))
+                    {
+                        fnv1a_u32(h, 0x46554C42u); // "FULB"
+                        fnv1a_i32(h, u.fuel_permille);
+                        fnv1a_i32(h, u.fuel_remainder);
+                        fnv1a_i32(h, u.food_bought_permille);
+                        fnv1a_i32(h, u.ammo_bought_permille);
+                        fnv1a_i32(h, u.equipment_bought_permille);
+                        fnv1a_i32(h, u.fuel_bought_permille);
+                        fnv1a_i32(h, u.food_owed);
+                        fnv1a_i32(h, u.ammo_owed);
+                        fnv1a_i32(h, u.equipment_owed);
+                        fnv1a_i32(h, u.fuel_owed);
+                    }
                 }
             }
         }

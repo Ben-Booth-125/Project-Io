@@ -2320,7 +2320,8 @@ int main()
         // and v88 is read as its strict prefix; every PG size below adds that section.
         // The space merge: today is v93 (every space section after the missiles); v89 is read
         // as its prefix less the space sections.
-        static_assert(world_save_version == k_world_save_version_tree_trim && k_world_save_version_tree_trim == 99 // BL-1712: the trimmed tree, v98's layout
+        static_assert(world_save_version == k_world_save_version_unit_stocks && k_world_save_version_unit_stocks == 100 // BL-1678: the unit stocks, after the names
+                          && k_world_save_version_tree_trim == 99 // BL-1712: the trimmed tree, v98's layout
                           && k_world_save_version_province_names == 98 // BL-1708: the province-name tail
                           && k_world_save_version_war_joiners == 97 // BL-1706: v97 grows the war records, no section
                           && k_world_save_version_launch_boost == 96 // BL-1637: the pad-boost tail
@@ -2420,7 +2421,7 @@ int main()
 
         // The space merge gave v84..v87 and v90..v92 the space line's layouts, so no version
         // in 81..93 is unclaimed any more; a stream stamped past today is refused.
-        for (const uint32_t v : {100u, 101u}) // BL-1712: v99 is today (the tree trim); BL-1708: v98 the names; BL-1706: v97 the sides
+        for (const uint32_t v : {101u, 102u}) // BL-1678: v100 is today (the stocks are bought); BL-1712: v99 the tree trim; BL-1708: v98 the names; BL-1706: v97 the sides
         {
             std::string other = b88;
             std::memcpy(&other[4], &v, sizeof v);
@@ -2439,7 +2440,7 @@ int main()
     {
         // BL-1641: v94 (one building per product) adds no section, nor does v95 (BL-1642, the
         // monthly tick), so today's stream is v93's layout.
-        static_assert(world_save_version == 99 /* BL-1637: v96 appends the pad-boost tail; BL-1706: v97 the sides, no section; BL-1708: v98 the province names; BL-1712: v99 is v98's layout, the trimmed tree */ && k_world_save_version_space_merge == 93
+        static_assert(world_save_version == 100 /* BL-1637: v96 appends the pad-boost tail; BL-1706: v97 the sides, no section; BL-1708: v98 the province names; BL-1712: v99 is v98's layout, the trimmed tree; BL-1678: v100 the unit stocks */ && k_world_save_version_space_merge == 93
                           && k_world_save_version_pre_space_merge == 89,
                       "PH pins v93 as the space merge over main's v89");
         static_assert(world_stream_is_space_line(84) && world_stream_is_space_line(87)
@@ -2469,7 +2470,7 @@ int main()
         world w92;
         const bool ok92 = s92 == 92 && from_bytes(b92, w92) && !w92.nations.at(gone).ended
             && w92.ships.empty() && w92.missile_magazines.empty()
-            && b93.size() - b92.size() == world_save_space_line_gap_bytes(k) + world_save_launch_boost_section_bytes(k) + world_save_province_names_section_bytes(k) /* BL-1708 (v98) */; // BL-1637 (v96)
+            && b93.size() - b92.size() == world_save_space_line_gap_bytes(k) + world_save_launch_boost_section_bytes(k) + world_save_province_names_section_bytes(k) /* BL-1708 (v98) */ + world_save_unit_stocks_section_bytes(k) /* BL-1678 (v100) */; // BL-1637 (v96)
         check(ok92, "PH a space-line v92 stream loads: 55 wide, no naval, carry, ended or missile section; v93 is v92 plus those");
         world again92;
         check(ok92 && from_bytes(to_bytes(w92), again92) && to_bytes(again92) == to_bytes(w92),

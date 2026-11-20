@@ -3,6 +3,8 @@
 #include "world.hpp"
 #include "battle_system.hpp"   // BL-1455: unit_terrain_effects - .wear, x the equipment drain
 #include "recipe_registry.hpp" // military_capability_params
+#include "unit_roster.hpp"     // BL-1678: the energy gate that marks a fuel carrier
+#include "unit_designs.hpp"    // BL-1678: kit_goods, unit_land_class - what a man's equipment is
 
 #include <cmath>
 
@@ -25,7 +27,7 @@ constexpr int64_t k_supply_unit = k_supply_remainder_unit;
 /// Integer throughout. A full stock under any cover at or past break-even is a no-op.
 /// @p spend_milli is the day's spend in thousandths of a per-mille (so a terrain wear
 /// multiplier can scale it without rounding the drain to whole per-mille).
-void stock_day(int& stock, int32_t& rem, int64_t spend_milli, int full_rate, int restock_pm, int share)
+int64_t stock_day(int& stock, int32_t& rem, int64_t spend_milli, int full_rate, int restock_pm, int share)
 {
     spend_milli = std::max<int64_t>(0, spend_milli);
     const int64_t s        = clamp_pm(share);
@@ -35,9 +37,22 @@ void stock_day(int& stock, int32_t& rem, int64_t spend_milli, int full_rate, int
     int64_t v = static_cast<int64_t>(clamp_pm(stock)) * k_supply_unit
               + std::clamp<int64_t>(rem, 0, k_supply_unit - 1)
               - spend_milli * 1000 + delivery;
+    // BL-1678: what the delivery actually put into the stock - all of it, less what ran
+    // past full - so the account bills goods that arrived, never goods that spilled.
+    const int64_t used = delivery - std::max<int64_t>(0, v - 1000 * k_supply_unit);
     v = std::clamp<int64_t>(v, 0, 1000 * k_supply_unit);
     stock = static_cast<int>(v / k_supply_unit);
     rem   = static_cast<int32_t>(v % k_supply_unit);
+    return used;
+}
+
+/// BL-1678: add today's delivery beyond the camp drain to a stock's account, in thousandths of
+/// a per-mille (`unit_component::*_owed`). Both in `stock_day`'s units; a quiet day at full is
+/// exactly zero, so it never moves the field.
+void owe(int32_t& owed, int64_t used_u, int64_t camp_milli)
+{
+    const int64_t d = (used_u - camp_milli * 1000) / 1000; // toward zero
+    owed = static_cast<int32_t>(std::clamp<int64_t>(int64_t{ owed } + d, -2000000000LL, 2000000000LL));
 }
 
 /// The three stocks after one day for @p u, written into @p out; no starvation. @p wear
@@ -45,23 +60,54 @@ void stock_day(int& stock, int32_t& rem, int64_t spend_milli, int full_rate, int
 void stocks_after_day(const unit_component& u, const carried_supply_params& p, bool fought,
                       unit_component& out, float wear = 1.0f)
 {
-    const int share      = u.lp_share_permille; // only the road gap starves (Ben, 2026-10-29)
+    // BL-1678 (Ben, 2026-11-19: "the lower of the two"): each stock refills at the LOWER of
+    // the road share and the share of its goods the shelf sold last month. The road gap
+    // still starves (Ben, 2026-10-29); an unbought ration now starves too.
+    const int road       = u.lp_share_permille;
+    const auto share_of  = [&](int bought) { return std::min(clamp_pm(road), clamp_pm(bought)); };
     const int ammo_rate  = p.ammo_per_battle_day;
-    const int equip_rate = p.equipment_attrition_per_day + p.equipment_per_battle_day;
+    const int wear_milli = equipment_attrition_milli_per_day(p);
+    // The restock is a per-mille of the full daily rate; the wear's sub-per-mille part is
+    // rounded up, so a unit that wears at all restocks at a whole rate.
+    const int equip_rate = (wear_milli + 999) / 1000 + p.equipment_per_battle_day;
     out.food_permille      = u.food_permille;      out.food_remainder      = u.food_remainder;
     out.ammo_permille      = u.ammo_permille;      out.ammo_remainder      = u.ammo_remainder;
     out.equipment_permille = u.equipment_permille; out.equipment_remainder = u.equipment_remainder;
-    stock_day(out.food_permille, out.food_remainder, int64_t{p.food_per_day} * 1000, p.food_per_day,
-              p.restock_permille, share);
-    stock_day(out.ammo_permille, out.ammo_remainder, int64_t{fought ? ammo_rate : 0} * 1000, ammo_rate,
-              p.restock_permille, share);
+    out.fuel_permille      = u.fuel_permille;      out.fuel_remainder      = u.fuel_remainder;
+    out.food_owed = u.food_owed; out.ammo_owed = u.ammo_owed;
+    out.equipment_owed = u.equipment_owed; out.fuel_owed = u.fuel_owed;
+    owe(out.food_owed,
+        stock_day(out.food_permille, out.food_remainder, int64_t{p.food_per_day} * 1000, p.food_per_day,
+                  p.restock_permille, share_of(u.food_bought_permille)),
+        int64_t{p.food_per_day} * 1000);
+    owe(out.ammo_owed,
+        stock_day(out.ammo_permille, out.ammo_remainder, int64_t{fought ? ammo_rate : 0} * 1000, ammo_rate,
+                  p.restock_permille, share_of(u.ammo_bought_permille)),
+        0);
     // BL-1455: the ground wears kit - the day's equipment drain x the tile's wear for the
     // unit's class (`unit_terrain_effects(...).wear`), rounded to a thousandth of a per-mille.
-    const int64_t equip_base = p.equipment_attrition_per_day + (fought ? p.equipment_per_battle_day : 0);
+    const int64_t equip_base_milli = wear_milli + int64_t{fought ? p.equipment_per_battle_day : 0} * 1000;
     const double  w = (std::isfinite(wear) && wear > 0.0f) ? static_cast<double>(wear) : 1.0;
-    stock_day(out.equipment_permille, out.equipment_remainder,
-              static_cast<int64_t>(std::llround(static_cast<double>(equip_base) * 1000.0 * w)),
-              equip_rate, p.restock_permille, share);
+    const int64_t equip_camp_milli = std::llround(static_cast<double>(wear_milli) * w); // the ground's wear is camp
+    owe(out.equipment_owed,
+        stock_day(out.equipment_permille, out.equipment_remainder,
+                  static_cast<int64_t>(std::llround(static_cast<double>(equip_base_milli) * w)),
+                  equip_rate, p.restock_permille, share_of(u.equipment_bought_permille)),
+        equip_camp_milli);
+    // BL-1678: the fuel stock, for a carrier only: camp, plus a day on the march (an order in
+    // flight that the march will step: not while fighting, and not on an empty tank, which
+    // holds), plus a day fighting.
+    if (unit_carries_fuel(u))
+    {
+        const bool marching  = u.order.dest != null_entity && !fought && u.fuel_permille > 0;
+        const int  fuel_rate = p.fuel_per_day + p.fuel_per_march_day + p.fuel_per_battle_day;
+        const int  spend     = p.fuel_per_day + (marching ? p.fuel_per_march_day : 0)
+                             + (fought ? p.fuel_per_battle_day : 0);
+        owe(out.fuel_owed,
+            stock_day(out.fuel_permille, out.fuel_remainder, int64_t{spend} * 1000, fuel_rate,
+                      p.restock_permille, share_of(u.fuel_bought_permille)),
+            int64_t{p.fuel_per_day} * 1000);
+    }
 }
 
 bool stocks_equal(const unit_component& a, const unit_component& b)
@@ -69,7 +115,10 @@ bool stocks_equal(const unit_component& a, const unit_component& b)
     return a.food_permille == b.food_permille && a.food_remainder == b.food_remainder
         && a.ammo_permille == b.ammo_permille && a.ammo_remainder == b.ammo_remainder
         && a.equipment_permille == b.equipment_permille
-        && a.equipment_remainder == b.equipment_remainder;
+        && a.equipment_remainder == b.equipment_remainder
+        && a.fuel_permille == b.fuel_permille && a.fuel_remainder == b.fuel_remainder
+        && a.food_owed == b.food_owed && a.ammo_owed == b.ammo_owed
+        && a.equipment_owed == b.equipment_owed && a.fuel_owed == b.fuel_owed;
 }
 
 } // namespace
@@ -133,7 +182,66 @@ int carried_combat_permille(const unit_component& u)
 {
     const int64_t ammo  = std::max(k_ammo_floor_permille, clamp_pm(u.ammo_permille));
     const int64_t equip = clamp_pm(u.equipment_permille);
-    return static_cast<int>(ammo * equip / 1000);
+    // BL-1678 (Ben, 2026-11-19): fuel scales every combat stat as ammunition does, floored
+    // the same; a unit that carries none is never scaled, whatever its field holds.
+    const int64_t fuel  = unit_carries_fuel(u) ? std::max(k_ammo_floor_permille, clamp_pm(u.fuel_permille)) : 1000;
+    return static_cast<int>(ammo * equip / 1000 * fuel / 1000);
+}
+
+int equipment_attrition_milli_per_day(const carried_supply_params& p)
+{
+    const int64_t m = std::max(0, p.equipment_attrition_per_month);
+    return static_cast<int>((m * 1000 + k_econ_tick_days / 2) / k_econ_tick_days);
+}
+
+bool unit_carries_fuel(const unit_component& u)
+{
+    // The fuelled vehicles (Ben, 2026-11-19: "energy-gated classes only"): a vehicle class whose
+    // row gates on energy. A pre-modern row's energy gate is a stand-in for saltpetre
+    // (unit_roster.hpp), and its foot carries no tank.
+    const std::vector<roster_row>& table = unit_roster_table();
+    if (u.type >= table.size() || gate_axis_q(table[u.type].gate, hire_axis::energy) <= 0)
+        return false;
+    const land_class c = unit_land_class(u);
+    return c == land_class::motorised || c == land_class::mechanised || c == land_class::armour
+        || c == land_class::light_armour;
+}
+
+bool unit_out_of_fuel(const unit_component& u)
+{
+    return u.fuel_permille <= 0 && unit_carries_fuel(u);
+}
+
+std::array<float, resource_count> carried_stock_goods(const world& w, const carried_supply_params& p,
+                                                      const unit_component& u, int food, int ammo,
+                                                      int equip, int fuel)
+{
+    std::array<float, resource_count> out{};
+    const float men = static_cast<float>(std::max(0, u.count));
+    if (men <= 0.0f)
+        return out;
+    const auto frac = [](int pm) { return static_cast<float>(std::max(0, pm)) / 1000.0f; };
+    out[static_cast<std::size_t>(resource_type::food_rations)] += frac(food) * p.food_fill_rations_per_head * men;
+    out[static_cast<std::size_t>(resource_type::ordnance)]     += frac(ammo) * p.ammo_fill_ordnance_per_head * men;
+    if (unit_carries_fuel(u))
+        out[static_cast<std::size_t>(resource_type::refined_fuel)] += frac(fuel) * p.fuel_fill_refined_fuel_per_head * men;
+    if (equip > 0)
+    {
+        // The man's KIT (Ben, 2026-11-18: "5% of a unit's kit"): his class's equipment goods
+        // and his design's, not the gated axes' flat raising costs a hire also pays.
+        (void)w;
+        const std::array<float, resource_count> kit = kit_goods(unit_land_class(u), u.kit);
+        for (std::size_t r = 0; r < resource_count; ++r)
+            out[r] += frac(equip) * kit[r] / static_cast<float>(hire_batch_manpower) * men;
+    }
+    return out;
+}
+
+std::array<int, 4> carried_month_drain(const carried_supply_params& p, const unit_component& u)
+{
+    return { std::max(0, p.food_per_day) * k_econ_tick_days, 0,
+             std::max(0, p.equipment_attrition_per_month),
+             unit_carries_fuel(u) ? std::max(0, p.fuel_per_day) * k_econ_tick_days : 0 };
 }
 
 int carried_attack_permille(const unit_component& u)
@@ -192,6 +300,12 @@ carried_supplies_day run_carried_supplies_day(world& w, const carried_supply_par
             u.ammo_remainder      = next.ammo_remainder;
             u.equipment_permille  = next.equipment_permille;
             u.equipment_remainder = next.equipment_remainder;
+            u.fuel_permille       = next.fuel_permille;
+            u.fuel_remainder      = next.fuel_remainder;
+            u.food_owed           = next.food_owed;
+            u.ammo_owed           = next.ammo_owed;
+            u.equipment_owed      = next.equipment_owed;
+            u.fuel_owed           = next.fuel_owed;
         }
 
         if (unit_starving(u))

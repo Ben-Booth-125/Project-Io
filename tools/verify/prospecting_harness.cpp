@@ -379,7 +379,7 @@ void rows_determinism_and_save()
     const std::size_t sec = world_save_prospecting_section_bytes(x.w);
     std::ostringstream o84(std::ios::binary);
     write_world_snapshot_pre_prospecting(x.w, o84);
-    check(o84.str().size() + world_save_space_line_gap_bytes(x.w) /* the space merge: main's naval..missile sections */ + sec + (world_save_space_convoy_section_bytes(x.w) + (world_save_debris_section_bytes(x.w) + (world_save_space_bombard_section_bytes(x.w) + (world_save_offworld_base_section_bytes(x.w) + (world_save_space_firsts_section_bytes(x.w) + world_save_transit_origin_section_bytes(x.w) + world_save_launch_boost_section_bytes(x.w) + world_save_province_names_section_bytes(x.w) /* BL-1708 (v98) */))))) == b.size() && sec == 4 + 2 * (16 + 8), "S1b",
+    check(o84.str().size() + world_save_space_line_gap_bytes(x.w) /* the space merge: main's naval..missile sections */ + sec + (world_save_space_convoy_section_bytes(x.w) + (world_save_debris_section_bytes(x.w) + (world_save_space_bombard_section_bytes(x.w) + (world_save_offworld_base_section_bytes(x.w) + (world_save_space_firsts_section_bytes(x.w) + world_save_transit_origin_section_bytes(x.w) + world_save_launch_boost_section_bytes(x.w) + world_save_province_names_section_bytes(x.w) /* BL-1708 (v98) */ + world_save_unit_stocks_section_bytes(x.w) /* BL-1678 (v100) */))))) == b.size() && sec == 4 + 2 * (16 + 8), "S1b",
           fmt("the section is the tail: v84 prefix %zu + %zu == %zu", o84.str().size(), sec, b.size()));
     {
         fixture e; build(e);
@@ -393,7 +393,7 @@ void rows_determinism_and_save()
 
     // Tampers. The section: u32 count, then per record (nation, body, total,
     // mapped, total bytes). Records are (Alpha, moon), (Beta, moon).
-    const std::size_t s0  = b.size() - sec - (world_save_space_convoy_section_bytes(x.w) + (world_save_debris_section_bytes(x.w) + (world_save_space_bombard_section_bytes(x.w) + (world_save_offworld_base_section_bytes(x.w) + (world_save_space_firsts_section_bytes(x.w) + world_save_transit_origin_section_bytes(x.w) + world_save_launch_boost_section_bytes(x.w) + world_save_province_names_section_bytes(x.w) /* BL-1708 (v98) */))))); // v87 follows
+    const std::size_t s0  = b.size() - sec - (world_save_space_convoy_section_bytes(x.w) + (world_save_debris_section_bytes(x.w) + (world_save_space_bombard_section_bytes(x.w) + (world_save_offworld_base_section_bytes(x.w) + (world_save_space_firsts_section_bytes(x.w) + world_save_transit_origin_section_bytes(x.w) + world_save_launch_boost_section_bytes(x.w) + world_save_province_names_section_bytes(x.w) /* BL-1708 (v98) */ + world_save_unit_stocks_section_bytes(x.w) /* BL-1678 (v100) */))))); // v87 follows
     const std::size_t r0  = s0 + 4;           // Alpha's record
     const std::size_t r1  = r0 + 16 + 8;      // Beta's record
     const auto refused = [&](std::string bad) {

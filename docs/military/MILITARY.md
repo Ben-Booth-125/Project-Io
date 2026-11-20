@@ -226,9 +226,12 @@ check**: hardness alone carries "infantry cannot hurt tanks".
 
 ### Carried supplies (Ben, 2026-10-29)
 
-**A unit carries three stocks — food, ammunition and equipment — each in per-mille of full.** They
-are stored on the unit and move every day: food is eaten at the unit's ration rate, ammunition is
-spent by every day the unit fights, and equipment is lost to battle and to attrition. They are
+**A unit carries three stocks — food, ammunition and equipment — each in per-mille of full.** A
+fuelled vehicle — a motorised, mechanised, armour or light armour row its roster gates on energy —
+carries a fourth, **fuel** (Ben, 2026-11-19). A pre-modern row's energy gate stands in for
+saltpetre, and its foot carry no tank. They are stored on the unit and move every day: food is eaten at the unit's ration
+rate, ammunition is spent by every day the unit fights, equipment is lost to battle and to wear,
+and fuel burns in camp, faster on the march and faster again in battle. They are
 **refilled by the monthly supply draw** (§ Upkeep, "Supply is drawn where the unit stands"): the
 share the network granted for the month arrives as a daily resupply. **Restock scales with cover
 (Ben, 2026-10-29):** each day a stock receives `share × (daily need + restock rate)`, capped at full
@@ -242,11 +245,22 @@ is more than 8 tiles from them (Ben, 2026-10-29):** a unit within 8 tiles of a r
 reaches draws its supply at that road, paid per item resupplied
 ([`LOGISTICS.md`](../economy/LOGISTICS.md) § A unit draws off the road).
 
-**Only the road gap starves (Ben, 2026-10-29).** The share that resupplies the stocks is the
-**Logistic Point share** at the unit's tile — whether the network reaches it. A nation that does
-not pay a unit's wage, or whose goods draw goes unmet, lowers that unit's readiness and morale
-through the supply factor (§ Upkeep), but **never empties its food**: hunger is a road problem,
-not a budget problem. **Starvation runs from the handoff (Ben, 2026-10-29):** the pre-game settle
+**The stocks are bought (Ben, 2026-11-19, overturning 2026-10-29's "only the road gap
+starves").** Once a month each unit pays for what its stocks were delivered: a month's **camp
+drain** at the ground it stands on, plus what a fight, a march or a refill was delivered beyond it
+(the stock's **account**, paid and cleared each month). So a war's shells and a march's fuel are
+bought in the month after they are spent, and a quiet unit at full stock buys its camp drain and
+nothing more. Food takes rations, ammunition ordnance, equipment the goods of the man's **kit** —
+his class's equipment and his design's — and fuel refined fuel; a coal-burning economy can raise
+armour but not run it. The purchase is one bid on the market the unit's tile clears against, by the
+one goods path (§ Upkeep): the whole want is posted, and what the shelf holds is sold and billed to
+the nation. Each stock's **bought share** is the share of its goods the shelf sold. Every tile of
+the home body belongs to a market (MARKETS.md § Market centres and seeding), so a unit there always has a shelf; an
+off-world body has none until its first building completes, and a unit standing there buys nothing. **A stock refills
+at the lower of its road share and its bought share** (Ben, 2026-11-19): a road that reaches the
+unit and a shelf that feeds it are both needed. So an unbought ration starves as surely as a road
+that does not reach. An unpaid wage still only lowers readiness and morale, through the supply
+factor (§ Upkeep). **Starvation runs from the handoff (Ben, 2026-10-29):** the pre-game settle
 keeps every stock full, and the stocks move only once the campaign begins.
 
 - **Hunger.** Below full food, the unit takes a **flat −15% to its attack and to its readiness
@@ -258,14 +272,33 @@ keeps every stock full, and the stocks move only once the campaign begins.
 - **Ammunition and equipment.** Each **scales every combat stat in proportion** — soft attack, hard
   attack, defence and breakthrough. **Ammunition is floored at 20%**: a unit out of shells still
   fights with small arms at close quarters. Equipment has no floor. The two multiply, with morale.
+- **Fuel (Ben, 2026-11-19).** It scales every combat stat as ammunition does, floored at 20%, and
+  multiplies with the others. **A unit whose fuel is gone cannot march**: the order is refused, and
+  an order in flight holds where it stands until fuel arrives, burning only its camp fuel. A
+  withdrawal from battle is not a march (§ Marching) and is not refused. A refit off the vehicles
+  takes the tank with them.
 
-The daily drain rates are authored in `scripts/economy.lua` § `economy.military.carried_supplies`
-(food per day, ammunition per day fighting, equipment per day and per day fighting, and the restock); the hunger
-step, the ammunition floor and the 180 days are the design's own numbers, not rates.
+The drain rates and the fills are authored in `scripts/economy.lua` §
+`economy.military.carried_supplies`; the hunger step, the ammunition and fuel floor and the 180
+days are the design's own numbers, not rates.
 
-The three stocks are what the round reads for supply. They are fed by the **Logistic Point share**
-granted at the unit's tile — only the road gap starves — while `supply_factor_permille` and the
-one decay rule (§ Upkeep) move readiness and morale; neither scales hits directly.
+| Rate | Authored | Meaning |
+|---|---|---|
+| `food_per_day` | `33` | The ration, per-mille a day |
+| `ammo_per_battle_day` | `50` | Spent per day fighting |
+| `equipment_attrition_per_month` | `50` | **Equipment wears 5% a month** (Ben, 2026-11-18), in peace as in war; a thirtieth a day |
+| `equipment_per_battle_day` | `10` | Lost per day fighting |
+| `fuel_per_day` | `2` | Burnt in camp |
+| `fuel_per_march_day` | `20` | Burnt on a day with a march order in flight, on top |
+| `fuel_per_battle_day` | `30` | Burnt on a day fighting, on top |
+| `restock_permille` | `500` | The restock, per-mille of a stock's full daily rate |
+| `food_fill_rations_per_head` | `0.00208333` | Rations one man's full food stock takes: a month's ration |
+| `ammo_fill_ordnance_per_head` | `0.0035` | Ordnance one man's full ammunition takes: twelve months of the old training fire |
+| `fuel_fill_refined_fuel_per_head` | `0.1` | Refined fuel one man's full fuel stock takes: the energy axis's hire cost per man |
+
+The stocks are what the round reads for supply. They are fed at the lower of the **Logistic Point
+share** granted at the unit's tile and the share the shelf sold, while `supply_factor_permille` and
+the one decay rule (§ Upkeep) move readiness and morale; neither scales hits directly.
 
 ### Recon (Ben, 2026-10-29)
 
@@ -1869,19 +1902,29 @@ and artillery pieces (`../generation/CORPORATION_GENERATION.md` § A major's ope
 nation, major or minor, opens with a reserve of those goods on its shelves. A minor with no works
 imports once its reserve is spent, so arms are real trade.
 
+**Equipment wears (Ben, 2026-11-18).** A land unit's equipment stock wears **5% a month**, in
+peace as in war (§ Carried supplies). Its monthly purchase buys the wear back: its men times each
+man's kit goods, times the month's wear. So an Arms Works always has a buyer whose
+demand is posted. A wear the shelf cannot sell is not replaced, and the unit fights with less.
+
 ### Force sizing (a rival nation's)
 
 A rival nation grows its forces until their **running cost** reaches a **target share of its
 income**. The player's nation is never sized; the player reads the same numbers and decides.
 
 - **The running cost** is the wages of every unit, wing and ship it holds or has mustering, plus
-  their running goods at posted prices.
+  their running goods at posted prices. A land unit's running goods are what its stocks buy in a
+  month at peace (§ Carried supplies): its ration, its equipment's wear and, for a fuelled class,
+  its fuel in camp.
 - **Income** is the nation's operating surplus over its last four returns: income and taxes less
   expenditure, maintenance and wages, never below zero (`../economy/FINANCE.md`
   § The monthly return). A good or bad month does not swing the army.
 - **The target share** is a base share raised by threat. **Threat** is the largest **force value**
   among its neighbours over its own. Below 1 it adds nothing: a nation does not shrink its share
-  for being the strongest. Above 1 the share climbs, to a ceiling.
+  for being the strongest. Above 1 the share climbs, to a ceiling. **Larger standing forces (Ben,
+  2026-11-18):** the base share is 30% of income and the ceiling 75%, one and a half times the first
+  cut, so rivals hold bigger armies in peace and draw more equipment. The ceiling is also what a
+  minor's income may pay its generated garrisons (`../generation/NATION_GENERATION.md`).
 - **Force value** is what a force would cost to hire: every unit, wing and ship at its hire price.
   A **neighbour** is a nation that shares a border with it, or that is hostile to it. A scorer
   reads one total per neighbour and nothing more: no position, no type, no count.
@@ -1912,7 +1955,10 @@ and wages every tick.
 **Upkeep is credits AND military goods** (Ben, 2026-08-17), so the cost is a **vector**: a credit
 wage plus a set of `{resource, qty}` draws bought off the shelf of the market the unit stands in,
 at the posted price under the fair-price ceiling. When the goods do not arrive the unit **weakens**
-rather than vanishing.
+rather than vanishing. **A land unit's goods are its stocks' purchase** (Ben, 2026-11-19; §
+Carried supplies): rations, ordnance, kit and fuel, bought each month to refill what it carries.
+`goods_per_head` below is the value anchor's and the supply claim's measure of those goods, not a
+second draw.
 
 The authored table, `scripts/economy.lua` § `economy.military.unit_upkeep`:
 

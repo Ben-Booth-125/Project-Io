@@ -11,7 +11,7 @@
 //       centre in it, verbatim.
 //   P3  Names are unique on their body.
 //   P4  Determinism: the same seed builds the same names, entry for entry.
-//   P5  The save carries them: today's (v98) stream round-trips every name.
+//   P5  The save carries them: today's (v100) stream round-trips every name.
 //   P6  A v97 stream (no name section) loads with no stored names, and
 //       `province_display_name` then reads each centre province's centre name.
 //   P7  A hostile v98 stream is refused whole: a name for an id that is not a
@@ -187,7 +187,7 @@ int main(int argc, char** argv)
         world r;
         const bool ok = from_bytes(o96.str(), r);
         bool reads = ok && r.province_name.empty()
-                     && o96.str().size() + world_save_province_names_section_bytes(w) == b.size();
+                     && o96.str().size() + world_save_province_names_section_bytes(w) + world_save_unit_stocks_section_bytes(w) /* BL-1678 (v100) follows */ == b.size();
         int checked = 0;
         if (reads)
             for (const auto& [pid, cid] : centre_of)
@@ -202,7 +202,7 @@ int main(int argc, char** argv)
     {
         // Hostile streams: rewrite the section's first record. Layout at the tail:
         // u32 count, then (u32 id, u32 len, bytes) per name, ascending id.
-        const std::size_t at = b.size() - world_save_province_names_section_bytes(w);
+        const std::size_t at = b.size() - world_save_unit_stocks_section_bytes(w) /* BL-1678 (v100) follows */ - world_save_province_names_section_bytes(w);
         std::string bad_id = b;
         const uint32_t not_a_province = 0xFFFFFFF0u;
         std::memcpy(&bad_id[at + 4], &not_a_province, sizeof not_a_province);

@@ -75,7 +75,7 @@ enum class corp_verb : uint8_t
     // command-at-tile / engagement-at-province split; see NR-405.
     // 2026-10-27 (Ben: "all marches go to a tile") RETURNED IT TO `tile`: the march
     // ends on its tile, and `province` is ignored. Same value, same position.
-    march_unit,    ///< Set/replace `subject`'s (a unit) movement order to tile `tile`, path-marched across ticks and ending on it; the path avoids every tile another nation's units stand on, save `tile` itself. rejected_not_owner / rejected_invalid (unknown unit or tile, a tile the type may not enter, off the unit's body, unreachable) / rejected_state (already on `tile`, in a battle, refitting, or spent — readiness 0 — and `tile` held by a nation the actor is hostile to) — see `march_check`. `province` is ignored.
+    march_unit,    ///< Set/replace `subject`'s (a unit) movement order to tile `tile`, path-marched across ticks and ending on it; the path avoids every tile another nation's units stand on, save `tile` itself. rejected_not_owner / rejected_invalid (unknown unit or tile, a tile the type may not enter, off the unit's body, unreachable) / rejected_state (already on `tile`, in a battle, refitting, out of fuel (BL-1678), or spent — readiness 0 — and `tile` held by a nation the actor is hostile to) — see `march_check`. `province` is ignored.
     halt_unit,     ///< Clear `subject`'s movement order. rejected_state if it has none.
     disband_unit,  ///< Erase `subject` (a unit) outright. No refund — manpower walks away.
     // --- BL-467: the battle seam (2026-08-21) ---

@@ -805,6 +805,7 @@ struct unit_upkeep_tick
     int disbanded    = 0; ///< Orphaned units erased this tick (see run_unit_upkeep).
     int unmet        = 0; ///< Units whose goods draw could not be met from the pool.
     int out_of_reach = 0; ///< Units beyond the reach field (trigger (a)).
+    int stock_draws  = 0; ///< BL-1678: units that bid for their carried stocks this tick.
 };
 
 /// BL-454's unit pass — the GOODS half of standing-force upkeep, plus the one

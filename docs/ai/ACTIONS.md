@@ -563,6 +563,7 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 - That unit is owned by the acting nation (rejected_not_owner otherwise).
 - The unit is NOT in a live battle (rejected_state otherwise) — walking away from contact is a priced withdrawal, not a free move; use withdraw_from_battle.
 - The unit is not refitting (rejected_state otherwise).
+- A fuelled class (one its roster row gates on energy) has fuel left (rejected_state otherwise; BL-1678, Ben 2026-11-19) - an order in flight holds where it stands while the tank is empty, until fuel arrives.
 - `tile` is a real tile (rejected_invalid otherwise) — the null default of an omitted field included.
 - The unit's type may enter the tile's domain (MILITARY.md § Domains and traversal): a land type marches on land only, no coast or lake tile, its own included; a roaded water tile counts as land, a bridge being a road (rejected_invalid otherwise).
 - The tile is on the SAME BODY as the unit — intra-body path march only, BL-470's ruling 1 (rejected_invalid otherwise).

@@ -1030,6 +1030,9 @@ k = 0/1/2/4 on seeds 0/43/10/28/38, k = 1 is the smallest k that takes a consumi
 at the ceiling against a stocked shelf to 0% (2.5% at k = 0); it passes run-rate income (50.8%
 against 47.2% at k = 0) and firm survival (83.5%, against 88.9% at k = 0), and lifts medical
 supply at ticks 20-50 from 31% to 51% of the household bid.
+**k is one month (Ben, 2026-11-18):** with the tick a month, k counts months, and a shelf's stock
+weighs on its price as at most one month of demand (it read as three, the quarter's k = 1 carried
+over in calendar time). A stocked good keeps its price, and its makers their margin, for longer.
 **A short shelf is shared pro-rata (Ben, 2026-10-07; BL-1209, shelf sees silenced want).** When a shelf cannot meet every
 draw admitted against it in a tick, each draw receives the same share of its need, not first-come
 by building id: a dip under the ceiling no longer lets the lowest-numbered plants empty the shelf

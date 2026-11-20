@@ -35,6 +35,7 @@
 #include "world/campaign_settle.hpp"
 #include "world/carried_supplies.hpp"
 #include "world/components.hpp"
+#include "world/corp_command.hpp"
 #include "world/economy_system.hpp"
 #include "world/province.hpp"
 #include "world/recipe_registry.hpp"
@@ -236,14 +237,19 @@ int main()
     recipe_registry reg;
     reg.load_from_lua(lua);
     const carried_supply_params& sp = reg.military().supplies;
-    std::printf("  authored: food %d/day, ammunition %d/battle day, equipment %d/day + %d/battle day, "
+    std::printf("  authored: food %d/day, ammunition %d/battle day, equipment %d/month + %d/battle day, "
                 "restock %d permille of the full rate (break-even %.1f permille)\n",
-                sp.food_per_day, sp.ammo_per_battle_day, sp.equipment_attrition_per_day,
+                sp.food_per_day, sp.ammo_per_battle_day, sp.equipment_attrition_per_month,
                 sp.equipment_per_battle_day, sp.restock_permille,
                 1000.0 * 1000.0 / (1000.0 + sp.restock_permille));
     const carried_supply_params defaults{};
     check(sp.food_per_day == defaults.food_per_day && sp.ammo_per_battle_day == defaults.ammo_per_battle_day
-              && sp.equipment_attrition_per_day == defaults.equipment_attrition_per_day
+              && sp.equipment_attrition_per_month == defaults.equipment_attrition_per_month
+              && sp.fuel_per_day == defaults.fuel_per_day && sp.fuel_per_march_day == defaults.fuel_per_march_day
+              && sp.fuel_per_battle_day == defaults.fuel_per_battle_day
+              && sp.food_fill_rations_per_head == defaults.food_fill_rations_per_head
+              && sp.ammo_fill_ordnance_per_head == defaults.ammo_fill_ordnance_per_head
+              && sp.fuel_fill_refined_fuel_per_head == defaults.fuel_fill_refined_fuel_per_head
               && sp.equipment_per_battle_day == defaults.equipment_per_battle_day
               && sp.restock_permille == defaults.restock_permille,
           "S0 the C++ defaults match the authored rates");
@@ -562,7 +568,7 @@ int main()
         check(rejects("economy.military.carried_supplies.food_per_day = -1"), "S9a a negative rate");
         check(rejects("economy.military.carried_supplies.ammo_per_battle_day = 1001"), "S9b a rate past 1000");
         check(rejects("economy.military.carried_supplies.equipment_per_battle_day = 2.5"), "S9c a fraction");
-        check(rejects("economy.military.carried_supplies.fuel_per_day = 3"), "S9d an unknown key");
+        check(rejects("economy.military.carried_supplies.oil_per_day = 3"), "S9d an unknown key"); // BL-1678: fuel_per_day is a rate now
     }
 
     // -----------------------------------------------------------------------
@@ -686,16 +692,22 @@ int main()
             c.w.tiles.at(c.w.units.at(c.u).position).cover = cover;
             wear_out = unit_terrain_effects(c.w, reg.military(), c.w.units.at(c.u)).wear;
             for (int day = 1; day <= 10; ++day) (void)run_military_day(c.w, reg, k_live + day);
-            return c.w.units.at(c.u).equipment_permille;
+            // BL-1678: the wear is a thirtieth of the month's 50 a day, so the drain is read to
+            // the millionth (stock and remainder), not in whole per-mille.
+            const unit_component& eu = c.w.units.at(c.u);
+            return 1000LL * k_supply_remainder_unit
+                 - (static_cast<long long>(eu.equipment_permille) * k_supply_remainder_unit + eu.equipment_remainder);
         };
         float wear_dunes = 0.0f, wear_plain = 0.0f;
-        const int dunes = equip_after(terrain_cover::dunes, wear_dunes);
-        const int plain = equip_after(terrain_cover::grass, wear_plain);
-        std::printf("      light armour, no cover, 10 days: equipment %d on grass (wear %.2f), %d on dunes (wear %.2f)\n",
-                    plain, static_cast<double>(wear_plain), dunes, static_cast<double>(wear_dunes));
-        check(wear_dunes > 1.0f && wear_plain == 1.0f
-                  && 1000 - dunes == (1000 - plain) * 3 / 2,
-              "S14 on dunes the equipment drain is x1.5 the plains drain (15 against 10 over ten days)");
+        const long long dunes = equip_after(terrain_cover::dunes, wear_dunes);
+        const long long plain = equip_after(terrain_cover::grass, wear_plain);
+        std::printf("      light armour, no cover, 10 days: drain %.3f permille on grass (wear %.2f), %.3f on dunes (wear %.2f)\n",
+                    plain / 1e6, static_cast<double>(wear_plain), dunes / 1e6, static_cast<double>(wear_dunes));
+        // Each day's drain rounds to a thousandth of a per-mille (1000 millionths): ten days
+        // may differ from x1.5 exactly by at most ten of those.
+        check(wear_dunes > 1.0f && wear_plain == 1.0f && plain > 0
+                  && std::llabs(dunes * 2 - plain * 3) <= 2 * 10 * 1000,
+              "S14 on dunes the equipment drain is x1.5 the plains drain (25 against 16.67 over ten days)");
     }
 
     // BL-1540 (rival march supply): the rival scorer reads these forward, so they must be the
@@ -745,6 +757,152 @@ int main()
         check(death_ok, "S15c the death read is the day the last man goes, at every share, or never at break-even");
         check(price_ok && carried_hunger_price_permille(sp, 1000, 0) == 1000,
               "S15d every share below break-even is priced, falling as it rises; zero at 667 and past");
+    }
+
+    // -----------------------------------------------------------------------
+    std::printf("\nS16 - the stocks are bought; fuel (BL-1678, Ben 2026-11-19)\n");
+    {
+        const uint16_t la = static_cast<uint16_t>(modern_row_for(land_class::light_armour));
+        unit_component probe_la, probe_inf;
+        probe_la.type = la;
+        probe_inf.type = infantry();
+        check(unit_carries_fuel(probe_la) && !unit_carries_fuel(probe_inf),
+              "S16a light armour (energy-gated) carries fuel; infantry (ungated) does not");
+
+        // An unbought ration starves on a covered road: the lower of the two shares.
+        const auto food_after = [&](int road, int bought, int days) {
+            camp c;
+            build_camp(c, road);
+            c.w.units.at(c.u).food_permille        = 500;
+            c.w.units.at(c.u).food_bought_permille = bought;
+            for (int day = 1; day <= days; ++day) (void)run_military_day(c.w, reg, k_live + day);
+            return c.w.units.at(c.u).food_permille;
+        };
+        const int unbought = food_after(1000, 0, 10);
+        const int low_road = food_after(300, 800, 20), low_shelf = food_after(800, 300, 20);
+        std::printf("      covered road, nothing bought, 10 days: food %d; road 300/shelf 800 %d, road 800/shelf 300 %d\n",
+                    unbought, low_road, low_shelf);
+        check(unbought == 500 - 10 * sp.food_per_day, "S16b a ration the shelf did not sell is not delivered, road or no road");
+        check(low_road == low_shelf, "S16c a stock refills at the lower of the road share and the bought share");
+
+        // Fuel: camp, march, and the combat scale.
+        camp f;
+        build_camp(f, 0);
+        f.w.units.at(f.u).type = la;
+        for (int day = 1; day <= 10; ++day) (void)run_military_day(f.w, reg, k_live + day);
+        camp g;
+        build_camp(g, 0);
+        for (int day = 1; day <= 10; ++day) (void)run_military_day(g.w, reg, k_live + day);
+        std::printf("      unsupplied 10 days: light armour fuel %d, infantry fuel %d\n",
+                    f.w.units.at(f.u).fuel_permille, g.w.units.at(g.u).fuel_permille);
+        check(f.w.units.at(f.u).fuel_permille == 1000 - 10 * sp.fuel_per_day && g.w.units.at(g.u).fuel_permille == 1000,
+              "S16d a carrier burns fuel in camp; a unit that carries none never moves it");
+
+        unit_component half = probe_la, empty = probe_la, inf_empty = probe_inf;
+        half.fuel_permille = 500;
+        empty.fuel_permille = 0;
+        inf_empty.fuel_permille = 0; // not a carrier: unreachable, but the scale must still read it
+        std::printf("      combat term: fuel 500 -> %d, fuel 0 -> %d\n", carried_combat_permille(half),
+                    carried_combat_permille(empty));
+        check(carried_combat_permille(half) == 500 && carried_combat_permille(empty) == k_ammo_floor_permille,
+              "S16e fuel scales every combat stat as ammunition does, floored at 20%");
+        check(unit_out_of_fuel(empty) && !unit_out_of_fuel(half) && !unit_out_of_fuel(inf_empty),
+              "S16f only a carrier with no fuel is out of fuel");
+
+        // An empty tank holds: march_check refuses, and an order in flight does not step. The
+        // destination is EMPTY ground, so nothing but the tank can hold it; the same order with
+        // fuel steps.
+        const auto march_10 = [&](int fuel, corp_command_result* mc_out) {
+            camp m;
+            build_camp(m, 0); // no road: nothing refuels the empty tank on the way
+            unit_component& mu = m.w.units.at(m.u);
+            mu.type = la;
+            mu.fuel_permille = fuel;
+            const entity_id from = mu.position;
+            const entity_id body = m.w.tiles.at(from).body;
+            movement_order mo;
+            mo.path       = { from, tile_at(m.w, body, 3) };
+            mo.dest       = mo.path.back();
+            mo.next_index = 1;
+            if (mc_out != nullptr)
+                *mc_out = march_check(m.w, mu.owner, m.u, mo.dest, null_entity, nullptr, &reg.military());
+            mu.order = mo;
+            for (int day = 1; day <= 10; ++day) (void)run_military_day(m.w, reg, k_live + day);
+            return m.w.units.at(m.u).position != from;
+        };
+        corp_command_result mc = corp_command_result::applied;
+        const bool moved_empty = march_10(0, &mc);
+        const bool moved_fuel  = march_10(1000, nullptr);
+        std::printf("      out of fuel: march_check %d, moved in 10 days: empty %s, fuelled %s%s", static_cast<int>(mc),
+                    moved_empty ? "yes" : "no", moved_fuel ? "yes" : "no", "\n");
+        check(mc == corp_command_result::rejected_state && !moved_empty && moved_fuel,
+              "S16g a unit out of fuel cannot march: the order is refused, and one in flight holds (a fuelled one steps)");
+
+        // Fighting at full cover keeps a stock full - and runs an account: the next purchase pays
+        // for the shells it was delivered (the review's case: never billed before).
+        duel acct;
+        build_duel(acct, 3000, 3000);
+        for (int day = 1; day <= 5; ++day) (void)run_military_day(acct.w, reg, k_live + day);
+        const unit_component& au = acct.w.units.at(acct.ua);
+        std::printf("      5 days fighting at full cover: ammunition %d, ammunition account %d thousandths%s",
+                    au.ammo_permille, au.ammo_owed, "\n");
+        check(au.ammo_owed > 0, "S16k a fight's deliveries go on account, to be paid at the next purchase");
+
+        // A quiet unit at full moves nothing day to day: no account, no churn.
+        camp q;
+        build_camp(q, 1000);
+        q.w.units.at(q.u).type = la;
+        for (int day = 1; day <= 30; ++day) (void)run_military_day(q.w, reg, k_live + day);
+        const unit_component& qu = q.w.units.at(q.u);
+        check(qu.food_owed == 0 && qu.ammo_owed == 0 && qu.equipment_owed == 0 && qu.fuel_owed == 0
+                  && qu.food_permille == 1000 && qu.fuel_permille == 1000 && qu.equipment_permille == 1000,
+              "S16l a quiet unit at full cover holds full with nothing on account");
+
+        // The one conversion: 1000 men, a full food stock is a month's ration.
+        unit_component men = probe_inf;
+        men.count = 1000;
+        const auto goods = carried_stock_goods(f.w, sp, men, 1000, 1000, 0, 1000);
+        const float rations  = goods[static_cast<std::size_t>(resource_type::food_rations)];
+        const float ordnance = goods[static_cast<std::size_t>(resource_type::ordnance)];
+        const float fuel     = goods[static_cast<std::size_t>(resource_type::refined_fuel)];
+        std::printf("      1000 infantry, full food/ammunition/fuel: rations %.4f, ordnance %.4f, fuel %.4f\n",
+                    static_cast<double>(rations), static_cast<double>(ordnance), static_cast<double>(fuel));
+        check(std::fabs(rations - 1000.0f * sp.food_fill_rations_per_head) < 1e-4f
+                  && std::fabs(ordnance - 1000.0f * sp.ammo_fill_ordnance_per_head) < 1e-4f && fuel == 0.0f,
+              "S16h the conversion: a man's full stock is its authored fill; a non-carrier buys no fuel");
+
+        // The save (v100) and the hash carry the fuel stock and the bought shares.
+        camp sv;
+        build_camp(sv, 1000);
+        sv.w.units.at(sv.u).type = la;
+        const std::uint64_t h_full = sv.w.state_hash(1);
+        unit_component& su = sv.w.units.at(sv.u);
+        su.fuel_permille = 640;
+        su.fuel_remainder = 12345;
+        su.food_bought_permille = 900;
+        su.ammo_bought_permille = 0;
+        su.equipment_bought_permille = 250;
+        su.fuel_bought_permille = 777;
+        su.ammo_owed = 41000;
+        su.fuel_owed = -500;
+        const std::string b = to_bytes(sv.w);
+        world back;
+        const bool ok = from_bytes(b, back);
+        const unit_component* bu = ok && back.units.count(sv.u) ? &back.units.at(sv.u) : nullptr;
+        const bool same = bu != nullptr && bu->fuel_permille == 640 && bu->fuel_remainder == 12345
+            && bu->food_bought_permille == 900 && bu->ammo_bought_permille == 0
+            && bu->equipment_bought_permille == 250 && bu->fuel_bought_permille == 777
+            && bu->ammo_owed == 41000 && bu->fuel_owed == -500 && bu->food_owed == 0;
+        check(same && to_bytes(back) == b && back.state_hash(1) == sv.w.state_hash(1)
+                  && sv.w.state_hash(1) != h_full && world_save_unit_stocks_section_bytes(sv.w) == 4 + 44,
+              "S16i the v100 section round-trips the fuel stock, the bought shares and the accounts, hashed off the defaults");
+        std::ostringstream o96(std::ios::binary);
+        write_world_snapshot_pre_unit_stocks(sv.w, o96);
+        world w96;
+        const bool ok96 = from_bytes(o96.str(), w96);
+        check(ok96 && o96.str().size() + world_save_unit_stocks_section_bytes(sv.w) == b.size()
+                  && w96.units.count(sv.u) && unit_stocks_bought_default(w96.units.at(sv.u)),
+              "S16j a v99 stream (the strict prefix) reads with full fuel and every stock bought in full");
     }
 
     std::printf("\n%d passed, %d failed\n", g_pass, g_fail);

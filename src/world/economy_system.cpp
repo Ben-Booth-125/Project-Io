@@ -28,6 +28,7 @@
 #include "unit_roster.hpp"     // resolve_unit_upkeep (BL-454 unit pass), unit_roster_table (BL-470)
 #include "workforce.hpp"
 #include "campaign_settle.hpp" // BL-1452: k_campaign_settle_ticks - the settle keeps the stocks full
+#include "carried_supplies.hpp" // BL-1678: the stocks the monthly draw buys
 
 #include <algorithm>
 #include <array>
@@ -2107,6 +2108,15 @@ void advance_refits_days(world& w, int days)
             continue;
         u.type       = u.refit_type;
         u.kit        = u.refit_kit; // BL-1434: the design the refit paid for
+        if (!unit_carries_fuel(u))
+        {
+            // BL-1678: a unit refitted off the vehicles carries no tank - its fuel stock and
+            // account return to the defaults, so nothing stale is read or saved.
+            u.fuel_permille = 1000;
+            u.fuel_remainder = 0;
+            u.fuel_bought_permille = 1000;
+            u.fuel_owed = 0;
+        }
         u.refit_type = k_no_refit;
         u.refit_kit  = unit_design{};
         u.refit_days = 0;
@@ -4299,6 +4309,76 @@ unit_upkeep_tick run_unit_upkeep(world& w, const recipe_registry& reg, economy_r
         // unit whose nation, base or tile is gone, so every unit left is alive.)
         {
             ++out.units; // alive, counted, untouched by the rest of this loop
+            // THE STOCKS ARE BOUGHT (BL-1678, Ben 2026-11-19; MILITARY.md § Carried supplies):
+            // once a month each unit pays for what its stocks were delivered - a month's camp
+            // drain at the ground it stands on (`carried_month_drain`, the equipment's x the
+            // tile's wear) plus each stock's account (`*_owed`: what a fight, a march or a
+            // refill was delivered beyond it), turned into goods by the one conversion
+            // (`carried_stock_goods`). THE ONE GOODS PATH (`draw_goods_or_bid`): the whole want
+            // is posted on the market the unit's tile clears against, and what the shelf holds
+            // is sold, billed to the nation by the clear. Each stock's BOUGHT SHARE is the mean
+            // met share of its goods; the day refills it at the lower of that and the road
+            // share (carried_supplies.cpp). The accounts are then settled to zero.
+            if (u.count > 0)
+            {
+                const auto wt = w.tiles.find(u.position);
+                if (wt != w.tiles.end())
+                {
+                    const carried_supply_params& sp = reg.military().supplies;
+                    const std::array<int, 4> drain = carried_month_drain(sp, u);
+                    const float ground = unit_terrain_effects(w, reg.military(), u).wear;
+                    const double wear  = (std::isfinite(ground) && ground > 0.0f) ? static_cast<double>(ground) : 1.0;
+                    // Per-mille, rounded from the thousandths the accounts keep; never below 0.
+                    const auto bill = [](int64_t camp_milli, int32_t owed) {
+                        return static_cast<int>(std::max<int64_t>(0, (camp_milli + owed + 500) / 1000));
+                    };
+                    const std::array<int, 4> want = {
+                        bill(int64_t{drain[0]} * 1000, u.food_owed),
+                        bill(int64_t{drain[1]} * 1000, u.ammo_owed),
+                        bill(std::llround(static_cast<double>(drain[2]) * 1000.0 * wear), u.equipment_owed),
+                        unit_carries_fuel(u) ? bill(int64_t{drain[3]} * 1000, u.fuel_owed) : 0 };
+                    std::array<std::array<float, resource_count>, 4> per{};
+                    per[0] = carried_stock_goods(w, sp, u, want[0], 0, 0, 0);
+                    per[1] = carried_stock_goods(w, sp, u, 0, want[1], 0, 0);
+                    per[2] = carried_stock_goods(w, sp, u, 0, 0, want[2], 0);
+                    per[3] = carried_stock_goods(w, sp, u, 0, 0, 0, want[3]);
+                    std::array<float, resource_count> need{};
+                    bool any = false;
+                    for (const auto& g : per)
+                        for (std::size_t r = 0; r < resource_count; ++r)
+                        {
+                            need[r] += g[r];
+                            any = any || g[r] > 0.0f;
+                        }
+                    std::array<int, 4> bought = { 1000, 1000, 1000, 1000 };
+                    if (any)
+                    {
+                        draw_outcome rec;
+                        (void)draw_goods_or_bid(w, reg, report, u.owner, wt->second.body, u.position, need, &rec);
+                        ++out.stock_draws;
+                        // A good bought for two stocks is met in the same share for both.
+                        for (std::size_t k = 0; k < 4; ++k)
+                        {
+                            int sum = 0, goods = 0;
+                            for (std::size_t r = 0; r < resource_count; ++r)
+                            {
+                                if (per[k][r] <= 0.0f || rec.need[r] <= 0.0f)
+                                    continue;
+                                ++goods;
+                                sum += rec.met[r] >= rec.need[r]
+                                    ? 1000
+                                    : static_cast<int>(std::clamp(rec.met[r] / rec.need[r], 0.0f, 1.0f) * 1000.0f);
+                            }
+                            bought[k] = goods > 0 ? sum / goods : 1000;
+                        }
+                    }
+                    u.food_bought_permille      = bought[0];
+                    u.ammo_bought_permille      = bought[1];
+                    u.equipment_bought_permille = bought[2];
+                    u.fuel_bought_permille      = bought[3];
+                    u.food_owed = u.ammo_owed = u.equipment_owed = u.fuel_owed = 0;
+                }
+            }
             continue;
         }
         if (u.muster_base != null_entity && w.buildings.find(u.muster_base) == w.buildings.end())
@@ -5093,6 +5173,8 @@ unit_march_tick run_unit_march(world& w, const recipe_registry& reg, int day_tic
             continue; // halted / never ordered
         if (fighting.count(id) != 0)
             continue; // in a battle: it holds
+        if (unit_out_of_fuel(u))
+            continue; // BL-1678: its fuel is gone - it holds, its order kept, until resupplied
 
         ++out.marching;
 

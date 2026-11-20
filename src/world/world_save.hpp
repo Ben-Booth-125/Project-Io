@@ -869,17 +869,32 @@ inline constexpr uint32_t k_province_name_max_bytes = 64;
 /// migration (`save_game_refusal_reason` says why). The world reader still DECODES v98
 /// and older for the layout harness rows; an old stream whose tech count exceeds this
 /// tree is refused by `r_nation_tech` on its own terms.
-/// MERGE NOTE: a parallel lane's bump renumbers this block (this paragraph, the
-/// constants below, the accepted-version line in `read_world_snapshot`, the
-/// static_assert under the tail table, and the game load's refusal in save_game.cpp).
-inline constexpr uint32_t world_save_version = 99;
 
 /// BL-1712: the first stream of the trimmed Digitisation tree. Every game save below it
 /// is refused (`read_save_game`).
 inline constexpr uint32_t k_world_save_version_tree_trim = 99;
+/// **100 (BL-1678; MILITARY.md § Carried supplies, "The stocks are bought") - THE UNIT
+/// STOCKS.** Appended last, after v98's province names, after a u32 count: every land unit -
+/// standing (`world::units`) or aboard a ship (`ship_component::aboard`) - whose fuel stock
+/// or bought shares are off their defaults (`unit_stocks_bought_default`), ascending id, as
+/// (id, i32 fuel_permille, i32 fuel_remainder, i32 food_bought, i32 ammo_bought, i32
+/// equipment_bought, i32 fuel_bought, i32 food_owed, i32 ammo_owed, i32 equipment_owed, i32
+/// fuel_owed) - 44 bytes. Untrusted: ids strictly ascending, each a unit in the stream, every
+/// per-mille in [0, 1000], the remainder in [0, 10^6) and 0 on a full stock, each account in
+/// [-10^8, 10^8] thousandths, no record at the defaults. Refused whole otherwise. v99 is a STRICT PREFIX
+/// of v100 and is read too (`k_world_save_version_pre_unit_stocks`), as a world whose units
+/// hold full fuel and bought every stock in full (v98 and older as well). A game save
+/// of v99 still opens: the tree-trim door refuses below v99, not below v100.
+inline constexpr uint32_t world_save_version = 100;
 
 /// BL-1637: the first version carrying the pad-boost section (see above).
 inline constexpr uint32_t k_world_save_version_launch_boost = 96;
+
+/// BL-1678: the first version carrying the unit stocks section (see above).
+inline constexpr uint32_t k_world_save_version_unit_stocks = 100;
+
+/// BL-1678: v99, a strict prefix of v100.
+inline constexpr uint32_t k_world_save_version_pre_unit_stocks = k_world_save_version_unit_stocks - 1;
 
 /// BL-1637: v95, a strict prefix of v96.
 inline constexpr uint32_t k_world_save_version_pre_launch_boost = k_world_save_version_launch_boost - 1;
@@ -1246,8 +1261,10 @@ inline constexpr bool world_stream_has_launch_boost(uint32_t v) { return v >= k_
 /// BL-1706: from v97 each war record carries its sides (joiners, requests, refusals,
 /// separate offers).
 inline constexpr bool world_stream_has_war_joiners(uint32_t v) { return v >= k_world_save_version_war_joiners && !world_stream_is_space_line(v); }
-/// BL-1708: from v97 the stream ends with the province-name section.
+/// BL-1708: from v98 the stream carries the province-name section.
 inline constexpr bool world_stream_has_province_names(uint32_t v) { return v >= k_world_save_version_province_names && !world_stream_is_space_line(v); }
+/// BL-1678: from v100 the stream ends with the unit stocks section.
+inline constexpr bool world_stream_has_unit_stocks(uint32_t v) { return v >= k_world_save_version_unit_stocks && !world_stream_is_space_line(v); }
 
 /// BL-1539: the first version carrying the research-books section (see above).
 inline constexpr uint32_t k_world_save_version_research_books = 80;
@@ -1574,11 +1591,17 @@ void write_world_snapshot_pre_launch_boost(const world& w, std::ostream& out);
 /// BL-1637: the v96 section's bytes (4 + 8 per pad holding boost).
 std::size_t world_save_launch_boost_section_bytes(const world& w);
 
-/// BL-1708, VERIFICATION ONLY: the v96 stream shape - no province-name section.
+/// BL-1708, VERIFICATION ONLY: the v97 stream shape - no province-name section.
 void write_world_snapshot_pre_province_names(const world& w, std::ostream& out);
 
-/// BL-1708: the v97 section's bytes (4 + per name 4 + 4 + its length).
+/// BL-1708: the v98 section's bytes (4 + per name 4 + 4 + its length).
 std::size_t world_save_province_names_section_bytes(const world& w);
+
+/// BL-1678, VERIFICATION ONLY: the v99 stream shape - no unit stocks section.
+void write_world_snapshot_pre_unit_stocks(const world& w, std::ostream& out);
+
+/// BL-1678: the v100 section's bytes (4 + 44 per unit, standing or aboard, off the defaults).
+std::size_t world_save_unit_stocks_section_bytes(const world& w);
 
 /// BL-1632: the byte lengths of the v57..v66 trailing sections `w` writes, each
 /// mirroring its writer block field for field - the construction days (v57), the unit

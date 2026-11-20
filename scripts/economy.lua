@@ -1109,12 +1109,27 @@ economy = {
         -- (a full stock lasts ~121 days) instead of 16.5.
         -- The hunger step (-15%), the ammunition floor (20%) and starvation's 180 days
         -- are the design's own numbers (carried_supplies.hpp), not rates.
+        -- BL-1678 (Ben, 2026-11-19; MILITARY.md § Carried supplies, "The stocks are
+        -- bought"): equipment wears 5% of full A MONTH (Ben, 2026-11-18: "5% of a unit's
+        -- kit per month"; was 1 a day). FUEL is a fourth stock, carried only by a class its
+        -- roster row gates on energy: 2 a day in camp (6% a month - its standing buy), 20
+        -- more on a day on the march, 30 more on a day fighting. The FILLS are the goods
+        -- one man's full stock takes, bought once a month off the shelf: food a month's
+        -- ration (goods_per_head's), ammunition twelve months of the old training fire,
+        -- fuel the energy axis's hire cost per man (hire_axis_cost 5 / 50 men).
+        -- Equipment takes the man's kit (refill_goods_per_man), not authored here.
         carried_supplies = {
-            food_per_day                = 33,
-            ammo_per_battle_day         = 50,
-            equipment_attrition_per_day = 1,
-            equipment_per_battle_day    = 10,
-            restock_permille            = 500,
+            food_per_day                  = 33,
+            ammo_per_battle_day           = 50,
+            equipment_attrition_per_month = 50,
+            equipment_per_battle_day      = 10,
+            restock_permille              = 500,
+            fuel_per_day                  = 2,
+            fuel_per_march_day            = 20,
+            fuel_per_battle_day           = 30,
+            food_fill_rations_per_head      = 0.00208333,
+            ammo_fill_ordnance_per_head     = 0.0035,
+            fuel_fill_refined_fuel_per_head = 0.1,
         },
 
         -- BL-1455 (Ben, 2026-10-29; MILITARY.md § Terrain and the classes): GROUND
@@ -2061,7 +2076,7 @@ economy = {
         --     G3 firms     88.9%  83.5%  83.5%  83.0%
         -- k = 1 is the smallest k that takes a consuming price at the ceiling
         -- against a stocked shelf to 0 and passes run-rate income.
-        shelf_supply_ticks = 3, -- months: the quarter's k = 1 in calendar time (BL-1642)
+        shelf_supply_ticks = 1, -- months (Ben, 2026-11-18: one month of demand; was 3, the quarter's k = 1 carried over by BL-1642)
     },
 
     -- ===================================================================
