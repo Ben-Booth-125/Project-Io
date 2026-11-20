@@ -883,11 +883,6 @@ bool push_target_fed(world& w, const recipe_registry& reg, unit_draw_memo& memo,
                                          unit_tile_cover_permille(w, memo, nation, tile)) == 0;
 }
 
-bool front_push_halted_for_supply(const world& w, entity_id nation, entity_id key)
-{
-    return w.fronts_cache.push_halted_supply.count({ nation, key }) != 0;
-}
-
 std::vector<entity_id> front_push_tiles(world& w, const recipe_registry& reg, const front& f,
                                         const std::vector<entity_id>& members)
 {
@@ -1264,7 +1259,6 @@ front_step advance_fronts(world& w, const recipe_registry& reg)
 {
     front_step out;
     reanchor_fronts(w);
-    w.fronts_cache.push_halted_supply.clear(); // BL-1707: re-read below, front by front
 
     // (nation, key) -> its assigned units, ascending id.
     std::map<std::pair<entity_id, entity_id>, std::vector<entity_id>> groups;
@@ -1448,18 +1442,12 @@ front_step advance_fronts(world& w, const recipe_registry& reg)
             const std::map<entity_id, int64_t> held =
                 push_strengths(w, nk.first, push_candidates(w, rs, *f));
             // BL-1707 (MILITARY.md § Fronts, "A push stops where supply stops"; Ben,
-            // 2026-11-19): a target the unit would not be fed on is skipped like a walled
-            // one, so a unit with no fed target holds its slot. One memo per front: the
-            // network does not move while the front issues its orders.
+            // 2026-11-19, made per unit at his live click): a target the unit would not be
+            // fed on is skipped like a walled one, so a unit with no fed target holds its
+            // slot while the rest of the front pushes. The front is never marked halted;
+            // the player moves a held unit on by hand. One memo per front: the network does
+            // not move while the front issues its orders.
             unit_draw_memo memo;
-            bool any_target = false, any_fed = false;
-            for (const auto& [t, st] : held)
-            {
-                any_target = true;
-                if (push_target_fed(w, reg, memo, nk.first, t)) { any_fed = true; break; }
-            }
-            if (any_target && !any_fed)
-                w.fronts_cache.push_halted_supply.insert(nk);
             for (std::size_t i = 0; i < n; ++i)
             {
                 const entity_id uid = line[i];

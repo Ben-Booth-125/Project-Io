@@ -67,10 +67,6 @@ struct front_cache
     bool          built = false;
     std::uint64_t territory_generation = 0; ///< `world::territory_generation` at derivation.
     std::map<entity_id, std::vector<front>> by_nation; ///< Nations with no front are absent.
-    /// BL-1707 (MILITARY.md § Fronts, "A push stops where supply stops"): the (nation, key)
-    /// of every front `advance_fronts` last found set to push with a target across it but
-    /// none its units would be fed on. What the front card reads; derived like the rest.
-    std::set<std::pair<entity_id, entity_id>> push_halted_supply;
 };
 
 /// Every front of `nation`, ordered by (neighbour, key). Empty for a nation with
@@ -161,10 +157,6 @@ std::vector<entity_id> front_push_tiles(world& w, const recipe_registry& reg, co
 /// declaration's supplied-front test reads. Memoised in @p memo for one pass.
 bool push_target_fed(world& w, const recipe_registry& reg, unit_draw_memo& memo, entity_id nation,
                      entity_id tile);
-
-/// BL-1707: has the front keyed @p key of @p nation halted its push for supply, as of the last
-/// `advance_fronts`? Read-only, for the front card.
-bool front_push_halted_for_supply(const world& w, entity_id nation, entity_id key);
 
 /// BL-1540: hex steps between two tiles of one body, the straight read a scorer may take of a
 /// march. No path is solved.

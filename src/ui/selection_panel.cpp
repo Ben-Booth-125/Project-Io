@@ -4882,16 +4882,14 @@ bool draw_front_selection(const world& w, ui_state& ui)
         }
         if (!open && !pushing)
             ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::negative), "Not hostile");
-        else if (pushing && open && front_push_halted_for_supply(w, nation, view.f.key))
-        {
-            // BL-1707 (MILITARY.md § Fronts, "A push stops where supply stops"): the push
-            // is ordered, but no ground across is ground its units would be fed on.
-            ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::negative), "Halted: no supply beyond");
-            if (ImGui::IsItemHovered())
-                ImGui::SetTooltip("Units push only onto ground they would be fed on. Extend roads or Logistic Points to push on.");
-        }
         else
+        {
             ImGui::TextDisabled(pushing ? "Pushing" : "Holding");
+            // BL-1707 (MILITARY.md § Fronts, "A push stops where supply stops"): per unit,
+            // never a halt on the front - said once on hover, where the push is ordered.
+            if (pushing && ImGui::IsItemHovered())
+                ImGui::SetTooltip("Each unit pushes only onto ground it would be fed on; a unit with none ahead holds until you move it.");
+        }
         if (unanswered)
         {
             ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::negative), "War unanswered");

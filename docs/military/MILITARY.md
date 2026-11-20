@@ -577,10 +577,11 @@ push acts as hold until it returns.
 **A push stops where supply stops (Ben, 2026-11-19).** A push target must be ground the pushing
 unit would be fed on: its nation's cover there at or past **break-even**, the share at which food
 holds steady (§ Carried supplies). This is the cover the declaration's supplied-front test reads
-(`../politics/RELATIONS.md` § Who declares). A target below it is skipped like a walled one. A unit
-with no fed target holds its slot on the span, so a push halts at the edge of its network and
-resumes the day roads or Logistic Points reach further. The rule is the front's, so it binds every
-nation's fronts alike. The front card says when a push has halted for supply.
+(`../politics/RELATIONS.md` § Who declares). A target below it is skipped like a walled one. **The
+decision is each unit's, never the front's (Ben, 2026-11-19):** a front is often fed in some places
+and not others, so the push stays ordered and every unit with fed ground ahead marches on, while a
+unit with none holds its slot until roads or Logistic Points reach further or the player moves it
+by hand. A unit's own march order is not bound by the rule. It binds every nation's fronts alike.
 
 **When the border moves.** Fronts re-derive from the territory map and the occupation layer. An assignment or order follows
 its key. If the key no longer names a front, it moves to the front toward the **same neighbour**

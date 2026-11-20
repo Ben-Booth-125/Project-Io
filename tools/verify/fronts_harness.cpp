@@ -2603,10 +2603,10 @@ int main()
         };
         fixture bare; build(bare); // no network: nothing across is fed
         const auto [crossed_bare, key_bare] = at_war_pushing(bare);
-        const bool halted = front_push_halted_for_supply(bare.w, bare.A, nation_fronts(bare.w, bare.A).front().key);
+        const bool still_push = front_order_of(bare.w, bare.A, key_bare) == front_order::push;
         check(!crossed_bare && bare.w.tile_occupier.empty(),
               "F14a at war with push ordered and no fed ground across: no unit leaves its own ground");
-        check(halted, "F14b the front is marked halted for supply (the card's line)");
+        check(still_push, "F14b the front's order stays push: no halt is applied, each unit holds on its own");
         bool on_slots = true;
         for (const auto& [uid, u] : bare.w.units)
             if (u.owner == bare.A)
@@ -2616,8 +2616,6 @@ int main()
         fixture fed; build(fed); feed(fed);
         const auto [crossed_fed, key_fed] = at_war_pushing(fed);
         check(crossed_fed && !fed.w.tile_occupier.empty(), "F14d the same war with fed ground across: the push marches and occupies");
-        check(!front_push_halted_for_supply(fed.w, fed.A, nation_fronts(fed.w, fed.A).front().key),
-              "F14e and the front is not marked halted");
         {
             unit_draw_memo memo;
             int unfed_occupied = 0;
