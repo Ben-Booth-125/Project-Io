@@ -130,8 +130,8 @@ bool draw_missile_section(const world& w, const recipe_registry& reg, ui_state& 
         }
         ImGui::EndDisabled();
         if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
-            ImGui::SetTooltip("Interceptors thin a missile strike on this unit's province: short range well, "
-                              "long range poorly. Each costs more than much of what it stops.");
+            ImGui::SetTooltip("Thins strikes on this province: short well, long poorly.\n"
+                              "Costs more than most of what it stops.");
     }
 
     for (int ki = 0; ki < missile_fireable_count; ++ki)
@@ -152,7 +152,7 @@ bool draw_missile_section(const world& w, const recipe_registry& reg, ui_state& 
             m.pending.push_back(c);
         }
         if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("Buy into the magazine; the goods come off your shelves at their prices.");
+            ImGui::SetTooltip("Buy into the magazine.\nGoods come off your shelves at their prices.");
 
         // BL-1431 review: cached per (launcher, kind); refreshed as the day moves, every
         // k_missile_target_refresh_frames frames, or when app sends the section's orders.
@@ -200,7 +200,7 @@ bool draw_missile_section(const world& w, const recipe_registry& reg, ui_state& 
             ImGui::EndDisabled();
             if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
                 ImGui::SetTooltip(k == missile_kind::tactical_nuclear
-                                      ? "Fire one warhead. Every nation's Alarm toward you rises sharply, the target's most."
+                                      ? "Fire one warhead.\n\xe2\x9a\xa0 Alarm \xe2\x96\xb2 toward you everywhere, target most."
                                       : "Fire one missile from the magazine.");
             if (fire && stock > 0)
             {

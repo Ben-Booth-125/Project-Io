@@ -1,5 +1,6 @@
 #include "hover_content.hpp"
 
+#include "hover_card.hpp" // glyph_tooltip / glyph_text (TOOLTIP.md § The symbols)
 #include "building_state.hpp" // BL-1239: the one running-state classification
 
 #include "icons.hpp"
@@ -11,10 +12,14 @@
 #include "world/sea_combat.hpp"
 #include "world/air_combat.hpp"
 #include "world/components.hpp"
+#include "world/resource_names.hpp"
+#include "world/recipe_registry.hpp" // the processing card names its recipe
 #include "world/logistics.hpp" // landform_logistics_cost — the landform's real cost (BL-232)
 #include "world/logistic_points.hpp" // BL-1353: lp_full_reach / lp_fade_length for the ground card
 
 #include <imgui.h>
+#include <cstdio>
+#include <string>
 #include <vector>
 
 namespace ui {
@@ -254,15 +259,26 @@ void hover_building_detail(const world& w, const recipe_registry* reg,
 {
     // Stat line 1: what it produces / targets.
     if (b.type == building_type::extraction_site)
-        ImGui::Text("Extracting: %s", resource_name(b.target_resource));
+    {
+        const std::string line = "{good:" + resource_names::name_of(b.target_resource) + "} "
+                               + resource_name(b.target_resource);
+        glyph_text(line.c_str()); // TOOLTIP.md § The symbols
+    }
     else if (b.type == building_type::processing_facility)
-        ImGui::TextUnformatted("Processing facility");
-    else
-        ImGui::TextUnformatted(building_type_name(b.type));
+    {
+        // What it makes - the title already says it is a processing facility.
+        const recipe* rc = reg ? reg->get_recipe(b.recipe) : nullptr;
+        if (rc != nullptr)
+            ImGui::TextUnformatted(rc->display_name.c_str());
+    }
+    // Any other type: the title already names it (TOOLTIP.md § The budget).
 
     // Stat line 2: workforce (proxy for output rate).
-    ImGui::Text("Workforce: %.0f%%",
-                static_cast<double>(b.workforce_assigned) * 100.0);
+    {
+        char wf[32];
+        std::snprintf(wf, sizeof wf, "{lab} %.0f%%", static_cast<double>(b.workforce_assigned) * 100.0);
+        glyph_text(wf);
+    }
 
     // Why-line: the running state and its reason. BL-1239: classified by the ONE
     // function the tile element's Production section and the building card's

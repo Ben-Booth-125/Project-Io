@@ -6073,7 +6073,7 @@ void draw_construction_ledger_body(world& w, const recipe_registry& reg, ui_stat
     cands.push_back({building_type::port,                 resource_type::iron_ore, "Port"});
     cands.push_back({building_type::planetary_marketplace, resource_type::iron_ore, "Planetary Marketplace"}); // BL-1269
     cands.push_back({building_type::launchpad,            resource_type::iron_ore, "Launchpad"});
-    cands.push_back({building_type::inland_logistics_hub, resource_type::iron_ore, "Inland Logistics Hub"}); // BL-149
+    cands.push_back({building_type::inland_logistics_hub, resource_type::iron_ore, "Truck Depot"}); // BL-149
     cands.push_back({building_type::military_base,        resource_type::iron_ore, "Military Base"});        // BL-325 S1
     cands.push_back({building_type::airbase,              resource_type::iron_ore, "Airbase"});              // BL-1450: the door to every wing
     cands.push_back({building_type::bunker,               resource_type::iron_ore, "Bunker"});               // BL-1426: cover for the units on the tile

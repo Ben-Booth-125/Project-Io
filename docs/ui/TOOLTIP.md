@@ -1,6 +1,7 @@
 # Project Io — Hover Card
 
 > **Settles:** what the shared hover card is and which pointer state it serves ·
+> how long any tooltip may be and which quantities it writes as a symbol ·
 > when it appears, how long it stays, and what makes it stick · what draws its
 > frame and what fills its content under a given lens · which surfaces get a hover
 > readout and which answer hovering some other way.
@@ -44,6 +45,14 @@ See also: [LAYOUT.md](LAYOUT.md) (where the card sits in the shell),
   lightweight chrome tooltip. Instant identity labels on chrome, not entity
   readouts — the instant-vs-delayed split survives exactly here.
 
+**On a built tile the card is about the STRUCTURE under the pointer** (Ben, 2026-11-20). A tile
+standing several stacks stands one structure per stack, up to three, at the fixed in-tile layout
+the installation pass places them by (RENDERING.md § Installations). The hover resolves to the
+stack whose structure stands nearest the pointer and shows that stack's lowest-id building, so
+every structure drawn on a hex can be hovered. A fourth stack and beyond draws no structure and
+has no hover; the tile card's building grid reaches it. This is the hover only: a press still
+selects the tile (SELECTION.md § Multi-building tiles).
+
 **Under a lens the card is about the LENS'S STRUCTURE, not the tile.** Owned by BL-673 (per-lens
 hover cards). The card reads `hovered_structure` / `hovered_structure_kind` — what the resolver
 already decided this frame — so its subject cannot disagree with what a click at the same pixel
@@ -64,6 +73,53 @@ absent across the whole body while one of them is active. The card answers the q
 is asking; a lens with no question about this ground gets no answer. **Logistics is the
 exception:** its field resolves to the ground, so it shows a card and still takes no click (Ben,
 2026-10-20; SELECTION.md owns the rule).
+
+---
+
+## The budget (Ben, 2026-11-19)
+
+**A tooltip names and measures; it does not explain.** Every tooltip is held to one budget. It
+covers the lightweight chrome tooltip on a control, and every line of the hover card and the
+freezable tooltip. Owned by BL-1703 (terse tooltips).
+
+- **At most two lines, at most eight words a line.** A number with its glyph counts as one word.
+- **Line one is what it is, or what the press does**, verb first for a control ("Fire one
+  warhead."). **Line two, if any, is the one consequence, cost or blocker.**
+- **A blocked control says what it lacks in one line**: `Needs: X, Y`.
+- **A per-tier row may run long** (Ben, 2026-11-20): a line giving one value per tier — the tax
+  rate or Discontent's pace at each of I–V — states every tier rather than summarising, since the
+  tiers the player can press are the comparison it exists for.
+- **Numbers over words.** "▲6%" rather than "raises it 6%"; "{cr} 120" rather than "costs 120
+  credits".
+- **What does not fit is cut, not moved** (Ben, 2026-11-19). A rule's mechanics, its history and
+  its rationale are not a tooltip's job; they are not re-homed into a second band or the manual.
+- **The hover card keeps its shape** — a title, one or two stat lines, one dimmed why-line — with
+  each line inside the eight words. Its title line counts toward nothing.
+- **Exempt:** a freezable tooltip's glyph grid (each cell is already a glyph and a number); its
+  nested glyph-name tooltips are one line by construction.
+
+### The symbols
+
+A quantity in a tooltip is written as its **symbol and its number**. Five are drawn glyphs from
+the icon vocabulary ([ICONS.md](ICONS.md)), placed inline by a `{token}` in the string; three are
+font characters typed as they are.
+
+| Quantity | Write | Draws |
+|---|---|---|
+| Money | `{cr}` | The coin (ICONS.md § 2) |
+| Time | `{t}` | The clock (ICONS.md § 2) |
+| Labour | `{lab}` | The Population lens's figure |
+| A good | `{good:<name>}` | That good's item glyph (ICONS.md § 2b); `<name>` is its code name, `iron_ore` |
+| Logistic Points | `{lp}` | The Logistics lens's truck |
+| Rise / fall | `▲` `▼` | Font characters |
+| Warning | `⚠` | Font character |
+| Met / unmet | `✓` `✗` | Font characters |
+
+**The writer is `glyph_text` / `glyph_tooltip`** (`hover_card.hpp`): `glyph_tooltip` is the
+drop-in for `ImGui::SetTooltip` — a printf format, then the tokens drawn inline at text height in
+the text colour, a good's glyph in its own colour. A token it does not know prints as written, so
+a typo is visible rather than silent. The font loads the Geometric Shapes, Miscellaneous Symbols
+and Dingbats blocks so the font characters render.
 
 ---
 

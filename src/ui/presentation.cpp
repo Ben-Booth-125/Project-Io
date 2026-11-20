@@ -360,7 +360,7 @@ const char* building_type_name(building_type t)
         case building_type::processing_facility:  return "Processing Facility";
         case building_type::port:                 return "Port";
         case building_type::launchpad:            return "Launchpad";
-        case building_type::inland_logistics_hub: return "Inland Logistics Hub"; // BL-149
+        case building_type::inland_logistics_hub: return "Truck Depot"; // BL-149
         case building_type::military_base:        return "Military Base";        // BL-325 S1
         case building_type::research_institute:   return "Research Institute";   // BL-332
         case building_type::schooling:            return "Schooling";            // BL-615

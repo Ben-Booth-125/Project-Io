@@ -186,7 +186,7 @@ std::string building_group_name(const world& w, const recipe_registry& reg, cons
 
 /// BL-1708 (Ben, 2026-11-19; PROVINCES.md § A province's name): a building's NAME — its
 /// province's name, then `building_group_name` (the good it works or makes, then what it
-/// is): "Velka Copper Mine", "Velka Steel Mill", "Velka Inland Logistics Hub". Two in one
+/// is): "Velka Copper Mine", "Velka Steel Mill", "Velka Truck Depot". Two in one
 /// province that would read the same are told apart by a numeral in build order
 /// (ascending entity id): "Velka Copper Mine II". Computed on demand, never stored, so a
 /// demolition renumbers the rest. Nothing that names a building prints a grid position.

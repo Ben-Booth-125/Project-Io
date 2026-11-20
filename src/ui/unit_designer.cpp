@@ -896,13 +896,13 @@ void draw_unit_designer(const world& w, const recipe_registry& reg, ui_state& s)
         if (hot && has_fi && !d.confirm_close)
         {
             if (changed)
-                ImGui::SetTooltip("%s: %s (changed, not saved; the live design has %s)\n%s\nPress to %s the choices.",
+                ImGui::SetTooltip("%s: %s (unsaved; live: %s)\n%s",
                                   t.slot_name(sl), t.item_name(fitted),
                                   live_it < ncat ? t.item_name(live_it) : "\xe2\x80\x94",
-                                  t.item_delta(fitted).c_str(), open ? "close" : "see");
+                                  t.item_delta(fitted).c_str());
             else
-                ImGui::SetTooltip("%s: %s\n%s\nPress to %s the choices.", t.slot_name(sl), t.item_name(fitted),
-                                  t.item_delta(fitted).c_str(), open ? "close" : "see");
+                ImGui::SetTooltip("%s: %s\n%s", t.slot_name(sl), t.item_name(fitted),
+                                  t.item_delta(fitted).c_str());
         }
 
         const bool  lit  = hot || d.slot_open == sl;

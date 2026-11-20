@@ -173,7 +173,7 @@ Both are their own designs, outside the three axes.
 ### Urban transform
 
 The substrate is fixed at generation, and the **cover** is the mutable axis: a tile whose
-**non-extraction** building stack (processors, ports, hubs, admin, amenity, military base,
+**non-extraction** building stack (processors, ports, depots, admin, amenity, military base,
 research institute — combined, not per type) fills its cap **transforms**, one-way, to
 `cover = urban`. The transform is BL-366 (urban transform).
 

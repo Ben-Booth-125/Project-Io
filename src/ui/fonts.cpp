@@ -46,6 +46,12 @@ ImFont* load_ui_font(float size_px, float density)
         0x2000, 0x206F, // General Punctuation — em/en dash, ellipsis, quotes
         0x2190, 0x21FF, // Arrows
         0x2200, 0x22FF, // Mathematical Operators
+        // TOOLTIP.md § The symbols (Ben, 2026-11-19): the font characters a tooltip
+        // writes - rise/fall (Geometric Shapes), warning (Misc Symbols), met/unmet
+        // (Dingbats). DejaVuSans carries each one used.
+        0x25A0, 0x25FF, // Geometric Shapes - the rise/fall triangles
+        0x2600, 0x26FF, // Miscellaneous Symbols - the warning sign
+        0x2700, 0x27BF, // Dingbats - the tick and cross
         0,
     };
     cfg.GlyphRanges = k_glyph_ranges;

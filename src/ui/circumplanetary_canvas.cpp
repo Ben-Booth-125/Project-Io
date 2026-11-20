@@ -405,7 +405,7 @@ void draw_circumplanetary_canvas(const world& w, ui_state& state, ImVec2 origin,
     if (hovered_body != null_entity)
     {
         const body_component& body = w.bodies.at(hovered_body);
-        ImGui::SetTooltip("%s\n%s\n%.2f AU",
+        ImGui::SetTooltip("%s \xc2\xb7 %s\n%.2f AU",
             body.name.c_str(), body_type_name(body.type), body.orbital_radius_au);
     }
 

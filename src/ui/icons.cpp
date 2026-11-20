@@ -1830,6 +1830,26 @@ void readout(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
                           { x0 + 2.0f + r * lens[i], ys[i] + bar_h * 0.5f }, colour);
 }
 
+void coin(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
+{
+    // A struck coin: the rim, and one bar through it that overruns top and bottom.
+    // The overrun is the read - a plain ring is the activity pulse's, and a circle
+    // with a contained cross is the market's.
+    const float w = std::max(1.0f, r * 0.18f);
+    dl->AddCircle(centre, r * 0.78f, colour, 0, w);
+    dl->AddLine({ centre.x, centre.y - r }, { centre.x, centre.y + r }, colour, w);
+}
+
+void clock(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
+{
+    // A clock face: the rim and two hands from the centre, long to twelve, short to
+    // three. Hands, not ticks, keep it clear of the soft-attack reticle.
+    const float w = std::max(1.0f, r * 0.18f);
+    dl->AddCircle(centre, r * 0.9f, colour, 0, w);
+    dl->AddLine(centre, { centre.x, centre.y - r * 0.62f }, colour, w);
+    dl->AddLine(centre, { centre.x + r * 0.45f, centre.y }, colour, w);
+}
+
 void diplomacy(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
 {
     // Two overlapping circle outlines — two parties meeting. The overlap is the

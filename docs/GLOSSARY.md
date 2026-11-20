@@ -183,6 +183,9 @@ The `ocean` substrate — the deep sea. **Unowned, structurally**: it is never t
 **Road (Track / Road / Highway)**
 A per-tile land cost-reducer, not a building — the `tile_component.road_level` field (0 = none) discounts a tile's intra-body A* traversal cost. Three tiers form a ladder (BL-172): **Track** (`road_level` 1, ×0.67 traversal — minor / low-throughput), **Road** (2, ×0.50 — regular), **Highway** (3, ×0.40 — high-throughput backbone). "Throughput" is *cost-discount*, not a capacity cap. Roads are laid by world generation between cities (Highway/Road/Track by centre scale) and placed by the player from the build front door (any tier, upgrade-in-place). A **railroad** is a distinct transport *mode*, not a road tier (BL-173, railroad transport mode). See `docs/economy/LOGISTICS.md`.
 
+**Truck depot**
+The building that makes a nation's road-carried Logistic Points and discounts the hauls that cross its tile — the road network's source, as the **railway station** is the rail network's and the **port** the sea's. Its code id is `inland_logistics_hub`; "Inland Logistics Hub" was its old name (Ben, 2026-11-19), and "depot" alone is its shorthand. See `docs/economy/LOGISTICS.md`.
+
 **Railroad**
 Rail track, laid on a tile rather than across a side (the `lay_track` verb), carrying goods between **railway stations**. What the construction list calls the row, because **Track** is already the first road tier and the two sit in one fold. "Track" alone means the road tier; say "rail track" for the line.
 

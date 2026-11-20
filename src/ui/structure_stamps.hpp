@@ -114,6 +114,9 @@ struct tile_installation
 {
     static constexpr int k_max_stacks = 3;
     stamp_key    stacks[k_max_stacks];
+    /// Each stack's lowest-id building - what a hover on its structure shows
+    /// (TOOLTIP.md, Ben 2026-11-20). Not hashed: it moves only with the stacks.
+    entity_id    rep[k_max_stacks] = { null_entity, null_entity, null_entity };
     std::uint8_t n_stacks = 0;
     stamp_key    settlement; ///< subject none / settlement / ruin.
 };
@@ -218,6 +221,22 @@ float installation_clear_radius(const bake_source& src, std::size_t i);
 
 /// The depicted-subject name of a key (verify / log use).
 const char* stamp_name(const stamp_key& k);
+
+/// One stack structure's place on its tile, as the installation pass stands it: its
+/// footprint centre offset from the tile centre and its radius, canonical units (hex
+/// circumradius = 1, flat ground, y down), and the stack's lowest-id building.
+struct stack_spot
+{
+    double    x = 0.0, y = 0.0, r = 0.0;
+    entity_id building = null_entity;
+};
+
+/// The stack structures of raster tile @p raster_i, dominant first, into @p out; returns
+/// how many (0 when the tile stands none). The same slot table and roaded shift the
+/// installation pass draws by, so the hover hit-test cannot disagree with the art
+/// (TOOLTIP.md § Where hover readouts live, Ben 2026-11-20).
+int installation_stack_spots(const bake_source& src, std::size_t raster_i,
+                             stack_spot (&out)[tile_installation::k_max_stacks]);
 
 /// BL-1670 (procedural 3D buildings; RENDERING.md § The 3D ground, "Buildings are procedural
 /// geometry"): one STANDING part of a tile's structures - the same parts the installation

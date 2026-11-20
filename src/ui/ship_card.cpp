@@ -165,7 +165,7 @@ void draw_refit_press(const world& w, ship_ui_state& u, const sea_ship& s, entit
         if (!enabled)
             ImGui::SetTooltip("%s", reason.c_str());
         else
-            ImGui::SetTooltip("Refit to the live design. Buys %s, out of action for its muster days.",
+            ImGui::SetTooltip("Refit to the live design.\nBuys %s; out for its muster days.",
                               goods_line(ship_kit_refit_goods(ship_class_of(s), s.kit, live)).c_str());
     }
     const ImVec2 c = item_centre();
@@ -539,9 +539,9 @@ bool draw_ship_selection(const world& w, const recipe_registry& reg, ui_state& u
                 if (!reason.empty())
                     ImGui::SetTooltip("%s", reason.c_str());
                 else if (active && m != sea_mission::none)
-                    ImGui::SetTooltip("Working %s - press to recall the ship", sea_mission_label(m));
+                    ImGui::SetTooltip("Working %s: press to recall.", sea_mission_label(m));
                 else if (m != sea_mission::none && s.provinces.empty())
-                    ImGui::SetTooltip("%s - then right-click a sea province on the map to assign it",
+                    ImGui::SetTooltip("%s: right-click a sea province to assign.",
                                       sea_mission_label(m));
                 else if (m != sea_mission::none)
                     ImGui::SetTooltip("Work %s over the assigned provinces", sea_mission_label(m));
@@ -602,7 +602,7 @@ bool draw_ship_selection(const world& w, const recipe_registry& reg, ui_state& u
         ImGui::Spacing();
         ImGui::TextDisabled("Ready to board");
         if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("A land unit on or beside your open port boards a transport lying at that port's mouth.");
+            ImGui::SetTooltip("Boards a land unit at your open port\nonto a transport at its mouth.");
         const float bw = ImGui::CalcTextSize("Board").x + style.FramePadding.x * 2.0f;
         int ready = 0;
         for (const auto& [uid, un] : w.units)

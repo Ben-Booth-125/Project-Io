@@ -499,7 +499,7 @@ bool draw_space_unit_selection(const world& w, ui_state& ui)
         }
         if (lit) ImGui::PopStyleColor();
         if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("Choose a destination; its " IO_DV " cost shows against the budget before you confirm.");
+            ImGui::SetTooltip("Choose a destination.\nIts " IO_DV " cost shows before you confirm.");
         publish("move", true, nullptr);
     }
 
@@ -528,7 +528,7 @@ bool draw_space_unit_selection(const world& w, ui_state& ui)
         ImGui::EndDisabled();
         if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
             ImGui::SetTooltip(dock_at == null_entity ? "No station of yours at this node."
-                                                     : "Berth at your station here: it needs a working Dock with a free berth.");
+                                                     : "Berth at your station here.\nNeeds: a working Dock, a free berth.");
         publish("dock", dock_at != null_entity, dock_at == null_entity ? "no station of yours here" : nullptr);
     }
 
@@ -538,7 +538,7 @@ bool draw_space_unit_selection(const world& w, ui_state& ui)
         if (ImGui::Button("Refuel"))
             queue(space_verb::refuel_unit, [](space_command&) {});
         if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("Fill the tanks: docked at a station's Fuel depot, or in a low orbit over your Launchpad.");
+            ImGui::SetTooltip("Fill the tanks.\nNeeds: a Fuel depot, or your Launchpad below.");
         publish("refuel", true, nullptr);
     }
 
@@ -564,7 +564,7 @@ bool draw_space_unit_selection(const world& w, ui_state& ui)
         if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
             ImGui::SetTooltip(has_order ? "Bombarding: press to stop."
                               : can_bombard ? "Choose ground below to strike once a day."
-                                            : "Needs an orbital-missile armament, in a body's low orbit.");
+                                            : "Needs: orbital missiles, in low orbit.");
         publish("bombard", can_bombard || has_order,
                 can_bombard || has_order ? nullptr : "no orbital-missile armament in low orbit");
     }
@@ -612,8 +612,8 @@ bool draw_space_unit_selection(const world& w, ui_state& ui)
             if (lit) ImGui::PopStyleColor();
             ImGui::EndDisabled();
             if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
-                ImGui::SetTooltip("%s", why != nullptr ? why
-                                        : "Board colonists from your most populous home centre, a thousand to a berth.");
+                glyph_tooltip("%s", why != nullptr ? why
+                                    : "Board colonists from your largest home centre.\n{lab} 1,000 a berth.");
             publish("embark", why == nullptr, why);
             if (f.embark_armed)
             {
@@ -671,8 +671,8 @@ bool draw_space_unit_selection(const world& w, ui_state& ui)
             if (lit) ImGui::PopStyleColor();
             ImGui::EndDisabled();
             if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
-                ImGui::SetTooltip("%s", tech ? "Choose mapped ground here for a base: it claims its province."
-                                             : "Needs Off-World Bases researched.");
+                ImGui::SetTooltip("%s", tech ? "Choose mapped ground for a base.\nIt claims its province."
+                                             : "Needs: Off-World Bases researched.");
             publish("found_base", tech, tech ? nullptr : "needs Off-World Bases researched");
 
             if (f.found_armed)
@@ -941,7 +941,7 @@ void draw_space_hull_designs(const world& w, ui_state& ui)
             }
         }
         if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("Press to design the %s: one item per slot. Items open as far-space research lands.",
+            ImGui::SetTooltip("Design the %s: one item per slot.\nItems open with far-space research.",
                               hulls[hi].name);
         space_fleet_ui_state::press row;
         row.name = hulls[hi].name;

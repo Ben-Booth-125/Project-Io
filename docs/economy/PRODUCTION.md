@@ -117,13 +117,13 @@ blocks new extraction/ambient placement on that tile. Extraction stacking (`k_ri
 richness-bound axis.
 
 **Generation obeys the cap with no exemptions (Ben, 2026-11-05).** Every building generation stands
-counts toward its tile's cap. Hubs, stations, ports and the capital's source count like any other
+counts toward its tile's cap. Depots, stations, ports and the capital's source count like any other
 building. A building with a choice of ground goes next door; one that may stand only where it is
 asked for (a station in the city it serves) is not placed, and the fold counts it. No count is
 clamped after the fact, and `tools/verify/province_capacity_probe.cpp` reads tiles past their cap
 as a failure. The capital's source may stand nowhere else, so every placer that runs before the
 seeding (a charter, a founding, the opening force's base, a retrofit marketplace, a kit, a station,
-a harbour) leaves a capital that slot until a hub stands there.
+a harbour) leaves a capital that slot until a depot stands there.
 
 Implementation: the constants and the rank helpers live in
 `src/world/placement_rules.{hpp,cpp}` (`stack_output_scalar`, which is 1 at every rank,
@@ -535,7 +535,7 @@ Infrastructure buildings affect logistical or economic capacity rather than extr
 | Port | A sea-lane node for shipments on the body, and a maker of **trade points** for its owner (`TRADE.md` § The Planetary Marketplace); coastal placement (`is_coastal`) | 0 |
 | Planetary Marketplace | Makes **trade points** for its owner each tick at its staffed rate — the capacity a trade spends to move goods between markets (`building_type::planetary_marketplace`; `TRADE.md` owns the rule). Cost and maintenance in `economy.buildings.planetary_marketplace`. | any |
 | Launchpad | Required on the source body for any trade between bodies; a processor that draws launch goods off its market's shelf and banks them as boost, which every launch through it spends (`SPACE_ASSETS.md` § Boost) | 0 (built), 1 (operational) |
-| Inland Logistics Hub | Land-mode logistics node (`building_type::inland_logistics_hub`, BL-149): its tile joins the population-centre set that discounts the A\* haul cost of any intra-body convoy routed through it (LOGISTICS.md). The player-placeable counterpart to a city's free-hub discount — extends the cheap land network out to remote sites. Produces nothing (0 workforce); cost in `economy.buildings.inland_logistics_hub`. | 0 |
+| Truck Depot | Land-mode logistics node (`building_type::inland_logistics_hub`, BL-149): its tile joins the population-centre set that discounts the A\* haul cost of any intra-body convoy routed through it (LOGISTICS.md). The player-placeable counterpart to a city's free-hub discount — extends the cheap land network out to remote sites. Produces nothing (0 workforce); cost in `economy.buildings.inland_logistics_hub`. | 0 |
 | Military Base | Unit muster building (`building_type::military_base`, BL-325). Produces nothing, staffs at zero, and is deliberately **not** a supply anchor — military reach IS the economic reach field. `docs/military/MILITARY.md`. | any |
 | Bunker | Concrete on a tile (`building_type::bunker`). Produces nothing, staffs at zero, one to a tile on any land tile of the builder's own ground; its owner's units defending the tile gain defence and hardness by its condition (`docs/military/MILITARY.md` § Fortifications). Cost in `economy.buildings.bunker`. | any |
 | Research Institute | The "how does tech get done" building (`building_type::research_institute`, BL-332). Passive: it adds research points each month to its owner's nation's research pool (`RESEARCH.md` § Research points), and only while staffed; like the University it is staffed at construction (Ben, 2026-10-10). RP are not a resource and never reach a market. | any |
@@ -586,7 +586,7 @@ The pool this demand draws on — how much labour a body's centres yield, who wi
 scarce, and what it is paid — is [`POPULATION.md`](POPULATION.md) § Workforce model.
 
 **Demand** is the sum of `workforce_assigned` over the nation's producing buildings on the body
-(extraction and processing only; ports and hubs demand no labour), capped by the body's
+(extraction and processing only; ports and depots demand no labour), capped by the body's
 habitability cap `min(1, mean_hab / 0.6)` (BL-041, habitability gates workforce).
 
 What a building's labour and maintenance cost the treasury each tick is
@@ -597,7 +597,7 @@ What a building's labour and maintenance cost the treasury each tick is
 `workforce_target`** (0–100 %), set by the game (below).
 
 **Infrastructure staffs to full and stays there (Ben, 2026-10-26).** Every building that is not
-a producer — port, logistics hub, railway station, Planetary Marketplace, launchpad, military
+a producer — port, truck depot, railway station, Planetary Marketplace, launchpad, military
 base, research institute, schooling, university — is authored at full employment, the internal
 maximum 200 (shown 100 %), by generation and by construction alike (`default_workforce_target`).
 No solver or dial moves it: the auto-solver steps producers only, and a rival's `set_workforce`
@@ -790,7 +790,7 @@ it can be used: a body's power gap is the sum over its wired grids of `max(0, ne
 and a power plant is placed in a short grid's provinces. **A nation reads its own buildings live
 and every other building nominally (Ben, 2026-11-04; BL-1485, power grid measure).** Its own
 buildings count as the grid runs them: the need is their actual draw — upkeep at their output
-share, none for a building its funding gate idled or for the capital's free hub — and the output
+share, none for a building its funding gate idled or for the capital's free depot — and the output
 is each of its generators at its own staffing and supply factor, one under construction at the
 staffing construction gives it. Every other nation's buildings on the grid count only as what is
 public of them — that they exist, their type and their recipe: a type's upkeep once complete, a
@@ -1031,7 +1031,7 @@ is not the opening's brake; money and materials are (§ What construction costs 
   exactly when it runs (NATIONS.md § What a nation owns, "A losing building idles").
 - **Progress is daily, and a site completes on a day.** Between clearings a site advances day by
   day, as surveys do. Completion fires that day: the building is operational, and a port or
-  logistics hub joins the network then.
+  truck depot joins the network then.
 - **The first month is prorated.** A building finishing mid-month produces for the rest of
   that month. At the next economy tick its output, operating costs, wages, inputs, upkeep goods
   and Logistic Point need are scaled by the share of the month it stood complete. From then on

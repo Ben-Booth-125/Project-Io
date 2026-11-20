@@ -49,7 +49,7 @@ building stops producing and paying until the treasury can pay again. **A treasu
 briefly below zero (Ben, 2026-11-05).** The funding gate commits a tick's bills against posted
 prices, and the earners it admits at an empty treasury (below) can sell for less than that
 estimate; the shortfall is carried as a negative treasury, never clamped, so no money is created.
-It charges no interest (§ Debt interest) and refills from the same earnings. **Network nodes are paid first (Ben, 2026-10-22):** hubs, stations and ports are funded
+It charges no interest (§ Debt interest) and refills from the same earnings. **Network nodes are paid first (Ben, 2026-10-22):** depots, stations and ports are funded
 before any other building (`NATIONS.md` § What a nation owns).
 
 **Earners keep running (Ben, 2026-11-04; BL-1482, broke nation spiral).** A treasury at zero

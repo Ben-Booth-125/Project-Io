@@ -3,7 +3,14 @@
 
 #include <imgui_internal.h>
 
+#include "icons.hpp"
+#include "world/resource_names.hpp"
+
 #include <algorithm>
+#include <cstdarg>
+#include <cstdio>
+#include <cstring>
+#include <string>
 
 namespace ui {
 
@@ -172,6 +179,120 @@ bool freezable_tooltip_frozen(unsigned* owner)
     if (owner != nullptr)
         *owner = g_freeze.frozen ? g_freeze.owner : 0u;
     return g_freeze.frozen;
+}
+
+// ---------------------------------------------------------------------------
+// Symbols inline (TOOLTIP.md § The symbols, BL-1703).
+// ---------------------------------------------------------------------------
+
+namespace {
+
+/// Draw one `{token}` as its glyph in a text-height cell; false when the token is not
+/// one of the symbols, so the caller prints it as written.
+bool draw_glyph_token(const std::string& tok)
+{
+    const float h = ImGui::GetTextLineHeight();
+    const ImU32 col = ImGui::GetColorU32(ImGuiCol_Text);
+
+    resource_type good = resource_type::iron_ore;
+    int kind = -1;
+    if      (tok == "cr")  kind = 0;
+    else if (tok == "t")   kind = 1;
+    else if (tok == "lab") kind = 2;
+    else if (tok == "lp")  kind = 3;
+    else if (tok.rfind("good:", 0) == 0)
+    {
+        bool ok = false;
+        good = resource_names::resource_from_name(tok.substr(5), ok);
+        if (!ok) return false;
+        kind = 4;
+    }
+    if (kind < 0) return false;
+
+    const ImVec2 p = ImGui::GetCursorScreenPos();
+    ImGui::Dummy(ImVec2(h, h));
+    ImDrawList* dl = ImGui::GetWindowDrawList();
+    const ImVec2 c{ p.x + h * 0.5f, p.y + h * 0.5f };
+    const float r = h * 0.42f;
+    switch (kind)
+    {
+        case 0: icons::coin(dl, c, r, col); break;
+        case 1: icons::clock(dl, c, r, col); break;
+        case 2: icons::population(dl, c, r, col); break;
+        case 3: icons::throughput(dl, c, r, col); break;
+        default: icons::item(dl, c, r, good); break;
+    }
+    return true;
+}
+
+/// Place the next item of a line: on the same line, flush, unless it is the line's first.
+/// Spacing comes from the string's own spaces, so "{cr} 120" reads glyph, space, number.
+void next_on_line(bool& first)
+{
+    if (!first) ImGui::SameLine(0.0f, 0.0f);
+    first = false;
+}
+
+} // namespace
+
+void glyph_text(const char* text)
+{
+    if (!text) return;
+    const char* line = text;
+    for (;;)
+    {
+        const char* eol = std::strchr(line, '\n');
+        const char* end = eol ? eol : line + std::strlen(line);
+        bool first = true;
+        const char* run = line; // start of the pending plain-text run
+        const char* q = line;
+        while (q < end)
+        {
+            const char* close = (*q == '{')
+                ? static_cast<const char*>(std::memchr(q, '}', static_cast<size_t>(end - q)))
+                : nullptr;
+            if (!close) { ++q; continue; }
+            const std::string tok(q + 1, close);
+            if (run < q) { next_on_line(first); ImGui::TextUnformatted(run, q); }
+            next_on_line(first);
+            if (!draw_glyph_token(tok))
+                ImGui::TextUnformatted(q, close + 1); // unknown token: as written
+            q = run = close + 1;
+        }
+        if (run < end || first) { next_on_line(first); ImGui::TextUnformatted(run, end); }
+        if (!eol) break;
+        line = eol + 1;
+    }
+}
+
+namespace {
+void glyph_tooltip_v(const char* fmt, va_list args)
+{
+    char buf[1024];
+    std::vsnprintf(buf, sizeof buf, fmt, args);
+    if (ImGui::BeginTooltip())
+    {
+        glyph_text(buf);
+        ImGui::EndTooltip();
+    }
+}
+} // namespace
+
+void glyph_tooltip(const char* fmt, ...)
+{
+    va_list args;
+    va_start(args, fmt);
+    glyph_tooltip_v(fmt, args);
+    va_end(args);
+}
+
+void glyph_item_tooltip(const char* fmt, ...)
+{
+    if (!ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip)) return;
+    va_list args;
+    va_start(args, fmt);
+    glyph_tooltip_v(fmt, args);
+    va_end(args);
 }
 
 } // namespace ui

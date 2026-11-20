@@ -328,9 +328,9 @@ bool draw_wing_selection(const world& w, const recipe_registry& reg, ui_state& s
             if (!reason.empty())
                 ImGui::SetTooltip("%s", reason.c_str());
             else if (active && m != air_mission::none)
-                ImGui::SetTooltip("Flying %s - press to stand the wing down", air_mission_label(m));
+                ImGui::SetTooltip("Flying %s: press to stand down.", air_mission_label(m));
             else if (m != air_mission::none && wg.provinces.empty())
-                ImGui::SetTooltip("%s - then right-click a province on the map to assign it",
+                ImGui::SetTooltip("%s: right-click a province to assign.",
                                   air_mission_label(m));
             else if (m != air_mission::none)
                 ImGui::SetTooltip("Fly %s over the assigned provinces", air_mission_label(m));

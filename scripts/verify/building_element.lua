@@ -147,7 +147,7 @@ verify.capture("building_element_player")
 -- Passive infrastructure: the no-output branch (the seeded Port).
 local passive = nil
 for _, b in ipairs(verify.buildings()) do
-    if b.player and (b.type == "Port" or b.type == "Inland Logistics Hub") then
+    if b.player and (b.type == "Port" or b.type == "Truck Depot") then
         passive = b
         break
     end
