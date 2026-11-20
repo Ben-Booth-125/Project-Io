@@ -6496,6 +6496,14 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         out["roster_h"]       = c.roster_h;
         out["roster_avail"]   = c.roster_avail;
         out["levers_h"]       = c.levers_h;
+        // Idle on top, location below (Ben, 2026-11-19): what the roster drew -
+        // counts and the words it printed, nothing the screen does not show.
+        out["idle_rows"]        = c.idle_rows;
+        out["first_idle_cause"] = c.first_idle_cause;
+        out["provinces_spanned"] = c.location_headers;     // by the open type
+        // Whether the canvas ringed a hovered roster row's tile (a yes, no position).
+        out["row_hover_ringed"] = (c.row_hover_drawn != null_entity);
+        out["building_ringed"]  = c.building_ring_drawn; // the selected building's tile took the outline
         // THE BUILD-PROGRESS CIRCLES the canvas drew this frame (Ben, 2026-10-26),
         // by screen position and the days they show - the surface reporting its
         // own marks, so a check hovers the real circle. No tile is named.

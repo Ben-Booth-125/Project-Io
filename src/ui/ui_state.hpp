@@ -1144,6 +1144,21 @@ struct construction_controls
     /// The roster's drawn height and the tab height it had to fill, this frame.
     float       roster_h = 0.0f;
     float       roster_avail = 0.0f;
+    /// The tile under the Buildings roster row the pointer is on, published each
+    /// frame the row is hovered; the planet canvas rings it with the hover outline
+    /// and clears it (Ben, 2026-11-19; ledgers/construction.md § Idle on top).
+    entity_id   row_hover_tile = null_entity;
+    /// The tile the canvas ringed for a row hover THIS frame, for a check to read
+    /// (both fields are reset by the canvas each frame).
+    entity_id   row_hover_drawn = null_entity;
+    /// True when, this frame, the canvas drew the selection outline on a selected
+    /// BUILDING's tile (Ben, 2026-11-19: a picked row lights its tile). For a check.
+    bool        building_ring_drawn = false;
+    /// Buildings view, this frame: the Idle section's rows and the provinces the
+    /// open type spans (Ben, 2026-11-19). For a check.
+    int         idle_rows = 0;
+    int         location_headers = 0;      ///< Provinces the open type spans (no headers are drawn).
+    std::string first_idle_cause;
 };
 
 // --- The SITE FINDER (Ben, 2026-10-25; docs/ui/ledgers/construction.md § The site

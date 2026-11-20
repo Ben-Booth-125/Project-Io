@@ -689,17 +689,21 @@
   },
   "construction_buildings_view": {
    "surface": "Construction ledger - Buildings view (the estate by type)",
-   "answers": "What do I own, how much is each kind of it making me, and where do I go to tune one?",
-   "because": "It is the ledger's DEFAULT view, and it earns that over the queue by the plainest fact about the two: the player always owns buildings and usually has nothing building. Grouping by type rather than listing every building is what makes it an overview - a count and a summed profit per named type answers 'which part of my estate pays' in one glance. The list takes the whole tab, less exactly what the levers below it need (Ben, 2026-10-26: a list a third of the tab tall with a scroll bar left two thirds of the column empty). Expanding a type row lists its own buildings, and a press selects one and draws its levers, so the chain runs type -> building -> lever without leaving the ledger. That is NAVIGATION, not recommendation: it lists what the player already owns, in a group whose count has already asserted they exist, and it ranks nothing they have not built. It also removes a dead end - 'Select a tile' is an instruction with no affordance attached, and the buildings behind a count are exactly the set the ledger has in hand. It is the destination for Method and Workforce, which left the Selection card's centre when Ben ruled that the centre presents data and never operates; the same function bodies are called from here, never a second set of controls writing the same fields.",
+   "answers": "What do I own, which of it is idle, how much is each kind of it making me, and where is it?",
+   "because": "It is the ledger's DEFAULT view, and it earns that over the queue by the plainest fact about the two: the player always owns buildings and usually has nothing building. Grouping by type rather than listing every building is what makes it an overview - a count and a summed profit per named type answers 'which part of my estate pays' in one glance. The list takes the whole tab, less exactly what the levers below it need (Ben, 2026-10-26: a list a third of the tab tall with a scroll bar left two thirds of the column empty). Expanding a type row lists its own buildings, and a press selects one and draws its levers, so the chain runs type -> building -> lever without leaving the ledger. That is NAVIGATION, not recommendation: it lists what the player already owns, in a group whose count has already asserted they exist, and it ranks nothing they have not built. It also removes a dead end - 'Select a tile' is an instruction with no affordance attached, and the buildings behind a count are exactly the set the ledger has in hand. It is the destination for Method and Workforce, which left the Selection card's centre when Ben ruled that the centre presents data and never operates; the same function bodies are called from here, never a second set of controls writing the same fields. IDLE ON TOP, LOCATION BELOW (Ben, 2026-11-19 playtest: idle buildings were hard to find; buildings should group by type with subgroups for location; a picked row should light its tile). An Idle section heads the roster whenever something is idle, each row its type, tile and the cause in one word - the cause is classify_building_running's, the verdict the hover card, tile element and building card already share, so the roster cannot disagree with them; the idle building also stays in its type group so every total is still the visible sum of its rows. Inside an open type a type's buildings stand together by province, with no sub-headers: each row is NAMED by its province (BL-1708), never by a coordinate pair (Ben, the same day). A selected building now rings its tile with the selection outline, and a hovered row with the hover outline: the roster says WHAT and the map says WHERE without a second press.",
    "backlog_item": [
     "BL-682",
     "BL-683",
-    "Ben's live-click rulings 2026-10-26 (Construction ledger and site finder; no backlog id yet)"
+    "Ben's live-click rulings 2026-10-26 (Construction ledger and site finder; no backlog id yet)",
+    "BL-1696",
+    "BL-1697",
+    "BL-1698"
    ],
    "files": [
     "src/ui/construction_panel.cpp",
     "src/ui/construction_panel.hpp",
-    "src/ui/ui_state.hpp"
+    "src/ui/ui_state.hpp",
+    "src/ui/body_surface_canvas.cpp"
    ],
    "status": "drafted"
   },
@@ -956,7 +960,7 @@
   "planetary_ground_master": {
    "surface": "The Planetary canvas ground at every zoom - one baked master per body, draped over a lit 3D surface under a camera whose tilt follows zoom",
    "answers": "What does this ground look like, at any zoom, the instant I look at it?",
-   "because": "Ben, 2026-10-09, after walking the sprint 51 build: the ground lag was off-putting, because every zoom step had been a fresh bake that arrived late and softer first. One 96 px/hex master (Ben, 2026-11-05) per body, pre-baked behind the handoff and held in RAM, makes every rung a downsample of the same picture: a rung change is final on arrival, and the baked detail never changes with zoom, only scale - so the player learns one picture of a world, not five. The two closest rungs add only a draw-time surface grain over it (Ben, 2026-11-15, BL-1658 (close-zoom detail layer)), which bakes nothing. The master is taken straight down and laid over the 3D ground (Ben, 2026-11-16: \"work with just 3D from now on\"; RENDERING.md \u00a7 The 3D ground), so the same picture serves every tilt: a zoom step tilts the camera, never re-bakes, and a lens toggle never moves the map under the cursor. It adds no chrome and no control: it replaces the per-rung tiers, the stand-in that hid their fills, the stepped tilt and the flat ground.",
+   "because": "Ben, 2026-10-09, after walking the sprint 51 build: the ground lag was off-putting, because every zoom step had been a fresh bake that arrived late and softer first. One 96 px/hex master (Ben, 2026-11-05) per body, pre-baked behind the handoff and held in RAM, makes every rung a downsample of the same picture: a rung change is final on arrival, and the baked detail never changes with zoom, only scale - so the player learns one picture of a world, not five. The two closest rungs add only a draw-time surface grain over it (Ben, 2026-11-15, BL-1658 (close-zoom detail layer)), which bakes nothing. The master is taken straight down and laid over the 3D ground (Ben, 2026-11-16: \"work with just 3D from now on\"; RENDERING.md § The 3D ground), so the same picture serves every tilt: a zoom step tilts the camera, never re-bakes, and a lens toggle never moves the map under the cursor. It adds no chrome and no control: it replaces the per-rung tiers, the stand-in that hid their fills, the stepped tilt and the flat ground.",
    "backlog_item": [
     "BL-1246"
    ],
