@@ -61,19 +61,19 @@ x, y = node("DG-PR-EX-A1")
 verify.click(x, y)
 verify.frames(2)
 local q = verify.tech_tree_queue()
-verify.expect(count(q) == 3, "one plain click queued 3 nodes (" .. count(q) .. ")")
-verify.expect(q[1] == "DG-PR-EX-T1" and q[2] == "DG-PR-EX-T2" and q[3] == "DG-PR-EX-A1",
+verify.expect(count(q) == 2, "one plain click queued 2 nodes (" .. count(q) .. ")")
+verify.expect(q[1] == "DG-PR-EX-T1" and q[2] == "DG-PR-EX-A1",
               "requirements queued ahead of the node, head first")
 away()
 verify.capture("tech_tree_queue")
 
 -- Shift-click on a queued node toggles it off, with every later entry needing it.
-x, y = node("DG-PR-EX-T2")
+x, y = node("DG-PR-EX-A1")
 verify.shift_click(x, y)
 verify.frames(2)
 q = verify.tech_tree_queue()
 verify.expect(count(q) == 1 and q[1] == "DG-PR-EX-T1",
-              "unqueue took Field Practice II and Seismic Survey, kept Field Practice I ("
+              "unqueue took Seismic Survey, kept Field Practice I ("
               .. count(q) .. ")")
 away()
 verify.capture("tech_tree_unqueue")
@@ -83,7 +83,7 @@ x, y = node("DG-ST-AC-Aa")
 verify.shift_click(x, y)
 verify.frames(2)
 local before = count(verify.tech_tree_queue())
-verify.expect(before == 5, "Free-Trade Accords queued with its path (" .. before .. ")")
+verify.expect(before == 4, "Free-Trade Accords queued with its path (" .. before .. ")")
 x, y = node("DG-ST-AC-Ab")
 verify.shift_click(x, y)
 verify.frames(2)
@@ -99,10 +99,10 @@ x, y = node("DG-ST-AC-M")
 verify.shift_click(x, y)
 verify.frames(2)
 q = verify.tech_tree_queue()
-verify.expect(count(q) == 15, "the far press queued its 10-node route (" .. count(q) .. " total)")
+verify.expect(count(q) == 11, "the far press queued its 7-node route (" .. count(q) .. " total)")
 verify.expect(q[count(q)] == "DG-ST-AC-M", "the far node is last, its route ahead of it")
 verify.expect(q[1] == "DG-PR-EX-T1", "a shift-click adds to the queue and keeps the target")
-verify.expect(has(q, "DG-ST-AC-C") and has(q, "DG-ST-AC-C1") and has(q, "DG-ST-AC-C2"),
+verify.expect(has(q, "DG-ST-AC-C") and has(q, "DG-ST-AC-C2") and has(q, "DG-ST-AC-B1"),
               "both AND groups' routes are queued")
 verify.expect(has(q, "DG-ST-AC-Ba") ~= has(q, "DG-ST-AC-Bb"),
               "the pick-one choice took exactly one side")
@@ -123,6 +123,6 @@ verify.click(x, y)
 verify.frames(2)
 q = verify.tech_tree_queue()
 local function at(id) for i = 1, count(q) do if q[i] == id then return i end end return nil end
-verify.expect(count(q) == 15, "retargeting kept every entry (" .. count(q) .. ")")
+verify.expect(count(q) == 11, "retargeting kept every entry (" .. count(q) .. ")")
 verify.expect(at("DG-ST-AC-M") ~= nil and at("DG-PR-EX-T1") ~= nil and at("DG-ST-AC-M") < at("DG-PR-EX-T1"),
               "the clicked node's route now runs ahead of the old target")

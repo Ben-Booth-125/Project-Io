@@ -5,7 +5,8 @@
 // the doc tables). The grammar is docs/economy/RESEARCH.md, section "The shape of an age's tree".
 //
 // A node's INDEX in `nodes` is its identity in the sim and on the save seam (a nation's held
-// set is a bitset over these indices), so the store is append-only once a save carries it.
+// set is a bitset over these indices), so the store is append-only once a save carries it;
+// a removal or reorder bumps world_save_version and refuses older game saves (BL-1712, v99).
 
 #include <array>
 #include <cstdint>

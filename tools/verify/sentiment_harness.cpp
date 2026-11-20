@@ -1207,7 +1207,7 @@ int main()
                   == std::string("unrest_visible"),
               "C4 unrest_visible is a named factor with no emitter (unrest has no store)");
 
-        // C5 THE TREE: "-1% Alarm toward you" (DG-ST-AC-T1) scales the Alarm others
+        // C5 THE TREE: "-2% Alarm toward you" (DG-ST-AC-T1, doubled by the BL-1712 trim) scales the Alarm others
         // gain toward the holder; "decays 10% faster" (DG-ST-AC-Q) scales its decay.
         const int corps1 = node_of("DG-ST-AC-T1");
         const int quiet  = node_of("DG-ST-AC-Q");
@@ -1219,9 +1219,9 @@ int main()
         fold_pending_sentiment(w, reg);
         const float toward_s = sentiment_toward(w.sentiment, O, S).alarm;
         const float toward_t = sentiment_toward(w.sentiment, O, T).alarm;
-        check(corps1 >= 0 && toward_t == 100.0f && toward_s == 100.0f * 0.99f,
-              "C5a a held \"-1% Alarm toward you\" node shrinks the Alarm the holder "
-              "raises by 1% (99 vs 100) - the tree writes to the Alarm dimension");
+        check(corps1 >= 0 && toward_t == 100.0f && toward_s == 100.0f * 0.98f,
+              "C5a a held \"-2% Alarm toward you\" node shrinks the Alarm the holder "
+              "raises by 2% (98 vs 100) - the tree writes to the Alarm dimension");
         const std::map<entity_id, float> scales = alarm_decay_scales(w);
         check(quiet >= 0 && scales.size() == 1 && scales.count(S) == 1
                   && scales.at(S) > 1.0999f && scales.at(S) < 1.1001f,
@@ -1241,7 +1241,8 @@ int main()
             }
         }
         std::printf("     %d Digitisation effect rows write the Alarm dimension\n", wired);
-        check(wired >= 13 && every_alarm_effect_read,
+        // BL-1712: the trim merged the Diplomatic Corps travel nodes, 13 rows -> 9.
+        check(wired >= 9 && every_alarm_effect_read,
               "C5c every Alarm modifier row in the store classifies as READ (nation_tech's "
               "declaration)");
     }

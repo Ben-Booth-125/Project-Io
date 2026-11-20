@@ -55,7 +55,7 @@ for (const b of branches) {
   if (inB.filter(n => n.tier === 'quest').length !== 1) err(`${b}: needs exactly one quest`);
   if (inB.filter(n => n.mastery).length !== 1) err(`${b}: needs exactly one mastery`);
   for (const m of inB.filter(n => n.tier === 'major')) {
-    if (!m.excludes && m.requires.length < 2) err(`${m.id}: a major outside a pair needs both minors (two groups)`);
+    if (!m.excludes && (m.requires.length < 1 || m.requires.length > 2)) err(`${m.id}: a major outside a pair needs one or two paths in (RESEARCH.md: a cluster has one minor or two)`);
   }
 }
 // Roots: only first travel nodes are open from the start.

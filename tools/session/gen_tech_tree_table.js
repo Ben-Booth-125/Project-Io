@@ -7,7 +7,8 @@
 // grammar, DIGITISATION_TREE.md the prose) and writes src/world/digitisation_tree_data.hpp:
 // namespace io::dg, one `node` per store node IN STORE ORDER (the index is the node's identity in
 // the sim and on the save seam — reordering the store re-points every saved held set, so the
-// store is append-only once a save carries it). Requirement groups become index lists (AND over
+// store is append-only once a save carries it; a removal or reorder bumps world_save_version
+// and refuses older game saves, as the BL-1712 trim did at v99). Requirement groups become index lists (AND over
 // groups, any member satisfies a group), `excludes` an index or -1.
 // Each node's machine `effects` (BL-1274) become a slice of the flat
 // `effects` table, in node order then store order; a list-valued scope expands to one row per member
@@ -99,7 +100,8 @@ lines.push('// DO NOT EDIT - edit the store, re-run the generator (and tools/ses
 lines.push('// the doc tables). The grammar is docs/economy/RESEARCH.md, section "The shape of an age\'s tree".');
 lines.push('//');
 lines.push('// A node\'s INDEX in `nodes` is its identity in the sim and on the save seam (a nation\'s held');
-lines.push('// set is a bitset over these indices), so the store is append-only once a save carries it.');
+lines.push('// set is a bitset over these indices), so the store is append-only once a save carries it;');
+lines.push('// a removal or reorder bumps world_save_version and refuses older game saves (BL-1712, v99).');
 lines.push('');
 lines.push('#include <array>');
 lines.push('#include <cstdint>');

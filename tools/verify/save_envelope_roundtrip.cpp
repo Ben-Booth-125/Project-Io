@@ -990,6 +990,30 @@ int main()
     }
 
     // -----------------------------------------------------------------------
+    // S9q -- BL-1712 (the tech tree trim, world v99): v99's layout is v98's, but a
+    // node index names a different node, so the game refuses a v98 world and says why.
+    // Today's save is stamped down to v98 in place (envelope magic, envelope version,
+    // world magic, then the world version at byte 12).
+    // -----------------------------------------------------------------------
+    {
+        static_assert(k_world_save_version_tree_trim == 99 && world_save_version >= 99,
+                      "S9q pins v99 as the first world of the trimmed tree");
+        world w = make_world();
+        const save_envelope env = make_envelope();
+        check(write_save_game(k_path, w, env), "S9q today's save writes");
+        {
+            std::fstream f(k_path, std::ios::binary | std::ios::in | std::ios::out);
+            f.seekp(12, std::ios::beg);
+            const uint32_t v98 = 98;
+            f.write(reinterpret_cast<const char*>(&v98), sizeof(v98));
+        }
+        world lw;
+        save_envelope le;
+        check(!save_game_refusal_reason(k_path).empty() && !read_save_game(k_path, lw, le),
+              "S9q a world stamped v98 (the untrimmed tree) carries the refusal reason and is refused");
+    }
+
+    // -----------------------------------------------------------------------
     // S9b -- BL-1422 (save_game_version 24): a GENUINELY NARROW v23 envelope, its
     // bodies' planetology endowments and its market history 49 wide, reads whole: the
     // first 49 slots as written, the five kit goods 0 / empty, and every field after

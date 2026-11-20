@@ -2609,6 +2609,28 @@
    "short_name": "ARMIES_COST_MORE",
    "title": "Military units cost twice as much to hire and four times as much to keep",
    "design": "PLAYTEST LANE D (war). Ben: \"we should increase the upkeep and purchase cost of military units. It's currently too cheap to build a large army quickly.\" Ruled 2026-11-19: hire x2 (hire_base_cost 240, hire_cost_per_power 2.8; every air and sea hire_cost x2), upkeep x4 on all theatres, apply then measure. The goods half of upkeep (ordnance, food_rations per head) is quadrupled with the wage so the value anchor (equipment about twice the wage) holds - logged for Ben in NEEDS_REVIEW. Digest movement expected; re-pinned with the lane's other movers."
+  },
+  {
+   "glyph": "~",
+   "sprint": null,
+   "version_goal": null,
+   "written": "2026-11-19",
+   "parked": false,
+   "blocked_on": null,
+   "requires": [],
+   "author": "Claude (lane F, BL-1712 tech tree trim)",
+   "priority": "C",
+   "difficulty": 2,
+   "files": [
+    "docs/economy/tech/early_space_tree.json"
+   ],
+   "category": "Economy",
+   "status": "design-owed",
+   "authority_doc": "docs/economy/tech/EARLY_SPACE_TREE.md",
+   "id": "BL-1720",
+   "short_name": "EARLY_SPACE_TRIM",
+   "title": "Early Space tree: take the Digitisation trim's grammar (three travel nodes a branch, one-minor clusters) or rule it exempt",
+   "design": "BL-1712 (Ben, 2026-11-19) cut the Digitisation tree to fewer, heavier nodes and wrote the rule into RESEARCH.md (three travel nodes a branch at double strength, a cluster of one minor or two, no joints, no placeholders). The Early Space tree (54 nodes, 3 authored branches) still has the seventeen-node spine with six travel nodes a branch, so it no longer matches the grammar RESEARCH.md states for every age. Either score and trim it the same way (tech_tree_store.js early_space; the save carries es_held by index, so a removal bumps world_save_version as BL-1712 did at v99 (v97 on its lane, renumbered at the playtest merge)), or Ben rules a later age may keep the longer spine."
   }
  ]
 }

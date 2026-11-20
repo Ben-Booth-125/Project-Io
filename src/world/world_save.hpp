@@ -850,7 +850,6 @@ inline constexpr uint32_t k_world_save_version_pre_war_joiners = k_world_save_ve
 /// whole otherwise. v97 is a STRICT PREFIX of v98 and is read too
 /// (`k_world_save_version_pre_province_names`), as a world with no stored names (a v96 stream as well) - its
 /// provinces read their centre's name through `province_display_name`.
-inline constexpr uint32_t world_save_version = 98;
 
 /// BL-1708: the first version carrying the province-name section (see above).
 inline constexpr uint32_t k_world_save_version_province_names = 98;
@@ -860,6 +859,24 @@ inline constexpr uint32_t k_world_save_version_pre_province_names = k_world_save
 
 /// BL-1708: the longest province name a stream may carry, in bytes.
 inline constexpr uint32_t k_province_name_max_bytes = 64;
+
+/// **99 (BL-1712, the tech tree trim; Ben, 2026-11-19) - THE TRIMMED TREE.** No section
+/// is added or moved and no record grows: v99's layout IS v98's. What moved is MEANING -
+/// the nation tech record's held bitset and queue name Digitisation nodes by store index
+/// (`io::dg`), and the trim removed 81 nodes from the middle of the store, so every
+/// index past the first removed node names a different node. A game save
+/// (`read_save_game`, src/core) refuses any world stream below v99 whole, with no
+/// migration (`save_game_refusal_reason` says why). The world reader still DECODES v98
+/// and older for the layout harness rows; an old stream whose tech count exceeds this
+/// tree is refused by `r_nation_tech` on its own terms.
+/// MERGE NOTE: a parallel lane's bump renumbers this block (this paragraph, the
+/// constants below, the accepted-version line in `read_world_snapshot`, the
+/// static_assert under the tail table, and the game load's refusal in save_game.cpp).
+inline constexpr uint32_t world_save_version = 99;
+
+/// BL-1712: the first stream of the trimmed Digitisation tree. Every game save below it
+/// is refused (`read_save_game`).
+inline constexpr uint32_t k_world_save_version_tree_trim = 99;
 
 /// BL-1637: the first version carrying the pad-boost section (see above).
 inline constexpr uint32_t k_world_save_version_launch_boost = 96;

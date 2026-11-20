@@ -462,11 +462,12 @@ constexpr std::string_view k_unread_systems[] = {
     "Alarm", "Container Port", "Marketplace trade capacity", "Nuclear Plant",
     "Port throughput", "activity fog", "assimilation", "battle resolution",
     "building fuel draw", "building maintenance by nation", "coastal water placement",
-    "construction cost by nation", "convoy cargo capacity", "deed history", "espionage",
+    "construction cost by nation", "convoy cargo capacity", "deed history",
     "fertiliser recipe", "holding losses by nation", "household demand by nation",
     "launch draw by nation", "microchip recipe", "muster time",
-    "national stock and demand ledger", "plastics recipe", "politics", // "offshore placement" is read (BL-1522)
-    "port handling by nation", "province building ceiling by type", "roads", "sea control", "sentiment", "ship muster time", "ship strength",
+    "national stock and demand ledger", "plastics recipe", // "offshore placement" is read (BL-1522);
+    // "espionage", "politics" and "port handling by nation" left with the BL-1712 trim
+    "province building ceiling by type", "roads", "sea control", "sentiment", "ship muster time", "ship strength",
     "survey reach", "tariffs", "tax yield", "trade partners by nation", "trade points",
     "trade settlement timing", "travel time by nation", "unit movement", "unit strength",
     "unit unlock", "unit_upkeep", "unrest", "wage_floor", "war outcomes",

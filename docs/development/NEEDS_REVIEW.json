@@ -2130,6 +2130,30 @@
     "Wage only x4 and restate the anchor ratio (about half, not twice)"
    ],
    "recommendation": "Keep. 'Upkeep x4' reads naturally as both halves, and the anchor is a standing ruling."
+  },
+  {
+   "raised": "2026-11-19",
+   "status": "open",
+   "source": "BL-1712 (trim the tech tree) step 2, lane F of the 2026-11-19 playtest",
+   "id": "NR-1260",
+   "title": "Tech tree trim: seven calls taken inside 'accept all as proposed', and one pacing miss to rule",
+   "kind": "decision",
+   "what": "Ben accepted the scored trim whole (213 -> 132 nodes). Applying it needed calls the review page did not spell out. (1) A merged minor whose buff was a smaller copy of its survivor's was DROPPED, not stacked: Drill-Bit Metallurgy, Mine Ventilation, Hybrid Seed, Catalysts, Clean Rooms, Process Automation, Heat Recovery, Rocket-Fuel Chemistry, Guidance Systems, Commodity Futures, Pallet Standards, Trucking Fleets, Air Cargo Hubs, Helicopter Lift, Public Housing, Inspection Regimes. Kit items, space unlocks and two distinct effects (Telex Network's fresher rival prices onto Mainframe Computing; Just-in-Time Inventory's holding cost onto Packet Networks) were CARRIED. (2) Travel I/III/V absorb II/IV/VI at +2% and are renamed I/II/III; masteries stay +3%, so a branch walked whole still gives 9 points. (3) In Force, Processing and Signal & Orbit, Travel IV and VI sat after a kit cluster; they were spliced out (what needed them now needs the cluster's major), which keeps every kit chain in order. (4) Force's and Signal & Orbit's masteries still need only their left rim major; the right arm's kit run (Active Protection, Loitering Munitions) is not added as a requirement. (5) The world save version moves to v97 and the game refuses older saves: the store's node index is the save's identity, and 81 removals re-point it. (6) The kit catalogue allows one item per slot per node, so two carried items moved off their planned survivor: the light mortar (infantry weapon) to Modern Gun Barrels, not Fire-and-Forget Missiles; the radar-laid howitzer (artillery gun) to Precision Munitions, not Rocket Artillery. Both keep their ring. (7) One harness row was narrowed: nation_tech_harness R6h used to show home water sites FLIP the research AI's pick between two equal minors. In the trimmed tree Desalination wins with or without water sites (its life-support space key carries relief alone), and no remaining pair puts a read resource buff against an unread minor at equal cost. R6h now asserts the water term adds to the relief; the tie rule stays covered by R6r0. Nothing in the picker changed. (8) PACING MISS, NOT RULED: nation_tech_harness R0h now FAILS. The path to the first ring-2 major (Extraction: T1, A1, A) costs 15 units where it cost 18, so over 16 seeds / 480 nations the median nation reaches it in 93 quarters against the band's floor of 96 (p10 85, 99.2% within 96; R0g and R0i still pass). The row was left failing, not re-banded.",
+   "why_it_matters": "(1) decides whether early-game extraction and processing numbers drop: a nation that held Drill-Bit Metallurgy before held +5% oil on top of Offshore Drilling's +25%; now it is +25% alone. (5) means no save from before the trim opens.",
+   "options": [
+    "A) Re-price: raise the ring-1 travel or minor cost so the opening path is 18 units again (the trim keeps fewer, heavier nodes, so heavier costs fit).",
+    "B) Move the band: accept a faster first major (median ~93) and lower R0h's floor.",
+    "C) Leave the row failing until the playtest pacing re-measure."
+   ],
+   "recommendation": "Calls 1-7: keep as built; re-price in play per the tree's placeholder-numbers rule (Ben, 2026-10-10). Call 8: A, since the trim's stated aim is fewer nodes each felt, not a faster climb.",
+   "files": [
+    "docs/economy/tech/digitisation_tree.json",
+    "docs/economy/RESEARCH.md",
+    "docs/economy/tech/DIGITISATION_TREE.md",
+    "src/world/world_save.hpp",
+    "src/core/save_game.cpp"
+   ],
+   "resolution": null
   }
  ]
 }

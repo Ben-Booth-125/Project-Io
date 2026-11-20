@@ -86,13 +86,16 @@ branch's first travel node is open from the start.
 
 | Tier | What it is | Base cost |
 |---|---|---|
-| **Travel** | A small stacking buff themed to its branch — *+1% extraction rate at every extraction building* — that lengthens the paths between clusters. Joints and masteries are travel nodes too | 1 |
+| **Travel** | A small stacking buff themed to its branch — *+2% extraction rate at every extraction building* — that lengthens the paths between clusters. Masteries are travel nodes too | 1 |
 | **Minor** | A narrower buff or a small utility, beside a major — or a kit item (Ben, 2026-11-03) | 2 |
 | **Major** | A named technology: unlocks a building, a recipe, a unit, a mechanic or a cluster's surge kit item. The power surge | 6 |
 | **Quest** | A deed-gated node: a small bonus now, and the key to the same branch in the next age | 3 |
 
-**Many nodes are small on purpose.** Travel is the bulk of the tree, and a branch's travel nodes
-carry the same buff, so a nation that walks a branch feels it stack.
+**Few nodes, and each one felt (Ben, 2026-11-19).** A node earns its place by changing what the
+nation can do or by moving a number the player will notice; a smaller copy of its neighbour's buff
+does not. So a branch carries three travel nodes, not six, each at the strength two used to have,
+and a minor that only repeats its major's buff at a smaller size is folded into that major. A
+branch's travel nodes carry the same buff, so a nation that walks a branch still feels it stack.
 
 ### Links require
 
@@ -100,26 +103,32 @@ carry the same buff, so a nation that walks a branch feels it stack.
 2026-10-10).** A node's requirements are groups; each group is satisfied by holding any one of its
 members, and every group must be satisfied. So:
 
-- **A major needs both of its minors.** The weight of an important node is the two paths into it.
-  A major off the spine with no cluster of its own takes those two paths from the branch's two arms,
-  both of their first nodes, and needs both. Wind Power is the one such major.
-- **A joint needs both of its neighbouring branches.** Joints sit where two branches — of one tree
-  or of two — meet, and buy a combined buff.
+- **A major needs its minors — one or two (Ben, 2026-11-19).** The weight of an important node is
+  the paths into it. A cluster has two minors where each minor is a choice worth making on its own,
+  and one where the second would only be a smaller copy of the major. A major off the spine with no
+  cluster of its own takes two paths from the branch's two arms, both of their first nodes, and
+  needs both. Wind Power is the one such major.
 - **A mastery needs both of its branch's rim majors**, and caps the branch with its travel buff at
-  triple strength.
+  one and a half times a travel node's strength.
 - Everything else hangs off one parent.
 
-**Branches fan out.** A branch runs travel → its first **cluster** (two minors feeding a major) →
-two arms → a cluster at the end of each arm → its mastery. The outer rings hold twice the majors of
-the inner, so the tree is widest at the rim.
+**No joints (Ben, 2026-11-19).** Nothing sits between two branches: a node that only glued two
+neighbours' small buffs together was never a decision.
+
+**Branches fan out.** A branch runs travel → its first **cluster** (one or two minors feeding a
+major) → two arms → a cluster at the end of each arm → its mastery. The outer rings hold twice the
+majors of the inner, so the tree is widest at the rim.
 
 **Kit clusters lengthen the arms (Ben, 2026-11-03).** A branch that carries military kit is wider
-than the seventeen-node spine — the Digitisation tree's Force holds 32 nodes, Signal & Orbit 29,
-Processing 23. Each kit cluster is two minors feeding a major, laid in line along an existing arm:
-its minors hang off the arm node before them, and the arm's next node hangs off its major, so the
-arm's rim cluster sits later. A kit cluster keeps the two-minors rule and is never a pair. **No kit
-node requires a node of another branch**: the tie between kit branches is economic, later kit
-drawing electronics off the shelf. A kit node opens one technology's item in every class it fits.
+than the common spine — the Digitisation tree's Force holds 21 nodes, Signal & Orbit 18,
+Processing 15. Each kit cluster is one or two minors feeding a major, laid in line along an existing
+arm: its minors hang off the arm node before them, and the arm's next node hangs off its major, so
+the arm's rim cluster sits later. A kit cluster is never a pair. **Kit minors on one subject are one
+node (Ben, 2026-11-19)** — a technology's armour for the tank and for the soldier, a ship's
+surface and submarine sensors — and a single item rides its cluster's major rather than a minor of
+its own. **No kit node requires a node of another branch**: the tie between kit branches is
+economic, later kit drawing electronics off the shelf. A kit node opens one technology's item in
+every class it fits.
 
 ### Pairs
 
@@ -136,12 +145,13 @@ done or become, read from state the game already carries (`../META_LAYER.md`, `c
 Holding it gives a small bonus now and **unlocks the same branch in the next age's tree**, which is
 otherwise locked. A deed is visible before it is met.
 
-### Placeholders
+### No placeholders
 
-**A placeholder cluster reserves room for a system the tree is designed to grow into (Ben, 2026-10-10).** It has a
-cluster's shape — two minors and a major — no effect, and it names the system that will fill it
-(espionage, politics). It may be researched and does nothing until that system exists. A mastery
-whose branch carries a placeholder needs only the branch's real rim major until the system lands.
+**A tree reserves no room for a system that does not exist (Ben, 2026-11-19; superseding the
+2026-10-10 placeholder clusters).** A node that may be researched and does nothing is a cost with no
+return. A system that lands — espionage, politics — brings its cluster into the tree with it, on the
+arm it belongs to. A branch whose arm was held for such a system keeps its mastery on its other
+arm's rim major alone; a kit run that now ends that arm is no requirement of the mastery.
 
 ### Cost
 
