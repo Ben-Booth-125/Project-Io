@@ -108,7 +108,10 @@ verify.expect(not verify.set_trade_reserve(-1.0), "a negative reserve is refused
 -- carries, traded at both ends), else any other market on the body.
 local pot = verify.potential_trades()
 local candidates = {}
-for _, r in ipairs(pot) do candidates[#candidates + 1] = { key = r.good_key, to = r.to_market } end
+-- Exports only: the list now carries imports too (Ben, 2026-11-19), whose source is elsewhere.
+for _, r in ipairs(pot) do
+    if r.dir == "out" then candidates[#candidates + 1] = { key = r.good_key, to = r.to_market } end
+end
 local others = {}
 for _, m in ipairs(verify.markets_on_body(home_body)) do if m ~= here then others[#others + 1] = m end end
 if #others > 0 then
@@ -267,6 +270,25 @@ if #pot > 0 then
     verify.expect(bad_margin == 0, "margin is sell there - buy here - haulage (" .. bad_margin .. " wrong)")
     verify.expect(out_of_order == 0, "potential trades are in the trade pass's order: profit per point, highest first")
     verify.expect(non_positive == 0, "a listed potential trade clears its haulage")
+
+    -- BOTH DIRECTIONS, ONE LIST (Ben, 2026-11-19): an export leaves here, an import
+    -- lands here, and the With column names the far end either way.
+    local outs, ins, bad_end = 0, 0, 0
+    for _, r in ipairs(pot) do
+        if r.dir == "out" then
+            outs = outs + 1
+            if r.from_market ~= here or r.to_market == here then bad_end = bad_end + 1 end
+        elseif r.dir == "in" then
+            ins = ins + 1
+            if r.to_market ~= here or r.from_market == here then bad_end = bad_end + 1 end
+        else
+            bad_end = bad_end + 1
+        end
+        if r.with == nil or r.with == "" then bad_end = bad_end + 1 end
+    end
+    print(string.format("MEASURED potential trades: %d out, %d in", outs, ins))
+    verify.expect(bad_end == 0, "every potential row has this market at the end its Dir says (" .. bad_end .. " wrong)")
+    verify.expect(ins > 0, "the list carries imports to this market as well as exports (" .. ins .. " in)")
 else
     print("MEASURED: no potential trade clears its haulage from this market")
 end

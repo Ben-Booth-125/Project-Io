@@ -239,6 +239,7 @@ std::vector<trade_row_record>       g_my_trades;
 std::vector<trade_row_record>       g_market_trades;
 std::vector<potential_trade_record> g_potential;
 float                               g_potential_points = 0.0f; ///< The acting nation's trade points at this market.
+std::map<entity_id, float>          g_potential_market_points; ///< ...and at every market: an import's gate is its source's.
 std::vector<exchange_row_record>    g_exchanges;
 trade_points_record                 g_points;
 bool                                g_market_trades_open = false;
@@ -272,6 +273,7 @@ void clear_trade_records()
     g_market_trades.clear();
     g_potential.clear();
     g_potential_points = 0.0f;
+    g_potential_market_points.clear();
     g_exchanges.clear();
     g_points             = trade_points_record{};
     g_market_trades_open = false;
@@ -486,7 +488,7 @@ trade_points_record collect_trade_points(const world& w)
 
 namespace {
 
-/// READ 3 — the potential-trade derivation: the routes FROM this market the
+/// READ 3 — the potential-trade derivation: the routes FROM and TO this market the
 /// trade pass itself would rank, best margin per trade point first.
 ///
 /// NOT A SECOND PRICING MODEL. Each row is a `trade_route_offer` out of
@@ -530,6 +532,27 @@ std::vector<potential_trade_record> derive_potential_trades(
     std::vector<trade_route_offer> offers;
     rank_trade_routes(w, reg, nodes, memo, corp, std::vector<entity_id>{here_mid}, offers);
 
+    // AND EVERY ROUTE LANDING HERE (Ben, 2026-11-19: "Trades should show potential
+    // imports and exports. Both from and to this market."). The same ranking read
+    // from the other end, not a second model: every other market is a source, and
+    // only the offers whose destination is this market are kept. One shared haul
+    // memo, so a pair priced for an export is not priced again. Ascending ids
+    // (`w.markets` is unordered) keep the walk deterministic.
+    {
+        std::vector<entity_id> others;
+        others.reserve(w.markets.size());
+        for (const auto& [mid, mk] : w.markets)
+            if (mid != here_mid)
+                others.push_back(mid);
+        std::sort(others.begin(), others.end());
+        std::vector<trade_route_offer> inbound;
+        if (!others.empty())
+            rank_trade_routes(w, reg, nodes, memo, corp, others, inbound);
+        for (const trade_route_offer& o : inbound)
+            if (o.b == here_mid)
+                offers.push_back(o);
+    }
+
     // RANKING IS PERMITTED HERE, and this is the one surface where that has been
     // ruled on explicitly (`CONCEPT.md` § Player identity, and Ben the same day:
     // "Market prices is a vital pillar of gameplay, but the strategy 'just build
@@ -551,9 +574,12 @@ std::vector<potential_trade_record> derive_potential_trades(
         potential_trade_record rec;
         rec.resource         = static_cast<resource_type>(o.r);
         rec.name             = presentation_of(rec.resource).name;
+        rec.import           = (o.b == here_mid);
+        rec.source_market    = o.a;
         rec.dest_market      = o.b;
         rec.dest_name        = market_city_name(w, o.b);
-        rec.haulage          = o.landed - posted_price(w.markets.at(here_mid), o.r);
+        rec.other_name       = market_city_name(w, rec.import ? o.a : o.b);
+        rec.haulage          = o.landed - posted_price(w.markets.at(o.a), o.r);
         rec.buy_price        = o.landed - rec.haulage;
         rec.margin           = o.margin_per_unit;
         rec.sell_price       = o.margin_per_unit + o.landed;
@@ -949,10 +975,10 @@ void potential_row_tooltip(const potential_trade_record& r, const std::string& n
 {
     if (!ImGui::BeginItemTooltip())
         return;
-    ImGui::Text("%s to %s", r.name, r.dest_name.c_str());
+    ImGui::Text("%s %s %s", r.name, r.import ? "from" : "to", r.other_name.c_str());
     ImGui::Separator();
-    ImGui::Text("Buy here      %.2f", static_cast<double>(r.buy_price));
-    ImGui::Text("Sell there    %.2f", static_cast<double>(r.sell_price));
+    ImGui::Text(r.import ? "Buy there     %.2f" : "Buy here      %.2f", static_cast<double>(r.buy_price));
+    ImGui::Text(r.import ? "Sell here     %.2f" : "Sell there    %.2f", static_cast<double>(r.sell_price));
     ImGui::Text("Haulage /unit %.2f", static_cast<double>(r.haulage));
     ImGui::Text("Margin /unit  %.2f", static_cast<double>(r.margin));
     ImGui::Text("Profit /point %.2f", static_cast<double>(r.margin_per_point));
@@ -969,29 +995,38 @@ void potential_row_tooltip(const potential_trade_record& r, const std::string& n
 /// READ 3's table. Highest profit first: PROFIT IS THE RANKING'S OWN FIGURE, margin
 /// per trade point, so the column a player reads is the key the rows sort by. The
 /// terms behind it sit under a hover rather than in columns the width cannot hold.
-/// Each row's "+" prefills the add-trade form (good, from here, to there), and is
-/// disabled when @p no_take_reason is non-empty: points gate taking a row, not
-/// listing it (Ben, 2026-11-09; ledgers/market.md § 2b).
-void draw_potential_table(const std::vector<potential_trade_record>& rows, entity_id here_mid,
-                          const std::string& no_take_reason)
+/// Each row's "+" prefills the add-trade form (good, source, destination), and is
+/// disabled when its entry in @p no_take is non-empty: points gate taking a row, not
+/// listing it (Ben, 2026-11-09; ledgers/market.md § 2b), and the points that bind it
+/// are the route's SOURCE's — this market for an export, the far end for an import.
+/// Exports and imports share one list and one order; the Dir column says which end
+/// this market is (Ben, 2026-11-19).
+void draw_potential_table(const std::vector<potential_trade_record>& rows,
+                          const std::vector<std::string>& no_take)
 {
     constexpr ImGuiTableFlags flags = ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingFixedFit;
-    if (!ImGui::BeginTable("##potential", 4, flags))
+    if (!ImGui::BeginTable("##potential", 5, flags))
         return;
 
     const float pad    = ImGui::GetStyle().CellPadding.x * 2.0f;
     const float w_marg = std::max(ImGui::CalcTextSize("+0000.00").x, ImGui::CalcTextSize("Profit").x) + pad;
     const float w_use  = ImGui::CalcTextSize("+").x + ImGui::GetStyle().FramePadding.x * 2.0f + pad;
 
+    const float w_dir  = std::max(ImGui::CalcTextSize("Out").x, ImGui::CalcTextSize("Dir").x) + pad;
+
     ImGui::TableSetupColumn("Good",    ImGuiTableColumnFlags_WidthStretch, 1.0f);
-    ImGui::TableSetupColumn("To",      ImGuiTableColumnFlags_WidthStretch, 1.0f);
+    ImGui::TableSetupColumn("Dir",     ImGuiTableColumnFlags_WidthFixed, w_dir);
+    ImGui::TableSetupColumn("With",    ImGuiTableColumnFlags_WidthStretch, 1.0f);
     ImGui::TableSetupColumn("Profit",  ImGuiTableColumnFlags_WidthFixed, w_marg);
     ImGui::TableSetupColumn("##use",   ImGuiTableColumnFlags_WidthFixed, w_use);
     ImGui::TableHeadersRow();
 
+    static const std::string k_none;
     int id = 0;
-    for (const potential_trade_record& r : rows)
+    for (std::size_t k = 0; k < rows.size(); ++k)
     {
+        const potential_trade_record& r = rows[k];
+        const std::string& no_take_reason = (k < no_take.size()) ? no_take[k] : k_none;
         ImGui::PushID(id++);
         ImGui::TableNextRow();
 
@@ -1004,23 +1039,27 @@ void draw_potential_table(const std::vector<potential_trade_record>& rows, entit
         potential_row_tooltip(r, no_take_reason);
 
         ImGui::TableSetColumnIndex(1);
-        ui::fit_text(ui::text_box::table_cell, "market.trades.potential_to", r.dest_name.c_str(),
-                     ImGui::GetContentRegionAvail().x);
+        ImGui::TextDisabled("%s", r.import ? "In" : "Out");
         potential_row_tooltip(r, no_take_reason);
 
         ImGui::TableSetColumnIndex(2);
+        ui::fit_text(ui::text_box::table_cell, "market.trades.potential_to", r.other_name.c_str(),
+                     ImGui::GetContentRegionAvail().x);
+        potential_row_tooltip(r, no_take_reason);
+
+        ImGui::TableSetColumnIndex(3);
         ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(IM_COL32(90, 200, 140, 255)),
                            "+%.2f", static_cast<double>(r.margin_per_point));
         // The row is a ranking; the hover is the arithmetic behind it, so nothing
         // is asserted that cannot be checked.
         potential_row_tooltip(r, no_take_reason);
 
-        ImGui::TableSetColumnIndex(3);
+        ImGui::TableSetColumnIndex(4);
         ImGui::BeginDisabled(!no_take_reason.empty());
         if (ImGui::SmallButton("+"))
         {
             g_form_good         = static_cast<int>(r.resource);
-            g_form_from         = here_mid;
+            g_form_from         = r.source_market;
             g_form_to           = r.dest_market;
             g_form_open_request = true;
         }
@@ -1173,9 +1212,9 @@ void draw_trades_tab(world& w, const recipe_registry& reg, ui_state& state,
     // changes whether this market can source anything. Null report: each building at
     // its own assignment, the same structural read the scorer takes.
     {
-        const std::map<entity_id, float> here = market_trade_points(w, reg, nullptr, player_actor(w));
-        const auto it = here.find(mid);
-        g_potential_points = (it != here.end()) ? it->second : 0.0f;
+        g_potential_market_points = market_trade_points(w, reg, nullptr, player_actor(w));
+        const auto it = g_potential_market_points.find(mid);
+        g_potential_points = (it != g_potential_market_points.end()) ? it->second : 0.0f;
     }
     // Empty when a row can be taken. The sentence is the one place the rule is said.
     const std::string no_take_reason =
@@ -1284,13 +1323,31 @@ void draw_trades_tab(world& w, const recipe_registry& reg, ui_state& state,
         ImGui::SeparatorText("Potential trades");
         if (g_potential.empty())
         {
-            ImGui::TextDisabled("No route from here clears its haulage.");
+            ImGui::TextDisabled("No route to or from here clears its haulage.");
         }
         else
         {
-            ImGui::TextDisabled("Routes from here, highest profit per trade point first.");
+            ImGui::TextDisabled("Routes out of and into here, highest profit per trade point first.");
+            // The gate on each row is its SOURCE's points: this market's for an
+            // export (the sentence below, said once), the far end's for an import.
+            std::vector<std::string> no_take;
+            no_take.reserve(g_potential.size());
+            for (const potential_trade_record& r : g_potential)
+            {
+                if (!r.import)
+                {
+                    no_take.push_back(no_take_reason);
+                    continue;
+                }
+                const auto pit = g_potential_market_points.find(r.source_market);
+                const bool has = pit != g_potential_market_points.end() && pit->second > 0.0f;
+                no_take.push_back(has ? std::string{}
+                                      : "You make no trade points in " + r.other_name
+                                            + ", so no trade can leave it. A trade leaves a market where you "
+                                              "hold a working Planetary Marketplace or Port.");
+            }
             ImGui::BeginChild("##pot_box", {0.0f, table_height(k_pot_cap)}, false);
-            draw_potential_table(g_potential, mid, no_take_reason);
+            draw_potential_table(g_potential, no_take);
             ImGui::EndChild();
         }
         // No points and an empty list are different answers (§ 2b): the line says

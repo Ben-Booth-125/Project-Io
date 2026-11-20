@@ -5426,6 +5426,9 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             row["good_key"]     = resource_names::name_of(r.resource); // the id set_trade takes
             row["to"]           = r.dest_name;
             row["to_market"]    = r.dest_market;
+            row["dir"]          = r.import ? "in" : "out"; // the Dir column (Ben, 2026-11-19)
+            row["from_market"]  = r.source_market;
+            row["with"]         = r.other_name;
             row["buy_price"]    = r.buy_price;
             row["sell_price"]   = r.sell_price;
             row["haulage"]      = r.haulage;
