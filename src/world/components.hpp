@@ -2087,8 +2087,8 @@ struct unit_component
     int32_t   morale_permille = 1000;
 
     // Refit to a newer type (Ben, 2026-10-27; MILITARY.md § The muster interface,
-    // "Refit to a newer type"). `refit_unit` sets both; each economy tick takes a
-    // quarter's days off `refit_days`, and at zero `type` becomes `refit_type`.
+    // "Refit to a newer type"). `refit_unit` sets both; each day of the walk takes a
+    // day off `refit_days` (BL-1704), and at zero `type` becomes `refit_type`.
     // While refitting the unit keeps its old type, fights as it, and may not march.
 
     /// The roster row the unit is refitting to, or `k_no_refit` when it is not.
@@ -2184,7 +2184,7 @@ inline bool unit_refitting(const unit_component& u)
 
 /// A hire waiting to become a unit (BL-1435, muster queue; MILITARY.md § The
 /// muster interface — "raising takes time", Ben 2026-10-27). `hire_unit` pays and
-/// queues one at the base; each economy tick takes a quarter's days off it, and at
+/// queues one at the base; each day of the walk takes a day off it (BL-1704), and at
 /// zero it becomes a unit standing on the base's tile.
 struct muster_order
 {

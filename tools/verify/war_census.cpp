@@ -108,6 +108,11 @@ const char* choice_name(war_ai_choice c)
         case war_ai_choice::accept:    return "accept";
         case war_ai_choice::refuse:    return "refuse";
         case war_ai_choice::impose:    return "impose";
+        case war_ai_choice::join_candidate: return "join-candidate"; // BL-1706
+        case war_ai_choice::join:           return "JOIN";
+        case war_ai_choice::accept_join:    return "accept-join";
+        case war_ai_choice::refuse_join:    return "refuse-join";
+        case war_ai_choice::capitulate:     return "CAPITULATE";
     }
     return "?";
 }

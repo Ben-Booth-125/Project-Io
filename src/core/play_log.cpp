@@ -245,6 +245,10 @@ const char* play_log::verb_name(corp_verb v)
         case corp_verb::set_embargo:          return "set_embargo";        // BL-1418
         case corp_verb::queue_space_research:   return "queue_space_research";   // BL-1613
         case corp_verb::unqueue_space_research: return "unqueue_space_research"; // BL-1613
+        case corp_verb::request_join_war:     return "request_join_war";   // BL-1706
+        case corp_verb::accept_join:          return "accept_join";        // BL-1706
+        case corp_verb::refuse_join:          return "refuse_join";        // BL-1706
+        case corp_verb::capitulate:           return "capitulate";         // BL-1706
     }
     return "verb?";
 }

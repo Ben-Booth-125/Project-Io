@@ -2606,3 +2606,16 @@ boilerplate: pure, seeded, deterministic, replayable, legal verbs only, never a 
   new verb; bending a front's slots to supply (§ Nation garrisons' ruling stands, and a rival meets it
   as a commander, by where it sends units); reading another nation's cover; a march planned beyond the
   next order. Pure, seeded, deterministic, replayable, legal verbs only, never a planner.
+  **Rival nations join wars — granted (Ben, 2026-11-19; BL-1706, wars draw in allies;
+  `../politics/RELATIONS.md` § Joining a war).** A new subject: a war that is not the rival's own,
+  which the 2026-10-30 war grant excluded. Raised in the playtest-lane form and granted on the standing
+  terms. A rival nation's scorer may **ask to join** an open war on a side, naming goals, where it holds
+  a declaration's own motive against a member of the other side or is the defender's friend, reading
+  only what a declaration reads (its own sentiment, its own front's supply, the price). Where it would
+  have declared on a nation already at war, it asks to join instead. **As a side's leader** it may
+  accept or refuse a nation asking to join its side, and as a joiner it may make a separate peace with
+  the other side's leader, both over the same legal verbs the player's Diplomacy ledger issues. Ben
+  chose that a leader must accept a joiner; a rival leader's accept-or-refuse is recorded here as part
+  of this grant, not read into it. **Not admitted:** asking, accepting or refusing for the player's
+  nation in a seated session; joining both sides; a war planned beyond the next verb. Pure, seeded,
+  deterministic, replayable, legal verbs only, never a planner.

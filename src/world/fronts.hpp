@@ -5,6 +5,8 @@
 
 #include <cstdint>
 #include <map>
+#include <set>
+#include <utility>
 #include <vector>
 
 struct world;
@@ -47,6 +49,8 @@ class recipe_registry;
 // tiles thick) sit next to their nearest line tile. All distances are hex steps
 // inside the span; every tie goes to the lower tile id.
 // ---------------------------------------------------------------------------
+
+struct unit_draw_memo; // nation_generation.hpp: the cover memo a push read keeps (BL-1707)
 
 struct front
 {
@@ -146,6 +150,13 @@ entity_id front_push_target(const world& w, const front& f, int64_t* defence = n
 /// march path cache: the same ranking and the same `march_check` the step asks.
 std::vector<entity_id> front_push_tiles(world& w, const recipe_registry& reg, const front& f,
                                         const std::vector<entity_id>& members);
+
+/// BL-1707 (MILITARY.md § Fronts, "A push stops where supply stops"; Ben, 2026-11-19): may a
+/// push of @p nation march onto @p tile? Only where its units would be fed: the nation's own
+/// cover there (`unit_tile_cover_permille`) at or past break-even, the same "fed" the
+/// declaration's supplied-front test reads. Memoised in @p memo for one pass.
+bool push_target_fed(world& w, const recipe_registry& reg, unit_draw_memo& memo, entity_id nation,
+                     entity_id tile);
 
 /// BL-1540: hex steps between two tiles of one body, the straight read a scorer may take of a
 /// march. No path is solved.

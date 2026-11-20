@@ -637,15 +637,23 @@ struct economy_report
 /// BL-1352: the step resolves this tick's Logistic Points itself — the marching
 /// claims first, then production's grants on what is left — so no caller hands it a
 /// pool any more. The legacy per-anchor pool (`lp_pool_map`) is gone with it.
-/// BL-1435 (muster queue): advance every muster a quarter's days and raise the ones
-/// that complete as units at their base. Called from run_economy_step before the
-/// battle pass; exposed so a harness can step it alone.
+/// BL-1435 (muster queue): advance every muster @p days and raise the ones that complete
+/// as units at their base, stamped as standing from the close of @p raised_day_stamp.
+/// BL-1704 (raising ticks daily, Ben 2026-11-19): the day walk (`advance_quarter_to`)
+/// calls it at the close of every day, so a muster completes on its own day.
+void advance_musters_days(world& w, int days, int raised_day_stamp);
+
+/// A whole month of `advance_musters_days`, stamped at the month's close. For a harness
+/// that steps the queue alone; the economy step walks musters by days.
 void advance_musters(world& w);
 
 /// Refit to a newer type (Ben, 2026-10-27; MILITARY.md § The muster interface): take
-/// a quarter's days off every refitting unit; one that reaches zero takes its new
-/// type, keeping its men, establishment, readiness and morale. Called beside
-/// advance_musters; exposed so a harness can step it alone.
+/// @p days off every refitting unit; one that reaches zero takes its new type, keeping
+/// its men, establishment, readiness and morale. Daily beside advance_musters_days
+/// (BL-1704).
+void advance_refits_days(world& w, int days);
+
+/// A whole month of `advance_refits_days`, for a harness that steps it alone.
 void advance_refits(world& w);
 
 /// BL-1637 (SPACE_ASSETS.md § Boost): THE PAD'S INTAKE. Every staffed Launchpad of a

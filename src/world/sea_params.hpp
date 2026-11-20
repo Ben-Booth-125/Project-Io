@@ -103,21 +103,21 @@ inline sea_params default_sea_params()
 
     ship_class_stats& s = p.cls[static_cast<std::size_t>(ship_class::submarine)];
     s.hp = 60; s.attack = 3000; s.detection = 20; s.stealth = 600; s.range = 40;
-    s.days_per_tile_permille = 700; s.muster_days = 180; s.crew = 20; s.hire_cost = 1200.0f;
+    s.days_per_tile_permille = 700; s.muster_days = 180; s.crew = 20; s.hire_cost = 2400.0f;
     g(s.hire_goods, rt::steel, 4.0f); g(s.hire_goods, rt::machinery, 3.0f); g(s.hire_goods, rt::electronics, 2.0f);
     s.missions = rai;
     s.targets  = static_cast<uint8_t>(t_cap | t_tra);
 
     ship_class_stats& d = p.cls[static_cast<std::size_t>(ship_class::destroyer)];
     d.hp = 80; d.attack = 2000; d.detection = 200; d.stealth = 50; d.range = 25;
-    d.days_per_tile_permille = 400; d.muster_days = 180; d.crew = 30; d.hire_cost = 900.0f;
+    d.days_per_tile_permille = 400; d.muster_days = 180; d.crew = 30; d.hire_cost = 1800.0f;
     g(d.hire_goods, rt::steel, 5.0f); g(d.hire_goods, rt::machinery, 3.0f); g(d.hire_goods, rt::electronics, 1.0f);
     d.missions = static_cast<uint8_t>(pat | esc | rai | blo);
     d.targets  = static_cast<uint8_t>(t_sub | t_des | t_cap | t_tra);
 
     ship_class_stats& c = p.cls[static_cast<std::size_t>(ship_class::capital)];
     c.hp = 200; c.attack = 6000; c.detection = 50; c.stealth = 30; c.range = 30;
-    c.days_per_tile_permille = 500; c.muster_days = 360; c.crew = 100; c.hire_cost = 3500.0f;
+    c.days_per_tile_permille = 500; c.muster_days = 360; c.crew = 100; c.hire_cost = 7000.0f;
     g(c.hire_goods, rt::steel, 14.0f); g(c.hire_goods, rt::alloys, 4.0f); g(c.hire_goods, rt::machinery, 6.0f);
     g(c.hire_goods, rt::electronics, 2.0f);
     c.missions = static_cast<uint8_t>(pat | esc | rai | blo);
@@ -125,7 +125,7 @@ inline sea_params default_sea_params()
 
     ship_class_stats& t = p.cls[static_cast<std::size_t>(ship_class::transport)];
     t.hp = 80; t.attack = 0; t.detection = 10; t.stealth = 30; t.range = 30;
-    t.days_per_tile_permille = 600; t.muster_days = 135; t.crew = 20; t.hire_cost = 700.0f;
+    t.days_per_tile_permille = 600; t.muster_days = 135; t.crew = 20; t.hire_cost = 1400.0f;
     t.capacity = 2;
     g(t.hire_goods, rt::steel, 6.0f); g(t.hire_goods, rt::machinery, 2.0f);
     t.missions = 0;

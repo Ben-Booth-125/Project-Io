@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*117 entries — 60 open, 57 resolved.*
+*118 entries — 61 open, 57 resolved.*
 
 ---
 
@@ -683,6 +683,18 @@ market_viability full tier, startups off: G1 82.2 (FAILS 85), G1t50 80.2 (FAILS 
 - D: the kit opens arms works only where a hire will soon want them (undoes part of BL-1551 force equipment)
 
 > **Recommendation:** C is done. Between A and B: A if the works should make arms ahead of war (the dial then staffs them on refill draw); B if BL-1551 meant them as a standing reserve that idles in peace. Either clears G1t50 by the reading above.
+
+### NR-1252 — Upkeep x4 quadrupled the goods draw as well as the wage, to keep the value anchor
+*decision · raised 2026-11-19 · from Playtest lane D, BL-1713 (armies cost more)*
+
+Ben ruled upkeep x4 against the wage figure (Rifle Infantry 2.25 -> 9 cr/month). Quadrupling the wage alone put every roster row out of the value anchor's band (equipment about twice the wage, Ben 2026-08-22): value_anchor R1a, 26 of 26 rows out, ratio 0.20-0.27. TAKEN: the goods half (ordnance 0.00029167 -> 0.00116668, food_rations 0.00208333 -> 0.00833332 per head per tick) quadrupled with it, so upkeep is x4 in both halves and the anchor holds (26/26 in band). This also quadruples army demand for ordnance and rations on the markets. MEASURED with BL-1713 as a whole (rebless_shape_probe, 16 seeds at the seat): rival units -21%, nation treasuries -15%, rivals with a negative balance 0 -> 5; opening_parity 20:4 five years: majors losing money on average 1/64 -> 9/64, none under 100 cr.
+
+**Why it matters.** The goods half moves market demand, which the wage alone did not. The alternative was to amend the anchor ruling.
+
+- Keep: upkeep x4 in both halves, anchor holds (taken)
+- Wage only x4 and restate the anchor ratio (about half, not twice)
+
+> **Recommendation:** Keep. 'Upkeep x4' reads naturally as both halves, and the anchor is a standing ruling.
 
 ---
 

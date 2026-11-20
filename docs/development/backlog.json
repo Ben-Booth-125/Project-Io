@@ -2419,7 +2419,7 @@
    "difficulty": 2,
    "files": [],
    "category": "Military",
-   "status": "designed",
+   "status": "complete",
    "authority_doc": "docs/military/MILITARY.md",
    "id": "BL-1704",
    "short_name": "RAISING_TICKS_DAILY",
@@ -2439,7 +2439,7 @@
    "difficulty": 3,
    "files": [],
    "category": "Military",
-   "status": "design-owed",
+   "status": "complete",
    "authority_doc": "docs/politics/RELATIONS.md",
    "id": "BL-1705",
    "short_name": "WAR_PREVIEW_OPINION",
@@ -2479,7 +2479,7 @@
    "difficulty": 3,
    "files": [],
    "category": "Military",
-   "status": "design-owed",
+   "status": "designed",
    "authority_doc": "docs/military/MILITARY.md",
    "id": "BL-1707",
    "short_name": "FRONT_PUSH_STAYS_SUPPLIED",
@@ -2499,7 +2499,7 @@
    "difficulty": 3,
    "files": [],
    "category": "Military",
-   "status": "design-owed",
+   "status": "complete",
    "authority_doc": "docs/ui/ledgers/military.md",
    "id": "BL-1709",
    "short_name": "WAR_GOALS_LEGIBLE",
@@ -2585,6 +2585,30 @@
    "short_name": "TECH_TREE_TRIM",
    "title": "Trim the tech tree: fewer minor nodes, keep the impactful majors - starting from a scored review list",
    "design": "PLAYTEST LANE F (tech tree). Ben: \"We should trim down the tech tree, reducing the number of minor nodes, and keeping more impactful major nodes... Let's keep an item in the backlog for going through them in a list scored by your perceived importance, and I can give my input.\" STEP 1: Claude lists every node of digitisation_tree.json (tech_tree_store.js) scored by perceived importance with a one-line reason; Ben marks keep / cut / merge. STEP 2: apply the cut in the store, re-render the doc, fix requirement groups and anything keyed to a cut node."
+  },
+  {
+   "glyph": "✓",
+   "sprint": null,
+   "version_goal": null,
+   "written": "2026-11-19",
+   "parked": false,
+   "blocked_on": null,
+   "requires": [],
+   "author": "Ben (playtest lane D, 2026-11-19); filed by Claude",
+   "priority": "B",
+   "difficulty": 2,
+   "files": [
+    "scripts/economy.lua",
+    "src/world/air_params.hpp",
+    "src/world/sea_params.hpp"
+   ],
+   "category": "Military",
+   "status": "complete",
+   "authority_doc": "docs/military/MILITARY.md",
+   "id": "BL-1713",
+   "short_name": "ARMIES_COST_MORE",
+   "title": "Military units cost twice as much to hire and four times as much to keep",
+   "design": "PLAYTEST LANE D (war). Ben: \"we should increase the upkeep and purchase cost of military units. It's currently too cheap to build a large army quickly.\" Ruled 2026-11-19: hire x2 (hire_base_cost 240, hire_cost_per_power 2.8; every air and sea hire_cost x2), upkeep x4 on all theatres, apply then measure. The goods half of upkeep (ordnance, food_rations per head) is quadrupled with the wage so the value anchor (equipment about twice the wage) holds - logged for Ben in NEEDS_REVIEW. Digest movement expected; re-pinned with the lane's other movers."
   }
  ]
 }

@@ -827,8 +827,8 @@ economy = {
         -- (power 380) costs 230. First-cut authored constants; retune by
         -- playtest. Standing-force UPKEEP is deliberately absent — flagged to
         -- BL-377's contract loop, not decided here.
-        hire_base_cost      = 120.0, -- BL-744 / NR-781: x2.776 with the head wage (was 40.0)
-        hire_cost_per_power = 1.4,   -- same factor (was 0.5)
+        hire_base_cost      = 240.0, -- Ben 2026-11-19 playtest: x2, a large army was too quick to raise (was 120.0; 40.0 before BL-744)
+        hire_cost_per_power = 2.8,   -- same x2 (was 1.4; 0.5 before BL-744). Air and sea hire_cost x2 too
 
         -- BL-1463 (MILITARY.md § Recruits, Ben 2026-10-30): soldiers are RECRUITS, and
         -- bases make them. Each quarter a completed, running military base makes
@@ -1038,8 +1038,8 @@ economy = {
             -- BL-1642 (the tick is a month): every rate below is a third of its per-quarter
             -- figure, so a year's keep is unchanged ("a year's keep < a fresh hire" reads
             -- 12 x 50 x 0.0347 = 20.8 < 120 as before).
-            credits_per_head           = 0.0347,    -- flat wage per head per tick (a quarter 0.1041; BL-1191 x0.25; was 0.4164; 0.15 before BL-744; 6.0 before BL-635)
-            credits_per_head_per_power = 0.0000233, -- wage scaled by the roster row's power_mod (a quarter 0.00007; BL-1191 x0.25; was 0.00028)
+            credits_per_head           = 0.1388,    -- Ben 2026-11-19 playtest: x4 (was 0.0347), upkeep was near free. flat wage per head per tick (a quarter 0.1041; BL-1191 x0.25; was 0.4164; 0.15 before BL-744; 6.0 before BL-635)
+            credits_per_head_per_power = 0.0000932, -- x4 with it (was 0.0000233). wage scaled by the roster row's power_mod (a quarter 0.00007; BL-1191 x0.25; was 0.00028)
 
             -- The goods half of the vector, per head per tick. ORDNANCE is the
             -- good (BL-457 added it as the roster's first terminal MILITARY
@@ -1047,8 +1047,8 @@ economy = {
             -- the sanctioned second line. Both rescaled by the same 0.025, so
             -- value_anchor's equipment:wage ratio is untouched.
             goods_per_head = {
-                ordnance     = 0.00029167, -- a quarter 0.000875 (BL-1191 x0.25; was 0.0035; 0.14 before BL-635)
-                food_rations = 0.00208333, -- a quarter 0.00625 (BL-1191 x0.25; was 0.025; 1.0 before BL-635)
+                ordnance     = 0.00116668, -- Ben 2026-11-19 playtest: x4 with the wage, so the value anchor holds (was 0.00029167). a quarter 0.000875 (BL-1191 x0.25; was 0.0035; 0.14 before BL-635)
+                food_rations = 0.00833332, -- x4 with it (was 0.00208333). a quarter 0.00625 (BL-1191 x0.25; was 0.025; 1.0 before BL-635)
             },
 
             supply_decay_permille    = 17,   -- the ONE decay subtraction, per tick (month; 50 a quarter / 3, rounded)
@@ -1254,28 +1254,28 @@ economy = {
             classes = {
                 submarine = {
                     hp = 60, attack = 3000, detection = 20, stealth = 600, range = 40,
-                    days_per_tile_permille = 700, muster_days = 180, crew = 20, hire_cost = 1200.0,
+                    days_per_tile_permille = 700, muster_days = 180, crew = 20, hire_cost = 2400.0,
                     hire_goods = { steel = 4.0, machinery = 3.0, electronics = 2.0 },
                     missions = { "raid" },
                     targets = { "capital", "transport" },
                 },
                 destroyer = {
                     hp = 80, attack = 2000, detection = 200, stealth = 50, range = 25,
-                    days_per_tile_permille = 400, muster_days = 180, crew = 30, hire_cost = 900.0,
+                    days_per_tile_permille = 400, muster_days = 180, crew = 30, hire_cost = 1800.0,
                     hire_goods = { steel = 5.0, machinery = 3.0, electronics = 1.0 },
                     missions = { "patrol", "escort", "raid", "blockade" },
                     targets = { "submarine", "destroyer", "capital", "transport" },
                 },
                 capital = {
                     hp = 200, attack = 6000, detection = 50, stealth = 30, range = 30,
-                    days_per_tile_permille = 500, muster_days = 360, crew = 100, hire_cost = 3500.0,
+                    days_per_tile_permille = 500, muster_days = 360, crew = 100, hire_cost = 7000.0,
                     hire_goods = { steel = 14.0, alloys = 4.0, machinery = 6.0, electronics = 2.0 },
                     missions = { "patrol", "escort", "raid", "blockade" },
                     targets = { "destroyer", "capital", "transport" },
                 },
                 transport = {
                     hp = 80, attack = 0, detection = 10, stealth = 30, range = 30,
-                    days_per_tile_permille = 600, muster_days = 135, crew = 20, hire_cost = 700.0,
+                    days_per_tile_permille = 600, muster_days = 135, crew = 20, hire_cost = 1400.0,
                     capacity = 2,
                     hire_goods = { steel = 6.0, machinery = 2.0 },
                     missions = {},
@@ -1296,37 +1296,37 @@ economy = {
             classes = {
                 fighter = {
                     hp = 100, air = 2000, superiority_permille = 1000, range = 15,
-                    ad_vulnerability_permille = 700, muster_days = 135, hire_cost = 900.0, crew = 20,
+                    ad_vulnerability_permille = 700, muster_days = 135, hire_cost = 1800.0, crew = 20,
                     hire_goods = { alloys = 4.0, electronics = 3.0, machinery = 2.0, refined_fuel = 2.0 },
                     missions = { "superiority" },
                 },
                 multirole = {
                     hp = 100, air = 1500, superiority_permille = 600, soft = 80, hard = 60,
-                    range = 12, ad_vulnerability_permille = 1000, muster_days = 135, hire_cost = 1100.0, crew = 24,
+                    range = 12, ad_vulnerability_permille = 1000, muster_days = 135, hire_cost = 2200.0, crew = 24,
                     hire_goods = { alloys = 4.0, electronics = 3.0, machinery = 2.0, ordnance = 2.0 },
                     missions = { "tactical", "superiority" },
                 },
                 bomber = {
                     hp = 140, strategic = 12, superiority_permille = 0, range = 40,
-                    ad_vulnerability_permille = 1600, muster_days = 180, hire_cost = 1600.0, crew = 40,
+                    ad_vulnerability_permille = 1600, muster_days = 180, hire_cost = 3200.0, crew = 40,
                     hire_goods = { alloys = 6.0, electronics = 3.0, machinery = 3.0, ordnance = 3.0 },
                     missions = { "strategic" },
                 },
                 helicopter = {
                     hp = 60, soft = 50, hard = 120, superiority_permille = 0, range = 6,
-                    ad_vulnerability_permille = 1300, muster_days = 90, hire_cost = 500.0, crew = 12,
+                    ad_vulnerability_permille = 1300, muster_days = 90, hire_cost = 1000.0, crew = 12,
                     hire_goods = { alloys = 2.0, machinery = 2.0, electronics = 1.0 },
                     missions = { "tactical" },
                 },
                 drone = {
                     hp = 40, soft = 40, hard = 40, recon = 150, superiority_permille = 0, range = 10,
-                    ad_vulnerability_permille = 1200, has_morale = false, muster_days = 90, hire_cost = 400.0, crew = 6,
+                    ad_vulnerability_permille = 1200, has_morale = false, muster_days = 90, hire_cost = 800.0, crew = 6,
                     hire_goods = { electronics = 2.0, alloys = 1.0 },
                     missions = { "tactical", "recon" },
                 },
                 recon = {
                     hp = 80, recon = 300, superiority_permille = 0, range = 20,
-                    ad_vulnerability_permille = 800, muster_days = 135, hire_cost = 800.0, crew = 30,
+                    ad_vulnerability_permille = 800, muster_days = 135, hire_cost = 1600.0, crew = 30,
                     hire_goods = { alloys = 3.0, electronics = 4.0 },
                     missions = { "recon" },
                 },

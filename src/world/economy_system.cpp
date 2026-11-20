@@ -2024,11 +2024,13 @@ economy_step_phase_clock*& economy_step_phase_clock_sink()
     return sink;
 }
 
-void advance_musters(world& w)
+void advance_musters_days(world& w, int days, int raised_day_stamp)
 {
-    // BL-1435 (muster queue; MILITARY.md § The muster interface). Each order takes a
-    // quarter's days (one economy tick) off its count; one that reaches zero becomes
-    // a unit on its base's tile, raised exactly as a hire used to raise it. Walked in
+    // BL-1435 (muster queue; MILITARY.md § The muster interface). Each order takes
+    // @p days off its count; one that reaches zero becomes a unit on its base's tile,
+    // raised exactly as a hire used to raise it. BL-1704 (raising ticks daily, Ben
+    // 2026-11-19): the day walk calls this once a day (`advance_quarter_to`), so a
+    // muster completes on its own day, not at the next month's close. Walked in
     // ISSUE order — the vector's own order — so the entity ids the completed units
     // take are a pure function of the queue. An order whose base is gone or
     // decommissioned is dropped with no unit: the force had nowhere to muster, as a
@@ -2045,7 +2047,7 @@ void advance_musters(world& w)
             (void)refund_muster_recruits(w, m); // Ben, 2026-10-31: its men go back to the pool
             continue;
         }
-        m.days_remaining -= k_construction_quarter_days;
+        m.days_remaining -= days;
         if (m.days_remaining > 0)
         {
             still.push_back(m);
@@ -2077,23 +2079,30 @@ void advance_musters(world& w)
             .kit                    = m.kit, // BL-1434: the design the hire paid for
         };
         // BL-1453 (MILITARY.md § Recon, "Only haste attacks blind"): raised NOW, at the
-        // close of this quarter. The next quarter's days are stamped from
-        // military_quarter_day_base(T + 1) + 1, so a raised unit counts toward an opening
-        // from the next day on; it has not stood a day before that.
-        w.units[unit].tile_since_day = military_quarter_day_base(w.current_econ_tick + 1);
+        // close of the day stamped @p raised_day_stamp. The next day is stamped one on,
+        // so a raised unit counts toward an opening from the next day on; it has not
+        // stood a day before that.
+        w.units[unit].tile_since_day = raised_day_stamp;
     }
     w.musters.swap(still);
 }
 
-void advance_refits(world& w)
+void advance_musters(world& w)
+{
+    // A harness's whole month: the days the walk would take, the unit stamped at the
+    // month's close (military_quarter_day_base(T + 1) is the stamp of its last day).
+    advance_musters_days(w, k_construction_quarter_days, military_quarter_day_base(w.current_econ_tick + 1));
+}
+
+void advance_refits_days(world& w, int days)
 {
     // Each unit's refit is its own: no unit's outcome reads another's, so the
-    // unordered walk cannot change the result.
+    // unordered walk cannot change the result. BL-1704: daily, as a muster is.
     for (auto& [uid, u] : w.units)
     {
         if (!unit_refitting(u))
             continue;
-        u.refit_days -= k_construction_quarter_days;
+        u.refit_days -= days;
         if (u.refit_days > 0)
             continue;
         u.type       = u.refit_type;
@@ -2102,6 +2111,11 @@ void advance_refits(world& w)
         u.refit_kit  = unit_design{};
         u.refit_days = 0;
     }
+}
+
+void advance_refits(world& w)
+{
+    advance_refits_days(w, k_construction_quarter_days);
 }
 
 // BL-1637 (SPACE_ASSETS.md § Boost; MARKETS.md § Demand channels, property 3):
@@ -3691,16 +3705,13 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
     // (`close_construction_quarter` -> `advance_quarter_to`), which walks the quarter
     // just closed day by day. What stays HERE is what is economic, once a quarter:
     //
-    //   - musters and refits advance a quarter's days and complete into units (below),
-    //     BEFORE the end-of-tick re-anchor, so a unit finishing either is free to be
-    //     sent by a front from tomorrow;
+    //   - (BL-1704, Ben 2026-11-19: musters and refits are DAILY now, at the close of
+    //     each day of the walk - `advance_quarter_to` - so they no longer run here);
     //   - the units' supply requests on the Logistic Point resolve (above);
     //   - the unit upkeep pass and its orphan cleanup (below) - the same cleanup the
     //     daily pass runs (`disband_orphaned_units`), here for a base torn down this tick.
     //
     // NR-344 ("war flips the queue") lives in the daily march's visit order.
-    advance_musters(w);
-    advance_refits(w); // Ben, 2026-10-27: a refit completes on the tick, as a muster does
 
     // BL-1449 (MILITARY.md § Air): the air missions, still flown over the quarter's 90
     // days HERE rather than in the daily military pass (run_military_day), until they
@@ -5381,6 +5392,33 @@ void run_space_day(world& w, const recipe_registry& reg)
 }
 } // namespace
 
+namespace
+{
+/// BL-1704: the fewest days until a muster or a refit next completes, so the day walk's
+/// skip stops on that day; INT_MAX when nothing is raising. A finished muster waiting on a
+/// foreign stack (at zero days) is retried every day.
+int days_to_next_raise(const world& w)
+{
+    int n = std::numeric_limits<int>::max();
+    for (const muster_order& m : w.musters)
+        n = std::min(n, std::max(1, m.days_remaining));
+    for (const auto& [uid, u] : w.units) // a pure minimum: walk order cannot reach it
+        if (unit_refitting(u))
+            n = std::min(n, std::max(1, u.refit_days));
+    return n;
+}
+
+/// BL-1704 (raising ticks daily; MILITARY.md § The muster interface): @p days of raising,
+/// closing on the day stamped @p last_day_stamp. Musters before refits, as the monthly step
+/// ran them.
+void advance_raising(world& w, int days, int last_day_stamp)
+{
+    if (!w.musters.empty())
+        advance_musters_days(w, days, last_day_stamp);
+    advance_refits_days(w, days);
+}
+} // namespace
+
 int advance_quarter_to(world& w, const recipe_registry& reg, int day_in_quarter,
                        int quarter_first_day_tick, std::vector<battle_dispatch>* dispatches)
 {
@@ -5403,25 +5441,33 @@ int advance_quarter_to(world& w, const recipe_registry& reg, int day_in_quarter,
         run_space_day(w, reg);
         if (!military_active(w, reg, quarter_first_day_tick + d))
         {
+            // BL-1704: the skip stops on the day a muster or refit completes, since a
+            // unit raised then may give the military something to walk from tomorrow.
+            const int last = static_cast<int>(std::min<long long>(to, static_cast<long long>(d) - 1 + days_to_next_raise(w)));
             // The space units walk the days the skip below jumps, one at a time.
             // (Stations count: two hostile defended stations at one node fight.)
-            for (int k = d + 1; k <= to && (!w.space_units.empty() || !w.stations.empty()); ++k)
+            for (int k = d + 1; k <= last && (!w.space_units.empty() || !w.stations.empty()); ++k)
             {
                 run_space_day(w, reg);
             }
             // Nothing military left to walk: construction takes the rest in one call,
             // which walks the identical days (advance_construction_to is days-outer).
-            advance_construction_to(w, reg, to);
+            advance_construction_to(w, reg, last);
             // BL-1428: no unit moves and no battle runs on the days skipped, so each
             // party's field share is today's for all of them — charged in one call.
-            accumulate_war_field_days(w, to - d + 1);
-            break;
+            accumulate_war_field_days(w, last - d + 1);
+            advance_raising(w, last - d + 1, quarter_first_day_tick + last);
+            d = last; // the loop's ++d resumes the walk the day after
+            continue;
         }
         advance_construction_to(w, reg, d);
         military_day_result r = run_military_day(w, reg, quarter_first_day_tick + d);
         // BL-1428 (RELATIONS.md § 7, "each day its units stand in the field"): the
         // day's positions, after its march, count one day.
         accumulate_war_field_days(w, 1);
+        // BL-1704: the day closes with its raising; a unit raised today is sent by a
+        // front from tomorrow, as it was from the next month before.
+        advance_raising(w, 1, quarter_first_day_tick + d);
         if (dispatches != nullptr)
             dispatches->insert(dispatches->end(),
                                std::make_move_iterator(r.battles.dispatches.begin()),

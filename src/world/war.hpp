@@ -7,8 +7,10 @@
 // queue, the battle trigger. The war gives that hostility a purpose (goals), a
 // measure (the war score and each side's exhaustion) and an end (a peace).
 //
-// There is ONE WAR PER PAIR, keyed (declarer, defender). A nation may be party
-// to several wars at once; there are no alliances.
+// A war is keyed by its two LEADERS, (declarer, defender). Other nations JOIN a
+// side (BL-1706, wars draw in allies; RELATIONS.md § Joining a war): every member
+// of a side is at war with every member of the other, and a pair stands across in
+// at most one war. A nation may be party to several wars at once.
 //
 // THE TYPES HERE ARE WORLD-FREE (the sentiment.hpp precedent): `world` holds the
 // tables and this header names their meaning, so world.hpp can include it
@@ -98,6 +100,22 @@ inline constexpr int k_war_morale_per_exhaustion = 5;
 // The record
 // ---------------------------------------------------------------------------
 
+/// A war's key in `world::wars`: (declarer, defender) — its two LEADERS.
+using war_key_t = std::pair<entity_id, entity_id>;
+
+/// BL-1706 (wars draw in allies; RELATIONS.md § Joining a war): a nation that joined
+/// a side. Leaders stay in `war_record`'s own fields.
+struct war_member
+{
+    entity_id             nation = null_entity;
+    uint8_t               side   = 0;   ///< 0 the declarer's side, 1 the defender's.
+    std::vector<uint32_t> goals;        ///< Ascending; provinces of members across (0..3 once pruned).
+    int64_t               men_lost   = 0;
+    float                 exhaustion = 0.0f;
+    float                 field_days = 0.0f;
+    int32_t               joined_tick = 0;
+};
+
 /// One open war. Keyed (declarer, defender) in `world::wars`.
 struct war_record
 {
@@ -131,7 +149,23 @@ struct war_record
     /// `run_war_quarter`.
     float declarer_field_days = 0.0f;
     float defender_field_days = 0.0f;
+
+    /// BL-1706: the joiners, in join order (ascending `joined_tick`, then append).
+    std::vector<war_member> joiners;
+    /// BL-1706: men lost by members who have since left, per side — kept so the
+    /// battles half still counts the whole war.
+    std::array<int64_t, 2> departed_men_lost{};
 };
+
+/// BL-1706: a pending request to join a war (`world::join_requests`, keyed (war key,
+/// asker)). One per nation per war.
+struct join_request
+{
+    uint8_t               side = 0;
+    std::vector<uint32_t> goals; ///< Ascending.
+    int32_t               tick = 0;
+};
+using war_join_key_t = std::pair<war_key_t, entity_id>; ///< (war key, asker)
 
 /// What a peace hands over. White: nothing. Cession: `provinces` pass from the
 /// loser to `gainer`.
@@ -164,8 +198,9 @@ enum class war_end : uint8_t
     cession       = 1,
     imposed_white = 2,
     imposed_cession = 3,
+    capitulation    = 4, ///< BL-1706: a leader capitulated (RELATIONS.md § 7, Capitulation).
 };
-inline constexpr uint8_t war_end_max = 3;
+inline constexpr uint8_t war_end_max = 4;
 
 /// A closed war (`world::war_history`, append order = close order).
 struct war_history_entry
@@ -296,9 +331,44 @@ entity_id province_owner(const world& w, uint32_t province_id);
 /// that is not the defender's). 0 when neither names one of the defender's provinces.
 uint32_t attack_goal_province(const world& w, entity_id defender, entity_id tile);
 
-/// The open war between @p a and @p b in either direction, or nullptr.
+/// The open war in which @p a and @p b stand on opposite sides (leaders or joiners;
+/// BL-1706), or nullptr. A pair stands across in at most one war.
 const war_record* war_between(const world& w, entity_id a, entity_id b);
 bool at_war(const world& w, entity_id a, entity_id b);
+
+// --- BL-1706 (wars draw in allies; RELATIONS.md § Joining a war): sides, pure ---
+
+/// @p nation's side in @p war: 0 the declarer's, 1 the defender's, -1 not a member.
+int war_side(const war_record& war, entity_id nation);
+/// The leader of @p side (0 the declarer, 1 the defender).
+entity_id war_leader(const war_record& war, int side);
+/// Every member of @p side: its leader, then its joiners in join order.
+std::vector<entity_id> war_side_members(const war_record& war, int side);
+/// The goals @p side named: its leader's, then each joiner's, ascending and distinct.
+std::vector<uint32_t> war_side_goals(const war_record& war, int side);
+/// The member of @p side that named @p province (the leader first, then join order),
+/// or null_entity.
+entity_id war_goal_namer(const war_record& war, int side, uint32_t province);
+/// The goals @p member named (its leader list or its joiner entry), or nullptr.
+const std::vector<uint32_t>* war_member_goals(const war_record& war, entity_id member);
+/// Men lost by @p side over the war: its members' and its departed members'.
+int64_t war_side_men_lost(const war_record& war, int side);
+/// The war (and its key) in which @p nation is a member opposite @p across, or nullptr.
+const war_record* war_of_member(const world& w, entity_id nation, entity_id across,
+                                war_key_t* key = nullptr);
+
+/// Pure: every refusal `request_join_war` makes, in its order. @p allow_pending
+/// skips "a request already pending" (accept re-validates the request itself).
+war_result check_join(const world& w, const war_key_t& key, entity_id asker, uint8_t side,
+                      const std::vector<uint32_t>& goals, bool allow_pending = false);
+/// True iff @p asker's last request to join the war at @p key was refused fewer
+/// than `k_war_offer_cooldown_ticks` ago.
+bool join_cooling(const world& w, const war_key_t& key, entity_id asker);
+/// The price of joining (pure): exactly what `accept_join` charges — the declaration's
+/// price for declaring on the opposing leader, with hostility_declared on EVERY member
+/// across. `valid` false when the join would be refused.
+war_price join_price(const world& w, const sentiment_params& p, const war_key_t& key,
+                     entity_id asker, uint8_t side, const std::vector<uint32_t>& goals);
 
 /// True iff a truce stands between the pair at `w.current_econ_tick`.
 bool truce_between(const world& w, entity_id a, entity_id b);
@@ -376,6 +446,38 @@ war_result refuse_peace(world& w, entity_id receiver, entity_id offerer);
 /// when the war score stands at 100 in its favour.
 war_result impose_peace(world& w, const sentiment_params& p, entity_id imposer,
                         entity_id other, const peace_terms& terms);
+
+// --- BL-1706 (wars draw in allies; RELATIONS.md § Joining a war) ---------------
+// The peace verbs above also take a SEPARATE PEACE between a joiner and the OTHER
+// side's leader (offers in `world::separate_peace_offers`, keyed (joiner, leader);
+// terms white, or a cession of goals the gainer named on the other's ground that its
+// side holds): it takes the joiner alone out of the war. Imposing is the leaders' only.
+
+/// Files @p asker's request to join the war at @p key on @p side, naming 1..3 goals
+/// among the provinces of the other side's members. Refused (mutating nothing):
+/// rejected_invalid — unknown nation, side > 1, a bad goal list; rejected_state — no
+/// such war, already a member, at war with any member (either side), a truce with a
+/// member across, a goal its side already named, a request pending, a refusal cooling.
+war_result request_join_war(world& w, entity_id asker, const war_key_t& key, uint8_t side,
+                            const std::vector<uint32_t>& goals);
+
+/// @p leader accepts @p asker's pending request on its side (the first in war-key
+/// order, if several): hostility both ways with every member across, the join's price
+/// charged as conduct (`join_price`), the joiner appended. Re-validated now; refused,
+/// mutating nothing, if it no longer holds.
+war_result accept_join(world& w, const sentiment_params& p, entity_id leader, entity_id asker);
+
+/// @p leader refuses @p asker's pending request; the refusal tick is recorded
+/// (`world::join_refusals`) and @p asker may not ask again in that war for
+/// `k_war_offer_cooldown_ticks`.
+war_result refuse_join(world& w, entity_id leader, entity_id asker);
+
+/// RELATIONS.md § 7, Capitulation (Ben, 2026-11-19): unilateral. Every goal the other
+/// side named on @p nation's ground, held or not, passes to the member that named it
+/// (`cede_provinces`, `province_ceded` conduct). A leader's capitulation closes the war
+/// (`war_end::capitulation`), its side's joiners leaving with a white peace; a joiner's
+/// takes it alone out. Truces as any peace; a last province ceded ends the nation.
+war_result capitulate(world& w, const sentiment_params& p, entity_id nation, const war_key_t& key);
 
 /// A CESSION MOVES THE TERRITORY (BL-1460; RELATIONS.md § 7). For each province
 /// (ascending): `province_holder` becomes @p to (already so for a legal cession)

@@ -574,6 +574,15 @@ stand on is taken, not a target. Marching onto a held tile is an attack (§ Batt
 toward the neighbour, which is the battle trigger's one-way test. If that hostility ends, the stored
 push acts as hold until it returns.
 
+**A push stops where supply stops (Ben, 2026-11-19).** A push target must be ground the pushing
+unit would be fed on: its nation's cover there at or past **break-even**, the share at which food
+holds steady (§ Carried supplies). This is the cover the declaration's supplied-front test reads
+(`../politics/RELATIONS.md` § Who declares). A target below it is skipped like a walled one. **The
+decision is each unit's, never the front's (Ben, 2026-11-19):** a front is often fed in some places
+and not others, so the push stays ordered and every unit with fed ground ahead marches on, while a
+unit with none holds its slot until roads or Logistic Points reach further or the player moves it
+by hand. A unit's own march order is not bound by the rule. It binds every nation's fronts alike.
+
 **When the border moves.** Fronts re-derive from the territory map and the occupation layer. An assignment or order follows
 its key. If the key no longer names a front, it moves to the front toward the **same neighbour**
 whose span now holds the key tile. Failing that, it goes to the front toward that neighbour nearest
@@ -608,7 +617,8 @@ priced and no such ground in reach, pays only what an order adds over where it s
 
 A push is scored unit by unit, at the tile that unit would march onto: its strength x (worth - price). Ground
 is worth half of the men who take it. A goal the neighbour still holds, under a stack or not, and the ground
-within 8 steps of it, is worth all of them, so a cover-0 price scores nothing against it and the war marches. The
+within 8 steps of it, is worth all of them, so a cover-0 price scores nothing against it and the war marches, as far as
+the push's own supply edge lets it (§ The push target). The
 8 steps are straight hex distance, ignoring water and walls: a cheap radial read, not a route. The price takes no credit for where the unit stands if it can stand fed: a starving force is weighed as a
 fed one is. A unit a push would leave on the neighbour's ground, with no war to take it, is priced where it stands,
 for no ground. The front pushes when the sum is not negative and the 3:2 passes. The 3:2 reads each unit's
@@ -1304,8 +1314,8 @@ checks, in order:
 5. The nation can pay **both** legs, else `rejected_funds`.
 
 The two payment legs. A **credit cost** of
-`hire_base_cost + hire_cost_per_power × row.power_mod` (economy.lua § military: 120 + 1.4 × power,
-BL-744 / NR-781, so Levy Spear costs 120, Rifle Regiment 652 and Rifle Infantry 736). Plus a **flat resource draw** of 5.0 per *gated*
+`hire_base_cost + hire_cost_per_power × row.power_mod` (economy.lua § military: 240 + 2.8 × power,
+doubled by Ben, 2026-11-19, because a large army was too quick to raise, so Levy Spear costs 240, Rifle Regiment 1304 and Rifle Infantry 1472; a ship's or aircraft's own `hire_cost` doubled with it). Plus a **flat resource draw** of 5.0 per *gated*
 axis, **bought** off the shelves of the markets the nation's buildings sit in, lowest market id first, at each
 shelf's posted price — a hire buys its kit like any buyer (`../economy/MARKETS.md` § The shelf
 economy).
@@ -1322,8 +1332,9 @@ checked before either is debited, so a refusal leaves the nation wholly uncharge
 a building enters construction, and becomes a unit when its muster completes; the Military
 ledger's **Recruit** tab (rail slot 7, `../ui/ledgers/military.md`) shows the queue and is the
 door to every hire. A muster takes **90 days** for infantry, motorised infantry and light armour,
-**135** for artillery and air defence, and **180** for mechanised infantry and armour — a month
-a tick, so one, two or two ticks (`muster_days_for`). A hire still mustering counts against a
+**135** for artillery and air defence, and **180** for mechanised infantry and armour (`muster_days_for`). **A muster progresses daily (Ben,
+2026-11-19):** each day of the walk takes one day off it, so a unit appears on the day its muster
+ends, not at the next month's close. A hire still mustering counts against a
 rival nation's force sizing (§ What a force costs). An order whose base is demolished or decommissioned is
 dropped with no unit, as a unit whose base is torn down is disbanded. On completion: a new unit entity at the muster tile with
 `count = hire_batch_manpower`, returned through `apply_corp_command`'s out-param. The verb records the base it was raised at as the unit's
@@ -1349,7 +1360,7 @@ row of the same class (`land_class_for`), newer — a later band, or the same ba
 `power_mod` — and one the nation can field now; an obsolete row is allowed, listed after the live
 ones. The unit must be the nation's own, out of battle, not already refitting, and standing on its
 own nation's ground. It pays at once: the hire price difference, floored at zero, plus the target's
-gated goods off the shelf as a hire buys them. It takes the target's muster days, a month a tick.
+gated goods off the shelf as a hire buys them. It takes the target's muster days, counted daily as a muster's are.
 Until then the unit keeps its old type, fights as it and is drawn into battles as it, but does not
 march: re-equipping is done in place, so a standing march order is cleared. On completion it takes
 the new type and keeps its men, establishment, readiness and morale. The press is on the unit card
@@ -1905,10 +1916,10 @@ The authored table, `scripts/economy.lua` § `economy.military.unit_upkeep`:
 
 | Rate | Authored | Meaning |
 |---|---|---|
-| `credits_per_head` | `0.0347` | Flat wage per head per tick |
-| `credits_per_head_per_power` | `0.0000233` | Wage scaled by the roster row's `power_mod` |
-| `goods_per_head.ordnance` | `0.00029167` | The **ordnance** draw |
-| `goods_per_head.food_rations` | `0.00208333` | The sanctioned second line |
+| `credits_per_head` | `0.1388` | Flat wage per head per tick (quadrupled by Ben, 2026-11-19, an army being near free to keep; the goods half quadrupled with it, so the value anchor holds) |
+| `credits_per_head_per_power` | `0.0000932` | Wage scaled by the roster row's `power_mod` |
+| `goods_per_head.ordnance` | `0.00116668` | The **ordnance** draw |
+| `goods_per_head.food_rations` | `0.00833332` | The sanctioned second line |
 | `supply_decay_permille` | `17` | The one decay subtraction, per tick |
 | `supply_recovery_permille` | `33` | Regained per tick while supplied |
 | `out_of_supply_reach` | `24.0` | Reach cost past which a unit is out of supply; ≤ 0 disables the trigger |

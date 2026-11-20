@@ -64,17 +64,32 @@ Pressing Declare war turns the chosen nation's detail into the declaration, in p
 - **Goals.** The canvas marks the target's provinces, every one a possible goal, its capital
   included (Ben, 2026-10-30). Clicking one toggles it, to at most three.
 - **Justifications** — every opening justification, each marked as holding or not.
-- **The price** — the Trust fall and Alarm rise with every other nation, summed and per neighbour,
-  updated as goals change.
+- **The price** — the Trust fall and Alarm rise with every other nation, summed, updated as goals
+  change.
+- **Whose opinion turns (Ben, 2026-11-19; RELATIONS § 7, "The preview says whose opinion turns").**
+  One row per nation whose Trust or Alarm band toward you would change, as words (*Kesh: Favourable
+  → Wary*), band changes toward the hostile end first, neighbours marked. The row's hover gives the
+  figures. Below them, **May join them** and **May join you**, a nation per row. A nation whose band
+  holds and who would join neither side has no row.
 - **Declare** commits through `declare_war`; **Cancel** leaves everything as it was.
 
 The right-click declare-and-attack opens this same declaration, with the attacked province chosen.
 
 ### Wars — the rows
 
-Each war shows declarer and defender, each side's goals and who holds each, the war score as a
-centred bar, each side's exhaustion, and days since it opened. Every war is public (Ben,
-2026-10-30). On a war the player is party to:
+Each war shows its two sides and the war score as a centred bar. Every war is public (Ben,
+2026-10-30).
+
+**Goals are rows, one each (Ben, 2026-11-19).** A goal's row is its province, a state word and a
+progress bar: the share of the province's tiles the side that named it holds. The word is **Held**
+when that side holds the province, **Contested** when it holds some of its tiles, and **Not held**
+otherwise. On a war the player is in, goals group under **Taking** (the player's side's goals) and
+**Defending** (the other side's). Pressing a goal row centres the map on its province. Each side's
+exhaustion and the days since the war opened are the score bar's hover, not lines. A war the player
+is not in is one line, its sides and its score bar, and a press expands it to the same rows. Every
+explanation is a tooltip (`military.md` § Explanation is a tooltip holds for this ledger too).
+
+On a war the player is party to:
 
 - **Offer peace** — white peace, or cession of named goals the receiving side holds. Terms that would
   take the loser's last province are allowed and marked: the loser's nation ends (RELATIONS § 7,

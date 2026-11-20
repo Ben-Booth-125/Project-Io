@@ -2,9 +2,11 @@
 
 #include "artillery.hpp"     // BL-1643: artillery_range_tiles - a battery stands at its range
 #include "battle_system.hpp" // unit_in_battle
+#include "carried_supplies.hpp" // BL-1707: carried_hunger_price_permille - the "fed" test
 #include "corp_command.hpp"
 #include "hex_neighbors.hpp"
 #include "logistics.hpp"     // body_tile_grid (warming the raster)
+#include "nation_generation.hpp" // BL-1707: unit_tile_cover_permille, unit_draw_memo
 #include "province.hpp"
 #include "recipe_registry.hpp" // BL-1455: the class terrain rows a front's slot and target read
 #include "stance.hpp"        // is_hostile
@@ -872,6 +874,15 @@ int tile_hex_steps(const world& w, entity_id a, entity_id b)
     return hex_distance(w, a, b);
 }
 
+bool push_target_fed(world& w, const recipe_registry& reg, unit_draw_memo& memo, entity_id nation,
+                     entity_id tile)
+{
+    // BL-1707 (Ben, 2026-11-19): fed is the declaration's own test - a full stock would
+    // pay no hunger at this cover, i.e. the cover is at or past break-even.
+    return carried_hunger_price_permille(reg.military().supplies, 1000,
+                                         unit_tile_cover_permille(w, memo, nation, tile)) == 0;
+}
+
 std::vector<entity_id> front_push_tiles(world& w, const recipe_registry& reg, const front& f,
                                         const std::vector<entity_id>& members)
 {
@@ -880,6 +891,7 @@ std::vector<entity_id> front_push_tiles(world& w, const recipe_registry& reg, co
         return out;
     raster_source rs{ w, {} };
     const std::map<entity_id, int64_t> held = push_strengths(w, f.nation, push_candidates(w, rs, f));
+    unit_draw_memo memo; // BL-1707: the nation's cover, read as the step reads it
     // BL-1643: a battery never pushes, and the line's slots are spaced among the line alone.
     std::vector<entity_id> line, batteries;
     split_line(w, reg, members, line, batteries);
@@ -902,6 +914,8 @@ std::vector<entity_id> front_push_tiles(world& w, const recipe_registry& reg, co
         {
             if (const auto tit = w.tiles.find(r.t); wall && tit != w.tiles.end() && wall(tit->second))
                 continue;
+            if (!push_target_fed(w, reg, memo, f.nation, r.t))
+                continue; // BL-1707: the step skips it, so the scorer does
             if (u.order.dest == r.t)
             {
                 out[m] = r.t;
@@ -1427,6 +1441,13 @@ front_step advance_fronts(world& w, const recipe_registry& reg)
             raster_source rs{ w, {} };
             const std::map<entity_id, int64_t> held =
                 push_strengths(w, nk.first, push_candidates(w, rs, *f));
+            // BL-1707 (MILITARY.md § Fronts, "A push stops where supply stops"; Ben,
+            // 2026-11-19, made per unit at his live click): a target the unit would not be
+            // fed on is skipped like a walled one, so a unit with no fed target holds its
+            // slot while the rest of the front pushes. The front is never marked halted;
+            // the player moves a held unit on by hand. One memo per front: the network does
+            // not move while the front issues its orders.
+            unit_draw_memo memo;
             for (std::size_t i = 0; i < n; ++i)
             {
                 const entity_id uid = line[i];
@@ -1450,6 +1471,8 @@ front_step advance_fronts(world& w, const recipe_registry& reg)
                 {
                     if (walled_for(wall, r.t))
                         continue;
+                    if (!push_target_fed(w, reg, memo, nk.first, r.t))
+                        continue; // BL-1707: past the supply edge
                     if (u.order.dest == r.t)
                     {
                         done = true; // already on its way
