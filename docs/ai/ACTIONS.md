@@ -1932,7 +1932,7 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 
 | Arg | Type | Meaning |
 |---|---|---|
-| `tier` | `int 1-5` | The clicked button: I = 0.25x, II = 0.5x, III = 3x, IV = 10x, V = 16x. The panel's rate label shows the multiplier and the real-time cost of one economic month at that tier. |
+| `tier` | `int 1-5` | The clicked button: I = 0.25x, II = 0.5x, III = 5x, IV = 10x, V = 16x. The panel's rate label shows the multiplier. |
 
 **Valid when:**
 - The app is in-game.
@@ -1947,7 +1947,7 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 
 | Arg | Type | Meaning |
 |---|---|---|
-| `tier` | `int 1-5` | Speed tier: 1 = I (0.25x), 2 = II (0.5x), 3 = III (3x), 4 = IV (10x), 5 = V (16x). |
+| `tier` | `int 1-5` | Speed tier: 1 = I (0.25x), 2 = II (0.5x), 3 = III (5x), 4 = IV (10x), 5 = V (16x). |
 
 **Valid when:**
 - The app is in-game and no ImGui text field has keyboard focus.

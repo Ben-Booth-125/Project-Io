@@ -279,7 +279,7 @@ A single panel in the top-right corner, the same width as the minimap so the rig
 
 - A **pause button** — a drawn filled square while running (deliberately not "||", which read as the Roman numeral II beside the tiers), flipping to a play "**>**" while paused — then speed tiers **I–V** in Roman numerals. The active speed is highlighted; each tier names its real rate on hover.
 
-The clock has three layers — sim tick → day → economy tick — paced so that tier III (3×) runs a day in 2 s (`TIME_CONTROLS.md` § Speed curve). The economy resolves monthly. The authoritative calendar/pacing constants live in `src/core/sim_loop.hpp` and are deliberately tentative.
+The clock has three layers — sim tick → day → economy tick — paced so that tier III (5×) runs a day in 1.2 s (`TIME_CONTROLS.md` § Speed curve). The economy resolves monthly. The authoritative calendar/pacing constants live in `src/core/sim_loop.hpp` and are deliberately tentative.
 
 ---
 

@@ -38,16 +38,11 @@ Panel height is content-derived, not a minimap fraction. Top to bottom:
    the numeral II beside the tiers); when paused it flips to `>` (play). The
    active tier is highlighted; pause toggles, restoring the previous speed.
 4. **Rate line** — an always-visible dimmed line naming the **active** tier's
-   real rate: `3×  ·  ~1m per month`, or `Paused` — a tooltip cannot be seen
-   without hovering, so the current speed's meaning is stated on screen.
-   Guaranteed-fit: the string is measured and the compact form (rate only) is
-   drawn if the long one would not fit.
+   multiplier — `5×` — or `Paused`. It carries the multiplier alone: the real-time
+   cost of a month was an explainer the player does not need (Ben, 2026-11-20).
 
-**Per-button rate tooltips.** Each tier button names its real rate on hover —
-`Speed III — 3×` plus `~1m per month (3)` — derived from
-`sim_loop::speed_multiplier` and the sim-loop constants (`speed_rate_label` /
-`speed_quarter_label` in `time_panel.cpp`), so the labels can never drift from
-the curve. The pause slot's tooltip is `Pause (Space)` / `Resume (Space)`.
+**Per-button rate tooltips.** Each tier button names its multiplier and hotkey on
+hover — `Speed III — 5× (3)` — and nothing more (Ben, 2026-11-20). The pause slot's tooltip is `Pause (Space)` / `Resume (Space)`.
 
 The calendar completes sim_loop's constants (30-day months, one month per economy tick)
 with a 12-month, 360-day year. The 12 thirty-day months map to Jan–Dec, and the
@@ -61,7 +56,7 @@ on a stopped clock and reads the opening before anything moves; the first press 
 slot, a tier, or `Space`) starts it. A new game's first `Space` resumes at the tier
 `scripts/init.lua`'s `default_speed` names; a load's resumes at the speed the save was made at.
 
-## Speed curve (settled 2026-06-15, [C2]; III and IV raised, Ben 2026-11-19)
+## Speed curve (settled 2026-06-15, [C2]; III and IV raised, Ben 2026-11-19; III to 5×, Ben 2026-11-20)
 
 The five speed buttons map **non-linearly**. Buttons 1–2 are genuine slow-motion (for watching
 detail); 3 is ordinary play; 4–5 fast-forward (for skipping quiet months to the next economy tick):
@@ -70,7 +65,7 @@ detail); 3 is ordinary play; 4–5 fast-forward (for skipping quiet months to th
 |--------|-----------|------|------|------|
 | 1 | 0.25× | 24 s | 12 min | Slow-motion (detail) |
 | 2 | 0.5× | 12 s | 6 min | Slow-motion |
-| 3 | 3× | 2 s | 1 min | Ordinary play |
+| 3 | 5× | 1.2 s | 36 s | Ordinary play |
 | 4 | 10× | 0.6 s | 18 s | Fast-forward |
 | 5 | 16× | 0.375 s | ~11 s | Fast-forward to the next econ tick |
 

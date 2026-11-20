@@ -178,7 +178,7 @@ static const std::array<key_binding, 24> s_bindings = {{
     {SDL_SCANCODE_SPACE,        false, ui::canvas_command::pause_toggle, "Pause / Resume",    "Space"},
     {SDL_SCANCODE_1,            false, ui::canvas_command::speed_1,      "Speed I  (0.25×)",  "1"},
     {SDL_SCANCODE_2,            false, ui::canvas_command::speed_2,      "Speed II (0.5×)",   "2"},
-    {SDL_SCANCODE_3,            false, ui::canvas_command::speed_3,      "Speed III (3×)",    "3"},
+    {SDL_SCANCODE_3,            false, ui::canvas_command::speed_3,      "Speed III (5×)",    "3"},
     {SDL_SCANCODE_4,            false, ui::canvas_command::speed_4,      "Speed IV (10×)",    "4"},
     {SDL_SCANCODE_5,            false, ui::canvas_command::speed_5,      "Speed V  (16×)",    "5"},
     // UI
