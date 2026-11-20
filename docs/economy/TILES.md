@@ -184,7 +184,10 @@ non-extraction stacking is bounded by the cap below (BL-193, building stacks).
 
 **Non-extraction cap** (`non_extraction_stack_cap`, `placement_rules.cpp`) is a **substrate base
 plus a cover modifier** — the substrate says how much weight the ground will take, the cover says
-how much what grows on it gets in the way:
+how much what grows on it gets in the way — **doubled** (Ben, 2026-11-19: every tile holds twice
+the buildings; `k_tile_capacity_multiplier`, `PRODUCTION.md` § Building stacks). The tables give
+the single values; the cap is twice their sum, floored at 1 before doubling, so 2–12 on land and
+24 urban:
 
 | Substrate | Base | Rationale |
 |---|---|---|
@@ -195,15 +198,15 @@ how much what grows on it gets in the way:
 
 | Cover | Modifier | Rationale |
 |---|---|---|
-| Urban | **12, pinned** | The paving decides the cap, not the geology under it. Soft-bounded in practice by workforce contention |
+| Urban | **12, pinned** (24 doubled) | The paving decides the cap, not the geology under it. Soft-bounded in practice by workforce contention |
 | Scrub | −3 on sedimentary, −1 elsewhere | On soil this pair **is** tundra, and tundra caps at 3 |
 | Forest, Marsh | 0 on sedimentary, −1 elsewhere | On soil these are settlement-favoured; on rock, vegetation is one more thing to clear |
 | Snow, Dunes, Ash | −1 | Something to clear |
 | Grass, Salt, None | 0 | Nothing in the way |
 
-Never below 1. The calibration table is in `placement_rules.cpp` and asserted by
+Never below 1 before doubling. The calibration table is in `placement_rules.cpp` and asserted by
 `multi_building_tile_harness` R1 and `tile_axes_harness` A4. A forested crag is 3 where the bare
-rock beside it is 4, and urban on metallic is 12.
+rock beside it is 4 (6 and 8 doubled), and urban on metallic is 12 (24 doubled).
 
 Once urban, a tile takes **no new extraction or ambient-resource placement** — the ground is
 built over. Extraction sites already standing when the transform fires are grandfathered; they

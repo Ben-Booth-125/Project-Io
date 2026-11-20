@@ -838,6 +838,13 @@ inline constexpr float k_population_scale_max = 5.0f;
 /// So at 12.6468 the ceilings total 157.58% of the pooled per-tile capacity —
 /// no longer a redistribution of it. Still binding on nothing: 5,631 buildings
 /// against 1,433,325 ceiling slots (0.393%).
+///
+/// BL-1710 (Ben, 2026-11-19): the tile caps DOUBLED (`k_tile_capacity_multiplier`)
+/// and k was deliberately left where it is, so the pooled per-tile capacity doubled
+/// under an unchanged ceiling. `province_capacity_probe 8` (seeds 0-7): aggregate
+/// 2.9499 -> 5.9004, so the ceilings went from 428.71% to 214.34% of the pooled
+/// per-tile capacity (the 157.58% above predates the partition's later moves).
+/// Still binding on nothing: 4,803 buildings against 3,899,146 ceiling slots.
 inline constexpr float k_province_buildings_per_sustain_unit = 12.6468f;
 
 /// The heuristic's working, kept whole so the probe can report each term rather
@@ -995,6 +1002,12 @@ private:
 ///          `tile_to_nation` is already populated; `province_holder` is
 ///          replaced.
 void seed_province_holders(world& w);
+
+/// BL-1708 (PROVINCES.md § A province's name): the name of province @p pid -
+/// `world::province_name`'s entry; else (a world saved before v98, or a fixture that
+/// never ran `name_provinces`) the name of the lowest-id population centre standing in
+/// it, which is what generation would have written; else "Province N". Empty never.
+std::string province_display_name(const world& w, std::uint32_t pid);
 
 /// THE PROVINCE ANCHOR, ONE DERIVATION (BL-611; shared since the BL-1146 review,
 /// 2026-09-27). A province's anchor is the tile carrying the highest SUMMED

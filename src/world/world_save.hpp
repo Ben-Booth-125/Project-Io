@@ -836,13 +836,30 @@ inline constexpr uint32_t k_world_save_version_one_product = 94;
 /// on a departed member's ground drop), and a closed war's ceded list may pass three (a
 /// capitulation). v96 is read too (`k_world_save_version_pre_war_joiners`), as a world in
 /// which no war has a joiner.
-inline constexpr uint32_t world_save_version = 97;
 
 /// BL-1706: the first version whose war records carry their sides (see above).
 inline constexpr uint32_t k_world_save_version_war_joiners = 97;
 
 /// BL-1706: v96, the same layout less the per-war sides.
 inline constexpr uint32_t k_world_save_version_pre_war_joiners = k_world_save_version_war_joiners - 1;
+
+/// **98 (BL-1708; PROVINCES.md § A province's name) - PROVINCE NAMES.** Appended last,
+/// after v96's pad boost (v97 adds no section): a u32 count, then every `world::province_name` entry in
+/// ascending province id as (u32 id, string name). Each id names a province of the
+/// stream's own partition; ids strictly ascending; each name 1..64 bytes. Refused
+/// whole otherwise. v97 is a STRICT PREFIX of v98 and is read too
+/// (`k_world_save_version_pre_province_names`), as a world with no stored names (a v96 stream as well) - its
+/// provinces read their centre's name through `province_display_name`.
+inline constexpr uint32_t world_save_version = 98;
+
+/// BL-1708: the first version carrying the province-name section (see above).
+inline constexpr uint32_t k_world_save_version_province_names = 98;
+
+/// BL-1708: v97, a strict prefix of v98.
+inline constexpr uint32_t k_world_save_version_pre_province_names = k_world_save_version_province_names - 1;
+
+/// BL-1708: the longest province name a stream may carry, in bytes.
+inline constexpr uint32_t k_province_name_max_bytes = 64;
 
 /// BL-1637: the first version carrying the pad-boost section (see above).
 inline constexpr uint32_t k_world_save_version_launch_boost = 96;
@@ -1212,6 +1229,8 @@ inline constexpr bool world_stream_has_launch_boost(uint32_t v) { return v >= k_
 /// BL-1706: from v97 each war record carries its sides (joiners, requests, refusals,
 /// separate offers).
 inline constexpr bool world_stream_has_war_joiners(uint32_t v) { return v >= k_world_save_version_war_joiners && !world_stream_is_space_line(v); }
+/// BL-1708: from v97 the stream ends with the province-name section.
+inline constexpr bool world_stream_has_province_names(uint32_t v) { return v >= k_world_save_version_province_names && !world_stream_is_space_line(v); }
 
 /// BL-1539: the first version carrying the research-books section (see above).
 inline constexpr uint32_t k_world_save_version_research_books = 80;
@@ -1537,6 +1556,12 @@ void write_world_snapshot_pre_launch_boost(const world& w, std::ostream& out);
 
 /// BL-1637: the v96 section's bytes (4 + 8 per pad holding boost).
 std::size_t world_save_launch_boost_section_bytes(const world& w);
+
+/// BL-1708, VERIFICATION ONLY: the v96 stream shape - no province-name section.
+void write_world_snapshot_pre_province_names(const world& w, std::ostream& out);
+
+/// BL-1708: the v97 section's bytes (4 + per name 4 + 4 + its length).
+std::size_t world_save_province_names_section_bytes(const world& w);
 
 /// BL-1632: the byte lengths of the v57..v66 trailing sections `w` writes, each
 /// mirroring its writer block field for field - the construction days (v57), the unit

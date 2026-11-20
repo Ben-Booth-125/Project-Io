@@ -100,17 +100,20 @@ their rank (they are the same population the placement ceiling counts) but contr
 the combined draw. The ordered walk is `placement_rules::stack_members`; reading rank off
 `world::buildings`' own unordered iteration would make the stack walk non-deterministic.
 
-**Capacity is `max(1, richness / 50)`** — the 0–250 generation band maps to 1–5 sites
-(`k_richness_per_site`, `placement_rules.hpp`). With shared depletion carrying the economics, the
+**Capacity is `2 × max(1, richness / 50)`** — the 0–250 generation band maps to 2–10 sites
+(`k_richness_per_site`, and `k_tile_capacity_multiplier`, `placement_rules.hpp`). **Every tile
+holds twice what it did (Ben, 2026-11-19):** *"We should raise the tile capacity for buildings to
+2x."* The doubling is one multiplier over both tile caps — this one and the non-extraction cap
+below — so a tile's two limits keep their ratio and the multiplier says the ruling in one place. With shared depletion carrying the economics, the
 ceiling is a **legibility** bound — how many markers a tile can host and a player can reason
 about — not the balance lever.
 
 **Non-extraction stacking** (BL-366, multi-building tiles) is bounded in **aggregate** — every
 non-extraction type on one tile combined, not per type — by a per-composition cap table
 (`non_extraction_stack_cap`, `placement_rules.cpp`; the table and rationale live in
-`docs/economy/TILES.md` § Urban transform). Filling the cap fires a one-way transform to the
-`urban` terrain composition, which raises the cap further (12) and blocks new extraction/ambient
-placement on that tile. Extraction stacking (`k_richness_per_site`, above) is a separate,
+`docs/economy/TILES.md` § Urban transform), doubled like the extraction cap. Filling the cap fires
+a one-way transform to the `urban` terrain composition, which raises the cap further (24) and
+blocks new extraction/ambient placement on that tile. Extraction stacking (`k_richness_per_site`, above) is a separate,
 richness-bound axis.
 
 **Generation obeys the cap with no exemptions (Ben, 2026-11-05).** Every building generation stands
@@ -168,9 +171,16 @@ Every band is read off a domain the codebase already defines, which leaves exact
 coefficient — `k` — and it is **pinned by measurement**. It is set so the ceiling's world total
 matches the capacity the world already grants under the pooled per-tile cap: the ceiling is a
 *redistribution* of existing capacity onto the four sustaining inputs, not a tighter or looser
-regime. Across 8 seeds, `pooled per-tile cap ÷ sustain units` measures **11.4694 … 15.2588,
-aggregate 12.6468** (spread 28.36% of the mean); `k` is that aggregate, and at it the ceilings
-total **100.01%** of the pooled per-tile capacity.
+regime. Across 8 seeds, `pooled per-tile cap ÷ sustain units` measured **11.4694 … 15.2588,
+aggregate 12.6468** (spread 28.36% of the mean) under the single tile caps; `k` is that aggregate.
+
+**`k` did not move when the tile caps doubled (Ben, 2026-11-19).** Offered the choice of doubling
+`k` with them, he kept the ceiling where it stands. The partition's later moves had lifted the
+ceilings to **428.71%** of the pooled per-tile capacity at the same `k`
+(`province_capacity_probe 8`, seeds 0-7); with the tiles granting twice as much they total
+**214.34%** of it. The ceiling still sits above what the tiles sum to, so in aggregate the tile
+cap binds first and the ceiling caps only a province whose tiles fill unevenly.
+`province_capacity_probe` re-derives the ratio on every run.
 
 **At generation density it refuses nothing, and that is the expected outcome.** Measured
 post-background-economy across 8 seeds: 1049 buildings against 909,245 ceiling slots — **0.115%

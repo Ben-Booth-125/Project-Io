@@ -44,3 +44,23 @@ std::string generate_unique_city_name(std::mt19937& rng, const tongue& t,
 void name_population_centres(world& w, entity_id body_id, int gw,
                              const settlement_state& ss, const creed_state& cs,
                              uint32_t seed);
+
+/// BL-1708 (Ben, 2026-11-19; PROVINCES.md § A province's name): name EVERY province
+/// of the canonical partition into `world::province_name`, replacing what was there.
+///
+/// A province holding a population centre takes the centre's name (the lowest centre
+/// id where it holds two). Every other one - a sea province, an uncentred pocket, a
+/// province on a body nobody settled - coins a name in the tongue of the people whose
+/// ground it is: on @p home_body, the plurality culture of the region nearest the
+/// province's id tile (the "whose ground" rule `name_population_centres` names a city
+/// by); on any other body, or where no culture answers, a tongue rolled from the
+/// body's own id. The coining is a PURE FUNCTION of that tongue and the province id -
+/// a stream seeded from the id alone, never a generation stream - so it moves nothing
+/// else the seed produces. Names are unique on their body: centre names are taken
+/// first, then provinces claim theirs in ascending id order, a collision lengthening
+/// the name by another root of the same tongue.
+///
+/// Run once the canonical partition and every centre exist (run_tail, after
+/// `seed_province_holders`).
+void name_provinces(world& w, entity_id home_body, int home_gw,
+                    const settlement_state& ss, const creed_state& cs);

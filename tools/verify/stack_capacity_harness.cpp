@@ -253,7 +253,7 @@ int main()
     // ---------------------------------------------------------------------
     {
         const float bands[] = { 0.0f, 1.0f, 49.9f, 50.0f, 99.0f, 100.0f, 175.0f, 250.0f };
-        const int   want[]  = { 1,    1,    1,     1,     1,     2,      3,      5     };
+        const int   want[]  = { 2,    2,    2,     2,     2,     4,      6,      10    }; // BL-1710: doubled
         for (std::size_t i = 0; i < sizeof(want) / sizeof(want[0]); ++i)
         {
             tile_component tc{};
@@ -261,7 +261,7 @@ int main()
             tc.resource_deposit[ri(resource_type::iron_ore)] = bands[i];
             const int cap = placement_rules::stack_capacity(
                 tc, building_type::extraction_site, resource_type::iron_ore);
-            check(cap == want[i], "S.R2 capacity = max(1, richness/50)",
+            check(cap == want[i], "S.R2 capacity = 2 x max(1, richness/50)",
                   static_cast<float>(cap), static_cast<float>(want[i]));
         }
     }

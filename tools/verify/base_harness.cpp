@@ -645,7 +645,7 @@ void rows_determinism_and_save()
     }
 
     // Tampers. Section: u32 n, (centre, i32 founded, i32 unfed, i32 carry), u32 n, (unit, i32 count).
-    const std::size_t s0 = b.size() - sec - (world_save_space_firsts_section_bytes(x.w) + world_save_transit_origin_section_bytes(x.w) + world_save_launch_boost_section_bytes(x.w)); // BL-1606 (v91) follows
+    const std::size_t s0 = b.size() - sec - (world_save_space_firsts_section_bytes(x.w) + world_save_transit_origin_section_bytes(x.w) + world_save_launch_boost_section_bytes(x.w) + world_save_province_names_section_bytes(x.w) /* BL-1708 (v98) */); // BL-1606 (v91) follows
     const std::size_t base0 = s0 + 4;
     const std::size_t col0 = s0 + 4 + 16 + 4;
     const auto refused = [&](std::string bad) {

@@ -839,6 +839,15 @@ struct world
     /// outcomes.
     province_partition provinces;
 
+    /// BL-1708 (Ben, 2026-11-19; PROVINCES.md § A province's name): every province's
+    /// NAME, keyed by province id. Written once at generation (`name_provinces`,
+    /// city_names.hpp, right after the canonical partition) and saved (world_save
+    /// v97). A province holding a centre carries that centre's name; every other one a
+    /// name coined in its people's tongue. Never hashed: a name moves nothing the sim
+    /// computes. Read it through `province_display_name` (province.hpp), which falls
+    /// back for a world named before v97.
+    faithful_unordered_map<entity_id, std::string> province_name;
+
     /// Current holder of each province (BL-569, province holder) — one
     /// entity_id per province, POSITIONALLY ALIGNED with `provinces.provinces`
     /// (ascending `province::id` order, the partition's own contract), NOT

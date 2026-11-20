@@ -238,7 +238,7 @@ int main()
               "A2c THE SUBSTRATE SURVIVES — a city on metallic ground is still on metallic ground");
         check(after.cover_density == k_cover_density_max,
               "A2d paved ground is at full density, never sparsely paved");
-        check(placement_rules::non_extraction_stack_cap(after.substrate, after.cover) == 12,
+        check(placement_rules::non_extraction_stack_cap(after.substrate, after.cover) == 12 * placement_rules::k_tile_capacity_multiplier, // BL-1710
               "A2e the urban cap applies whatever ground the city stands on");
     }
 
@@ -267,7 +267,10 @@ int main()
         int bad = 0;
         for (const legacy_row& r : k_legacy)
         {
-            const int c = placement_rules::non_extraction_stack_cap(r.sub, r.cov);
+            // BL-1710 (Ben, 2026-11-19): the legacy numbers are the single caps; the
+            // live cap is them doubled.
+            const int c = placement_rules::non_extraction_stack_cap(r.sub, r.cov)
+                        / placement_rules::k_tile_capacity_multiplier;
             if (c != r.stack_cap)
             {
                 ++bad;

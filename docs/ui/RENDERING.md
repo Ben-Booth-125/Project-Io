@@ -383,10 +383,30 @@ says *what stands here*; the Selection element's tile card says *how many*, on t
 (SELECTION.md § The tile element's layout).
 
 **Settlements are structures too.** A population centre bakes as a settlement whose
-footprint and height step with its scale (Outpost → Metropolis), and a razed centre as a
-ruin. A small centre may vanish into the ground at the far page where the old density dot
-stood, but a scale ≥ 3 centre must read as a city at every rung — the obligation the
-skyline LOD ladder carried, which the art now takes over.
+footprint and height step with its scale, and a razed centre as a ruin. A small centre may
+vanish into the ground at the far page where the old density dot stood, but a scale ≥ 3 centre
+must read as a city at every rung — the obligation the skyline LOD ladder carried, which the
+art now takes over.
+
+**Each size band draws a different group, on its one tile (Ben, 2026-11-19).** His reason:
+*"render different population centre sizes with different building groups, to show that a city
+is larger than a town."* He chose a sharper form per band over spreading a city across its urban
+footprint: the settlement stays on its centre's tile, and the bands are told apart by **what
+stands**, not by how many hexes it covers. The bands are POPULATION.md's scale rungs. Each
+band's tallest standing thing is well above the band below's, so the bands part by silhouette at
+any camera, and roofs turn from pitched to flat as the place stops being rural:
+
+| Scale | Band | Field (of the hex) | What stands | Storeys | The heart |
+|---|---|---|---|---|---|
+| 1 | Village | small, ~0.30 | a handful of pitched-roof houses and a barn round a yard; no street grid | 1 | — |
+| 2 | Town | ~0.46 | a loose street grid of pitched-roof lots with gardens between | 1–2 | a church spire |
+| 3 | City | ~0.62 | a full grid of flat-roofed blocks, a works quarter with stacks | 2–4 | a domed civic hall |
+| 4 | Metropolis | ~0.80 | dense mid-rise to near the hex edge, two works quarters' stacks | 3–6 | a cluster of towers, ~14 storeys |
+| 5 | Megacity | ~0.92, to the edge | every lot built, mid-rise throughout | 4–8 | a skyline of towers, ~24 storeys, over a wide core |
+
+The field may overhang its hex a little at the top band, as any structure may. The constants are
+`k_town` in `src/ui/structure_stamps.cpp`; the capture check is
+`scripts/verify/settlement_bands.lua`, one frame per band.
 
 **The art is static** (Ben, 2026-10-08). No smoke, light, flag or animation distinguishes
 a running building from an idle, starved or mothballed one; running state is read in the

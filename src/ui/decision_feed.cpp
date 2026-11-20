@@ -8,6 +8,7 @@
 #include "world/components.hpp"
 #include "world/corp_ai.hpp"    // corp_verb_label / corp_decision_reason_label / corp_decision_reason_count (BL-420)
 #include "world/corp_command.hpp"
+#include "world/province.hpp"     // province_display_name (BL-1708)
 #include "world/unit_roster.hpp"
 #include "world/world.hpp"
 
@@ -54,7 +55,8 @@ const char* body_name(const world& w, entity_id body)
     return (it != w.bodies.end()) ? it->second.name.c_str() : "an unknown body";
 }
 
-/// "(12, 7) on Kadru" for a tile, or a plain marker when the tile is gone.
+/// "Velka on Kadru" for a tile - its province's name (BL-1708), never a grid
+/// position - or a plain marker when the tile is gone.
 /// A decision's tile CAN have been demolished or otherwise outlived by the time
 /// the feed reads it — the ring holds 256 decisions, and the world moves on —
 /// so every lookup here degrades to a phrase rather than asserting.
@@ -64,9 +66,7 @@ std::string tile_label(const world& w, entity_id tile)
     if (it == w.tiles.end())
         return "a tile no longer on the map";
 
-    char buf[64];
-    std::snprintf(buf, sizeof buf, "(%d, %d) on ", it->second.grid_x, it->second.grid_y);
-    return std::string(buf) + body_name(w, it->second.body);
+    return province_display_name(w, w.provinces.province_of(tile)) + " on " + body_name(w, it->second.body);
 }
 
 /// The building's type and where it stands — "Extraction site on Kadru".
@@ -80,6 +80,8 @@ std::string building_label(const world& w, entity_id building)
     const auto tit = w.tiles.find(it->second.tile);
     if (tit != w.tiles.end())
     {
+        s += " in "; // BL-1708: the province names the place
+        s += province_display_name(w, w.provinces.province_of(it->second.tile));
         s += " on ";
         s += body_name(w, tit->second.body);
     }

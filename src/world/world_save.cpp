@@ -2803,6 +2803,22 @@ void write_world_snapshot_at(const world& w, std::ostream& out, uint32_t version
         }
     }
     // ===== END BL-1637 =====
+    // ===== BEGIN BL-1708 (v98): PROVINCE NAMES, the last section =====
+    if (world_stream_has_province_names(version))
+    {
+        std::vector<entity_id> ids;
+        ids.reserve(w.province_name.size());
+        for (const auto& [pid, name] : w.province_name)
+            ids.push_back(pid);
+        std::sort(ids.begin(), ids.end()); // `province_name` is unordered
+        w_u32(out, static_cast<uint32_t>(ids.size()));
+        for (const entity_id pid : ids)
+        {
+            w_id(out, pid);
+            w_str(out, w.province_name.at(pid));
+        }
+    }
+    // ===== END BL-1708 =====
 }
 
 void write_world_snapshot_pre_missiles(const world& w, std::ostream& out)
@@ -2999,6 +3015,20 @@ void write_world_snapshot_pre_launch_boost(const world& w, std::ostream& out)
 {
     // VERIFICATION ONLY (BL-1637): the v95 stream shape - no pad-boost section.
     write_world_snapshot_at(w, out, k_world_save_version_pre_launch_boost);
+}
+
+void write_world_snapshot_pre_province_names(const world& w, std::ostream& out)
+{
+    // VERIFICATION ONLY (BL-1708): the v96 stream shape - no province-name section.
+    write_world_snapshot_at(w, out, k_world_save_version_pre_province_names);
+}
+
+std::size_t world_save_province_names_section_bytes(const world& w)
+{
+    std::size_t n = 4;
+    for (const auto& [pid, name] : w.province_name)
+        n += 4 + 4 + name.size();
+    return n;
 }
 
 std::size_t world_save_launch_boost_section_bytes(const world& w)
@@ -3683,14 +3713,16 @@ std::size_t tail_bytes_after_key(int version, const world& w)
         { k_space_key + k_world_save_version_transit_origin, world_save_transit_origin_section_bytes },     // v92
         // BL-1637: after every space-line section in writer order, so keyed past them all.
         { 2 * k_space_key + k_world_save_version_launch_boost, world_save_launch_boost_section_bytes },     // v96
+        // BL-1708: after the pad boost in writer order, so keyed past it.
+        { 2 * k_space_key + k_world_save_version_province_names, world_save_province_names_section_bytes }, // v97
     };
     // BL-1641: v94 (one building per product) adds no section, nor does v95 (BL-1642, the
     // monthly tick), so the table ends at v92's. v95 does GROW one record: each off-world
     // base carries its loss carry (16 bytes, was 12) - the v90 row above counts today's
     // stream, which is what a tail "after" an older version is measured in.
-    // BL-1706: v97 adds no trailing section (its sides grow the v69 war records,
-    // counted in world_save_war_section_bytes).
-    static_assert(world_save_version == k_world_save_version_war_joiners,
+    // BL-1706: v97 adds no trailing section (its sides grow the v69 war records, counted in
+    // world_save_war_section_bytes). BL-1708: v98 appends the province names.
+    static_assert(world_save_version == k_world_save_version_province_names,
                   "BL-1632: a new trailing section joins world_save_tail_bytes_after's table");
     assert(version >= static_cast<int>(k_world_save_version_pre_tax)); // older tails are not today's
     std::size_t n = 0;
@@ -3778,6 +3810,7 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
     if (!r_u32(in, version)
         || (version != world_save_version && version != k_world_save_version_pre_lp
             && version != k_world_save_version_pre_war_joiners // BL-1706: v96, no war has a joiner
+            && version != k_world_save_version_pre_province_names // BL-1708: v97, no province names
             && version != k_world_save_version_pre_launch_boost // BL-1637: v95, no pad boost
             && version != k_world_save_version_one_product // v94: v95's layout, the quarter tick (BL-1642)
             && version != k_world_save_version_space_merge // BL-1641: v93, the same layout as v94
@@ -6984,6 +7017,34 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
             s.buildings.at(bid).boost = boost;
     }
     // ===== END BL-1637 =====
+    // ===== BEGIN BL-1708 (v98): province names. Untrusted, refused whole on any breach
+    // of world_save.hpp's v97 paragraph. A v96 (and older) stream ends before it: no
+    // names are stored, and `province_display_name` reads each centre's. =====
+    if (world_stream_has_province_names(version))
+    {
+        uint32_t count = 0;
+        if (!r_u32(in, count) || count > s.provinces.provinces.size())
+            return false;
+        decltype(s.province_name) names;
+        entity_id prev = null_entity;
+        for (uint32_t k = 0; k < count; ++k)
+        {
+            entity_id   pid = null_entity;
+            std::string name;
+            if (!r_id(in, pid) || pid == null_entity || (k > 0 && pid <= prev) || !r_str(in, name)
+                || name.empty() || name.size() > k_province_name_max_bytes)
+                return false;
+            prev = pid;
+            const auto& pv = s.provinces.provinces;
+            const auto  pit = std::lower_bound(pv.begin(), pv.end(), pid,
+                                               [](const province& p, entity_id id) { return p.id < id; });
+            if (pit == pv.end() || pit->id != pid)
+                return false; // not a province of this stream's partition
+            names.emplace(pid, std::move(name));
+        }
+        s.province_name = std::move(names);
+    }
+    // ===== END BL-1708 =====
 
     // BL-1266 (v46): every manual trade names a live owner and two distinct
     // standing markets, and holds an id below the next one to be issued, all

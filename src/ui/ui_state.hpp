@@ -2176,6 +2176,10 @@ struct ui_state
         float       lp_uses          = 0.0f;
         float       lp_need          = 0.0f;
         int         lp_rivals_hidden = 0;
+        /// The figure row's capacity cell (Ben, 2026-11-20): non-extraction buildings
+        /// standing on the tile, against `non_extraction_stack_cap`.
+        int         capacity_used    = 0;
+        int         capacity_cap     = 0;
     };
     tile_card_readout tile_card;
 
