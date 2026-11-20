@@ -2737,6 +2737,52 @@
     "src/world/nation_tech.cpp"
    ],
    "design": "RESEARCH.md § Cost (Ruling 2026-11-13, 6f433135: median first ring-2 major ~112 months, R0g-i passing). At HEAD 47bb959f nation_tech_harness R0g FAILS: 2 of 480 nations reach DG-PR-EX-A within 96 quarters, median 97 (= never), live RP/quarter p50 100. Measured identically with and without BL-1678 (stocks are bought), so it predates that work; 45 commits on main since the re-pin. WORK: bisect 6f433135..47bb959f with nation_tech_harness (one run ~10 min), name the mover, then fix the cause or bring Ben the re-pin. Never weaken R0g to pass."
+  },
+  {
+   "glyph": "✓",
+   "sprint": null,
+   "version_goal": null,
+   "written": "2026-11-19",
+   "parked": false,
+   "blocked_on": null,
+   "requires": [],
+   "author": "Claude (Ben, 2026-11-19: generation speed ideas; \"file 1 and 4\")",
+   "category": "Generation",
+   "status": "complete",
+   "priority": "B",
+   "authority_doc": "docs/generation/GENERATION_STRATEGY.md",
+   "id": "BL-1676",
+   "short_name": "SEARCH_SCORED_AHEAD",
+   "difficulty": 3,
+   "title": "Score the landscape search's proposals ahead, in parallel, so \"Placing buildings\" waits on one evaluation instead of four",
+   "files": [
+    "src/world/landscape_search.cpp",
+    "src/world/finish_campaign_world.hpp"
+   ],
+   "design": "MEASURED 2026-11-19 (seed 0, Release): \"Placing buildings\" is ~10.8 s, of which ~8.1 s is four landscape evaluations run one after another (the seed candidate and three placement rounds, ~2.0 s each); the rest is the winner's apply, the majors reconcile and the retrofit. The walk is serial in its DECISIONS, not its candidates: a round's proposal is perturb_placement(incumbent, axis_rng(seed, round)), keyed not sequenced, so after k rounds the incumbent is one of at most 2^k candidates and the whole proposal tree for the next D rounds is known before any is scored. WORK: score that tree at once (2^D - 1 proposals, plus the seed in the first wave) on up to k_campaign_search_threads workers, then REPLAY the serial walk over the stored scores - same comparisons, same order - so the winner, every score and the path are bit-identical; the branch not taken is scored and discarded. Raise k_campaign_search_threads from 2 to 8 (D = 3: the seed and seven proposals in one wave). A worker that cannot start or throws leaves its jobs to a serial pass. The inner bar counts every evaluation run over all planned. EXPECTED ~-6 s on seed 0, no re-bless. COSTS: up to 8 world copies held at once (measure peak memory first; cap the workers if it is too high), ~2x the CPU. CHECK: the finished state hash is unchanged on seeds 0, 5, 28, 40, and landscape_search_harness --check-threads agrees with the serial walk. RISK: scoring has not run truly concurrently since the walk went placement-only (2026-11-12) - one proposal per round meant one worker - so audit the apply/score path for shared mutable state (the static logs in corp_ai.cpp are on the settle path, not this one) and repeat each seed twice. Also considered and set aside: pre-building route maps on the base world, which each evaluation's apply would invalidate anyway. BUILT 2026-11-19: at 8 workers the walk scores three rounds ahead in one wave. MEASURED on a quiet machine, alternating builds, two pairs each: search seed 0 10.8-11.1 s -> 6.8-6.9 s, seed 28 3.7-3.8 s -> 2.4 s; finished state hashes unchanged on seeds 0, 5, 28, 40 (0 and 5 run twice); landscape_search_harness --curve --check-threads 8 P1 PASS at k = 3, 4 and 5 (full and partial waves) with both negative controls detected; peak memory 246 -> ~490 MB. Each evaluation is mostly single-threaded (its market field step takes spare cores), so the wave scales."
+  },
+  {
+   "glyph": "✓",
+   "sprint": null,
+   "version_goal": null,
+   "written": "2026-11-19",
+   "parked": false,
+   "blocked_on": null,
+   "requires": [],
+   "author": "Claude (Ben, 2026-11-19: generation speed ideas; \"file 1 and 4\")",
+   "category": "Generation",
+   "status": "complete",
+   "priority": "B",
+   "authority_doc": "docs/ui/RENDERING.md",
+   "id": "BL-1677",
+   "short_name": "TEXTURES_DURING_SETTLE",
+   "difficulty": 3,
+   "title": "Bake the ground textures while the settle runs, so \"Loading textures\" overlaps \"Settling industry\"",
+   "files": [
+    "src/core/app.cpp",
+    "src/world/finish_campaign_world.cpp"
+   ],
+   "design": "The ground textures need only the finished tiles, not the settled economy, yet \"Loading textures\" starts after \"Settling industry\" ends. WORK: once the search's winner is applied and every step that writes the ground (roads, ports, installations laid before the settle) is done, start the bake against a snapshot of what it reads, on its own thread, and join it after the settle. EXPECTED: hide ~1-2 s of the paint step behind the settle. FIRST: list exactly what the bake reads (tiles, road field, installations, ownership tint?) and confirm the settle writes none of it - if the settle lays roads or buildings, the bake must either take a post-settle pass for the touched chunks or stay after the settle. CHECK: the baked chunks are byte-identical to today's (hash the textures on seeds 0 and 28), the bar's weights still sum to the wall time, and a live New Game shows no texture pop-in. BUILT 2026-11-19 by reusing the wizard's in-round snapshot on the cold build: the worker builds the home body's bake source once the tail has laid the roads, the main thread starts the master from it, and the landing's resnapshot re-bakes what the search and settle moved (574 of 2975 chunks on the measured run). MEASURED live, one New Game each on a quiet machine (different random seeds): \"Loading textures\" waited 35.2 s before, 26.9 s after; 1077 of 2975 chunks were baked by the landing. Ground opened fully painted."
   }
  ]
 }

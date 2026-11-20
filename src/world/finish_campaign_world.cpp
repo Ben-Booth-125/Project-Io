@@ -161,9 +161,9 @@ landscape_search_params campaign_search_params(std::uint32_t world_seed, int cor
     // and the history-span cuts (BL-1645) every curated seed reached play in
     // under 33 s, so the 72% share is bought for one more evaluation.
     sp.rounds                  = 3;
-    // BL-1136 (Ben, 2026-09-26): the threads a round's proposals are scored
-    // on. With placement alone a round holds ONE proposal, so one worker runs
-    // whatever this says; it is kept so a wider round inherits it. The winner,
+    // BL-1136 (Ben, 2026-09-26), BL-1676: the workers the walk scores on,
+    // ahead of its decisions (the seed and every proposal its rounds could
+    // make, in one wave at 8 workers and k = 3). The winner,
     // every scored term and the whole path are the serial walk's, bit for bit
     // (the determinism clauses in landscape_search.hpp; `landscape_search_harness
     // --curve --check-k <rounds> --check-threads 2` proves it on the curated

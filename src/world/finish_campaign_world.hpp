@@ -75,13 +75,13 @@ struct world_params;
 /// never band differently.
 era_band campaign_band_from_world(const world& w);
 
-/// BL-1136 (Ben, 2026-09-26): the threads a round's proposals are scored on.
-/// Two, set when a budget world proposed two per round; since the walk went
-/// placement-only (2026-11-12) a round holds one proposal and one worker runs,
-/// so this caps nothing today. The result does not
-/// depend on it (landscape_search.hpp § what keeps it deterministic); only the
-/// wall time and the peak memory do — one world copy per thread is held at once.
-inline constexpr int k_campaign_search_threads = 2;
+/// BL-1136 (Ben, 2026-09-26), BL-1676: the workers the search scores on. Eight
+/// lets the walk score three rounds ahead -- the seed and the seven proposals
+/// its three rounds could make -- in one wave (landscape_search.cpp § the walk,
+/// scored ahead). The result does not depend on it (landscape_search.hpp § what
+/// keeps it deterministic); only the wall time and the peak memory do -- one
+/// world copy per worker is held at once.
+inline constexpr int k_campaign_search_threads = 8;
 
 /// The search params the campaign passes, keyed from the world seed exactly
 /// as Begin always keyed them: `regenerate_specialists` (every candidate

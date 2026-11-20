@@ -949,12 +949,40 @@ void app::launch_cold_build()
                                            std::memory_order_relaxed);
 
     // The worker writes only into its slot plus the atomics; the slot is
-    // handed across by the future, so nothing is shared mutable state.
-    m_worldgen_future = std::async(std::launch::async, [this, slot] {
+    // handed across by the future, so nothing is shared mutable state. The
+    // one exception is the ground snapshot below, handed over under its
+    // mutex (BL-1677); the main thread holds the slot only to take it.
+    const bool want_ground_roads = m_ground_prebake_on && !m_ground_bake_all;
+    m_ground_prebake_cold = false;
+    m_cold_slot = want_ground_roads ? slot : nullptr;
+    m_worldgen_future = std::async(std::launch::async, [this, slot, want_ground_roads] {
         // m_works is loaded once at startup and never mutated after, so handing
         // the worker a pointer to it shares nothing mutable (BL-321).
         slot->w = make_hard_coded_world(m_worldgen_params, &slot->report,
                                         m_worldgen_cfg, &m_worldgen_progress, &m_works);
+        // BL-1677 (STARTUP.md § Handoff): THE COLD BUILD'S IN-ROUND SNAPSHOT,
+        // the one round 6's worker takes (startup_screens.cpp, BL-1246). The
+        // generation tail has laid the road network, so the home master can
+        // bake while the search and the settle run; the landing's resnapshot
+        // re-bakes only what they moved. A read of this worker's own world:
+        // the build is unchanged by it.
+        if (want_ground_roads)
+        {
+            const auto t0 = std::chrono::steady_clock::now();
+            auto src = std::make_shared<const ui::ground::bake_source>(
+                ui::ground::prepare_source(slot->w, slot->w.home_body, /*reveal_all=*/true,
+                                           &slot->registry));
+            {
+                std::lock_guard lk(slot->ground_mx);
+                slot->ground_roads      = std::move(src);
+                slot->ground_roads_body = slot->w.home_body;
+            }
+            std::printf("[ground] cold worker: roads laid, ground source snapshot built "
+                        "(%.0f ms on the worker)\n",
+                        std::chrono::duration<double, std::milli>(
+                            std::chrono::steady_clock::now() - t0).count());
+            std::fflush(stdout);
+        }
         // THE SAME CALL ROUND 6 MAKES, in the same order (STARTUP.md
         // § Handoff): an adopted world and a cold build open on one state hash.
         slot->finish = finish_campaign_world(slot->w, slot->report, slot->registry,
@@ -1004,8 +1032,12 @@ void app::poll_worldgen()
         if (!m_worldgen_future.valid())
             return;
         if (m_worldgen_future.wait_for(std::chrono::seconds(0)) != std::future_status::ready)
+        {
+            ground_take_cold_snapshot(); // BL-1677: bake behind the search and settle
             return;
+        }
         built = m_worldgen_future.get();
+        m_cold_slot.reset(); // a snapshot still untaken is moot: the world is here
     }
     if (!built || !built->ready)
     {
@@ -1068,12 +1100,15 @@ void app::poll_worldgen()
     // path the home master has been baking since the Life round, re-taking
     // its source at every round boundary; adoption is the last boundary (the
     // world is the main thread's now, survey state and all), so only what the
-    // tail and the settle changed re-bakes. On the cold path it starts now.
-    // Either way the rest bakes behind the seat canvas.
+    // tail and the settle changed re-bakes. On the cold path the master has
+    // been baking since the roads were laid (BL-1677), and the same landing
+    // re-bakes only what the search and the settle moved; if no snapshot was
+    // taken it starts now. Either way the rest bakes behind the seat canvas.
     built.reset();
-    const bool prebaked = adopted && m_ground_prebake_wizard
+    const bool prebaked = ((adopted && m_ground_prebake_wizard) || (!adopted && m_ground_prebake_cold))
                        && m_ground.resnapshot(m_world, /*assume_surveyed=*/false);
     m_ground_prebake_wizard = false;
+    m_ground_prebake_cold   = false;
     if (!prebaked)
         start_ground_prebake(m_world, /*wizard=*/false);
     m_ground_world_live = true;
@@ -1281,6 +1316,37 @@ void app::ground_take_roads_snapshot(wizard_world_cache& c)
         std::printf("[ground] the in-round snapshot is not the pre-bake's homeworld: skipped\n");
         std::fflush(stdout);
     }
+}
+
+void app::ground_take_cold_snapshot()
+{
+    if (!m_cold_slot)
+        return;
+    std::shared_ptr<const ui::ground::bake_source> src;
+    entity_id body = null_entity;
+    {
+        std::lock_guard lk(m_cold_slot->ground_mx);
+        if (!m_cold_slot->ground_roads)
+            return; // not laid yet
+        src  = std::move(m_cold_slot->ground_roads);
+        body = m_cold_slot->ground_roads_body;
+    }
+    m_cold_slot.reset(); // taken: the main thread holds nothing of the worker's now
+    if (!m_ground_prebake_on || m_ground_bake_all)
+        return;
+    // THE RACE AUDIT (start_ground_prebake's, unchanged): the bake workers
+    // read only this immutable snapshot, and pump() is handed no world until
+    // the landing adopts the built one, so nothing reads the world the cold
+    // worker is still writing.
+    m_ground.forget_world();
+    m_ground.registry = &m_registry;
+    m_ground.prebake(body, std::move(src), /*assume_surveyed=*/true);
+    m_ground_prebake_cold   = true;
+    m_ground_prebake_wizard = false;
+    m_ground_world_live     = false; // m_world is not this world yet
+    std::printf("[ground] pre-bake of the home master started (the cold build's roads, "
+                "before the search and the settle)\n");
+    std::fflush(stdout);
 }
 
 void app::drop_wizard_ground(const char* why)

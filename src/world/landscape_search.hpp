@@ -70,12 +70,15 @@
 // proposed, what it scored and whether it was taken, so a landscape is
 // inspectable rather than being one draw among hundreds.
 //
-// PARALLELISM IS AN OPTIMISATION, and with one live axis it has nothing to
-// spread: a round holds one proposal, so at most one scoring thread runs
-// whatever `thread_count` says. The constraint it imposed stays — the winner
-// never varies with `thread_count`, which the harness PROVES — and the threaded
-// path is kept, generic over a round's proposals, so a round with more than one
-// inherits it. Each scoring thread holds its own copy of the base world.
+// PARALLELISM IS AN OPTIMISATION, spread ACROSS ROUNDS (BL-1676). A round
+// holds one proposal, but keying means its proposal depends only on which
+// candidate is the incumbent, and after k rounds that is one of at most 2^k
+// candidates. So the walk scores the whole tree of proposals its next rounds
+// could make at once, then replays its serial decisions over the stored
+// scores; the branches not taken are scored and discarded. The constraint
+// stays — the winner, every score and the path never vary with
+// `thread_count`, which the harness PROVES. Each scoring thread holds its own
+// copy of the base world.
 //
 // NOTHING HERE IS PERSISTENT. The search runs at generation time and its output
 // is a world, not a field — so it adds nothing to the flat-binary save path.
@@ -172,8 +175,10 @@ struct landscape_search_params
     /// unwatched one.
     generation_progress* progress = nullptr;
 
-    /// Threads used to score one round's proposals. 1 = serial (the default
-    /// here); the campaign passes `k_campaign_search_threads` (2, BL-1136). The
+    /// Workers used to score proposals; with T workers the walk scores the
+    /// largest depth D whose tree of 2^D - 1 proposals fits T, ahead of its
+    /// decisions (BL-1676). 1 = serial (the default here); the campaign passes
+    /// `k_campaign_search_threads` (8). The
     /// result must not depend on this value; that is the property the harness
     /// asserts.
     int thread_count = 1;
@@ -241,7 +246,8 @@ struct landscape_search_result
     int accepted_by_axis[landscape_axis_count] = { 0, 0, 0 };
 
     /// Wall time per round, milliseconds, DIAGNOSTIC ONLY (see `print_rounds`).
-    /// Index 0 is the seed candidate's evaluation.
+    /// Index 0 is the seed candidate's evaluation. Rounds scored in one wave
+    /// (BL-1676) share its wall time evenly, so the entries sum to the walk's.
     std::vector<double> round_ms;
 
     /// BL-1032. Set when a NON-EMPTY charter budget arrived with spend params

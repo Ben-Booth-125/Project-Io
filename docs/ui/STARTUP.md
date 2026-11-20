@@ -676,8 +676,10 @@ hashes of its own chunks, and only those chunks re-bake. Play does not open on a
 ground: if the master is still unfinished when the player confirms a seat, entering play waits
 on the loading screen with its own labelled step ("Loading textures"), and the budget is that
 it adds **at most 15 s** on the minimum PC ([TECH_FOUNDATIONS.md](../tech/TECH_FOUNDATIONS.md)
-§ Target hardware). The cold path, with no wizard to hide behind, starts the bake when its world
-is built and waits as needed. Other bodies bake in the background once play opens.
+§ Target hardware). The cold path, with no wizard to hide behind, takes the same in-round snapshot:
+its master starts baking **the moment the generation tail has laid the road network**, behind the
+landscape search and the settle, and the built world's landing re-bakes only the chunks those two
+moved. Other bodies bake in the background once play opens.
 
 3. **Seat the player**: open the nation selection screen over the major nations (§ The seat);
    the player's Confirm seats the player on the major picked, through the `take_seat` command. A

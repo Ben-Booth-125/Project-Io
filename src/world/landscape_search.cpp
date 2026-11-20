@@ -8,6 +8,7 @@
 #include "world.hpp"
 
 #include <algorithm>
+#include <atomic>
 #include <chrono>   // round timings — printed diagnostics only, never read by the walk
 #include <cstdio>
 #include <thread>
@@ -433,151 +434,218 @@ landscape_search_result search_landscape(const world& base, const recipe_registr
         std::printf("[landscape_search] no charter budget: the seed candidate alone (placement "
                     "moves nothing on a world that charters nothing)\n");
 
-    // BL-1085: the inner bar -- evaluations done over evaluations planned (the
-    // seed, then one placement proposal per round). A write-only tap;
-    // `out.evaluations` is the count the walk keeps anyway.
-    const int planned_evaluations = 1 + rounds * landscape_live_axis_count;
-    const auto report_progress = [&](int done) {
-        if (p.progress != nullptr)
-            p.progress->report_sub(done, planned_evaluations);
-    };
-
     using clock = std::chrono::steady_clock;
     const auto ms_since = [](clock::time_point t0)
     {
         return std::chrono::duration<double, std::milli>(clock::now() - t0).count();
     };
 
-    // --- the seed candidate -------------------------------------------------
-    {
-        const auto t0 = clock::now();
-        scored s;
-        s.cand = p.start;
-        score_one(base, reg, p, s);
-        out.seed_score   = s.score;
-        out.winner       = s.cand;
-        out.winner_score = s.score;
-        out.evaluations  = 1;
-        report_progress(out.evaluations);
-        out.round_ms.push_back(ms_since(t0));
-        if (p.print_rounds)
-            std::printf("[landscape_search] seed   corps=%d placement=%08X tier=%u  "
-                        "composite=%.6f  (%.0f ms)\n",
-                        s.cand.corporation_count, s.cand.placement_seed,
-                        static_cast<unsigned>(s.cand.road_tier), s.score.composite,
-                        out.round_ms.back());
-    }
-
+    // --- THE WALK, SCORED AHEAD (2026-11-19) ---------------------------------
+    // The walk is serial in its DECISIONS, not in its candidates. A round's
+    // proposal is `perturb_placement(incumbent, axis_rng(seed, r))`: keyed,
+    // never sequenced, so it depends only on WHICH candidate is the incumbent,
+    // and after k rounds the incumbent is one of at most 2^k candidates (each
+    // round keeps it or takes its proposal). The whole tree of proposals for the
+    // next D rounds is therefore known before any of them is scored. A WAVE
+    // scores that tree at once (2^D - 1 proposals, plus the seed in the first
+    // wave), then the serial walk is REPLAYED over the stored scores: the same
+    // comparisons in the same order, so the winner, every score and the whole
+    // path are the serial walk's, bit for bit. The branch not taken is scored
+    // and thrown away -- that is the price, paid in CPU and in peak memory (one
+    // world copy per worker), never in the result. D is the largest depth whose
+    // tree fits `thread_count` workers; one or two threads give D = 1, which is
+    // one proposal per wave, the old walk.
     const int threads = std::max(1, p.thread_count);
+    int depth = 1;
+    while (depth < 8 && ((1 << (depth + 1)) - 1) <= threads)
+        ++depth;
 
-    for (int r = 0; r < rounds; ++r)
+    // The inner bar counts every evaluation run, taken branch or not, over every
+    // evaluation planned (computed up front, so the bar never runs backwards).
+    int planned_runs = 1;
+    for (int r0 = 0; r0 < rounds; r0 += depth)
+        planned_runs += (1 << std::min(depth, rounds - r0)) - 1;
+    std::atomic<int> runs_done{0};
+    const auto report_run = [&] {
+        const int done = runs_done.fetch_add(1, std::memory_order_relaxed) + 1;
+        if (p.progress != nullptr)
+            p.progress->report_sub(done, planned_runs);
+    };
+
+    // Score every job, on up to `threads` workers. Each job writes only its own
+    // slot. A worker that cannot start, or that throws, leaves its jobs undone;
+    // the calling thread then scores whatever is left, in index order, so a
+    // missing thread costs wall time and never a result. An exception from that
+    // serial pass propagates as it always did.
+    struct job { scored* s; double ms; bool done; };
+    const auto run_jobs = [&](std::vector<job>& jobs)
     {
-        const auto round_t0 = clock::now();
-        // --- propose: PLACEMENT alone (Ben, 2026-11-12) ---------------------
-        // `props` is indexed by axis SLOT and `live` holds the slots this round
-        // proposes, which is the placement slot alone. Roster and road tier are
-        // retired: no draw, no proposal, no score, no path step. NEVER RE-KEYED
-        // — the draw is keyed by (round, axis slot) at the unchanged stride, so
-        // the placement proposal is exactly the three-axis walk's.
-        std::vector<scored> props(landscape_axis_count);
-        std::vector<std::size_t> live;
-        live.reserve(landscape_live_axis_count);
+        const auto run_one = [&](job& j)
         {
-            const landscape_axis axis = landscape_axis::placement;
-            checkpoint_rng rng = axis_rng(p.seed, r, axis);
-            const std::size_t slot = static_cast<std::size_t>(static_cast<int>(axis));
-            props[slot].cand = perturb_placement(out.winner, rng);
-            live.push_back(slot);
-        }
-
-        // --- score them INDEPENDENTLY ---------------------------------------
-        // One proposal today, so the threaded branch runs one worker; it stays
-        // generic over `live`. Results land at their own index, so nothing
-        // downstream can observe which finished first. Each worker copies `base` itself: score_landscape
-        // memoises into the world it scores, so a shared world would be both a
-        // race and an ordering hazard (landscape_score.hpp § the consequence).
-        if (threads <= 1)
+            const auto t0 = clock::now();
+            score_one(base, reg, p, *j.s);
+            j.ms   = ms_since(t0);
+            j.done = true;
+            report_run();
+        };
+        const int n = static_cast<int>(jobs.size());
+        const int spawn = std::min(threads, n);
+        if (spawn > 1)
         {
-            int scored_this_round = 0;
-            for (const std::size_t i : live)
-            {
-                score_one(base, reg, p, props[i]);
-                report_progress(out.evaluations + ++scored_this_round);
-            }
-        }
-        else
-        {
-            const int n = static_cast<int>(live.size());
-            const int spawn = std::min(threads, n);
             std::vector<std::thread> pool;
             pool.reserve(static_cast<std::size_t>(spawn));
             for (int t = 0; t < spawn; ++t)
             {
-                pool.emplace_back([&, t]
+                try
                 {
-                    for (int i = t; i < n; i += spawn)
-                        score_one(base, reg, p, props[live[static_cast<std::size_t>(i)]]);
-                });
+                    pool.emplace_back([&, t]
+                    {
+                        try
+                        {
+                            for (int i = t; i < n; i += spawn)
+                                run_one(jobs[static_cast<std::size_t>(i)]);
+                        }
+                        catch (...) {} // its jobs stay undone; the serial pass redoes them
+                    });
+                }
+                catch (...) { break; } // could not start: the serial pass covers it
             }
             for (std::thread& th : pool)
                 th.join();
         }
-        out.evaluations += static_cast<int>(live.size());
-        report_progress(out.evaluations); // the threaded path reports per round
+        for (job& j : jobs)
+            if (!j.done)
+            {
+                // A worker that threw mid-job may have left a partial score;
+                // the job is scored again from its candidate.
+                j.s->score = landscape_score{};
+                run_one(j);
+            }
+    };
 
-        // --- argmax over the proposals, by the TOTAL order -------------------
-        // A single proposal is its own argmax; the loop stays so the order is
-        // the one any wider round would use. Proposal-vs-proposal ties are broken by `candidate_key_less`, so an
-        // exact tie between two proposals resolves identically everywhere. This
-        // key is deliberately NOT consulted against the incumbent below.
-        std::size_t best = live.front();
-        for (std::size_t k = 1; k < live.size(); ++k)
+    // --- the seed candidate -------------------------------------------------
+    scored seed;
+    seed.cand = p.start;
+    double seed_ms = 0.0;
+    bool seed_scored = false;
+
+    landscape_candidate incumbent = p.start;
+    for (int r0 = 0; r0 < rounds || !seed_scored; r0 += depth)
+    {
+        const int d = std::max(0, std::min(depth, rounds - r0));
+
+        // levels[k] holds round r0+k's proposals, one per incumbent that round
+        // can have, ordered so incumbent index i after round k becomes 2i (kept)
+        // and 2i+1 (its proposal taken) after round k+1.
+        std::vector<std::vector<scored>> levels(static_cast<std::size_t>(d));
         {
-            const std::size_t i = live[k];
-            const int c = compare_landscape(props[i].score, props[best].score);
-            if (c > 0 || (c == 0 && candidate_key_less(props[i].cand, props[best].cand)))
-                best = i;
+            std::vector<landscape_candidate> incs{incumbent};
+            for (int k = 0; k < d; ++k)
+            {
+                const landscape_axis axis = landscape_axis::placement;
+                std::vector<landscape_candidate> next;
+                next.reserve(incs.size() * 2);
+                levels[static_cast<std::size_t>(k)].resize(incs.size());
+                for (std::size_t i = 0; i < incs.size(); ++i)
+                {
+                    checkpoint_rng rng = axis_rng(p.seed, r0 + k, axis);
+                    scored& s = levels[static_cast<std::size_t>(k)][i];
+                    s.cand = perturb_placement(incs[i], rng);
+                    next.push_back(incs[i]);
+                    next.push_back(s.cand);
+                }
+                incs = std::move(next);
+            }
         }
 
-        // --- replace only on a STRICT improvement ----------------------------
-        // A tie leaves the incumbent standing. Consulting the candidate key here
-        // would make an equal-scoring proposal unseat the incumbent and let the
-        // walk churn between equals for the rest of its fixed rounds.
-        const double incumbent_composite = out.winner_score.composite;
-        const bool accept = compare_landscape(props[best].score, out.winner_score) > 0;
-        if (accept)
+        std::vector<job> jobs;
+        if (!seed_scored)
+            jobs.push_back(job{&seed, 0.0, false});
+        for (auto& lv : levels)
+            for (scored& s : lv)
+                jobs.push_back(job{&s, 0.0, false});
+        const auto wave_t0 = clock::now();
+        run_jobs(jobs);
+        // `round_ms` stays WALL TIME (its readers sum it into a walk's cost):
+        // the wave's wall time, split evenly over the entries it decided, so
+        // the entries still sum to the walk's wall time. The printed line
+        // gives each evaluation's own time instead.
+        const double wave_share = ms_since(wave_t0)
+            / static_cast<double>(std::max(1, d + (seed_scored ? 0 : 1)));
+        std::size_t ji = 0;
+
+        if (!seed_scored)
         {
-            out.winner       = props[best].cand;
-            out.winner_score = props[best].score;
-            ++out.accepted;
-            ++out.accepted_by_axis[best];
+            seed_ms = jobs[ji++].ms;
+            seed_scored = true;
+            out.seed_score   = seed.score;
+            out.winner       = seed.cand;
+            out.winner_score = seed.score;
+            out.evaluations  = 1;
+            out.round_ms.push_back(wave_share);
+            if (p.print_rounds)
+                std::printf("[landscape_search] seed   corps=%d placement=%08X tier=%u  "
+                            "composite=%.6f  (%.0f ms)\n",
+                            seed.cand.corporation_count, seed.cand.placement_seed,
+                            static_cast<unsigned>(seed.cand.road_tier), seed.score.composite,
+                            seed_ms);
         }
 
-        out.round_ms.push_back(ms_since(round_t0));
-        if (p.print_rounds)
+        // --- the replay: the serial walk, read off the stored scores --------
+        std::vector<double> ms_by_job;
+        for (const job& j : jobs)
+            ms_by_job.push_back(j.ms);
+        std::size_t idx = 0;
+        std::size_t level_base = ji; // job index of levels[k][0]
+        for (int k = 0; k < d; ++k)
         {
-            const landscape_candidate& bc = props[best].cand;
-            std::printf("[landscape_search] round %d  %-9s %s  corps=%d placement=%08X tier=%u  "
-                        "composite=%.6f vs incumbent %.6f  (%.0f ms, %.0f ms/eval)\n",
-                        r, landscape_axis_name(static_cast<landscape_axis>(static_cast<int>(best))),
-                        accept ? "TAKEN" : "held ",
-                        bc.corporation_count, bc.placement_seed,
-                        static_cast<unsigned>(bc.road_tier), props[best].score.composite,
-                        incumbent_composite, out.round_ms.back(),
-                        out.round_ms.back() / static_cast<double>(live.size()));
-        }
+            const int r = r0 + k;
+            const scored& prop = levels[static_cast<std::size_t>(k)][idx];
+            const double prop_ms = ms_by_job[level_base + idx];
+            level_base += levels[static_cast<std::size_t>(k)].size();
+            ++out.evaluations;
 
-        for (const std::size_t i : live)
-        {
+            // --- replace only on a STRICT improvement ------------------------
+            // A tie leaves the incumbent standing. Consulting the candidate key
+            // here would make an equal-scoring proposal unseat the incumbent and
+            // let the walk churn between equals for the rest of its rounds.
+            const std::size_t slot = static_cast<std::size_t>(static_cast<int>(landscape_axis::placement));
+            const double incumbent_composite = out.winner_score.composite;
+            const bool accept = compare_landscape(prop.score, out.winner_score) > 0;
+            if (accept)
+            {
+                out.winner       = prop.cand;
+                out.winner_score = prop.score;
+                ++out.accepted;
+                ++out.accepted_by_axis[slot];
+            }
+
+            out.round_ms.push_back(wave_share);
+            if (p.print_rounds)
+                std::printf("[landscape_search] round %d  %-9s %s  corps=%d placement=%08X tier=%u  "
+                            "composite=%.6f vs incumbent %.6f  (%.0f ms, %.0f ms/eval)\n",
+                            r, landscape_axis_name(landscape_axis::placement),
+                            accept ? "TAKEN" : "held ",
+                            prop.cand.corporation_count, prop.cand.placement_seed,
+                            static_cast<unsigned>(prop.cand.road_tier), prop.score.composite,
+                            incumbent_composite, prop_ms, prop_ms);
+
             landscape_search_step step;
             step.round    = r;
-            step.axis     = static_cast<landscape_axis>(static_cast<int>(i));
-            step.proposal = props[i].cand;
-            step.score    = props[i].score;
-            step.accepted = accept && i == best;
+            step.axis     = landscape_axis::placement;
+            step.proposal = prop.cand;
+            step.score    = prop.score;
+            step.accepted = accept;
             out.path.push_back(step);
+
+            idx = idx * 2 + (accept ? 1u : 0u);
         }
+        incumbent = out.winner;
     }
+    if (p.print_rounds && planned_runs > out.evaluations)
+        std::printf("[landscape_search] scored ahead: %d evaluations run for the %d the walk "
+                    "read (%d workers, %d rounds per wave)\n",
+                    planned_runs, out.evaluations, threads, depth);
 
     return out;
 }

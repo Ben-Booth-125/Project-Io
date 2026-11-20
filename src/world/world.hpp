@@ -140,6 +140,11 @@ struct logistics_flood_field
     std::vector<float> dist;              ///< Weighted travel cost cell -> anchor; 1e30f unreached.
     std::vector<int>   came_from;         ///< The cell's next hop toward the anchor, -1 at anchor/unreached.
     std::vector<char>  crossed;           ///< Best path cell -> anchor touches ocean?
+    /// Served by the lazy path since it was cached. NOT part of the field's value:
+    /// a cache-bookkeeping flag that decides only which fields a cache clear
+    /// remembers for rewarm_flood_fields, so a rebuilt field nobody asks for again
+    /// drops out rather than being rebuilt after every clear.
+    bool               asked = false;
 };
 
 /// A body's NEAREST-ANCHOR FIELD (BL-1117, settle tick one): for every cell, the
@@ -935,6 +940,12 @@ struct world
     /// stay theirs. Pure functions of the body's tiles.
     std::map<std::tuple<entity_id, entity_id, std::uint8_t>, logistics_flood_field> leg_flood_fields;
     std::map<std::tuple<entity_id, entity_id, entity_id, std::uint8_t>, logistics_path> leg_path_cache;
+
+    /// The keys of the two flood caches above as they stood at the last
+    /// invalidate_logistics_caches, so rewarm_flood_fields can rebuild them at once on
+    /// worker threads. Derived, never saved or hashed; a key list, not a field.
+    std::vector<std::pair<entity_id, entity_id>>                flood_rewarm_keys;
+    std::vector<std::tuple<entity_id, entity_id, std::uint8_t>> leg_flood_rewarm_keys;
 
     /// BL-1505 (SUPPLY.md § A lane does not cross a warring front): the lanes a nation at
     /// war may fly, keyed (party, body, src, dst, kind), and the closed floods behind the
