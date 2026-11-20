@@ -486,8 +486,12 @@ int main()
             (void)open_war(g, sp);
             std::ostringstream o96(std::ios::binary);
             write_world_snapshot_legacy(g.w, {}, o96, k_world_save_version_pre_war_joiners);
+            // BL-1708: today's stream also carries the province-name tail (v98), so measure the
+            // 32 bytes against a v97 stream, the sides' own version.
+            std::ostringstream o97(std::ios::binary);
+            write_world_snapshot_legacy(g.w, {}, o97, k_world_save_version_war_joiners);
             world rr;
-            check(o96.str().size() + 32 == to_bytes(g.w).size() && from_bytes(o96.str(), rr)
+            check(o96.str().size() + 32 == o97.str().size() && from_bytes(o96.str(), rr)
                       && rr.wars.size() == 1 && rr.wars.begin()->second.joiners.empty()
                       && to_bytes(rr) == to_bytes(g.w) && rr.state_hash(0) == g.w.state_hash(0),
                   "J8f a v96 stream (32 bytes a war shorter) loads with no joiners and re-saves as today's");
