@@ -603,7 +603,7 @@ void draw_queue_section(const world& w, const recipe_registry& reg, ui_state& ui
     {
         entity_id         id = null_entity;
         std::string       name;
-        std::string       where;           ///< "Body [x, y]" — the hover.
+        std::string       where;           ///< "Province, Body" — the hover.
         float             progress  = 0.0f; ///< construction_paid / capex.
         float             cost_left = 0.0f;
         construction_read rd;
@@ -622,6 +622,8 @@ void draw_queue_section(const world& w, const recipe_registry& reg, ui_state& ui
             continue;
         queue_row row;
         row.id         = id;
+        // The row names the kind only (Ben, 2026-11-20: no place in the queue); the
+        // province stays in the hover.
         row.name       = building_group_name(w, reg, b);
         row.progress   = construction_progress_fraction(w, reg, b);
         row.days_left  = construction_days_left(b);

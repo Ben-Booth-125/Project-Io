@@ -4269,29 +4269,102 @@ static void draw_tile_logistics(world& w, const economy_report& report, ui_state
     ui.tile_card.lp_need          = need;
     ui.tile_card.lp_rivals_hidden = rivals_hidden;
 
-    // The label carries the hover; the two figures sit under it, one a line, because
-    // the tile card is a quarter of the band and narrow at the reference width.
-    ImGui::TextDisabled("Logistic Points");
-    const bool hovered_label = ImGui::IsItemHovered();
-    if (sources.empty() || !(makes > 0.0f))
-        ImGui::TextDisabled("Makes none");
-    else
-        ImGui::Text("Makes %.0f", static_cast<double>(makes));
-    if (need <= 0.0f)
-        ImGui::TextDisabled("Uses none");
-    else
+    // THE TILE'S FIGURE ROW (Ben, 2026-11-20, the lane E live check: "a grid with glyphs
+    // above the list of buildings, capacity can go next to logistics points usage, and we
+    // can use tooltips rather than listing it"). One row of glyph cells - Logistic Points
+    // made, Logistic Points used of need, buildings against the tile's capacity - and each
+    // cell's words live in its hover, not on the card.
+    const tile_component* tcp = host != w.tiles.end() ? &host->second : nullptr;
+    const bool  water   = tcp != nullptr && is_water(tcp->substrate);
+    const int   ne_cap  = tcp != nullptr ? placement_rules::non_extraction_stack_cap(tcp->substrate, tcp->cover) : 0;
+    const int   ne_used = placement_rules::non_extraction_buildings_on_tile(w, tile_id);
+    ui.tile_card.capacity_used = ne_used;
+    ui.tile_card.capacity_cap  = ne_cap;
+
+    ImDrawList* dl     = ImGui::GetWindowDrawList();
+    const float line_h = ImGui::GetTextLineHeight();
+    const float gr     = line_h * 0.45f;            // glyph half-extent
+    const float cell_w = std::floor(ImGui::GetContentRegionAvail().x / 3.0f);
+    const ImU32 dim    = ImGui::GetColorU32(ImGuiCol_TextDisabled);
+    const ImU32 prim   = ImGui::GetColorU32(ImGuiCol_Text);
+    const ImVec2 row0  = ImGui::GetCursorScreenPos();
+    // Draws one cell: glyph at the left, the figure after it, an invisible button over
+    // the whole cell so its hover is one target. Returns true while hovered.
+    auto cell = [&](int i, const char* id, auto&& glyph, const char* figure, ImU32 col) {
+        const ImVec2 p = {row0.x + cell_w * static_cast<float>(i), row0.y};
+        ImGui::SetCursorScreenPos(p);
+        ImGui::InvisibleButton(id, {cell_w - ui::px(2.0f), line_h});
+        const bool hov = ImGui::IsItemHovered();
+        glyph(ImVec2{p.x + gr + ui::px(1.0f), p.y + line_h * 0.5f});
+        dl->AddText({p.x + gr * 2.0f + ui::px(5.0f), p.y}, col, figure);
+        return hov;
+    };
+
+    char f_make[32], f_use[48], f_cap[32];
+    if (sources.empty() || !(makes > 0.0f)) std::snprintf(f_make, sizeof f_make, "â");
+    else std::snprintf(f_make, sizeof f_make, "%.0f", static_cast<double>(makes));
+    const bool short_of = need > 0.0f && uses + 0.05f < need;
+    if (need <= 0.0f) std::snprintf(f_use, sizeof f_use, "â");
+    else std::snprintf(f_use, sizeof f_use, "%.1f/%.1f", static_cast<double>(uses), static_cast<double>(need));
+    if (ne_cap <= 0) std::snprintf(f_cap, sizeof f_cap, "â");
+    else std::snprintf(f_cap, sizeof f_cap, "%d/%d", ne_used, ne_cap);
+
+    const bool hov_make = cell(0, "##lp_make",
+        [&](ImVec2 c) { icons::building(dl, c, gr, building_type::inland_logistics_hub, resource_type::iron_ore,
+                                        makes > 0.0f ? prim : dim); },
+        f_make, makes > 0.0f ? prim : dim);
+    const bool hov_use = cell(1, "##lp_use",
+        [&](ImVec2 c) { icons::throughput(dl, c, gr, short_of ? palette::negative : dim); },
+        f_use, short_of ? palette::negative : (need > 0.0f ? prim : dim));
+    const bool full = ne_cap > 0 && ne_used >= ne_cap;
+    const bool hov_cap = cell(2, "##tile_cap",
+        [&](ImVec2 c) { icons::stat(dl, c, gr, icons::stat_glyph::capacity, full ? palette::negative : dim); },
+        f_cap, full ? palette::negative : (ne_cap > 0 ? prim : dim));
+    ImGui::SetCursorScreenPos({row0.x, row0.y + line_h + ImGui::GetStyle().ItemSpacing.y});
+    ImGui::Dummy({0.0f, 0.0f});
+
+    if (hov_cap)
     {
-        // A shortfall reads as one: granted short of need by more than rounding.
-        const bool short_of = uses + 0.05f < need;
-        const ImVec4 col = ImGui::ColorConvertU32ToFloat4(short_of ? palette::negative
-                                                                   : palette::text_secondary);
-        ImGui::TextColored(col, "Uses %.1f of %.1f", static_cast<double>(uses),
-                           static_cast<double>(need));
+        ImGui::BeginTooltip();
+        ImGui::TextUnformatted("Tile capacity");
+        if (water || ne_cap <= 0)
+            ImGui::TextDisabled("Nothing can be built on this ground.");
+        else
+        {
+            ImGui::Text("%d of %d building slots used", ne_used, ne_cap);
+            ImGui::TextDisabled("Every building but an extraction site counts here.");
+            if (tcp->cover == terrain_cover::urban)
+                ImGui::TextDisabled("Urban ground: the highest ceiling.");
+            else
+                ImGui::TextDisabled("Filling it turns the tile urban.");
+            // Extraction sites stack per deposit, on a cap of their own.
+            const bool readable = tile_deposits_readable(w, *tcp);
+            bool head = false;
+            for (std::size_t r = 0; r < resource_count && readable; ++r)
+            {
+                if (tcp->resource_deposit[r] <= 0.0f) continue;
+                const auto rt = static_cast<resource_type>(r);
+                if (!placement_rules::can_place(*tcp, building_type::extraction_site, rt)) continue;
+                if (!head) { ImGui::Spacing(); ImGui::TextUnformatted("Extraction sites, per deposit"); head = true; }
+                ImGui::Text("%s: %d of %d", resource_name(rt),
+                            placement_rules::buildings_on_tile(w, tile_id, building_type::extraction_site, rt),
+                            placement_rules::stack_capacity(*tcp, building_type::extraction_site, rt));
+            }
+        }
+        ImGui::EndTooltip();
     }
-    if (!hovered_label)
+    if (!hov_make && !hov_use)
         return;
 
     ImGui::BeginTooltip();
+    if (hov_make)
+        ImGui::TextUnformatted(makes > 0.0f ? "Logistic Points made here this tick"
+                                            : "No Logistic Points source on this tile");
+    else
+        ImGui::TextUnformatted(need > 0.0f ? (short_of ? "Logistic Points used here - short of need"
+                                                       : "Logistic Points used here, of what they need")
+                                           : "Nothing here uses Logistic Points");
+    ImGui::Separator();
     const auto nit = w.tile_to_nation.find(tile_id);
     const entity_id nation = (nit != w.tile_to_nation.end()) ? nit->second : null_entity;
     const auto nat = w.nations.find(nation);
@@ -5370,13 +5443,14 @@ void draw_construction_ledger_body(world& w, const recipe_registry& reg, ui_stat
     }
     const tile_component& tile = tit->second;
 
-    // ── Header: Construct · [x, y] ──
+    // ── Header: Construct · <province> ── (BL-1708, Ben 2026-11-20: the place's
+    // name, never a grid position)
     // No close 'x': the host ledger's nav rail slot and its tab strip own closing
     // now, and a second closer on a section inside it would close something the
     // player did not point at.
     ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Construct");
     ImGui::SameLine();
-    ImGui::TextDisabled("[%d, %d]", tile.grid_x, tile.grid_y);
+    ImGui::TextDisabled("%s", province_display_name(w, w.provinces.province_of(tile_id)).c_str());
 
     ImGui::Separator();
 

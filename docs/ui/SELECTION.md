@@ -204,16 +204,23 @@ a tile keep the shared header (§ Layout & chrome).
 3. **Tile — one titled card: the buildings on this tile.** Tile grain, because a building
    stands on a tile. **Buildings only** — no market or price rows; what the tile's goods fetch
    is the Market ledger's question.
-   - **A Logistics section, between the title and the grid** (Ben, 2026-10-16: "we should
-     improve visibility by giving tile selection a surface for logistics. We should show the
-     number of logistics points provided, and the number consumed by that tile"). Owned by
-     BL-1354 (tile logistics section). Two figures under a *Logistic Points* label, read off the
-     tick's own resolve (`LOGISTICS.md` § Logistic Points), never re-derived:
-     - **Makes** — what a source standing on this tile (hub, station or port) makes this tick,
-       upkeep folded in; *none* where no source stands.
-     - **Uses** — the points granted to this tile's producing buildings, **out of** what they
-       need, so a shortfall reads as one (drawn in the warning colour when granted falls short).
-     Hovering the label opens the detail: **whose pool** this ground draws on — every building
+   - **A figure row, between the title and the grid** — three glyph cells across, each a
+     figure with its words in its hover, never a labelled list (Ben, 2026-11-20: "a grid with
+     glyphs above the list of buildings, capacity can go next to logistics points usage, and we
+     can use tooltips rather than listing it"). The Logistic Points cells answer Ben's
+     2026-10-16 ask ("show the number of logistics points provided, and the number consumed by
+     that tile"; BL-1354, tile logistics section), read off the tick's own resolve
+     (`LOGISTICS.md` § Logistic Points), never re-derived:
+     - **Made** (the logistics-hub glyph) — what a source standing on this tile (hub, station
+       or port) makes this tick, upkeep folded in; a dash where no source stands.
+     - **Used** (the Logistics lens's truck) — the points granted to this tile's producing
+       buildings **over** what they need, so a shortfall reads as one (glyph and figure in the
+       warning colour when granted falls short).
+     - **Capacity** (the capacity glyph) — the tile's non-extraction buildings over its
+       `non_extraction_stack_cap` (`../economy/PRODUCTION.md`), warning-coloured when full. Its
+       hover names what counts, that filling it turns the tile urban, and each readable
+       deposit's extraction sites over its own `stack_capacity`.
+     Hovering either Logistic Points cell opens the detail: **whose pool** this ground draws on — every building
      on a nation's ground draws *that nation's* pool, and is that nation's — with the pool and its
      claim; the **coverage** a building here would get (`lp_coverage_at`, the one genuinely
      per-tile figure, meaningful on an empty tile too); and one line per source and per
