@@ -3175,6 +3175,14 @@ void app::render()
         // The pin toggle (LAYOUT.md § Pinned items): on the band's header row, at its
         // top-right corner; its own window so it sits over whichever layout drew.
         ui::draw_pin_toggle(m_world, m_ui, band_origin, band_size);
+        // The locator: the bottom-left tile, the width of a ledger, under the column.
+        // An open ledger runs over it (Ben, 2026-11-20; LAYOUT.md § Bottom strip).
+        if (!ui::any_panel_open(m_ui))
+        {
+            const float col_l = ui::nav_pane_width;
+            const float col_r = ui::shell_column_width(disp.x);
+            ui::draw_selection_locator(m_world, m_ui, {col_l, band.y}, {col_r - col_l, band.h});
+        }
     }
 
     // The shell fold-out column is ledgers-only (BL-195), and it now really is: the

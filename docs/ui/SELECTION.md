@@ -127,29 +127,31 @@ Each kind routes its 'go to' to the right place:
 | **Building** (any) | The host tile's card with this stack expanded in place, no header row — § The building element's layout. Player-owned and rival buildings alike. | | None: the tile element draws no go-to. |
 | **Unit** | Dedicated three-column band — § The unit element's layout. | | Canvas: entity's position. |
 | **Front** (non-entity) | Its own card — § The front element. | | None: a front is selected from its line on the canvas. |
-| **Market** | § The market element. | | Canvas: `focus_on_tile` on the market's **centre tile** — the canvas lands on the market, not the grid's centre (Ben, 2026-11-19). An unanchored market (no centre) frames its body's surface. |
-| **Nation** | None — **"Open its ledger via [>]."** | (none) | A ledger (no canvas of its own). |
+| **Market** | § The market element. | | Canvas: `focus_on_tile` on the market's **capital** — the population centre it is named for (Ben, 2026-11-20), not its clearing `centre_tile`, which is a trade site near the city. A market no centre names lands on its centre tile; an unanchored one frames its body's surface. |
+| **Nation** | § The nation element. | | Canvas: `focus_on_tile` on the nation's **capital** (`nation_component::capital_tile`; Ben, 2026-11-20). |
 | **Space asset** (a satellite or a station) | None. | The shared space-asset summary, the same the hover card draws: owner, role (a satellite) or modules and crew (a station), node, state. | None: it is pressed on the Circumplanetary rung it is drawn on. A station is selected by its core's id; its modules are not selectable on their own. |
 | **Space unit** (a ship; its fleet) | The player's own: **Move**, **Dock** / **Undock**, **Refuel**, **Bombard**; a Lander's **Embark colonists** and **Found base** — § The space-unit element. A rival's: none. | The shared space-unit summary, the same the hover card draws: hull, owner, node or transit, Δv budget, propellant, hull points, cargo, firepower. | None: it is pressed on the Circumplanetary or Solar rung it is drawn on. |
 
-So 'go to' is itself polymorphic: spatial entities navigate a canvas;
-non-spatial entities (a nation) open the relevant ledger.
+So 'go to' is itself polymorphic over the canvas rung: most kinds land on a tile, a body
+frames its surface.
 
 ### The tile element's layout
 
 A selected **Tile** takes a dedicated layout (`draw_tile_selection`,
-`src/ui/selection_panel.cpp`) running **left to right** across the band in four columns
+`src/ui/selection_panel.cpp`) running **left to right** across the band in three columns
 (Ben, 2026-10-13, the sprint 54 tile pass; it supersedes the 2026-07-28 three-column layout
-and the 2026-08-24 six-section nav):
+and the 2026-08-24 six-section nav). The preview that was its first column is the **locator**
+in the bottom-left tile (Ben, 2026-11-20; `LAYOUT.md` § The locator), so the province and tile
+cards take its width:
 
-> **Preview → Province → Tile → Actions**
+> **Province → Tile → Actions** (the preview, below, draws in the locator)
 
 **The tile element draws no header row.** The shared `[icon] Tile [x, y] · type  [>]` row
 spent a line of the band on a name the canvas already shows and a 'go to' that is a no-op for
 a tile (§ Action + Facts). The whole band height goes to the four columns. Kinds that are not
 a tile keep the shared header (§ Layout & chrome).
 
-1. **Preview — the zoomed hex neighbourhood.** A bordered render of the selected tile and its
+1. **Preview — the zoomed hex neighbourhood, drawn in the locator.** A bordered render of the selected tile and its
    immediate ring (`draw_tile_neighbourhood`, radius 2), the selected tile picked out, drawn
    from the **baked neighbourhood page** — the same ground, structures and grade the canvas
    draws. **Until that page is ready for this tile, the box shows a loading bar**, not flat
@@ -846,6 +848,23 @@ centre tile. Below, two columns:
 Markets are the public channel, so nothing here is private. The card does not rank or recommend:
 the goods are ordered by volume, a fact, not by what the player should do.
 
+
+### The nation element (Ben, 2026-11-20)
+
+A selected **nation** — pressed on the far map, or the band at rest on the player's own — shows
+what the nation *is* and where it stands with the player, under the shared header (its name,
+its `[>]` to its capital). Two columns:
+
+- **Left, the nation.** Its colour swatch; its **capital** (the largest settlement in the
+  capital's province) and the body it stands on; its **land provinces and tiles**; its
+  **settlements and people**; its **GDP a year** (the public figure the Diplomacy ledger reads).
+  The player's own nation adds its **army** (units and men) and its **treasury**. A rival's
+  treasury and army are not shown: they are its internals (`DISCOVERY.md`), and the Diplomacy
+  ledger's power comparison names only public figures.
+- **Right, the relation.** A rival: **"Toward you"** — the stance word (At war, Truce, Hostile,
+  Friends, At peace) and its **Access, Trust and Alarm** toward the player — then **Open in
+  Diplomacy**, which navigates that ledger to it. The player's own: **"Your nation"** — at peace
+  or at war with how many, and how many fronts it holds — then **Open Diplomacy**.
 ### Tile repeat-click selection cycle
 
 **A no-lens gesture.** The cycle walks the stack of things standing on one piece of ground, and a
@@ -971,9 +990,12 @@ the screen, rather than floating with the cursor."* The band is:
   to front** or **< Group** sits left of the pin and can never spill under it. A card with no
   header row (the tile, an expanded building) reserves the same width at the right end of the row
   the pin is anchored to.
-- **Every spatial 'go to' lands on its tile.** A building, a unit and a market centre the
-  Planetary canvas on their own tile (`focus_on_tile`); a body frames its surface. None of them
-  frames the grid's middle and leaves the player to find the thing.
+- **Every spatial 'go to' lands on its tile, close.** A building, a unit, a market (its capital)
+  and a nation (its capital) centre the Planetary canvas on their own tile (`focus_on_tile`); a
+  body frames its surface. None of them frames the grid's middle and leaves the player to find
+  the thing. A go-to lands at the second-nearest zoom rung, where a city and its buildings read,
+  or keeps a closer view already on that body (Ben, 2026-11-20): the whole-map framing reads as
+  having gone nowhere.
 - **Always open.** The band never hides: there is no `[x]` button, no Esc hide rung (Esc clears
   the selection, and the band rests on the player's nation), and no hidden state. With the shell filling the perimeter, a hidden band reads as a hole in the
   frame (Ben, NR-017).
@@ -1030,6 +1052,12 @@ returns the literal lowest entity (a building over a tile resolves to the buildi
 resolves to the tile, whose element carries its province), and a repeat click walks the four rungs
 below (§ Tile repeat-click selection cycle). Under a lens the stack does not apply at all — see
 the next section, which supersedes it.
+
+**Zoomed out, a press selects the nation (Ben, 2026-11-20).** Once the far map is the main read
+(its fade more than half in — `RENDERING.md` § the farthest rung), a press on ground that no
+counter answers selects the **nation** holding that ground, not the tile: the map at that zoom
+answers *whose*, so the press does too. A counter is still aimed at, and unclaimed ground still
+selects its tile. Zooming back in restores the stack above.
 
 **Two resolvers, and which wins.**
 

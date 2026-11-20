@@ -14,7 +14,10 @@
 #include "circum_units.hpp"    // BL-1609: the space-unit card
 #include "construction_panel.hpp" // building_group_name - the aim of the open-in-ledger button
 #include "diplomacy_ledger.hpp"   // open_declaration - the front card's Answer door
-#include "world/war.hpp"          // war_between - the front card's unanswered war
+#include "world/war.hpp"          // war_between - the front card's unanswered war; at_war, truce_between
+#include "world/fronts.hpp"       // current_fronts - the nation card's fronts
+#include "world/sentiment.hpp"    // sentiment_toward - the nation card's reading of the player
+#include "world/stance.hpp"       // is_hostile, are_friends - the nation card's stance word
 
 #include "foldout_column.hpp" // shell fold-out column host (shared with the ledgers)
 #include "format.hpp"         // fmt::credits — the god-view corp readout (BL-408)
@@ -610,7 +613,7 @@ void draw_selection_action(const world& w, const recipe_registry& reg,
         // selection_kind::market no longer routes here (BL-1694) — it takes its
         // own two-column body (draw_market_selection_body).
 
-        case selection_kind::nation:
+        // selection_kind::nation no longer routes here — draw_nation_selection_body.
         case selection_kind::corporation:
             ImGui::TextDisabled("Open its ledger via [>].");
             break;
@@ -4364,13 +4367,14 @@ void draw_tile_selection(world& w, const recipe_registry& reg, const economy_rep
     const float           avail = ImGui::GetContentRegionAvail().x;
     const bool            god   = ui.spectating && ui.god_view;
 
-    // Preview and actions keep their quarter each; the two cards split the
-    // former centre half equally (Ben, 2026-10-13).
+    // The actions keep a quarter; the province and tile cards split the rest equally.
+    // The zoomed-ground preview that was the first column is the LOCATOR now, in the
+    // bottom-left tile (Ben, 2026-11-20; draw_selection_locator).
     const float total_h  = ImGui::GetContentRegionAvail().y;
     const float spacing  = style.ItemSpacing.x;
-    const float left_w   = avail * 0.25f;
+    const float left_w   = 0.0f;
     const float right_w  = avail * 0.25f;
-    const float centre_w = std::max(ui::px(160.0f), avail - left_w - right_w - 3.0f * spacing);
+    const float centre_w = std::max(ui::px(160.0f), avail - right_w - 2.0f * spacing);
     const float prov_w   = std::floor(centre_w * 0.5f);
     const float tile_w   = centre_w - prov_w;
 
@@ -4383,19 +4387,9 @@ void draw_tile_selection(world& w, const recipe_registry& reg, const economy_rep
     ui.tile_card.actions_w  = right_w;
     ui.tile_card.height     = total_h;
 
-    // ── 1. Preview: zoomed hex neighbourhood ──
-    {
-        const ImVec2 p  = ImGui::GetCursorScreenPos();
-        const ImVec2 mx = {p.x + left_w, p.y + total_h};
-        dl->AddRectFilled(p, mx, IM_COL32(16, 18, 24, 255), 3.0f);
-        request_neighbourhood_page(w, ui, tile_id, 2);
-        draw_tile_neighbourhood(dl, w, tile_id, p, {left_w, total_h}, /*radius=*/2, &ui.ground);
-        dl->AddRect(p, mx, IM_COL32(90, 90, 100, 255), 3.0f);
-        ImGui::Dummy({left_w, total_h});
-    }
-    ImGui::SameLine();
+    (void)dl;
 
-    // ── 2. Province ──
+    // ── 1. Province ──
     if (water)
         draw_water_facts_column(w, tile_id, tile, prov_w, total_h);
     else
@@ -5114,11 +5108,266 @@ void draw_market_selection_body(const world& w, ui_state& ui, entity_id mid)
     ImGui::EndChild();
 }
 
+
+/// What the nation card reads off the world that moves only with the territory or
+/// the econ tick: its land provinces, its settlements and their people, and the name
+/// of its capital. Cached per nation against those two clocks.
+struct nation_reading
+{
+    int         provinces   = 0;
+    int         settlements = 0;
+    long long   people      = 0; ///< Thousands, as population_centre_component counts them.
+    std::string capital;         ///< The largest settlement in the capital's province, or "".
+};
+
+const nation_reading& read_nation(const world& w, entity_id nid)
+{
+    static entity_id     c_nid  = null_entity;
+    static int           c_tick = -1;
+    static std::uint64_t c_terr = ~std::uint64_t{0};
+    static nation_reading c;
+    if (nid == c_nid && c_tick == w.current_econ_tick && c_terr == w.territory_generation)
+        return c;
+    c = nation_reading{};
+    c_nid = nid; c_tick = w.current_econ_tick; c_terr = w.territory_generation;
+
+    const auto nit = w.nations.find(nid);
+    if (nit == w.nations.end())
+        return c;
+    for (const province& pr : w.provinces.provinces)
+        if (province_kind_of(w, pr.id) == province_kind::land && province_holder_for(w, pr.id) == nid)
+            ++c.provinces;
+
+    const uint32_t cap_prov = nit->second.capital_tile != null_entity
+                                  ? w.provinces.province_of(nit->second.capital_tile) : 0u;
+    entity_id best = null_entity;
+    int       best_scale = -1, best_pop = -1;
+    for (const auto& [cid, pc] : w.population_centres)
+    {
+        if (pc.razed)
+            continue;
+        const auto t = w.population_centre_tile.find(cid);
+        if (t == w.population_centre_tile.end())
+            continue;
+        const auto tn = w.tile_to_nation.find(t->second);
+        if (tn == w.tile_to_nation.end() || tn->second != nid)
+            continue;
+        ++c.settlements;
+        c.people += pc.population;
+        if (cap_prov != 0u && w.provinces.province_of(t->second) == cap_prov
+            && (pc.scale > best_scale || (pc.scale == best_scale && pc.population > best_pop)
+                || (pc.scale == best_scale && pc.population == best_pop && cid < best)))
+        {
+            best = cid; best_scale = pc.scale; best_pop = pc.population;
+        }
+    }
+    if (best != null_entity)
+        if (const auto nm = w.population_centre_name.find(best); nm != w.population_centre_name.end())
+            c.capital = nm->second;
+    return c;
+}
+
+/// "23.1M" / "640k" from a count in thousands.
+std::string people_text(long long thousands)
+{
+    char buf[32];
+    if (thousands >= 1000)
+        std::snprintf(buf, sizeof buf, "%.1fM", static_cast<double>(thousands) / 1000.0);
+    else
+        std::snprintf(buf, sizeof buf, "%lldk", thousands);
+    return buf;
+}
+
+/// A selected NATION (Ben, 2026-11-20; SELECTION.md § The nation element). Left: what
+/// it is — capital, ground, people, GDP, army. Right: where it stands with the player
+/// (a rival), or the player's own wars and fronts (the player's nation), and the door
+/// onto the Diplomacy ledger. Public figures only for a rival: never its treasury, and
+/// its army is not counted (DISCOVERY.md: a rival's internals are not the player's).
+void draw_nation_selection_body(const world& w, const recipe_registry& reg, const economy_report& report,
+                                ui_state& ui, entity_id nid)
+{
+    const auto nit = w.nations.find(nid);
+    if (nit == w.nations.end())
+        return;
+    const nation_component& n  = nit->second;
+    const entity_id         me = player_actor(w);
+    const bool              own = (nid == me) || (ui.spectating && ui.god_view);
+    const ImVec4            accent = ImGui::ColorConvertU32ToFloat4(palette::selection);
+    const ImGuiStyle&       style  = ImGui::GetStyle();
+    const float             avail  = ImGui::GetContentRegionAvail().x;
+    const float             left_w = std::floor((avail - style.ItemSpacing.x) * 0.58f);
+    const nation_reading&   r = read_nation(w, nid);
+
+    refresh_nation_gdp(w, reg, report, ui);
+    const auto gdp = ui.diplomacy.gdp_year.find(nid);
+
+    ImGui::BeginChild("##nation_facts", {left_w, 0.0f}, false, ImGuiWindowFlags_NoSavedSettings);
+    ImGui::PushTextWrapPos(0.0f);
+    ImGui::TextColored(accent, "Nation");
+    draw_swatch(palette::nation_colour(nid));
+    if (!r.capital.empty())
+    {
+        const auto        ct   = w.tiles.find(n.capital_tile);
+        const auto        bt   = ct != w.tiles.end() ? w.bodies.find(ct->second.body) : w.bodies.end();
+        const std::string body = bt != w.bodies.end() ? bt->second.name : std::string();
+        if (!body.empty())
+            ImGui::Text("Capital %s, on %s", r.capital.c_str(), body.c_str());
+        else
+            ImGui::Text("Capital %s", r.capital.c_str());
+    }
+    else
+        ImGui::TextDisabled("No capital stands.");
+    ImGui::Text("%d %s, %d tiles", r.provinces, r.provinces == 1 ? "province" : "provinces",
+                static_cast<int>(n.tiles.size()));
+    ImGui::Text("%d %s, %s people", r.settlements, r.settlements == 1 ? "settlement" : "settlements",
+                people_text(r.people).c_str());
+    ImGui::Text("GDP %s a year", gdp == ui.diplomacy.gdp_year.end() ? "-" : fmt::credits(gdp->second).c_str());
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("Last month's output of every building on its ground, at its market's price, for a year.");
+    if (own)
+    {
+        int units = 0;
+        long long men = 0;
+        for (const auto& [uid, u] : w.units)
+            if (u.owner == nid && u.count > 0) { ++units; men += u.count; }
+        ImGui::Text("Army %d %s, %lld men", units, units == 1 ? "unit" : "units", men);
+        ImGui::Text("Treasury %s", fmt::credits(n.treasury).c_str());
+    }
+    ImGui::PopTextWrapPos();
+    ImGui::EndChild();
+    ImGui::SameLine();
+
+    ImGui::BeginChild("##nation_side", {0.0f, 0.0f}, false, ImGuiWindowFlags_NoSavedSettings);
+    ImGui::PushTextWrapPos(0.0f);
+    if (nid != me)
+    {
+        ImGui::TextColored(accent, "Toward you");
+        const char* stance = at_war(w, me, nid) ? "At war"
+                           : truce_between(w, me, nid) ? "Truce"
+                           : (is_hostile(w, me, nid) || is_hostile(w, nid, me)) ? "Hostile"
+                           : are_friends(w, me, nid) ? "Friends" : "At peace";
+        ImGui::TextUnformatted(stance);
+        const sentiment_value v = sentiment_toward(w.sentiment, nid, me);
+        ImGui::Text("Access %+.1f   Trust %+.1f   Alarm %+.1f",
+                    static_cast<double>(v.access), static_cast<double>(v.trust), static_cast<double>(v.alarm));
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("How this nation reads you. The Diplomacy ledger names each one's cause.");
+        ImGui::Spacing();
+        if (ImGui::Button("Open in Diplomacy##nation_dip"))
+            navigate_diplomacy_to(w, ui, nid);
+    }
+    else
+    {
+        ImGui::TextColored(accent, "Your nation");
+        int wars = 0;
+        for (const auto& [oid, on] : w.nations)
+            if (oid != nid && !on.ended && at_war(w, nid, oid))
+                ++wars;
+        const int fronts = static_cast<int>(current_fronts(w, nid).size());
+        if (wars == 0)
+            ImGui::TextUnformatted("At peace");
+        else
+            ImGui::Text("At war with %d %s", wars, wars == 1 ? "nation" : "nations");
+        ImGui::Text("%d %s", fronts, fronts == 1 ? "front" : "fronts");
+        ImGui::Spacing();
+        if (ImGui::Button("Open Diplomacy##nation_dip"))
+        {
+            close_all_panels(ui);
+            ui.show_diplomacy_ledger = true;
+        }
+    }
+    ImGui::PopTextWrapPos();
+    ImGui::EndChild();
+}
+
 } // namespace
 
 void set_selection_market_history(const market_plot_history* history)
 {
     g_market_history = history;
+}
+
+// The locator (Ben, 2026-11-20; LAYOUT.md § Bottom strip): the zoomed map of the
+// ground under the selection, in the bottom-left tile the width of a ledger. An open
+// ledger covers it. It was the tile card's first column; it moved out so the band
+// is wider and the corner the comms dock left is not empty.
+namespace {
+
+/// The tile the selection stands on, for the locator: a tile itself, a building's or
+/// a unit's tile, a market's capital, a nation's capital. Null for a selection with no
+/// one tile (a convoy, a deposit, a plate, a front).
+entity_id locator_tile(const world& w, const ui_state& ui, entity_id sel)
+{
+    if (ui.selected_convoy != 0 || ui.has_deposit_selection() || ui.has_plate_selection()
+        || ui.has_front_selection())
+        return null_entity;
+    if (sel == null_entity)
+        return null_entity;
+    if (w.tiles.count(sel))
+        return sel;
+    if (const auto b = w.buildings.find(sel); b != w.buildings.end())
+        return b->second.tile;
+    if (const auto u = w.units.find(sel); u != w.units.end())
+        return u->second.position;
+    if (const auto m = w.markets.find(sel); m != w.markets.end())
+    {
+        const entity_id pc = market_naming_centre(w, sel);
+        if (const auto ct = w.population_centre_tile.find(pc); pc != null_entity && ct != w.population_centre_tile.end())
+            return ct->second;
+        return m->second.centre_tile;
+    }
+    if (const auto n = w.nations.find(sel); n != w.nations.end())
+        return n->second.capital_tile;
+    return null_entity;
+}
+
+} // namespace
+
+void draw_selection_locator(world& w, ui_state& ui, ImVec2 origin, ImVec2 size)
+{
+    // A battle's card draws its own map and has already asked for the ground page;
+    // the locator shows that same ground rather than asking for a second.
+    entity_id tile = null_entity;
+    if (ui.ground_neigh_req.valid)
+        tile = ui.ground_neigh_req.tile;
+    else
+    {
+        entity_id sel = ui.selected_entity;
+        if (sel == null_entity || selection_kind_of(w, sel) == selection_kind::none)
+        {
+            const entity_id pn = player_nation(w); // the band's resting selection
+            sel = pn != null_entity ? pn : w.player_entity;
+        }
+        tile = locator_tile(w, ui, sel);
+    }
+
+    ImGui::SetNextWindowPos(origin, ImGuiCond_Always);
+    ImGui::SetNextWindowSize(size, ImGuiCond_Always);
+    ImGui::SetNextWindowBgAlpha(0.96f);
+    constexpr ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize
+                                     | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse
+                                     | ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoScrollbar
+                                     | ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoInputs
+                                     | ImGuiWindowFlags_NoBringToFrontOnFocus
+                                     | ImGuiWindowFlags_NoSavedSettings;
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, {ui::px(6.0f), ui::px(6.0f)});
+    if (ImGui::Begin("##selection_locator", nullptr, flags))
+    {
+        ImDrawList*  dl = ImGui::GetWindowDrawList();
+        const ImVec2 p  = ImGui::GetCursorScreenPos();
+        const ImVec2 sz = ImGui::GetContentRegionAvail();
+        const ImVec2 mx = {p.x + sz.x, p.y + sz.y};
+        dl->AddRectFilled(p, mx, IM_COL32(16, 18, 24, 255), 3.0f);
+        if (tile != null_entity && w.tiles.count(tile))
+        {
+            if (!ui.ground_neigh_req.valid)
+                request_neighbourhood_page(w, ui, tile, 2);
+            draw_tile_neighbourhood(dl, w, tile, p, sz, /*radius=*/2, &ui.ground);
+        }
+        dl->AddRect(p, mx, IM_COL32(90, 90, 100, 255), 3.0f);
+    }
+    ImGui::End();
+    ImGui::PopStyleVar();
 }
 
 void draw_selection_content(world& w, const recipe_registry& reg,
@@ -5325,6 +5574,13 @@ void draw_selection_content(world& w, const recipe_registry& reg,
     if (kind == selection_kind::market)
     {
         draw_market_selection_body(w, ui, ui.selected_entity);
+        return;
+    }
+    // A selected nation shows what it is and where it stands with the player
+    // (Ben, 2026-11-20; SELECTION.md § The nation element).
+    if (kind == selection_kind::nation)
+    {
+        draw_nation_selection_body(w, reg, report, ui, ui.selected_entity);
         return;
     }
 

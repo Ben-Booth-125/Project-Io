@@ -29,10 +29,10 @@ The prototype UI is built with Dear ImGui (see TECH_FOUNDATIONS). Everything her
 │ ▢   │            │ (Solar / Circumpl./Surface) │              │
 │ ▢ … │ (runs to   │                             │ [lens legend]│
 │ ▦   │ the screen │                             ├──────────────┤
-│ ▢ … │ bottom)    │                             │   Minimap    │
-│ ▢   │            ├─────────────────────────────┤  [lens bar]  │
-│     │            │ SELECTION BAND (fixed;      │              │
-│     │            │ action/facts or tile)       │              │
+│ ▢ … │ bottom,    │                             │   Minimap    │
+│ ▢   │ over the   ├─────────────────────────────┤  [lens bar]  │
+│     │ LOCATOR)   │ SELECTION BAND (fixed;      │              │
+│     │ LOCATOR    │ action/facts or tile)       │              │
 └─────┴────────────┴─────────────────────────────┴──────────────┘
 ```
 
@@ -46,11 +46,11 @@ shell's only internal one, which is the argument `selection_band_rect` already m
 bottom band — *"introducing the shell's only gap here would read as a mistake"*.
 
 The nav rail and the fold-out column both run the **full screen height**. The screen's
-**bottom strip** is one solid band of two tiles sharing a top edge that lands exactly on
-the minimap's: the **Selection band** from the shell column's right edge
-(`shell_column_width`) to the right chrome column, and the **minimap** in the corner. A
-ledger runs from the identity tile to the screen's bottom edge — see *Selection band* and
-*The comms dock is retired* below.
+**bottom strip** is one solid band of three tiles sharing a top edge that lands exactly on
+the minimap's: the **locator** bottom-left, under the fold-out column and its width; the
+**Selection band** from the shell column's right edge (`shell_column_width`) to the right
+chrome column; and the **minimap** in the corner. A ledger runs from the identity tile to the
+screen's bottom edge, over the locator — see *Selection band* and *The locator* below.
 
 The **right chrome column** splits two ways and elastically: the content-derived
 **time panel** on top, the ratio-locked **minimap** at the foot, and the whole
@@ -99,8 +99,8 @@ range. The column is reserved down the whole left edge:
 - The narrow **icon nav rail** (56 px) runs down its left sub-edge, full height.
 - A **fold-out ledger** fills the rest of the column (`[nav_pane_width, W]`, below the
   identity tile) when a nav slot is active — see *Ledger windows*. The column **runs to the
-  screen's bottom edge** (`foldout_column_rect`): the bottom strip starts at the column's
-  right edge, so a ledger loses no height to it (Ben, 2026-11-19).
+  screen's bottom edge** (`foldout_column_rect`), covering the locator, so a ledger loses no
+  height to the bottom strip (Ben, 2026-11-19; 2026-11-20).
 - The **balance bar** (header) starts at `x = W` permanently, whether or not any fold-out is
   open, so it always clears the column.
 
@@ -283,12 +283,25 @@ The clock has three layers — sim tick → day → economy tick — paced so th
 
 ---
 
+## The locator — bottom-left (Ben, 2026-11-20)
+
+The bottom-left tile, under the fold-out column and exactly its width (`[nav_pane_width,
+shell_column_width]`), at the bottom strip's height. It is the **zoomed map of the ground under
+the selection** (`draw_selection_locator`): the selected tile, a building's or a unit's tile, a
+market's capital, a nation's capital — the player's own capital at rest. It is the tile card's
+former first column, moved out so the Selection band has the width and the corner the comms dock
+left is not an empty tile. A selection with no one tile (a convoy, a deposit, a plate, a front)
+leaves it dark; a battle's card shows the battle's ground there.
+
+**A ledger covers it.** With a ledger open the column runs to the screen's bottom over the
+locator, which is not drawn; it returns when the ledger closes. It takes no input.
+
 ## The comms dock is retired (Ben, 2026-11-19)
 
 The bottom-left comms dock — the channel chat log with its Public, Field and Counsel channels
 and player-made groups — is **retired outright**, with every feed that posted to it. Its tile
-goes to the fold-out column, which now runs to the screen's bottom, and the Selection band
-starts at the column's right edge rather than the dock's.
+is the **locator**'s (above), which an open ledger covers, and the Selection band starts at the
+column's right edge rather than the dock's.
 
 Nothing it carried moves to another surface. What the player must know already has a home
 that does not scroll away: a war opened on them is the **war notice** and the **alert strip**

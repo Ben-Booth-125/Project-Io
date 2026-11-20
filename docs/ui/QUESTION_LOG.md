@@ -9,7 +9,7 @@ space**, with the backlog item that demanded it. The pair is required. Enforceme
 authorship, not machinery — there is deliberately no audit check against this file
 (BL-260, Ben 2026-08-01: *"the docs are the audit"*).
 
-**94 surfaces** — 4 settled, 90 awaiting Ben's wording.
+**96 surfaces** — 4 settled, 92 awaiting Ben's wording.
 
 ---
 
@@ -482,6 +482,14 @@ THE SEAM'S ANSWER IS SHOWN, because set_trade validates what the form cannot (bo
 
 *Demanded by BL-683, BL-682, BL-431, BL-430, BL-074, BL-1312, BL-1514, BL-1641 · `src/ui/selection_panel.cpp`, `src/ui/selection_panel.hpp`, `src/ui/ui_state.hpp`, `src/ui/building_state.cpp` · id `selection_building_card`*
 
+### Bottom-left locator - the zoomed ground under the selection
+
+**Answers:** Where on the map is the thing I selected, and what does the ground around it look like?
+
+**Because:** Ben, review 2026-11-20: the corner the comms dock left read as an empty tile. The tile card's preview column moved there, at a ledger's width, so the band is wider for its cards and the corner shows the ground under any selection with a tile - a building, a unit, a market's or a nation's capital, the player's capital at rest. An open ledger covers it.
+
+*Demanded by BL-1692 · `src/ui/selection_panel.cpp`, `src/core/app.cpp` · id `selection_locator`*
+
 ### Selection band - the market element (top goods | identity, catchment, your trades)
 
 **Answers:** What is this market - where it is, whom it serves, what moves through it and at what price - and do any of my trades run through it?
@@ -489,6 +497,14 @@ THE SEAM'S ANSWER IS SHOWN, because set_trade validates what the form cannot (bo
 **Because:** Ben, playtest 2026-11-19: a selected market showed only Go to and Trades, so selecting one told the player nothing the canvas glyph had not. Markets are the public intelligence channel (BL-068), so the card can say everything the Market ledger says, but the band asks a shorter question than the ledger: not the whole board, the six goods by volume with each price against its base and its move since last month, beside the three facts a glance needs - the body and the nation holding the centre, the settlements and people that clear here, and how many of the player's own trades touch it (a count that is also the door onto the ledger's Trades tab, where the old Trades button led). Go to is the header's own press, landing on the centre tile. The activity fog still gates the goods: a market outside the trade network names itself and its catchment but shows no prices.
 
 *Demanded by BL-1694 · `src/ui/selection_panel.cpp` · id `selection_market_card`*
+
+### Selection band - the nation element (capital, ground, people, GDP | relation to the player)
+
+**Answers:** What is this nation - where its capital is, how much ground and how many people it holds, how big its economy is - and where does it stand with me?
+
+**Because:** Ben, review 2026-11-20: a selected nation said only 'Open its ledger via [>]', and the band rests on the player's own nation, so the card the player sees most often said nothing. Zoomed out, a press now selects a nation, so the card answers the question the far map raises - whose ground is this, and how much of it. Public figures only for a rival (capital, provinces, settlements, people, GDP; its stance and Access/Trust/Alarm toward the player), the Diplomacy ledger's own power-comparison rule; the player's own nation adds its army and treasury, and its wars and fronts. The Diplomacy ledger keeps the detail; the card is its door.
+
+*Demanded by BL-1692 · `src/ui/selection_panel.cpp` · id `selection_nation_card`*
 
 ### Selection element
 

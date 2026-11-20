@@ -9845,7 +9845,24 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             // never a cycle step on the airbase tile under it.
             if (marker_hit != null_entity && (w.wings.count(marker_hit) != 0 || w.ships.count(marker_hit) != 0))
                 unit_of_other_tile = true;
-            if (hovered_tile != null_entity && state.selection_cycle_tile == hovered_tile
+            // ZOOMED OUT, A PRESS ON GROUND SELECTS ITS NATION (Ben, 2026-11-20). Once the
+            // far map is the main read (its fade past half), the map answers "whose", so a
+            // press does too; a counter is still aimed at. Unclaimed ground keeps the tile.
+            entity_id far_nation = null_entity;
+            if (map_w >= 0.5f && marker_hit == null_entity && hovered_tile != null_entity)
+                if (const auto tn = w.tile_to_nation.find(hovered_tile); tn != w.tile_to_nation.end())
+                    far_nation = tn->second;
+            if (far_nation != null_entity && w.nations.count(far_nation) != 0)
+            {
+                state.selected_entity      = far_nation;
+                state.selected_province    = 0u;
+                state.province_sync_entity = far_nation;
+                state.selection_cycle_tile = null_entity;
+                state.selection_unit_group = false;
+                state.clear_battle_selection();
+                state.clear_lens_region_selection();
+            }
+            else if (hovered_tile != null_entity && state.selection_cycle_tile == hovered_tile
                 && !unit_of_other_tile)
             {
                 entity_id unit_here = null_entity;
