@@ -78,6 +78,9 @@ freezable tooltip. Owned by BL-1703 (terse tooltips).
 - **Line one is what it is, or what the press does**, verb first for a control ("Fire one
   warhead."). **Line two, if any, is the one consequence, cost or blocker.**
 - **A blocked control says what it lacks in one line**: `Needs: X, Y`.
+- **A per-tier row may run long** (Ben, 2026-11-20): a line giving one value per tier — the tax
+  rate or Discontent's pace at each of I–V — states every tier rather than summarising, since the
+  tiers the player can press are the comparison it exists for.
 - **Numbers over words.** "▲6%" rather than "raises it 6%"; "{cr} 120" rather than "costs 120
   credits".
 - **What does not fit is cut, not moved** (Ben, 2026-11-19). A rule's mechanics, its history and

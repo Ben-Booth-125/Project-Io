@@ -1293,24 +1293,6 @@
    "reason_to_select": "Fund the nation's budget (research, the space programme, works) from its own firms' profits; the price is Discontent, which costs the nation's ground output two years on at IV, sooner at V. Cut the tier to let Discontent ebb."
   },
   {
-   "id": "ledger.budget_wage_tier",
-   "family": "ledger",
-   "surface": "Balance Ledger (Budget), 'Wages' tier control",
-   "press": "Click '-' / '+' to step, or a Roman numeral I-V to set, the wage tier",
-   "args": [
-    {
-     "name": "tier",
-     "type": "int 1-5",
-     "meaning": "Target wage tier"
-    }
-   ],
-   "preconditions": [
-    "Balance Ledger is open"
-   ],
-   "expected_output": "The displayed tier changes and highlights. HONESTLY: a stub with NO economic effect yet (BL-155); distinct from the per-building workforce target, which the game sets one 25% step a month (BL-1322) and no control writes.",
-   "reason_to_select": "Will eventually set corporate wage policy; today it is display-only."
-  },
-  {
    "id": "ledger.chat_channel_tab",
    "family": "ledger",
    "surface": "Comms dock (bottom-left), channel button row",

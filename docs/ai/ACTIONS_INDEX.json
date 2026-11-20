@@ -270,10 +270,6 @@
    "Balance Ledger (Budget), 'Taxes' tier control, with the nation's Discontent beside it. Also the command seam (--serve / MCP `issue_command` verb `set_tax_tier` with `nation`; the verify API's `corp_command{verb=set_tax_tier, as_nation=...}`)."
   ],
   [
-   "ledger.budget_wage_tier",
-   "Balance Ledger (Budget), 'Wages' tier control"
-  ],
-  [
    "ledger.chat_channel_tab",
    "Comms dock (bottom-left), channel button row"
   ],

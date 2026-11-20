@@ -1985,10 +1985,7 @@ struct ui_state
     // --- Budget ledger policy levers (BL-171 UI) ---
     // Taxes is the player's NATION's tax tier (BL-1335): the control reads
     // `nation_component::tax_tier` and a press is a set_tax_tier command, so it
-    // holds no state here. The Wages selector is still a stub with NO economic
-    // effect (a cost<->workforce trade-off designed under BL-155). Tiers run 1–5
-    // (I–V); the Wages default matches the mockup (II).
-    int  budget_wage_tier = 2;
+    // holds no state here. The Wages lever retired with BL-155 (Ben, 2026-11-20).
     bool show_corporation_panel = false; ///< Whether the Corporation Overview Dashboard is open.
 
     // BL-1406: the corporation stance table (rail slot 8 now, Diplomacy) retired with

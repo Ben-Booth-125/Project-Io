@@ -24,7 +24,7 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 > **Generated file.** Produced by `node tools/session/render_actions.js`.
 > Edit the JSON, then re-run; hand edits here are overwritten.
 
-*287 entries — 85 gameplay · 45 canvas · 15 lens · 100 ledger · 42 chrome.*
+*286 entries — 85 gameplay · 45 canvas · 15 lens · 99 ledger · 42 chrome.*
 
 ---
 
@@ -2533,21 +2533,6 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 **Expected output.** The nation's tier changes at once and the active numeral highlights green. From the next month the nation takes the tier's rate of the operating profit (money-loop income less every outflow, when positive) of every firm headquartered on its ground, into its treasury — a transfer, the firm debited what the treasury is credited. Each month Discontent moves by the tier's pressure: IV +2.08%, V +4.17%, III holds, II -6.25%, I -12.5%, within 0-100%. Above 50% every building on the nation's ground (any owner) loses output in proportion, up to 15% at 100% — the readout beside the control shows the reading and the cut. Tier IV bites after two years, V after one.
 
 **Reason to select.** Fund the nation's budget (research, the space programme, works) from its own firms' profits; the price is Discontent, which costs the nation's ground output two years on at IV, sooner at V. Cut the tier to let Discontent ebb.
-
-### `ledger.budget_wage_tier` — Balance Ledger (Budget), 'Wages' tier control
-
-**Press.** Click '-' / '+' to step, or a Roman numeral I-V to set, the wage tier
-
-| Arg | Type | Meaning |
-|---|---|---|
-| `tier` | `int 1-5` | Target wage tier |
-
-**Valid when:**
-- Balance Ledger is open
-
-**Expected output.** The displayed tier changes and highlights. HONESTLY: a stub with NO economic effect yet (BL-155); distinct from the per-building workforce target, which the game sets one 25% step a month (BL-1322) and no control writes.
-
-**Reason to select.** Will eventually set corporate wage policy; today it is display-only.
 
 ### `ledger.chat_channel_tab` — Comms dock (bottom-left), channel button row
 

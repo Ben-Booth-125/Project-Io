@@ -119,12 +119,10 @@ void draw_profit_chart(ImDrawList* dl, ImVec2 mn, ImVec2 mx, const std::vector<f
 // A policy-tier selector (BL-171 UI): a centred label over a `– I II III IV V +`
 // row. The active tier is highlighted green; the arrows step it, the numerals select
 // it. Returns the tier the press asked for (@p tier when nothing was pressed) — the
-// caller decides what a press does. @p wired: false for a lever with no economic
-// effect yet (Wages, owed to BL-155), whose tooltip says so; true for one that acts
-// (Taxes, BL-1335 — the press is a set_tax_tier command). @p enabled false draws the
-// row disabled (the tier shown, no press).
-int draw_tier_control(const char* label, int tier, const char* what_it_does, bool wired,
-                      bool enabled = true)
+// caller decides what a press does (Taxes, BL-1335: a set_tax_tier command; the Wages
+// lever retired, Ben 2026-11-20). @p enabled false draws the row disabled (the tier
+// shown, no press).
+int draw_tier_control(const char* label, int tier, const char* what_it_does, bool enabled = true)
 {
     // Scope the button IDs to this control — both tiers draw the same labels
     // ("-"/"I".."V"/"+"), so without a per-control ID they collide (ImGui warns).
@@ -148,9 +146,9 @@ int draw_tier_control(const char* label, int tier, const char* what_it_does, boo
     // the tooltip said only "not yet wired", which names the state without ever
     // saying what the lever is FOR. Now it leads with the effect and keeps the
     // honest caveat second.
-    const auto note = [what_it_does, wired] {
+    const auto note = [what_it_does] {
         if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
-            glyph_tooltip("%s%s", what_it_does, wired ? "" : "\n\xe2\x9a\xa0 Not wired to the economy yet.");
+            glyph_tooltip("%s", what_it_does);
     };
 
     int want = tier;
@@ -268,20 +266,39 @@ void draw_balance_ledger(const world& w, const recipe_registry& reg,
     // command (applied by app::render through apply_corp_command; this ledger
     // holds a const world). Under spectate the seat's nation is scored like any
     // nation, so the row is shown but not pressable. Discontent sits beside it.
-    // Wages is still the BL-171 stub (BL-155), and the disabled line says so.
+    // There is no Wages lever: it retired with BL-155 (Ben, 2026-11-20).
     {
         const entity_id pn  = player_nation(w);
         const auto      pit = w.nations.find(pn);
         if (pit != w.nations.end())
         {
             const nation_component& nc = pit->second;
-            const int want = draw_tier_control(
-                "Taxes", nc.tax_tier,
-                "The share of your home firms' income your nation takes each month\n"
-                "(the firms headquartered on its ground; their operating profit).\n"
-                "Sustained high taxes (IV, V) raise Discontent; above half, every\n"
-                "building on your ground loses output, up to 15%. Lower tiers let it ebb.",
-                /*wired=*/true, /*enabled=*/!ui.spectating);
+            // TOOLTIP.md § The budget, read off the live dials (economy.lua `tax`), so a
+            // retuned rate or pressure cannot leave the words behind. A per-tier row
+            // runs one value per tier (Ben, 2026-11-20).
+            const tax_params& tp = reg.tax();
+            const char* const k_roman[] = {"I", "II", "III", "IV", "V"};
+            std::string tax_tip = "Takes back a share of the wages you pay:\n";
+            std::string mood_tip = "{t} 3 mo:";
+            for (int t = 0; t < static_cast<int>(tp.rate.size()) && t < 5; ++t)
+            {
+                char cell[48];
+                std::snprintf(cell, sizeof cell, "%s%s %.0f%%", t ? "  " : "", k_roman[t],
+                              static_cast<double>(tp.rate[t]) * 100.0);
+                tax_tip += cell;
+                const double q = static_cast<double>(tp.pressure[t]) * 3.0 * 100.0; // per 3 months
+                if (q > 0.005)       std::snprintf(cell, sizeof cell, "  %s \xe2\x96\xb2%.4g%%", k_roman[t], q);
+                else if (q < -0.005) std::snprintf(cell, sizeof cell, "  %s \xe2\x96\xbc%.4g%%", k_roman[t], -q);
+                else                 std::snprintf(cell, sizeof cell, "  %s holds", k_roman[t]);
+                mood_tip += cell;
+            }
+            char tail[96];
+            std::snprintf(tail, sizeof tail, "\nOver %.0f%%: all output \xe2\x96\xbc, up to %.0f%%.",
+                          static_cast<double>(tp.bite_threshold) * 100.0,
+                          static_cast<double>(tp.max_penalty) * 100.0);
+            mood_tip += tail;
+            const int want = draw_tier_control("Taxes", nc.tax_tier, tax_tip.c_str(),
+                                               /*enabled=*/!ui.spectating);
             if (want != nc.tax_tier && !ui.spectating)
             {
                 corp_command cmd;
@@ -308,17 +325,9 @@ void draw_balance_ledger(const world& w, const recipe_registry& reg,
                                  + std::max(0.0f, (ImGui::GetContentRegionAvail().x - dts.x) * 0.5f));
             ImGui::TextColored(col, "%s", dbuf);
             if (ImGui::IsItemHovered())
-                glyph_tooltip("{t} 3 mo: V \xe2\x96\xb2" "12.5%%, IV \xe2\x96\xb2" "6.25%%, I-II \xe2\x96\xbc\n"
-                              "Over 50%%: all output \xe2\x96\xbc, up to 15%%.");
+                glyph_tooltip("%s", mood_tip.c_str());
         }
     }
-    ImGui::Spacing();
-    ui.budget_wage_tier = draw_tier_control("Wages", ui.budget_wage_tier,
-                      "What you pay your workforce, per head.\n"
-                      "A higher tier costs more but competes harder for scarce labour.",
-                      /*wired=*/false);
-    ImGui::Spacing();
-    ImGui::TextDisabled("Wages - not yet wired to the economy");
     ImGui::Spacing();
 
     // --- Laws in force (BL-343; read-only since BL-480). ---
