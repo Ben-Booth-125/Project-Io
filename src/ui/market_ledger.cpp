@@ -2245,9 +2245,21 @@ void draw_market_ledger(world& w, const recipe_registry& reg, ui_state& s,
 
     // --- The market's top section (BL-1317) ---------------------------------
     // BELOW the selectors, ABOVE the tab strip: it qualifies the market the
-    // combos just chose, before the tabs ask a question about it. About 2/7 of
-    // the column's height; the tabs take the rest.
-    const float top_h = std::floor(column_h * 2.0f / 7.0f);
+    // combos just chose, before the tabs ask a question about it.
+    //
+    // AS TALL AS ITS CONTENT, NO TALLER (Ben, 2026-11-19: "the market ledger also
+    // reserves too much space for information about the markets, the 'Goods' and
+    // 'Trades' tabs should be higher up"). It was a fixed 2/7 of the column, most of
+    // it empty under three metric lines. Now: the taller of the three metric lines
+    // and the nations list, the list showing at most four rows and scrolling inside
+    // the section past that. The Goods rows are unmoved by this - they size off the
+    // window through `legacy_extra_h` below - so the tabs simply gain the room.
+    const float line_h    = ImGui::GetTextLineHeightWithSpacing();
+    const float spacing_y = ImGui::GetStyle().ItemSpacing.y;
+    const float metrics_h = 3.0f * line_h + 2.0f * spacing_y; // three lines, two Spacing()s
+    const int   n_nations = static_cast<int>(nations_in_market(w, selected_market).size());
+    const float nations_h = static_cast<float>(std::clamp(n_nations, 1, 4)) * line_h;
+    const float top_h     = std::ceil(std::max(metrics_h, nations_h));
     draw_market_top_section(w, selected_market, top_h);
     g_market_top.column_h = column_h;
     ImGui::Separator();
