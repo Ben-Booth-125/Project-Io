@@ -1697,6 +1697,11 @@ struct ui_state
     /// canvas draw pass from the hovered tile; drives the province hover outline.
     uint32_t hovered_province = 0;
 
+    /// The nation under the cursor this frame while the far map is past half faded
+    /// in, or null. Zoomed out a press selects the NATION, so the hover outline lights
+    /// the whole nation rather than a province (Ben, 2026-11-20; SELECTION.md).
+    entity_id hovered_far_nation = null_entity;
+
 
     // --- The selected battle (BL-469) ------------------------------------
     // Keyed by (province, attacker, defender), exactly as `active_battle` is,

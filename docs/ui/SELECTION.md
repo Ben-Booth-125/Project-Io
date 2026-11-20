@@ -990,12 +990,12 @@ the screen, rather than floating with the cursor."* The band is:
   to front** or **< Group** sits left of the pin and can never spill under it. A card with no
   header row (the tile, an expanded building) reserves the same width at the right end of the row
   the pin is anchored to.
-- **Every spatial 'go to' lands on its tile, close.** A building, a unit, a market (its capital)
+- **Every spatial 'go to' lands on its tile, at the player's zoom.** A building, a unit, a market (its capital)
   and a nation (its capital) centre the Planetary canvas on their own tile (`focus_on_tile`); a
   body frames its surface. None of them frames the grid's middle and leaves the player to find
-  the thing. A go-to lands at the second-nearest zoom rung, where a city and its buildings read,
-  or keeps a closer view already on that body (Ben, 2026-11-20): the whole-map framing reads as
-  having gone nowhere.
+  the thing. A go-to moves the view and never its zoom (Ben, 2026-11-20): on a surface, the
+  zoom the player chose carries over; arriving from space, the surface opens at its default
+  framing.
 - **Always open.** The band never hides: there is no `[x]` button, no Esc hide rung (Esc clears
   the selection, and the band rests on the player's nation), and no hidden state. With the shell filling the perimeter, a hidden band reads as a hole in the
   frame (Ben, NR-017).
@@ -1057,7 +1057,9 @@ the next section, which supersedes it.
 (its fade more than half in — `RENDERING.md` § the farthest rung), a press on ground that no
 counter answers selects the **nation** holding that ground, not the tile: the map at that zoom
 answers *whose*, so the press does too. A counter is still aimed at, and unclaimed ground still
-selects its tile. Zooming back in restores the stack above.
+selects its tile. Zooming back in restores the stack above. The **hover** follows the press: at
+that zoom, with no lens up, the hover outline traces the whole hovered nation's border in place of
+the province's, and the hovered tile takes no ring of its own (Ben, 2026-11-20).
 
 **Two resolvers, and which wins.**
 

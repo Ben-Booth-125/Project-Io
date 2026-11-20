@@ -6349,6 +6349,11 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                              ? w.provinces.find(state.selected_province) : nullptr;
     const province* hov_prov = state.hovered_province != 0
                              ? w.provinces.find(state.hovered_province) : nullptr;
+    // Zoomed out a press selects the nation (Ben, 2026-11-20), so the hover lights
+    // the whole hovered nation in place of the province, with no lens, as the
+    // province hover does.
+    const bool far_hover = map_w >= 0.5f && state.overlay == overlay_mode::none
+                        && state.hovered_far_nation != null_entity;
     for (int t_row = row_lo; t_row <= row_hi; ++t_row)
     for (int t_col = 0; t_col < gw; ++t_col)
     {
@@ -7255,7 +7260,20 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             }
             const bool in_sel_prov = sel_prov
                 && std::binary_search(sel_prov->tiles.begin(), sel_prov->tiles.end(), id);
-            const bool in_hov_prov = !in_sel_prov && hov_prov
+            if (far_hover && revealed && !in_sel_prov
+                && nation_rc(t_col, t_row) == state.hovered_far_nation)
+            {
+                for (int s = 0; s < 6; ++s)
+                {
+                    const auto nc   = hex_neighbors::neighbour(t_col, t_row, s);
+                    const int  ncol = ((nc.gx % gw) + gw) % gw;
+                    if (nation_rc(ncol, nc.gy) == state.hovered_far_nation)
+                        continue;
+                    dl->AddLine(verts[k_side_verts[s][0]], verts[k_side_verts[s][1]],
+                                palette::hover, 2.0f);
+                }
+            }
+            const bool in_hov_prov = !in_sel_prov && hov_prov && !far_hover
                 && std::binary_search(hov_prov->tiles.begin(), hov_prov->tiles.end(), id);
             if (revealed && (in_sel_prov || in_hov_prov) && !goal_cand_tile)
             {
@@ -7333,7 +7351,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     //
     // With no lens the tile IS the resolved thing, so the ring is the right mark
     // and is unchanged.
-    if (have_hover && !hovered_selected && state.overlay == overlay_mode::none)
+    if (have_hover && !hovered_selected && state.overlay == overlay_mode::none && !far_hover)
         draw_hex_highlight(dl, hover_verts, highlight::hovered);
 
     // BL-511: the hovered PROVINCE, for the outline the tile loop draws. Written
@@ -7342,6 +7360,8 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     // invisible at any frame rate the canvas runs at.
     state.hovered_province = (hovered_tile != null_entity)
                              ? w.provinces.province_of(hovered_tile) : 0u;
+    state.hovered_far_nation = (map_w >= 0.5f && hovered_tile != null_entity)
+                             ? nation_of(hovered_tile) : null_entity;
 
     // BL-603: and the hovered STRUCTURE, on the same one-frame lag and for the
     // same reason. Cleared when the pointer leaves the canvas or the lens has no

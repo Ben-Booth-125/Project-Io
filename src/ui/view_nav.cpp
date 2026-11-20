@@ -12,11 +12,6 @@ namespace {
 constexpr float solar_default_zoom     = 1.0f;        // auto-fit whole system
 constexpr float circum_default_zoom    = 1.0f;        // auto-fit local view
 constexpr float planetary_default_zoom = 4.0f / 3.0f; // 3/4 of the grid height
-// A 'go to' lands CLOSE (Ben, 2026-11-20): the second-nearest rung of the stepped
-// ladder (body_surface_canvas.cpp, kMaxZoom 17.1 / 2), where a city and its
-// buildings read. The default framing is the whole map, and a go-to that zooms out
-// to it reads as having gone nowhere.
-constexpr float planetary_goto_zoom    = 17.1f / 2.0f;
 
 } // namespace
 
@@ -73,13 +68,14 @@ void focus_on_tile(const world& w, ui_state& ui, entity_id tile)
     if (it == w.tiles.end())
         return;
 
-    // Keep a view already this close on this body; otherwise land at the go-to rung.
-    const bool  same_view = ui.primary_level == canvas_level::planetary
-                         && ui.active_body == it->second.body;
-    const float keep_zoom = (same_view && ui.planetary_zoom >= planetary_goto_zoom)
-                                ? ui.planetary_zoom : planetary_goto_zoom;
+    // A 'go to' moves the view and never its zoom (Ben, 2026-11-20): already on a
+    // surface, the player's zoom carries over; arriving from space, the surface opens
+    // at its default framing.
+    const bool  on_surface = ui.primary_level == canvas_level::planetary;
+    const float keep_zoom  = ui.planetary_zoom;
     focus_on_surface(w, ui, it->second.body);
-    ui.planetary_zoom = keep_zoom;
+    if (on_surface)
+        ui.planetary_zoom = keep_zoom;
 
     // Land ON the tile (Ben's 2026-11-09 playtest): focus_on_surface alone resets the
     // pan to the grid's centre, so a 'go to' framed whatever tile sits there. The
