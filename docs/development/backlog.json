@@ -2834,6 +2834,28 @@
    "design": "PLAYTEST 2 LANE G (canvas). Ben: \"Let's draw units over the construction wheel for newly constructing buildings.\" WORK: draw order - unit markers after the construction progress wheel, so a unit standing on a building site stays visible and pressable. Check the press order matches the draw order."
   },
   {
+   "glyph": "○",
+   "sprint": null,
+   "version_goal": null,
+   "written": "2026-11-22",
+   "parked": false,
+   "blocked_on": null,
+   "requires": [],
+   "author": "Ben (2026-11-22, lane G of the second playtest: \"Yes, file it\"); filed by Claude",
+   "priority": "C",
+   "difficulty": 2,
+   "files": [
+    "src/shaders/slice3d.frag.hlsl"
+   ],
+   "category": "UI",
+   "status": "proposed",
+   "authority_doc": "docs/ui/RENDERING.md",
+   "id": "BL-1738",
+   "short_name": "LAND_LIFT_FOLLOWS_COAST",
+   "title": "The draw-time land lift follows the painted coast, not the hex side",
+   "design": "Follow-up to BL-1721 (coast texture follows land). The 3D ground applies the land lift (Brightness) with a PER-TILE land weight, so the lifted shore is the hex side: water inside a land hex is brightened, land inside a water hex is not. RENDERING.md § Level of detail, 'The lift at draw time', rules this per tile and names a half-resolution land mask per chunk (NR-1232 option B) as the fallback. BL-1721 now stores a per-pixel LAND MARK in the bake (red's lowest bit, apply_land_mark), which the shader already reads through painted_land(uv) at no memory cost - a cheaper route than option B. WORK, if Ben settles it: in slice3d.frag.hlsl, weight lift() by painted_land(uv) (perhaps blended with the tile weight at far rungs where the mark is sub-pixel), and rewrite the RENDERING.md paragraph. CALL OWED: this overturns the per-tile ruling, so it is Ben's to settle before build. Capture a coast at close and play zoom with Brightness at +30% before and after (scripts/verify/coast_detail.lua frames the coasts)."
+  },
+  {
    "glyph": "~",
    "sprint": null,
    "version_goal": null,
