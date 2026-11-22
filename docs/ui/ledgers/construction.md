@@ -337,7 +337,10 @@ ring fills clockwise from twelve o'clock with the **days built over the days the
 ink is the month's rate — green on schedule, amber stretched, red paused
 (`construction_status_colour`) — so a stalled site reads without a hover. It draws under any lens,
 because it is the site's own mark rather than a lens, wherever a tile is drawn at 5 px or more.
-Rivals' sites carry none: what a rival's build still needs is its own affair.
+Rivals' sites carry none: what a rival's build still needs is its own affair. **Units stand over it
+(Ben, 2026-11-22):** a unit counter on the site's tile draws over the circle, and where the two
+overlap the pointer reads the unit and a press selects it; the circle's site card opens from the part
+of the ring the counter leaves clear.
 
 **The site card.** Pointing at the circle — at once, with no dwell — or at a queue row's name or Done
 bar opens one card, the same function on both surfaces (`construction_site_card`), so the map and

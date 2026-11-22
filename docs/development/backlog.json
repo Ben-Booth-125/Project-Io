@@ -2821,9 +2821,12 @@
    "author": "Ben (second playtest of the release build at 320655c8, 2026-11-22); filed by Claude",
    "priority": "B",
    "difficulty": 1,
-   "files": [],
+   "files": [
+    "src/ui/body_surface_canvas.cpp",
+    "scripts/verify/units_over_site.lua"
+   ],
    "category": "UI",
-   "status": "designed",
+   "status": "complete",
    "authority_doc": "docs/ui/RENDERING.md",
    "id": "BL-1722",
    "short_name": "UNITS_OVER_CONSTRUCTION_WHEEL",

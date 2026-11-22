@@ -432,6 +432,10 @@ a filled five-point star with the family's dark outline ([ICONS.md](ICONS.md) §
   public mark, as the Logistics lens's source ring is.
 - **Under the units:** unit counters, standing and marching, draw over the star (Ben,
   2026-11-09: *"render the capital icon below units"*), so a force at the capital stays readable.
+  They draw over a site's **progress circle** too (Ben, 2026-11-22: *"draw units over the
+  construction wheel for newly constructing buildings"*; `docs/ui/ledgers/construction.md`
+  § The progress circle), and the pointer agrees with the stack: where a counter and a circle
+  overlap, the counter takes the hover and the press.
 
 ## Layers — what draws on this canvas
 
