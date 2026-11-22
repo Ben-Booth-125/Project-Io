@@ -81,9 +81,10 @@ end
 -- Slot 5, Market ledger -> the price/catchment wash. Ben, 2026-08-30.
 pair(5, "market ledger", "market", "lenspair_market", true)
 
--- Slot 6, Convoys ledger -> the lane overlay. Landed with BL-689 and, for the
+-- Slot 6, Convoys ledger -> the Trade Flow lens (BL-1729, Ben 2026-11-22; it armed
+-- the lane overlay from BL-689 until then). Landed with BL-689 and, for the
 -- reason in this file's header, has never been asserted until now.
-pair(6, "convoys ledger", "supply_routes", "lenspair_convoys", true)
+pair(6, "convoys ledger", "trade_flow", "lenspair_convoys", true)
 
 -- Slot 9, History -> the Continent lens, but ON ENTERING THE TECTONICS VIEW
 -- rather than on opening the ledger (Ben's ruling on NR-742). A different rule

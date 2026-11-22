@@ -3002,7 +3002,7 @@
    "design": "PLAYTEST 2 LANE H (selection & shell). Ben: \"We should increase speed II to 1x.\" WORK: report speed II's current rate and what \"1x\" means in TIME_CONTROLS.md (days per second) first (Rule 0b), then set it; speeds III and IV must stay faster than II."
   },
   {
-   "glyph": "~",
+   "glyph": "✓",
    "sprint": null,
    "version_goal": null,
    "written": "2026-11-22",
@@ -3012,14 +3012,14 @@
    "author": "Ben (second playtest of the release build at 320655c8, 2026-11-22); filed by Claude",
    "priority": "B",
    "difficulty": 2,
-   "files": [],
+   "files": ["src/ui/body_surface_canvas.cpp", "src/ui/nav_pane.cpp", "scripts/verify/logistics_network_view.lua", "scripts/verify/convoy_map.lua", "scripts/verify/lens_ledger_pairs.lua"],
    "category": "UI",
-   "status": "design-owed",
+   "status": "complete",
    "authority_doc": "docs/ui/LENSES.md",
    "id": "BL-1729",
    "short_name": "CONVOYS_ON_TRADE_FLOW_LENS",
    "title": "Convoys draw only under the Trade Flow lens; the Convoys tab turns the lens on",
-   "design": "PLAYTEST 2 LANE I (lenses & network). Ben: \"We should hide convoy movement unless the trade flow lens is turned on. We should also wire the convoys tab to the trade flow lens.\" DESIGN OWED: does opening the Convoys tab switch the lens on (and closing it off), or only offer it; space convoys too? Toggle rule applies."
+   "design": "PLAYTEST 2 LANE I (lenses & network). Ben: \"We should hide convoy movement unless the trade flow lens is turned on. We should also wire the convoys tab to the trade flow lens.\" DESIGN OWED: does opening the Convoys tab switch the lens on (and closing it off), or only offer it; space convoys too? Toggle rule applies. RULED (Ben, 2026-11-22): the Convoys tab arms Trade Flow on open and disarms on close, replacing Supply-routes; markers draw under Trade Flow and Supply; space convoys stay as they are (Planetary only). Written into docs/ui/LENSES.md and docs/ui/ledgers/convoys.md."
   },
   {
    "glyph": "✓",
@@ -3032,9 +3032,9 @@
    "author": "Ben (second playtest of the release build at 320655c8, 2026-11-22); filed by Claude",
    "priority": "B",
    "difficulty": 2,
-   "files": [],
+   "files": ["src/ui/body_surface_canvas.cpp", "src/core/ground_layer.cpp", "src/ui/route_paint.cpp", "scripts/verify/logistics_chain.lua"],
    "category": "UI",
-   "status": "designed",
+   "status": "complete",
    "authority_doc": "docs/ui/LENSES.md",
    "id": "BL-1730",
    "short_name": "LOGISTICS_LENS_ON_DRAWN_ROADS",
@@ -3042,7 +3042,7 @@
    "design": "PLAYTEST 2 LANE I (lenses & network). Ben: \"When selecting the logistics lens, let's keep the drawn road, but make sure to paint the logistics highlighted roads directly on top of drawn roads, with the same deviations.\" WORK: the lens overlay follows the drawn road's own curve and offsets (one path source), not tile centres; the drawn road stays visible beneath. Capture a bend and a junction."
   },
   {
-   "glyph": "~",
+   "glyph": "✓",
    "sprint": null,
    "version_goal": null,
    "written": "2026-11-22",
@@ -3052,14 +3052,14 @@
    "author": "Ben (second playtest of the release build at 320655c8, 2026-11-22); filed by Claude",
    "priority": "B",
    "difficulty": 2,
-   "files": [],
+   "files": ["src/world/state_industry.cpp", "src/world/finish_campaign_world.cpp", "tools/verify/harness_params.hpp", "tools/verify/rail_dead_end_census.cpp", "tools/verify/player_seed_sweep.cpp"],
    "category": "Economy",
-   "status": "design-owed",
+   "status": "complete",
    "authority_doc": "docs/economy/LOGISTICS.md",
    "id": "BL-1731",
    "short_name": "RAIL_ENDS_WITHOUT_STATION",
    "title": "Railways that end with no rail station: find out why",
-   "design": "PLAYTEST 2 LANE I (lenses & network). Ben: \"I'm seeing examples of railways with no rail station at the end. Can you investigate?\" INVESTIGATION FIRST: count dead-end rail with no station across the seed library, find who lays it (generation, the AI, a removed station leaving its line) and what LOGISTICS.md says a line needs at its ends. Report before fixing; the fix may be a placement rule or a prune."
+   "design": "PLAYTEST 2 LANE I (lenses & network). Ben: \"I'm seeing examples of railways with no rail station at the end. Can you investigate?\" INVESTIGATION FIRST: count dead-end rail with no station across the seed library, find who lays it (generation, the AI, a removed station leaving its line) and what LOGISTICS.md says a line needs at its ends. Report before fixing; the fix may be a placement rule or a prune. RULED (Ben, 2026-11-22): option A, prune stubs - LOGISTICS.md § 4c \"A line ends at a station\". Census: 33 unserved ends on 5 of 16 seeds (17 bridge-gap stubs from hand_over_rail dropping water tiles, 14 from cap_major_logistics taking up stations, 2 from the opening state cut); 0 after."
   },
   {
    "glyph": "✓",
@@ -3072,14 +3072,14 @@
    "author": "Ben (second playtest of the release build at 320655c8, 2026-11-22); filed by Claude",
    "priority": "B",
    "difficulty": 2,
-   "files": [],
+   "files": ["src/ui/body_surface_canvas.cpp", "src/ui/ui_state.hpp", "src/core/verify_api.cpp", "scripts/verify/logistics_network_view.lua"],
    "category": "UI",
-   "status": "designed",
+   "status": "complete",
    "authority_doc": "docs/ui/LENSES.md",
    "id": "BL-1732",
    "short_name": "LOGISTICS_LENS_RAIL_ROAD_TOGGLE",
    "title": "The Logistics lens has a Rail / Road toggle",
-   "design": "PLAYTEST 2 LANE I (lenses & network). Ben: \"Let's change the logistics lens to have a toggleable 'Rail / Road' option, so it's easier to see railways.\" WORK: a two-state toggle in the lens's legend; Rail shows only rail and stations, Road only roads. Add the ACTIONS.json entry."
+   "design": "PLAYTEST 2 LANE I (lenses & network). Ben: \"Let's change the logistics lens to have a toggleable 'Rail / Road' option, so it's easier to see railways.\" WORK: a two-state toggle in the lens's legend; Rail shows only rail and stations, Road only roads. Add the ACTIONS.json entry. RULED (Ben, 2026-11-22): three states, Both / Rail / Road, opening on Both each time the lens arms; each view shows that network's own figures; sea legs draw under both views. Written into docs/ui/LENSES.md."
   },
   {
    "glyph": "~",

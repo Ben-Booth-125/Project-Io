@@ -36,9 +36,11 @@ and Market combos do **not** come with it: a convoy is a route between two place
 scoped by the market you are looking at, which is part of why the tab sat oddly there.
 
 ## 3. Lens on open
-Arm **`supply_routes`** — the lane overlay is the literal map twin of this list, and the ledger
-and the canvas then answer the same question in two registers. This is the pairing the Market
-ledger could never offer from a tab, since opening it armed the price wash instead. Closing the
+Arm **`trade_flow`** (Ben, 2026-11-22: *"wire the convoys tab to the trade flow lens"*) — the
+lens convoys draw under (LENSES.md § Trade-flow lens, "Convoys draw under it") is the map twin
+of this list, and the ledger and the canvas then answer the same question in two registers. This
+is the pairing the Market ledger could never offer from a tab, since opening it armed the price
+wash instead. Closing the
 ledger **disarms** it, as the Market ledger's does (Ben, 2026-10-13; LENSES.md § The other direction).
 
 ## 4. Data sources

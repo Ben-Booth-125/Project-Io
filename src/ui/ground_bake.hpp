@@ -339,14 +339,8 @@ struct bake_source
     std::vector<std::int32_t> route_first;   ///< Per tile: its first piece in route_pieces.
     std::vector<std::uint8_t> route_count;   ///< Per tile: its piece count.
     std::vector<route_piece>  route_pieces;
-    /// THE LOGISTICS LENS'S GROUND (Ben, 2026-10-25; route_paint.hpp
-    /// strip_painted_routes): the routes are derived as ever - trees and a town's
-    /// blocks keep off them, a cluster still steps toward its road - but the route
-    /// pass paints no surface. Folded into route_hash, so flipping it re-bakes
-    /// exactly the windows a route reaches.
-    bool routes_unpainted = false;
     /// THE LAND LIFT's level (BL-1537; 0 = off, 1..k_land_lift_levels-1): a view
-    /// setting the snapshot carries, as routes_unpainted is, so it reaches the bake
+    /// setting the snapshot carries, so it reaches the bake
     /// through the source and moves terrain_hash on every window that holds land -
     /// changing it re-bakes the land and leaves the open sea and the lock fill be.
     std::uint8_t land_lift = 0;

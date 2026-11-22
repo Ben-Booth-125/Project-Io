@@ -633,7 +633,9 @@ left-click on a land tile names the destination, with the same green outline.
 
 ### The convoy element (Ben, 2026-11-05)
 
-**Convoys are drawn on the map as they move, and a press selects one.** The Selection band then shows
+**Convoys are drawn on the map as they move, and a press selects one** — under the Trade Flow and
+Supply lenses, the only two the markers draw under (Ben, 2026-11-22; LENSES.md § Trade-flow lens,
+"Convoys draw under it"); there the marker's press comes before the lens's. The Selection band then shows
 that convoy: its cargo, owner, route and arrival. A convoy is not an entity and its id is what the
 selection holds. What the player may see of another nation's convoy follows the visibility rules
 (`DISCOVERY.md`).

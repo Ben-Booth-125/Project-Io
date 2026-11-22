@@ -1,15 +1,15 @@
 -- Visual verification for three rulings on the Logistics lens and the capital star
 -- (Ben, 2026-10-25). LENSES.md § Logistics lens and PLANETARY.md § The capital star
--- own what they show; RENDERING.md § Roads and sea lanes owns the unpainted ground.
+-- own what they show; RENDERING.md § Roads and sea lanes owns the highlight on the paint.
 --
 --   C1  THE CAPITAL STAR. Every nation's capital carries a star in its nation's colour,
 --       the player's larger and ringed - on the plain canvas and under most lenses;
 --       NONE under Resource, Continent or Population. Asserted on the canvas's own
 --       count of stars drawn (verify.capital_stars), captured wide and close.
---   R1  THE ROADS ARE NOT DRAWN TWICE. Under the Logistics lens the bake paints no route
---       surface (strip_painted_routes); the canvas's coloured stroke is the only road.
---       Captured close on the same road with the lens off and on; the toggle's re-bake
---       is counted and TIMED (the ROAD_HIDE lines - the cost Ben asked to see).
+--   R1  THE HIGHLIGHT RIDES THE PAINT (BL-1730, Ben 2026-11-22). The painted roads stay
+--       under the Logistics lens and its colours are stroked along their own path, so
+--       a toggle re-bakes nothing (the ROAD_LENS lines). Captured close and mid on the
+--       same roads with the lens off and on: the highlight must lie on the painted road.
 --   L1  EVERY LINK OF THE CHAIN. Rail legs along their track and sea legs down their
 --       water carry the lens's colour and numbers; a road on the chain that no route
 --       uses reads CONNECTED, IDLE (one number, steel), not 0 over 0; a road no
@@ -72,55 +72,34 @@ verify.set_overlay("market")
 shot("capital_star_market_mid")
 
 -- R1 - the same frame on the roads round the capital, plain and under the lens, at
--- three rungs: close, mid, and the whole grid. Each toggle is timed on this synchronous
--- --verify path, where every view chunk the flip moves is baked INSIDE the frame (in
--- play the pool bakes them behind the frame; the frame itself pays the snapshot).
+-- close and mid rungs. The paint stays under the lens and the highlight rides it
+-- (BL-1730), so a toggle re-bakes NOTHING: the ROAD_LENS lines count it.
 local function toggle(lens, label)
   local c0 = verify.ground_bake_counters()
   verify.set_overlay(lens)
-  verify.frames(1)
-  local t0 = verify.ground_stats().clock_ms
-  verify.frames(1)
-  local g  = verify.ground_stats()
-  local t1 = g.clock_ms
-  verify.frames(3)
+  verify.frames(4)
   local c1 = verify.ground_bake_counters()
-  print(string.format("ROAD_HIDE %s -> %s: draw_r %.1f px (level ppr %.0f); frame %.1f ms; re-bakes %d "
-        .. "(%d route-only patches, %d windows, %.0f px patched, %.0f px whole); worker ms %.1f",
-        label, lens, g.draw_r, g.level_ppr, t1 - t0, c1.chunk_rebakes - c0.chunk_rebakes,
-        c1.chunk_patches - c0.chunk_patches, c1.patch_windows - c0.patch_windows,
-        c1.patch_px - c0.patch_px, c1.rebake_px - c0.rebake_px, c1.rebake_ms - c0.rebake_ms))
+  local g  = verify.ground_stats()
+  print(string.format("ROAD_LENS %s -> %s: draw_r %.1f px; re-bakes %d", label, lens, g.draw_r,
+        c1.chunk_rebakes - c0.chunk_rebakes))
   return c1.chunk_rebakes - c0.chunk_rebakes
 end
 verify.set_overlay("none")
 if cap_x then frame_tile(cap_x, cap_y, 14) end
 shot("roads_plain_close")
 local n_on = toggle("logistics", "close")
-verify.expect(n_on > 0, "R1: arming the Logistics lens close re-bakes the chunks a route reaches")
+verify.expect(n_on == 0, "R1: arming the Logistics lens re-bakes nothing - the paint stays (" .. n_on .. ")")
 shot("roads_lens_close")
-toggle("none", "close")
-shot("roads_plain_close_again")
+local n_off = toggle("none", "close")
+verify.expect(n_off == 0, "R1: disarming it re-bakes nothing (" .. n_off .. ")")
 if cap_x then frame_tile(cap_x, cap_y, 5) end
 shot("roads_plain_mid")
 toggle("logistics", "mid")
 shot("roads_lens_mid")
 toggle("none", "mid")
-verify.set_zoom(1.06875)
-verify.set_pan(0, 0)
-verify.frames(3)
-local n_wide = toggle("logistics", "whole grid")
-verify.expect(n_wide == 0, "R1: arming the lens on the whole grid re-bakes nothing (a road is under a pixel there)")
-toggle("none", "whole grid")
 if cap_x then frame_tile(cap_x, cap_y, 14) end
--- Steady state under the lens: no further re-bake once the flip has landed.
-verify.set_overlay("logistics")
-verify.frames(6)
-local c3 = verify.ground_bake_counters()
-verify.frames(30)
-local c4 = verify.ground_bake_counters()
-print(string.format("ROAD_HIDE steady: %d re-bake(s) over 30 frames with the lens up",
-      c4.chunk_rebakes - c3.chunk_rebakes))
-verify.expect(c4.chunk_rebakes == c3.chunk_rebakes, "R1: a held lens re-bakes nothing")
+verify.set_overlay("logistics") -- the chain checks below read the armed lens
+verify.frames(3)
 
 -- L1 - the chain, whole grid and close, with a real resolve behind it. This seat's
 -- nation opens with no Logistic Point source on the home body, so the chain is STAGED:
@@ -182,6 +161,10 @@ do
                 "L2: a road + leg tile's requested is the two networks' sum")
   verify.expect(rb.leg_cells_drawn > 0, "L2: the leg is stroked tile by tile in its tiles' colours ("
                 .. rb.leg_cells_drawn .. ")")
+  -- BL-1730: on baked ground the leg follows the painted track's own pieces.
+  print("[logistics_chain] leg pieces stroked along the paint: " .. tostring(rb.leg_pieces_drawn))
+  verify.expect((rb.leg_pieces_drawn or 0) > 0, "R1: the rail leg rides the painted track's pieces ("
+                .. tostring(rb.leg_pieces_drawn) .. ")")
 end
 if fx.sea then
   print("[logistics_chain] sea leg " .. fx.port_a_x .. "," .. fx.port_a_y .. " -> "

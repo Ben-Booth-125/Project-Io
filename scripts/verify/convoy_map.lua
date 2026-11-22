@@ -8,6 +8,9 @@
 
 verify.window(1920, 1080)
 verify.goto_surface("home")
+-- BL-1729 (convoys on trade flow lens, Ben 2026-11-22): markers draw under Trade Flow
+-- and Supply only, so the press checks run under Trade Flow.
+verify.set_overlay("trade_flow")
 
 -- The lowest-id unit of the player's, which is what the staging anchors to.
 local anchor = nil

@@ -45,7 +45,7 @@ by the cycle without a literal being kept in step by hand.
 | `supply` | Solar per-convoy lines · Circumplanetary convoy-count badge · Planetary per-tile convoy glyph |
 | `reach` | Planetary key listing the active body's trade-route endpoints by recency |
 | `supply_routes` | Planetary key of aggregated lanes, log-scaled thickness |
-| `throughput` — the **Logistics** lens | Planetary: every link of the player nation's chain — roads, rail legs, sea legs — coloured red → yellow → green by supplied over requested where traffic crosses it, steel where it is connected but idle, umber where a road is not tied to the capital + a ring on every source + numbers on every link (supplied over requested; one figure on an idle link) + key. No ground tint; the painted routes leave the ground while it is up. |
+| `throughput` — the **Logistics** lens | Planetary: every link of the player nation's chain — roads, rail legs, sea legs — coloured red → yellow → green by supplied over requested where traffic crosses it, steel where it is connected but idle, umber where a road is not tied to the capital + a ring on every source + numbers on every link (supplied over requested; one figure on an idle link) + key. No ground tint; the highlight is stroked along the painted roads' own path. |
 | `culture` | Planetary province fill in the primary culture's lineage hue; a checker of the second culture where it is close + culture key |
 | `trade_flow` | Planetary paths of the player's shipments along the routes they ride (roads, sea lanes, rail), with direction chevrons and a head at the destination + a marker on each short market coloured by why the player's surplus did not go there + class key |
 
@@ -423,7 +423,7 @@ slots are not in it.
 | Rail slot | Ledger | Arms | The shared question |
 |---|---|---|---|
 | 5 | Market | `market` | Which market is this ground in, and what does it pay? |
-| 6 | Convoys | `supply_routes` | What is moving, and along which lanes? |
+| 6 | Convoys | `trade_flow` | What is moving, where to, and why not elsewhere? |
 | 9 | History | `continent` — on entering **Tectonics**, see below | Which plate made this ground? |
 
 **There are two arming rules, and which one a slot uses follows from how many questions
@@ -861,6 +861,15 @@ game shows the lens from its first pass on. A flow's tiles are read from those w
 one route reader every convoy surface uses, and held per flow until its waypoints or the network
 move, so a frame re-derives no path.
 
+**Convoys draw under it** (Ben, 2026-11-22: *"we should hide convoy movement unless the trade flow
+lens is turned on"*). The Planetary convoy markers (SELECTION.md § The convoy element) draw only
+under this lens and the Supply lens — the two that answer what is moving — and on the plain canvas
+and under every other lens they are hidden. Under those two lenses a press on a marker selects the
+convoy before the lens's own press, since a marker shown only there must be pressable there. The
+Convoys ledger arms this lens on open and disarms it on close (§ The other direction). Space
+convoys — the Solar and Circumplanetary canvases' convoy lines, badges and transits — are not
+affected.
+
 **Legend.** A class key (colour → class) and a flow-width key (units per tick), in the
 shared legend home.
 
@@ -971,9 +980,8 @@ resolver routes on (`LOGISTICS.md` § How a tile's points get to it):
   its sources' paths), and **supplied** is the carrying source's points × its reach across the leg.
   Where legs share a tile their shares add.
 - Each leg is stroked along its run over a dark casing — a Highway's weight on rail, a lane's on the
-  sea. The bake paints no rail bed under the lens, so every **track** tile is also drawn, at a Road's
-  weight, with the player's legs over it: in the tile's colour on a link of the player's chain, in a
-  dark ballast tone elsewhere.
+  sea — following the painted track's or lane's own path (below, "The highlight rides the paint").
+  Track off the player's chain is its painted bed alone.
 
 **One colour per tile, both networks added together** (Ben, 2026-10-26: *"go with one colour per
 tile, showing both networks added together"*). A tile that carries a road **and** a rail or sea leg
@@ -1050,12 +1058,30 @@ ramp's measurement.
 **Rung.** Planetary only — sources, roads and requests are per-tile. Guarded behind
 `overlay_mode::throughput` in [`body_surface_canvas.cpp`](../../src/ui/body_surface_canvas.cpp).
 The drawn road network is this lens's at every rung (RENDERING.md § Roads and sea lanes).
-**While the lens is up the bake paints no route surface at all** (Ben, 2026-10-25: *"currently you
-can see roads twice"*): the painted thread and the drawn stroke follow different geometry, so both
-showing read as two roads. Arming the lens re-bakes only the windows a route reaches, as a
-route-only partial re-bake on the worker pool, and disarming it re-bakes them back — RENDERING.md
-§ Roads and sea lanes, "The Logistics lens takes the routes off the ground", owns the mechanism and
-its measured cost. The capital star shows under this lens (PLANETARY.md § The capital star).
+**A Rail / Road toggle in the key** (Ben, 2026-11-22: *"a toggleable 'Rail / Road' option, so it's
+easier to see railways"*). Under the key's title a three-way toggle — **Both · Rail · Road** — and
+every arming of the lens opens on **Both**. It is a toggle: pressing the active Rail or Road returns
+to Both.
+
+- **Both** is the lens as this section describes it, a tile carrying two networks summed.
+- **Rail** shows only the rail legs and their track and the railway stations' rings; **Road** only
+  the roads, the truck depots' rings and the units' off-road dashes.
+- **Sea legs and ports show in every view.**
+- **Each view carries its own network's figures**, not the summed tile: under Rail a track tile's
+  pair is the rail legs' own, and under Road a road tile's pair is its routed flow alone. "One colour
+  per tile, both networks added together" is the Both view's rule.
+- Only the highlight, the numbers and the rings filter; the painted ground is the same in every view,
+  and the key's arithmetic stays the nation's whole.
+
+**The highlight rides the paint** (Ben, 2026-11-22: *"keep the drawn road, but make sure to paint
+the logistics highlighted roads directly on top of drawn roads, with the same deviations"*). The
+painted roads, rail beds and lane wakes stay on the ground under this lens. Each link of the
+player's chain is stroked **on top of its own paint, along the same path** — the crossing points,
+the bows round hills and clusters, the spurs to a forecourt — because the stroke reads the route
+pieces the bake painted (RENDERING.md § Roads and sea lanes, "The Logistics lens paints on the
+painted road", owns the mechanism). One path source, so no road is seen twice and arming the lens
+re-bakes nothing. A road, line or lane off the player's chain shows its paint only. The capital
+star shows under this lens (PLANETARY.md § The capital star).
 
 **Colour.**
 
@@ -1082,7 +1108,7 @@ persisted and the simulation reads none of it.
 
 **Interaction notes.** Planetary-only, single-select, no selector. Verified by
 `scripts/verify/logistics_lens.lua` and `scripts/verify/logistics_chain.lua` (the chain's links,
-reach apart from traffic, the unpainted ground and the capital star).
+reach apart from traffic, the highlight on the paint and the capital star).
 
 ## Placement-suitability surface *(not a strip lens)*
 

@@ -460,3 +460,21 @@ rail_handover_report hand_over_rail(world& w);
 
 /// Print the rail handover's one `[rail]` log line.
 void print_rail_handover(const rail_handover_report& r);
+
+/// BL-1731 (Ben, 2026-11-22, option A): A LINE ENDS AT A STATION
+/// (LOGISTICS.md § 4c). Generation's later steps can leave track that no station
+/// serves - the handover lays only a land path's dry tiles, so a line crossing a
+/// river breaks into shore stubs; the logistics cap and the opening state cut take
+/// up stations and leave their track. This prune runs once, after the last step
+/// that removes a station: a line (a four-cardinal component of track) with no
+/// station on or beside any tile is taken up whole, and every END (a track tile
+/// with at most one track neighbour) with no station on or beside it is trimmed,
+/// repeatedly, back to the last served tile. Ascending tile id; deterministic.
+struct rail_prune_report
+{
+    int lines_dropped = 0; ///< whole lines no station touches
+    int line_tiles    = 0; ///< track tiles those lines held
+    int stub_tiles    = 0; ///< track tiles trimmed off unserved ends
+};
+rail_prune_report prune_rail_stubs(world& w);
+void print_rail_prune(const rail_prune_report& r);

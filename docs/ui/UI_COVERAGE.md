@@ -57,18 +57,18 @@ and so is the safety net.
 | `UI-045` Selection band > Tile selection layout | sub-element | `selection_tile_layout`, `tile_card`, `ui_shell_fixture` | 57 | 1 | 4 |
 | `UI-117` Selection band > Water tile selection | sub-element | `water_tile_selection` | 1 | 0 | 1 |
 | `UI-046` Selection band > Body selection action/facts | sub-element | `descend_into_selection`, `selection_go_to`, `base_prospect_ui` | 31 | 0 | 11 |
-| `UI-047` Selection band > Building selection (expanded tile card) | sub-element | `building_element`, `tile_card`, `workforce_step`, `construction_ledger_tabs`, `building_management_shell`, `building_recipe_rows` | 144 | 2 | 11 |
-| `UI-048` Selection band > Tile selection layout > Tile construction ledger (build-here fold-out) | sub-element | `tile_build_ledger`, `tile_build_ledger_survives`, `drill_through_fold`, `construction_ledger_tabs`, `air_gate` | 55 | 1 | 7 |
+| `UI-047` Selection band > Building selection (expanded tile card) | sub-element | `building_element`, `tile_card`, `workforce_step`, `construction_ledger_tabs`, `building_management_shell`, `building_recipe_rows` | 146 | 2 | 11 |
+| `UI-048` Selection band > Tile selection layout > Tile construction ledger (build-here fold-out) | sub-element | `tile_build_ledger`, `tile_build_ledger_survives`, `drill_through_fold`, `construction_ledger_tabs`, `air_gate` | 57 | 1 | 7 |
 | `UI-049` Hover Card | element | `hover_freeze`, `sticky_card`, `border_band`, `lens_one_tier`, `lens_strip_and_fields` | 28 | 0 | 4 |
 | `UI-050` Hover Card > Hover content dispatch (lens-keyed) | sub-element | `lens_structure_pivot`, `lens_selection_paths`, `lens_one_tier`, `lens_strip_and_fields` | 36 | 0 | 3 |
 | `UI-051` Header Panel | panel | `header`, `shell_pass`, `nation_seat_ui` | 9 | 1 | 1 |
 | `UI-052` Header Panel > Treasury figure | sub-element | `header`, `debt_interest`, `nation_seat_ui` | 9 | 0 | 0 |
-| `UI-074` Construction Ledger | ledger | `construction_ledger`, `construction_panel`, `build_door_wide_roster`, `construction_ledger_tabs` | 31 | 1 | 7 |
+| `UI-074` Construction Ledger | ledger | `construction_ledger`, `construction_panel`, `build_door_wide_roster`, `construction_ledger_tabs` | 33 | 1 | 7 |
 | `UI-075` Construction Ledger > Build view | view | `tile_build_ledger`, `roads`, `build_door_wide_roster`, `fresh_start_build`, `air_gate`, `construction_progress`, `construction_folds`, `shelf_runway_warning`, `schooling_door` | 196 | 0 | 10 |
 | `UI-076` Construction Ledger > Manage view | view | `building_management`, `building_management_shell`, `recipe_workforce`, `building_profit`, `processing_management_ux`, `v009_batch`, `air_gate` | 36 | 0 | 0 |
 | `UI-080` Market Ledger | ledger | `market_ledger`, `lens_structure_pivot`, `goods_table`, `lens_ledger_pairs`, `market_names` | 44 | 1 | 8 |
 | `UI-081` Market Ledger > Goods table | view | `market_ledger`, `goods_table`, `item_glyphs`, `market_density` | 36 | 1 | 1 |
-| `UI-082` Market Ledger > Trades view | view | `trade_offers_sourced`, `market_ledger`, `trades_tab` | 59 | 1 | 2 |
+| `UI-082` Market Ledger > Trades view | view | `trade_offers_sourced`, `market_ledger`, `trades_tab` | 61 | 1 | 2 |
 | `UI-091` Main Menu | view | `main_menu`, `planetology_generation`, `quick_start`, `setup_round`, `shell_pass` | 16 | 1 | 7 |
 | `UI-092` New World wizard | view | `history_lapse_press`, `planetology_generation`, `setup_round`, `wizard_fit` | 45 | 0 | 7 |
 | `UI-093` New World wizard > Wizard planetology round (System or Life) | sub-element | `planetology_generation`, `life_to_people` | 9 | 1 | 0 |
@@ -190,7 +190,6 @@ staleness detector — a non-empty list means the UI grew and the spine did not.
 - `border_hard_edges` (4 captures, 1 expects) — BL-1292 (borders hard edges) — the plain canvas at the three widest rungs, framed
 - `campaign_lapse` (4 captures, 1 expects) — campaign_lapse — BL-723's visual half: the spectated campaign as a film strip.
 - `canvas_vector_perf` (1 captures, 0 expects) — The Planetary canvas's vector layer at every rung (sprint 51; PLANETARY.md
-- `chat_panel` (1 captures, 0 expects) — Verify the comms chat log (BL-205 R1) — the panel that replaced the Explorer.
 - `construct_tooltip` (2 captures, 1 expects) — Verify a disabled Construct button says why on hover (Ben, 2026-11-09: "When clicking on a
 - `construction_sites_ties` (0 captures, 0 expects) — How often the site ledger's rows TIE on estimated net (Ben, 2026-10-25). A
 - `culture_overrun` (6 captures, 2 expects) — BL-1092 R4 -- THE 400 BCE CLAMP on an OVERRUN seed (Ben, 2026-09-24,
@@ -211,7 +210,7 @@ staleness detector — a non-empty list means the UI grew and the spine did not.
 - `history_lapse_marks` (7 captures, 2 expects) — THE MARKS THAT EARN THEIR PLACE (BL-1094; Ben, 2026-09-24, sprint 47
 - `history_lapse_works` (8 captures, 8 expects) — THE WORKS AND THE RUNG ON ROUND 6 (BL-1099, BL-1100; Ben, 2026-09-24,
 - `lens_strip_glyphs` (7 captures, 3 expects) — BL-1225 (every lens on strip): every built lens sits in at least one rung row
-- `logistics_unpaint_perf` (0 captures, 0 expects) — What arming the Logistics lens costs the FRAME, on the play path (Ben, 2026-10-25:
+- `locator_plan` (1 captures, 0 expects) — The locator's buildings, seen from above (Ben, 2026-11-20; LAYOUT.md § The locator).
 - `names_and_voice` (6 captures, 10 expects) — BL-1106 -- THE TICKER AND BOARD SPEAK THE HISTORY'S WORDS.
 - `pan_perf` (0 captures, 0 expects) — Pan-cost measurement (the "stutter while panning" report, 2026-08-02).
 - `realm_identity` (11 captures, 20 expects) — A realm keeps its identity across the wizard's seams (BL-1087 colour,
@@ -223,7 +222,9 @@ staleness detector — a non-empty list means the UI grew and the spine did not.
 - `round6_mid_tail` (2 captures, 11 expects) — BL-1084 (world built once and moved), the K4 cold review -- ROUND 6 WHILE ITS
 - `route_curves` (2 captures, 5 expects) — ROADS AS THINNER CURVES, SEA LANES ON THEIR SEA PATH (Ben, 2026-10-03, playing
 - `routes_and_splits` (10 captures, 16 expects) — BL-1092 -- ROUTES AND SPLITS ON THE MAP: the migration shows its roads
+- `settlement_bands` (2 captures, 0 expects) — BL-1711 (settlement size rendering) - RENDERING.md § Installations, the band table
 - `terrain_variants` (1 captures, 0 expects) — BL-1243 (terrain variant families) — RENDERING.md § Mountains, rivers and
+- `tooltip_symbols` (2 captures, 3 expects) — BL-1703 (terse tooltips): the hover card writes its quantities as symbols
 - `towns_denser` (3 captures, 4 expects) — TOWNS DENSER (BL-1258; Ben, 2026-10-10: towns should read like the it3 C-F
 - `trade_flow_lens` (8 captures, 5 expects) — Visual verification for the Trade-flow lens (overlay_mode::trade_flow, BL-1222).
 - `trade_flow_routed` (12 captures, 8 expects) — The Trade-flow lens draws a flow ALONG THE ROUTE IT RIDES (Ben, 2026-10-26: "render the

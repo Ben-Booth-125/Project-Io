@@ -633,13 +633,6 @@ ground_layer::body_state& ground_layer::make_body(entity_id id, int gw, int gh)
 void ground_layer::refresh_source(body_state& b, const world& w)
 {
     gb::bake_source src = gb::prepare_source(w, b.id, b.reveal_all, registry);
-    // THE LOGISTICS LENS'S GROUND (Ben, 2026-10-25): under that lens the canvas draws
-    // the whole network itself, so the bake paints no route surface - the canvas asks
-    // through ground_request::hide_routes, and the flipped flag moves route_hash, so
-    // the sweep re-bakes exactly the windows a route reaches (RENDERING.md § Roads and
-    // sea lanes, "The Logistics lens takes the routes off the ground").
-    if (m_hide_routes)
-        gb::strip_painted_routes(src);
     src.land_lift = baked_lift();
     set_source(b, std::make_shared<const gb::bake_source>(std::move(src)));
 }
@@ -881,14 +874,7 @@ void ground_layer::prebake(entity_id body, std::shared_ptr<const gb::bake_source
     if (b.gw != src->gw || b.gh != src->gh)
         return; // a body of that id at another grid: not this source's
     b.reveal_all = assume_surveyed;
-    // As refresh_source shapes a source the layer prepared itself (the land
-    // lift is re-stamped inside set_source).
-    if (m_hide_routes)
-    {
-        auto c = std::make_shared<gb::bake_source>(*src);
-        gb::strip_painted_routes(*c);
-        src = std::move(c);
-    }
+    // The land lift is re-stamped inside set_source, as refresh_source's is.
     set_source(b, std::move(src));
     start_prebake(b);
 }
@@ -944,11 +930,6 @@ bool ground_layer::resnapshot(const world& w, bool assume_surveyed)
         return false; // the homeworld is not this one any more
     b->reveal_all = assume_surveyed;
     gb::bake_source src = gb::prepare_source(w, b->id, b->reveal_all, registry);
-    // As refresh_source does: under the Logistics lens the ground paints no
-    // routes, and a lens left on across a New Game must not open with them
-    // painted (the BL-1677 review).
-    if (m_hide_routes)
-        gb::strip_painted_routes(src);
     land_boundary(*b, std::make_shared<const gb::bake_source>(std::move(src)), "round-boundary");
     return true;
 }
@@ -960,12 +941,6 @@ bool ground_layer::resnapshot(entity_id body, std::shared_ptr<const gb::bake_sou
     if (!b || !src || b->id != body || src->gw != b->gw || src->gh != b->gh)
         return false;
     b->reveal_all = assume_surveyed;
-    if (m_hide_routes) // as the landing's resnapshot (the BL-1677 review)
-    {
-        auto c = std::make_shared<gb::bake_source>(*src);
-        gb::strip_painted_routes(*c);
-        src = std::move(c);
-    }
     land_boundary(*b, std::move(src), "in-round (roads laid)");
     return true;
 }
@@ -1627,10 +1602,7 @@ void ground_layer::feed(bool verify)
 
     // Far pages and sweeps first, for the bodies being worked on.
     const auto housekeep = [&](body_state& b) {
-        // The Logistics lens's unpainted ground leaves a READY far page alone: at
-        // 6 px a hex a road is a fraction of a pixel, and re-baking the whole body
-        // per toggle buys nothing (RENDERING.md, "takes the routes off the ground").
-        if ((!b.far_ready || (b.far_hash != b.src_digest && !m_hide_routes)) && b.far_pending == 0)
+        if ((!b.far_ready || b.far_hash != b.src_digest) && b.far_pending == 0)
         {
             start_far(b);
             queued += b.far_pending;
@@ -1658,24 +1630,16 @@ void ground_layer::feed(bool verify)
         // A chunk whose spill is still being written waits for it (then loads).
         return b.job[i] == 0 && !b.disk_pending[i] && (!b.ready[i] || b.dirty[i]);
     };
-    // THE LOGISTICS LENS RE-BAKES ONLY WHAT IT SHOWS CLOSE (2026-10-25; RENDERING.md
-    // § Roads and sea lanes, "takes the routes off the ground"). While the lens is up a
-    // READY chunk that went dirty is re-baked only when it is under the view at a
-    // level fine enough for a painted road to read (k_unpaint_max_level); the rest keep
-    // their pixels until the view brings them close. Measured: unpainting the whole
-    // home master costs about nine minutes of worker time per toggle; unpainting the
-    // view costs a few dozen chunks. A chunk never re-baked keeps the painted hash, so
-    // disarming the lens re-bakes only what arming it did.
-    // And a dirty flag from a sweep older than the current source is not acted on
+    // A dirty flag from a sweep older than the current source is not acted on
     // until this source's sweep lands: flipping the lens straight back leaves every
     // chunk the first flip dirtied still flagged, though most now match again
     // (measured: 542 needless re-bakes on disarming after 42 real ones).
     const auto deferred = [&](const body_state& b, int i, bool in_view, bool active) {
+        (void)in_view;
+        (void)active;
         if (!(b.ready[i] && b.dirty[i]))
             return false;
-        if (b.swept_digest != b.src_digest)
-            return true;
-        return active && m_hide_routes && (!in_view || m_view_level > k_unpaint_max_level);
+        return b.swept_digest != b.src_digest;
     };
     // Every unbaked or dirty chunk of @p b, nearest (cx, cy) first.
     const auto fill_body = [&](body_state& b, double base, double cx, double cy) {
@@ -2132,18 +2096,6 @@ void ground_layer::tick(SDL_Renderer* r, const world& w, ui_state& ui, bool bake
     b.last_visit = m_frame;
     make_room(master_bytes(b), m_active, m_prebake);
 
-    // The Logistics lens takes the painted routes off the ground (refresh_source).
-    // A flip re-takes the active body's snapshot NOW rather than at the cadence, so
-    // the sweep starts on the frame after the toggle.
-    const bool hide_routes = ui.ground_req.valid && ui.ground_req.body == m_active
-                          && ui.ground_req.hide_routes;
-    if (hide_routes != m_hide_routes)
-    {
-        m_hide_routes = hide_routes;
-        if (!bake_everything)
-            refresh_source(b, w);
-    }
-
     if (bake_everything)
         refresh_source(b, w); // a capture sees this frame's world
 
@@ -2197,9 +2149,7 @@ void ground_layer::tick(SDL_Renderer* r, const world& w, ui_state& ui, bool bake
     if (bake_everything)
     {
         // --- THE --verify PATH: everything this frame draws, complete ---
-        // (The Logistics lens's unpainted ground leaves a ready far page, and a view
-        // too coarse for a road to read, as the pool path does - feed()'s `deferred`.)
-        if (!b.far_ready || (b.far_hash != b.src_digest && !m_hide_routes))
+        if (!b.far_ready || b.far_hash != b.src_digest)
         {
             if (b.far_pending == 0)
                 start_far(b);
@@ -2220,8 +2170,7 @@ void ground_layer::tick(SDL_Renderer* r, const world& w, ui_state& ui, bool bake
             // slot, so this is the serial result, only sooner.
             std::vector<int> need;
             for (const int i : under_view(vis)) // raster order
-                if (b.job[i] == 0 && (!b.ready[i] || b.dirty[i])
-                    && !(m_hide_routes && b.ready[i] && b.dirty[i] && level > k_unpaint_max_level))
+                if (b.job[i] == 0 && (!b.ready[i] || b.dirty[i]))
                     need.push_back(i);
             std::sort(need.begin(), need.end());
             if (verify_fill_limit >= 0 && static_cast<int>(need.size()) > verify_fill_limit)

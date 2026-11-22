@@ -1411,10 +1411,6 @@ struct ground_request
     float x0 = 0, y0 = 0, x1 = 0, y1 = 0;
     float draw_r = 0;                ///< Drawn hex circumradius, screen px.
     bool  valid = false;
-    /// The Logistics lens is up (Ben, 2026-10-25): bake the ground with no route
-    /// surface painted, because the canvas draws the network itself in the lens's
-    /// colours (RENDERING.md § Roads and sea lanes).
-    bool  hide_routes = false;
 };
 
 /// Shared selection and view state for the three primary canvases.
@@ -2664,6 +2660,13 @@ struct ui_state
     /// never in state_hash, never read back by the simulation.
     std::vector<float> lp_reaching;
     int lp_reaching_gw = 0, lp_reaching_gh = 0;
+    /// BL-1732 (Ben, 2026-11-22): the Logistics lens's NETWORK VIEW, the toggle in its key.
+    /// 0 Both (the view every arming opens on), 1 Rail - rail legs and stations, 2 Road -
+    /// roads and depots. Sea legs and ports show in all three. Each view's links carry
+    /// that network's OWN figures, not the summed tile. View state only.
+    std::uint8_t lp_network_view = 0;
+    bool         lp_view_was_armed = false; ///< Last frame's lens state: arming resets the view.
+    ImVec2       lp_view_press[3] = {};     ///< Each segment's press centre, screen px (verify read).
 
     // --- The Logistics lens's TWO NUMBERS per tile (Ben, 2026-10-24) -------------
     // Same raster and footing as `lp_reaching` (-1 = not the player nation's ground).
@@ -2711,6 +2714,7 @@ struct ui_state
     double lp_both_leg_supplied = 0.0, lp_both_leg_requested = 0.0;
     /// What the leg pass drew last frame: the cells it stroked, each in its tile's colour.
     int    lp_leg_cells_drawn = 0;
+    int    lp_leg_pieces_drawn = 0; ///< BL-1730: route pieces the leg pass stroked along the paint (a count)
     /// BL-1456 (Ben, 2026-10-29; LENSES.md § Logistics lens, "A unit off the road is
     /// joined to it by a dashed line"): one dash per player unit standing off its
     /// network - raster cells of the road tile its supply is paid at (or, past its 8
