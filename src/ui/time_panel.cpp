@@ -34,7 +34,7 @@ const char* speed_rate_label(int speed)
     switch (speed)
     {
     case 1:  return "0.25×";
-    case 2:  return "0.5×";
+    case 2:  return "1×";
     case 3:  return "5×";
     case 4:  return "10×";
     case 5:  return "16×";

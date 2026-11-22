@@ -56,15 +56,15 @@ on a stopped clock and reads the opening before anything moves; the first press 
 slot, a tier, or `Space`) starts it. A new game's first `Space` resumes at the tier
 `scripts/init.lua`'s `default_speed` names; a load's resumes at the speed the save was made at.
 
-## Speed curve (settled 2026-06-15, [C2]; III and IV raised, Ben 2026-11-19; III to 5×, Ben 2026-11-20)
+## Speed curve (settled 2026-06-15, [C2]; III and IV raised, Ben 2026-11-19; III to 5×, Ben 2026-11-20; II to 1×, Ben 2026-11-22)
 
-The five speed buttons map **non-linearly**. Buttons 1–2 are genuine slow-motion (for watching
-detail); 3 is ordinary play; 4–5 fast-forward (for skipping quiet months to the next economy tick):
+The five speed buttons map **non-linearly**. Button 1 is genuine slow-motion (for watching
+detail); 2 is real time, the 1× reference pace; 3 is ordinary play; 4–5 fast-forward (for skipping quiet months to the next economy tick):
 
 | Button | Multiplier | Real time per day | Real time per month | Role |
 |--------|-----------|------|------|------|
 | 1 | 0.25× | 24 s | 12 min | Slow-motion (detail) |
-| 2 | 0.5× | 12 s | 6 min | Slow-motion |
+| 2 | 1× | 6 s | 3 min | Real time |
 | 3 | 5× | 1.2 s | 36 s | Ordinary play |
 | 4 | 10× | 0.6 s | 18 s | Fast-forward |
 | 5 | 16× | 0.375 s | ~11 s | Fast-forward to the next econ tick |
