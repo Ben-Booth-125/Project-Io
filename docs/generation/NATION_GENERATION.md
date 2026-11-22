@@ -617,11 +617,10 @@ exist — which is why `generate_population_centres` runs before `generate_natio
 
 ### Pass 7 — Starting treasury *(Ben, 2026-08-24; the source ruled BL-975, 2026-09-15)*
 
-**Every major starts play on 4,500 credits (Ben, 2026-11-07; the same credits since Ben, 2026-11-05;
-flat since Ben, 2026-11-02).** Ben: *"We can start with the same building kits, but we should start with
-much fewer opening credits."* The figure is a **build fund of two to three buildings** at opening prices
-(`../economy/PRODUCTION.md` § What construction costs at the opening), and nothing beyond it: a runway
-on top was offered and declined. The kit's own income carries its running bill from the first tick.
+**Every major starts play on 2,000 credits (Ben, 2026-11-22; the same credits since Ben, 2026-11-05;
+flat since Ben, 2026-11-02).** Ben: *"We should also decrease starting credits to 2000."* The figure is
+a **build fund of about one building** at opening prices (`../economy/PRODUCTION.md` § What
+construction costs at the opening), and nothing beyond it: a runway on top was offered and declined. The kit's own income carries its running bill from the first tick.
 
 **The figure is the kit's grant, set at the handoff, after the settle.** Whatever the settle's ticks left a
 major is replaced by the figure, and the difference is stated per major on the generation output. It is

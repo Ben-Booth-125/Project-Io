@@ -3059,7 +3059,7 @@
    "design": "PLAYTEST 2 LANE J (opening economy). Ben: \"We should decrease the building ceiling on provinces by roughly 100x, increased by researching techs. Currently 29000 seems an unreachable ceiling so it's useless.\" DESIGN OWED: report the current ceiling formula and its spread across provinces (Rule 0b), the new base (~1/100), and which tech nodes raise it and by how much (RESEARCH.md modifier grammar; the Digitisation store). World-mover: re-pin with a cause comment."
   },
   {
-   "glyph": "~",
+   "glyph": "●",
    "sprint": null,
    "version_goal": null,
    "written": "2026-11-22",
@@ -3069,9 +3069,14 @@
    "author": "Ben (second playtest of the release build at 320655c8, 2026-11-22); filed by Claude",
    "priority": "B",
    "difficulty": 3,
-   "files": [],
+   "files": [
+    "scripts/economy.lua",
+    "src/world/recipe_registry.cpp",
+    "scripts/world_gen.lua",
+    "tools/verify/player_seed_sweep.cpp"
+   ],
    "category": "Economy",
-   "status": "design-owed",
+   "status": "complete",
    "authority_doc": "docs/economy/FINANCE.md",
    "id": "BL-1734",
    "short_name": "SLOWER_OPENING_PAYBACK",

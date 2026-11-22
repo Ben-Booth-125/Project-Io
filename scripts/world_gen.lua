@@ -311,7 +311,7 @@ world_gen = {
                 treasury = 12000,
                 -- Every major starts play on this (Ben, 2026-11-05 and 2026-11-07), set after the
                 -- settle as the kit's grant; `treasury` above only carries it through the settle.
-                handoff_treasury = 4500,
+                handoff_treasury = 2000, -- BL-1734 (Ben, 2026-11-22)
                 logistics = { inland_logistics_hub = 2, railway_station = 1, port = 1 },
                 -- The fixed army (BL-1736, Ben 2026-11-22; MILITARY.md § Nation garrisons): four
                 -- Rifle Infantry of 50 men, all at the capital post; no border posts are manned.

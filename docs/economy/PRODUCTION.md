@@ -969,8 +969,14 @@ of an input registers that want as demand, so the stall is visible to the price 
 
 ### What construction costs at the opening (Ben, 2026-11-05)
 
-**Construction is the opening's scarce decision.** At the opening a mine costs about **six months of
-a major's net**, and that net reads **before research** (Ben, 2026-11-07): research is a choice a
+**Construction is the opening's scarce decision.** At the opening a mine costs about **twelve months
+of a major's net** (Ben, 2026-11-22: *"we want the player to have to wait about 12 months to afford a
+building"*; six months before). Two levers carry it together (Ben, 2026-11-22). **Building profit
+falls:** every building's maintenance carries one authored scale (FINANCE.md § Building operating
+cost), doubled, which cuts a major's opening net by about two fifths. **The live price rises:** the
+two scales below carry the rest. Profit alone was measured first and refused: the maintenance that
+reached twelve months put a third of the majors in the red in their first year, and the hybrid
+keeps that near the old count. That net reads **before research** (Ben, 2026-11-07): research is a choice a
 nation makes against construction, so the price is set against what its economy earns, not against
 how hard it is researching. A nation researching hard reads a longer wait, and that wait is true.
 Construction comes back to about one month of that net only after **10-20 years of play**. No timer
