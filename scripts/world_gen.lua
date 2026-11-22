@@ -313,12 +313,12 @@ world_gen = {
                 -- settle as the kit's grant; `treasury` above only carries it through the settle.
                 handoff_treasury = 4500,
                 logistics = { inland_logistics_hub = 2, railway_station = 1, port = 1 },
-                -- The fixed army (Ben, 2026-11-02; MILITARY.md § Nation garrisons): eight units
-                -- of 50 men, four at the capital post, the rest one each at the border posts in
-                -- descending grudge order, wrapping; the land pool opens on 200 recruits.
+                -- The fixed army (BL-1736, Ben 2026-11-22; MILITARY.md § Nation garrisons): four
+                -- Rifle Infantry of 50 men, all at the capital post; no border posts are manned.
+                -- The land pool opens on 200 recruits.
                 army = {
-                    capital = { "infantry", "infantry", "artillery", "light_armour" },
-                    border  = { "motorised", "infantry", "infantry", "infantry" },
+                    capital = { "infantry", "infantry", "infantry", "infantry" },
+                    border  = { },
                     men = 50, land_recruits = 200,
                 },
                 -- The fixed fleet (Ben, 2026-11-07; MILITARY.md § Sea): all four classes in
@@ -343,14 +343,13 @@ world_gen = {
                     { good = "machinery",      recipes = { "machinery" } },
                     { good = "refined_fuel",   recipes = { "refined_fuel" } },
                     { good = "power",          recipes = { "coal_power_plant", "oil_power_plant" } },
-                    { good = "ordnance",       recipes = { "ordnance" } },          -- Fabricator: steel + machinery
                     { good = "food_rations",   recipes = { "food_rations" } },
                     { good = "silicon",        recipes = { "silicon" } },           -- Refinery, from silica
                     { good = "steel",          recipes = { "steel" } },
-                    -- BL-1551 (Ben, 2026-11-08): every class is raised and refilled with its arms.
+                    -- BL-1736 (Ben, 2026-11-22): of the military works only the small-arms
+                    -- Arms Works stays, the one the opening Rifle Infantry refit from; the
+                    -- Ordnance works and the armoured-vehicle and artillery Arms Works left.
                     { good = "small_arms",        recipes = { "small_arms" } },        -- Arms Works
-                    { good = "armoured_vehicles", recipes = { "armoured_vehicles" } }, -- Arms Works
-                    { good = "artillery_pieces",  recipes = { "artillery_pieces" } },  -- Arms Works
                 },
                 civic = {
                     "planetary_marketplace", "research_institute", "research_institute",
