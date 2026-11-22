@@ -2785,7 +2785,7 @@
    "design": "The ground textures need only the finished tiles, not the settled economy, yet \"Loading textures\" starts after \"Settling industry\" ends. WORK: once the search's winner is applied and every step that writes the ground (roads, ports, installations laid before the settle) is done, start the bake against a snapshot of what it reads, on its own thread, and join it after the settle. EXPECTED: hide ~1-2 s of the paint step behind the settle. FIRST: list exactly what the bake reads (tiles, road field, installations, ownership tint?) and confirm the settle writes none of it - if the settle lays roads or buildings, the bake must either take a post-settle pass for the touched chunks or stay after the settle. CHECK: the baked chunks are byte-identical to today's (hash the textures on seeds 0 and 28), the bar's weights still sum to the wall time, and a live New Game shows no texture pop-in. BUILT 2026-11-19 by reusing the wizard's in-round snapshot on the cold build: the worker builds the home body's bake source once the tail has laid the roads, the main thread starts the master from it, and the landing's resnapshot re-bakes what the search and settle moved (574 of 2975 chunks on the measured run). MEASURED live, one New Game each on a quiet machine (different random seeds): \"Loading textures\" waited 35.2 s before, 26.9 s after; 1077 of 2975 chunks were baked by the landing. Ground opened fully painted."
   },
   {
-   "glyph": "~",
+   "glyph": "✓",
    "sprint": null,
    "version_goal": null,
    "written": "2026-11-22",
@@ -2795,9 +2795,15 @@
    "author": "Ben (second playtest of the release build at 320655c8, 2026-11-22); filed by Claude",
    "priority": "B",
    "difficulty": 3,
-   "files": [],
+   "files": [
+    "src/ui/ground_bake.cpp",
+    "src/ui/ground_bake.hpp",
+    "src/shaders/slice3d.frag.hlsl",
+    "tools/verify/ground_bake_check.cpp",
+    "scripts/verify/coast_detail.lua"
+   ],
    "category": "UI",
-   "status": "design-owed",
+   "status": "complete",
    "authority_doc": "docs/ui/RENDERING.md",
    "id": "BL-1721",
    "short_name": "COAST_TEXTURE_FOLLOWS_LAND",

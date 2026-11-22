@@ -795,6 +795,16 @@ zoom; the two closest rungs add a draw-time detail texture (Ben, 2026-11-15, bel
     it pans and zooms with the map. The family is per tile, softened across a hex side
     over the lift's band. It touches what is drawn on land - trees, crags - which reads as
     surface texture, not pattern.
+  - **The detail ends at the painted coast (Ben, 2026-11-22: "fine grain textures drawn over the
+    ocean, or land with no texture where the hexagon spills onto the ocean").** The bake's coast
+    is warped and organic; the hex side is not. So the detail's extent is per pixel, not per
+    tile: the bake **marks every pixel it paints as land** (land weight at least half; the sea,
+    a lake and a river's water are not land) in the **lowest bit of its red channel**, as the
+    structure mark uses blue's, and the shader filters that bit over the four texels round the
+    point, so the detail's edge follows the painted shore softly. The family is still per tile:
+    the hex's own, and where the painted land runs past the hex side into a water tile, the
+    nearest land tile beside it. A land tile does not fade toward a water neighbour at the hex
+    side; the mark is the coast. The land lift keeps its per-tile weight (below).
   - **Each tile reads on its own (Ben, 2026-11-16: the style "doesn't differentiate between
     different tiles very well" - both the families looking alike and neighbours running on as
     wallpaper).** Every tile reads the textures **at its own offset**, a hash of its grid cell,

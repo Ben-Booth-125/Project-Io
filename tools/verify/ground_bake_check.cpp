@@ -450,11 +450,14 @@ void master_row(const bake_source& src, const body_component& hb, int land_i, co
         // BL-1652 (gamma-correct mips): a black/white checker halves to the sRGB byte of
         // HALF the light (188), not the byte mean (128); one lit pixel in three dark ones
         // to a quarter of the light (137); greys a step apart stay ordered and exact.
+        // Read on GREEN: red's and blue's lowest bits are marks (the land mark, the
+        // structure mark), replaced by their own majority rule, so green is the one
+        // channel that is colour alone.
         auto px = [](int v) { return ui::palette::col32(v, v, v, 255); };
         auto half_of = [](std::vector<std::uint32_t> q) {
             std::vector<std::uint32_t> h(1);
             downsample_half(q.data(), 2, 2, h.data());
-            return ui::palette::col_r(h[0]);
+            return ui::palette::col_g(h[0]);
         };
         const int checker = half_of({ px(0), px(255), px(255), px(0) });
         const int one_lit = half_of({ px(255), px(0), px(0), px(0) });
@@ -467,8 +470,19 @@ void master_row(const bake_source& src, const body_component& hb, int land_i, co
         // stays white at a quarter coverage.
         std::vector<std::uint32_t> q{ px(255), 0u, 0u, 0u }, h(1);
         downsample_half(q.data(), 2, 2, h.data());
-        check(ui::palette::col_r(h[0]) == 255 && ui::palette::col_a(h[0]) == 64, "P36",
+        check(ui::palette::col_g(h[0]) == 255 && ui::palette::col_a(h[0]) == 64, "P36",
               "alpha weights the colour and averages as coverage");
+        // BL-1721 (coast texture follows land): the land mark (red's lowest bit) carries
+        // where at least two of the four opaque pixels carry it, as the structure mark does.
+        auto land = [](bool on) { return ui::palette::col32(on ? 101 : 100, 100, 100, 255); };
+        auto land_of = [](std::vector<std::uint32_t> q) {
+            std::vector<std::uint32_t> h(1);
+            downsample_half(q.data(), 2, 2, h.data());
+            return (ui::palette::col_r(h[0]) & 1) != 0;
+        };
+        check(land_of({ land(true), land(true), land(false), land(false) })
+                  && !land_of({ land(true), land(false), land(false), land(false) }),
+              "P36", "the land mark carries where at least two of the four pixels carry it");
     }
 
     // The chooser. Rung radii at 1720x1080 (drawn: 5.91 / 11.83 / 23.66 /

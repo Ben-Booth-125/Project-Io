@@ -538,7 +538,8 @@ int choose_level(double draw_r);
 /// edge. Pure: the mip chain is built with it chunk by chunk, and because a
 /// master chunk's sides are multiples of k_master_align the chunkwise chain
 /// equals the whole-image one byte for byte. The structure mark (blue's lowest bit,
-/// apply_structure_mark) carries where at least two of the four pixels carry it.
+/// apply_structure_mark) and the land mark (red's lowest bit, apply_land_mark) each
+/// carry where at least two of the four pixels carry them.
 void downsample_half(const std::uint32_t* src, int sw, int sh, std::uint32_t* dst);
 
 /// THE STRUCTURE MARK (Ben, 2026-11-16; RENDERING.md § Level of detail, "Buildings and
@@ -547,6 +548,15 @@ void downsample_half(const std::uint32_t* src, int sw, int sh, std::uint32_t* ds
 /// other opaque pixel, so the draw-time detail can leave roads and structures as baked.
 /// A transparent pixel is left untouched.
 void apply_structure_mark(std::uint32_t* px, const std::uint8_t* mark, std::size_t n);
+
+/// THE LAND MARK (Ben, 2026-11-22, BL-1721 (coast texture follows land); RENDERING.md
+/// § Level of detail, "The detail ends at the painted coast"): bake_region's step after
+/// the structure mark. Sets red's lowest bit on every pixel whose land weight @p land is
+/// at least half (the painted land, not the hex: the shore follows the bake's warped
+/// coast) and clears it on every other opaque pixel, so the draw-time detail layer can
+/// end where the painted coast does. A transparent pixel is left untouched; the lock
+/// fill carries no land.
+void apply_land_mark(std::uint32_t* px, const std::uint8_t* land, std::size_t n);
 
 /// Content hash of everything bake_region reads for the given pixel window
 /// (tile fields + mask state of the tiles overlapping it, plus a margin ring).
