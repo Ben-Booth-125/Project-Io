@@ -2922,7 +2922,7 @@
    "id": "BL-1727",
    "short_name": "LABOUR_POOL_LEGIBLE",
    "title": "The selection element shows where a labour pool comes from and where it is allocated",
-   "design": "PLAYTEST 2 LANE H (selection & shell). Ben: \"We need to increase visibility on where the labour pool is coming from and where it's allocated in the selection element. Let me know what ideas you have. Perhaps this can go above the resource table for provinces.\" DESIGN OWED: Claude proposes; Ben picks. POPULATION.md owns labour supply and contention; SELECTION.md owns the card. Answer the surface's question in question_log.json first."
+   "design": "PLAYTEST 2 LANE H (selection & shell). Ben: \"We need to increase visibility on where the labour pool is coming from and where it's allocated in the selection element. Let me know what ideas you have. Perhaps this can go above the resource table for provinces.\" DESIGN OWED: Claude proposes; Ben picks. POPULATION.md owns labour supply and contention; SELECTION.md owns the card. Answer the surface's question in question_log.json first. FORM PICKED (Ben, 2026-11-22): two stacked bars above the province resource table. Bar 1 \"supplied\", split by source population centre (plus rural); bar 2 \"allocated\", split by building class, with an idle segment. Below them, one line naming the most short-staffed building. Hover a segment for names and figures. Example: \"Labour 12.4k supplied / [Velka 7.1k | Oruth 3.9k | rural 1.4k] / [Mines 5.2k | Mills 4.8k | Depot 0.9k | idle 1.5k] / Short: Steel Mill -0.6k\". Still to design: the tile card's version, and where the source split comes from."
   },
   {
    "glyph": "✓",
