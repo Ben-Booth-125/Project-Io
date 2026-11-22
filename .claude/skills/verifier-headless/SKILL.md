@@ -1064,6 +1064,13 @@ in `tools/verify/README.md`.
   the resolver; a retreat that refuses a wall; fronts that substitute a walled slot, skip a walled
   push target and never re-issue a walled unit daily; and the loader's rejections. Build with
   `bash tools/verify/build_lua_harness.sh terrain_class_harness`.
+- **`army_groups_harness`** — BL-1737 (army groups; MILITARY.md § Army groups): the one verb
+  `set_army_group` and the operations built from it on a generated world. Ordinal names; Form
+  (a new group, then joins); the seat-only refusal and the verb's own refusals, each mutating
+  nothing; one group at most; Merge (the emptied group ends); Split off (the lowest free
+  ordinal); a unit dying and units disbanded through the seam, the prune ending a group with
+  none left; save/load byte-identical with the hash equal; two copies byte-identical. Build with
+  `node tools/verify/build_harness.js army_groups_harness --run`.
 
 ## Running the whole suite (CTest — BL-104)
 

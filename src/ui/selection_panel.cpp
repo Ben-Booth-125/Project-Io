@@ -27,6 +27,8 @@
 #include "market_ledger.hpp"   // market_city_name — a building's market, by city
 #include "nav_pane.hpp"        // close_all_panels — the card's doors onto the fold-out column
 #include "pinned_panel.hpp"     // pin_header_reserve — BL-1695, header rows keep the pin clear
+#include "army_group_ui.hpp"    // BL-1737: select_army_group, sync_army_group_selection
+#include "world/army_groups.hpp" // BL-1737: army_group_name, army_groups_of
 #include "presentation.hpp"
 #include "selection.hpp"
 #include "text_fit.hpp"
@@ -1744,6 +1746,18 @@ void draw_unit_selection_body(const world& w, const recipe_registry& reg, ui_sta
                 ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(
                                        front_stance_colour(stance_toward(w, u.owner, fv->f.neighbour))),
                                    "Front: %s", fv->label.c_str());
+            // BL-1737 (SELECTION.md § The army group element): the unit's army group, a
+            // press back to the group's card.
+            if (u.army_group != null_entity && w.army_groups.count(u.army_group) != 0
+                && is_player_side(w, u.owner))
+            {
+                const std::string an = "In the " + army_group_name(w, u.army_group);
+                if (ImGui::Selectable((an + "##unit_army").c_str(), false, 0,
+                                      {ui::fit_width(an.c_str()) + ImGui::GetStyle().FramePadding.x, 0.0f}))
+                    select_army_group(w, ui, u.army_group);
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip("Open this army group's card");
+            }
             // Supply (BL-454): an unpaid wage, an unmet draw or standing past the reach
             // field weakens the unit; the grid's stocks do not show it, so say it here.
             if (u.supply_factor_permille < 1000)
@@ -2011,32 +2025,63 @@ void draw_unit_cell_bar(float share, ImU32 col)
 // the rest — a row is the door to that unit's card, whose header carries the way
 // back. HP, readiness and morale for the player's own units only (BL-068, the
 // counter's own rule): a rival's row says what it is and how many men it has.
+//
+// BL-1737 (SELECTION.md § The army group element): with @p army a group of the player's,
+// the same element names the group and carries Merge, Split off and a tick box a row;
+// without one, a stack or dragged group of the player's carries Form group.
 void draw_unit_group_selection(const world& w, const recipe_registry& reg, ui_state& ui,
-                               const std::vector<entity_id>& group)
+                               const std::vector<entity_id>& group, entity_id army = null_entity)
 {
     const unit_component& head = w.units.at(group.front());
     const bool  own     = is_player_side(w, head.owner);
     const float bar_w   = ImGui::GetContentRegionAvail().x;
     const float frame_h = ImGui::GetFrameHeight();
     const int   n       = static_cast<int>(group.size());
+    ui.army_drawn.form_x = ui.army_drawn.form_y = -1.0f;
+    ui.army_drawn.merge_x = ui.army_drawn.merge_y = -1.0f;
+    ui.army_drawn.split_x = ui.army_drawn.split_y = -1.0f;
+    ui.army_drawn.split_enabled = false;
+    ui.army_drawn.ticks.clear();
+    ui.army_drawn.merge_rows.clear();
+    // The ticks belong to one group; another group shown starts them empty, and a
+    // fallen unit leaves them.
+    if (ui.army_ticks_for != army)
+    {
+        ui.army_ticks_for = army;
+        ui.army_ticks.clear();
+    }
+    ui.army_ticks.erase(std::remove_if(ui.army_ticks.begin(), ui.army_ticks.end(),
+                                       [&](entity_id u) {
+                                           return std::find(group.begin(), group.end(), u) == group.end();
+                                       }),
+                        ui.army_ticks.end());
+    const auto centre_of_last = [](float& x, float& y) {
+        const ImVec2 a = ImGui::GetItemRectMin(), b = ImGui::GetItemRectMax();
+        x = (a.x + b.x) * 0.5f;
+        y = (a.y + b.y) * 0.5f;
+    };
 
     // ── Header: Owner · N units · tile col, row .................... [>] ──
     {
         const char* owner_name = owner_display_name(w, head.owner);
-        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "%s",
-                           owner_name != nullptr ? owner_name : "\xe2\x80\x94");
+        if (army != null_entity) // BL-1737: an army group reads by its name
+            ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "%s",
+                               army_group_name(w, army).c_str());
+        else
+            ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "%s",
+                               owner_name != nullptr ? owner_name : "\xe2\x80\x94");
         ImGui::SameLine();
         // BL-1508: a dragged group may span tiles, and then names how many.
         std::set<entity_id> group_tiles;
         for (const entity_id uid : group)
             group_tiles.insert(w.units.at(uid).position);
         if (group_tiles.size() > 1)
-            ImGui::TextDisabled("%d units \xc2\xb7 %d tiles", n, static_cast<int>(group_tiles.size()));
+            ImGui::TextDisabled("%d unit%s \xc2\xb7 %d tiles", n, n == 1 ? "" : "s", static_cast<int>(group_tiles.size()));
         else if (const auto tit = w.tiles.find(head.position); tit != w.tiles.end())
-            ImGui::TextDisabled("%d units \xc2\xb7 tile %d, %d", n,
+            ImGui::TextDisabled("%d unit%s \xc2\xb7 tile %d, %d", n, n == 1 ? "" : "s",
                                 tit->second.grid_x, tit->second.grid_y);
         else
-            ImGui::TextDisabled("%d units", n);
+            ImGui::TextDisabled("%d unit%s", n, n == 1 ? "" : "s");
         // Assign to front (BL-1427): every unit of the group, one press — the
         // player's own groups only. Left of 'go to', as the card's "< Group" is.
         if (own)
@@ -2050,6 +2095,89 @@ void draw_unit_group_selection(const world& w, const recipe_registry& reg, ui_st
             // Defend province (Ben, 2026-11-09): the group's own press, as the card's is.
             // BL-1695: both presses stand clear of the pin toggle, left of 'go to'.
             const float right = bar_w - frame_h - pin_header_reserve();
+            // BL-1737 (SELECTION.md § The army group element): Merge and Split off on an
+            // army group; Form group on a stack or dragged group. Left of Defend.
+            float left_of = right - bw - gap - dw;
+            if (army != null_entity)
+            {
+                const char* mlb = "Merge";
+                const char* slb = "Split off";
+                const float mw  = ui::fit_width(mlb) + pad;
+                const float sw  = ui::fit_width(slb) + pad;
+                const std::vector<entity_id> others = [&] {
+                    std::vector<entity_id> v;
+                    for (const entity_id g : army_groups_of(w, head.owner))
+                        if (g != army && !army_group_members(w, g).empty())
+                            v.push_back(g);
+                    return v;
+                }();
+                ImGui::SameLine(left_of - gap - sw - gap - mw);
+                ImGui::BeginDisabled(others.empty());
+                if (ImGui::Button("Merge##army_merge", {mw, frame_h}))
+                    ImGui::OpenPopup("army_merge_menu");
+                ImGui::EndDisabled();
+                centre_of_last(ui.army_drawn.merge_x, ui.army_drawn.merge_y);
+                if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+                    ImGui::SetTooltip(others.empty() ? "You have no other army group to merge into this one"
+                                                     : "Take every unit of another of your army groups into this one");
+                if (ImGui::BeginPopup("army_merge_menu"))
+                {
+                    for (const entity_id g : others)
+                    {
+                        const std::vector<entity_id> gm = army_group_members(w, g);
+                        char lbl[96];
+                        std::snprintf(lbl, sizeof lbl, "%s  (%d unit%s)##merge%u", army_group_name(w, g).c_str(),
+                                      static_cast<int>(gm.size()), gm.size() == 1 ? "" : "s",
+                                      static_cast<unsigned>(g));
+                        if (ImGui::Selectable(lbl))
+                        {
+                            ui.pending_army_group.kind   = 2;
+                            ui.pending_army_group.target = army;
+                            ui.pending_army_group.units  = gm;
+                        }
+                        float rx = 0.0f, ry = 0.0f;
+                        centre_of_last(rx, ry);
+                        ui.army_drawn.merge_rows.push_back({ g, { rx, ry } });
+                    }
+                    ImGui::EndPopup();
+                }
+                const int ticked = static_cast<int>(ui.army_ticks.size());
+                const bool can_split = ticked >= 1 && ticked < n;
+                ImGui::SameLine(left_of - gap - sw);
+                ImGui::BeginDisabled(!can_split);
+                if (ImGui::Button("Split off##army_split", {sw, frame_h}))
+                {
+                    std::vector<entity_id> picked = ui.army_ticks;
+                    std::sort(picked.begin(), picked.end());
+                    ui.pending_army_group.kind   = 3;
+                    ui.pending_army_group.target = null_entity;
+                    ui.pending_army_group.units  = picked;
+                    ui.army_ticks.clear();
+                }
+                ImGui::EndDisabled();
+                centre_of_last(ui.army_drawn.split_x, ui.army_drawn.split_y);
+                ui.army_drawn.split_enabled = can_split;
+                if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+                    ImGui::SetTooltip(can_split ? "Move the ticked units into a new army group"
+                                                : "Tick the units to split off, leaving at least one");
+                left_of -= gap + sw + gap + mw;
+            }
+            else if (n >= 2)
+            {
+                const char* flb = "Form group";
+                const float fw  = ui::fit_width(flb) + pad;
+                ImGui::SameLine(left_of - gap - fw);
+                if (ImGui::Button("Form group##army_form", {fw, frame_h}))
+                {
+                    ui.pending_army_group.kind   = 1;
+                    ui.pending_army_group.target = null_entity;
+                    ui.pending_army_group.units  = group;
+                }
+                centre_of_last(ui.army_drawn.form_x, ui.army_drawn.form_y);
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip("Put every unit shown into a new army group");
+                left_of -= gap + fw;
+            }
             ImGui::SameLine(right - bw - gap - dw);
             const bool group_defending = units_all_defending(w, group);
             if (group_defending)
@@ -2119,9 +2247,12 @@ void draw_unit_group_selection(const world& w, const recipe_registry& reg, ui_st
     // ── The rest: one row per unit ──
     const ImGuiTableFlags tf = ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollY
                              | ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_BordersInnerV;
-    if (ImGui::BeginTable("##unit_group_rows", 6, tf, {0.0f, total_h}))
+    const bool ticks = army != null_entity; // BL-1737: Split off picks its rows
+    if (ImGui::BeginTable("##unit_group_rows", ticks ? 7 : 6, tf, {0.0f, total_h}))
     {
         ImGui::TableSetupScrollFreeze(0, 1);
+        if (ticks)
+            ImGui::TableSetupColumn("##tick", ImGuiTableColumnFlags_WidthFixed, frame_h);
         ImGui::TableSetupColumn("Unit",      ImGuiTableColumnFlags_None, 2.0f);
         ImGui::TableSetupColumn("Fights as", ImGuiTableColumnFlags_None, 1.4f);
         ImGui::TableSetupColumn("Men",       ImGuiTableColumnFlags_None, 1.0f);
@@ -2136,37 +2267,57 @@ void draw_unit_group_selection(const world& w, const recipe_registry& reg, ui_st
             const unit_component& u = w.units.at(uid);
             ImGui::PushID(static_cast<int>(uid));
             ImGui::TableNextRow();
+            const int c0 = ticks ? 1 : 0;
 
-            ImGui::TableSetColumnIndex(0);
+            if (ticks)
+            {
+                ImGui::TableSetColumnIndex(0);
+                const auto at = std::find(ui.army_ticks.begin(), ui.army_ticks.end(), uid);
+                bool on = at != ui.army_ticks.end();
+                if (ImGui::Checkbox("##tick", &on))
+                {
+                    if (on)
+                        ui.army_ticks.push_back(uid);
+                    else
+                        ui.army_ticks.erase(std::find(ui.army_ticks.begin(), ui.army_ticks.end(), uid));
+                }
+                float tx = 0.0f, ty = 0.0f;
+                centre_of_last(tx, ty);
+                ui.army_drawn.ticks.push_back({ uid, { tx, ty } });
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip("Tick to split this unit off");
+            }
+
+            ImGui::TableSetColumnIndex(c0 + 0);
             if (ImGui::Selectable(unit_roster_display_name(u.type).c_str(), false,
-                                  ImGuiSelectableFlags_SpanAllColumns))
+                                  ticks ? ImGuiSelectableFlags_None : ImGuiSelectableFlags_SpanAllColumns))
                 open = uid;
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip("Open this unit's card");
 
-            ImGui::TableSetColumnIndex(1);
+            ImGui::TableSetColumnIndex(c0 + 1);
             ImGui::TextUnformatted(land_class_display_name(unit_land_class(u)));
 
-            ImGui::TableSetColumnIndex(2);
+            ImGui::TableSetColumnIndex(c0 + 2);
             const int est = unit_establishment(u);
             if (own)
                 ImGui::Text("%d / %d", u.count, est);
             else
                 ImGui::Text("%d", u.count);
 
-            ImGui::TableSetColumnIndex(3);
+            ImGui::TableSetColumnIndex(c0 + 3);
             if (own)
                 draw_unit_cell_bar(est > 0 ? static_cast<float>(u.count) / est : 0.0f, palette::unit_hp);
             else
                 ImGui::TextDisabled("\xe2\x80\x94");
 
-            ImGui::TableSetColumnIndex(4);
+            ImGui::TableSetColumnIndex(c0 + 4);
             if (own)
                 draw_unit_cell_bar(u.readiness_permille / 1000.0f, palette::unit_readiness);
             else
                 ImGui::TextDisabled("\xe2\x80\x94");
 
-            ImGui::TableSetColumnIndex(5);
+            ImGui::TableSetColumnIndex(c0 + 5);
             if (own)
                 ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::unit_morale),
                                    "%.0f%%", u.morale_permille / 10.0f);
@@ -2183,6 +2334,7 @@ void draw_unit_group_selection(const world& w, const recipe_registry& reg, ui_st
             ui.selected_entity      = open;
             ui.selection_unit_group = false;
             ui.selection_unit_page  = 0;
+            ui.selection_army_group = null_entity; // BL-1737: the unit's card names the way back
         }
     }
 }
@@ -5568,6 +5720,13 @@ void draw_selection_content(world& w, const recipe_registry& reg,
     std::vector<entity_id> unit_group;
     if (kind == selection_kind::unit)
     {
+        // BL-1737 (SELECTION.md § The army group element): a shown army group, its
+        // members re-derived from the world this frame.
+        if (const std::vector<entity_id> army = sync_army_group_selection(w, ui); !army.empty())
+        {
+            draw_unit_group_selection(w, reg, ui, army, ui.selection_army_group);
+            return;
+        }
         // BL-1508: the dragged group, across tiles, when this unit is one of it.
         unit_group = std::find(ui.selected_units.begin(), ui.selected_units.end(), ui.selected_entity)
                          != ui.selected_units.end()

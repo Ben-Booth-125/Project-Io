@@ -1,4 +1,5 @@
 #include "economy_system.hpp"
+#include "army_groups.hpp" // BL-1737: prune_army_groups
 #include "space_units.hpp" // BL-1595: run_space_unit_day
 #include "space_battle.hpp" // BL-1597: run_space_battle_day
 #include "debris.hpp"       // BL-1598: run_space_debris_day
@@ -5452,6 +5453,8 @@ military_day_result run_military_day(world& w, const recipe_registry& reg, int d
     // § Marching), by the one disband path the upkeep pass also runs, so it never
     // stands on its tile blocking today's march.
     out.disbanded = disband_orphaned_units(w);
+    // BL-1737 (MILITARY.md § Army groups): a group whose last unit fell today ends today.
+    prune_army_groups(w);
     out.march   = run_unit_march(w, reg, day_tick);
     // OUT OF CONTACT, READINESS AND MORALE RECOVER DAILY (Ben, 2026-10-28), after the
     // march, so a unit whose march opened a battle today is in contact and does not.

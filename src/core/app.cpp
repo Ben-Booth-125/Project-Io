@@ -12,6 +12,8 @@
 #include <imgui_impl_sdlrenderer3.h>
 #include <SDL3/SDL.h>
 
+#include "ui/army_group_ui.hpp"   // BL-1737: select_army_group after a reshaping press
+#include "world/army_groups.hpp" // BL-1737: army_group_name
 #include "ui/construction_sites.hpp"
 #include "ui/body_surface_canvas.hpp"
 #include "ui/rail_tool.hpp" // BL-1255: rail_player_nation for the Rail group presses
@@ -4034,6 +4036,54 @@ void app::render()
             m_ui.construction.last_message = std::to_string(applied) + " defending, "
                                            + std::to_string(refused) + " refused.";
         m_ui.pending_defend_province.clear(); // consume the request
+    }
+
+    // BL-1737 (MILITARY.md § Army groups): Form group, Merge and Split off — one
+    // `set_army_group` per unit, ascending id. Form and Split put the first unit into a
+    // new group and the rest into it; Merge puts each unit into the shown group. The band
+    // then shows the group the units went to.
+    if (m_ui.pending_army_group.kind != 0)
+    {
+        const ui_state::army_group_op op = m_ui.pending_army_group;
+        m_ui.pending_army_group = {};
+        std::vector<entity_id> units = op.units;
+        std::sort(units.begin(), units.end());
+        entity_id into = op.kind == 2 ? op.target : null_entity;
+        int applied = 0, refused = 0;
+        for (const entity_id unit : units)
+        {
+            corp_command cmd;
+            cmd.tick         = static_cast<int>(m_sim_loop.day_tick());
+            cmd.corp         = m_world.player_entity;
+            cmd.verb         = corp_verb::set_army_group;
+            cmd.subject      = unit;
+            cmd.counterparty = into;
+            cmd.order        = into == null_entity ? 1u : 0u;
+            entity_id made = null_entity;
+            const corp_command_result r = player_command(cmd, &made);
+            if (r == corp_command_result::applied)
+            {
+                ++applied;
+                if (into == null_entity)
+                    into = made;
+            }
+            else
+                ++refused;
+        }
+        const std::string name = army_group_name(m_world, into);
+        if (applied == 0)
+            m_ui.construction.last_message = op.kind == 2 ? "Couldn't merge those groups."
+                                                          : "Couldn't form an army group.";
+        else if (op.kind == 1)
+            m_ui.construction.last_message = name + " formed.";
+        else if (op.kind == 2)
+            m_ui.construction.last_message = "Merged into the " + name + ".";
+        else
+            m_ui.construction.last_message = "Split off as the " + name + ".";
+        if (refused > 0 && applied > 0)
+            m_ui.construction.last_message += " " + std::to_string(refused) + " refused.";
+        if (into != null_entity)
+            ui::select_army_group(m_world, m_ui, into);
     }
 
     // Assign to front (BL-1427): the unit card's and the unit group's menu — one

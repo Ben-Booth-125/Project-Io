@@ -423,6 +423,11 @@ struct world
     /// wing never stands on a tile, and no land pass may see it. Saved (v65).
     std::map<entity_id, air_wing> wings;
 
+    /// BL-1737 (MILITARY.md § Army groups): every army group, keyed by its entity id.
+    /// ORDERED, so every walk is ascending id. Members are the units naming it
+    /// (`unit_component::army_group`). Saved (v101).
+    std::map<entity_id, army_group_component> army_groups;
+
     /// BL-1430 (MILITARY.md § Sea): every ship, keyed by its entity id. ORDERED, so every
     /// walk is ascending id. Deliberately NOT in `units`: no land pass may see a ship.
     /// Saved (v80).

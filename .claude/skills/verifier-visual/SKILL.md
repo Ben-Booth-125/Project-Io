@@ -139,6 +139,12 @@ what the SURFACE listed or drew — the surface publishing its own list — neve
   `wrong_air`), and `status_drawn` asserts the status line was DRAWN, not merely recorded.
   Fixture: `verify.seed_processing(recipe[, direct])` — the real `construct_building`, minus the
   construction wait; `direct` inserts on a body the player cannot reach, still refusing wrong air.
+- **`army_groups.lua`** — BL-1737 (army groups; SELECTION.md § The army group element,
+  ledgers/military.md § Groups): a drag gathers two of the player's units, Form group makes the
+  1st Army, a tick and Split off the 2nd, the Groups tab lists both in ordinal order, Merge takes
+  one into the other, and the row's pin pins and unpins the group. Every press aims at the point
+  `verify.army_groups()` publishes (the card's presses, tick boxes, Merge rows and ledger rows;
+  units and screen positions only). Captures the card, the tab, the merge list and the pin.
 - **`sea_lane.lua`** — a sea-route convoy drawn along its legs (SUPPLY.md, "The lane is the legs").
   `verify.sea_route_fixture(res, qty, min_land)` finds (or, by laying two Ports, makes) a market pair
   on the home planet whose cheapest haul is land -> port -> sea -> port -> land with `min_land` land

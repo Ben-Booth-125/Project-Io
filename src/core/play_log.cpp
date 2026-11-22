@@ -249,6 +249,7 @@ const char* play_log::verb_name(corp_verb v)
         case corp_verb::accept_join:          return "accept_join";        // BL-1706
         case corp_verb::refuse_join:          return "refuse_join";        // BL-1706
         case corp_verb::capitulate:           return "capitulate";         // BL-1706
+        case corp_verb::set_army_group:       return "set_army_group";     // BL-1737
     }
     return "verb?";
 }

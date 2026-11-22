@@ -885,7 +885,16 @@ inline constexpr uint32_t k_world_save_version_tree_trim = 99;
 /// of v100 and is read too (`k_world_save_version_pre_unit_stocks`), as a world whose units
 /// hold full fuel and bought every stock in full (v98 and older as well). A game save
 /// of v99 still opens: the tree-trim door refuses below v99, not below v100.
-inline constexpr uint32_t world_save_version = 100;
+/// **101 (BL-1737; MILITARY.md § Army groups) - THE ARMY GROUPS.** Appended last, after
+/// v100's unit stocks, after a u32 count: every army group with at least one member, ascending
+/// id, as (id, owner, u32 ordinal, u32 n, then n member unit ids ascending) - 16 + 4n bytes.
+/// A member is a land unit standing (`world::units`) or aboard a ship. Untrusted: group ids
+/// strictly ascending, none a unit; owner a nation; ordinal in [1, 99] and unique per owner;
+/// n in [1, units]; each member a unit in the stream owned by the group's owner and in no
+/// other group, ids strictly ascending; at most 99 groups an owner. Refused whole otherwise.
+/// v100 is a STRICT PREFIX of v101 and is read too (`k_world_save_version_pre_army_groups`),
+/// as a world with no army group (v99 and older as well).
+inline constexpr uint32_t world_save_version = 101;
 
 /// BL-1637: the first version carrying the pad-boost section (see above).
 inline constexpr uint32_t k_world_save_version_launch_boost = 96;
@@ -895,6 +904,12 @@ inline constexpr uint32_t k_world_save_version_unit_stocks = 100;
 
 /// BL-1678: v99, a strict prefix of v100.
 inline constexpr uint32_t k_world_save_version_pre_unit_stocks = k_world_save_version_unit_stocks - 1;
+
+/// BL-1737: the first version carrying the army groups section (see above).
+inline constexpr uint32_t k_world_save_version_army_groups = 101;
+
+/// BL-1737: v100, a strict prefix of v101.
+inline constexpr uint32_t k_world_save_version_pre_army_groups = k_world_save_version_army_groups - 1;
 
 /// BL-1637: v95, a strict prefix of v96.
 inline constexpr uint32_t k_world_save_version_pre_launch_boost = k_world_save_version_launch_boost - 1;
@@ -1265,6 +1280,8 @@ inline constexpr bool world_stream_has_war_joiners(uint32_t v) { return v >= k_w
 inline constexpr bool world_stream_has_province_names(uint32_t v) { return v >= k_world_save_version_province_names && !world_stream_is_space_line(v); }
 /// BL-1678: from v100 the stream ends with the unit stocks section.
 inline constexpr bool world_stream_has_unit_stocks(uint32_t v) { return v >= k_world_save_version_unit_stocks && !world_stream_is_space_line(v); }
+/// BL-1737: from v101 the stream ends with the army groups section.
+inline constexpr bool world_stream_has_army_groups(uint32_t v) { return v >= k_world_save_version_army_groups && !world_stream_is_space_line(v); }
 
 /// BL-1539: the first version carrying the research-books section (see above).
 inline constexpr uint32_t k_world_save_version_research_books = 80;
@@ -1602,6 +1619,12 @@ void write_world_snapshot_pre_unit_stocks(const world& w, std::ostream& out);
 
 /// BL-1678: the v100 section's bytes (4 + 44 per unit, standing or aboard, off the defaults).
 std::size_t world_save_unit_stocks_section_bytes(const world& w);
+
+/// BL-1737, VERIFICATION ONLY: the v100 stream shape - no army groups section.
+void write_world_snapshot_pre_army_groups(const world& w, std::ostream& out);
+
+/// BL-1737: the v101 section's bytes (4 + per group with a member 16 + 4 per member).
+std::size_t world_save_army_group_section_bytes(const world& w);
 
 /// BL-1632: the byte lengths of the v57..v66 trailing sections `w` writes, each
 /// mirroring its writer block field for field - the construction days (v57), the unit

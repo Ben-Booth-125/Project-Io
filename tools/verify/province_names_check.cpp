@@ -187,7 +187,7 @@ int main(int argc, char** argv)
         world r;
         const bool ok = from_bytes(o96.str(), r);
         bool reads = ok && r.province_name.empty()
-                     && o96.str().size() + world_save_province_names_section_bytes(w) + world_save_unit_stocks_section_bytes(w) /* BL-1678 (v100) follows */ == b.size();
+                     && o96.str().size() + world_save_province_names_section_bytes(w) + world_save_unit_stocks_section_bytes(w) /* BL-1678 (v100) follows */ + world_save_army_group_section_bytes(w) /* BL-1737 (v101) */ == b.size();
         int checked = 0;
         if (reads)
             for (const auto& [pid, cid] : centre_of)
@@ -202,7 +202,7 @@ int main(int argc, char** argv)
     {
         // Hostile streams: rewrite the section's first record. Layout at the tail:
         // u32 count, then (u32 id, u32 len, bytes) per name, ascending id.
-        const std::size_t at = b.size() - world_save_unit_stocks_section_bytes(w) /* BL-1678 (v100) follows */ - world_save_province_names_section_bytes(w);
+        const std::size_t at = b.size() - world_save_army_group_section_bytes(w) /* BL-1737 (v101) */ - world_save_unit_stocks_section_bytes(w) /* BL-1678 (v100) follows */ - world_save_province_names_section_bytes(w);
         std::string bad_id = b;
         const uint32_t not_a_province = 0xFFFFFFF0u;
         std::memcpy(&bad_id[at + 4], &not_a_province, sizeof not_a_province);

@@ -272,6 +272,11 @@ enum class corp_verb : uint8_t
     accept_join,          ///< `corp`, a war leader, accepts `counterparty`'s pending request to join its side: hostility both ways with every member across, the join's price charged. rejected_state (no such request, or it no longer holds).
     refuse_join,          ///< `corp`, a war leader, refuses `counterparty`'s pending request to join its side; `counterparty` may not ask again in that war for 12 ticks. rejected_state (no such request).
     capitulate,           ///< `corp` capitulates in the war it fights against `counterparty`: every goal the other side named on its ground passes to its namer, held or not; a leader's capitulation ends the war. rejected_state (not at war with `counterparty`).
+    // --- BL-1737 (army groups; MILITARY.md § Army groups, Ben 2026-11-22) ---
+    // Appended after capitulate, same append-only rule. The SEAT's alone: a rival
+    // grouping its units would be a new widening (AI_OPPONENT.md § 11), so corp_ai.cpp
+    // never issues it. Form, merge and split are this verb sent once per unit.
+    set_army_group,       ///< Put the actor's unit `subject` into the actor's army group `counterparty`; with `counterparty` null, `order` 1 puts it into a NEW group (its id through `out_building`; ordinal the lowest the nation does not use) and `order` 0 takes it out of any. A group left with no unit is removed. rejected_not_owner (not the seat, not its unit, not its group) / rejected_invalid (no such unit or group, `order` above 1, or `order` 1 with a group named) / rejected_state (already in that group, out of none, or the nation holds 99 groups) — see `set_army_group_check`.
 };
 
 /// One past the highest verb — the wire parser's range gate (BL-396: run_serve
@@ -281,7 +286,7 @@ enum class corp_verb : uint8_t
 /// appending a verb means moving this with it — and only this, since existing
 /// values never renumber.
 inline constexpr uint8_t corp_verb_count =
-    static_cast<uint8_t>(corp_verb::capitulate) + 1;
+    static_cast<uint8_t>(corp_verb::set_army_group) + 1;
 
 /// `unqueue_research`'s "the last entry" sentinel for `corp_command::order`
 /// (the MCP boundary's -1). UINT32_MAX, never a node index.

@@ -677,6 +677,33 @@ day. The rule is deterministic, ordered by unit id like the rest of the march.
 no-default-assignment rule stands. Every move is a legal `march_unit`, under the grant in
 `../ai/AI_OPPONENT.md` § 11.
 
+### Army groups (Ben, 2026-11-22)
+
+**An army group is a named, lasting set of a nation's own land units, which may span tiles.** It is
+the player's organisation of force, kept until the player changes it. It is not the counter's stack,
+which is derived from a tile each frame (`../ui/SELECTION.md` § The unit group element), and not the
+dragged group, which a drag gathers and any other selection retires.
+
+- **A unit sits in one army group at most.** Joining a group moves it out of the one it was in.
+- **A group is formed from a selection.** Any selection of two or more of the player's units (a
+  stack or a dragged group) carries **Form group**. It puts every selected unit into a new group.
+- **Merge** takes every unit of another of the player's groups into this one. The other group,
+  left empty, is gone.
+- **Split off** takes the units picked out on the group's card into a new group. Those left stay.
+- **A group is named by its ordinal**: *1st Army*, *2nd Army*, and so on, the lowest number its
+  nation does not already use. It is not renamed.
+- **A group ends when its last unit does.** A unit that dies, disbands or is lost leaves its group.
+  A group with no unit left is removed in the day's pass, and a pin of it drops off.
+- **A group takes orders as one, by each of its units.** A right-click march, Assign to front and
+  Defend province are sent once per unit, in ascending id, as the dragged group's are. A unit the
+  verb refuses is reported and the rest still go. The group holds no order of its own.
+- **One verb carries all of it**: `set_army_group` puts one unit into a group, into a new one, or
+  out of any. Form, merge and split are that verb sent once per unit.
+
+**Player-only.** The verb is the seat's alone. A rival grouping its units would be AI behaviour,
+a new widening under `../ai/AI_OPPONENT.md` § 11, and no grant gives it. Rival units are never in
+an army group.
+
 ### Air
 
 An air wing is **based** at an airbase and **assigned** to provinces in range with a mission —

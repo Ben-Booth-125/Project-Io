@@ -575,7 +575,7 @@ int main()
                                + world_save_ships_section_bytes(w) + world_save_growth_carry_section_bytes(w) // the space merge: main's v81..v83
                                + world_save_ended_section_bytes(w) + world_save_missile_section_bytes(w)     // and v89, before the space sections
                                + world_save_station_section_bytes(w) + world_save_early_space_section_bytes(w) // BL-1583 (v81), BL-1612 (v82)
-                               + (world_save_space_node_section_bytes(w) + (world_save_space_unit_section_bytes(w) + (world_save_space_battle_section_bytes(w) + (world_save_prospecting_section_bytes(w) + (world_save_space_convoy_section_bytes(w) + (world_save_debris_section_bytes(w) + (world_save_space_bombard_section_bytes(w) + (world_save_offworld_base_section_bytes(w) + (world_save_space_firsts_section_bytes(w) + world_save_transit_origin_section_bytes(w) + world_save_launch_boost_section_bytes(w) + world_save_province_names_section_bytes(w) /* BL-1708 (v98) */ + world_save_unit_stocks_section_bytes(w) /* BL-1678 (v100) */))))))))); // BL-1581 (v83); BL-1637 (v96) last
+                               + (world_save_space_node_section_bytes(w) + (world_save_space_unit_section_bytes(w) + (world_save_space_battle_section_bytes(w) + (world_save_prospecting_section_bytes(w) + (world_save_space_convoy_section_bytes(w) + (world_save_debris_section_bytes(w) + (world_save_space_bombard_section_bytes(w) + (world_save_offworld_base_section_bytes(w) + (world_save_space_firsts_section_bytes(w) + world_save_transit_origin_section_bytes(w) + world_save_launch_boost_section_bytes(w) + world_save_province_names_section_bytes(w) /* BL-1708 (v98) */ + world_save_unit_stocks_section_bytes(w) /* BL-1678 (v100) */ + world_save_army_group_section_bytes(w) /* BL-1737 (v101) */))))))))); // BL-1581 (v83); BL-1637 (v96) last
         // BL-1582: the launch-gate staging (a gridless tile, its pad, the shelf) predates
         // v53 tiles; the v50 rows read the world without it.
         const auto unstaged = [](world x) {
@@ -858,7 +858,7 @@ int main()
                       && back.space_orders[0].cmd.role == retask.role && back.next_space_order_id == kw.next_space_order_id
                       && back.state_hash(0) == kw.state_hash(0) && to_bytes(back) == b,
                   "A14", "a pending order round-trips (fields, equal state_hash, byte-identical re-serialise)");
-            const std::size_t sec = b.size() - (world_save_space_node_section_bytes(kw) + (world_save_space_unit_section_bytes(kw) + (world_save_space_battle_section_bytes(kw) + (world_save_prospecting_section_bytes(kw) + (world_save_space_convoy_section_bytes(kw) + (world_save_debris_section_bytes(kw) + (world_save_space_bombard_section_bytes(kw) + (world_save_offworld_base_section_bytes(kw) + (world_save_space_firsts_section_bytes(kw) + world_save_transit_origin_section_bytes(kw) + world_save_launch_boost_section_bytes(kw) + world_save_province_names_section_bytes(kw) /* BL-1708 (v98) */ + world_save_unit_stocks_section_bytes(kw) /* BL-1678 (v100) */)))))))));
+            const std::size_t sec = b.size() - (world_save_space_node_section_bytes(kw) + (world_save_space_unit_section_bytes(kw) + (world_save_space_battle_section_bytes(kw) + (world_save_prospecting_section_bytes(kw) + (world_save_space_convoy_section_bytes(kw) + (world_save_debris_section_bytes(kw) + (world_save_space_bombard_section_bytes(kw) + (world_save_offworld_base_section_bytes(kw) + (world_save_space_firsts_section_bytes(kw) + world_save_transit_origin_section_bytes(kw) + world_save_launch_boost_section_bytes(kw) + world_save_province_names_section_bytes(kw) /* BL-1708 (v98) */ + world_save_unit_stocks_section_bytes(kw) /* BL-1678 (v100) */ + world_save_army_group_section_bytes(kw) /* BL-1737 (v101) */)))))))));
             const std::size_t ord = sec + 4 + kw.space_assets.size() * 10 + 4 + 4; // the first order
             auto refused = [&](std::size_t off, const void* v, std::size_t n) {
                 std::string t = b;
@@ -1062,7 +1062,7 @@ int main()
         const std::size_t sec = world_save_transit_origin_section_bytes(x.w);
         const std::size_t lb  = world_save_launch_boost_section_bytes(x.w); // BL-1637 (v96), after it
         const std::size_t pn  = world_save_province_names_section_bytes(x.w); // BL-1708 (v98), after that
-        const std::size_t us  = world_save_unit_stocks_section_bytes(x.w);  // BL-1678 (v100), last
+        const std::size_t us  = world_save_unit_stocks_section_bytes(x.w) + world_save_army_group_section_bytes(x.w); // BL-1678 (v100), then BL-1737 (v101) last
         std::ostringstream o89(std::ios::binary);
         write_world_snapshot_pre_transit_origin(x.w, o89);
         world old;

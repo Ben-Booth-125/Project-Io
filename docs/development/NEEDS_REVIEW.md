@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*123 entries — 66 open, 57 resolved.*
+*124 entries — 67 open, 57 resolved.*
 
 ---
 
@@ -740,6 +740,15 @@ BL-1678 was merged as complete (Ben, 2026-11-20) onto the playtest lanes, where 
 **Why it matters.** The two cost rulings were made apart and compound. Rivals start the game short of money, and the build-out the settle leaves is thinner.
 
 *Files: `src/world/carried_supplies.cpp`, `docs/military/MILITARY.md`, `tools/verify/player_seed_sweep.cpp`*
+
+### NR-1262 — Army groups: four small calls taken in the build
+*decision · raised 2026-11-22 · from BL-1737 (army groups), lane K of the second playtest*
+
+Taken on your behalf while building army groups: (1) the name word is 'Army' - '1st Army', '2nd Army'; (2) a nation holds at most 99 groups, a bound the seam needs since an agent can send the verb; (3) a group may fall to one unit, and a one-unit group keeps its card (Split off is then off, Merge still works); (4) a group whose units are all aboard a transport stays alive but has no card until they land, since the card lists standing units only.
+
+**Why it matters.** Each shows on screen or in the seam, and each is cheap to change now.
+
+*Files: `src/world/army_groups.cpp`, `src/ui/selection_panel.cpp`, `docs/military/MILITARY.md`*
 
 ---
 

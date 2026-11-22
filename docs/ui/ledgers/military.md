@@ -21,19 +21,35 @@ a system with types, costs and kit.
 **What it is NOT.** It does not answer "where are my units and how are they doing" — the canvas
 counters and the unit and stack cards answer that, and a list of every unit would be a second
 surface for the same question. Fronts (BL-1427) will want their own read when they exist; whether
-that is a third tab here or the canvas is open question 4.
+that is a third tab here or the canvas is open question 4. **The army groups are the one list of
+force it keeps** (§ Groups): a group spans tiles, so no one counter shows it, and the ledger is
+where the player finds it again.
 
 ## 2. Sub-levels — views & default
 
-Two views behind a `nav_button` strip, inside `foldout_begin("Military")`.
+Three views behind a `nav_button` strip, inside `foldout_begin("Military")`.
 
 | View | Answers (one question) | Content |
 |---|---|---|
 | **Recruit** *(default)* | "What can I raise, where, and what will it cost?" | A **base picker** — the nation's completed military bases, each with its province and the units standing there. Below it, the **roster**: one row per unit type the nation may field (`available_rows`), each one line: its name, its hire price in credits, and a **Raise** press that hires at the chosen base. The row's numbers are its **card**, the name's hover (§ A row's card). What the hire takes is the Raise press's hover (§ What a Raise takes). A type the nation cannot field yet is listed dimmed, its Raise disabled, and **why** (the missing good, or the technology it waits on) is the Raise press's tooltip, so the roster shows the ladder, not only the rungs in reach. |
 | **Design** | "What is each kind of unit raised with?" | **Designs, one per land class to start** (Ben, 2026-10-27): each class's **kit slots** with the researched choice in each — infantry's rifles or anti-tank launchers, artillery's guns with drones or anti-armour alongside — what the kit costs per unit, and what the design gives (its soft, hard and hardness). A slot offers only researched kit; a class with nothing researched for a slot fields its base kit. Saving a design makes it the one Recruit raises; units in the field refit to it as kit arrives (BL-1423). Kit opens by military research. |
+| **Groups** | "What are my army groups, and how strong is each?" | One row per army group of the player's (`../../military/MILITARY.md` § Army groups), in ordinal order (§ Groups). |
 
 **Why Recruit is the default.** It is the act the ledger exists for; Design is set once and
 revisited when a technology lands.
+
+### Groups (Ben, 2026-11-22)
+
+**The Groups tab lists the player's army groups, one row each, in ordinal order.** A row reads the
+group's name (*1st Army*), its units, its men over establishment, the tiles it spans, and the front
+its units hold when they all hold one. **A press on the row selects the group**, so the Selection
+band shows its card (`../SELECTION.md` § The army group element), and a double press goes to it.
+**The pin is the row's last cell**, a toggle under the shared pin rule: its width is reserved
+before the row's other cells lay out, so no text runs under it. A pinned group is watched in the
+pinned-items list as any pin is (`../LAYOUT.md` § Pinned items).
+
+With no group, the tab shows its heading alone; how to form one is the heading's tooltip ("Select
+two or more of your units and press Form group.").
 
 ### Explanation is a tooltip (Ben, 2026-10-30)
 
@@ -252,6 +268,7 @@ recruit flow, as the placement lens is of the build flow, not an `overlay_mode`.
 | A row's numbers | `unit_land_stats` / `land_class_stats` (`src/world/unit_roster.hpp`) |
 | Hire price | `hire_base_cost + hire_cost_per_power x power_mod` (`scripts/economy.lua` § military), plus the shelf draw per gated axis |
 | Raise | the existing `hire_unit` verb — the ledger is a door onto it, never a second hire path |
+| Groups | `world::army_groups` and each unit's `army_group` (`src/world/army_groups.hpp`); members derived, ascending id |
 | Design rows | the player nation's live design per class — `design_of` / `design_stats`, the kit catalogue and its lock (`src/world/unit_designs.hpp`); a pick's refusal is `unit_design_check` |
 
 ## 5. Toggle / close semantics

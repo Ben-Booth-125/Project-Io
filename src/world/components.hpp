@@ -2190,6 +2190,21 @@ struct unit_component
     /// while it fights for the shore from the water beside it; null otherwise, which is every
     /// unit that is not in a contested landing. Saved (the v81 section) and hashed only when set.
     entity_id landing_ship = null_entity;
+
+    /// BL-1737 (MILITARY.md § Army groups, Ben 2026-11-22): the army group this unit sits in,
+    /// a key of `world::army_groups`, or null for none. One group at most. Set only by
+    /// `set_army_group` (army_groups.hpp). Saved (the v101 section) and hashed only when set.
+    entity_id army_group = null_entity;
+};
+
+/// BL-1737 (MILITARY.md § Army groups): a named, lasting set of one nation's land units.
+/// Its members are not stored here: they are the units whose `army_group` names it, so a
+/// unit that dies leaves its group with nothing to update. A group no unit names is
+/// removed by `prune_army_groups`. Named by its ordinal: 1st Army, 2nd Army, ...
+struct army_group_component
+{
+    entity_id owner   = null_entity; ///< The nation whose units it holds (the seat's alone).
+    uint32_t  ordinal = 0;           ///< 1-based; unique per owner; the lowest free at forming.
 };
 
 /// True when a unit's carried supplies are all full with nothing carried and its road

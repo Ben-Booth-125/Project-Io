@@ -900,7 +900,7 @@ int main()
         write_world_snapshot_pre_unit_stocks(sv.w, o96);
         world w96;
         const bool ok96 = from_bytes(o96.str(), w96);
-        check(ok96 && o96.str().size() + world_save_unit_stocks_section_bytes(sv.w) == b.size()
+        check(ok96 && o96.str().size() + world_save_unit_stocks_section_bytes(sv.w) + world_save_army_group_section_bytes(sv.w) /* BL-1737 (v101) */ == b.size()
                   && w96.units.count(sv.u) && unit_stocks_bought_default(w96.units.at(sv.u)),
               "S16j a v99 stream (the strict prefix) reads with full fuel and every stock bought in full");
     }

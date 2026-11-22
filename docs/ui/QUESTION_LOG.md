@@ -9,7 +9,7 @@ space**, with the backlog item that demanded it. The pair is required. Enforceme
 authorship, not machinery — there is deliberately no audit check against this file
 (BL-260, Ben 2026-08-01: *"the docs are the audit"*).
 
-**96 surfaces** — 4 settled, 92 awaiting Ben's wording.
+**98 surfaces** — 4 settled, 94 awaiting Ben's wording.
 
 ---
 
@@ -314,6 +314,14 @@ THE SEAM'S ANSWER IS SHOWN, because set_trade validates what the form cannot (bo
 
 *Demanded by BL-1516, BL-687, BL-1269, BL-1699 · `src/ui/market_ledger.cpp`, `src/ui/market_ledger.hpp`, `src/ui/selection_panel.cpp`, `src/core/app.cpp` · id `market_ledger_trades`*
 
+### Military ledger - Groups tab: one row per army group of the player's
+
+**Answers:** What are my army groups, and how strong is each?
+
+**Because:** Ben, 2026-11-22 (second playtest): "We should be able to select our units and add them to a group, with merge and split options. We should also list army groups in the military ledger, and have the option to pin them." An army group spans tiles (MILITARY.md § Army groups), so no one counter on the canvas shows it and no stack card can find it again; the ledger is the one place every group is listed wherever its units stand. A row is the group in one line - its ordinal name, its units, men over establishment, the tiles it spans, and the front its units hold when they all hold one - which is what a player needs to choose which army to send. A press selects the group so the band shows its card; the pin is the row's last cell, its width reserved before the other cells lay out (the shared pin rule, BL-1695), so the player can watch a group from the pinned-items list while working elsewhere. It overturns the ledger's old line that it lists no force: a list of every UNIT would duplicate the counters, a list of GROUPS duplicates nothing.
+
+*Demanded by BL-1737 · `src/ui/military_ledger.cpp`, `src/world/army_groups.hpp`, `docs/ui/ledgers/military.md` · id `military_groups`*
+
 ### Military ledger (nav rail slot 7): Recruit and Design tabs
 
 **Answers:** What force can I raise, where, at what cost - and what is it raised with?
@@ -473,6 +481,14 @@ THE SEAM'S ANSWER IS SHOWN, because set_trade validates what the form cannot (bo
 **Because:** The seat screen asks which nation the player is, and 'none' is a real answer: spectator mode (AI_OPPONENT.md section 10i) opens a session with nobody seated, and before this press it was reachable only by relaunching with --spectate - after the player had already waited out a generation and read the nations on the card. One button under the header, always shown, so watching needs no row pressed first; a line beside it says what it does. It earns its space because it is the screen's third answer and the only pre-play route to the mode from inside the app, and it sits on this screen because spectate is entered at the START of a session: the seat screen is the last moment before play, so the press keeps the mode a property of the whole session. It issues no take_seat. Not a toggle: it has no visible active state - it leaves the screen.
 
 *Demanded by BL-1334 · `src/ui/seat_screen.cpp`, `src/core/app.hpp` · id `seat_spectate`*
+
+### Selection band - Army group (a named, lasting group of the player's units, opened from the Groups tab or a pin)
+
+**Answers:** What is in this army, and how do I reshape it?
+
+**Because:** Ben, 2026-11-22: army groups with merge and split options. The card is the unit group element's shape (counter, stat grid, one row per unit) because a group is read the same way a stack is; what it adds is the reshaping. Merge lists the player's other groups and moves the picked one's units in; Split off moves the ticked rows into a new group, enabled only with at least one row ticked and one left, so neither press can leave an empty group behind. Each is the one verb set_army_group sent once per unit, so the card is a door onto the seam and an agent reshapes groups the same way. Orders reach every unit as the dragged group's do (selected_units), so a group is an army the player can send, not only a label. Form group on a stack or dragged group card is how a group starts. The pin's width is reserved at the header's end (BL-1695). Player-only: no grant lets a rival group its units (AI_OPPONENT.md § 11).
+
+*Demanded by BL-1737 · `src/ui/selection_panel.cpp`, `src/ui/ui_state.hpp`, `src/ui/pinned_panel.cpp`, `docs/ui/SELECTION.md` · id `selection_army_group`*
 
 ### Selection band - the expanded building card (the tile card with one stack expanded) and its retargeted action grid
 

@@ -2208,6 +2208,23 @@
     "tools/verify/player_seed_sweep.cpp"
    ],
    "resolution": null
+  },
+  {
+   "raised": "2026-11-22",
+   "status": "open",
+   "source": "BL-1737 (army groups), lane K of the second playtest",
+   "id": "NR-1262",
+   "title": "Army groups: four small calls taken in the build",
+   "kind": "decision",
+   "what": "Taken on your behalf while building army groups: (1) the name word is 'Army' - '1st Army', '2nd Army'; (2) a nation holds at most 99 groups, a bound the seam needs since an agent can send the verb; (3) a group may fall to one unit, and a one-unit group keeps its card (Split off is then off, Merge still works); (4) a group whose units are all aboard a transport stays alive but has no card until they land, since the card lists standing units only.",
+   "why_it_matters": "Each shows on screen or in the seam, and each is cheap to change now.",
+   "ask": "Accept the four, or name the ones to change (a different word, a smaller cap, a one-unit group dissolving).",
+   "files": [
+    "src/world/army_groups.cpp",
+    "src/ui/selection_panel.cpp",
+    "docs/military/MILITARY.md"
+   ],
+   "resolution": null
   }
  ]
 }

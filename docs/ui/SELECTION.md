@@ -560,6 +560,30 @@ counter, never a repeat-click step on the ground under the pointer.
 unit inside it joins the group, across tiles. **Shift adds** to the group. Right-click orders and
 front assignment apply to every unit in it. Own units only: a rival's units are not gathered.
 
+**Form group (Ben, 2026-11-22).** A stack or dragged group of two or more of the player's units
+carries **Form group** in its header. It puts every unit shown into a new army group
+(`../military/MILITARY.md` § Army groups), and the band then shows that group's card.
+
+### The army group element (Ben, 2026-11-22)
+
+**An army group's card is the unit group element's, named and lasting.** It opens from a Groups row
+of the Military ledger (`ledgers/military.md` § Groups) or a press on its pin. As the dragged group,
+`selected_entity` holds its lowest-id unit and `selected_units` its units, so right-click orders,
+Assign to front and Defend reach every unit; `ui_state::selection_army_group` names the group. The
+members are derived from the world each frame, so a fallen unit drops off the card.
+
+1. **Header** — the group's name (*1st Army*), `N units · K tiles`, then **Merge**, **Split off**,
+   Assign to front, Defend and 'go to'. The pin's width is reserved at the header's end first.
+2. **The counter column and the group's stat grid**, as the unit group element's.
+3. **One row per unit**, as there, each with a **tick box** at its start. A row's name is still
+   the door to that unit's card.
+
+- **Merge** opens a list of the player's other groups. Picking one moves its units into this
+  group; the other ends.
+- **Split off** is enabled with at least one row ticked and at least one left unticked. It moves
+  the ticked units into a new group, and the band shows the new group.
+- A unit's card names its group, if it has one, and that line is a press back to the group's card.
+
 ### Right-click orders
 
 **With the player's own unit or group selected, a right-click on a tile is an order** (Ben,

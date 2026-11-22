@@ -11,6 +11,7 @@
 #include <chrono>
 #include <thread>
 #include "app.hpp"
+#include "world/army_groups.hpp" // BL-1737: verify.army_groups
 #include "core/ground_slice_3d.hpp" // set_unbudgeted: whole 3D ground per capture
 #include "world/nation_tech.hpp"
 #include "world/economy_system.hpp" // BL-1453: advance_quarter_to for day_step
@@ -28,6 +29,7 @@
 #include <psapi.h> // BL-1084: K32GetProcessMemoryInfo, the autostart-adopt walk's memory line
 #endif
 
+#include "ui/pinned_panel.hpp"   // BL-1737: is_pinned - verify.army_groups
 #include "ui/canvas_command.hpp"
 #include "ui/construction_panel.hpp"
 #include "ui/construction_sites.hpp" // the site finder (Ben, 2026-10-25): construction_sites.lua
@@ -4166,6 +4168,73 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         out["center_pending"] = m_ui.planetary_center_pending;
         out["selected"]    = static_cast<double>(m_ui.selected_entity);
         out["front_selected"] = m_ui.has_front_selection();
+        return out;
+    });
+    // BL-1737 (army groups): the player's army groups (id, name, ordinal, member unit ids)
+    // and what the army group card and the Groups tab drew last frame - the presses'
+    // centres, the tick boxes, the Merge list's rows and the ledger rows with their pins.
+    // Units and screen positions only, as the card and ledger show them; no tile data.
+    v.set_function("army_groups", [this](sol::this_state ts) {
+        sol::state_view lua(ts);
+        sol::table out = lua.create_table();
+        sol::table gs = lua.create_table();
+        int i = 0;
+        for (const entity_id g : army_groups_of(m_world, player_nation(m_world)))
+        {
+            sol::table row = lua.create_table();
+            row["id"]      = static_cast<double>(g);
+            row["name"]    = army_group_name(m_world, g);
+            row["ordinal"] = static_cast<int>(m_world.army_groups.at(g).ordinal);
+            sol::table mem = lua.create_table();
+            int k = 0;
+            for (const entity_id u : army_group_members(m_world, g))
+                mem[++k] = static_cast<double>(u);
+            row["members"] = mem;
+            row["pinned"]  = ui::is_pinned(m_ui, g);
+            gs[++i] = row;
+        }
+        out["groups"]   = gs;
+        out["shown"]    = static_cast<double>(m_ui.selection_army_group);
+        const auto& d   = m_ui.army_drawn;
+        out["form_x"]   = d.form_x;  out["form_y"]  = d.form_y;
+        out["merge_x"]  = d.merge_x; out["merge_y"] = d.merge_y;
+        out["split_x"]  = d.split_x; out["split_y"] = d.split_y;
+        out["split_enabled"] = d.split_enabled;
+        out["tab_x"]    = d.groups_tab_x; out["tab_y"] = d.groups_tab_y;
+        out["military_view"] = m_ui.military.view;
+        sol::table ticks = lua.create_table();
+        int t = 0;
+        for (const auto& [u, xy] : d.ticks)
+        {
+            sol::table r = lua.create_table();
+            r["unit"] = static_cast<double>(u);
+            r["x"] = xy.first; r["y"] = xy.second;
+            r["on"] = std::find(m_ui.army_ticks.begin(), m_ui.army_ticks.end(), u) != m_ui.army_ticks.end();
+            ticks[++t] = r;
+        }
+        out["ticks"] = ticks;
+        sol::table mr = lua.create_table();
+        int m = 0;
+        for (const auto& [g, xy] : d.merge_rows)
+        {
+            sol::table r = lua.create_table();
+            r["group"] = static_cast<double>(g);
+            r["x"] = xy.first; r["y"] = xy.second;
+            mr[++m] = r;
+        }
+        out["merge_rows"] = mr;
+        sol::table lr = lua.create_table();
+        int l = 0;
+        for (const auto& row : d.ledger_rows)
+        {
+            sol::table r = lua.create_table();
+            r["group"] = static_cast<double>(row.group);
+            r["x"] = row.x; r["y"] = row.y; r["pin_x"] = row.pin_x; r["pin_y"] = row.pin_y;
+            r["pinned"] = row.pinned;
+            lr[++l] = r;
+        }
+        out["ledger_rows"] = lr;
+        out["message"] = m_ui.construction.last_message;
         return out;
     });
     // BL-1515: which ledger stands open, so a check can read where a click-through led.

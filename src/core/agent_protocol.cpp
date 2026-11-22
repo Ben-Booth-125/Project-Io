@@ -202,6 +202,7 @@ bool wire_nation_verb(corp_verb v)
         case corp_verb::accept_join:        // BL-1706
         case corp_verb::refuse_join:        // BL-1706
         case corp_verb::capitulate:         // BL-1706
+        case corp_verb::set_army_group:     // BL-1737: the seat's own unit and group; new/leave rides `order=`
         case corp_verb::set_embargo:        // BL-1418: the actor's own embargo; on/off rides `order=`
         // BL-1407: every player verb is sent as the nation, these included.
         case corp_verb::survey:
