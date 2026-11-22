@@ -549,6 +549,10 @@ finish_campaign_result finish_campaign_world(world& w, generation_report& report
     // BL-1473: the cut does not run on a major when a kit is laid -- its kit is sized to
     // its chest by construction (NATION_GENERATION.md § Pass 7).
     print_opening_state_cut(size_opening_state_to_chest(w, reg, /*skip_majors=*/kit != nullptr));
+    // BL-1731 (Ben, 2026-11-22, option A): a line ends at a station. After the last step
+    // that takes up a station (the cap, the stacked hubs, the cut), track no station
+    // serves is pruned back (LOGISTICS.md § 4c, "A line ends at a station").
+    print_rail_prune(prune_rail_stubs(w));
     if (kit != nullptr)
     {
         // What each major carries into the settle: the flat figure, less what the reserve

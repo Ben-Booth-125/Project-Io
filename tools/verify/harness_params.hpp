@@ -458,6 +458,7 @@ inline shipped_landscape apply_shipped_landscape(
                                                   && kit->logistics_capped()); // finish_campaign_world's, verbatim
         out.cut = size_opening_state_to_chest(w, reg, /*skip_majors=*/kit != nullptr); // BL-1452 / BL-1473: finish_campaign_world's, verbatim
         print_opening_state_cut(out.cut);
+        print_rail_prune(prune_rail_stubs(w)); // BL-1731: finish_campaign_world's, verbatim
         // BL-1398's firm top-up retired with the fold (finish_campaign_world).
         if (charter.skip_fold)
             print_state_node_fund(fund_state_nodes_from_firms(w, reg));

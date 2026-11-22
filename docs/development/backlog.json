@@ -2985,7 +2985,7 @@
    "design": "PLAYTEST 2 LANE I (lenses & network). Ben: \"When selecting the logistics lens, let's keep the drawn road, but make sure to paint the logistics highlighted roads directly on top of drawn roads, with the same deviations.\" WORK: the lens overlay follows the drawn road's own curve and offsets (one path source), not tile centres; the drawn road stays visible beneath. Capture a bend and a junction."
   },
   {
-   "glyph": "~",
+   "glyph": "✓",
    "sprint": null,
    "version_goal": null,
    "written": "2026-11-22",
@@ -2995,14 +2995,14 @@
    "author": "Ben (second playtest of the release build at 320655c8, 2026-11-22); filed by Claude",
    "priority": "B",
    "difficulty": 2,
-   "files": [],
+   "files": ["src/world/state_industry.cpp", "src/world/finish_campaign_world.cpp", "tools/verify/harness_params.hpp", "tools/verify/rail_dead_end_census.cpp", "tools/verify/player_seed_sweep.cpp"],
    "category": "Economy",
-   "status": "design-owed",
+   "status": "complete",
    "authority_doc": "docs/economy/LOGISTICS.md",
    "id": "BL-1731",
    "short_name": "RAIL_ENDS_WITHOUT_STATION",
    "title": "Railways that end with no rail station: find out why",
-   "design": "PLAYTEST 2 LANE I (lenses & network). Ben: \"I'm seeing examples of railways with no rail station at the end. Can you investigate?\" INVESTIGATION FIRST: count dead-end rail with no station across the seed library, find who lays it (generation, the AI, a removed station leaving its line) and what LOGISTICS.md says a line needs at its ends. Report before fixing; the fix may be a placement rule or a prune."
+   "design": "PLAYTEST 2 LANE I (lenses & network). Ben: \"I'm seeing examples of railways with no rail station at the end. Can you investigate?\" INVESTIGATION FIRST: count dead-end rail with no station across the seed library, find who lays it (generation, the AI, a removed station leaving its line) and what LOGISTICS.md says a line needs at its ends. Report before fixing; the fix may be a placement rule or a prune. RULED (Ben, 2026-11-22): option A, prune stubs - LOGISTICS.md § 4c \"A line ends at a station\". Census: 33 unserved ends on 5 of 16 seeds (17 bridge-gap stubs from hand_over_rail dropping water tiles, 14 from cap_major_logistics taking up stations, 2 from the opening state cut); 0 after."
   },
   {
    "glyph": "✓",

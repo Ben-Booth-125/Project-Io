@@ -678,6 +678,14 @@ building that moves nothing.
   builds stations and lays track in play as its nation's verbs. **Track costs the treasury per tile,
   plus steel per tile, with upkeep per tile (Ben, 2026-10-13).**
 - **Interdiction** cuts a rail line as it cuts a road (§ 7); a cut line strands the stations beyond it.
+- **A line ends at a station (Ben, 2026-11-22).** Generation opens no track that no station serves.
+  Its own later steps can leave such track — a line laid over a land path that a road bridges is laid
+  on its dry tiles only, so it breaks into stubs on each shore, and a station the logistics cap or the
+  opening state cut takes up leaves its track behind — so after the last step that takes up a station,
+  generation prunes it: a line with no station on or beside any of its tiles is taken up whole, and an
+  end with no station on or beside it is trimmed back to the last tile one serves. "Beside" is the
+  four-cardinal step the rail walk uses. Track the player lays in play is the player's own and is not
+  pruned.
 - **Rail is built like anything else (Ben, 2026-10-15, at the live click).** The player selects a tile
   and picks track or a station from the same list of buildings the Construction view offers there —
   no separate armed tool.

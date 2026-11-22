@@ -956,19 +956,25 @@ struct world_digest_pin
 // sums, before -> after BL-1678: rivals in the red 4 -> 148, rival balance median -22%,
 // nation treasuries -15%, processing -13%, extraction -8.8%, under construction 594 -> 324,
 // decommissioned 122 -> 174, rival units -6.5%, player balance -0.7% (NR-1261 asks Ben).
+// RE-PINNED 2026-11-22 (playtest 2, lane I; BL-1731 (rail ends without station), Ben's
+// option A "prune stubs"): finish_campaign_world now prunes rail no station serves, after the
+// opening state cut (prune_rail_stubs, LOGISTICS.md § 4c "A line ends at a station"). It moves
+// exactly the five seeds that carried such track - 0 (2 + 47 tiles), 46 (39), 31 (6 + 64),
+// 2 (2 + 86), 54 (8 + 12) - on D_land, D_settle and D_seat; D_search unmoved, and the other
+// eleven rows read unchanged (--digest-check). Every row seats one player.
 const std::vector<world_digest_pin> k_shipped_digest_pins = {
     //  seed  D_search               D_land                 D_settle               D_seat
-    {  0u, 0x7E1E60510E24832Full, 0xE772D10A2B84C861ull, 0xDCECE2FD4A1535CAull, 0x6296DDD9E654A5FCull },
-    { 46u, 0x6B88EA656449F877ull, 0x38CE21253900A7BDull, 0x3FCE679D5B86B17Bull, 0x5FAC3812F3128093ull },
+    {  0u, 0x7E1E60510E24832Full, 0x25444550532280BCull, 0x9DFF7269139CAFDFull, 0x08521ECAF40AF968ull },
+    { 46u, 0x6B88EA656449F877ull, 0x5FB083DC955CC0FCull, 0x1DEB51F30A22278Eull, 0x56EC006995421DB0ull },
     {  7u, 0x47196757CE4FD05Aull, 0xBFED3BBFC20224A2ull, 0x1F7DCB0440DD53A2ull, 0x17FE3AED63657577ull },
     {  3u, 0x320BA736E3A912C5ull, 0x8FCAAE73B37D4C54ull, 0x9B495848AB7835C9ull, 0x9D143CFF193DD59Full },
     { 29u, 0x511960AA0131A87Full, 0x0EEA2B245E0CEF26ull, 0xC92BDE6503D9966Eull, 0x81A35E9760A04BA1ull },
     { 92u, 0x028577AC3B30D3F0ull, 0x4D04EAF213DDF8BBull, 0x7890D81F8CDA2EA5ull, 0xE6B548316B1A9860ull },
-    {  2u, 0x96F4944A0490E266ull, 0x0DB5E2A29194FCBAull, 0xE79DA5045A5D825Full, 0xAC143F9C874D8703ull },
-    { 54u, 0xD9C78524245F4A13ull, 0xA17F6C37518DEC55ull, 0x0E162361D7B56CECull, 0x4A30B38E299C5146ull },
+    {  2u, 0x96F4944A0490E266ull, 0x1353FA7986EC26E1ull, 0xE1B83B715237A2B1ull, 0x26E70837B0F37F18ull },
+    { 54u, 0xD9C78524245F4A13ull, 0xBC7D8716CE1F6970ull, 0x385F7B7F396432B4ull, 0xFF9F423FA2FC86A1ull },
     { 17u, 0x3F833B3E2201B10Bull, 0x5B47F7F2E0DCBFDCull, 0x065664D5B8C59BD2ull, 0xD8A3878AB770F97Full },
     { 27u, 0xF7E3A25952049A5Cull, 0x37157312C85A9028ull, 0xB1DFAD3272958CA8ull, 0x5C27AFA19726F807ull },
-    { 31u, 0x74904993062B2150ull, 0x0CA4576AD5B4D306ull, 0xA6779A37D1F53947ull, 0x7D612C5DE2199A42ull },
+    { 31u, 0x74904993062B2150ull, 0x6D5C39500AA1E88Cull, 0x0775C99949C2BCCEull, 0x2A5925262C4AF184ull },
     { 22u, 0x60046B4D394574E1ull, 0x1B7ACA1A26B0D031ull, 0x3C08024B9B80DE98ull, 0xA0EADD28F07A48C1ull },
     { 13u, 0x17DE412AA567E39Cull, 0x9206D1738F26CB8Eull, 0x367E00F5A7B4A399ull, 0x9757653761309DB0ull },
     { 64u, 0x031762BE585999B9ull, 0x8F53DA258BDABF49ull, 0x422353C509F580D4ull, 0x8D6099EDA363F491ull },

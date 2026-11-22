@@ -255,6 +255,8 @@ void finish_tail(app_start_world& out, std::vector<stage_snap>* snaps)
     snap("stack_hubs");
     out.land.cut = size_opening_state_to_chest(w, reg, /*skip_majors=*/kit != nullptr);
     snap("state_cut");
+    print_rail_prune(prune_rail_stubs(w)); // BL-1731: finish_campaign_world's, verbatim
+    snap("rail_prune");
     lp_seed_read_at_gate(w, reg, out.land.lp);
     lay_site_roads_every_body(w);
     if (kit != nullptr && kit->has_fleet())

@@ -1439,6 +1439,88 @@ std::array<entity_id, 4> rail_tile_neighbours(world& w, entity_id tile)
 
 } // namespace
 
+rail_prune_report prune_rail_stubs(world& w)
+{
+    rail_prune_report r;
+    if (w.rail_track.empty())
+        return r;
+    std::set<entity_id> stations;
+    for (const auto& [bid, b] : w.buildings)
+    {
+        (void)bid;
+        if (b.type == building_type::railway_station)
+            stations.insert(b.tile);
+    }
+    const auto served = [&](entity_id t) {
+        if (stations.count(t))
+            return true;
+        for (const entity_id n : rail_tile_neighbours(w, t))
+            if (n != null_entity && stations.count(n))
+                return true;
+        return false;
+    };
+    // 1. Whole lines no station touches (a loop with no end would survive the trim).
+    {
+        std::set<entity_id> seen;
+        std::vector<entity_id> drop;
+        for (const auto& [t, owner] : w.rail_track)
+        {
+            (void)owner;
+            if (seen.count(t))
+                continue;
+            std::vector<entity_id> comp{t};
+            seen.insert(t);
+            bool any = false;
+            for (std::size_t h = 0; h < comp.size(); ++h)
+            {
+                any = any || served(comp[h]);
+                for (const entity_id n : rail_tile_neighbours(w, comp[h]))
+                    if (n != null_entity && w.rail_track.count(n) && seen.insert(n).second)
+                        comp.push_back(n);
+            }
+            if (!any)
+            {
+                ++r.lines_dropped;
+                drop.insert(drop.end(), comp.begin(), comp.end());
+            }
+        }
+        std::sort(drop.begin(), drop.end());
+        for (const entity_id t : drop)
+            w.rail_track.erase(t);
+        r.line_tiles = static_cast<int>(drop.size());
+    }
+    // 2. Unserved ends, trimmed one layer at a time until every end is served.
+    for (;;)
+    {
+        std::vector<entity_id> drop;
+        for (const auto& [t, owner] : w.rail_track)
+        {
+            (void)owner;
+            int nb = 0;
+            for (const entity_id n : rail_tile_neighbours(w, t))
+                if (n != null_entity && w.rail_track.count(n))
+                    ++nb;
+            if (nb <= 1 && !served(t))
+                drop.push_back(t);
+        }
+        if (drop.empty())
+            break;
+        for (const entity_id t : drop)
+            w.rail_track.erase(t);
+        r.stub_tiles += static_cast<int>(drop.size());
+    }
+    if (r.line_tiles + r.stub_tiles > 0)
+        invalidate_logistics_caches(w);
+    return r;
+}
+
+void print_rail_prune(const rail_prune_report& r)
+{
+    std::printf("[rail] prune: %d line(s) with no station taken up (%d tile(s)), %d stub tile(s) trimmed\n",
+                r.lines_dropped, r.line_tiles, r.stub_tiles);
+    std::fflush(stdout);
+}
+
 int assign_rail_owners(world& w)
 {
     if (w.rail_track.empty())
