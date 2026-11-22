@@ -24,7 +24,7 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 > **Generated file.** Produced by `node tools/session/render_actions.js`.
 > Edit the JSON, then re-run; hand edits here are overwritten.
 
-*294 entries — 89 gameplay · 45 canvas · 15 lens · 103 ledger · 42 chrome.*
+*303 entries — 90 gameplay · 45 canvas · 15 lens · 111 ledger · 42 chrome.*
 
 ---
 
@@ -1097,6 +1097,26 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 **Expected output.** Every goal the other side named on the actor's ground, HELD OR NOT, passes to the member that named it (cede_provinces; province_ceded on the actor's row toward each namer). A leader's capitulation closes the war (world::war_history end 'capitulation', with what it ceded); its side's joiners leave with a white peace. A joiner's takes only it out. Truces follow as at any peace (16 ticks between every pair that stood across); peace_concluded warms the rows. A capitulation that hands over the actor's last province ends its nation (NATIONS.md § Elimination).
 
 **Reason to select.** The war is lost: give up the ground it was fought for and stop the bleeding now.
+
+### `gameplay.set_army_group` — The army group card's Merge and Split off and a stack's Form group (ledger.selection_army_form_group, ledger.selection_army_merge, ledger.selection_army_split); each sends this verb once per unit. A corp_verb (corp_verb::set_army_group, 70) on the command seam.
+
+**Press.** Over the seam: COMMAND corp=<nation> nation=<nation> verb=70 subject=<unit> counterparty=<group or 0> order=<0|1>.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `subject` | `entity_id (unit)` | One of the actor's standing land units. |
+| `counterparty` | `entity_id (army group) or null` | The actor's army group to put the unit in; null with order 1 for a new group, with order 0 to take it out of any. |
+| `order` | `0 or 1` | 1: into a NEW group (counterparty must be null). 0: into counterparty, or out of any when counterparty is null. |
+
+**Valid when:**
+- The actor is the SEAT (the player's nation, corp == as_nation); any other nation is rejected_not_owner - no grant lets a rival group its units (AI_OPPONENT.md § 11), so no scorer issues this verb.
+- subject is a unit in world::units the actor owns (rejected_invalid unknown, rejected_not_owner another's).
+- counterparty, when named, is an army group the actor owns (rejected_invalid unknown, rejected_not_owner another's).
+- rejected_invalid for order above 1, or order 1 with a group named. rejected_state when the unit is already in that group, when leaving while in none, or when the nation already holds 99 groups. A refusal mutates nothing.
+
+**Expected output.** The unit sits in one army group at most: joining moves it out of the group it was in. A new group takes the lowest ordinal its nation does not use and is named by it ('1st Army', '2nd Army', ...); its id comes back through out_building. A group left with no unit is removed at once, and any group whose last unit dies or disbands is removed in the day's pass. Groups are saved (world save v101) and hashed only when any exist. No order is given: a group's orders are its units' own (MILITARY.md § Army groups).
+
+**Reason to select.** Gather units into an army that keeps its shape across tiles, so it can be found again, watched and sent as one.
 
 ### `gameplay.set_embargo` — Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Nations tab, the chosen nation's Embargo / Lift toggle (ledger.diplomacy_embargo). A corp_verb (corp_verb::set_embargo, 53) on the command seam; a rival nation's scorer issues the same verb for itself (score_nation_embargo; AI_OPPONENT.md § 11, Ben 2026-11-03, NR-1117).
 
@@ -3289,6 +3309,69 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 
 **Reason to select.** A front does nothing without units on it: assigned units spread along the span, fill gaps and push when ordered.
 
+### `ledger.selection_army_form_group` — Selection band, the unit group element (a stack of two or more of the player's units, or a dragged group): 'Form group' in the header, left of Defend and Assign to front (docs/ui/SELECTION.md § The dragged group).
+
+**Press.** Press 'Form group'.
+
+**Valid when:**
+- The band shows a stack or dragged group of two or more of the player's own units, not an army group (an army group's card shows Merge and Split off instead).
+
+**Expected output.** Sends gameplay.set_army_group once per unit shown, ascending id: the first with order 1 (a new group), the rest into it. The band then shows the new group's card (ledger.selection_army_group_card); the line reads '<Nth> Army formed.' A unit that was in another group leaves it, and a group so emptied ends.
+
+**Reason to select.** Keep a gathered force as one army after the selection moves on.
+
+### `ledger.selection_army_group_card` — Selection band, the army group element: the group's name ('1st Army'), 'N units · K tiles', Merge, Split off, Defend, Assign to front and go-to in the header (the pin's width reserved at its end); the counter, the group's stat grid, and one row per unit with a tick box at its start (docs/ui/SELECTION.md § The army group element).
+
+**Press.** Open it from a Groups row (ledger.military_select_group), a pinned group (chrome.pin_press), a unit card's 'In the <Nth> Army' line, or Form group / Split off / Merge.
+
+**Valid when:**
+- The group has at least one standing unit.
+
+**Expected output.** selected_entity is the group's lowest-id unit and selected_units its units, so right-click orders (canvas.unit_right_click_move / canvas.unit_right_click_attack), Assign to front and Defend reach every unit, one command each in ascending id. Members are re-derived every frame: a fallen unit drops off; the last gone, the card closes. A row's name opens that unit's card, whose 'In the <Nth> Army' line comes back. No world change.
+
+**Reason to select.** Read and order a named army as one.
+
+### `ledger.selection_army_merge` — Selection band, army group card header: 'Merge', opening a list of the player's other army groups, each 'Name (N units)'.
+
+**Press.** Press 'Merge', then press a group in the list.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `group` | `entity_id (army group)` | The other group whose units come into this one. |
+
+**Valid when:**
+- The band shows one of the player's army groups. Disabled when the player has no other group (its tooltip says so).
+
+**Expected output.** Sends gameplay.set_army_group once per unit of the picked group, ascending id, into the shown group. The picked group, left empty, ends; the band shows the merged group; the line reads 'Merged into the <Nth> Army.'
+
+**Reason to select.** Two armies have met and should fight as one.
+
+### `ledger.selection_army_tick` — Selection band, army group card: the tick box at the start of each unit row.
+
+**Press.** Click a row's tick box; click again to untick.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `unit` | `entity_id (unit)` | The row's unit. |
+
+**Valid when:**
+- The band shows one of the player's army groups.
+
+**Expected output.** Marks the unit for Split off. Ticks belong to the group shown and clear when another group is shown or the unit falls. No world change.
+
+**Reason to select.** Pick which units leave in the next Split off.
+
+### `ledger.selection_army_split` — Selection band, army group card header: 'Split off'.
+
+**Press.** Tick the units to move (ledger.selection_army_tick), then press 'Split off'.
+
+**Valid when:**
+- The band shows one of the player's army groups, with at least one row ticked and at least one left unticked; otherwise disabled, its tooltip saying why.
+
+**Expected output.** Sends gameplay.set_army_group once per ticked unit, ascending id: the first into a new group (the lowest free ordinal), the rest into it. The unticked units stay. The band shows the new group; the line reads 'Split off as the <Nth> Army.'
+
+**Reason to select.** Detach part of an army to hold other ground.
+
 ### `ledger.military_theatre_tab` — Military ledger (nav rail slot 7), Recruit and Design tabs: the row of theatre tabs under them, 'Land N', 'Air N' and 'Sea N', and under Design a fourth, 'Space N' - each names its theatre and counts its rows (Recruit Land: the land types shown; Recruit Air and Design Air: the six air classes; Design Land: the seven land classes; Sea: 0; Design Space: the five hulls). The active one is lit.
 
 **Press.** Click a theatre tab. A SELECTOR, not a toggle (ledgers/military.md § Grouped by theatre, Ben 2026-11-02): re-pressing the active tab does nothing. Each of Recruit and Design keeps its own theatre; Land by default.
@@ -3913,6 +3996,47 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 
 **Reason to select.** Pick up a ship from the list.
 
+### `ledger.military_groups_tab` — Military ledger (nav rail slot 7): the 'Groups' tab, third after Recruit and Design (docs/ui/ledgers/military.md § Groups).
+
+**Press.** Click 'Groups'. Re-clicking it while active closes the ledger (the toggle rule).
+
+**Valid when:**
+- The Military ledger is open.
+
+**Expected output.** Lists 'Army groups (N)' then one row per army group of the player's, in ordinal order: the name on the first line; '<units> units · <men> / <establishment> men · <tiles> tiles', and '· <front>' when every unit holds one front, on the second; a pin toggle as the row's last cell. With none, the heading alone, its tooltip saying how to form one. No world change.
+
+**Reason to select.** Find every army wherever it stands, and compare their strength.
+
+### `ledger.military_select_group` — Military ledger, Groups tab: an army group's row.
+
+**Press.** Click a row to select the group; double-click to also go to it.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `group` | `entity_id (army group)` | The row pressed. |
+
+**Valid when:**
+- The Military ledger is open on Groups.
+
+**Expected output.** The Selection band shows the group's card (ledger.selection_army_group_card); the row is lit while it does. A double-click also frames the canvas on the group's lowest-id unit (focus_on_entity). No world change.
+
+**Reason to select.** Reach an army from one list to order or reshape it.
+
+### `ledger.military_group_pin` — Military ledger, Groups tab: the pushpin square at the end of each row, its width reserved before the row's text.
+
+**Press.** Click the pin. A toggle: pressing it on a pinned group unpins it.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `group` | `entity_id (army group)` | The row's group. |
+
+**Valid when:**
+- The Military ledger is open on Groups.
+
+**Expected output.** Pins the group to the pinned-items panel as a watch card: 'Army group', its name, units and tiles, men over establishment and its front; pressed again, unpins it. The same list as chrome.pin_toggle's, so the band's pin on the group's card reads the same state. Pins travel in the save; a group that ends drops off. Issues no command.
+
+**Reason to select.** Watch an army's strength while working elsewhere.
+
 ### `ledger.military_open_ship_designer` — Military ledger, Design, Sea tab: one row per ship class with its numbers.
 
 **Press.** Click a class row; click it again to close (the toggle rule).
@@ -4070,7 +4194,7 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 
 **Reason to select.** To learn that a war has begun where the eye already is, and step straight to answering it.
 
-### `chrome.pin_toggle` — The pin toggle: a small pushpin square at the Selection band's top-right corner, over the band's header row, shown whenever the band shows an entity - a body, tile, building, market, unit, nation or air wing (docs/ui/LAYOUT.md § Pinned items).
+### `chrome.pin_toggle` — The pin toggle: a small pushpin square at the Selection band's top-right corner, over the band's header row, shown whenever the band shows an entity - a body, tile, building, market, unit, nation, air wing or army group (the group, not its leading unit) (docs/ui/LAYOUT.md § Pinned items).
 
 **Press.** Press the pin toggle. It is a toggle: pressing it while the subject is pinned unpins it.
 
@@ -4088,7 +4212,7 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 **Valid when:**
 - App is in game and the panel shows at least one card: the player has pinned something, or the player's nation is at war with a nation that holds provinces on a body where it holds provinces too.
 
-**Expected output.** A player pin: single-click selects its entity (the Selection band shows it); double-click also frames the canvas on it (focus_on_entity; a tile or a nation's capital tile on the Planetary view, centred). A front pin: single-click selects the player's land front toward that enemy on that body (the front card), or the enemy nation where no land front exists; double-click also takes the canvas to that body's Planetary view centred on the front (else a contested province, else the enemy's province nearest the player's ground). The front pin's card shows the body, the enemy, provinces each side holds, provinces occupied either way, and the war score from the player's side. Issues no command.
+**Expected output.** A player pin: single-click selects its entity (the Selection band shows it; a pinned army group shows its card, ledger.selection_army_group_card); double-click also frames the canvas on it (focus_on_entity; a tile or a nation's capital tile on the Planetary view, centred). A front pin: single-click selects the player's land front toward that enemy on that body (the front card), or the enemy nation where no land front exists; double-click also takes the canvas to that body's Planetary view centred on the front (else a contested province, else the enemy's province nearest the player's ground). The front pin's card shows the body, the enemy, provinces each side holds, provinces occupied either way, and the war score from the player's side. Issues no command.
 
 **Reason to select.** To return to a watched entity, or to reach a front of a war on any body, in one double-click.
 

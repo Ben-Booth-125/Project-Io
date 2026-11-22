@@ -1,4 +1,5 @@
 #include "corp_command.hpp"
+#include "army_groups.hpp" // BL-1737: set_army_group
 #include "logistic_points.hpp" // BL-1309; BL-1405 retired its one use (lp_share_rule_valid)
 
 #include "battle_system.hpp" // request_withdraw, unit_in_battle (BL-467)
@@ -484,6 +485,12 @@ corp_command_result apply_state_command(world& w, const recipe_registry& reg,
             flips.insert(at, cmd.unit_type);
         return corp_command_result::applied;
     }
+
+    // BL-1737 (army groups; MILITARY.md § Army groups): the seat puts one of its units
+    // into one of its groups, a new one, or none. Every check first
+    // (`set_army_group_check`, which refuses any actor but the seat).
+    if (cmd.verb == corp_verb::set_army_group)
+        return apply_set_army_group(w, nation, cmd.subject, cmd.counterparty, cmd.order, out_building);
 
     // BL-1434 (unit designs; MILITARY.md § The kit): the seat fits one kit item into
     // one slot of its live design for one class. Every check first

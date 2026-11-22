@@ -1,6 +1,7 @@
 #include "pinned_panel.hpp"
 
 #include "entity_summary.hpp" // the shared stat block a watch card carries
+#include "army_group_ui.hpp"    // BL-1737: a pinned army group's card and selection
 #include "front_view.hpp"     // fronts_of: the player's land fronts, cached
 #include "icons.hpp"
 #include "presentation.hpp"
@@ -8,6 +9,7 @@
 #include "shell_metrics.hpp"  // pinned_panel_rect, lens_chrome_this_frame
 #include "view_nav.hpp"       // focus_on_entity / focus_on_tile / focus_on_surface
 
+#include "world/army_groups.hpp" // BL-1737: army_group_members
 #include "world/fronts.hpp"   // tile_hex_steps
 #include "world/province.hpp" // province_kind_of, province_anchor_tile
 #include "world/war.hpp"      // war_score, province_owner
@@ -295,6 +297,9 @@ entity_id pin_subject(const world& w, const ui_state& ui)
     if (ui.has_front_selection() || ui.has_battle_selection() || ui.has_deposit_selection()
         || ui.has_plate_selection() || ui.selected_convoy != 0)
         return null_entity;
+    // BL-1737: the army group card pins its group, not the unit that leads it.
+    if (ui.selection_army_group != null_entity && w.army_groups.count(ui.selection_army_group) != 0)
+        return ui.selection_army_group;
     const entity_id id = ui.selected_entity;
     switch (selection_kind_of(w, id))
     {
@@ -313,6 +318,13 @@ entity_id pin_subject(const world& w, const ui_state& ui)
 
 void navigate_to_pin(const world& w, ui_state& ui, entity_id id)
 {
+    if (w.army_groups.count(id) != 0) // BL-1737: to the unit that leads it
+    {
+        const std::vector<entity_id> m = army_group_members(w, id);
+        if (!m.empty())
+            focus_on_entity(w, ui, m.front());
+        return;
+    }
     if (w.tiles.count(id))
     {
         focus_on_tile(w, ui, id);
@@ -348,6 +360,9 @@ void draw_pinned_panel(const world& w, ui_state& ui, ImVec2 disp)
     // A pin outlives nothing it names: a removed entity drops off the list.
     ps.pins.erase(std::remove_if(ps.pins.begin(), ps.pins.end(),
                                  [&](entity_id id) {
+                                     // BL-1737: an army group stays while it stands.
+                                     if (w.army_groups.count(id) != 0)
+                                         return army_group_members(w, id).empty();
                                      const selection_kind k = selection_kind_of(w, id);
                                      return k == selection_kind::none || k == selection_kind::corporation;
                                  }),
@@ -448,15 +463,19 @@ void draw_pinned_panel(const world& w, ui_state& ui, ImVec2 disp)
         for (std::size_t i = 0; i < ps.pins.size(); ++i)
         {
             const entity_id id = ps.pins[i];
-            const selection_kind k = selection_kind_of(w, id);
+            const bool army = w.army_groups.count(id) != 0; // BL-1737
+            const selection_kind k = army ? selection_kind::none : selection_kind_of(w, id);
             ImGui::PushID(static_cast<int>(i));
             const card_frame cf = begin_card(inner_w);
             const ImVec2 gp = ImGui::GetCursorScreenPos();
             const float  lh = ImGui::GetTextLineHeight();
-            kind_glyph(w, dl, k, id, { gp.x + k_glyph_r, gp.y + lh * 0.5f }, k_glyph_r);
+            if (army)
+                icons::helmet(dl, { gp.x + k_glyph_r, gp.y + lh * 0.5f }, k_glyph_r, palette::selection);
+            else
+                kind_glyph(w, dl, k, id, { gp.x + k_glyph_r, gp.y + lh * 0.5f }, k_glyph_r);
             ImGui::Dummy({ k_glyph_r * 2.0f + 4.0f, lh });
             ImGui::SameLine();
-            ImGui::TextDisabled("%s", kind_word(k));
+            ImGui::TextDisabled("%s", army ? "Army group" : kind_word(k));
             ImGui::SameLine(inner_w - k_card_pad * 2.0f - k_glyph_r * 2.0f);
             {
                 const ImVec2 pp = ImGui::GetCursorScreenPos();
@@ -470,6 +489,18 @@ void draw_pinned_panel(const world& w, ui_state& ui, ImVec2 disp)
                                   ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse
                                       | ImGuiWindowFlags_NoBackground))
             {
+                if (army)
+                {
+                    // BL-1737: the group's ledger row, as a watch card.
+                    const army_group_stats st = army_group_stats_of(w, id);
+                    ImGui::TextUnformatted(st.name.c_str());
+                    ImGui::TextDisabled("%d unit%s · %d tile%s", st.units, st.units == 1 ? "" : "s",
+                                        st.tiles, st.tiles == 1 ? "" : "s");
+                    ImGui::TextDisabled("Men %lld / %lld", st.men, st.establishment);
+                    if (!st.front.empty())
+                        ImGui::TextDisabled("Front: %s", st.front.c_str());
+                }
+                else
                 switch (k)
                 {
                     case selection_kind::body:     draw_body_summary(w, ui, id); break;
@@ -484,7 +515,8 @@ void draw_pinned_panel(const world& w, ui_state& ui, ImVec2 disp)
             ImGui::EndChild();
             pinned_items_state::card c;
             c.id = id;
-            const ImU32 edge = id == ui.selected_entity ? palette::selection : IM_COL32(80, 84, 100, 255);
+            const bool  lit  = army ? id == ui.selection_army_group : id == ui.selected_entity;
+            const ImU32 edge = lit ? palette::selection : IM_COL32(80, 84, 100, 255);
             const int press2 = end_card(cf, edge, c);
             ps.drawn.cards.push_back(c);
             if (press2 == 1)
@@ -496,7 +528,9 @@ void draw_pinned_panel(const world& w, ui_state& ui, ImVec2 disp)
         // A press on a pin selects it as a canvas press would: the band then has
         // one thing to draw (no battle, front, deposit, plate or convoy beside it).
         const entity_id pick = go != null_entity ? go : select;
-        if (pick != null_entity)
+        if (pick != null_entity && w.army_groups.count(pick) != 0)
+            select_army_group(w, ui, pick); // BL-1737: the group's card
+        else if (pick != null_entity)
         {
             ui.clear_battle_selection();
             ui.clear_front_selection();

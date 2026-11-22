@@ -16,6 +16,7 @@
 #include "hex_neighbors.hpp" // BL-1502: a front key across the line
 #include "debris.hpp"        // BL-1598: the debris section's ceilings
 #include "survey_system.hpp" // BL-1600: survey_knowledge_applies, survey_region_count - the v85 checks
+#include "army_groups.hpp"   // BL-1737: k_army_groups_max - the v101 section's cap
 #include "unit_roster.hpp" // BL-1437: unit_roster_table — the obsolete flips' range check // BL-1407: fold_legacy_firms -- a pre-v56 stream's corporations
 
 #include <sstream>
@@ -2852,6 +2853,31 @@ void write_world_snapshot_at(const world& w, std::ostream& out, uint32_t version
         }
     }
     // ===== END BL-1678 =====
+    // ===== BEGIN BL-1737 (v101): THE ARMY GROUPS, the last section =====
+    if (world_stream_has_army_groups(version))
+    {
+        std::map<entity_id, std::vector<entity_id>> members; // ordered: ascending group id
+        for (const auto& [uid, u] : w.units)
+            if (u.army_group != null_entity && w.army_groups.count(u.army_group) != 0)
+                members[u.army_group].push_back(uid);
+        for (const auto& [sid, sh] : w.ships)
+            for (const auto& [uid, u] : sh.aboard)
+                if (u.army_group != null_entity && w.army_groups.count(u.army_group) != 0)
+                    members[u.army_group].push_back(uid);
+        w_u32(out, static_cast<uint32_t>(members.size()));
+        for (auto& [gid, ids] : members)
+        {
+            std::sort(ids.begin(), ids.end());
+            const army_group_component& g = w.army_groups.at(gid);
+            w_id(out, gid);
+            w_id(out, g.owner);
+            w_u32(out, g.ordinal);
+            w_u32(out, static_cast<uint32_t>(ids.size()));
+            for (const entity_id uid : ids)
+                w_id(out, uid);
+        }
+    }
+    // ===== END BL-1737 =====
 }
 
 void write_world_snapshot_pre_missiles(const world& w, std::ostream& out)
@@ -3068,6 +3094,29 @@ void write_world_snapshot_pre_unit_stocks(const world& w, std::ostream& out)
 {
     // VERIFICATION ONLY (BL-1678): the v99 stream shape - no unit stocks section.
     write_world_snapshot_at(w, out, k_world_save_version_pre_unit_stocks);
+}
+
+void write_world_snapshot_pre_army_groups(const world& w, std::ostream& out)
+{
+    // VERIFICATION ONLY (BL-1737): the v100 stream shape - no army groups section.
+    write_world_snapshot_at(w, out, k_world_save_version_pre_army_groups);
+}
+
+std::size_t world_save_army_group_section_bytes(const world& w)
+{
+    // Mirrors the writer: a group counts only with a member naming it.
+    std::map<entity_id, std::size_t> n_of;
+    for (const auto& [uid, u] : w.units)
+        if (u.army_group != null_entity && w.army_groups.count(u.army_group) != 0)
+            ++n_of[u.army_group];
+    for (const auto& [sid, sh] : w.ships)
+        for (const auto& [uid, u] : sh.aboard)
+            if (u.army_group != null_entity && w.army_groups.count(u.army_group) != 0)
+                ++n_of[u.army_group];
+    std::size_t n = 4;
+    for (const auto& [gid, k] : n_of)
+        n += 16 + 4 * k;
+    return n;
 }
 
 std::size_t world_save_unit_stocks_section_bytes(const world& w)
@@ -3767,6 +3816,8 @@ std::size_t tail_bytes_after_key(int version, const world& w)
         { 2 * k_space_key + k_world_save_version_province_names, world_save_province_names_section_bytes }, // v98
         // BL-1678: after the province names in writer order.
         { 2 * k_space_key + k_world_save_version_unit_stocks,  world_save_unit_stocks_section_bytes },      // v100
+        // BL-1737: after the unit stocks in writer order.
+        { 2 * k_space_key + k_world_save_version_army_groups,  world_save_army_group_section_bytes },       // v101
     };
     // BL-1641: v94 (one building per product) adds no section, nor does v95 (BL-1642, the
     // monthly tick), so the table ends at v92's. v95 does GROW one record: each off-world
@@ -3775,7 +3826,9 @@ std::size_t tail_bytes_after_key(int version, const world& w)
     // BL-1706: v97 adds no trailing section (its sides grow the v69 war records, counted in
     // world_save_war_section_bytes). BL-1708: v98 appends the province names.
     // BL-1712: v99 (the trimmed tree) adds no section. BL-1678: v100 appends the unit stocks.
-    static_assert(world_save_version == k_world_save_version_unit_stocks
+    // BL-1737: v101 appends the army groups.
+    static_assert(world_save_version == k_world_save_version_army_groups
+                      && k_world_save_version_army_groups == k_world_save_version_unit_stocks + 1
                       && k_world_save_version_unit_stocks == k_world_save_version_tree_trim + 1
                       && k_world_save_version_tree_trim == k_world_save_version_province_names + 1,
                   "BL-1632: a new trailing section joins world_save_tail_bytes_after's table");
@@ -3868,6 +3921,7 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
             && version != k_world_save_version_pre_province_names // BL-1708: v97, no province names
             && version != k_world_save_version_province_names // BL-1712: v98, v99's layout, the untrimmed tree
             && version != k_world_save_version_pre_unit_stocks // BL-1678: v99, no unit stocks
+            && version != k_world_save_version_pre_army_groups // BL-1737: v100, no army groups
             && version != k_world_save_version_pre_launch_boost // BL-1637: v95, no pad boost
             && version != k_world_save_version_one_product // v94: v95's layout, the quarter tick (BL-1642)
             && version != k_world_save_version_space_merge // BL-1641: v93, the same layout as v94
@@ -7161,6 +7215,69 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
         }
     }
     // ===== END BL-1678 =====
+    // ===== BEGIN BL-1737 (v101): the army groups. Untrusted, refused whole on any breach of
+    // world_save.hpp's v101 paragraph. A v100 (and older) stream ends before it: no unit is in
+    // a group. Read into scratch, applied only when all pass. =====
+    if (world_stream_has_army_groups(version))
+    {
+        std::map<entity_id, unit_component*> live;
+        for (auto& [uid, u] : s.units)
+            live.emplace(uid, &u);
+        for (auto& [sid, sh] : s.ships)
+            for (auto& [uid, u] : sh.aboard)
+                live.emplace(uid, &u);
+        uint32_t count = 0;
+        if (!r_u32(in, count) || count > live.size())
+            return false;
+        struct group_rec { entity_id gid = null_entity, owner = null_entity; uint32_t ordinal = 0; std::vector<entity_id> ids; };
+        std::vector<group_rec> recs;
+        recs.reserve(count);
+        std::set<entity_id> taken;
+        std::set<std::pair<entity_id, uint32_t>> ordinals;
+        std::map<entity_id, std::size_t> per_owner;
+        entity_id prev = null_entity;
+        for (uint32_t k = 0; k < count; ++k)
+        {
+            group_rec r{};
+            uint32_t n = 0;
+            if (!r_id(in, r.gid) || r.gid == null_entity || (k > 0 && r.gid <= prev)
+                || !r_id(in, r.owner) || !r_u32(in, r.ordinal) || !r_u32(in, n))
+                return false;
+            prev = r.gid;
+            if (live.count(r.gid) != 0 || s.nations.count(r.owner) == 0
+                || r.ordinal < 1 || r.ordinal > k_army_groups_max
+                || !ordinals.emplace(r.owner, r.ordinal).second
+                || ++per_owner[r.owner] > k_army_groups_max
+                || n < 1 || n > live.size())
+                return false;
+            r.ids.reserve(n);
+            entity_id prev_u = null_entity;
+            for (uint32_t m = 0; m < n; ++m)
+            {
+                entity_id uid = null_entity;
+                if (!r_id(in, uid) || uid == null_entity || (m > 0 && uid <= prev_u))
+                    return false;
+                prev_u = uid;
+                const auto lit = live.find(uid);
+                if (lit == live.end() || lit->second->owner != r.owner || !taken.insert(uid).second)
+                    return false;
+                r.ids.push_back(uid);
+            }
+            recs.push_back(std::move(r));
+        }
+        std::map<entity_id, army_group_component> groups;
+        for (const group_rec& r : recs)
+        {
+            army_group_component g;
+            g.owner   = r.owner;
+            g.ordinal = r.ordinal;
+            groups.emplace(r.gid, g);
+            for (const entity_id uid : r.ids)
+                live.at(uid)->army_group = r.gid;
+        }
+        s.army_groups = std::move(groups);
+    }
+    // ===== END BL-1737 =====
 
     // BL-1266 (v46): every manual trade names a live owner and two distinct
     // standing markets, and holds an id below the next one to be issued, all

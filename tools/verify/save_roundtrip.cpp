@@ -2320,7 +2320,8 @@ int main()
         // and v88 is read as its strict prefix; every PG size below adds that section.
         // The space merge: today is v93 (every space section after the missiles); v89 is read
         // as its prefix less the space sections.
-        static_assert(world_save_version == k_world_save_version_unit_stocks && k_world_save_version_unit_stocks == 100 // BL-1678: the unit stocks, after the names
+        static_assert(world_save_version == k_world_save_version_army_groups && k_world_save_version_army_groups == 101 // BL-1737: the army groups, after the stocks
+                          && k_world_save_version_unit_stocks == 100 // BL-1678: the unit stocks, after the names
                           && k_world_save_version_tree_trim == 99 // BL-1712: the trimmed tree, v98's layout
                           && k_world_save_version_province_names == 98 // BL-1708: the province-name tail
                           && k_world_save_version_war_joiners == 97 // BL-1706: v97 grows the war records, no section
@@ -2421,7 +2422,7 @@ int main()
 
         // The space merge gave v84..v87 and v90..v92 the space line's layouts, so no version
         // in 81..93 is unclaimed any more; a stream stamped past today is refused.
-        for (const uint32_t v : {101u, 102u}) // BL-1678: v100 is today (the stocks are bought); BL-1712: v99 the tree trim; BL-1708: v98 the names; BL-1706: v97 the sides
+        for (const uint32_t v : {102u, 103u}) // BL-1737: v101 is today (the army groups); BL-1678: v100 is today (the stocks are bought); BL-1712: v99 the tree trim; BL-1708: v98 the names; BL-1706: v97 the sides
         {
             std::string other = b88;
             std::memcpy(&other[4], &v, sizeof v);
@@ -2440,7 +2441,7 @@ int main()
     {
         // BL-1641: v94 (one building per product) adds no section, nor does v95 (BL-1642, the
         // monthly tick), so today's stream is v93's layout.
-        static_assert(world_save_version == 100 /* BL-1637: v96 appends the pad-boost tail; BL-1706: v97 the sides, no section; BL-1708: v98 the province names; BL-1712: v99 is v98's layout, the trimmed tree; BL-1678: v100 the unit stocks */ && k_world_save_version_space_merge == 93
+        static_assert(world_save_version == 101 /* BL-1737: v101 the army groups; BL-1637: v96 appends the pad-boost tail; BL-1706: v97 the sides, no section; BL-1708: v98 the province names; BL-1712: v99 is v98's layout, the trimmed tree; BL-1678: v100 the unit stocks */ && k_world_save_version_space_merge == 93
                           && k_world_save_version_pre_space_merge == 89,
                       "PH pins v93 as the space merge over main's v89");
         static_assert(world_stream_is_space_line(84) && world_stream_is_space_line(87)
@@ -2470,7 +2471,7 @@ int main()
         world w92;
         const bool ok92 = s92 == 92 && from_bytes(b92, w92) && !w92.nations.at(gone).ended
             && w92.ships.empty() && w92.missile_magazines.empty()
-            && b93.size() - b92.size() == world_save_space_line_gap_bytes(k) + world_save_launch_boost_section_bytes(k) + world_save_province_names_section_bytes(k) /* BL-1708 (v98) */ + world_save_unit_stocks_section_bytes(k) /* BL-1678 (v100) */; // BL-1637 (v96)
+            && b93.size() - b92.size() == world_save_space_line_gap_bytes(k) + world_save_launch_boost_section_bytes(k) + world_save_province_names_section_bytes(k) /* BL-1708 (v98) */ + world_save_unit_stocks_section_bytes(k) /* BL-1678 (v100) */ + world_save_army_group_section_bytes(k) /* BL-1737 (v101) */; // BL-1637 (v96)
         check(ok92, "PH a space-line v92 stream loads: 55 wide, no naval, carry, ended or missile section; v93 is v92 plus those");
         world again92;
         check(ok92 && from_bytes(to_bytes(w92), again92) && to_bytes(again92) == to_bytes(w92),
@@ -2486,6 +2487,72 @@ int main()
         check(s89 == 89 && from_bytes(b89, w89) && w89.nations.at(gone).ended
                   && b93.size() - b89.size() == world_save_space_tail_bytes_after(80, k),
               "PH main's v89 stream loads; v93 is v89 plus every space section");
+    }
+
+    // -----------------------------------------------------------------------
+    // PJ (BL-1737, MILITARY.md § Army groups) -- v101 appends the army groups after v100's
+    // unit stocks. A group round-trips with its owner, ordinal and members; v100 is the
+    // strict prefix and reads as a world with no group; a malformed section is refused whole.
+    // -----------------------------------------------------------------------
+    {
+        static_assert(world_save_version == k_world_save_version_army_groups
+                          && k_world_save_version_pre_army_groups == 100
+                          && world_stream_has_army_groups(101) && !world_stream_has_army_groups(100),
+                      "PJ pins v101 as the army groups over v100");
+        world k = w;
+        // Three units of one owner: two in the 1st Army, one in the 3rd.
+        std::map<entity_id, std::vector<entity_id>> by_owner;
+        for (const auto& [uid, u] : k.units)
+            by_owner[u.owner].push_back(uid);
+        entity_id owner = null_entity;
+        for (auto& [oid, ids] : by_owner)
+            if (ids.size() >= 3 && k.nations.count(oid) != 0) { owner = oid; std::sort(ids.begin(), ids.end()); break; }
+        check(owner != null_entity, "PJ the world has a nation with three units to group");
+        if (owner != null_entity)
+        {
+            const std::vector<entity_id>& ids = by_owner.at(owner);
+            const entity_id g1 = k.create_entity();
+            const entity_id g3 = k.create_entity();
+            k.army_groups[g1] = army_group_component{ owner, 1 };
+            k.army_groups[g3] = army_group_component{ owner, 3 };
+            k.units.at(ids[0]).army_group = g1;
+            k.units.at(ids[1]).army_group = g1;
+            k.units.at(ids[2]).army_group = g3;
+            const std::string b = to_bytes(k);
+            world back;
+            const bool ok = from_bytes(b, back);
+            check(ok && to_bytes(back) == b && back.state_hash(1) == k.state_hash(1)
+                      && back.army_groups.size() == 2 && back.army_groups.at(g1).ordinal == 1
+                      && back.army_groups.at(g3).ordinal == 3 && back.army_groups.at(g1).owner == owner
+                      && back.units.at(ids[0]).army_group == g1 && back.units.at(ids[1]).army_group == g1
+                      && back.units.at(ids[2]).army_group == g3
+                      && world_save_army_group_section_bytes(k) == 4 + (16 + 8) + (16 + 4),
+                  "PJ the v101 section round-trips each group's owner, ordinal and members (bytes and hash equal)");
+            check(k.state_hash(1) != w.state_hash(1), "PJ a grouped world hashes apart from the ungrouped one");
+
+            std::ostringstream o100(std::ios::binary);
+            write_world_snapshot_pre_army_groups(k, o100);
+            world w100;
+            const bool ok100 = from_bytes(o100.str(), w100);
+            check(ok100 && w100.army_groups.empty() && w100.units.at(ids[0]).army_group == null_entity
+                      && o100.str().size() + world_save_army_group_section_bytes(k) == b.size(),
+                  "PJ a v100 stream (the strict prefix) reads as a world with no army group");
+
+            // Refusals: the section's last group record starts 16 + 4 bytes from the end
+            // (g3, one member). Owner, ordinal and member are each corrupted in turn.
+            const std::size_t at = b.size() - (16 + 4);
+            const auto refused = [&](std::size_t off, uint32_t v) {
+                std::string bad = b;
+                std::memcpy(&bad[at + off], &v, sizeof v);
+                world sentinel;
+                return !from_bytes(bad, sentinel) && sentinel.tiles.empty();
+            };
+            check(refused(8, 1u), "PJ a second group with the same owner and ordinal is REFUSED whole");
+            check(refused(8, 0u) && refused(8, 100u), "PJ an ordinal outside [1, 99] is REFUSED whole");
+            check(refused(16, static_cast<uint32_t>(ids[0])), "PJ a unit in two groups is REFUSED whole");
+            check(refused(0, static_cast<uint32_t>(ids[2])), "PJ a group id that is a unit's is REFUSED whole");
+            check(refused(12, 0u), "PJ a group with no member is REFUSED whole");
+        }
     }
 
     std::printf("\n");

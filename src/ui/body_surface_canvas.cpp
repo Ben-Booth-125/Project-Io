@@ -3219,6 +3219,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         state.clear_front_selection(); // BL-1427: the front channel, the same rule
         // A selection made elsewhere (a group row, a ledger) is ONE unit's card.
         state.selection_unit_group = false;
+        state.selection_army_group = null_entity; // BL-1737: and not an army group's
         state.province_sync_entity = state.selected_entity;
         // BL-1508: a group row opens one unit of the group, and "< Group" comes back to
         // it; anything outside the group retires it.
@@ -9152,6 +9153,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 state.selected_province    = 0u;
                 state.selection_cycle_tile = null_entity;
                 state.selected_units.assign(gathered.begin(), gathered.end());
+                state.selection_army_group = null_entity; // BL-1737: a drag is not an army group
                 state.selected_entity      = state.selected_units.front();
                 state.selection_unit_group = state.selected_units.size() > 1;
                 state.province_sync_entity = state.selected_entity;

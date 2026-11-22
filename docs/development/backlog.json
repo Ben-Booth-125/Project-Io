@@ -3162,7 +3162,7 @@
    "design": "PLAYTEST 2 LANE J (opening economy). Ben: \"We can also drop buildings that are unprofitable at the beginning, and drop many of the military buildings we start with, changing the initial army kit to just 4 Rifle Infantry.\" WORK: the same profit table as BL-1735 (opening kit follows profit) names what goes; DESIGN OWED: which military buildings stay. MILITARY.md owns the opening army. Rivals share the kit: say whether the change is player-only or all majors (opening_parity)."
   },
   {
-   "glyph": "~",
+   "glyph": "●",
    "sprint": null,
    "version_goal": null,
    "written": "2026-11-22",
@@ -3172,14 +3172,36 @@
    "author": "Ben (second playtest, 2026-11-22); filed by Claude",
    "priority": "B",
    "difficulty": 4,
-   "files": [],
+   "files": [
+    "src/world/army_groups.hpp",
+    "src/world/army_groups.cpp",
+    "src/world/components.hpp",
+    "src/world/world.hpp",
+    "src/world/world.cpp",
+    "src/world/corp_command.hpp",
+    "src/world/corp_command.cpp",
+    "src/world/economy_system.cpp",
+    "src/world/world_save.hpp",
+    "src/world/world_save.cpp",
+    "src/ui/army_group_ui.hpp",
+    "src/ui/army_group_ui.cpp",
+    "src/ui/selection_panel.cpp",
+    "src/ui/military_ledger.cpp",
+    "src/ui/pinned_panel.cpp",
+    "src/ui/ui_state.hpp",
+    "src/core/app.cpp",
+    "src/core/verify_api.cpp",
+    "tools/verify/army_groups_harness.cpp",
+    "tools/verify/save_roundtrip.cpp",
+    "scripts/verify/army_groups.lua"
+   ],
    "category": "Military",
-   "status": "design-owed",
+   "status": "complete",
    "authority_doc": "docs/military/MILITARY.md",
    "id": "BL-1737",
    "short_name": "ARMY_GROUPS",
    "title": "Army groups: gather selected units into a named group, merge and split it, list and pin it in the military ledger",
-   "design": "Ben, 2026-11-22: \"Another item we should build is army grouping. We should be able to select our units and add them to a group, with merge and split options. We should also list army groups in the military ledger, and have the option to pin them.\" NEW CONCEPT: today a \"unit group\" (SELECTION.md § The unit group element) is only the stack of one owner's units on one tile, drawn as one counter. An army group is a persistent, player-made set of units that can span tiles. DESIGN OWED: (1) how units are selected for grouping (multi-select on the canvas? from the unit group card?); (2) what a group is in the model (a world record, saved, so a save-format bump); (3) merge (two groups become one) and split (pick units out into a new group), and whether a unit may sit in two groups; (4) the military ledger's group list (name, size, strength, location spread) and pinning per the shared pin rule from BL-1695 (pin space reserved); (5) does a group take orders as one (march, assign to front), or is it a filter only for now; (6) naming. Rivals: player-only, since a rival's grouping is AI behaviour and a new widening (AI_OPPONENT.md § 11). Update ACTIONS.json for every new control."
+   "design": "MILITARY.md § Army groups; SELECTION.md § The army group element; ledgers/military.md § Groups (Ben, 2026-11-22, the six-call form). Form group on any multi-unit selection; Merge picks another group into this one; Split off moves ticked rows to a new group; one group per unit; ordinal names, no rename; orders go per unit as the dragged group's do; a Groups tab lists and pins them. One seat-only verb, set_army_group; save v101. Player-only: no AI grant. Original filing: Ben, 2026-11-22: \"Another item we should build is army grouping. We should be able to select our units and add them to a group, with merge and split options. We should also list army groups in the military ledger, and have the option to pin them.\" NEW CONCEPT: today a \"unit group\" (SELECTION.md § The unit group element) is only the stack of one owner's units on one tile, drawn as one counter. An army group is a persistent, player-made set of units that can span tiles. DESIGN OWED: (1) how units are selected for grouping (multi-select on the canvas? from the unit group card?); (2) what a group is in the model (a world record, saved, so a save-format bump); (3) merge (two groups become one) and split (pick units out into a new group), and whether a unit may sit in two groups; (4) the military ledger's group list (name, size, strength, location spread) and pinning per the shared pin rule from BL-1695 (pin space reserved); (5) does a group take orders as one (march, assign to front), or is it a filter only for now; (6) naming. Rivals: player-only, since a rival's grouping is AI behaviour and a new widening (AI_OPPONENT.md § 11). Update ACTIONS.json for every new control."
   }
  ]
 }

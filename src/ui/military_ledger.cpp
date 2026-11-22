@@ -8,6 +8,11 @@
 #include "nav_pane.hpp"           // close_all_panels — the no-base door takes the column
 #include "presentation.hpp"
 #include "unit_designer.hpp"      // the Design tab's class rows open it
+#include "army_group_ui.hpp"      // BL-1737: the Groups tab's rows
+#include "view_nav.hpp"           // BL-1737: focus_on_entity, a double press on a group row
+#include "icons.hpp"              // BL-1737: the row's pin glyph
+#include "pinned_panel.hpp"       // BL-1737: is_pinned, toggle_pin
+#include "world/army_groups.hpp"  // BL-1737: army_groups_of
 #include "circum_units.hpp"       // BL-1609: the Design tab's Space theatre
 #include "wing_card.hpp"          // BL-1450: air class / mission names
 #include "ship_card.hpp" // BL-1534: the Sea tab's labels and rows
@@ -1078,6 +1083,88 @@ void close_designer_on_ledger_close(ui_state& s, bool open)
 
 } // namespace
 
+
+/// BL-1737 (military.md § Groups; MILITARY.md § Army groups): the player's army groups, one
+/// row each in ordinal order. A press selects the group (the band shows its card), a double
+/// press goes to it; the pin is the row's last cell, its width reserved first.
+void draw_groups(const world& w, ui_state& s)
+{
+    s.army_drawn.ledger_rows.clear();
+    const entity_id nation = player_nation(w);
+    std::vector<entity_id> groups;
+    for (const entity_id g : army_groups_of(w, nation))
+        if (!army_group_members(w, g).empty())
+            groups.push_back(g);
+    ImGui::TextDisabled("Army groups (%d)", static_cast<int>(groups.size()));
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip(groups.empty() ? "Select two or more of your units and press Form group."
+                                         : "Press a group to show its card; double-press to go to it. "
+                                           "Form more from any selection of two or more of your units.");
+    if (groups.empty())
+        return;
+    const float frame_h = ImGui::GetFrameHeight();
+    const float gap     = ImGui::GetStyle().ItemSpacing.x;
+    const float row_w   = ImGui::GetContentRegionAvail().x;
+    const float pin_w   = frame_h; // BL-1695: reserved before the row's text lays out
+    const float text_w  = row_w - pin_w - gap;
+    for (const entity_id g : groups)
+    {
+        const army_group_stats st = army_group_stats_of(w, g);
+        ImGui::PushID(static_cast<int>(g));
+        const ImVec2 p0 = ImGui::GetCursorScreenPos();
+        const float  lh = ImGui::GetTextLineHeight();
+        const float  rh = lh * 2.0f + ImGui::GetStyle().ItemSpacing.y;
+        const bool   lit = s.selection_army_group == g;
+        if (ImGui::Selectable("##group_row", lit, ImGuiSelectableFlags_AllowDoubleClick, {text_w, rh}))
+        {
+            select_army_group(w, s, g);
+            if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
+            {
+                const std::vector<entity_id> m = army_group_members(w, g);
+                if (!m.empty())
+                    focus_on_entity(w, s, m.front());
+            }
+        }
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("Show this army group's card; double-press to go to it");
+        ImDrawList* dl = ImGui::GetWindowDrawList();
+        ImGui::PushClipRect(p0, {p0.x + text_w, p0.y + rh}, true);
+        dl->AddText({p0.x + 2.0f, p0.y}, ImGui::GetColorU32(ImGuiCol_Text), st.name.c_str());
+        char line[160];
+        std::snprintf(line, sizeof line, "%d unit%s · %lld / %lld men · %d tile%s%s%s",
+                      st.units, st.units == 1 ? "" : "s", st.men, st.establishment, st.tiles,
+                      st.tiles == 1 ? "" : "s", st.front.empty() ? "" : " · ", st.front.c_str());
+        dl->AddText({p0.x + 2.0f, p0.y + lh + ImGui::GetStyle().ItemSpacing.y},
+                    ImGui::GetColorU32(ImGuiCol_TextDisabled), line);
+        ImGui::PopClipRect();
+        ui_state::army_group_drawn_state::row r;
+        r.group = g;
+        r.x = p0.x + text_w * 0.5f;
+        r.y = p0.y + rh * 0.5f;
+        // The pin: a toggle, the row's last cell.
+        ImGui::SameLine(row_w - pin_w);
+        const bool on = is_pinned(s, g);
+        const ImVec2 q0 = ImGui::GetCursorScreenPos();
+        if (ImGui::InvisibleButton("##group_pin", {pin_w, pin_w}))
+            toggle_pin(s, g);
+        const bool hov = ImGui::IsItemHovered();
+        const ImVec2 q1 = {q0.x + pin_w, q0.y + pin_w};
+        dl->AddRectFilled(q0, q1, on ? IM_COL32(70, 58, 30, 255) : (hov ? IM_COL32(52, 56, 72, 255)
+                                                                         : IM_COL32(34, 36, 48, 255)), 4.0f);
+        dl->AddRect(q0, q1, on ? palette::pinned : IM_COL32(90, 95, 110, 255), 4.0f);
+        icons::pin(dl, {(q0.x + q1.x) * 0.5f, (q0.y + q1.y) * 0.5f}, pin_w * 0.34f,
+                   on ? palette::pinned : IM_COL32(170, 175, 190, 255));
+        if (hov)
+            ImGui::SetTooltip(on ? "Unpin: take this group off the watch list."
+                                 : "Pin: keep this group on the watch list, right of the canvas.");
+        r.pin_x  = (q0.x + q1.x) * 0.5f;
+        r.pin_y  = (q0.y + q1.y) * 0.5f;
+        r.pinned = is_pinned(s, g);
+        s.army_drawn.ledger_rows.push_back(r);
+        ImGui::PopID();
+    }
+}
+
 void draw_military_ledger(const world& w, const recipe_registry& reg, ui_state& s, bool& open)
 {
     military_ledger_state& m = s.military;
@@ -1123,15 +1210,22 @@ void draw_military_ledger(const world& w, const recipe_registry& reg, ui_state& 
                           "military research lands.");
     m.tab_x[1] = (ImGui::GetItemRectMin().x + ImGui::GetItemRectMax().x) * 0.5f;
     m.tab_y[1] = (ImGui::GetItemRectMin().y + ImGui::GetItemRectMax().y) * 0.5f;
-    if (m.view < 0 || m.view > 1)
+    ImGui::SameLine();
+    ui::nav_button("Groups", 2, m.view, &open); // BL-1737 (military.md § Groups)
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("Your army groups: each one's units, men and the ground it spans.");
+    s.army_drawn.groups_tab_x = (ImGui::GetItemRectMin().x + ImGui::GetItemRectMax().x) * 0.5f;
+    s.army_drawn.groups_tab_y = (ImGui::GetItemRectMin().y + ImGui::GetItemRectMax().y) * 0.5f;
+    if (m.view < 0 || m.view > 2)
         m.view = 0;
     ImGui::Separator();
     ImGui::Spacing();
 
     if (open)
     {
-        if (m.view == 0) draw_recruit(w, reg, s);
-        else             draw_design(w, reg, s);
+        if (m.view == 0)      draw_recruit(w, reg, s);
+        else if (m.view == 1) draw_design(w, reg, s);
+        else                  draw_groups(w, s); // BL-1737
     }
     else
         m.raise_pressed = false;

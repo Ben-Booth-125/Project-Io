@@ -1695,6 +1695,41 @@ struct ui_state
     /// has its entity, and the band, a right-click and Assign to front read this list.
     /// Pruned each frame of the fallen, and retired by any other selection.
     std::vector<entity_id> selected_units;
+    /// BL-1737 (SELECTION.md § The army group element): the army group the band shows, or
+    /// null. Set by `select_army_group` (army_group_ui.hpp) with `selected_entity` its
+    /// lowest-id unit and `selected_units` its units, so every order path reads it as the
+    /// dragged group; re-derived from the world each frame (`sync_army_group_selection`),
+    /// and cleared by any other selection. VIEW state, not serialised.
+    entity_id selection_army_group = null_entity;
+    /// The army group card's ticked rows (Split off) and the group they belong to; a
+    /// different group shown clears them. VIEW state.
+    entity_id              army_ticks_for = null_entity;
+    std::vector<entity_id> army_ticks;
+    /// A press that reshapes army groups, queued by the card and sent by app::render as
+    /// `set_army_group` once per unit (MILITARY.md § Army groups). `kind` 0 none, 1 form
+    /// (the units into a new group), 2 merge (the units into `target`), 3 split (the units
+    /// into a new group). The band then shows the group the units went to.
+    struct army_group_op
+    {
+        int                    kind   = 0;
+        entity_id              target = null_entity;
+        std::vector<entity_id> units;
+    };
+    army_group_op pending_army_group;
+    /// What the army group surfaces drew last frame, for verify: the presses' centres
+    /// (-1 = not drawn) and the Groups tab's rows (group id, row centre, pin centre).
+    struct army_group_drawn_state
+    {
+        float form_x = -1.0f, form_y = -1.0f;
+        float merge_x = -1.0f, merge_y = -1.0f;
+        float split_x = -1.0f, split_y = -1.0f;
+        bool  split_enabled = false;
+        std::vector<std::pair<entity_id, std::pair<float, float>>> ticks;     ///< (unit, tick box centre)
+        std::vector<std::pair<entity_id, std::pair<float, float>>> merge_rows; ///< (group, row centre), while the list is open
+        struct row { entity_id group = null_entity; float x = 0, y = 0, pin_x = 0, pin_y = 0; bool pinned = false; };
+        std::vector<row> ledger_rows;
+        float groups_tab_x = -1.0f, groups_tab_y = -1.0f;
+    } army_drawn;
     /// The left press that may become that drag: where it went down (screen), whether
     /// Shift held at the press, and whether it has moved far enough to be a band.
     struct unit_drag_gesture

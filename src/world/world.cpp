@@ -488,6 +488,25 @@ uint64_t world::state_hash(int tick) const
                 fnv1a_u32(h, 0x53555246u); // "SURF"
                 fnv1a_u32(h, u.landing_ship);
             }
+            if (u.army_group != null_entity) // BL-1737: only while in an army group
+            {
+                fnv1a_u32(h, 0x41524D59u); // "ARMY"
+                fnv1a_u32(h, u.army_group);
+            }
+        }
+    }
+
+    // BL-1737 (army groups): ascending id, folded only when there are any, so a world
+    // nobody groups hashes as it did.
+    if (!army_groups.empty())
+    {
+        fnv1a_u32(h, 0x41475250u); // "AGRP"
+        fnv1a_u32(h, static_cast<uint32_t>(army_groups.size()));
+        for (const auto& [gid, g] : army_groups)
+        {
+            fnv1a_u32(h, gid);
+            fnv1a_u32(h, g.owner);
+            fnv1a_u32(h, g.ordinal);
         }
     }
 

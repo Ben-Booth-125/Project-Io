@@ -423,7 +423,7 @@
   ],
   [
    "chrome.pin_toggle",
-   "The pin toggle: a small pushpin square at the Selection band's top-right corner, over the band's header row, shown whenever the band shows an entity - a body, tile, building, market, unit, nation or air wing (docs/ui/LAYOUT.md § Pinned items)."
+   "The pin toggle: a small pushpin square at the Selection band's top-right corner, over the band's header row, shown whenever the band shows an entity - a body, tile, building, market, unit, nation, air wing or army group (the group, not its leading unit) (docs/ui/LAYOUT.md § Pinned items)."
   ],
   [
    "chrome.pin_press",
@@ -750,6 +750,26 @@
    "The Planetary canvas, with no lens and nothing armed (BL-1508; SELECTION.md § The dragged group)."
   ],
   [
+   "ledger.selection_army_form_group",
+   "Selection band, the unit group element (a stack of two or more of the player's units, or a dragged group): 'Form group' in the header, left of Defend and Assign to front (docs/ui/SELECTION.md § The dragged group)."
+  ],
+  [
+   "ledger.selection_army_group_card",
+   "Selection band, the army group element: the group's name ('1st Army'), 'N units · K tiles', Merge, Split off, Defend, Assign to front and go-to in the header (the pin's width reserved at its end); the counter, the group's stat grid, and one row per unit with a tick box at its start (docs/ui/SELECTION.md § The army group element)."
+  ],
+  [
+   "ledger.selection_army_merge",
+   "Selection band, army group card header: 'Merge', opening a list of the player's other army groups, each 'Name (N units)'."
+  ],
+  [
+   "ledger.selection_army_tick",
+   "Selection band, army group card: the tick box at the start of each unit row."
+  ],
+  [
+   "ledger.selection_army_split",
+   "Selection band, army group card header: 'Split off'."
+  ],
+  [
    "gameplay.hire_wing",
    "The Military ledger's air rows (nav rail slot 7, Recruit tab, Air theatre tab; ledger.military_air_raise). Also a corp_verb (corp_verb::hire_wing, 44) on the command seam, which rival nations' scorers issue too."
   ],
@@ -800,6 +820,10 @@
   [
    "gameplay.capitulate",
    "Diplomacy ledger, Wars tab, 'Capitulate' on a war the player is in, leader or joiner (ledger.diplomacy_capitulate). A corp_verb (corp_verb::capitulate, 69) on the command seam."
+  ],
+  [
+   "gameplay.set_army_group",
+   "The army group card's Merge and Split off and a stack's Form group (ledger.selection_army_form_group, ledger.selection_army_merge, ledger.selection_army_split); each sends this verb once per unit. A corp_verb (corp_verb::set_army_group, 70) on the command seam."
   ],
   [
    "gameplay.set_embargo",
@@ -1120,6 +1144,18 @@
   [
    "ledger.military_select_ship",
    "Military ledger, Recruit, Sea tab: \"Your ships\", one row per ship with what it is doing."
+  ],
+  [
+   "ledger.military_groups_tab",
+   "Military ledger (nav rail slot 7): the 'Groups' tab, third after Recruit and Design (docs/ui/ledgers/military.md § Groups)."
+  ],
+  [
+   "ledger.military_select_group",
+   "Military ledger, Groups tab: an army group's row."
+  ],
+  [
+   "ledger.military_group_pin",
+   "Military ledger, Groups tab: the pushpin square at the end of each row, its width reserved before the row's text."
   ],
   [
    "ledger.military_open_ship_designer",
