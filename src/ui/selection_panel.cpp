@@ -4484,8 +4484,9 @@ void draw_tile_selection(world& w, const recipe_registry& reg, const economy_rep
         }
         else
         {
-            ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection),
-                               "Tile [%d, %d]", tile.grid_x, tile.grid_y);
+            // The title is the word alone (Ben, 2026-11-22): the grid position was a
+            // row the player never reads, and the canvas already marks the tile.
+            ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Tile");
             // Road tier (BL-184): the canvas draws the three tiers by weight
             // alone, with no key, so the card names the tier at the moment of
             // interest. Moved here from the retired header row.

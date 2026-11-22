@@ -208,7 +208,9 @@ a tile keep the shared header (§ Layout & chrome).
    tile's own deposits.
 3. **Tile — one titled card: the buildings on this tile.** Tile grain, because a building
    stands on a tile. **Buildings only** — no market or price rows; what the tile's goods fetch
-   is the Market ledger's question.
+   is the Market ledger's question. **The title is the word "Tile" alone**, with the road tier
+   beside it where one meets the tile — no grid coordinates (Ben, 2026-11-22): the canvas marks
+   which tile is selected, and a coordinate pair answers no question the player asks.
    - **A figure row, between the title and the grid** — three glyph cells across, each a
      figure with its words in its hover, never a labelled list (Ben, 2026-11-20: "a grid with
      glyphs above the list of buildings, capacity can go next to logistics points usage, and we
