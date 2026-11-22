@@ -1170,8 +1170,7 @@ constexpr float kTwoPiLocal = 6.2831853f;
 
 void glyph_hammer(ImDrawList* dl, ImVec2 c, float r, ImU32 col)
 {
-    dl->AddRectFilled({c.x - r * 0.55f, c.y - r * 0.7f}, {c.x + r * 0.7f, c.y - r * 0.28f}, col, 1.5f);
-    dl->AddLine({c.x - r * 0.05f, c.y - r * 0.35f}, {c.x - r * 0.45f, c.y + r * 0.75f}, col, 2.2f);
+    icons::construct(dl, c, r, col); // the shared Construct hammer, the Site Finder's too
 }
 
 void glyph_gear(ImDrawList* dl, ImVec2 c, float r, ImU32 col)

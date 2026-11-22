@@ -1438,15 +1438,16 @@ void draw_site_grid(const world& w, const recipe_registry& reg, ui_state& ui)
         ImGui::BeginDisabled(!can_build);
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ui::px(1.0f, 0.0f));
         // THE PRESS IS A GLYPH (Ben, 2026-11-22: "the construct button in the site finder
-        // should just be a symbol rather than the full text"): the crane the canvas names a
-        // site under construction by, centred on the same press, its hover the cost as before.
+        // should just be a symbol rather than the full text"): the Construct hammer, the same
+        // glyph as the Selection element's Construct action (Ben, 2026-11-22), centred on the
+        // same press, its hover the cost as before.
         const bool build_pressed = ImGui::Button("##cell_build", {b_mx.x - b_mn.x, b_mx.y - b_mn.y});
         {
             const ImVec2 g_mn = ImGui::GetItemRectMin();
             const ImVec2 g_mx = ImGui::GetItemRectMax();
             const float  g_r  = std::max(ui::px(3.0f), (g_mx.y - g_mn.y) * 0.5f - ui::px(2.0f));
-            icons::under_construction(dl, {(g_mn.x + g_mx.x) * 0.5f, (g_mn.y + g_mx.y) * 0.5f}, g_r,
-                                      ImGui::GetColorU32(ImGuiCol_Text));
+            icons::construct(dl, {(g_mn.x + g_mx.x) * 0.5f, (g_mn.y + g_mx.y) * 0.5f}, g_r,
+                             ImGui::GetColorU32(ImGuiCol_Text));
         }
         ImGui::PopStyleVar();
         ImGui::EndDisabled();

@@ -91,6 +91,12 @@ void item(ImDrawList* dl, ImVec2 centre, float r, resource_type res);
 ///               still reads while the type does not).
 void under_construction(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
 
+/// Draw the Construct press glyph - a hammer: a square head and one handle - in @p colour.
+/// One glyph for every press that opens or starts a build: the Selection element's Construct
+/// action and the Site Finder's Construct press (Ben, 2026-11-22: "the same as the
+/// construction button in the selection element").
+void construct(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
+
 /// Draw a ledger glyph — a small ruled table outline — in @p colour. Used by the
 /// navigation pane for slots that open a ledger window (e.g. the Tile Ledger).
 ///

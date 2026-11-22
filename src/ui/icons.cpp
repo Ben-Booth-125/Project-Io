@@ -1201,6 +1201,12 @@ void item(ImDrawList* dl, ImVec2 centre, float r, resource_type res)
     }
 }
 
+void construct(ImDrawList* dl, ImVec2 c, float r, ImU32 col)
+{
+    dl->AddRectFilled({c.x - r * 0.55f, c.y - r * 0.7f}, {c.x + r * 0.7f, c.y - r * 0.28f}, col, 1.5f);
+    dl->AddLine({c.x - r * 0.05f, c.y - r * 0.35f}, {c.x - r * 0.45f, c.y + r * 0.75f}, col, 2.2f);
+}
+
 void under_construction(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
 {
     // Crane silhouette: a mast, an angled boom reaching toward the load, a

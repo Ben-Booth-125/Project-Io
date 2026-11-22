@@ -115,8 +115,9 @@ portions (credits and site number) to half the width, add Cr prefix to the credi
 other half for a construct button. This will automatically pick the most profitable (or highest
 spare logistic points on ties), and start construction there."*).** The left half carries the best
 Net as **"Cr <figure>"** and the site count; the right half is a **Construct** press, drawn as the
-`under_construction` crane glyph alone, its hover the build's cost (Ben, 2026-11-22: "the construct
-button in the site finder should just be a symbol rather than the full text"). It builds the
+`construct` hammer alone - the Selection element's own Construct glyph - its hover the build's cost
+(Ben, 2026-11-22: "the construct button in the site finder should just be a symbol rather than the
+full text"; "a hammer the same as the construction button in the selection element"). It builds the
 cell's building at its **best site**: the listed tile with the highest Net in whole credits (a priced
 site before an unpriced one), ties to the highest Logistic Point cover, then the lowest tile id - one
 answer, whatever the order the tiles were priced in. It goes through the map press's own path (the

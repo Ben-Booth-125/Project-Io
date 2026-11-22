@@ -2686,9 +2686,9 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 
 **Reason to select.** Answers 'what would earn most on my ground, and where?' without choosing a building first or sweeping the map tile by tile; selecting a tile narrows the same question to its province. The estimate is today's prices with each tile's Logistic Point cover applied - one input among several, not the move.
 
-### `ledger.construction_site_construct` — Construction ledger, Site Finder view, the 'Find a site' building grid: the Construct press on the right half of each cell's lower line, drawn as a crane glyph with no word (the left half carries 'Cr <best Net>' and the site count)
+### `ledger.construction_site_construct` — Construction ledger, Site Finder view, the 'Find a site' building grid: the Construct press on the right half of each cell's lower line, drawn as the Construct hammer glyph (the Selection element's) with no word (the left half carries 'Cr <best Net>' and the site count)
 
-**Press.** Press the crane glyph (Construct) on a cell of the 'Find a site' grid; its hover is the build's cost. No cell need be chosen first, and the press does not choose or clear one.
+**Press.** Press the hammer glyph (Construct) on a cell of the 'Find a site' grid; its hover is the build's cost. No cell need be chosen first, and the press does not choose or clear one.
 
 | Arg | Type | Meaning |
 |---|---|---|
