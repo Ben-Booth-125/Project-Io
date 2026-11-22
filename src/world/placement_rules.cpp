@@ -750,8 +750,11 @@ placement_result can_place_in_world(const world& w, entity_id tile_id,
     // a rig is bounded by its deposit's stack above, not by the land it is not on.
     if (const uint32_t province_id = rig ? 0u : w.provinces.province_of(tile_id); province_id != 0)
     {
+        // BL-1733: an infrastructure building brings its own room (at least the base
+        // grant), so a full province can always take the depot that would open it up.
         const int ceiling = ::province_building_ceiling(w, province_id);
-        if (ceiling >= 0 && ::province_buildings_standing(w, province_id) >= ceiling)
+        const int own     = ::raises_province_ceiling(type) ? k_province_infrastructure_grant : 0;
+        if (ceiling >= 0 && ::province_buildings_standing(w, province_id) >= ceiling + own)
             return placement_reason::province_full;
     }
 

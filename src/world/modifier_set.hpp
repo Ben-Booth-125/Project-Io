@@ -119,6 +119,13 @@ enum class modifier_subject : uint8_t
                          ///  decays ("Alarm toward you decays 10% faster" is x1.10).
                          ///  WIRED: handed to `decay_sentiment` as the per-subject
                          ///  scale at the head of `run_economy_step`. Scope "all".
+    province_ceiling,    ///< BL-1733 (PRODUCTION.md § The province building ceiling, Ben
+                         ///  2026-11-22): a multiplier on the building ceiling of every
+                         ///  province the holder owns. WIRED: `measure_province_sustain`
+                         ///  folds the province owner's held nodes. Scope "all".
+    province_ceiling_infrastructure, ///< BL-1733: a multiplier on the ceiling each
+                         ///  infrastructure building (port, Truck Depot, railway station)
+                         ///  grants its province, read beside `province_ceiling`. Scope "all".
 };
 
 /// How a modifier combines with the value it moves. The three ops the BL-479

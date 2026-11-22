@@ -137,7 +137,7 @@ the system that builds, launches or designs the thing reads the key through the 
 | `ES-PR-IP-T2` | Cryogenics II | travel | 1 | +1% propellant output | Cryogenics I |
 | `ES-PR-IP-A1` | Remote Prospecting | minor | 1 | a surveyed body may be prospected for its deposits | Cryogenics II |
 | `ES-PR-IP-A2` | Habitat Shielding | minor | 1 | off-world base upkeep -10% | Cryogenics II |
-| `ES-PR-IP-A` | Off-World Bases | major | 2 | a base may be founded on another body | Remote Prospecting + Habitat Shielding |
+| `ES-PR-IP-A` | Off-World Bases | major | 2 | a base may be founded on another body; province building ceiling +50% | Remote Prospecting + Habitat Shielding |
 | `ES-PR-IP-T3` | Cryogenics III | travel | 2 | +1% propellant output | Off-World Bases |
 | `ES-PR-IP-T4` | Cryogenics IV | travel | 3 | +1% propellant output | Cryogenics III |
 | `ES-PR-IP-T5` | Cryogenics V | travel | 2 | +1% propellant output | Off-World Bases |
@@ -172,7 +172,7 @@ the system that builds, launches or designs the thing reads the key through the 
 | `ES-NE-IC-C1` | Rendezvous and Capture | minor | 3 | opens the debris arm (Tug payload) | Transfer Orbits VI |
 | `ES-NE-IC-C2` | Nuclear Thermal Rockets | minor | 3 | opens the nuclear thermal drive (space hull drive) | Transfer Orbits VI |
 | `ES-NE-IC-C` | Orbital Tugs | major | 4 | opens the Tug hull: clears debris, moves an unpowered asset | Rendezvous and Capture + Nuclear Thermal Rockets |
-| `ES-NE-IC-M` | Transfer Network | mastery | 4 | -3% launch propellant | Landers + Orbital Tugs |
+| `ES-NE-IC-M` | Transfer Network | mastery | 4 | -3% launch propellant; infrastructure buildings raise the province building ceiling +100% | Landers + Orbital Tugs |
 | `ES-NE-IC-Q` | Interplanetary Trade | quest | 2 | launch propellant -5%. **Deed:** a Hauler of yours delivers cargo between two bodies, neither your home world. **Keys next age:** Deep-Space Convoys | Space Haulers |
 
 ### State — what the nation can field and hold in space

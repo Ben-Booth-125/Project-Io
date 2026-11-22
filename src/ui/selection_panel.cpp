@@ -3979,6 +3979,14 @@ void draw_capacity_tooltip(const world& w, entity_id tile_id)
         std::snprintf(v, sizeof v, "x%.2f", static_cast<double>(s.population_factor));
         std::snprintf(sh, sizeof sh, "%.0f%%", static_cast<double>(100.0f * lift / total));
         row("Population", v, sh);
+        // BL-1733: research lifts the land term; infrastructure adds room of its own.
+        std::snprintf(v, sizeof v, "x%.2f", static_cast<double>(s.research_multiplier));
+        std::snprintf(sh, sizeof sh, "land room %d", s.land_ceiling);
+        row("Research", v, sh);
+        std::snprintf(v, sizeof v, "%d building%s", s.infrastructure_buildings,
+                      s.infrastructure_buildings == 1 ? "" : "s");
+        std::snprintf(sh, sizeof sh, "+%d", s.infrastructure_grant);
+        row("Ports, depots, stations", v, sh);
         ImGui::EndTable();
     }
     ImGui::TextDisabled("Buildings of every type count against it,\n"

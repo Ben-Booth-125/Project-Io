@@ -1284,6 +1284,8 @@ void rows_t2(const recipe_registry& reg)
                      : s == "alarm_toward" ? modifier_subject::alarm_toward // BL-1432
                      : s == "alarm_tell" ? modifier_subject::alarm_tell
                      : s == "alarm_decay" ? modifier_subject::alarm_decay
+                     : s == "province_ceiling" ? modifier_subject::province_ceiling // BL-1733
+                     : s == "province_ceiling_infrastructure" ? modifier_subject::province_ceiling_infrastructure
                      : modifier_subject::extraction_rate;
             }
             fixture f = make_fixture();

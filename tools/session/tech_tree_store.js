@@ -66,7 +66,8 @@ for (const n of nodes) if (!n.requires.length && !(n.tier === 'travel' && /-T1$/
 // (the header this store renders into, via gen_tech_tree_table.js, is what that audit reads).
 const SUBJECTS = new Set(['extraction_rate', 'processing_yield', 'unit_upkeep', 'logistics_cost',
                           'wage_floor', 'collapse_strain', 'national_research',
-                          'alarm_toward', 'alarm_tell', 'alarm_decay']); // modifier_set.hpp (BL-1432)
+                          'alarm_toward', 'alarm_tell', 'alarm_decay', // modifier_set.hpp (BL-1432)
+                          'province_ceiling', 'province_ceiling_infrastructure']); // BL-1733
 const POINT_SUBJECTS = new Set(['alarm_tell']); // added in points, not percent (BL-1432)
 const SCOPE_RE = /^(all|resource:[a-z_]+|group:[A-Za-z &]+|recipe:[a-z_]+|building:[a-z_]+|site:[a-z_]+)$/;
 const str = v => typeof v === 'string' && v.length > 0;

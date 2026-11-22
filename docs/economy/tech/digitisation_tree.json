@@ -241,12 +241,16 @@
      "DG-PR-EX-B2"
     ]
    ],
-   "advantage": "province building ceiling +1 for extraction buildings; Mines +10% extraction rate",
+   "advantage": "province building ceiling +50%; Mines +10% extraction rate",
    "effects": [
     {
-     "kind": "unread",
-     "what": "province building ceiling +1 for extraction buildings",
-     "waits_on": "province building ceiling by type"
+     "kind": "modifier",
+     "subject": "province_ceiling",
+     "scope": [
+      "all"
+     ],
+     "op": "multiply",
+     "value": 1.5
     },
     {
      "kind": "modifier",
@@ -1693,12 +1697,21 @@
      "DG-NE-FR-B1"
     ]
    ],
-   "advantage": "road-tier upgrades cost -30%; road travel time -15%",
+   "advantage": "road-tier upgrades cost -30%; road travel time -15%; infrastructure buildings raise the province building ceiling +50%",
    "effects": [
     {
      "kind": "unread",
      "what": "road-tier upgrades cost -30%; road travel time -15%",
      "waits_on": "roads"
+    },
+    {
+     "kind": "modifier",
+     "subject": "province_ceiling_infrastructure",
+     "scope": [
+      "all"
+     ],
+     "op": "multiply",
+     "value": 1.5
     }
    ],
    "cost_units": 24

@@ -435,6 +435,8 @@ constexpr modifier_subject k_read_subjects[] = {
     // step's sentiment decay (alarm_decay).
     modifier_subject::alarm_toward, modifier_subject::alarm_tell,
     modifier_subject::alarm_decay,
+    // BL-1733: the province building ceiling, read by measure_province_sustain.
+    modifier_subject::province_ceiling, modifier_subject::province_ceiling_infrastructure,
 };
 
 /// Mechanic keys with a reader: the Digitisation tree's space keys
@@ -467,7 +469,8 @@ constexpr std::string_view k_unread_systems[] = {
     "launch draw by nation", "microchip recipe", "muster time",
     "national stock and demand ledger", "plastics recipe", // "offshore placement" is read (BL-1522);
     // "espionage", "politics" and "port handling by nation" left with the BL-1712 trim
-    "province building ceiling by type", "roads", "sea control", "sentiment", "ship muster time", "ship strength",
+    "roads", // "province building ceiling by type": read since BL-1733, type-agnostic
+    "sea control", "sentiment", "ship muster time", "ship strength",
     "survey reach", "tariffs", "tax yield", "trade partners by nation", "trade points",
     "trade settlement timing", "travel time by nation", "unit movement", "unit strength",
     "unit unlock", "unit_upkeep", "unrest", "wage_floor", "war outcomes",
@@ -486,6 +489,8 @@ bool parse_subject(std::string_view s, modifier_subject& out)
         { "alarm_toward", modifier_subject::alarm_toward }, // BL-1432
         { "alarm_tell", modifier_subject::alarm_tell },     // BL-1432
         { "alarm_decay", modifier_subject::alarm_decay },   // BL-1432
+        { "province_ceiling", modifier_subject::province_ceiling },                               // BL-1733
+        { "province_ceiling_infrastructure", modifier_subject::province_ceiling_infrastructure }, // BL-1733
     };
     for (const auto& [name, v] : table)
         if (name == s)
@@ -600,13 +605,13 @@ void parse_scope(std::string_view s, resolved_modifier& r)
 struct effect_tables
 {
     // Read modifiers, per subject, in node-index order (the effects table's own order).
-    std::vector<resolved_modifier> by_subject[static_cast<std::size_t>(modifier_subject::alarm_decay) + 1];
+    std::vector<resolved_modifier> by_subject[static_cast<std::size_t>(modifier_subject::province_ceiling_infrastructure) + 1];
     std::vector<resolved_unlock>   recipe_unlocks;
     std::vector<resolved_unlock>   structure_unlocks;
     std::vector<resolved_mechanic> mechanics;
     // BL-1613: the Early Space tree's read modifiers, per subject, in ES node-index
     // order. `node` is an `io::es` index here.
-    std::vector<resolved_modifier> es_by_subject[static_cast<std::size_t>(modifier_subject::alarm_decay) + 1];
+    std::vector<resolved_modifier> es_by_subject[static_cast<std::size_t>(modifier_subject::province_ceiling_infrastructure) + 1];
 };
 
 /// An Early Space effect row in the Digitisation row's shape: the two generated

@@ -2208,6 +2208,40 @@
     "tools/verify/player_seed_sweep.cpp"
    ],
    "resolution": null
+  },
+  {
+   "raised": "2026-11-22",
+   "status": "open",
+   "source": "Lane J (opening economy), second playtest; branch claude/playtest2-lane-j-economy-8a55c5",
+   "id": "NR-1262",
+   "title": "BL-1733 (province ceiling tech raised): the calls taken inside Ben's ruling",
+   "kind": "decision",
+   "what": "Ben ruled k/30, one Digitisation major, later trees too, and infrastructure buildings that raise it with later techs boosting them. Taken on his behalf: the major is Deep-Shaft Mining (it already carried a typed ceiling effect; now x1.5, type-agnostic). Off-World Bases x1.5 in Early Space. Infrastructure = port, Truck Depot, railway station, complete; each adds 10 room, scaled by Motorway Grid x1.5 and Transfer Network x2. The owner is the plurality of the province's claimed tiles. An infrastructure building is admitted while the province stands under ceiling + 10, so a full province can always take the depot that opens it.",
+   "why_it_matters": "At k/30 the median land province holds one building, so the depot grant decides where a nation can build outside its cities.",
+   "ask": "Keep these, or move the grant (10) or the nodes?",
+   "files": [
+    "src/world/province.cpp",
+    "docs/economy/PRODUCTION.md",
+    "docs/economy/tech/digitisation_tree.json",
+    "docs/economy/tech/early_space_tree.json"
+   ],
+   "resolution": null
+  },
+  {
+   "raised": "2026-11-22",
+   "status": "open",
+   "source": "Lane J (opening economy), second playtest; branch claude/playtest2-lane-j-economy-8a55c5",
+   "id": "NR-1263",
+   "title": "Generation reads the cut province ceiling only in part",
+   "kind": "question",
+   "what": "The kit's processors, civic buildings and Marketplaces go through can_place_in_world, so the cut ceiling binds them; the history, the charter walk and the kit's extraction slots do not read it. Provinces therefore open over their ceiling, and kit slots refused for room become substitutions or unbuilt slots (unbuilt kit slots rose 88 -> 132 over 64 majors once the ceiling and trim landed). PRODUCTION.md states the split as it stands.",
+   "why_it_matters": "BL-1500 ruled generation obeys the tile cap with no exemptions; the province ceiling now has no such ruling and is applied unevenly.",
+   "ask": "Should generation obey the province ceiling everywhere (as the tile cap), stay exempt everywhere, or keep the split?",
+   "files": [
+    "src/world/opening_kit.cpp",
+    "docs/economy/PRODUCTION.md"
+   ],
+   "resolution": null
   }
  ]
 }

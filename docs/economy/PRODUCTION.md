@@ -157,7 +157,8 @@ building types.
 sustain_units = pop_factor × Σ over the province's land tiles of
                                 habitability_t × (1 + road_level_t / 3)
 
-ceiling       = max(1, round(k × sustain_units)),   k = 12.6468
+land room     = max(1, round(k × sustain_units × research)),   k = 12.6468 / 30
+ceiling       = land room + round(10 × infrastructure buildings × infrastructure research)
 ```
 
 * **Area** is the number of terms in the sum — a bigger province sustains more by being bigger.
@@ -174,6 +175,22 @@ matches the capacity the world already grants under the pooled per-tile cap: the
 regime. Across 8 seeds, `pooled per-tile cap ÷ sustain units` measured **11.4694 … 15.2588,
 aggregate 12.6468** (spread 28.36% of the mean) under the single tile caps; `k` is that aggregate.
 
+**The ceiling is cut by thirty, and research and infrastructure raise it (Ben, 2026-11-22).**
+Ben: *"29000 seems an unreachable ceiling so it's useless."* Offered `k` / 100 and `k` / 30, he took
+thirty. The measured `k` below stays the anchor and the divisor is his ruling. At the handoff the
+major capitals read about 40 to 1,100, and most small rural provinces hold one building.
+
+* **Research.** The province's owner (the plurality of its claimed tiles, ties to the lower nation
+  id) lends its held `province_ceiling` nodes to the land room: Deep-Shaft Mining ×1.5 in the
+  Digitisation tree, Off-World Bases ×1.5 in the Early Space tree. An unowned province reads none.
+* **Infrastructure buildings.** Each complete port, Truck Depot or railway station standing in the
+  province adds ten buildings of room. The owner's `province_ceiling_infrastructure` nodes scale
+  that grant: Motorway Grid ×1.5, Transfer Network ×2. An infrastructure building brings its own
+  room, so a full province can always take the depot that opens it up: it is admitted while the
+  province stands under its ceiling plus the base grant.
+
+The ceiling stays type-agnostic: research and infrastructure add room, never room for a kind.
+
 **`k` did not move when the tile caps doubled (Ben, 2026-11-19).** Offered the choice of doubling
 `k` with them, he kept the ceiling where it stands. The partition's later moves had lifted the
 ceilings to **428.71%** of the pooled per-tile capacity at the same `k`
@@ -182,11 +199,12 @@ ceilings to **428.71%** of the pooled per-tile capacity at the same `k`
 cap binds first and the ceiling caps only a province whose tiles fill unevenly.
 `province_capacity_probe` re-derives the ratio on every run.
 
-**At generation density it refuses nothing, and that is the expected outcome.** Measured
-post-background-economy across 8 seeds: 1049 buildings against 909,245 ceiling slots — **0.115%
-used**, and **zero** provinces at their ceiling on any seed. Its value is forward: it is the
-ceiling that makes "pack more productivity into a smaller space" a real trade-off once density
-rises, and the natural place for infrastructure to pay off into.
+**Since the cut it binds at the opening.** A province can open over its ceiling. The history, the
+charter walk and the kit's extraction slots do not read it; the kit's processors, civic buildings
+and Marketplaces are laid under it, through the build door's own check. So a rural province the
+history filled stands full until a depot or research opens it. The ceiling refuses new buildings only, never standing ones. It is the ceiling that makes
+"pack more productivity into a smaller space" a real trade-off, and the place infrastructure and
+research pay off into.
 
 **It is computed on demand, never cached, and adds no persistent field** — the flat-binary
 save/load path is untouched by it. Because roads are built during play, this ceiling **moves

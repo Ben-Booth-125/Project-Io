@@ -845,7 +845,29 @@ inline constexpr float k_population_scale_max = 5.0f;
 /// 2.9499 -> 5.9004, so the ceilings went from 428.71% to 214.34% of the pooled
 /// per-tile capacity (the 157.58% above predates the partition's later moves).
 /// Still binding on nothing: 4,803 buildings against 3,899,146 ceiling slots.
-inline constexpr float k_province_buildings_per_sustain_unit = 12.6468f;
+///
+/// BL-1733 (Ben, 2026-11-22): CUT BY 30, research and infrastructure raise it. Ben: "29000
+/// seems an unreachable ceiling so it's useless." The measured pin above stays the
+/// anchor and the cut is his ruling, offered at /100 and /30 and taken at /30.
+/// `province_capacity_probe`, seeds 0/28/46/12, at the handoff: land provinces p10 11-13,
+/// median 21-25, p90 33-37, max 14,640-39,225, major capitals 1,151-33,498. At /30 the
+/// capitals read 38-1,100, and 0-3 occupied provinces per seed stood over the cut
+/// (at /100 it was 2-7, up to 58 buildings past it).
+inline constexpr float k_province_sustain_pin = 12.6468f;
+inline constexpr float k_province_ceiling_cut = 30.0f;
+inline constexpr float k_province_buildings_per_sustain_unit = k_province_sustain_pin / k_province_ceiling_cut;
+
+/// BL-1733 (Ben, 2026-11-22: "can be raised by infrastructure buildings too, their effect
+/// increased by later techs"): buildings each standing INFRASTRUCTURE building adds to its
+/// province's ceiling - a port, a Truck Depot (`inland_logistics_hub`) or a railway station,
+/// complete. Scaled by the owner's `province_ceiling_infrastructure` research. In-band
+/// calibration (Ben delegated, 2026-11-22): ten, so one depot lets a one-building rural
+/// province hold a small field of mines.
+inline constexpr int k_province_infrastructure_grant = 10;
+
+/// Whether @p t is an infrastructure building that grants its province ceiling room.
+enum class building_type : uint8_t; // components.hpp
+bool raises_province_ceiling(building_type t);
 
 /// The heuristic's working, kept whole so the probe can report each term rather
 /// than only the answer. A ceiling nobody can decompose is a picked number with
@@ -857,7 +879,11 @@ struct province_sustain
     float infrastructure_gain = 0.0f; ///< SUM of habitability * road_level / 3.
     float population_factor   = 1.0f; ///< 1 + SUM(centre scale) / 5.
     float units               = 0.0f; ///< (habitability_area + infrastructure_gain) * population_factor.
-    int   ceiling             = 0;    ///< max(1, round(k * units)) on land; 0 for a sea province.
+    float research_multiplier = 1.0f; ///< BL-1733: the owner's held `province_ceiling` nodes.
+    int   infrastructure_buildings = 0; ///< BL-1733: complete ports, depots and stations here.
+    int   infrastructure_grant = 0;   ///< BL-1733: the room they add, after research.
+    int   land_ceiling        = 0;    ///< max(1, round(k * units * research_multiplier)).
+    int   ceiling             = 0;    ///< land_ceiling + infrastructure_grant on land; 0 at sea.
 };
 
 /// Measure @p pr's sustain terms and ceiling against @p w.

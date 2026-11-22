@@ -407,9 +407,18 @@ int main(int argc, char** argv)
         int    ceil_min = -1, ceil_max = 0;
         int    fullest_prov_ceiling = 0;
         int    provs_at_ceiling = 0;
+        std::vector<int> land_ceilings;      // BL-1733: the spread, land provinces only
+        double best_use = 0.0;               // BL-1733: the fullest land province, used / ceiling
         for (const province& pr : w.provinces.provinces)
         {
             const province_sustain s = measure_province_sustain(w, pr);
+            if (s.land_tiles > 0)
+            {
+                land_ceilings.push_back(s.ceiling);
+                const auto u = prov_used.find(pr.id);
+                if (u != prov_used.end() && s.ceiling > 0)
+                    best_use = std::max(best_use, double(u->second) / s.ceiling);
+            }
             seed_units   += s.units;
             seed_ceiling += s.ceiling;
             if (ceil_min < 0 || s.ceiling < ceil_min) ceil_min = s.ceiling;
@@ -419,6 +428,43 @@ int main(int argc, char** argv)
             if (uit != prov_used.end() && uit->second >= s.ceiling)
                 ++provs_at_ceiling;
         }
+        // BL-1733: what makes the tail, and where the majors' capitals sit in it.
+        for (const province& pr : w.provinces.provinces)
+        {
+            const province_sustain s = measure_province_sustain(w, pr);
+            bool capital = false;
+            for (const auto& [nid, n] : w.nations)
+                if (n.is_major && n.capital_tile != null_entity && w.provinces.province_of(n.capital_tile) == pr.id)
+                    capital = true;
+            if (capital || s.ceiling > 1000)
+                std::printf("       BL-1733 province #%u%s ceiling %d tiles %d hab %.1f infra %.1f pop_factor %.1f\n",
+                            pr.id, capital ? " (major capital)" : "", s.ceiling, s.land_tiles,
+                            s.habitability_area, s.infrastructure_gain, s.population_factor);
+        }
+        // BL-1733: a cut of k by D - how many land provinces would already stand
+        // over the cut ceiling at the handoff, and by how many buildings.
+        for (const int div : {10, 30, 100})
+        {
+            int over = 0, past = 0, held = 0;
+            for (const province& pr : w.provinces.provinces)
+            {
+                const province_sustain s = measure_province_sustain(w, pr);
+                if (s.land_tiles == 0) continue;
+                const int scaled = static_cast<int>(s.units * (k_province_buildings_per_sustain_unit / div) + 0.5f);
+                const int cut = scaled < 1 ? 1 : scaled;
+                const auto u = prov_used.find(pr.id);
+                const int used = u != prov_used.end() ? u->second : 0;
+                held += used > 0 ? 1 : 0;
+                if (used > cut) { ++over; past += used - cut; }
+            }
+            std::printf("       BL-1733 k/%d: %d of %d occupied land provinces over the cut, %d buildings past it\n",
+                        div, over, held, past);
+        }
+        std::sort(land_ceilings.begin(), land_ceilings.end());
+        auto pct = [&](double q) { return land_ceilings.empty() ? 0
+            : land_ceilings[static_cast<std::size_t>(q * (land_ceilings.size() - 1) + 0.5)]; };
+        std::printf("       BL-1733 land ceilings: n %zu  p10 %d  p50 %d  p90 %d  max %d  fullest used/ceiling %.4f\n",
+                    land_ceilings.size(), pct(0.10), pct(0.50), pct(0.90), pct(1.0), best_use);
         const double seed_ratio = seed_units > 0.0 ? double(cap_sum) / seed_units : 0.0;
         if (!ratio_seen) { ratio_min = ratio_max = seed_ratio; ratio_seen = true; }
         else { ratio_min = std::min(ratio_min, seed_ratio); ratio_max = std::max(ratio_max, seed_ratio); }
