@@ -521,6 +521,14 @@ when it is scarce, and what it is paid.
 
 ### The labour pool
 
+**The pool's grain is the province (Ben, 2026-11-22).** A province's labour is supplied by the
+centres standing in it and drawn by the producing buildings standing in it, so the Selection
+band can say where a province's labour comes from and where it goes. The rule below — a pool per
+`(nation, body)`, shared between nations by building count — is the model this ruling replaces.
+How labour crosses a province border, what a province with buildings and no centre draws on, and
+whether the qualified pool follows are design-owed under BL-1745 (labour per province). There is
+no rural labour: every unit of supply comes from a centre.
+
 Workforce is a **pool**, not a per-building free parameter. The pool is held **per `(nation,
 body)`** (Ben, 2026-10-23, re-subjected from the corporation) because labour does not cross
 bodies without transport, and a nation's contention is local to where its buildings
