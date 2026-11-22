@@ -2625,6 +2625,13 @@ struct ui_state
     /// never in state_hash, never read back by the simulation.
     std::vector<float> lp_reaching;
     int lp_reaching_gw = 0, lp_reaching_gh = 0;
+    /// BL-1732 (Ben, 2026-11-22): the Logistics lens's NETWORK VIEW, the toggle in its key.
+    /// 0 Both (the view every arming opens on), 1 Rail - rail legs and stations, 2 Road -
+    /// roads and depots. Sea legs and ports show in all three. Each view's links carry
+    /// that network's OWN figures, not the summed tile. View state only.
+    std::uint8_t lp_network_view = 0;
+    bool         lp_view_was_armed = false; ///< Last frame's lens state: arming resets the view.
+    ImVec2       lp_view_press[3] = {};     ///< Each segment's press centre, screen px (verify read).
 
     // --- The Logistics lens's TWO NUMBERS per tile (Ben, 2026-10-24) -------------
     // Same raster and footing as `lp_reaching` (-1 = not the player nation's ground).

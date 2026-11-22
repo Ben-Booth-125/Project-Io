@@ -3015,14 +3015,14 @@
    "author": "Ben (second playtest of the release build at 320655c8, 2026-11-22); filed by Claude",
    "priority": "B",
    "difficulty": 2,
-   "files": [],
+   "files": ["src/ui/body_surface_canvas.cpp", "src/ui/ui_state.hpp", "src/core/verify_api.cpp", "scripts/verify/logistics_network_view.lua"],
    "category": "UI",
-   "status": "designed",
+   "status": "complete",
    "authority_doc": "docs/ui/LENSES.md",
    "id": "BL-1732",
    "short_name": "LOGISTICS_LENS_RAIL_ROAD_TOGGLE",
    "title": "The Logistics lens has a Rail / Road toggle",
-   "design": "PLAYTEST 2 LANE I (lenses & network). Ben: \"Let's change the logistics lens to have a toggleable 'Rail / Road' option, so it's easier to see railways.\" WORK: a two-state toggle in the lens's legend; Rail shows only rail and stations, Road only roads. Add the ACTIONS.json entry."
+   "design": "PLAYTEST 2 LANE I (lenses & network). Ben: \"Let's change the logistics lens to have a toggleable 'Rail / Road' option, so it's easier to see railways.\" WORK: a two-state toggle in the lens's legend; Rail shows only rail and stations, Road only roads. Add the ACTIONS.json entry. RULED (Ben, 2026-11-22): three states, Both / Rail / Road, opening on Both each time the lens arms; each view shows that network's own figures; sea legs draw under both views. Written into docs/ui/LENSES.md."
   },
   {
    "glyph": "~",

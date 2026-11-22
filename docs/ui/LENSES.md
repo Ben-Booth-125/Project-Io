@@ -1058,6 +1058,21 @@ ramp's measurement.
 **Rung.** Planetary only — sources, roads and requests are per-tile. Guarded behind
 `overlay_mode::throughput` in [`body_surface_canvas.cpp`](../../src/ui/body_surface_canvas.cpp).
 The drawn road network is this lens's at every rung (RENDERING.md § Roads and sea lanes).
+**A Rail / Road toggle in the key** (Ben, 2026-11-22: *"a toggleable 'Rail / Road' option, so it's
+easier to see railways"*). Under the key's title a three-way toggle — **Both · Rail · Road** — and
+every arming of the lens opens on **Both**. It is a toggle: pressing the active Rail or Road returns
+to Both.
+
+- **Both** is the lens as this section describes it, a tile carrying two networks summed.
+- **Rail** shows only the rail legs and their track and the railway stations' rings; **Road** only
+  the roads, the truck depots' rings and the units' off-road dashes.
+- **Sea legs and ports show in every view.**
+- **Each view carries its own network's figures**, not the summed tile: under Rail a track tile's
+  pair is the rail legs' own, and under Road a road tile's pair is its routed flow alone. "One colour
+  per tile, both networks added together" is the Both view's rule.
+- Only the highlight, the numbers and the rings filter; the painted ground is the same in every view,
+  and the key's arithmetic stays the nation's whole.
+
 **The highlight rides the paint** (Ben, 2026-11-22: *"keep the drawn road, but make sure to paint
 the logistics highlighted roads directly on top of drawn roads, with the same deviations"*). The
 painted roads, rail beds and lane wakes stay on the ground under this lens. Each link of the

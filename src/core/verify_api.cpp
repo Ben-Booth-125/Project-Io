@@ -1688,6 +1688,12 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         out["both_leg_requested"]  = m_ui.lp_both_leg_requested;
         out["leg_cells_drawn"]     = m_ui.lp_leg_cells_drawn;
         out["leg_pieces_drawn"]    = m_ui.lp_leg_pieces_drawn; // BL-1730: a count only
+        // BL-1732: the network view and its toggle's press centres (chrome positions).
+        out["network_view"] = static_cast<int>(m_ui.lp_network_view);
+        out["view_both_x"] = m_ui.lp_view_press[0].x; out["view_both_y"] = m_ui.lp_view_press[0].y;
+        out["view_rail_x"] = m_ui.lp_view_press[1].x; out["view_rail_y"] = m_ui.lp_view_press[1].y;
+        out["view_road_x"] = m_ui.lp_view_press[2].x; out["view_road_y"] = m_ui.lp_view_press[2].y;
+        out["anchors"]      = static_cast<int>(m_ui.lp_anchors.size());
         // BL-1456: the off-road dashes - COUNTS ONLY, no position crosses the seam.
         // `dashes` / `dashes_red` are the player units the lens joins to a road (red:
         // past their 8 tiles); `dashes_drawn` / `dashes_red_drawn` what the canvas

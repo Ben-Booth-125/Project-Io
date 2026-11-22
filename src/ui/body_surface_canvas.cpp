@@ -894,6 +894,44 @@ void draw_lens_resource_combo(ui_state& state, ImVec2 pos, float w)
     ImGui::PopStyleVar();
 }
 
+/// BL-1732 (Ben, 2026-11-22): THE LOGISTICS LENS'S NETWORK TOGGLE - Both / Rail / Road,
+/// in the key, opening on Both. A toggle (io-standing-rules § Toggle rule): pressing the
+/// active Rail or Road returns to Both. Hosted in a small borderless window, as the
+/// resource combo is, since the key paints on a draw list. Each segment's press centre
+/// is published for the verify read (a chrome position, not tile data).
+void draw_logistics_network_toggle(ui_state& state, ImVec2 pos, float w)
+{
+    ImGui::SetNextWindowPos(pos, ImGuiCond_Always);
+    ImGui::SetNextWindowSize({w, kLensComboH}, ImGuiCond_Always);
+    ImGui::SetNextWindowBgAlpha(0.0f);
+    constexpr ImGuiWindowFlags flags =
+        ImGuiWindowFlags_NoTitleBar  | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
+        ImGuiWindowFlags_NoCollapse  | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoNav |
+        ImGuiWindowFlags_NoSavedSettings;
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, {0.0f, 0.0f});
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, {2.0f, 0.0f});
+    ImGui::Begin("##lens_key_network_toggle", nullptr, flags);
+    static const char* const k_names[3] = { "Both", "Rail", "Road" };
+    const float seg_w = (w - 4.0f) / 3.0f;
+    for (int i = 0; i < 3; ++i)
+    {
+        if (i > 0)
+            ImGui::SameLine();
+        const bool active = state.lp_network_view == i;
+        ImGui::PushStyleColor(ImGuiCol_Button, active ? IM_COL32(70, 110, 160, 255) : IM_COL32(40, 46, 56, 230));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, active ? IM_COL32(85, 125, 175, 255) : IM_COL32(58, 66, 80, 240));
+        ImGui::PushID(i);
+        const ImVec2 at = ImGui::GetCursorScreenPos();
+        if (ImGui::Button(k_names[i], {seg_w, static_cast<float>(kLensComboH)}))
+            state.lp_network_view = (active && i != 0) ? std::uint8_t{0} : static_cast<std::uint8_t>(i);
+        state.lp_view_press[i] = { at.x + seg_w * 0.5f, at.y + static_cast<float>(kLensComboH) * 0.5f };
+        ImGui::PopID();
+        ImGui::PopStyleColor(2);
+    }
+    ImGui::End();
+    ImGui::PopStyleVar(2);
+}
+
 /// Marker glyph for a count-driven lens-key row: a filled swatch (Country / Market),
 /// a small dot (Reach), or a thickness bar (Supply). Lets one scrollable renderer
 /// serve every list-shaped legend.
@@ -1507,7 +1545,7 @@ ImU32 throughput_anchor_colour(float t)
 /// this body, and how much they generate in total this tick. Degrades honestly —
 /// a body with no anchor, or an authored rate of zero, says so instead of
 /// drawing a scale over nothing.
-void draw_throughput_key(ImDrawList* dl, const ui_state& state)
+void draw_throughput_key(ImDrawList* dl, const ui_state& state, ImVec2* toggle_at = nullptr, float* toggle_w = nullptr)
 {
     const float pad    = 8.0f;
     const float line_h = ImGui::GetTextLineHeight();
@@ -1520,7 +1558,8 @@ void draw_throughput_key(ImDrawList* dl, const ui_state& state)
     // (Ben, 2026-10-24: "it is not clear whether logistics works as intended"):
     // "Generated 0" beside what production needs is the answer, not a blank key.
     const float body_h = state.lp_player_known
-        ? pad + line_h + 4.0f + bar_h + 2.0f + line_h + 2.0f + line_h + 6.0f // ramp, stops, caption
+        ? pad + line_h + 4.0f + static_cast<float>(kLensComboH) + 4.0f // BL-1732: the network toggle
+              + bar_h + 2.0f + line_h + 2.0f + line_h + 6.0f // ramp, stops, caption
               + 2.0f * (line_h + 2.0f) + 4.0f // the idle and off-chain swatches
               + (dashes ? 2.0f * (line_h + 2.0f) + 4.0f : 0.0f) // BL-1456: the two dashes
               + (have ? std::max(line_h, mark_d) : line_h) + 4.0f
@@ -1546,6 +1585,10 @@ void draw_throughput_key(ImDrawList* dl, const ui_state& state)
         dl->AddText({x, y}, IM_COL32(150, 150, 160, 255), "from this seat."); // fit-exempt: legend box sized to its measured entries (container 2)
         return;
     }
+    // BL-1732: the Both / Rail / Road toggle's row; the caller hosts the live control.
+    if (toggle_at) *toggle_at = { x, y };
+    if (toggle_w)  *toggle_w  = bar_w;
+    y += static_cast<float>(kLensComboH) + 4.0f;
 
     // Bar 1 - THE ROAD RAMP (Ben, 2026-10-24; red end 2026-10-26): a road's colour is
     // SUPPLIED over REQUESTED on a log2 scale - red at half or less, yellow at 1x,
@@ -2203,6 +2246,15 @@ void update_body_throughput(world& w, ui_state& state, const recipe_registry& re
     state.lp_reaching.clear();
     state.lp_reaching_gw  = 0;
     state.lp_reaching_gh  = 0;
+    // BL-1732: EVERY ARMING OPENS ON BOTH (Ben, 2026-11-22). Taken on the edge, so a
+    // view the player picked holds while the lens stays up.
+    {
+        const bool armed = state.overlay == overlay_mode::throughput;
+        if (armed && !state.lp_view_was_armed)
+            state.lp_network_view = 0;
+        state.lp_view_was_armed = armed;
+    }
+    const bool view_rail = state.lp_network_view == 1, view_road = state.lp_network_view == 2;
     state.lp_supplied.clear();
     state.lp_requested.clear();
     state.lp_on_road.clear();
@@ -2285,6 +2337,9 @@ void update_body_throughput(world& w, ui_state& state, const recipe_registry& re
             if (src.nation != pn2)
                 continue;
         }
+        // BL-1732: a network view rings its own sources; ports ride every view.
+        if ((view_rail && src.network == lp_network::road) || (view_road && src.network == lp_network::rail))
+            continue;
         const auto tit = w.tiles.find(src.tile);
         if (tit == w.tiles.end() || tit->second.body != state.active_body)
             continue;
@@ -2404,14 +2459,16 @@ void update_body_throughput(world& w, ui_state& state, const recipe_registry& re
             }
             const std::unordered_map<entity_id, lp_flow>& flow = s_flow;
             state.lp_chain.assign(n, 0);
-            state.lp_track = s_track;
+            if (!view_road) // BL-1732: the Road view draws no track
+                state.lp_track = s_track;
             for (std::size_t i = 0; i < raster.size() && i < n; ++i)
             {
                 if (state.lp_reaching[i] < 0.0f)
                     continue;
                 const entity_id tid = raster[i];
                 const auto tc = w.tiles.find(tid);
-                if (tc != w.tiles.end() && tile_has_road(tc->second))
+                // BL-1732: the Rail view carries no road link at all.
+                if (tc != w.tiles.end() && tile_has_road(tc->second) && !view_rail)
                 {
                     const auto fit = flow.find(tid);
                     state.lp_on_road[i]   = 1;
@@ -2463,6 +2520,8 @@ void update_body_throughput(world& w, ui_state& state, const recipe_registry& re
             state.lp_legs.reserve(s_legs.size());
             for (const ui::lp_leg& leg : s_legs)
             {
+                if (view_road && leg.network == lp_network::rail)
+                    continue; // BL-1732: the Road view carries no rail leg (sea legs ride every view)
                 ui_state::lp_leg_view lv;
                 lv.network   = static_cast<std::uint8_t>(leg.network);
                 lv.chain     = leg.requested > 0.0f ? 2 : 1;
@@ -2691,7 +2750,8 @@ void update_body_throughput(world& w, ui_state& state, const recipe_registry& re
                             s_dashes.push_back(d);
                     }
                 }
-                state.lp_dashes = s_dashes;
+                if (!view_rail) // BL-1732: a dash joins a unit to its ROAD
+                    state.lp_dashes = s_dashes;
             }
         }
     }
@@ -5839,7 +5899,13 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                     const std::size_t pi = static_cast<std::size_t>(first + j);
                     if (first < 0 || pi >= lens_src->route_pieces.size())
                         break;
-                    stroke_piece(out, lens_src->route_pieces[pi], cx, cy, colour_of, thick_of);
+                    const ui::ground::route_piece& pc = lens_src->route_pieces[pi];
+                    // BL-1732: the network view strokes its own network; lanes ride every view.
+                    const bool rail_piece = pc.tier == ui::ground::k_route_rail;
+                    const bool road_piece = (pc.tier & 0x80u) == 0 && !rail_piece;
+                    if ((state.lp_network_view == 1 && road_piece) || (state.lp_network_view == 2 && rail_piece))
+                        continue;
+                    stroke_piece(out, pc, cx, cy, colour_of, thick_of);
                 }
                 // A lane's end runs on into its port's centre (RENDERING.md § Roads and sea
                 // lanes, "A lane ends in its port"): the wake stays on the water, so the
@@ -6327,6 +6393,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             // recoloured network simply never appeared: the colours were changed in
             // the emitter and the cache kept handing back the old vertices.
             h = mix(h, static_cast<std::uint64_t>(state.overlay) + 1ull);
+            h = mix(h, static_cast<std::uint64_t>(state.lp_network_view) + 0x1732ull); // BL-1732
             // BL-1657: a bucket built with the vector rule is not one built without it.
             h = mix(h, border_gpu ? 0xB0D3ull : 0x0ull);
             for (int rr = r - 2; rr <= r + 2; ++rr)
@@ -9304,7 +9371,13 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     // header region removes the collision the workaround existed for, so the
     // key draws on the ordinary list like every other legend.
     else if (state.overlay == overlay_mode::throughput)
-        draw_throughput_key(dl, state);
+    {
+        ImVec2 tat{ -1.0f, -1.0f };
+        float  tw = 0.0f;
+        draw_throughput_key(dl, state, &tat, &tw);
+        if (tw > 0.0f)
+            draw_logistics_network_toggle(state, tat, tw);
+    }
     else if (state.overlay == overlay_mode::reach)
         draw_reach_key(w, reach_links, state);
     else if (state.overlay == overlay_mode::supply_routes)
