@@ -4223,7 +4223,7 @@ void draw_province_card(const world& w, const recipe_registry& reg, const econom
 // USES COUNTS THE PLAYER'S OWN BUILDINGS (god view: all). A rival building's need is
 // its run rate, which the competitor-visibility rule keeps private (DISCOVERY.md),
 // so the hover says how many were left out rather than folding them in.
-static void draw_tile_logistics(world& w, const economy_report& report, ui_state& ui,
+static void draw_tile_logistics(world& w, const recipe_registry& reg, const economy_report& report, ui_state& ui,
                                 entity_id tile_id, bool god)
 {
     const auto host = w.tiles.find(tile_id);
@@ -4281,7 +4281,7 @@ static void draw_tile_logistics(world& w, const economy_report& report, ui_state
     ImDrawList* dl     = ImGui::GetWindowDrawList();
     const float line_h = ImGui::GetTextLineHeight();
     const float gr     = line_h * 0.45f;            // glyph half-extent
-    const float cell_w = std::floor(ImGui::GetContentRegionAvail().x / 3.0f);
+    const float cell_w = std::floor(ImGui::GetContentRegionAvail().x / 4.0f);
     const ImU32 dim    = ImGui::GetColorU32(ImGuiCol_TextDisabled);
     const ImU32 prim   = ImGui::GetColorU32(ImGuiCol_Text);
     const ImVec2 row0  = ImGui::GetCursorScreenPos();
@@ -4298,12 +4298,12 @@ static void draw_tile_logistics(world& w, const economy_report& report, ui_state
     };
 
     char f_make[32], f_use[48], f_cap[32];
-    if (sources.empty() || !(makes > 0.0f)) std::snprintf(f_make, sizeof f_make, "â");
+    if (sources.empty() || !(makes > 0.0f)) std::snprintf(f_make, sizeof f_make, "\xe2\x80\x94");
     else std::snprintf(f_make, sizeof f_make, "%.0f", static_cast<double>(makes));
     const bool short_of = need > 0.0f && uses + 0.05f < need;
-    if (need <= 0.0f) std::snprintf(f_use, sizeof f_use, "â");
+    if (need <= 0.0f) std::snprintf(f_use, sizeof f_use, "\xe2\x80\x94");
     else std::snprintf(f_use, sizeof f_use, "%.1f/%.1f", static_cast<double>(uses), static_cast<double>(need));
-    if (ne_cap <= 0) std::snprintf(f_cap, sizeof f_cap, "â");
+    if (ne_cap <= 0) std::snprintf(f_cap, sizeof f_cap, "\xe2\x80\x94");
     else std::snprintf(f_cap, sizeof f_cap, "%d/%d", ne_used, ne_cap);
 
     const bool hov_make = cell(0, "##lp_make",
@@ -4317,6 +4317,72 @@ static void draw_tile_logistics(world& w, const economy_report& report, ui_state
     const bool hov_cap = cell(2, "##tile_cap",
         [&](ImVec2 c) { icons::stat(dl, c, gr, icons::stat_glyph::capacity, full ? palette::negative : dim); },
         f_cap, full ? palette::negative : (ne_cap > 0 ? prim : dim));
+
+    // THE TILE'S WORKFORCE (Ben, 2026-11-22: "show tile population at the top of the tile
+    // selection element, next to logistics and building capacity"; the figure is the
+    // buildings' workforce, or a dash). Population lives on centres, not tiles
+    // (POPULATION.md), so the tile's own headcount is the labour its producing buildings
+    // were granted this tick, in labour units: each one's requested share
+    // (`workforce_assigned`) times its pool grant (`economy_report.building_labour`).
+    // Only buildings whose internals the player may read are counted.
+    struct wf_row { entity_id id; float granted; float wanted; };
+    std::vector<wf_row> wf_rows;
+    int   wf_hidden  = 0;
+    float wf_granted = 0.0f, wf_wanted = 0.0f;
+    {
+        std::vector<entity_id> ids;
+        for (const auto& [bid, b] : w.buildings)
+            if (b.tile == tile_id && b.ticks_remaining <= 0 &&
+                (b.type == building_type::extraction_site || b.type == building_type::processing_facility))
+                ids.push_back(bid);
+        std::sort(ids.begin(), ids.end());
+        for (const entity_id bid : ids)
+        {
+            if (!god && !is_player_owned(w, bid)) { ++wf_hidden; continue; }
+            const building_component& b = w.buildings.at(bid);
+            const float want  = b.state_idle ? 0.0f : b.workforce_assigned;
+            const auto  git   = report.building_labour.find(bid);
+            const float grant = (git != report.building_labour.end()) ? git->second : 1.0f;
+            wf_rows.push_back({bid, want * grant, want});
+            wf_granted += want * grant;
+            wf_wanted  += want;
+        }
+    }
+    const bool wf_short = wf_wanted > 0.0f && wf_granted + 0.005f < wf_wanted;
+    char f_wf[32];
+    if (wf_rows.empty()) std::snprintf(f_wf, sizeof f_wf, "\xe2\x80\x94");
+    else std::snprintf(f_wf, sizeof f_wf, "%.1f", static_cast<double>(wf_granted));
+    const ImU32 wf_col = wf_rows.empty() ? dim : (wf_short ? palette::negative : prim);
+    const bool hov_wf = cell(3, "##tile_workforce",
+        [&](ImVec2 c) { icons::population(dl, c, gr, wf_col); }, f_wf, wf_col);
+    if (hov_wf)
+    {
+        ImGui::BeginTooltip();
+        ImGui::TextUnformatted("Workforce on this tile");
+        if (wf_rows.empty())
+            ImGui::TextDisabled("No building here employs labour.");
+        else
+        {
+            ImGui::Text("%.1f of %.1f labour units granted", static_cast<double>(wf_granted),
+                        static_cast<double>(wf_wanted));
+            ImGui::Separator();
+            for (const wf_row& r : wf_rows)
+            {
+                const building_component& b = w.buildings.at(r.id);
+                const std::string nm   = building_group_name(w, reg, b);
+                const char*       name = nm.c_str();
+                if (r.granted + 0.005f < r.wanted)
+                    ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::negative), "%s  %.2f of %.2f",
+                                       name, static_cast<double>(r.granted), static_cast<double>(r.wanted));
+                else
+                    ImGui::Text("%s  %.2f", name, static_cast<double>(r.granted));
+            }
+        }
+        if (wf_hidden > 0)
+            ImGui::TextDisabled("%d rival building%s not counted.", wf_hidden, wf_hidden == 1 ? "" : "s");
+        ImGui::TextDisabled("A labour unit staffs one building in full; a town supplies 3.");
+        ImGui::EndTooltip();
+    }
     ImGui::SetCursorScreenPos({row0.x, row0.y + line_h + ImGui::GetStyle().ItemSpacing.y});
     ImGui::Dummy({0.0f, 0.0f});
 
@@ -4502,7 +4568,7 @@ void draw_tile_selection(world& w, const recipe_registry& reg, const economy_rep
                                       "A better road moves goods across this tile faster.");
             }
             ImGui::Separator();
-            draw_tile_logistics(w, report, ui, tile_id, god);
+            draw_tile_logistics(w, reg, report, ui, tile_id, god);
             ImGui::Separator();
             draw_tile_building_grid(w, reg, report, ui, stacks);
         }

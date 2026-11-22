@@ -211,7 +211,7 @@ a tile keep the shared header (§ Layout & chrome).
    is the Market ledger's question. **The title is the word "Tile" alone**, with the road tier
    beside it where one meets the tile — no grid coordinates (Ben, 2026-11-22): the canvas marks
    which tile is selected, and a coordinate pair answers no question the player asks.
-   - **A figure row, between the title and the grid** — three glyph cells across, each a
+   - **A figure row, between the title and the grid** — four glyph cells across, each a
      figure with its words in its hover, never a labelled list (Ben, 2026-11-20: "a grid with
      glyphs above the list of buildings, capacity can go next to logistics points usage, and we
      can use tooltips rather than listing it"). The Logistic Points cells answer Ben's
@@ -227,6 +227,15 @@ a tile keep the shared header (§ Layout & chrome).
        `non_extraction_stack_cap` (`../economy/PRODUCTION.md`), warning-coloured when full. Its
        hover names what counts, that filling it turns the tile urban, and each readable
        deposit's extraction sites over its own `stack_capacity`.
+     - **Workforce** (the population glyph) — the tile's population, as the labour its producing
+       buildings were granted this tick, in labour units: each building's requested share
+       (`workforce_assigned`) times its pool grant (`economy_report.building_labour`); a dash where
+       no building here employs labour (Ben, 2026-11-22: "show tile population at the top of the
+       tile selection element, next to logistics and building capacity" — the figure is the
+       buildings' workforce, because population lives on centres, not tiles,
+       `../economy/POPULATION.md`). Warning-coloured when any building is granted less than it
+       wants. Its hover lists each building's grant against its want. Like **Used**, it counts
+       the player's own buildings only, and names how many rival buildings it left out.
      Hovering either Logistic Points cell opens the detail: **whose pool** this ground draws on — every building
      on a nation's ground draws *that nation's* pool, and is that nation's — with the pool and its
      claim; the **coverage** a building here would get (`lp_coverage_at`, the one genuinely
