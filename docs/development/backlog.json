@@ -3079,7 +3079,7 @@
    "design": "PLAYTEST 2 LANE J (opening economy). Ben: \"We should decrease profit from buildings. Currently it takes 3-5 months to save up for a building, from the beginning of the game, we want the player to have to wait about 12 months to afford a building. We should also decrease starting credits to 2000.\" DESIGN OWED: measure today's months-to-afford at the opening across the seed library (Rule 0b), then the lever: prices, recipe yields, wages, or build costs. Ben prefers a systemic force over a clamp. World-mover: market_viability and opening_parity before/after."
   },
   {
-   "glyph": "~",
+   "glyph": "●",
    "sprint": null,
    "version_goal": null,
    "written": "2026-11-22",
@@ -3089,9 +3089,12 @@
    "author": "Ben (second playtest of the release build at 320655c8, 2026-11-22); filed by Claude",
    "priority": "B",
    "difficulty": 3,
-   "files": [],
+   "files": [
+    "scripts/world_gen.lua",
+    "docs/generation/CORPORATION_GENERATION.md"
+   ],
    "category": "Economy",
-   "status": "design-owed",
+   "status": "complete",
    "authority_doc": "docs/generation/CORPORATION_GENERATION.md",
    "id": "BL-1735",
    "short_name": "OPENING_KIT_FOLLOWS_PROFIT",

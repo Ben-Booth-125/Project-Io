@@ -2242,6 +2242,22 @@
     "docs/economy/PRODUCTION.md"
    ],
    "resolution": null
+  },
+  {
+   "raised": "2026-11-22",
+   "status": "open",
+   "source": "Lane J (opening economy), second playtest; branch claude/playtest2-lane-j-economy-8a55c5",
+   "id": "NR-1264",
+   "title": "BL-1735 (opening kit follows profit): what the measured re-weight added, and machinery still refused",
+   "kind": "decision",
+   "what": "Delegated by Ben. build_payback_census gained KIT rows (each opening building's mean monthly net over its first year). Added to rich_core: produce x3 and a third food line, copper ore x3 and a second copper line, water x2 and a clean-water works. Year-1 net median 450 -> 594 a month before BL-1734. The machinery slot still mostly substitutes: it stays short of spare refined copper by ~75 even with two copper lines; where it stands it earns ~320 a month, the best row.",
+   "why_it_matters": "Machinery is the single biggest earner the kit could carry; reaching it needs a much wider copper spread or a looser spare-input rule, which is Ben's rule.",
+   "ask": "Leave machinery as it is, or widen the copper spread further?",
+   "files": [
+    "scripts/world_gen.lua",
+    "tools/verify/build_payback_census.cpp"
+   ],
+   "resolution": null
   }
  ]
 }

@@ -335,10 +335,18 @@ world_gen = {
                     "water", "coal", "petroleum", "iron_ore", "iron_ore", "copper_ore",
                     "copper_ore", "copper_ore", "silica", "silica", "silica", "silica",
                     "silica", "flex", "flex",
+                    -- BL-1735 (Ben, 2026-11-22, delegated): the kit follows what pays in its first
+                    -- year (build_payback_census KIT rows). Produce for a third food line, copper
+                    -- for a second copper line, water for the clean-water works.
+                    "agricultural_produce", "agricultural_produce", "agricultural_produce",
+                    "copper_ore", "copper_ore", "copper_ore", "water", "water",
                 },
                 processing = {
                     { good = "food_rations",   recipes = { "food_rations" } },
                     { good = "steel",          recipes = { "steel" } },
+                    { good = "refined_copper", recipes = { "refined_copper" } },
+                    -- BL-1735: a second copper line ahead of machinery, which is refused
+                    -- short of spare refined copper without it and earns most when it stands.
                     { good = "refined_copper", recipes = { "refined_copper" } },
                     { good = "machinery",      recipes = { "machinery" } },
                     { good = "refined_fuel",   recipes = { "refined_fuel" } },
@@ -346,6 +354,9 @@ world_gen = {
                     { good = "food_rations",   recipes = { "food_rations" } },
                     { good = "silicon",        recipes = { "silicon" } },           -- Refinery, from silica
                     { good = "steel",          recipes = { "steel" } },
+                    -- BL-1735: a third food line and the clean-water works, both paying from day one.
+                    { good = "food_rations",   recipes = { "food_rations" } },
+                    { good = "clean_water",    recipes = { "clean_water" } },
                     -- BL-1736 (Ben, 2026-11-22): of the military works only the small-arms
                     -- Arms Works stays, the one the opening Rifle Infantry refit from; the
                     -- Ordnance works and the armoured-vehicle and artillery Arms Works left.
