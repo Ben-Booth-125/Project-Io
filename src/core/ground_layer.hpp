@@ -645,20 +645,12 @@ private:
     std::vector<std::filesystem::path> m_session_dirs; ///< Deleted at exit and on a new world.
     entity_id     m_home = null_entity;     ///< The pinned body (the world's home body).
     bool          m_view_final = false;
-    /// The Logistics lens is up: sources are taken with their routes unpainted
-    /// (ui::ground::strip_painted_routes; ground_request::hide_routes).
-    bool          m_hide_routes = false;
     int           m_land_lift = initial_land_lift(); ///< BL-1537; see set_land_lift.
     bool          m_lift_at_draw = false;            ///< BL-1659; see set_lift_at_draw.
     /// The lift level every held source is stamped with: 0 when the canvas lifts.
     std::uint8_t  baked_lift() const
     { return m_lift_at_draw ? std::uint8_t{0} : static_cast<std::uint8_t>(m_land_lift); }
     static int    initial_land_lift();
-    /// The coarsest drawn level (0 = the master, 96 px a hex; 2 = 24 px) at which the
-    /// Logistics lens's unpainted ground is re-baked under the view. Coarser than this a
-    /// painted road is under a pixel, so a dirty chunk keeps its pixels until the view
-    /// comes close (feed()'s `deferred`).
-    static constexpr int k_unpaint_max_level = 2;
 
     std::unordered_map<entity_id, std::unique_ptr<body_state>> m_bodies;
     entity_id     m_active = null_entity;   ///< Body the canvas draws (GPU textures are its).

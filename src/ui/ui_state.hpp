@@ -1411,10 +1411,6 @@ struct ground_request
     float x0 = 0, y0 = 0, x1 = 0, y1 = 0;
     float draw_r = 0;                ///< Drawn hex circumradius, screen px.
     bool  valid = false;
-    /// The Logistics lens is up (Ben, 2026-10-25): bake the ground with no route
-    /// surface painted, because the canvas draws the network itself in the lens's
-    /// colours (RENDERING.md § Roads and sea lanes).
-    bool  hide_routes = false;
 };
 
 /// Shared selection and view state for the three primary canvases.
@@ -2676,6 +2672,7 @@ struct ui_state
     double lp_both_leg_supplied = 0.0, lp_both_leg_requested = 0.0;
     /// What the leg pass drew last frame: the cells it stroked, each in its tile's colour.
     int    lp_leg_cells_drawn = 0;
+    int    lp_leg_pieces_drawn = 0; ///< BL-1730: route pieces the leg pass stroked along the paint (a count)
     /// BL-1456 (Ben, 2026-10-29; LENSES.md § Logistics lens, "A unit off the road is
     /// joined to it by a dashed line"): one dash per player unit standing off its
     /// network - raster cells of the road tile its supply is paid at (or, past its 8

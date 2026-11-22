@@ -24,6 +24,7 @@
 #include "road_tool.hpp"        // BL-1370: the crossings an armed road press may reach
 #include "shell_metrics.hpp"     // right chrome column + minimap rect (BL-533 legend home)
 #include "ground_bake.hpp"
+#include "route_paint.hpp"       // BL-1730: the Logistics lens strokes the bake's own route pieces
 #include "structure_stamps.hpp" // installation_stack_spots: hover the structure under the pointer
 #include "world/battle_system.hpp" // first_battle_in (BL-469 battle rung)
 #include "world/economy_system.hpp" // march_hop_fraction: the glide reads the march's own bank (BL-1507)
@@ -4163,12 +4164,6 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         // radius in (T, T+1] pick tier T and draw it magnified (BL-1244).
         state.ground_req.draw_r = hit_r; ///< Picks the master's level (RENDERING.md § Level of detail).
         state.ground_req.valid  = raster_ok;
-        // Ben, 2026-10-25: under the Logistics lens the roads were drawn twice - the
-        // painted surface and this canvas's coloured stroke. The bake drops its route
-        // surface while the lens is up; this canvas draws the whole network
-        // (RENDERING.md § Roads and sea lanes, "The Logistics lens takes the routes
-        // off the ground").
-        state.ground_req.hide_routes = state.overlay == overlay_mode::throughput;
     }
     // Everything from here to the camera at the end of the map passes draws in FLAT
     // ground space, which the 3D finish drapes or stands upright. (The background rect,
@@ -5359,6 +5354,67 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                             + static_cast<std::size_t>(col);
         return i < state.lp_track.size() && state.lp_track[i] != 0;
     };
+    // THE LOGISTICS LENS RIDES THE PAINTED ROAD (BL-1730; Ben, 2026-11-22: "keep the drawn
+    // road, but make sure to paint the logistics highlighted roads directly on top of drawn
+    // roads, with the same deviations"). ONE PATH SOURCE: the bake's own route pieces
+    // (route_paint.hpp route_piece - the hashed crossing points, the bows round ground and
+    // clusters, the forecourt spurs), read off the snapshot the active body's ground was
+    // baked from. Pieces are tile-relative canonical units (hex circumradius 1), so a
+    // piece point lands at the tile's drawn centre plus the point times the drawn radius.
+    // Null off the lens, off a baked tile's snapshot, or on a snapshot of another grid:
+    // the drawn network (the vector fallback) then draws as it always has.
+    const ui::ground::bake_source* lens_src =
+        (state.overlay == overlay_mode::throughput && gview.src && gview.body == state.active_body
+         && gview.src->gw == gw && gview.src->gh == gh
+         && gview.src->route_first.size() == static_cast<std::size_t>(gw) * static_cast<std::size_t>(gh)
+         && gview.src->route_count.size() == gview.src->route_first.size())
+            ? gview.src.get() : nullptr;
+    const float piece_px = hex_size * zoom; // screen px per canonical unit
+    // Stroke one piece into @p out at tile centre (cx, cy). A curve whose two halves carry
+    // different tiers (BL-1390) splits at its apex, each half at its own weight.
+    const auto stroke_piece = [&](ImDrawList* out, const ui::ground::route_piece& pc, float cx, float cy,
+                                  auto colour_of, auto thick_of) {
+        constexpr int np = ui::ground::route_piece::k_pts;
+        ImVec2 p[np + 1];
+        for (int q = 0; q < np; ++q)
+            p[q] = { cx + pc.x[q] * piece_px, cy + pc.y[q] * piece_px };
+        const ImU32 ca = colour_of(pc.tier);
+        const float ta = thick_of(pc.tier);
+        if (pc.kind == ui::ground::route_piece::yard)
+        {
+            out->AddCircleFilled(p[0], std::max(1.0f, ta * 0.75f), ca);
+            return;
+        }
+        if (pc.tier_b == pc.tier || pc.tier_b == 0 || pc.split <= 0.0f)
+            out->AddPolyline(p, np, ca, ImDrawFlags_None, ta);
+        else
+        {
+            int q = 1;
+            while (q < np - 1 && pc.cum[q] < pc.split)
+                ++q;
+            const float seg = pc.cum[q] - pc.cum[q - 1];
+            const float f = seg > 0.0f ? (pc.split - pc.cum[q - 1]) / seg : 0.0f;
+            const ImVec2 m = { p[q - 1].x + (p[q].x - p[q - 1].x) * f, p[q - 1].y + (p[q].y - p[q - 1].y) * f };
+            ImVec2 a[np + 1];
+            int na = 0;
+            for (int i = 0; i < q; ++i) a[na++] = p[i];
+            a[na++] = m;
+            out->AddPolyline(a, na, ca, ImDrawFlags_None, ta);
+            ImVec2 b[np + 1];
+            int nb = 0;
+            b[nb++] = m;
+            for (int i = q; i < np; ++i) b[nb++] = p[i];
+            const ImU32 cb = colour_of(pc.tier_b);
+            const float tb = thick_of(pc.tier_b);
+            out->AddPolyline(b, nb, cb, ImDrawFlags_None, tb);
+            const bool heavy_a = ta >= tb;
+            out->AddCircleFilled(m, (heavy_a ? ta : tb) * 0.5f, heavy_a ? ca : cb);
+        }
+        // A spoke's free end (x[0]) and a spur's ends are capped, so an end or a forecourt
+        // reads rounded rather than cut; a curve's ends meet the neighbour at the crossing.
+        if (pc.kind == ui::ground::route_piece::spoke || pc.kind == ui::ground::route_piece::spur)
+            out->AddCircleFilled(p[0], std::max(1.0f, ta * 0.5f), ca);
+    };
     // A SEA LANE'S ENDS GO INTO THE PORT (Ben, 2026-10-26; RENDERING.md § Roads and sea
     // lanes, "A lane ends in its port"). A port lays its lanes from the water on its six
     // sides (lay_port_lanes), so a lane used to stop on the sea tile BESIDE the port and
@@ -5748,7 +5804,62 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         const bool route_lens  = state.overlay == overlay_mode::throughput;
         const bool route_drawn = !on_bake || route_lens;
         const float route_r = std::max(10.0f, draw_r) * state.dbg_route_width_scale;
-        if (route_drawn && tile_has_road(tile))
+        // BL-1730: on baked ground the lens strokes the bake's own pieces of this tile -
+        // road, rail and lane alike, one colour per tile - and only where the tile is a
+        // link of the player's chain. Every other route keeps its painted surface, which
+        // the bake no longer takes off under this lens.
+        if (on_bake && lens_src != nullptr)
+        {
+            const ImU32 lc = lens_road_colour(t_col, t_row);
+            const std::size_t ri = static_cast<std::size_t>(t_row) * static_cast<std::size_t>(gw)
+                                 + static_cast<std::size_t>(t_col);
+            if (lc != 0u && ri < lens_src->route_first.size())
+            {
+                const auto colour_of = [&](int tier) -> ImU32 {
+                    unsigned a = 230u;
+                    if (tier & 0x80) a = 190u; // a lane
+                    else if (tier == 1) a = 205u;
+                    else if (tier == 2) a = 225u;
+                    else if (tier == 3) a = 238u;
+                    return fog_dim((lc & ~IM_COL32_A_MASK) | (a << IM_COL32_A_SHIFT), vision);
+                };
+                const auto thick_of = [&](int tier) -> float {
+                    if (tier & 0x80) return route_r * k_lane_width;
+                    switch (tier)
+                    {
+                        case 1:  return route_r * k_road_width_track;
+                        case 3:  return route_r * k_road_width_highway;
+                        default: return route_r * k_road_width_road; // a Road; rail at a Road's weight
+                    }
+                };
+                const int first = lens_src->route_first[ri];
+                const int count = lens_src->route_count[ri];
+                for (int j = 0; j < count; ++j)
+                {
+                    const std::size_t pi = static_cast<std::size_t>(first + j);
+                    if (first < 0 || pi >= lens_src->route_pieces.size())
+                        break;
+                    stroke_piece(out, lens_src->route_pieces[pi], cx, cy, colour_of, thick_of);
+                }
+                // A lane's end runs on into its port's centre (RENDERING.md § Roads and sea
+                // lanes, "A lane ends in its port"): the wake stays on the water, so the
+                // lens carries the join from the tile centre across the shared edge.
+                const std::uint8_t pm = tile.lane_level > 0 ? port_sides_rc(t_col, t_row) : 0u;
+                for (int side = 0; side < 6 && pm != 0; ++side)
+                {
+                    if (!(pm & (1u << side)))
+                        continue;
+                    const hex_neighbors::coord nb = hex_neighbors::neighbour(t_col, t_row, side);
+                    if (nb.gy < 0 || nb.gy >= gh)
+                        continue;
+                    ImVec2 p_sc = to_scr(vo, hex_local_centre(nb.gx, nb.gy, hex_size));
+                    p_sc.x += static_cast<float>(k) * period_px;
+                    out->AddLine({ cx, cy }, p_sc, colour_of(0x80), thick_of(0x80));
+                    out->AddCircleFilled(p_sc, std::max(1.0f, thick_of(0x80) * 0.75f), colour_of(0x80));
+                }
+            }
+        }
+        else if (route_drawn && tile_has_road(tile))
         {
             // The run's weight is the best tier meeting at this centre; which boundaries it
             // crosses is the edge mask's (BL-1340).
@@ -5824,7 +5935,8 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         // the player's chain takes the tile's own colour, as its road and its leg do, so
         // no tile reads in two.
         const ImU32 lane_lens = route_lens ? lens_road_colour(t_col, t_row) : 0u;
-        if (route_drawn && tile.lane_level > 0)
+        const bool pieces_drawn = on_bake && lens_src != nullptr; // BL-1730: the pieces above
+        if (route_drawn && !pieces_drawn && tile.lane_level > 0)
             draw_network([](const tile_component& t) { return t.lane_level; },
                          [](const tile_component&, int, int) { return 1; }, // a lane is a tile field
                          lane_lens != 0u ? ((lane_lens & ~IM_COL32_A_MASK) | (190u << IM_COL32_A_SHIFT))
@@ -5835,15 +5947,15 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                          [](int, float fallback) { return fallback; },
                          port_sides_rc(t_col, t_row));
 
-        // RAIL UNDER THE LOGISTICS LENS (Ben, 2026-10-25). The bake paints no route
-        // surface under this lens (strip_painted_routes), the rail bed included, so the
-        // line is drawn here - every track tile, on the four-cardinal grid the rail walk
-        // steps on, in a dark ballast tone at a Road's weight. A leg of the player's
-        // chain is stroked over it in the lens's colours by the leg pass.
+        // RAIL UNDER THE LOGISTICS LENS, OFF THE BAKE. On baked ground the painted rail
+        // bed stays and the pieces above colour it (BL-1730); a tile whose ground is not
+        // yet baked has no painted bed, so the line is drawn here - every track tile, on
+        // the four-cardinal grid the rail walk steps on, in a dark ballast tone at a
+        // Road's weight. A leg of the player's chain is stroked over it by the leg pass.
         // On a tile of the player's chain the track takes the tile's one colour (Ben,
         // 2026-10-26: "one colour per tile"), so a road and a line on one tile never read
         // as two networks in two colours; elsewhere it keeps the ballast tone.
-        if (route_lens && track_rc(t_col, t_row))
+        if (route_lens && !pieces_drawn && track_rc(t_col, t_row))
             draw_network([&](const tile_component& t) { return track_rc(t.grid_x, t.grid_y) ? 1 : 0; },
                          [](const tile_component&, int, int) { return 1; }, // track is a tile field
                          lane_lens != 0u ? ((lane_lens & ~IM_COL32_A_MASK) | (230u << IM_COL32_A_SHIFT))
@@ -6232,6 +6344,20 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 own = mix(own, lens_road_colour(cc, r));
                 // A lane tile's port ends (Ben, 2026-10-26) move when a port stands or goes.
                 own = mix(own, static_cast<std::uint64_t>(port_sides_rc(cc, r)) + 0x51ull);
+                // BL-1730: under the lens the strokes are the snapshot's route pieces, which
+                // move when a road is built or re-planned - the tile's pieces are its identity.
+                if (lens_src != nullptr && ci < lens_src->route_first.size())
+                {
+                    const int pf = lens_src->route_first[ci], pn = lens_src->route_count[ci];
+                    own = mix(own, static_cast<std::uint64_t>(pn) + 0x7A0ull);
+                    for (int j = 0; j < pn && pf >= 0; ++j)
+                    {
+                        const std::size_t pi = static_cast<std::size_t>(pf + j);
+                        if (pi >= lens_src->route_pieces.size()) break;
+                        const ui::ground::route_piece& pc = lens_src->route_pieces[pi];
+                        own = mix(own, fbits(pc.x[6]) ^ (fbits(pc.y[6]) << 1) ^ pc.tier ^ (pc.tier_b << 8));
+                    }
+                }
                 h = mix(h, own);
             }
 
@@ -8048,6 +8174,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     // casing under it so it holds on the sea's blue and the ballast's grey alike. Per
     // frame and not cached: a few legs of a few dozen tiles each.
     state.lp_leg_cells_drawn = 0;
+    state.lp_leg_pieces_drawn = 0;
     if (state.overlay == overlay_mode::throughput && !state.lp_legs.empty() && raster_ok
         && state.lp_reaching_gw == gw)
     {
@@ -8095,6 +8222,108 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             // where its road's would.
             const std::size_t ncell = pts.size();
             state.lp_leg_cells_drawn += static_cast<int>(ncell);
+            // BL-1730: ONE PATH SOURCE. On baked ground each cell strokes the bake's own
+            // pieces of the leg's network - the track's or the lane's - that run toward the
+            // cells before and after it, so the leg lies on the painted line, bends and all.
+            // A piece is the leg's when each of its ends is a crossing toward a leg
+            // neighbour or no crossing at all (a station's spoke end); a junction paired so
+            // that no piece qualifies falls back to every piece touching a leg crossing.
+            if (lens_src != nullptr)
+            {
+                const int net = leg.network == 2 ? 2 : 1;
+                const auto want_tier = [&](std::uint8_t t) {
+                    return net == 2 ? (t & 0x80u) != 0 : t == ui::ground::k_route_rail;
+                };
+                struct cell_pieces { int ids[8]; int n = 0; };
+                static std::vector<cell_pieces> sel;
+                sel.assign(ncell, cell_pieces{});
+                const auto link_to = [&](int from, int to) -> int { // E, W, S, N = 0-3, or -1
+                    const int fc = from % gw, fr = from / gw, tc = to % gw, tr = to / gw;
+                    if (tr == fr && (((fc + 1) % gw) == tc)) return 0;
+                    if (tr == fr && (((fc - 1 + gw) % gw) == tc)) return 1;
+                    if (tc == fc && tr == fr + 1) return 2;
+                    if (tc == fc && tr == fr - 1) return 3;
+                    return -1;
+                };
+                for (std::size_t c = 0; c < ncell; ++c)
+                {
+                    const int ci = leg.cells[c];
+                    const std::size_t ri = static_cast<std::size_t>(ci);
+                    if (ri >= lens_src->route_first.size())
+                        continue;
+                    double xs[2], ys[2];
+                    int nx = 0;
+                    for (const std::size_t o : { c - 1, c + 1 })
+                    {
+                        if (o >= ncell) continue; // c - 1 wraps past zero for the first cell
+                        const int n = link_to(ci, leg.cells[o]);
+                        if (n < 0) continue;
+                        double tx, ty;
+                        ui::ground::route_crossing(gw, ci % gw, ci / gw, n, net, xs[nx], ys[nx], tx, ty);
+                        ++nx;
+                    }
+                    const auto is_crossing = [&](float x, float y) {
+                        // Every crossing of the four edges sits on its edge, 0.5 * sqrt(3)
+                        // or more from the centre's axis; a free end lies well inside.
+                        for (int n = 0; n < 4; ++n)
+                        {
+                            double cx2, cy2, tx, ty;
+                            ui::ground::route_crossing(gw, ci % gw, ci / gw, n, net, cx2, cy2, tx, ty);
+                            if (std::fabs(cx2 - x) < 1e-3 && std::fabs(cy2 - y) < 1e-3) return true;
+                        }
+                        return false;
+                    };
+                    const auto on_leg = [&](float x, float y) {
+                        for (int q = 0; q < nx; ++q)
+                            if (std::fabs(xs[q] - x) < 1e-3 && std::fabs(ys[q] - y) < 1e-3) return true;
+                        return false;
+                    };
+                    const int first = lens_src->route_first[ri], count = lens_src->route_count[ri];
+                    cell_pieces strict, loose;
+                    for (int j = 0; j < count && first >= 0; ++j)
+                    {
+                        const std::size_t pi = static_cast<std::size_t>(first + j);
+                        if (pi >= lens_src->route_pieces.size()) break;
+                        const ui::ground::route_piece& pc = lens_src->route_pieces[pi];
+                        if (!want_tier(pc.tier)) continue;
+                        constexpr int L = ui::ground::route_piece::k_pts - 1;
+                        const bool a_leg = on_leg(pc.x[0], pc.y[0]), b_leg = on_leg(pc.x[L], pc.y[L]);
+                        const bool a_ok = a_leg || !is_crossing(pc.x[0], pc.y[0]);
+                        const bool b_ok = b_leg || !is_crossing(pc.x[L], pc.y[L]);
+                        if (a_ok && b_ok && strict.n < 8) strict.ids[strict.n++] = static_cast<int>(pi);
+                        if ((a_leg || b_leg) && loose.n < 8) loose.ids[loose.n++] = static_cast<int>(pi);
+                    }
+                    sel[c] = strict.n > 0 ? strict : loose;
+                    state.lp_leg_pieces_drawn += sel[c].n;
+                }
+                const auto casing = [](int) -> ImU32 { return IM_COL32(12, 16, 24, 170); };
+                for (int k = k_lo; k <= k_hi; ++k)
+                {
+                    const float off = static_cast<float>(k) * period_px;
+                    for (int pass = 0; pass < 2; ++pass)
+                        for (std::size_t c = 0; c < ncell; ++c)
+                        {
+                            const std::size_t ci = static_cast<std::size_t>(leg.cells[c]);
+                            const std::uint8_t chain = ci < state.lp_chain.size() ? state.lp_chain[ci] : 2;
+                            const ImU32 cell_col = ci < state.lp_supplied.size()
+                                ? logistics_link_colour(chain, state.lp_supplied[ci], state.lp_requested[ci])
+                                : logistics_link_colour(leg.chain, leg.available, leg.requested);
+                            const auto fill = [cell_col](int) { return cell_col; };
+                            const auto w_case = [thick](int) { return thick + 2.0f; };
+                            const auto w_fill = [thick](int) { return thick; };
+                            for (int q = 0; q < sel[c].n; ++q)
+                            {
+                                const ui::ground::route_piece& pc =
+                                    lens_src->route_pieces[static_cast<std::size_t>(sel[c].ids[q])];
+                                if (pass == 0)
+                                    stroke_piece(dl, pc, pts[c].x + off, pts[c].y, casing, w_case);
+                                else
+                                    stroke_piece(dl, pc, pts[c].x + off, pts[c].y, fill, w_fill);
+                            }
+                        }
+                }
+                continue;
+            }
             for (int k = k_lo; k <= k_hi; ++k)
             {
                 const float off = static_cast<float>(k) * period_px;

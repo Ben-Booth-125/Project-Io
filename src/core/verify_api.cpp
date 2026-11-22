@@ -1687,6 +1687,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         out["both_leg_supplied"]   = m_ui.lp_both_leg_supplied;
         out["both_leg_requested"]  = m_ui.lp_both_leg_requested;
         out["leg_cells_drawn"]     = m_ui.lp_leg_cells_drawn;
+        out["leg_pieces_drawn"]    = m_ui.lp_leg_pieces_drawn; // BL-1730: a count only
         // BL-1456: the off-road dashes - COUNTS ONLY, no position crosses the seam.
         // `dashes` / `dashes_red` are the player units the lens joins to a road (red:
         // past their 8 tiles); `dashes_drawn` / `dashes_red_drawn` what the canvas

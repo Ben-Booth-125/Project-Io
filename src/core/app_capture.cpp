@@ -28,7 +28,7 @@ void app::capture_frame(const std::string& name)
     if (m_ground_bake_all)
     {
         const auto same = [](const ground_request& a, const ground_request& b) {
-            return a.body == b.body && a.valid == b.valid && a.hide_routes == b.hide_routes
+            return a.body == b.body && a.valid == b.valid
                 && a.x0 == b.x0 && a.y0 == b.y0 && a.x1 == b.x1 && a.y1 == b.y1 && a.draw_r == b.draw_r;
         };
         const auto settled = [&] {
