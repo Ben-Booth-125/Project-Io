@@ -125,7 +125,7 @@ void draw_nav_pane(ui_state& state, float top_offset)
         was_open = open;
     };
     disarm_on_close(state.market_ledger_was_open,  state.show_market_ledger,  overlay_mode::market);
-    disarm_on_close(state.convoys_ledger_was_open, state.show_convoys_ledger, overlay_mode::supply_routes);
+    disarm_on_close(state.convoys_ledger_was_open, state.show_convoys_ledger, overlay_mode::trade_flow); // BL-1729
     disarm_on_close(state.tile_ledger_was_open,    state.show_tile_ledger,    overlay_mode::continent);
 
     const ImVec2 disp = ImGui::GetIO().DisplaySize;
@@ -341,14 +341,14 @@ void draw_nav_pane(ui_state& state, float top_offset)
                 const bool was_open = state.show_convoys_ledger;
                 close_all_panels(state);
                 state.show_convoys_ledger = !was_open;
-                // ARM THE LANE OVERLAY ON OPEN (convoys.md § 3). The list and the
-                // lens answer the same question in two registers, and this
-                // pairing is the argument for the split: a tab strip arms one
-                // lens for every tab, so hosting Convoys in the Market ledger
-                // armed the price wash instead. Armed on OPEN here; disarmed on
-                // CLOSE at the top of draw_nav_pane.
+                // ARM THE TRADE FLOW LENS ON OPEN (BL-1729, Ben 2026-11-22: "wire the
+                // convoys tab to the trade flow lens"; it armed Supply-routes before).
+                // The list and the lens answer the same question in two registers,
+                // and the lens is where convoys draw (LENSES.md § The other
+                // direction). Armed on OPEN here; disarmed on CLOSE at the top of
+                // draw_nav_pane.
                 if (state.show_convoys_ledger)
-                    state.overlay = overlay_mode::supply_routes;
+                    state.overlay = overlay_mode::trade_flow;
             }
             slot_tooltip("Convoys",
                          "What is on its way, and what it is costing you.", false);

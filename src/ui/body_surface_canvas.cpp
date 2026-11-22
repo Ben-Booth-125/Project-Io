@@ -7561,7 +7561,12 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         return { prev_drawn.x + gx * (cap / gap), prev_drawn.y + gy * (cap / gap) };
     };
     state.convoy_zones.clear();
-    if (draw_r >= 6.0f && !state.convoy_markers.empty())
+    // BL-1729 (Ben, 2026-11-22: "hide convoy movement unless the trade flow lens is turned
+    // on"): the markers draw only under the Trade Flow and Supply lenses - the two that
+    // answer what is moving (LENSES.md § Convoys draw under the convoy lenses).
+    const bool convoy_lens = state.overlay == overlay_mode::trade_flow
+                          || state.overlay == overlay_mode::supply;
+    if (convoy_lens && draw_r >= 6.0f && !state.convoy_markers.empty())
     {
         const float frac = static_cast<float>(
             std::fmod(std::max(0.0, state.sim_now_days), static_cast<double>(k_econ_tick_days)) / static_cast<double>(k_econ_tick_days)); // BL-1642: a month
@@ -7743,10 +7748,12 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         s_convoy_trail.swap(trail_now);
     }
     {
-        // Hover: the nearest marker under the pointer, with no lens (BL-664). One frame
-        // behind, as every hover read here is.
+        // Hover: the nearest marker under the pointer. One frame behind, as every hover
+        // read here is. BL-1729: the markers draw only under the convoy lenses, so that
+        // is where they answer - the one exception to BL-664's "a marker takes no press
+        // under a lens", since a marker that only shows under a lens must be pressable there.
         state.hovered_convoy = 0;
-        if (state.overlay == overlay_mode::none)
+        if (convoy_lens)
         {
             float best = std::numeric_limits<float>::max();
             for (const ui_state::convoy_zone& z : state.convoy_zones)
@@ -9840,7 +9847,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             // BL-1506: A CONVOY MARKER. A counter stands in front of it; it stands in
             // front of the front line and the ground. Non-entity, in its own field.
             const std::uint32_t convoy_hit =
-                (!lensed && marker_hit == null_entity) ? state.hovered_convoy : 0u;
+                (marker_hit == null_entity) ? state.hovered_convoy : 0u; // BL-1729: hover is gated to the convoy lenses
             state.selected_convoy = 0; // every press retires the channel; the hit sets it below
 
             // STRUCTURE-GRAIN selection (BL-601), between the markers and the

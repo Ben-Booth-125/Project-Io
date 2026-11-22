@@ -2200,7 +2200,7 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 
 **Valid when:**
 - A convoy is in flight with a lane on the active body.
-- No lens is active (under a lens a press resolves to the lens's structure).
+- The Trade Flow or Supply lens is active: convoy markers draw only under those two (BL-1729 (convoys on trade flow lens), Ben 2026-11-22), and there the press answers on the marker before the lens's own press.
 - Another nation's convoy has a marker only on ground the player's vision lights.
 - Zoomed in to at least the unit counters' draw (a hex radius of 6 px).
 
@@ -2975,7 +2975,7 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 **Valid when:**
 - In-game
 
-**Expected output.** Toggles the Convoys ledger open in the fold-out column; re-click closes; opening closes any other ledger AND ARMS THE supply_routes LENS -- the lane overlay is the map twin of this list. Closing disarms it if it is still the supply_routes lens; a lens the player chose meanwhile is kept. Open, it lists one row per convoy of your corp in flight, soonest arrival first: cargo and quantity, origin -> destination and mode, a progress bar carrying the ETA in mo (or 'held' / 'stalled'), and the haul cost already paid. One flat view; NO Body/Market selectors, because a convoy is a route between two places and is not scoped by the market you are looking at.
+**Expected output.** Toggles the Convoys ledger open in the fold-out column; re-click closes; opening closes any other ledger AND ARMS THE trade_flow LENS (BL-1729 (convoys on trade flow lens), Ben 2026-11-22) -- the lens convoys draw under is the map twin of this list. Closing disarms it if it is still the trade_flow lens; a lens the player chose meanwhile is kept. Open, it lists one row per convoy of your corp in flight, soonest arrival first: cargo and quantity, origin -> destination and mode, a progress bar carrying the ETA in mo (or 'held' / 'stalled'), and the haul cost already paid. One flat view; NO Body/Market selectors, because a convoy is a route between two places and is not scoped by the market you are looking at.
 
 **Reason to select.** Answers 'what is on its way, and what is it costing me?'. It is the only surface reporting TICKS TO ARRIVAL: convoys are drawn on three canvases and listed nowhere else, and since travel time became load-bearing a long haul takes several months, with the cargo out of your pool for all of it. Read it before planning a build against stock you think you have.
 

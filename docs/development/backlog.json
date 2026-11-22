@@ -2945,7 +2945,7 @@
    "design": "PLAYTEST 2 LANE H (selection & shell). Ben: \"We should increase speed II to 1x.\" WORK: report speed II's current rate and what \"1x\" means in TIME_CONTROLS.md (days per second) first (Rule 0b), then set it; speeds III and IV must stay faster than II."
   },
   {
-   "glyph": "~",
+   "glyph": "✓",
    "sprint": null,
    "version_goal": null,
    "written": "2026-11-22",
@@ -2955,14 +2955,14 @@
    "author": "Ben (second playtest of the release build at 320655c8, 2026-11-22); filed by Claude",
    "priority": "B",
    "difficulty": 2,
-   "files": [],
+   "files": ["src/ui/body_surface_canvas.cpp", "src/ui/nav_pane.cpp", "scripts/verify/logistics_network_view.lua", "scripts/verify/convoy_map.lua", "scripts/verify/lens_ledger_pairs.lua"],
    "category": "UI",
-   "status": "design-owed",
+   "status": "complete",
    "authority_doc": "docs/ui/LENSES.md",
    "id": "BL-1729",
    "short_name": "CONVOYS_ON_TRADE_FLOW_LENS",
    "title": "Convoys draw only under the Trade Flow lens; the Convoys tab turns the lens on",
-   "design": "PLAYTEST 2 LANE I (lenses & network). Ben: \"We should hide convoy movement unless the trade flow lens is turned on. We should also wire the convoys tab to the trade flow lens.\" DESIGN OWED: does opening the Convoys tab switch the lens on (and closing it off), or only offer it; space convoys too? Toggle rule applies."
+   "design": "PLAYTEST 2 LANE I (lenses & network). Ben: \"We should hide convoy movement unless the trade flow lens is turned on. We should also wire the convoys tab to the trade flow lens.\" DESIGN OWED: does opening the Convoys tab switch the lens on (and closing it off), or only offer it; space convoys too? Toggle rule applies. RULED (Ben, 2026-11-22): the Convoys tab arms Trade Flow on open and disarms on close, replacing Supply-routes; markers draw under Trade Flow and Supply; space convoys stay as they are (Planetary only). Written into docs/ui/LENSES.md and docs/ui/ledgers/convoys.md."
   },
   {
    "glyph": "✓",

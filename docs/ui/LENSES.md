@@ -423,7 +423,7 @@ slots are not in it.
 | Rail slot | Ledger | Arms | The shared question |
 |---|---|---|---|
 | 5 | Market | `market` | Which market is this ground in, and what does it pay? |
-| 6 | Convoys | `supply_routes` | What is moving, and along which lanes? |
+| 6 | Convoys | `trade_flow` | What is moving, where to, and why not elsewhere? |
 | 9 | History | `continent` — on entering **Tectonics**, see below | Which plate made this ground? |
 
 **There are two arming rules, and which one a slot uses follows from how many questions
@@ -860,6 +860,15 @@ left behind. The simulation never reads the record and it is not saved, so a loa
 game shows the lens from its first pass on. A flow's tiles are read from those waypoints by the
 one route reader every convoy surface uses, and held per flow until its waypoints or the network
 move, so a frame re-derives no path.
+
+**Convoys draw under it** (Ben, 2026-11-22: *"we should hide convoy movement unless the trade flow
+lens is turned on"*). The Planetary convoy markers (SELECTION.md § The convoy element) draw only
+under this lens and the Supply lens — the two that answer what is moving — and on the plain canvas
+and under every other lens they are hidden. Under those two lenses a press on a marker selects the
+convoy before the lens's own press, since a marker shown only there must be pressable there. The
+Convoys ledger arms this lens on open and disarms it on close (§ The other direction). Space
+convoys — the Solar and Circumplanetary canvases' convoy lines, badges and transits — are not
+affected.
 
 **Legend.** A class key (colour → class) and a flow-width key (units per tick), in the
 shared legend home.
