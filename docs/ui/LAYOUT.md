@@ -70,14 +70,14 @@ every call site asks it for a rect: `right_chrome_width` / `right_chrome_left`,
 `pinned_panel_rect`. It **consumes** `foldout_column.hpp`'s primitives
 (`shell_column_width`, `minimap_width`/`_height`, `selection_band_height`,
 `foldout_column_rect`) rather than duplicating them — the split
-is primitives there, composed rects here. Widths round to whole pixels, so every
-region edge lands on a pixel boundary.
-
-> One inconsistency is **recorded, not silently fixed**: the minimap is flush to the
-> screen edge (`disp.x - mm_w`) while the column's other occupants stop a
-> `shell_margin` short of it (`right_chrome_left`). `minimap_rect` and
-> `right_chrome_left` therefore disagree by 8 px, deliberately and in one visible
-> place, instead of five invisible ones.
+is primitives there, composed rects here. **Every region edge lands on a whole pixel**: the
+shell column's width, the right chrome column's left edge (`right_chrome_left`, rounded, with
+the minimap and time panel running from it to the screen edge) and the bottom strip's height
+(`selection_band_height`, rounded). ImGui truncates a window's position and size, so a
+fractional edge left a one-pixel seam of map between neighbours (Ben, 2026-11-22: the
+Selection band "should expand so it covers the edges of the canvas, and the edge of the mini
+map"). The right column is flush to the screen edge, and every occupant of it shares one left
+edge.
 
 Two layers compose the screen:
 
@@ -241,7 +241,10 @@ left tile of the bottom strip, from the **shell column's right edge** (`shell_co
 so an open ledger sits beside it, never under it) to the **minimap** on its right. Its height is
 `selection_band_height` (`src/ui/foldout_column.{hpp,cpp}`), **derived from the minimap
 height** plus `chrome_margin` so the whole strip's top edge lands on the minimap's. The
-band always occupies the same rect — it is never click-anchored. Ben's call: *"doing/
+band always occupies the same rect — it is never click-anchored. **It meets every neighbour
+with no gap and square corners** — the shell column on its left, the minimap on its right, the
+screen's foot below (Ben, 2026-11-22): a rounded corner or a fractional edge let the map show
+through the seam. Ben's call: *"doing/
 building" menus need a fixed place at the bottom of the screen, not a widget that floats
 with the cursor.* It shows detail about the **current selection**, whatever entity the
 player last single-clicked, and **does not close an open ledger**: the two do not

@@ -4,6 +4,7 @@
 #include "profile_panel.hpp" // profile_panel_height
 
 #include <algorithm>
+#include <cmath>
 
 namespace ui {
 
@@ -25,12 +26,19 @@ float right_chrome_left(ImVec2 disp)
     // y = 0, nav rail and comms dock at x = 0, comms dock at y = 719 -- so this is
     // the right column joining a rule the rest of the shell already followed, not a
     // new rule being invented for it.
-    return disp.x - right_chrome_width(disp);
+    //
+    // ROUNDED to a whole pixel (Ben, 2026-11-22: the band "should expand so it covers the
+    // edges of the canvas, and the edge of the mini map"). The minimap width is fractional
+    // at most sizes and ImGui truncates a window's position and size, so the band ended
+    // one pixel short of the minimap and the map showed through the seam. Every occupant
+    // of the column, and the band's right edge, reads this one rounded figure.
+    return std::round(disp.x - right_chrome_width(disp));
 }
 
 shell_rect minimap_rect(ImVec2 disp)
 {
-    const float w = right_chrome_width(disp);
+    const float x = right_chrome_left(disp);
+    const float w = disp.x - x; // to the screen edge exactly, from the rounded left edge
     // Flush right (BL-312) and now flush BOTTOM too (BL-599). The bottom used to
     // keep `chrome_margin`, which floated the box four pixels clear of the screen
     // foot with canvas visible underneath it (measured: row 716 is background, rows
@@ -44,7 +52,7 @@ shell_rect minimap_rect(ImVec2 disp)
     // is therefore `selection_band_height`, which is the same number said in the
     // terms that explain why.
     const float h = selection_band_height(disp.x, disp.y);
-    return { right_chrome_left(disp), disp.y - h, w, h };
+    return { x, disp.y - h, w, h };
 }
 
 shell_rect time_panel_rect(ImVec2 disp, float time_h)
@@ -52,7 +60,8 @@ shell_rect time_panel_rect(ImVec2 disp, float time_h)
     // Flush to the TOP screen edge (BL-600). The profile tile and the header have
     // always started at y = 0; the time panel started at y = 8, so the top band was
     // ragged along an edge two of its three tiles already shared.
-    return { right_chrome_left(disp), 0.0f, right_chrome_width(disp), time_h };
+    const float x = right_chrome_left(disp);
+    return { x, 0.0f, disp.x - x, time_h };
 }
 
 shell_rect selection_band_rect(ImVec2 disp)
