@@ -8342,7 +8342,86 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         }
     }
 
-    // The unit counters, standing then marching, over the capital star.
+    // THE BUILD-PROGRESS CIRCLE (Ben, 2026-10-26; construction.md § The progress
+    // circle): over every one of the player's sites under construction, a ring
+    // filling clockwise from twelve o'clock with the days built over the days the
+    // build takes, coloured by the quarter's rate (on schedule / stretched /
+    // paused). Hovering it opens the site card (construction_panel.cpp), the
+    // materials still to draw with "!" on a short good. Drawn whatever lens is up:
+    // it is the site's own mark, not a lens. Sites walk in building-id order.
+    //
+    // UNITS DRAW OVER IT (Ben, 2026-11-22, BL-1722 (units over construction wheel)):
+    // the circle draws here, before the unit counters, so a unit standing on a site
+    // stays visible; and a counter under the pointer takes the hover from the circle,
+    // so what is on top is what the pointer reads and what the press selects (a unit
+    // marker already outranks everything else in the press path).
+    state.construction_ui.site_marks.clear();
+    entity_id site_circle_hover = null_entity;
+    if (draw_r >= 5.0f)
+    {
+        const entity_id over_counter = state.overlay == overlay_mode::none
+            ? resolve_marker_hit(state.marker_hit_zones, mouse_g, mouse) : null_entity;
+        const bool counter_under_pointer = over_counter != null_entity
+            && (w.units.count(over_counter) != 0 || w.wings.count(over_counter) != 0
+                || w.ships.count(over_counter) != 0);
+        std::vector<entity_id> sites;
+        for (const auto& [bid, b] : w.buildings)
+            if (b.ticks_remaining > 0 && is_player_owned(w, bid))
+                sites.push_back(bid);
+        std::sort(sites.begin(), sites.end());
+        const float cr = std::clamp(draw_r * 0.42f, 5.0f, 13.0f);
+        const float th = std::max(2.0f, cr * 0.32f);
+        float best_d2 = (cr + 3.0f) * (cr + 3.0f);
+        for (const entity_id bid : sites)
+        {
+            const building_component& b = w.buildings.at(bid);
+            const auto tit = w.tiles.find(b.tile);
+            if (tit == w.tiles.end() || tit->second.body != state.active_body)
+                continue;
+            const construction_site_reading rd = read_construction_site(w, reg, b);
+            const ImU32 ink = ImGui::ColorConvertFloat4ToU32(construction_status_colour(rd.rd));
+            const ImVec2 c0 = to_screen(hex_local_centre(tit->second.grid_x, tit->second.grid_y, hex_size));
+            const int k_min = (period_px > 0.0f)
+                ? static_cast<int>(std::ceil((visible_left  - c0.x) / period_px)) : 0;
+            const int k_max = (period_px > 0.0f)
+                ? static_cast<int>(std::floor((visible_right - c0.x) / period_px)) : 0;
+            for (int k = k_min; k <= k_max; ++k)
+            {
+                const ImVec2 c{ c0.x + static_cast<float>(k) * period_px, c0.y };
+                const int u0 = dl->VtxBuffer.Size;
+                dl->AddCircleFilled(c, cr + th * 0.5f, IM_COL32(10, 12, 18, 200), 24);
+                dl->AddCircle(c, cr, IM_COL32(70, 74, 86, 255), 24, th);
+                if (rd.frac > 0.0f)
+                {
+                    constexpr float k_top = -1.5707964f; // twelve o'clock
+                    dl->PathArcTo(c, cr, k_top, k_top + 6.2831853f * rd.frac,
+                                  std::max(4, static_cast<int>(24.0f * rd.frac)));
+                    dl->PathStroke(ink, ImDrawFlags_None, th);
+                }
+                upright(c, u0);
+                const float dx = mouse_g.x - c.x, dy = mouse_g.y - c.y;
+                if (!counter_under_pointer && dx * dx + dy * dy <= best_d2)
+                {
+                    best_d2 = dx * dx + dy * dy;
+                    site_circle_hover = bid;
+                }
+                construction_controls::site_mark m;
+                m.building   = bid;
+                m.col        = tit->second.grid_x;
+                m.row        = tit->second.grid_y;
+                m.days_done  = rd.days_done;
+                m.days_total = rd.days_total;
+                const ImVec2 mv = view_pt(c); // after the camera
+                m.x          = mv.x;
+                m.y          = mv.y;
+                m.r          = cr;
+                state.construction_ui.site_marks.push_back(m);
+            }
+        }
+    }
+
+    // The unit counters, standing then marching, over the capital star and the
+    // build-progress circle (BL-1722 (units over construction wheel)).
     for (const deferred_counter& uc : unit_counters_drawn)
     {
         const int u0 = dl->VtxBuffer.Size;
@@ -8744,73 +8823,6 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     state.trade_flow_arrows  = static_cast<int>(tf_arrows.size());
     state.trade_flow_markers = static_cast<int>(tf_markers.size());
     state.trade_flow_passes  = static_cast<int>(tf_passes.size());
-
-    // THE BUILD-PROGRESS CIRCLE (Ben, 2026-10-26; construction.md § The progress
-    // circle): over every one of the player's sites under construction, a ring
-    // filling clockwise from twelve o'clock with the days built over the days the
-    // build takes, coloured by the quarter's rate (on schedule / stretched /
-    // paused). Hovering it opens the site card (construction_panel.cpp), the
-    // materials still to draw with "!" on a short good. Drawn whatever lens is up:
-    // it is the site's own mark, not a lens. Sites walk in building-id order.
-    state.construction_ui.site_marks.clear();
-    entity_id site_circle_hover = null_entity;
-    if (draw_r >= 5.0f)
-    {
-        std::vector<entity_id> sites;
-        for (const auto& [bid, b] : w.buildings)
-            if (b.ticks_remaining > 0 && is_player_owned(w, bid))
-                sites.push_back(bid);
-        std::sort(sites.begin(), sites.end());
-        const float cr = std::clamp(draw_r * 0.42f, 5.0f, 13.0f);
-        const float th = std::max(2.0f, cr * 0.32f);
-        float best_d2 = (cr + 3.0f) * (cr + 3.0f);
-        for (const entity_id bid : sites)
-        {
-            const building_component& b = w.buildings.at(bid);
-            const auto tit = w.tiles.find(b.tile);
-            if (tit == w.tiles.end() || tit->second.body != state.active_body)
-                continue;
-            const construction_site_reading rd = read_construction_site(w, reg, b);
-            const ImU32 ink = ImGui::ColorConvertFloat4ToU32(construction_status_colour(rd.rd));
-            const ImVec2 c0 = to_screen(hex_local_centre(tit->second.grid_x, tit->second.grid_y, hex_size));
-            const int k_min = (period_px > 0.0f)
-                ? static_cast<int>(std::ceil((visible_left  - c0.x) / period_px)) : 0;
-            const int k_max = (period_px > 0.0f)
-                ? static_cast<int>(std::floor((visible_right - c0.x) / period_px)) : 0;
-            for (int k = k_min; k <= k_max; ++k)
-            {
-                const ImVec2 c{ c0.x + static_cast<float>(k) * period_px, c0.y };
-                const int u0 = dl->VtxBuffer.Size;
-                dl->AddCircleFilled(c, cr + th * 0.5f, IM_COL32(10, 12, 18, 200), 24);
-                dl->AddCircle(c, cr, IM_COL32(70, 74, 86, 255), 24, th);
-                if (rd.frac > 0.0f)
-                {
-                    constexpr float k_top = -1.5707964f; // twelve o'clock
-                    dl->PathArcTo(c, cr, k_top, k_top + 6.2831853f * rd.frac,
-                                  std::max(4, static_cast<int>(24.0f * rd.frac)));
-                    dl->PathStroke(ink, ImDrawFlags_None, th);
-                }
-                upright(c, u0);
-                const float dx = mouse_g.x - c.x, dy = mouse_g.y - c.y;
-                if (dx * dx + dy * dy <= best_d2)
-                {
-                    best_d2 = dx * dx + dy * dy;
-                    site_circle_hover = bid;
-                }
-                construction_controls::site_mark m;
-                m.building   = bid;
-                m.col        = tit->second.grid_x;
-                m.row        = tit->second.grid_y;
-                m.days_done  = rd.days_done;
-                m.days_total = rd.days_total;
-                const ImVec2 mv = view_pt(c); // after the camera
-                m.x          = mv.x;
-                m.y          = mv.y;
-                m.r          = cr;
-                state.construction_ui.site_marks.push_back(m);
-            }
-        }
-    }
 
     // UNIT ORDERS (BL-1443; SELECTION.md § Right-click orders). With the player's
     // own unit or group selected, the hovered hex says what a right-click would

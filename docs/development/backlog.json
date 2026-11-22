@@ -2785,7 +2785,7 @@
    "design": "The ground textures need only the finished tiles, not the settled economy, yet \"Loading textures\" starts after \"Settling industry\" ends. WORK: once the search's winner is applied and every step that writes the ground (roads, ports, installations laid before the settle) is done, start the bake against a snapshot of what it reads, on its own thread, and join it after the settle. EXPECTED: hide ~1-2 s of the paint step behind the settle. FIRST: list exactly what the bake reads (tiles, road field, installations, ownership tint?) and confirm the settle writes none of it - if the settle lays roads or buildings, the bake must either take a post-settle pass for the touched chunks or stay after the settle. CHECK: the baked chunks are byte-identical to today's (hash the textures on seeds 0 and 28), the bar's weights still sum to the wall time, and a live New Game shows no texture pop-in. BUILT 2026-11-19 by reusing the wizard's in-round snapshot on the cold build: the worker builds the home body's bake source once the tail has laid the roads, the main thread starts the master from it, and the landing's resnapshot re-bakes what the search and settle moved (574 of 2975 chunks on the measured run). MEASURED live, one New Game each on a quiet machine (different random seeds): \"Loading textures\" waited 35.2 s before, 26.9 s after; 1077 of 2975 chunks were baked by the landing. Ground opened fully painted."
   },
   {
-   "glyph": "~",
+   "glyph": "✓",
    "sprint": null,
    "version_goal": null,
    "written": "2026-11-22",
@@ -2795,9 +2795,15 @@
    "author": "Ben (second playtest of the release build at 320655c8, 2026-11-22); filed by Claude",
    "priority": "B",
    "difficulty": 3,
-   "files": [],
+   "files": [
+    "src/ui/ground_bake.cpp",
+    "src/ui/ground_bake.hpp",
+    "src/shaders/slice3d.frag.hlsl",
+    "tools/verify/ground_bake_check.cpp",
+    "scripts/verify/coast_detail.lua"
+   ],
    "category": "UI",
-   "status": "design-owed",
+   "status": "complete",
    "authority_doc": "docs/ui/RENDERING.md",
    "id": "BL-1721",
    "short_name": "COAST_TEXTURE_FOLLOWS_LAND",
@@ -2815,14 +2821,39 @@
    "author": "Ben (second playtest of the release build at 320655c8, 2026-11-22); filed by Claude",
    "priority": "B",
    "difficulty": 1,
-   "files": [],
+   "files": [
+    "src/ui/body_surface_canvas.cpp",
+    "scripts/verify/units_over_site.lua"
+   ],
    "category": "UI",
-   "status": "designed",
+   "status": "complete",
    "authority_doc": "docs/ui/RENDERING.md",
    "id": "BL-1722",
    "short_name": "UNITS_OVER_CONSTRUCTION_WHEEL",
    "title": "Units draw over a new building's construction wheel",
    "design": "PLAYTEST 2 LANE G (canvas). Ben: \"Let's draw units over the construction wheel for newly constructing buildings.\" WORK: draw order - unit markers after the construction progress wheel, so a unit standing on a building site stays visible and pressable. Check the press order matches the draw order."
+  },
+  {
+   "glyph": "✓",
+   "sprint": null,
+   "version_goal": null,
+   "written": "2026-11-22",
+   "parked": false,
+   "blocked_on": null,
+   "requires": [],
+   "author": "Ben (2026-11-22, lane G of the second playtest: \"Yes, file it\"); filed by Claude",
+   "priority": "C",
+   "difficulty": 2,
+   "files": [
+    "src/shaders/slice3d.frag.hlsl"
+   ],
+   "category": "UI",
+   "status": "complete",
+   "authority_doc": "docs/ui/RENDERING.md",
+   "id": "BL-1738",
+   "short_name": "LAND_LIFT_FOLLOWS_COAST",
+   "title": "The draw-time land lift follows the painted coast, not the hex side",
+   "design": "Follow-up to BL-1721 (coast texture follows land). The 3D ground applies the land lift (Brightness) with a PER-TILE land weight, so the lifted shore is the hex side: water inside a land hex is brightened, land inside a water hex is not. RENDERING.md § Level of detail, 'The lift at draw time', rules this per tile and names a half-resolution land mask per chunk (NR-1232 option B) as the fallback. BL-1721 now stores a per-pixel LAND MARK in the bake (red's lowest bit, apply_land_mark), which the shader already reads through painted_land(uv) at no memory cost - a cheaper route than option B. WORK, if Ben settles it: in slice3d.frag.hlsl, weight lift() by painted_land(uv) (perhaps blended with the tile weight at far rungs where the mark is sub-pixel), and rewrite the RENDERING.md paragraph. SETTLED (Ben, 2026-11-22: \"Settle BL-1738, build it now\"): the lift reads the land mark at every rung; RENDERING.md carries the ruling. Capture a coast at close and play zoom with Brightness at +30% before and after (scripts/verify/coast_detail.lua frames the coasts)."
   },
   {
    "glyph": "~",

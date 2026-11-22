@@ -173,6 +173,24 @@ float shadow_at(float4 spos, float ndl)
     return sum / 9.0;
 }
 
+// The painted land at this pixel, 0..1: the bake's land mark (red's lowest bit, set where
+// the bake painted land rather than water), filtered over the four texels around the
+// point so the detail's edge along the painted coast is soft, not a stair of texels.
+float painted_land(float2 uv)
+{
+    uint w, h;
+    u_bake.GetDimensions(w, h);
+    const float2 f = float2(frac(uv.x), saturate(uv.y)) * float2(w, h) - 0.5;
+    const int2 i0 = int2(floor(f));
+    const float2 fr = f - floor(f);
+    const int2 hi = int2(w - 1, h - 1);
+    const float a = (float)(((uint)round(u_bake.Load(int3(clamp(i0,               int2(0, 0), hi), 0)).r * 255.0)) & 1u);
+    const float b = (float)(((uint)round(u_bake.Load(int3(clamp(i0 + int2(1, 0), int2(0, 0), hi), 0)).r * 255.0)) & 1u);
+    const float c = (float)(((uint)round(u_bake.Load(int3(clamp(i0 + int2(0, 1), int2(0, 0), hi), 0)).r * 255.0)) & 1u);
+    const float d = (float)(((uint)round(u_bake.Load(int3(clamp(i0 + int2(1, 1), int2(0, 0), hi), 0)).r * 255.0)) & 1u);
+    return lerp(lerp(a, b, fr.x), lerp(c, d, fr.x), fr.y);
+}
+
 float3 lift(float3 c, float gamma, float land)
 {
     const float y = dot(c, float3(0.2126, 0.7152, 0.0722));
@@ -231,16 +249,46 @@ PSOut main(PSIn i)
             float t = 0.0; // the neighbour's share
             if (u_ink.z > 0.0)
                 t = 0.5 - 0.5 * smoothstep(0.0, u_ink.z, d);
-            const float land = lerp(own.x, nb.x, t);
-            land_w = land;
             // Detail stays off a pixel the bake marked (a road or an installation).
             uint cw_, ch_;
             u_bake.GetDimensions(cw_, ch_);
             const float2 tuv = float2(frac(i.uv.x), saturate(i.uv.y));
             const int2 texel = clamp(int2(tuv * float2(cw_, ch_)), int2(0, 0), int2(cw_ - 1, ch_ - 1));
             const bool marked = (((uint)round(u_bake.Load(int3(texel, 0)).b * 255.0)) & 1u) != 0u;
-            const float wown = marked ? 0.0 : own.x, wnb = marked ? 0.0 : nb.x;
-            const float dw = lerp(wown, wnb, t);
+            // THE DETAIL ENDS AT THE PAINTED COAST (BL-1721 (coast texture follows land)):
+            // the bake's land mark, not the hex, says where land is. The family comes from
+            // the hex's own tile; where the painted land runs past the hex side into a water
+            // tile, from the nearest land tile beside it; and a land tile does not fade
+            // toward a water neighbour at the hex side, since the coast is the mask's.
+            const float painted = painted_land(i.uv);
+            // The land lift's weight is the same mark (Ben, 2026-11-22, BL-1738 (land lift
+            // follows coast)): the lifted shore is the painted one, and a river's water
+            // keeps its colour, as the baked lift's land weight has it.
+            land_w = painted;
+            int2 d_cell = cell, d_nb_cell = nb_cell;
+            float4 d_own = own, d_nb = nb;
+            float dt = t;
+            if (own.x < 0.5)
+            {
+                float best = 1e30;
+                d_own = float4(0, 0, 0, 0);
+                [unroll] for (int a = 0; a < 6; ++a)
+                {
+                    const float2 e = float2(cos(a * k_sixth), sin(a * k_sixth));
+                    const int2 c2 = nearest_cell(centre_of(cell) + k_s3 * e);
+                    const float4 t2 = tile_of(c2, wi, hi);
+                    const float2 dv2 = p - centre_of(c2);
+                    const float dd = dot(dv2, dv2);
+                    if (t2.x > 0.5 && dd < best) { best = dd; d_own = t2; d_cell = c2; }
+                }
+                d_nb = d_own; d_nb_cell = d_cell; dt = 0.0;
+            }
+            else if (nb.x < 0.5)
+            {
+                d_nb = own; d_nb_cell = cell;
+            }
+            const float wown = marked ? 0.0 : d_own.x, wnb = marked ? 0.0 : d_nb.x;
+            const float dw = lerp(wown, wnb, dt) * painted;
             // The detail's weight at this pixel's drawn radius (a glide or a tilt brings it in
             // smoothly), and each layer's share by its texels per pixel - full to 1.5, gone by 3.
             const float kr = saturate((r_px - u_detr.x) / max(u_detr.y - u_detr.x, 1e-3));
@@ -251,48 +299,49 @@ PSOut main(PSIn i)
             const float fpx = max(fwp.x, fwp.y);
             const float coarse_share = saturate((3.0 - fpx / u_det.y * (float)dwid) / 1.5);
             const float fine_share = saturate((3.0 - fpx / u_det.w * (float)fwid) / 1.5);
-            if (land > 0.0 && dw > 0.0 && strength > 0.0)
+            if (dw > 0.0 && strength > 0.0)
             {
-                const float2 s_own = float2(own.y, own.z), s_nb = float2(nb.y, nb.z);
-                const float3 v_own = tile_hash(cell, wi), v_nb = tile_hash(nb_cell, wi);
+                const float2 s_own = float2(d_own.y, d_own.z), s_nb = float2(d_nb.y, d_nb.z);
+                const float3 v_own = tile_hash(d_cell, wi), v_nb = tile_hash(d_nb_cell, wi);
                 const float2 o_own = v_own.xy, o_nb = v_nb.xy;
                 // Sand creeps downwind; nothing else moves the lookup.
-                const float2 q_own = p + (own.y > 1.5 && own.y < 2.5 ? k_wind_dir * u_org.z * u_anim.w : float2(0, 0));
-                const float2 q_nb  = p + (nb.y > 1.5 && nb.y < 2.5 ? k_wind_dir * u_org.z * u_anim.w : float2(0, 0));
-                const float k_own = family_pick(u_famk, own.y), k_nb = family_pick(u_famk, nb.y);
+                const float2 q_own = p + (d_own.y > 1.5 && d_own.y < 2.5 ? k_wind_dir * u_org.z * u_anim.w : float2(0, 0));
+                const float2 q_nb  = p + (d_nb.y > 1.5 && d_nb.y < 2.5 ? k_wind_dir * u_org.z * u_anim.w : float2(0, 0));
+                const float k_own = family_pick(u_famk, d_own.y), k_nb = family_pick(u_famk, d_nb.y);
                 const float4 dt0 = u_detail.SampleLevel(u_detail_sampler, q_own / u_det.y + o_own, 0);
                 const float4 dt1 = u_detail.SampleLevel(u_detail_sampler, q_nb / u_det.y + o_nb, 0);
-                float dv = lerp(wown * k_own * (family_pick(dt0, own.y) - 0.5),
-                                wnb * k_nb * (family_pick(dt1, nb.y) - 0.5), t) * coarse_share;
+                float dv = lerp(wown * k_own * (family_pick(dt0, d_own.y) - 0.5),
+                                wnb * k_nb * (family_pick(dt1, d_nb.y) - 0.5), dt) * coarse_share;
                 const float fk = (u_det.z / max(u_det.x, 1e-4)) * fine_share;
                 if (fk > 0.0)
                 {
                     const float4 ft0 = u_fine.SampleLevel(u_fine_sampler, q_own / u_det.w + o_own, 0);
                     const float4 ft1 = u_fine.SampleLevel(u_fine_sampler, q_nb / u_det.w + o_nb, 0);
-                    dv += lerp(wown * k_own * (family_pick(ft0, own.y) - 0.5),
-                               wnb * k_nb * (family_pick(ft1, nb.y) - 0.5), t) * fk;
+                    dv += lerp(wown * k_own * (family_pick(ft0, d_own.y) - 0.5),
+                               wnb * k_nb * (family_pick(ft1, d_nb.y) - 0.5), dt) * fk;
                 }
                 dv *= strength;
-                dv += lerp(wown * (v_own.z - 0.5), wnb * (v_nb.z - 0.5), t) * u_ink.w * (strength / max(u_det.x, 1e-4));
+                dv += lerp(wown * (v_own.z - 0.5), wnb * (v_nb.z - 0.5), dt) * u_ink.w * (strength / max(u_det.x, 1e-4));
                 // A gust lightens what it bends, and each blade flutters on its own inside it.
                 if (u_anim.y > 0.0 || u_anim.z > 0.0)
                 {
                     const float gust = gust_at(p);
-                    const float tip0 = saturate((family_pick(dt0, own.y) - 0.5) * 4.0);
-                    const float tip1 = saturate((family_pick(dt1, nb.y) - 0.5) * 4.0);
+                    const float tip0 = saturate((family_pick(dt0, d_own.y) - 0.5) * 4.0);
+                    const float tip1 = saturate((family_pick(dt1, d_nb.y) - 0.5) * 4.0);
                     const float fl = flutter_at(p);
-                    dv += lerp(wown * family_pick(u_wind, own.y) * (u_anim.y + u_anim.z * tip0 * fl),
-                               wnb * family_pick(u_wind, nb.y) * (u_anim.y + u_anim.z * tip1 * fl), t)
+                    dv += lerp(wown * family_pick(u_wind, d_own.y) * (u_anim.y + u_anim.z * tip0 * fl),
+                               wnb * family_pick(u_wind, d_nb.y) * (u_anim.y + u_anim.z * tip1 * fl), dt)
                         * gust * (strength / max(u_det.x, 1e-4));
                 }
+                dv *= painted;
                 c = saturate(c * (1.0 + 2.0 * dv));
                 // The detail's relief on the mesh's light: the bumps' slope, one coarse texel apart.
                 if (u_misc.z > 0.0)
                 {
                     const float eps = u_det.y / (float)dwid;
-                    const float b0 = bump_at(q_own, s_own, s_nb, o_own, o_nb, t, fine_share);
-                    const float bx = bump_at(q_own + float2(eps, 0), s_own, s_nb, o_own, o_nb, t, fine_share);
-                    const float by = bump_at(q_own + float2(0, eps), s_own, s_nb, o_own, o_nb, t, fine_share);
+                    const float b0 = bump_at(q_own, s_own, s_nb, o_own, o_nb, dt, fine_share);
+                    const float bx = bump_at(q_own + float2(eps, 0), s_own, s_nb, o_own, o_nb, dt, fine_share);
+                    const float by = bump_at(q_own + float2(0, eps), s_own, s_nb, o_own, o_nb, dt, fine_share);
                     const float2 bg = float2(bx - b0, by - b0) / eps * u_misc.z * dw * (strength / max(u_det.x, 1e-4));
                     bn = normalize(n + float3(-bg.x, 0.0, -bg.y));
                 }

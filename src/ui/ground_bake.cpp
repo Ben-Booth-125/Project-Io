@@ -4263,6 +4263,18 @@ void apply_structure_mark(std::uint32_t* px, const std::uint8_t* mark, std::size
     }
 }
 
+void apply_land_mark(std::uint32_t* px, const std::uint8_t* land, std::size_t n)
+{
+    for (std::size_t i = 0; i < n; ++i)
+    {
+        const std::uint32_t c = px[i];
+        if (palette::col_a(c) == 0)
+            continue; // the transparent margin stays exactly 0
+        const int r = (palette::col_r(c) & ~1) | (land[i] >= 128u ? 1 : 0);
+        px[i] = palette::col32(r, palette::col_g(c), palette::col_b(c), palette::col_a(c));
+    }
+}
+
 float land_lift_gamma(int level)
 {
     // +15%, +30%, +45% on the home body's median land luminance (the shipped
@@ -4285,8 +4297,10 @@ void bake_region(const bake_source& src, const geometry& g, const bake_params& p
         return;
     }
     const bool lift = src.land_lift > 0 && land_lift_gamma(src.land_lift) < 1.0f;
+    // The land weight is always computed: the land mark (red's lowest bit) reads it
+    // whether or not the lift does (BL-1721 (coast texture follows land)).
     std::vector<std::uint8_t> own_land;
-    if (lift && !land_out)
+    if (!land_out)
     {
         own_land.assign(npx, 0u);
         land_out = own_land.data();
@@ -4338,6 +4352,7 @@ void bake_region(const bake_source& src, const geometry& g, const bake_params& p
         if (lift)
             apply_land_lift(out, land_out, npx, src.land_lift);
         apply_structure_mark(out, mark.data(), npx);
+        apply_land_mark(out, land_out, npx);
         return;
     }
 
@@ -4425,6 +4440,7 @@ void bake_region(const bake_source& src, const geometry& g, const bake_params& p
     if (lift) // after the unsharp: the lift is the last pass on colour
         apply_land_lift(out, land_out, npx, src.land_lift);
     apply_structure_mark(out, mark.data(), npx);
+    apply_land_mark(out, land_out, npx);
 }
 
 geometry make_master_geometry(int gw, int gh, double tilt_sy)
@@ -4533,11 +4549,16 @@ void downsample_half(const std::uint32_t* src, int sw, int sh, std::uint32_t* ds
             };
             // The structure mark (blue's lowest bit) where at least two of the four
             // carry it; the mean's own lowest bit is replaced.
-            int marks = 0;
+            // The land mark (red's lowest bit) the same way.
+            int marks = 0, lands = 0;
             for (const std::uint32_t c : q)
+            {
                 marks += palette::col_a(c) != 0 && (palette::col_b(c) & 1) != 0 ? 1 : 0;
+                lands += palette::col_a(c) != 0 && (palette::col_r(c) & 1) != 0 ? 1 : 0;
+            }
             o[x] = sa == 0 ? 0u
-                 : palette::col32(mean(sr), mean(sg), (mean(sb) & ~1) | (marks >= 2 ? 1 : 0),
+                 : palette::col32((mean(sr) & ~1) | (lands >= 2 ? 1 : 0), mean(sg),
+                                  (mean(sb) & ~1) | (marks >= 2 ? 1 : 0),
                                   static_cast<int>((sa + 2) / 4));
         }
     }
