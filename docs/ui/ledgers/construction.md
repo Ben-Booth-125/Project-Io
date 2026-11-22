@@ -114,7 +114,9 @@ table's row count and its figure is that table's top Net.
 portions (credits and site number) to half the width, add Cr prefix to the credits, and use the
 other half for a construct button. This will automatically pick the most profitable (or highest
 spare logistic points on ties), and start construction there."*).** The left half carries the best
-Net as **"Cr <figure>"** and the site count; the right half is a **Construct** press. It builds the
+Net as **"Cr <figure>"** and the site count; the right half is a **Construct** press, drawn as the
+`under_construction` crane glyph alone, its hover the build's cost (Ben, 2026-11-22: "the construct
+button in the site finder should just be a symbol rather than the full text"). It builds the
 cell's building at its **best site**: the listed tile with the highest Net in whole credits (a priced
 site before an unpriced one), ties to the highest Logistic Point cover, then the lowest tile id - one
 answer, whatever the order the tiles were priced in. It goes through the map press's own path (the

@@ -37,7 +37,7 @@ enum class canvas_command
     // from verify scripts so a script can drive the clock deterministically.
     pause_toggle, ///< Toggle pause / resume (restores previous speed on resume).
     speed_1,      ///< Set speed to tier I (0.25×).
-    speed_2,      ///< Set speed to tier II (0.5×).
+    speed_2,      ///< Set speed to tier II (1×, real time).
     speed_3,      ///< Set speed to tier III (5×).
     speed_4,      ///< Set speed to tier IV (10×).
     speed_5,      ///< Set speed to tier V (16×, fast-forward).

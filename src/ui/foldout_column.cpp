@@ -9,6 +9,7 @@
 
 #include <imgui.h>
 
+#include <cmath>
 #include <string>
 
 namespace ui {
@@ -59,7 +60,9 @@ float selection_band_height(float disp_x, float disp_y)
 {
     // Top edge flush with the minimap's: the minimap floats `chrome_margin` off
     // the bottom, the strip does not, so the strip is exactly that much taller.
-    return minimap_height(disp_x, disp_y) + chrome_margin;
+    // Rounded to a whole pixel (Ben, 2026-11-22): ImGui truncates a window's size, so a
+    // fractional height left the screen's last row of canvas showing under the band.
+    return std::round(minimap_height(disp_x, disp_y) + chrome_margin);
 }
 
 foldout_rect foldout_column_rect()

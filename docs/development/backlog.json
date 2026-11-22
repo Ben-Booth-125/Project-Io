@@ -2941,8 +2941,12 @@
    "version_goal": null,
    "written": "2026-11-22",
    "parked": false,
-   "blocked_on": null,
-   "requires": [],
+   "blocked_on": [
+    "BL-1745"
+   ],
+   "requires": [
+    "BL-1745"
+   ],
    "author": "Ben (second playtest of the release build at 320655c8, 2026-11-22); filed by Claude",
    "priority": "B",
    "difficulty": 3,
@@ -2953,7 +2957,29 @@
    "id": "BL-1727",
    "short_name": "LABOUR_POOL_LEGIBLE",
    "title": "The selection element shows where a labour pool comes from and where it is allocated",
-   "design": "PLAYTEST 2 LANE H (selection & shell). Ben: \"We need to increase visibility on where the labour pool is coming from and where it's allocated in the selection element. Let me know what ideas you have. Perhaps this can go above the resource table for provinces.\" DESIGN OWED: Claude proposes; Ben picks. POPULATION.md owns labour supply and contention; SELECTION.md owns the card. Answer the surface's question in question_log.json first. FORM PICKED (Ben, 2026-11-22): two stacked bars above the province resource table. Bar 1 \"supplied\", split by source population centre (plus rural); bar 2 \"allocated\", split by building class, with an idle segment. Below them, one line naming the most short-staffed building. Hover a segment for names and figures. Example: \"Labour 12.4k supplied / [Velka 7.1k | Oruth 3.9k | rural 1.4k] / [Mines 5.2k | Mills 4.8k | Depot 0.9k | idle 1.5k] / Short: Steel Mill -0.6k\". Still to design: the tile card's version, and where the source split comes from."
+   "design": "PLAYTEST 2 LANE H (selection & shell). Ben: \"We need to increase visibility on where the labour pool is coming from and where it's allocated in the selection element. Let me know what ideas you have. Perhaps this can go above the resource table for provinces.\" DESIGN OWED: Claude proposes; Ben picks. POPULATION.md owns labour supply and contention; SELECTION.md owns the card. Answer the surface's question in question_log.json first. FORM PICKED (Ben, 2026-11-22): two stacked bars above the province resource table. Bar 1 \"supplied\", split by source population centre (plus rural); bar 2 \"allocated\", split by building class, with an idle segment. Below them, one line naming the most short-staffed building. Hover a segment for names and figures. Example: \"Labour 12.4k supplied / [Velka 7.1k | Oruth 3.9k | rural 1.4k] / [Mines 5.2k | Mills 4.8k | Depot 0.9k | idle 1.5k] / Short: Steel Mill -0.6k\". Still to design: the tile card's version, and where the source split comes from. CALLS TAKEN (Ben, 2026-11-22, lane H form): the labour pool becomes PER PROVINCE first (BL-1745 (labour per province)) - the bars wait for it, since a province's bars over a body-wide pool would show a split the model does not make. Units: labour units (a building staffed in full takes 1; a town supplies 3). No rural segment: the model has no rural labour, and none is filed. Allocated bar: by building type, the top four plus 'other', with an idle segment. No tile-card version: the province bars beside it are enough (the tile's own workforce figure is BL-1725 (tile population in header))."
+  },
+  {
+   "glyph": "~",
+   "sprint": null,
+   "version_goal": null,
+   "written": "2026-11-22",
+   "parked": false,
+   "blocked_on": [],
+   "requires": [],
+   "author": "Ben (lane H design form, 2026-11-22); filed by Claude",
+   "priority": "B",
+   "difficulty": 4,
+   "files": [
+    "src/world/economy_system.cpp"
+   ],
+   "category": "Economy",
+   "status": "design-owed",
+   "authority_doc": "docs/economy/POPULATION.md",
+   "id": "BL-1745",
+   "short_name": "LABOUR_PER_PROVINCE",
+   "title": "The labour pool is held per province, not per (nation, body)",
+   "design": "Ben, 2026-11-22 (lane H form, answering BL-1727 (labour pool legible)): \"Make labour per province\". Today the pool is per (nation, body): supply is every centre on the body at labour_by_scale 1/3/10/30/100, apportioned to a nation by its share of the body's BUILDING COUNT - so a rival's centres feed the player's pool, and no province has a pool of its own to show. WORK: the pool's grain becomes the province - supply from the centres standing in it, demand from the producing buildings standing in it, contention (wage order) cleared inside it. DESIGN OWED before build (Ben's calls): (1) does labour cross a province border at all - none, to neighbours, or along the road/logistics network at a cost (LOGISTICS.md); (2) what replaces the building-count share between nations when a province's ground is one nation's; (3) the qualified pool (BL-613) - per province too, or stays national; (4) what a province with buildings and no centre gets (today's workforce_supply fallback is per body). Determinism and save format: the report keys change (workforce_contention per province), and the clearing-wage signal migration reads (BL-617) moves with it. A world-mover: measure with market-viability and opening-parity before and after. POPULATION.md § The labour pool carries the ruling."
   },
   {
    "glyph": "✓",

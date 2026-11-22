@@ -9,7 +9,9 @@ namespace ui {
 namespace {
 
 constexpr px_const kPad      {10.0f};
-constexpr px_const kRounding {6.0f};
+// Square corners (Ben, 2026-11-22): the band meets the column, the minimap and the
+// screen's foot, and a rounded corner let the map show through at all four.
+constexpr px_const kRounding {0.0f};
 
 } // namespace
 

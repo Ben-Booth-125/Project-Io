@@ -929,7 +929,7 @@
     {
      "name": "tier",
      "type": "int 1-5",
-     "meaning": "The clicked button: I = 0.25x, II = 0.5x, III = 5x, IV = 10x, V = 16x. The panel's rate label shows the multiplier."
+     "meaning": "The clicked button: I = 0.25x, II = 1x, III = 5x, IV = 10x, V = 16x. The panel's rate label shows the multiplier."
     }
    ],
    "preconditions": [
@@ -947,7 +947,7 @@
     {
      "name": "tier",
      "type": "int 1-5",
-     "meaning": "Speed tier: 1 = I (0.25x), 2 = II (0.5x), 3 = III (5x), 4 = IV (10x), 5 = V (16x)."
+     "meaning": "Speed tier: 1 = I (0.25x), 2 = II (1x), 3 = III (5x), 4 = IV (10x), 5 = V (16x)."
     }
    ],
    "preconditions": [
@@ -1350,8 +1350,8 @@
   {
    "id": "ledger.construction_site_construct",
    "family": "ledger",
-   "surface": "Construction ledger, Site Finder view, the 'Find a site' building grid: the Construct press on the right half of each cell's lower line (the left half carries 'Cr <best Net>' and the site count)",
-   "press": "Press 'Construct' on a cell of the 'Find a site' grid. No cell need be chosen first, and the press does not choose or clear one.",
+   "surface": "Construction ledger, Site Finder view, the 'Find a site' building grid: the Construct press on the right half of each cell's lower line, drawn as a crane glyph with no word (the left half carries 'Cr <best Net>' and the site count)",
+   "press": "Press the crane glyph (Construct) on a cell of the 'Find a site' grid; its hover is the build's cost. No cell need be chosen first, and the press does not choose or clear one.",
    "args": [
     {
      "name": "building",

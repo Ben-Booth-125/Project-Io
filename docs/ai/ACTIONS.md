@@ -2006,7 +2006,7 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 
 | Arg | Type | Meaning |
 |---|---|---|
-| `tier` | `int 1-5` | The clicked button: I = 0.25x, II = 0.5x, III = 5x, IV = 10x, V = 16x. The panel's rate label shows the multiplier. |
+| `tier` | `int 1-5` | The clicked button: I = 0.25x, II = 1x, III = 5x, IV = 10x, V = 16x. The panel's rate label shows the multiplier. |
 
 **Valid when:**
 - The app is in-game.
@@ -2021,7 +2021,7 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 
 | Arg | Type | Meaning |
 |---|---|---|
-| `tier` | `int 1-5` | Speed tier: 1 = I (0.25x), 2 = II (0.5x), 3 = III (5x), 4 = IV (10x), 5 = V (16x). |
+| `tier` | `int 1-5` | Speed tier: 1 = I (0.25x), 2 = II (1x), 3 = III (5x), 4 = IV (10x), 5 = V (16x). |
 
 **Valid when:**
 - The app is in-game and no ImGui text field has keyboard focus.
@@ -2654,9 +2654,9 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 
 **Reason to select.** Answers 'what would earn most on my ground, and where?' without choosing a building first or sweeping the map tile by tile; selecting a tile narrows the same question to its province. The estimate is today's prices with each tile's Logistic Point cover applied - one input among several, not the move.
 
-### `ledger.construction_site_construct` — Construction ledger, Site Finder view, the 'Find a site' building grid: the Construct press on the right half of each cell's lower line (the left half carries 'Cr <best Net>' and the site count)
+### `ledger.construction_site_construct` — Construction ledger, Site Finder view, the 'Find a site' building grid: the Construct press on the right half of each cell's lower line, drawn as a crane glyph with no word (the left half carries 'Cr <best Net>' and the site count)
 
-**Press.** Press 'Construct' on a cell of the 'Find a site' grid. No cell need be chosen first, and the press does not choose or clear one.
+**Press.** Press the crane glyph (Construct) on a cell of the 'Find a site' grid; its hover is the build's cost. No cell need be chosen first, and the press does not choose or clear one.
 
 | Arg | Type | Meaning |
 |---|---|---|
