@@ -334,6 +334,8 @@ int main(int argc, char** argv)
         // what it earns a year after it stands.
         struct watched { int ordered; std::string name; double old_quote; double new_quote; int starved; double share; int age; double earned; double run; };
         std::map<entity_id, watched> watch;
+        std::map<entity_id, entity_id> kit_open;                // BL-1735: opening building -> its major
+        std::map<entity_id, std::pair<double, int>> kit_acc;    // BL-1735: summed monthly net, months
         for (int k = 1; k <= quarters; ++k)
         {
             const int day = k * k_econ_tick_days;
@@ -434,6 +436,46 @@ int main(int argc, char** argv)
                 }
             }
 
+            // BL-1735/BL-1736: what each building a major opened with earns over its
+            // first year of play, so the kit can be weighed against what pays. A KIT
+            // row per opening building, its mean monthly net over the months it stood.
+            if (k <= 12)
+            {
+                for (const entity_id nid : majors)
+                {
+                    const auto nit = w.nations.find(nid);
+                    if (nit == w.nations.end()) continue;
+                    for (const entity_id a : nit->second.state_assets)
+                    {
+                        const auto b = w.buildings.find(a);
+                        if (b == w.buildings.end() || b->second.ticks_remaining > 0) continue;
+                        if (k == 1) kit_open[a] = nid;
+                        const auto ko = kit_open.find(a);
+                        if (ko == kit_open.end()) continue;
+                        auto& acc = kit_acc[a];
+                        acc.first += estimate_building_profit(w, seed_reg, tick.report, a).net();
+                        ++acc.second;
+                    }
+                }
+                if (k == 12)
+                    for (const auto& [a, nid] : kit_open)
+                    {
+                        const auto b = w.buildings.find(a);
+                        const auto acc = kit_acc.find(a);
+                        if (b == w.buildings.end() || acc == kit_acc.end() || acc->second.second == 0) continue;
+                        std::string name;
+                        if (const recipe* rc = seed_reg.get_recipe(b->second.recipe))
+                            name = rc->name;
+                        else if (b->second.type == building_type::extraction_site)
+                            name = std::string(resource_names::name_of(b->second.target_resource));
+                        else
+                            name = "type" + std::to_string(static_cast<int>(b->second.type));
+                        std::printf("KIT seed=%d nation=%llu kind=%d name=%s net=%.2f months=%d idled=%d\n", seed,
+                                    static_cast<unsigned long long>(nid), static_cast<int>(b->second.type), name.c_str(),
+                                    acc->second.first / acc->second.second, acc->second.second,
+                                    b->second.decommissioned ? 1 : 0);
+                    }
+            }
             if (k == 4 || k == 8 || k == 20 || k == 40 || k == 80)
                 for (const entity_id nid : majors)
                     if (const auto it = w.nations.find(nid); it != w.nations.end())

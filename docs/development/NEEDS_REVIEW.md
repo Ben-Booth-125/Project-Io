@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*124 entries — 67 open, 57 resolved.*
+*127 entries — 70 open, 57 resolved.*
 
 ---
 
@@ -741,7 +741,7 @@ BL-1678 was merged as complete (Ben, 2026-11-20) onto the playtest lanes, where 
 
 *Files: `src/world/carried_supplies.cpp`, `docs/military/MILITARY.md`, `tools/verify/player_seed_sweep.cpp`*
 
-### NR-1262 — Army groups: four small calls taken in the build
+### NR-1265 — Army groups: four small calls taken in the build
 *decision · raised 2026-11-22 · from BL-1737 (army groups), lane K of the second playtest*
 
 Taken on your behalf while building army groups: (1) the name word is 'Army' - '1st Army', '2nd Army'; (2) a nation holds at most 99 groups, a bound the seam needs since an agent can send the verb; (3) a group may fall to one unit, and a one-unit group keeps its card (Split off is then off, Merge still works); (4) a group whose units are all aboard a transport stays alive but has no card until they land, since the card lists standing units only.
@@ -749,6 +749,33 @@ Taken on your behalf while building army groups: (1) the name word is 'Army' - '
 **Why it matters.** Each shows on screen or in the seam, and each is cheap to change now.
 
 *Files: `src/world/army_groups.cpp`, `src/ui/selection_panel.cpp`, `docs/military/MILITARY.md`*
+
+### NR-1262 — BL-1733 (province ceiling tech raised): the calls taken inside Ben's ruling
+*decision · raised 2026-11-22 · from Lane J (opening economy), second playtest; branch claude/playtest2-lane-j-economy-8a55c5*
+
+Ben ruled k/30, one Digitisation major, later trees too, and infrastructure buildings that raise it with later techs boosting them. Taken on his behalf: the major is Deep-Shaft Mining (it already carried a typed ceiling effect; now x1.5, type-agnostic). Off-World Bases x1.5 in Early Space. Infrastructure = port, Truck Depot, railway station, complete; each adds 10 room, scaled by Motorway Grid x1.5 and Transfer Network x2. The owner is the plurality of the province's claimed tiles. An infrastructure building is admitted while the province stands under ceiling + 10, so a full province can always take the depot that opens it.
+
+**Why it matters.** At k/30 the median land province holds one building, so the depot grant decides where a nation can build outside its cities.
+
+*Files: `src/world/province.cpp`, `docs/economy/PRODUCTION.md`, `docs/economy/tech/digitisation_tree.json`, `docs/economy/tech/early_space_tree.json`*
+
+### NR-1263 — Generation reads the cut province ceiling only in part
+*question · raised 2026-11-22 · from Lane J (opening economy), second playtest; branch claude/playtest2-lane-j-economy-8a55c5*
+
+The kit's processors, civic buildings and Marketplaces go through can_place_in_world, so the cut ceiling binds them; the history, the charter walk and the kit's extraction slots do not read it. Provinces therefore open over their ceiling, and kit slots refused for room become substitutions or unbuilt slots (unbuilt kit slots rose 88 -> 132 over 64 majors once the ceiling and trim landed). PRODUCTION.md states the split as it stands.
+
+**Why it matters.** BL-1500 ruled generation obeys the tile cap with no exemptions; the province ceiling now has no such ruling and is applied unevenly.
+
+*Files: `src/world/opening_kit.cpp`, `docs/economy/PRODUCTION.md`*
+
+### NR-1264 — BL-1735 (opening kit follows profit): what the measured re-weight added, and machinery still refused
+*decision · raised 2026-11-22 · from Lane J (opening economy), second playtest; branch claude/playtest2-lane-j-economy-8a55c5*
+
+Delegated by Ben. build_payback_census gained KIT rows (each opening building's mean monthly net over its first year). Added to rich_core: produce x3 and a third food line, copper ore x3 and a second copper line, water x2 and a clean-water works. Year-1 net median 450 -> 594 a month before BL-1734. The machinery slot still mostly substitutes: it stays short of spare refined copper by ~75 even with two copper lines; where it stands it earns ~320 a month, the best row.
+
+**Why it matters.** Machinery is the single biggest earner the kit could carry; reaching it needs a much wider copper spread or a looser spare-input rule, which is Ben's rule.
+
+*Files: `scripts/world_gen.lua`, `tools/verify/build_payback_census.cpp`*
 
 ---
 

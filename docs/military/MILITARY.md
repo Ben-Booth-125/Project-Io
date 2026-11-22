@@ -1842,18 +1842,17 @@ opening muster queued at the cut base is dropped. To recruit or refill it builds
 capital opens without a base for this reason or for want of any legal tile, and for no other.
 
 **A major's opening army is fixed (Ben, 2026-11-02).** Every major opens with the same force,
-authored with its kit (`../generation/CORPORATION_GENERATION.md` § A major's opening kit). The
-Standard kit's force is **eight land units of 50 men**: five infantry, one motorised infantry, one
-artillery and one light armour, each on its class's base kit. Four stand at the capital post: two
-infantry, the artillery and the light armour. The other four are one unit each at the border posts,
-taken in descending grudge order and wrapping round when there are fewer than four posts. A major
-with no border post holds all eight at the capital. The opening unit `seed_starting_military`
-raises is one of the eight, not a ninth. Its land pool opens holding **200 recruits**, about twelve months
+authored with its kit (`../generation/CORPORATION_GENERATION.md` § A major's opening kit). **It is
+four Rifle Infantry of 50 men, all at the capital post (Ben, 2026-11-22)**, on the class's base kit,
+for every major alike. No border post is manned at the opening: a border is guarded by what a
+nation raises for it. The opening unit `seed_starting_military` raises is one of the four, not a
+fifth. (The Standard comparison kit keeps its earlier eight: two infantry, the artillery and the
+light armour at the capital, one unit each at the border posts in descending grudge order.) Its land pool opens holding **200 recruits**, about twelve months
 of one base. The army is equal; the threat each major faces is not, and that is the intended
 asymmetry.
 
-**Taking a seat keeps the army (Ben, 2026-11-04).** A major's eight are posted as garrisons are,
-never raised at a base. So the player's major opens on the same eight as every rival, and moving the
+**Taking a seat keeps the army (Ben, 2026-11-04).** A major's opening units are posted as garrisons
+are, never raised at a base. So the player's major opens on the same force as every rival, and moving the
 seat neither takes a major's units nor arms the nation it leaves. A seat move takes a force only
 from a nation holding one raised at a base, and only then arms the nation it leaves.
 

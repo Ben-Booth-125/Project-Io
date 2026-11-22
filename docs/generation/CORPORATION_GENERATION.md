@@ -411,20 +411,35 @@ and copper slots need to pass the spare-input rule after households and neighbou
 quick tier of the seed library, 2026-11-03): two Farms leave a Food Processor no spare produce, one
 copper site leaves a copper Smelter short by up to fourteen units at `t_idle`.
 
-The kit in play (`rich_core`) carries agricultural produce ×9, water, coal, petroleum,
-iron ore ×2, copper ore ×3, silica ×5 and two flex slots (24); the Standard processors plus ordnance,
-a second food and steel line and silicon (10); `planetary_marketplace`, `research_institute` ×2,
-`schooling` and `university` (5); the same logistics and military slots: forty-four buildings and
-the source, and a Marketplace on each steel slot's market that lacks one (below), about 460 credits a tick, and the one treasury figure every major starts play on: 4,500
-credits (`NATION_GENERATION.md` § Pass 7).
+The kit in play (`rich_core`) carries agricultural produce ×12, water ×3, coal, petroleum,
+iron ore ×2, copper ore ×6, silica ×5 and two flex slots (32); the Standard processors plus a second
+copper line, a second steel line, a third food line, silicon, clean water and a small-arms Arms Works
+(13); `planetary_marketplace`, `research_institute` ×2, `schooling` and `university` (5); the same
+logistics and military slots: fifty-four buildings and the source, a Marketplace on each steel
+slot's market that lacks one (below), and the one treasury figure every major starts play on
+(`NATION_GENERATION.md` § Pass 7).
+
+**The kit follows what pays (Ben, 2026-11-22).** Ben: *"look for what is commonly profitable from
+the beginning of the game, and increase the opening kit to match it."* What a kit building earns in
+its first year of play is measured per building across the seed library (`build_payback_census`,
+its KIT rows), and the kit is weighted toward the rows that pay. Ben delegated the pick to the
+measurement. Machinery pays most where it stands, so a second copper line is laid ahead of it to
+pass the spare-input rule. Produce, food rations, steel, refined copper and clean water pay from the
+first month, so each carries another line or its feed. A row that loses money at the opening is
+not kept for its own sake.
+
+**The kit carries one military works (Ben, 2026-11-22).** Ben: *"drop many of the military
+buildings we start with."* The capital's `military_base` stays, as the door units are hired at, and
+so does the small-arms Arms Works the opening Rifle Infantry refit from. The Ordnance works and the
+armoured-vehicle and artillery Arms Works left the kit: none of them ran in its first year. The same
+holds for every major, the player's included, so the opening stays equal.
 
 **Why these processors.** Each one runs on day one, which the hard rules of § Pass 3 require. The
 steel, copper and machinery slots are one chain: iron ore and coal make steel, copper ore makes
 refined copper, and the two make machinery. Ordnance, which every unit draws, is machinery and steel,
-so a major can make it as its first build. **Arms Works are in the kit (Ben, 2026-11-08):** one each for small arms, armoured vehicles and
-artillery pieces, since every class is raised and refilled with its equipment. A works whose inputs are out of reach still opens, idle until they arrive
-(`../military/MILITARY.md` § What a force costs). **Every nation, major or minor, opens with a reserve
-of those three goods on its shelves**, so a nation can raise its first force before its works or its
+so a major can make it as its first build. A works whose inputs are out of reach still opens, idle
+until they arrive (`../military/MILITARY.md` § What a force costs). **Every nation, major or minor, opens with a reserve
+of small arms, armoured vehicles and artillery pieces on its shelves**, so a nation can raise its first force before its works or its
 imports arrive.
 
 **Every kit placement passes § Pass 3's rules, with want read at the major's own markets (Ben,

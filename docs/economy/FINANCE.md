@@ -217,6 +217,13 @@ per-building profitability estimate (`building_profit.hpp`, BL-074 building
 profitability) both call it, so they cannot drift. The wage/maintenance split is
 BL-049 (wage/maintenance split).
 
+**Maintenance carries one authored scale (Ben, 2026-11-22).** Every building type's maintenance
+constant is multiplied at load by `economy.operating_cost.maintenance_mult` (`scripts/economy.lua`).
+It is one of the two levers that set how long an opening major saves for a building, about twelve
+months of net; the construction price curve is the other (PRODUCTION.md § What construction costs at
+the opening). It lowers every building's profit, rivals' included, so it is held at twice the
+authored constants: higher, and thin sites tip into the red and idle, taking their buyers with them.
+
 - **Material maintenance** — the **idle floor**, `economy.thresholds.idle_maintenance_floor`
   (`scripts/economy.lua`, reached in code as `recipe_registry::idle_maintenance_floor`): the
   fraction of the building's maintenance constant charged even at workforce 0 or decommissioned.

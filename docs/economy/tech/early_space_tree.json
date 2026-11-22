@@ -165,12 +165,21 @@
      "ES-PR-IP-A2"
     ]
    ],
-   "advantage": "a base may be founded on another body",
+   "advantage": "a base may be founded on another body; province building ceiling +50%",
    "effects": [
     {
      "kind": "mechanic",
      "key": "base_founding",
      "what": "a base may be founded on another body"
+    },
+    {
+     "kind": "modifier",
+     "subject": "province_ceiling",
+     "scope": [
+      "all"
+     ],
+     "op": "multiply",
+     "value": 1.5
     }
    ],
    "cost_units": 12
@@ -817,12 +826,21 @@
      "ES-NE-IC-C"
     ]
    ],
-   "advantage": "-3% launch propellant",
+   "advantage": "-3% launch propellant; infrastructure buildings raise the province building ceiling +100%",
    "effects": [
     {
      "kind": "unread",
      "what": "-3% launch propellant",
      "waits_on": "launch draw by nation"
+    },
+    {
+     "kind": "modifier",
+     "subject": "province_ceiling_infrastructure",
+     "scope": [
+      "all"
+     ],
+     "op": "multiply",
+     "value": 2
     }
    ],
    "cost_units": 4,

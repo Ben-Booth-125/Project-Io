@@ -2230,6 +2230,14 @@ economy = {
     --   market supplies part            -> stretched, proportionally slower
     --   supplies less than 1/max_stretch -> paused until supply recovers
     -- so a starved build takes up to max_stretch × its base duration, then stalls.
+    -- BL-1734 (Ben, 2026-11-22; FINANCE.md § Building operating cost): building profit is
+    -- lowered across the board; with the construction curve below, a new building takes
+    -- about twelve months of a major's net to afford from the opening. One scale on every
+    -- type's `maintenance` below.
+    operating_cost = {
+        maintenance_mult = 2.0, -- the hybrid's profit half (Ben, 2026-11-22); x3 put 20 of 64 majors in the red
+    },
+
     construction = {
         max_stretch = 10.0, -- longest a starved build stretches to (×base duration); below 1/max_stretch it pauses.
 
@@ -2238,8 +2246,10 @@ economy = {
         -- net before research. What a LIVE build pays against the authored bills below;
         -- the extra lives mostly in materials, so a planned steel chain is the edge.
         -- Foundings stay on the authored bills: the curve never prices what ground opens with.
-        credit_cost_mult   = 2.0,
-        material_cost_mult = 4.75,
+        -- BL-1734 (Ben, 2026-11-22): the hybrid's price half, x2.65 on both, so with
+        -- maintenance x2 a mine costs about twelve months of opening net (was 2.0 / 4.75).
+        credit_cost_mult   = 5.3,
+        material_cost_mult = 12.6,
 
         -- BL-323 S2 — LOGISTICAL MAX BUILDING RANGE.
         -- The furthest a new building may sit from its nearest supply anchor (a

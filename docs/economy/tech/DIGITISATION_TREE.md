@@ -263,7 +263,7 @@ shape; `nation_tech_harness` holds the store to what the code reads.
 | `DG-PR-EX-T3` | Field Practice II | travel | 2 | +2% extraction rate at every extraction building | Offshore Drilling |
 | `DG-PR-EX-T5` | Field Practice III | travel | 2 | +2% extraction rate at every extraction building | Offshore Drilling |
 | `DG-PR-EX-B2` | Rock Bolting | minor | 3 | Mine maintenance -10% | Field Practice II |
-| `DG-PR-EX-B` | Deep-Shaft Mining | major | 4 | province building ceiling +1 for extraction buildings; Mines +10% extraction rate | Rock Bolting |
+| `DG-PR-EX-B` | Deep-Shaft Mining | major | 4 | province building ceiling +50%; Mines +10% extraction rate | Rock Bolting |
 | `DG-PR-EX-C2` | Desalination | minor | 3 | coastal Water extraction sites; Water extraction +10%; station Life support modules may be fitted | Field Practice III |
 | `DG-PR-EX-C` | Green Revolution | major | 4 | Farms +25% output; Chemical Plants unlock the fertiliser recipe | Desalination |
 | `DG-PR-EX-M` | Resource Base | mastery | 4 | +3% extraction rate at every extraction building | Deep-Shaft Mining + Green Revolution |
@@ -356,7 +356,7 @@ shape; `nation_tech_harness` holds the store to what the code reads.
 | `DG-NE-FR-T3` | Route Planning II | travel | 2 | -2% logistics cost | Container Shipping |
 | `DG-NE-FR-T5` | Route Planning III | travel | 2 | -2% logistics cost | Container Shipping |
 | `DG-NE-FR-B1` | Asphalt Paving | minor | 3 | road maintenance -10% | Route Planning II |
-| `DG-NE-FR-B` | Motorway Grid | major | 4 | road-tier upgrades cost -30%; road travel time -15% | Asphalt Paving |
+| `DG-NE-FR-B` | Motorway Grid | major | 4 | road-tier upgrades cost -30%; road travel time -15%; infrastructure buildings raise the province building ceiling +50% | Asphalt Paving |
 | `DG-NE-FR-C2` | Satellite Navigation | minor | 3 | travel time -5% everywhere; Navigation satellites may be launched | Route Planning III |
 | `DG-NE-FR-C` | Jet Freight | major | 4 | perishables and electronics travel time -40% | Satellite Navigation |
 | `DG-NE-FR-M` | Logistics Backbone | mastery | 4 | -3% logistics cost | Motorway Grid + Jet Freight |

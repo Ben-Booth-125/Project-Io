@@ -144,6 +144,8 @@ exactly one place — **a subject earns its row by naming its consumer** (Ben, 2
 | `alarm_toward` | the Alarm OTHER nations gain toward the holder (`politics/RELATIONS.md` § 6) | the sentiment fold's stamp (`fold_pending_sentiment`, sentiment_emitters.cpp): op `multiply`, scope `all`, folded over the held nodes into one per-subject scale that multiplies only an Alarm delta that RAISES Alarm — relief, Access and Trust are never scaled. "-1% Alarm toward you" is ×0.99 |
 | `alarm_tell` | the public tell of a held technology, in Alarm points | `emit_alarm_capability` (sentiment_emitters.cpp): op `add` from a base of 0, scope `all`, summed per nation and emitted each tick as `technology_visible` from every other nation — the level each settles at. "every rival's Alarm toward you +10" is +10 |
 | `alarm_decay` | how fast Alarm held TOWARD the holder decays | `alarm_decay_scales` → `decay_sentiment`'s per-subject Alarm rate at the head of `run_economy_step`: op `multiply`, scope `all`. "decays 10% faster" is ×1.10, so a level emitted every tick settles at 1/1.10 of what it would |
+| `province_ceiling` | the land room of every province the holder owns (`economy/PRODUCTION.md` § The province building ceiling) | `measure_province_sustain` (province.cpp): op `multiply`, scope `all`, read off the province owner's held nodes |
+| `province_ceiling_infrastructure` | the room each port, Truck Depot or railway station adds to its province | `measure_province_sustain`, beside `province_ceiling`: op `multiply`, scope `all` |
 
 Vocabulary-only is a **promise**, not a state: a subject that cannot name the item that reads it has
 not earned its row, and should be removed rather than left waiting. That is what keeps *a shape is

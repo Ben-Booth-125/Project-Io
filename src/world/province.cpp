@@ -3,6 +3,7 @@
 #include "hex_neighbors.hpp"
 #include "logistics.hpp" // body_tile_grid — the raster index every body-grid pass walks
 #include "placement_rules.hpp" // the anchor site score's gate and deposit list (BL-1382)
+#include "nation_tech.hpp"     // BL-1733: the owner's province_ceiling research
 #include "world.hpp"           // province_display_name reads the centre and name stores (BL-1708)
 #include <string>
 
@@ -1847,10 +1848,48 @@ province_sustain measure_province_sustain(const world& w, const province& pr)
     // provinces, and they never reach here — the guard at the top returns a zero
     // sustain for them, because the claim this floor rests on is one only a land
     // province makes.
-    const int scaled =
-        static_cast<int>(s.units * k_province_buildings_per_sustain_unit + 0.5f);
-    s.ceiling = scaled < 1 ? 1 : scaled;
+    //
+    // BL-1733 (Ben, 2026-11-22): RESEARCH AND INFRASTRUCTURE RAISE IT. The province's
+    // owner - the plurality of its claimed tiles, ties to the lower nation id, the
+    // rule `province_owner` (war.cpp) states - lends its held `province_ceiling`
+    // nodes to the land term, and each complete infrastructure building standing
+    // here adds `k_province_infrastructure_grant`, scaled by the owner's
+    // `province_ceiling_infrastructure` nodes. An unowned province reads no research.
+    std::map<entity_id, int> claim; // ordered: the strict '>' scan keeps the lower id
+    for (const entity_id tile_id : pr.tiles)
+        if (const auto it = w.tile_to_nation.find(tile_id); it != w.tile_to_nation.end())
+            ++claim[it->second];
+    entity_id owner = null_entity;
+    int       owner_n = 0;
+    for (const auto& [n, c] : claim)
+        if (c > owner_n) { owner = n; owner_n = c; }
+    float infra_mult = 1.0f;
+    if (owner != null_entity)
+    {
+        s.research_multiplier = nation_scalar(w, owner, modifier_subject::province_ceiling, effect_target{}, 1.0f);
+        infra_mult = nation_scalar(w, owner, modifier_subject::province_ceiling_infrastructure, effect_target{}, 1.0f);
+    }
+    // Counted by key, so the unordered walk cannot reach the result. Inside a
+    // province_ceiling_scope this is one walk per province per scope (the ceiling
+    // itself is memoised by province id).
+    for (const auto& [bid, bc] : w.buildings)
+        if (raises_province_ceiling(bc.type) && bc.ticks_remaining <= 0 && !bc.decommissioned
+            && w.provinces.province_of(bc.tile) == pr.id)
+            ++s.infrastructure_buildings;
+    s.infrastructure_grant = static_cast<int>(
+        static_cast<float>(s.infrastructure_buildings * k_province_infrastructure_grant) * infra_mult + 0.5f);
+
+    const int scaled = static_cast<int>(
+        s.units * k_province_buildings_per_sustain_unit * s.research_multiplier + 0.5f);
+    s.land_ceiling = scaled < 1 ? 1 : scaled;
+    s.ceiling      = s.land_ceiling + s.infrastructure_grant;
     return s;
+}
+
+bool raises_province_ceiling(building_type t)
+{
+    return t == building_type::port || t == building_type::inland_logistics_hub
+        || t == building_type::railway_station;
 }
 
 int province_building_ceiling(const world& w, uint32_t province_id)

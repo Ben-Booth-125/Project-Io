@@ -649,6 +649,17 @@ void recipe_registry::load_from_lua(lua_state& lua)
         m_construction = cp;
     }
 
+    // BL-1734 (Ben, 2026-11-22; FINANCE.md § Building operating cost): one authored
+    // scale on every building type's maintenance constant, so building profit is
+    // lower across the board and a new building takes about a year of net to afford.
+    float maintenance_mult = 1.0f;
+    if (sol::optional<sol::table> op = (*econ)["operating_cost"])
+    {
+        maintenance_mult = op->get_or("maintenance_mult", 1.0f);
+        if (!(maintenance_mult > 0.0f) || !std::isfinite(maintenance_mult))
+            throw std::runtime_error("economy.operating_cost.maintenance_mult must be > 0");
+    }
+
     sol::optional<sol::table> buildings = (*econ)["buildings"];
     if (buildings)
     {
@@ -678,7 +689,7 @@ void recipe_registry::load_from_lua(lua_state& lua)
                 continue;
             building_economics e;
             e.base_rate   = b->get_or("base_rate",   0.0f);
-            e.maintenance = b->get_or("maintenance", 0.0f);
+            e.maintenance = b->get_or("maintenance", 0.0f) * maintenance_mult; // BL-1734
             e.base_wage   = b->get_or("base_wage",   0.0f);
             e.build_cost  = b->get_or("build_cost",  0.0f);
             // Construction is measured in DAYS (Ben, 2026-10-24; PRODUCTION.md
