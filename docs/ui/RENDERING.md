@@ -804,7 +804,7 @@ zoom; the two closest rungs add a draw-time detail texture (Ben, 2026-11-15, bel
     point, so the detail's edge follows the painted shore softly. The family is still per tile:
     the hex's own, and where the painted land runs past the hex side into a water tile, the
     nearest land tile beside it. A land tile does not fade toward a water neighbour at the hex
-    side; the mark is the coast. The land lift keeps its per-tile weight (below).
+    side; the mark is the coast. The draw-time land lift reads the same mark (below).
   - **Each tile reads on its own (Ben, 2026-11-16: the style "doesn't differentiate between
     different tiles very well" - both the families looking alike and neighbours running on as
     wallpaper).** Every tile reads the textures **at its own offset**, a hash of its grid cell,
@@ -983,15 +983,14 @@ Judged against `docs/ui/design/renders/map/`. What it asks of the bake, procedur
   the design's name for the pass.
 - **The lift at draw time (BL-1659, live grade shader; NR-1232 option D, Ben 2026-11-15).**
   The canvas's ground bakes **without** the lift and the 3D pass (§ The 3D ground) applies the
-  same curve as it draws, so a change of level is instant and re-bakes nothing. The land weight
-  there is **per tile**, not per pixel: a table of one texel per tile (land = seen and not
-  ocean, coast or lake, the bake's own class), looked up at each point of the ground. So the
-  lifted shore is the
-  **hex side**, softened over a short band, not the painted coast, and a river's water on a land
-  tile lifts with its tile. The opaque chunks stay RGB (§ Resident set): no per-pixel weight is
-  stored. The Selection band's neighbourhood page, which no shader draws, still bakes the lift.
-  If the hex-side shore shows at play zooms, the fallback is a half-resolution land mask
-  per chunk (NR-1232 option B).
+  same curve as it draws, so a change of level is instant and re-bakes nothing. **The land
+  weight there is the bake's land mark (Ben, 2026-11-22, overturning the per-tile weight of
+  2026-11-15):** red's lowest bit, set where the bake painted land (§ Level of detail, "The
+  detail ends at the painted coast"), filtered over the four texels round the point. So the
+  lifted shore is the **painted coast**, as in the baked lift, and a river's water keeps its
+  colour. The mark costs no memory: the opaque chunks stay RGB (§ Resident set), and the
+  half-resolution land mask per chunk (NR-1232 option B) is not needed. The Selection band's
+  neighbourhood page, which no shader draws, still bakes the lift.
 - **Palette and value.** Base hues take **it1's colour** — warm olive and khaki, rich green
   forest, white peaks, blue-green sea — not C-F's grey (the grade's desaturation eases to
   match); from it3 the value structure stays:

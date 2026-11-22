@@ -249,8 +249,6 @@ PSOut main(PSIn i)
             float t = 0.0; // the neighbour's share
             if (u_ink.z > 0.0)
                 t = 0.5 - 0.5 * smoothstep(0.0, u_ink.z, d);
-            const float land = lerp(own.x, nb.x, t);
-            land_w = land;
             // Detail stays off a pixel the bake marked (a road or an installation).
             uint cw_, ch_;
             u_bake.GetDimensions(cw_, ch_);
@@ -263,6 +261,10 @@ PSOut main(PSIn i)
             // tile, from the nearest land tile beside it; and a land tile does not fade
             // toward a water neighbour at the hex side, since the coast is the mask's.
             const float painted = painted_land(i.uv);
+            // The land lift's weight is the same mark (Ben, 2026-11-22, BL-1738 (land lift
+            // follows coast)): the lifted shore is the painted one, and a river's water
+            // keeps its colour, as the baked lift's land weight has it.
+            land_w = painted;
             int2 d_cell = cell, d_nb_cell = nb_cell;
             float4 d_own = own, d_nb = nb;
             float dt = t;
