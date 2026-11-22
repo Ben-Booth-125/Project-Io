@@ -2805,7 +2805,7 @@
    "design": "PLAYTEST 2 LANE G (canvas). Ben: \"The fine grain textures are drawn to fit the hexagon, so when land meets coast we can sometimes see fine grain textures drawn over the ocean, or land with no texture where the hexagon spills onto the ocean.\" A defect: the detail texture is masked by the tile hexagon while the drawn coast is not the hexagon edge. WORK: mask the fine-grain layer by the drawn land/water boundary (the same field the coast is drawn from), not the cell. Capture a coast at close zoom before and after."
   },
   {
-   "glyph": "2713",
+   "glyph": "✓",
    "sprint": null,
    "version_goal": null,
    "written": "2026-11-22",
@@ -2845,7 +2845,7 @@
    "design": "PLAYTEST 2 LANE H (selection & shell). Ben: \"The selection element should expand so it covers the edges of the canvas, and the edge of the mini map.\" WORK: the selection element's rect spans to the canvas edge and lines up with the minimap's outer edge, with no gap. Report the current rect and gaps in px first (Rule 0b); live-click after."
   },
   {
-   "glyph": "2713",
+   "glyph": "✓",
    "sprint": null,
    "version_goal": null,
    "written": "2026-11-22",
@@ -2865,7 +2865,7 @@
    "design": "PLAYTEST 2 LANE H (selection & shell). Ben: \"The construct button in the site finder should just be a symbol rather than the full text.\" WORK: a construct glyph from src/ui/icons.* (add one to ICONS.md if none fits), keeping the cost tooltip from BL-1701 (site finder cost tooltip). Update the ACTIONS.json entry if its label changes."
   },
   {
-   "glyph": "2713",
+   "glyph": "✓",
    "sprint": null,
    "version_goal": null,
    "written": "2026-11-22",
@@ -2885,7 +2885,7 @@
    "design": "PLAYTEST 2 LANE H (selection & shell). Ben: \"We should show tile population at the top of the tile selection element, next to logistics and building capacity.\" WORK: a population figure (glyph + number) in the tile card's header strip, next to the logistics and capacity figures."
   },
   {
-   "glyph": "2713",
+   "glyph": "✓",
    "sprint": null,
    "version_goal": null,
    "written": "2026-11-22",
@@ -2925,7 +2925,7 @@
    "design": "PLAYTEST 2 LANE H (selection & shell). Ben: \"We need to increase visibility on where the labour pool is coming from and where it's allocated in the selection element. Let me know what ideas you have. Perhaps this can go above the resource table for provinces.\" DESIGN OWED: Claude proposes; Ben picks. POPULATION.md owns labour supply and contention; SELECTION.md owns the card. Answer the surface's question in question_log.json first."
   },
   {
-   "glyph": "2713",
+   "glyph": "✓",
    "sprint": null,
    "version_goal": null,
    "written": "2026-11-22",
@@ -2965,7 +2965,7 @@
    "design": "PLAYTEST 2 LANE I (lenses & network). Ben: \"We should hide convoy movement unless the trade flow lens is turned on. We should also wire the convoys tab to the trade flow lens.\" DESIGN OWED: does opening the Convoys tab switch the lens on (and closing it off), or only offer it; space convoys too? Toggle rule applies."
   },
   {
-   "glyph": "2713",
+   "glyph": "✓",
    "sprint": null,
    "version_goal": null,
    "written": "2026-11-22",
@@ -3005,7 +3005,7 @@
    "design": "PLAYTEST 2 LANE I (lenses & network). Ben: \"I'm seeing examples of railways with no rail station at the end. Can you investigate?\" INVESTIGATION FIRST: count dead-end rail with no station across the seed library, find who lays it (generation, the AI, a removed station leaving its line) and what LOGISTICS.md says a line needs at its ends. Report before fixing; the fix may be a placement rule or a prune."
   },
   {
-   "glyph": "2713",
+   "glyph": "✓",
    "sprint": null,
    "version_goal": null,
    "written": "2026-11-22",
