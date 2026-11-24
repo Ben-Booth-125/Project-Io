@@ -1,0 +1,267 @@
+<title>Io Cue Bench</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: a console strip on top, then one panel per event family, one row per cue. */
+:root {
+  --bg: #eef1f3; --panel: #ffffff; --line: #d3dadf; --fg: #17222b; --muted: #5a6872;
+  --accent: #0d7a8a; --accent-soft: #d8eef1; --trace: #0d7a8a;
+  --keep: #2f7d4a; --tweak: #a86a00; --redo: #b0342c;
+  --sans: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0f151a; --panel: #161f26; --line: #27333c; --fg: #dde6eb; --muted: #8d9ca6;
+  --accent: #5cc6d4; --accent-soft: #163840; --trace: #5cc6d4;
+  --keep: #6fca8c; --tweak: #e8ad4a; --redo: #ef7a70; color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #0f151a; --panel: #161f26; --line: #27333c; --fg: #dde6eb; --muted: #8d9ca6;
+  --accent: #5cc6d4; --accent-soft: #163840; --trace: #5cc6d4;
+  --keep: #6fca8c; --tweak: #e8ad4a; --redo: #ef7a70; color-scheme: dark; }
+body { background: var(--bg); color: var(--fg); font: 15px/1.5 var(--sans);
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 24px 48px; }
+.wrap { max-width: 980px; margin: 0 auto; display: grid; gap: 20px; }
+h1 { font-size: 22px; font-weight: 600; margin: 0; text-wrap: balance; }
+.lede { color: var(--muted); margin: 4px 0 0; max-width: 65ch; }
+.console { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center; background: var(--panel);
+  border: 1px solid var(--line); border-radius: 8px; padding: 12px 16px; font-family: var(--mono); font-size: 13px; }
+.console label { display: flex; align-items: center; gap: 8px; color: var(--muted); }
+.console input[type=range] { width: 140px; accent-color: var(--accent); }
+.status { margin-left: auto; color: var(--muted); }
+.status b { color: var(--fg); font-weight: 500; }
+button { font: inherit; color: inherit; cursor: pointer; }
+button:focus-visible, textarea:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.btn { border: 1px solid var(--line); background: var(--panel); border-radius: 6px; padding: 5px 12px; font-family: var(--mono); font-size: 13px; }
+.btn[aria-pressed=true] { background: var(--accent-soft); border-color: var(--accent); }
+section.family { display: grid; gap: 0; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.fam-head { display: flex; align-items: baseline; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--line); }
+.fam-head h2 { font-size: 13px; letter-spacing: .08em; text-transform: uppercase; font-weight: 600; margin: 0; }
+.fam-head .count { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.fam-head .btn { margin-left: auto; }
+.cue { display: grid; grid-template-columns: 44px minmax(0, 1fr) 150px; gap: 6px 14px; padding: 14px 16px; border-bottom: 1px solid var(--line); align-items: start; }
+.cue:last-child { border-bottom: 0; }
+.play { width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--accent); background: var(--accent-soft); color: var(--accent); display: grid; place-items: center; }
+.play svg { width: 14px; height: 14px; }
+.cue.playing .play { background: var(--accent); color: var(--panel); }
+.meta { min-width: 0; }
+.name { font-family: var(--mono); font-size: 14px; font-weight: 500; }
+.len { font-family: var(--mono); font-size: 12px; color: var(--muted); margin-left: 8px; font-variant-numeric: tabular-nums; }
+.when { color: var(--muted); margin: 2px 0 8px; font-size: 14px; }
+canvas.wave { width: 150px; height: 40px; display: block; }
+.review { grid-column: 2 / 4; display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-start; }
+.verdict { display: flex; gap: 6px; }
+.verdict button { border: 1px solid var(--line); background: transparent; border-radius: 999px; padding: 3px 12px; font-size: 13px; }
+.verdict button[data-v=keep][aria-pressed=true] { border-color: var(--keep); color: var(--keep); }
+.verdict button[data-v=tweak][aria-pressed=true] { border-color: var(--tweak); color: var(--tweak); }
+.verdict button[data-v=redo][aria-pressed=true] { border-color: var(--redo); color: var(--redo); }
+textarea { flex: 1 1 260px; min-width: 0; min-height: 34px; resize: vertical; font: 14px/1.4 var(--sans); color: var(--fg);
+  background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; }
+.saved { font-family: var(--mono); font-size: 12px; color: var(--muted); align-self: center; min-width: 52px; }
+@media (max-width: 560px) {
+  .cue { grid-template-columns: 44px minmax(0, 1fr); }
+  canvas.wave { grid-column: 2; }
+  .review { grid-column: 1 / 3; }
+  .status { margin-left: 0; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Io cue bench</h1>
+    <p class="lede">Every sound the game will make, synthesised here from the same table the game reads (<code>scripts/sounds.lua</code>). Play each, mark it keep, tweak or redo, and leave a note: what it should feel like, or what's wrong.</p>
+  </header>
+
+  <div class="console" role="group" aria-label="Playback">
+    <label for="vol">Volume <input id="vol" type="range" min="0" max="1" step="0.01" value="0.7"></label>
+    <button class="btn" id="bed" aria-pressed="false" type="button">Play the bed</button>
+    <button class="btn" id="all" type="button">Play every cue</button>
+    <button class="btn" id="copy" type="button">Copy all notes</button>
+    <span class="status" id="status">Notes: <b>connecting…</b></span>
+  </div>
+
+  <main id="list" class="wrap" style="gap:16px"></main>
+</div>
+
+<script>
+const DATA = /*CUE_DATA*/null;
+const SR = 48000;
+
+/* The synthesis: mirrors src/audio/synth.cpp. A note is an attack/hold/release envelope over
+   one oscillator with an exponential glide and an optional one-pole low-pass. */
+function renderCue(cue) {
+  const len = Math.max(...cue.notes.map(n => (n.at || 0) + n.a + (n.h || 0) + n.r));
+  const out = new Float32Array(Math.ceil(len * SR) + 1);
+  cue.notes.forEach((n, idx) => {
+    const start = Math.round((n.at || 0) * SR), h = n.h || 0, dur = n.a + h + n.r;
+    const count = Math.round(dur * SR), f0 = n.f || 0, f1 = n.f1 || f0;
+    const sweep = n.lp && n.lp1 && n.lp1 !== n.lp, lpRatio = sweep ? n.lp1 / n.lp : 1;
+    let alpha = n.lp ? 1 - Math.exp(-2 * Math.PI * n.lp / SR) : 1;
+    let phase = 0, y = 0, seed = (0x9E3779B9 ^ (idx + 1) * 2654435761) >>> 0;
+    for (let k = 0; k < count && start + k < out.length; k++) {
+      const t = k / SR;
+      const env = t < n.a ? t / n.a : t < n.a + h ? 1 : Math.exp(-6.9078 * (t - n.a - h) / n.r);
+      let v;
+      if (n.wave === 'noise') { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; v = seed / 2147483648 - 1; }
+      else {
+        const freq = f0 * Math.pow(f1 / f0, t / dur);
+        phase += 2 * Math.PI * freq / SR; if (phase > 2 * Math.PI) phase -= 2 * Math.PI;
+        const s = Math.sin(phase);
+        v = n.wave === 'sine' ? s : n.wave === 'tri' ? (2 / Math.PI) * Math.asin(s) : (s >= 0 ? 1 : -1);
+      }
+      if (sweep) alpha = 1 - Math.exp(-2 * Math.PI * n.lp * Math.pow(lpRatio, t / dur) / SR);
+      y += alpha * (v - y);
+      out[start + k] += env * n.g * y * cue.gain;
+    }
+  });
+  return out;
+}
+function renderBed(bed, seconds) {
+  const out = new Float32Array(seconds * SR); let y = 0, seed = 12345;
+  const alpha = 1 - Math.exp(-2 * Math.PI * bed.noise.lp / SR);
+  for (let k = 0; k < out.length; k++) {
+    const t = k / SR; let s = 0;
+    bed.partials.forEach((p, i) => {
+      const lvl = 1 - p.depth * 0.5 * (1 + Math.sin(2 * Math.PI * p.lfo * t + i * 1.7));
+      s += p.g * lvl * Math.sin(2 * Math.PI * p.f * t);
+    });
+    seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+    y += alpha * ((seed / 2147483648 - 1) - y);
+    out[k] = (s + bed.noise.g * y) * bed.gain;
+  }
+  const fade = SR; for (let k = 0; k < fade; k++) { const w = k / fade; out[k] *= w; out[out.length - 1 - k] *= w; }
+  return out;
+}
+
+let ctx = null, master = null;
+function audio() {
+  if (!ctx) { ctx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: SR }); master = ctx.createGain(); master.connect(ctx.destination); setVol(); }
+  if (ctx.state === 'suspended') ctx.resume();
+  return ctx;
+}
+const vol = document.getElementById('vol');
+function setVol() { if (master) master.gain.value = Number(vol.value); }
+vol.addEventListener('input', setVol);
+const buffers = new Map();
+function bufferFor(cue) {
+  if (!buffers.has(cue.name)) { const d = renderCue(cue); const b = audio().createBuffer(1, d.length, SR); b.copyToChannel(d, 0); buffers.set(cue.name, b); }
+  return buffers.get(cue.name);
+}
+function play(cue, when = 0) {
+  const c = audio(); const src = c.createBufferSource(); src.buffer = bufferFor(cue); src.connect(master);
+  const row = document.getElementById('cue-' + cue.name);
+  src.start(c.currentTime + when);
+  setTimeout(() => row.classList.add('playing'), when * 1000);
+  src.onended = () => row.classList.remove('playing');
+  return src.buffer.duration;
+}
+let bedSrc = null;
+document.getElementById('bed').addEventListener('click', (e) => {
+  const c = audio();
+  if (bedSrc) { bedSrc.stop(); bedSrc = null; e.currentTarget.setAttribute('aria-pressed', 'false'); e.currentTarget.textContent = 'Play the bed'; return; }
+  const d = renderBed(DATA.bed, 30); const b = c.createBuffer(1, d.length, SR); b.copyToChannel(d, 0);
+  bedSrc = c.createBufferSource(); bedSrc.buffer = b; bedSrc.loop = true; bedSrc.connect(master); bedSrc.start();
+  e.currentTarget.setAttribute('aria-pressed', 'true'); e.currentTarget.textContent = 'Stop the bed';
+});
+function playSeq(cues) { let t = 0; cues.forEach(c => { t += play(c, t) + 0.35; }); }
+document.getElementById('all').addEventListener('click', () => playSeq(DATA.cues));
+
+function drawWave(canvas, cue) {
+  const d = renderCue(cue), dpr = window.devicePixelRatio || 1, w = 150, h = 40;
+  canvas.width = w * dpr; canvas.height = h * dpr;
+  const g = canvas.getContext('2d'); g.scale(dpr, dpr);
+  const css = getComputedStyle(document.documentElement);
+  g.strokeStyle = css.getPropertyValue('--line'); g.beginPath(); g.moveTo(0, h / 2); g.lineTo(w, h / 2); g.stroke();
+  g.fillStyle = css.getPropertyValue('--trace');
+  const per = d.length / w; let peak = 0; for (const v of d) peak = Math.max(peak, Math.abs(v));
+  const scale = (h / 2 - 2) / Math.max(peak, 0.05);
+  for (let x = 0; x < w; x++) { let m = 0; for (let k = Math.floor(x * per); k < Math.floor((x + 1) * per); k++) m = Math.max(m, Math.abs(d[k] || 0)); const bh = Math.max(1, m * scale); g.fillRect(x, h / 2 - bh, 1, bh * 2); }
+}
+
+const playIcon = '<svg viewBox="0 0 14 14" aria-hidden="true"><path d="M3 1.5v11l9-5.5z" fill="currentColor"/></svg>';
+const families = [...new Set(DATA.cues.map(c => c.family))];
+const list = document.getElementById('list');
+const rows = new Map();
+for (const fam of families) {
+  const cues = DATA.cues.filter(c => c.family === fam);
+  const sec = document.createElement('section'); sec.className = 'family';
+  sec.innerHTML = `<div class="fam-head"><h2></h2><span class="count">${cues.length} cue${cues.length > 1 ? 's' : ''}</span><button class="btn" type="button">Play family</button></div>`;
+  sec.querySelector('h2').textContent = fam;
+  sec.querySelector('.btn').addEventListener('click', () => playSeq(cues));
+  for (const cue of cues) {
+    const len = Math.max(...cue.notes.map(n => (n.at || 0) + n.a + (n.h || 0) + n.r));
+    const row = document.createElement('div'); row.className = 'cue'; row.id = 'cue-' + cue.name;
+    row.innerHTML = `<button class="play" type="button" aria-label="Play ${cue.name}">${playIcon}</button>
+      <div class="meta"><span class="name"></span><span class="len">${len.toFixed(2)} s · ${cue.group}</span><p class="when"></p></div>
+      <canvas class="wave" aria-hidden="true"></canvas>
+      <div class="review"><div class="verdict" role="group" aria-label="Verdict">
+        <button type="button" data-v="keep" aria-pressed="false">Keep</button><button type="button" data-v="tweak" aria-pressed="false">Tweak</button><button type="button" data-v="redo" aria-pressed="false">Redo</button></div>
+        <textarea id="note-${cue.name}" rows="1" placeholder="Note on ${cue.name}"></textarea><span class="saved" aria-live="polite"></span></div>`;
+    row.querySelector('.name').textContent = cue.name;
+    row.querySelector('.when').textContent = cue.when;
+    row.querySelector('.play').addEventListener('click', () => play(cue));
+    drawWave(row.querySelector('canvas'), cue);
+    sec.appendChild(row); rows.set(cue.name, row);
+  }
+  list.appendChild(sec);
+}
+
+/* Notes live in the artifact's db (collection "reviews", one doc per cue) so Claude can read them. */
+const status = document.getElementById('status');
+const setStatus = (s) => { status.innerHTML = 'Notes: <b></b>'; status.querySelector('b').textContent = s; };
+let db = null; const timers = new Map();
+async function save(name) {
+  if (!db) return;
+  const row = rows.get(name), mark = row.querySelector('.saved');
+  const pressed = row.querySelector('.verdict [aria-pressed=true]');
+  mark.textContent = 'saving';
+  try {
+    await db.collection('reviews').doc(name).set({ cue: name, verdict: pressed ? pressed.dataset.v : '', note: row.querySelector('textarea').value, updated: new Date().toISOString() });
+    mark.textContent = 'saved';
+  } catch (e) { mark.textContent = 'not saved'; }
+}
+for (const [name, row] of rows) {
+  row.querySelectorAll('.verdict button').forEach(b => b.addEventListener('click', () => {
+    const on = b.getAttribute('aria-pressed') !== 'true';
+    row.querySelectorAll('.verdict button').forEach(x => x.setAttribute('aria-pressed', 'false'));
+    b.setAttribute('aria-pressed', String(on)); save(name);
+  }));
+  const ta = row.querySelector('textarea');
+  ta.addEventListener('input', () => { clearTimeout(timers.get(name)); timers.set(name, setTimeout(() => save(name), 900)); });
+  ta.addEventListener('blur', () => { clearTimeout(timers.get(name)); save(name); });
+}
+/* Works whether or not the db connects: gather every verdict and note to paste into the chat. */
+const copyBtn = document.getElementById('copy');
+copyBtn.addEventListener('click', () => {
+  const lines = [];
+  for (const [name, row] of rows) {
+    const v = row.querySelector('.verdict [aria-pressed=true]');
+    const note = row.querySelector('textarea').value.trim().replace(/\s+/g, ' ');
+    if (v || note) lines.push(`${name}: ${v ? v.dataset.v : '-'}${note ? ' — ' + note : ''}`);
+  }
+  const text = lines.length ? lines.join('\n') : '(no verdicts or notes yet)';
+  const done = (msg) => { copyBtn.textContent = msg; setTimeout(() => { copyBtn.textContent = 'Copy all notes'; }, 2000); };
+  const fallback = () => {
+    const ta = document.createElement('textarea'); ta.value = text; ta.setAttribute('readonly', '');
+    ta.style.cssText = 'width:100%;min-height:120px;margin-top:8px';
+    copyBtn.parentElement.after(ta); ta.select(); done('Select and copy below');
+  };
+  try { navigator.clipboard.writeText(text).then(() => done('Copied'), fallback); } catch (e) { fallback(); }
+});
+
+(async () => {
+  const give = setTimeout(() => setStatus('not saving in this view'), 10000);
+  for (let i = 0; i < 30 && !window.claude; i++) await new Promise(r => setTimeout(r, 100));
+  try { db = window.claude ? await window.claude.use('db') : null; } catch (e) { db = null; }
+  if (!db) { clearTimeout(give); setStatus('not saving in this view'); return; }
+  db.collection('reviews').onSnapshot((snap) => {
+    clearTimeout(give); setStatus('saved for Claude');
+    snap.docs.forEach(doc => {
+      const r = rows.get(doc.id), v = doc.data() || {}; if (!r) return;
+      r.querySelectorAll('.verdict button').forEach(x => x.setAttribute('aria-pressed', String(x.dataset.v === v.verdict)));
+      const ta = r.querySelector('textarea'); if (document.activeElement !== ta && typeof v.note === 'string') ta.value = v.note;
+    });
+  }, () => { clearTimeout(give); setStatus('not saving in this view'); });
+})();
+</script>

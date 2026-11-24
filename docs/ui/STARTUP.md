@@ -70,7 +70,7 @@ settings hub. **It offers Load (Ben, 2026-11-05)**, because Exit to Menu must no
   with the seed (Ben, 2026-10-11).**
 - **Bodies** — a disabled slider, fixed at 5; the count knob is phased to a
   later update. The nation targets are set on the setup round, not here (§ Rounds).
-- **New Game**; **Load**; **Quit**. **Quick Start is the only way into a new world, and its press
+- **New Game**; **Load**; **Options** (the Options window, `MENU.md`, so the volume is set before play); **Quit**. **Quick Start is the only way into a new world, and its press
   is labelled New Game (Ben, 2026-11-18)**: the menu carries no press into the round-by-round
   wizard, so no player walks the wizard's rounds.
 - **Load lists the saves by name (Ben, 2026-11-09)**, newest first, in place of its button, with a

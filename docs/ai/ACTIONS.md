@@ -24,7 +24,7 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 > **Generated file.** Produced by `node tools/session/render_actions.js`.
 > Edit the JSON, then re-run; hand edits here are overwritten.
 
-*304 entries — 90 gameplay · 45 canvas · 16 lens · 111 ledger · 42 chrome.*
+*309 entries — 90 gameplay · 45 canvas · 16 lens · 111 ledger · 47 chrome.*
 
 ---
 
@@ -4236,9 +4236,58 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 - App is in game.
 - Not while an ImGui widget owns the keyboard.
 
-**Expected output.** Toggles the Options window: a Display section (Resolution preset combo, Fullscreen, VSync), an Accessibility section (UI Scale), a Map section (Brightness), a live window-size readout, and Close. Every change applies live to the SDL window and persists to options.cfg immediately.
+**Expected output.** Toggles the Options window: two tabs. Display holds the Display section (Resolution preset combo, Fullscreen, VSync), the Map section (Brightness) and a live window-size readout; Audio holds Mute, Master and the Interface / Events / Background volumes (SOUND.md § 8). Close sits below both. Every change applies live and persists to options.cfg.
 
-**Reason to select.** To adjust display and UI-scale settings mid-session.
+**Reason to select.** To adjust display, map or sound settings mid-session.
+
+### `chrome.options_tab_display` — Options window, tab bar
+
+**Press.** Click the Display tab.
+
+**Valid when:**
+- The Options window is open (chrome.f10_options, chrome.escape_options or chrome.menu_options).
+
+**Expected output.** Shows the Display tab: resolution, fullscreen, VSync, brightness, the window-size readout.
+
+**Reason to select.** To reach the display and map settings.
+
+### `chrome.options_tab_audio` — Options window, tab bar
+
+**Press.** Click the Audio tab.
+
+**Valid when:**
+- The Options window is open (chrome.f10_options, chrome.escape_options or chrome.menu_options).
+
+**Expected output.** Shows the Audio tab: Mute and the four volume sliders, or a line saying no audio device is open.
+
+**Reason to select.** To reach the sound settings.
+
+### `chrome.options_mute` — Options window, Audio tab
+
+**Press.** Tick or untick Mute.
+
+**Valid when:**
+- The Options window is open (chrome.f10_options, chrome.escape_options or chrome.menu_options).
+
+**Expected output.** Silences every sound at once, or restores it; the sliders keep their values and grey out while muted. Persists to options.cfg.
+
+**Reason to select.** To silence the game without losing the chosen levels.
+
+### `chrome.options_set_volume` — Options window, Audio tab, the four sliders
+
+**Press.** Drag the Master, Interface, Events or Background slider.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `group` | `enum(master|interface|events|background)` | Which slider. |
+| `percent` | `int 0..100` | The level. |
+
+**Valid when:**
+- The Options window is open (chrome.f10_options, chrome.escape_options or chrome.menu_options).
+
+**Expected output.** Sets that level live while dragging; saves to options.cfg on release. Interface covers presses and time controls, Events the game events and alerts, Background the bed (SOUND.md § 8).
+
+**Reason to select.** To turn a kind of sound up or down.
 
 ### `chrome.f11_frame_hud` — Keyboard; works on every screen (menu, wizard, and in game)
 
@@ -4319,6 +4368,17 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 **Expected output.** Replaces the button with the list of saves by name, newest first, and a Back press; pressing a row opens that save. Opening one shows the loading screen (Loading the save) while the home world's ground bakes, then enters play. A save that cannot be read leaves the list up with the reason beneath it.
 
 **Reason to select.** To go back to a saved campaign from the entry screen, after Exit to Menu or a fresh launch.
+
+### `chrome.menu_options` — Main menu, primary button column, between Load and Quit
+
+**Press.** Click Options (click again to close it).
+
+**Valid when:**
+- App is on the main menu screen.
+
+**Expected output.** Toggles the Options window beside the menu, the press lit while it is open (toggle rule). Nothing else changes; settings persist to options.cfg as they change.
+
+**Reason to select.** To set the volume or display before starting or loading a game.
 
 ### `chrome.menu_quit` — Main menu, primary button column
 

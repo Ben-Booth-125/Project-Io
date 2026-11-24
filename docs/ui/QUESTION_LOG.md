@@ -9,7 +9,7 @@ space**, with the backlog item that demanded it. The pair is required. Enforceme
 authorship, not machinery — there is deliberately no audit check against this file
 (BL-260, Ben 2026-08-01: *"the docs are the audit"*).
 
-**98 surfaces** — 4 settled, 94 awaiting Ben's wording.
+**99 surfaces** — 4 settled, 95 awaiting Ben's wording.
 
 ---
 
@@ -369,6 +369,14 @@ THE SEAM'S ANSWER IS SHOWN, because set_trade validates what the form cannot (bo
 **Because:** Every ledger and panel needs exactly one discoverable door, and the rail is where that door is. A surface with no slot is drawn every frame and reachable by nobody; a slot with no surface teaches a system the game does not have. That is why the inert Acquisitions slot left the rail rather than standing blank once its ledger retired (Ben, 2026-10-24: "we can retire rail slot 5, and move everything up"): twelve slots, every later one moved up one.
 
 *Demanded by BL-022, BL-027, BL-028 · `src/ui/nav_pane.cpp` · id `nav_pane`*
+
+### Options window - Audio tab (Mute, Master, Interface, Events, Background)
+
+**Answers:** How loud should the game be, and which kinds of sound?
+
+**Because:** Ben, 2026-11-22: "add options into the game with an audio tab so I can turn the volume down". SOUND.md § 8 asks for a master volume, one per group and a mute; the tab sits in the window that already holds the settings, and the main menu reaches it so the level is set before the first cue plays.
+
+*Demanded by BL-1746 · `src/core/app.cpp`, `src/ui/startup_screens.cpp` · id `options_audio_tab`*
 
 ### Options window - Map section, Brightness combo (Off, +15%, +30%, +45%)
 

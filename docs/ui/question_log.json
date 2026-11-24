@@ -1593,6 +1593,17 @@
     "src/core/app.cpp"
    ],
    "status": "drafted"
+  },
+  "options_audio_tab": {
+   "surface": "Options window - Audio tab (Mute, Master, Interface, Events, Background)",
+   "answers": "How loud should the game be, and which kinds of sound?",
+   "because": "Ben, 2026-11-22: \"add options into the game with an audio tab so I can turn the volume down\". SOUND.md § 8 asks for a master volume, one per group and a mute; the tab sits in the window that already holds the settings, and the main menu reaches it so the level is set before the first cue plays.",
+   "backlog_item": "BL-1746",
+   "files": [
+    "src/core/app.cpp",
+    "src/ui/startup_screens.cpp"
+   ],
+   "status": "drafted"
   }
  }
 }

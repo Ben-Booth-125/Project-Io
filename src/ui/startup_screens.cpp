@@ -1822,6 +1822,16 @@ void app::draw_main_menu()
                     m_load_list_open = false;
             }
         }
+        // SOUND.md § 8 / MENU.md: Options from the menu, so the volume is set before play.
+        // Lit while open; a second press closes it (the toggle rule).
+        ImGui::Dummy(ui::px(0.0f, 6.0f)); // the same gap as between every menu press
+        if (m_show_options)
+            ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
+        const bool options_lit = m_show_options;
+        if (ImGui::Button("Options", btn))
+            m_show_options = !m_show_options;
+        if (options_lit)
+            ImGui::PopStyleColor();
         ImGui::Dummy(ui::px(0.0f, 6.0f));
         if (ImGui::Button("Quit", btn))
             m_quit_requested = true;

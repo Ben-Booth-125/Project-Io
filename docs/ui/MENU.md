@@ -247,14 +247,19 @@ The display-settings surface is BL-076 (display options). Separate from the nav-
 and from the session menu above.
 
 - **Options window** — toggled by **F10** (`canvas_command::options_toggle`; appears in the F1
-  cheat-sheet). A floating ImGui window with a **Display** section: resolution preset combo
+  cheat-sheet), by the session menu's **Options**, and by the main menu's **Options**, so the
+  volume can be set before a game exists. Two tabs: **Display** and **Audio**.
+- **Audio tab** — **Mute**, a **Master** volume, and one volume per group: **Interface**,
+  **Events**, **Background** (`SOUND.md` § 8). Levels apply live while a slider drags and save
+  on release. With no audio device the tab says the game is silent.
+- **Display tab** — a **Display** section: resolution preset combo
   (1280×720 / 1600×900 / 1920×1080 / 2560×1440, "Custom" when the live size matches no preset),
   **Fullscreen** (borderless-desktop) and **VSync** toggles, a live `Window: W×H` readout, and
   Close. Resolution is disabled while fullscreen is on. Picking a preset **restores a maximised
   window first**, because a maximised window takes no size and the pick would otherwise change
   nothing on screen (Ben, 2026-11-09); VSync and Fullscreen leave a maximised window alone.
 - **Persistence** — settings are stored in a flat `options.cfg` (key=value: `window_w`, `window_h`,
-  `fullscreen`, `vsync`, `ui_scale_px`) in the working directory, loaded at interactive startup only (never in the
+  `fullscreen`, `vsync`, `land_lift`, `vol_master`, `vol_ui`, `vol_event`, `vol_bed`, `mute`) in the working directory, loaded at interactive startup only (never in the
   `--verify` path, so golden captures stay at the fixed default). Preset/toggle changes save
   immediately; a free drag-resize of the window frame is remembered and flushed on clean exit.
 - **UI Scale** picks the font in steps (12, 16, 20 or 24 px; 12 is the default), and every chrome

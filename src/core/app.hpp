@@ -3,6 +3,8 @@
 #include <SDL3/SDL.h>
 #include "save_names.hpp"    // the Load list's rows
 #include "agent_seam.hpp"
+#include "audio/cue_watch.hpp" // SOUND.md: the cue watcher
+#include "audio/mixer.hpp"     // SOUND.md: the mixer
 #include "ground_layer.hpp" // BL-732: baked-ground chunk cache
 #include "play_log.hpp"     // the seated session's write-only play log
 #include "sim_loop.hpp"
@@ -550,6 +552,12 @@ private:
         bool fullscreen = false;  ///< Borderless-desktop fullscreen.
         bool vsync      = true;
         int  land_lift = ui::ground::k_land_lift_default; ///< BL-1537 the Brightness setting (the land lift): 0 = off, 1-3.
+        // SOUND.md § 8: the player's sound controls, 0..1.
+        float vol_master = 0.8f;
+        float vol_ui     = 0.8f;
+        float vol_event  = 0.8f;
+        float vol_bed    = 0.6f;
+        bool  mute       = false;
     };
 
     /// Read options.cfg into m_settings; a missing/partial file leaves defaults.
@@ -1381,6 +1389,12 @@ private:
     bool        m_show_help        = false;   ///< Toggle for the F1 key-binding cheat-sheet overlay.
     bool        m_show_options     = false;   ///< Toggle for the F10 display/options window.
     display_settings m_settings;              ///< Persisted display settings (options.cfg).
+    // SOUND.md: audio is a view. Only run() opens it; every headless path stays silent.
+    audio::mixer      m_audio;
+    audio::cue_watch  m_cue_watch;
+    bool              m_audio_was_in_game = false;
+    void push_audio_volumes();
+    void draw_options_window(const ImVec2& disp); ///< Display and Audio tabs (MENU.md)
     // --- Synthetic pointer input (BL-521), drained by pump_injected_input() ---
     bool  m_pointer_injected = false; ///< Sticky once a script injects: the harness owns the cursor from then on, and re-posts it every frame so settle frames and captures see the same position the click did.
     float m_pointer_x = 0.0f;         ///< Held synthetic cursor position (px), valid while m_pointer_injected.
