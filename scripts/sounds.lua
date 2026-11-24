@@ -25,18 +25,23 @@ return {
   cues = {
     -- UI presses ------------------------------------------------------------------------
     ui_press = { when = "Any button press in the shell or a ledger that no more specific cue claims.",
-      group = "ui", priority = 2, gain = 0.35, notes = {
-      { wave = "sine", f = 1250, f1 = 1150, a = 0.002, r = 0.045, g = 1.0 },
+      group = "ui", priority = 2, gain = 0.32, notes = {
+      { wave = "noise", a = 0.0005, r = 0.006, g = 0.45, lp = 7000 },
+      { wave = "sine",  f = 2100, a = 0.0008, r = 0.014, g = 0.7 },
     }},
     ui_toggle_on = { when = "A visible-state toggle switches on: a lens/overlay, a panel flag.",
-      group = "ui", priority = 2, gain = 0.35, notes = {
-      { wave = "sine", f = 900,  a = 0.002, r = 0.04, g = 0.8 },
-      { wave = "sine", f = 1350, at = 0.045, a = 0.002, r = 0.06, g = 1.0 },
+      group = "ui", priority = 2, gain = 0.32, notes = {
+      { wave = "noise", a = 0.0005, r = 0.006, g = 0.4, lp = 7000 },
+      { wave = "sine",  f = 1700, a = 0.0008, r = 0.012, g = 0.7 },
+      { wave = "noise", at = 0.022, a = 0.0005, r = 0.006, g = 0.4, lp = 7000 },
+      { wave = "sine",  f = 2300, at = 0.022, a = 0.0008, r = 0.016, g = 0.8 },
     }},
     ui_toggle_off = { when = "A visible-state toggle switches off.",
-      group = "ui", priority = 2, gain = 0.35, notes = {
-      { wave = "sine", f = 1350, a = 0.002, r = 0.04, g = 0.8 },
-      { wave = "sine", f = 900,  at = 0.045, a = 0.002, r = 0.06, g = 0.9 },
+      group = "ui", priority = 2, gain = 0.32, notes = {
+      { wave = "noise", a = 0.0005, r = 0.006, g = 0.4, lp = 7000 },
+      { wave = "sine",  f = 2300, a = 0.0008, r = 0.012, g = 0.7 },
+      { wave = "noise", at = 0.022, a = 0.0005, r = 0.006, g = 0.4, lp = 6000 },
+      { wave = "sine",  f = 1700, at = 0.022, a = 0.0008, r = 0.016, g = 0.8 },
     }},
     ui_refused = { when = "A press the game refuses: a disabled button clicked, or a command the sim rejects (build, road, demolish, survey, any player order).",
       group = "ui", priority = 3, gain = 0.4, notes = {
@@ -57,8 +62,9 @@ return {
       { wave = "sine",  f = 1400, at = 0.035, a = 0.001, r = 0.025, g = 0.9 },
     }},
     ui_tab = { when = "Switching to a different tab inside an open ledger.",
-      group = "ui", priority = 1, gain = 0.25, notes = {
-      { wave = "sine", f = 1600, a = 0.001, r = 0.025, g = 1.0 },
+      group = "ui", priority = 1, gain = 0.24, notes = {
+      { wave = "noise", a = 0.0005, r = 0.005, g = 0.4, lp = 8000 },
+      { wave = "sine",  f = 2600, a = 0.0008, r = 0.01, g = 0.6 },
     }},
 
     -- Alerts — one cue per severity tier, as an alert first appears -----------------------
@@ -131,22 +137,36 @@ return {
 
     -- Time -------------------------------------------------------------------------------
     time_pause = { when = "Time pauses (button, key or menu).",
-      group = "ui", priority = 3, gain = 0.35, notes = {
-      { wave = "sine", f = 820, f1 = 480, a = 0.004, h = 0.04, r = 0.1, g = 1.0 },
+      group = "ui", priority = 3, gain = 0.34, notes = {
+      { wave = "noise", a = 0.0005, r = 0.006, g = 0.4, lp = 5000 },
+      { wave = "sine",  f = 1300, a = 0.0008, r = 0.018, g = 0.75 },
+      { wave = "noise", at = 0.03, a = 0.0005, r = 0.006, g = 0.4, lp = 4000 },
+      { wave = "sine",  f = 900, at = 0.03, a = 0.0008, r = 0.028, g = 0.75 },
     }},
     time_resume = { when = "Time resumes from pause.",
-      group = "ui", priority = 3, gain = 0.35, notes = {
-      { wave = "sine", f = 480, f1 = 820, a = 0.004, h = 0.04, r = 0.1, g = 1.0 },
+      group = "ui", priority = 3, gain = 0.34, notes = {
+      { wave = "noise", a = 0.0005, r = 0.006, g = 0.4, lp = 4000 },
+      { wave = "sine",  f = 900, a = 0.0008, r = 0.018, g = 0.75 },
+      { wave = "noise", at = 0.03, a = 0.0005, r = 0.006, g = 0.4, lp = 5000 },
+      { wave = "sine",  f = 1300, at = 0.03, a = 0.0008, r = 0.028, g = 0.75 },
     }},
     time_faster = { when = "Game speed goes up a step.",
-      group = "ui", priority = 2, gain = 0.3, notes = {
-      { wave = "sine", f = 1000, a = 0.002, r = 0.03, g = 0.8 },
-      { wave = "sine", f = 1330, at = 0.04, a = 0.002, r = 0.04, g = 0.8 },
+      group = "ui", priority = 2, gain = 0.28, notes = {
+      { wave = "noise", a = 0.0005, r = 0.006, g = 0.4, lp = 7000 },
+      { wave = "sine",  f = 1800, a = 0.0008, r = 0.01, g = 0.75 },
+      { wave = "noise", at = 0.018, a = 0.0005, r = 0.006, g = 0.4, lp = 7000 },
+      { wave = "sine",  f = 2200, at = 0.018, a = 0.0008, r = 0.01, g = 0.75 },
+      { wave = "noise", at = 0.036, a = 0.0005, r = 0.006, g = 0.4, lp = 7000 },
+      { wave = "sine",  f = 2600, at = 0.036, a = 0.0008, r = 0.014, g = 0.75 },
     }},
     time_slower = { when = "Game speed goes down a step.",
-      group = "ui", priority = 2, gain = 0.3, notes = {
-      { wave = "sine", f = 1330, a = 0.002, r = 0.03, g = 0.8 },
-      { wave = "sine", f = 1000, at = 0.04, a = 0.002, r = 0.04, g = 0.8 },
+      group = "ui", priority = 2, gain = 0.28, notes = {
+      { wave = "noise", a = 0.0005, r = 0.006, g = 0.4, lp = 7000 },
+      { wave = "sine",  f = 2600, a = 0.0008, r = 0.01, g = 0.75 },
+      { wave = "noise", at = 0.018, a = 0.0005, r = 0.006, g = 0.4, lp = 7000 },
+      { wave = "sine",  f = 2200, at = 0.018, a = 0.0008, r = 0.01, g = 0.75 },
+      { wave = "noise", at = 0.036, a = 0.0005, r = 0.006, g = 0.4, lp = 7000 },
+      { wave = "sine",  f = 1800, at = 0.036, a = 0.0008, r = 0.014, g = 0.75 },
     }},
 
     -- Space ------------------------------------------------------------------------------
@@ -163,8 +183,9 @@ return {
   },
 
   -- The bed (SOUND.md § 7): slow partials whose level drifts, plus a breath of filtered noise.
+  -- Muted (gain 0) pending a rework (Ben, 2026-11-24): the mixer skips a zero-gain bed.
   bed = {
-    gain = 0.12,
+    gain = 0,
     partials = {
       { f = 55,    g = 0.6, lfo = 0.031, depth = 0.5 },
       { f = 82.4,  g = 0.4, lfo = 0.047, depth = 0.6 },
