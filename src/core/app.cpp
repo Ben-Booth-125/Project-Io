@@ -1,4 +1,5 @@
 #include "app.hpp"
+#include "audio/ui_cues.hpp" // SOUND.md: refused presses
 
 #include "png_writer.hpp"
 #include "gpu_effects.hpp" // BL-1655: the fragment-shader seam
@@ -453,6 +454,16 @@ int app::run(autostart_mode autostart)
 
     m_lua.load("scripts/init.lua");
 
+    // SOUND.md § 9: audio opens here and nowhere else, so --verify and every headless
+    // path stay silent. The smoke and bench autostarts open no device either.
+    if (autostart == autostart_mode::none || autostart == autostart_mode::play)
+    {
+        std::string why;
+        if (!m_audio.load("scripts/sounds.lua", why) || !m_audio.open_device(why))
+            std::printf("[audio] silent: %s\n", why.c_str());
+        push_audio_volumes();
+    }
+
     // Open on the main menu — the deliberate entry point. "New Game" only opens the
     // New World wizard; the world, economy and sim clock are not built until the
     // player finishes it (start_new_game), so nothing simulates behind either screen
@@ -513,6 +524,10 @@ int app::run(autostart_mode autostart)
         if (m_screen != app_screen::in_game)
         {
             render();
+            m_audio.set_bed(false);
+            m_audio_was_in_game = false;
+            if (audio::cue_watch::generic_press_this_frame())
+                m_audio.request("ui_press", SDL_GetTicks());
             bench_ground_frame(); // BL-1247: no-op unless --bench-ground
             continue;
         }
@@ -691,6 +706,18 @@ int app::run(autostart_mode autostart)
 
         render();
         bench_ground_frame(); // BL-1247: no-op unless --bench-ground
+
+        // SOUND.md: the cue watcher reads what this frame produced and writes nothing back.
+        {
+            if (!m_audio_was_in_game) { m_cue_watch.rearm(); m_audio_was_in_game = true; }
+            m_audio.set_focus((SDL_GetWindowFlags(m_window) & SDL_WINDOW_INPUT_FOCUS) != 0);
+            m_audio.set_bed(!m_ui.show_system_menu);
+            audio::frame_view fv;
+            fv.w = &m_world; fv.ui = &m_ui; fv.reg = &m_registry;
+            fv.speed = m_sim_loop.speed();
+            m_cue_watch.observe(fv, m_audio, SDL_GetTicks());
+            (void)m_audio.take_fired();
+        }
 
         // Windowed autostart: a handful of real in-game frames is the coverage —
         // the first frame builds the raster caches and every shell surface; if
@@ -1732,6 +1759,7 @@ corp_command_result app::player_command(const corp_command& in, entity_id* out_b
         cmd.as_nation = cmd.corp;
     const corp_command_result r = apply_corp_command(m_world, m_registry, cmd, out_building);
     m_play_log.command(m_world, cmd, r, m_sim_loop.day_tick(), "player");
+    if (r != corp_command_result::applied) audio::note_ui("ui_refused"); // SOUND.md § 3
     return r;
 }
 
@@ -2891,7 +2919,10 @@ void app::render()
         else if (m_screen == app_screen::generating)
             draw_generation_screen();
         else
+        {
             draw_main_menu();
+            draw_options_window(ImGui::GetIO().DisplaySize); // the main menu's Options press
+        }
 
         // The pre-play screens are frames like any other, so the instrument follows
         // them too — the generation screen's chain preview is exactly the kind of
@@ -3271,6 +3302,7 @@ void app::render()
             construct_nation(m_world, m_registry, player_actor(m_world), m_ui.construction.pending_tile,
                              m_ui.construction.pending_type, m_ui.construction.pending_target,
                              m_ui.construction.pending_recipe, built);
+        if (r != construction_result::placed) audio::note_ui("ui_refused"); // SOUND.md § 3
         m_play_log.direct(m_world, "build", construction_result_name(r), m_sim_loop.day_tick(),
                           m_ui.construction.pending_tile, built,
                           static_cast<int>(m_ui.construction.pending_type),
@@ -3379,6 +3411,7 @@ void app::render()
         const construction_result r = place_road(
             m_world, m_registry, player_actor(m_world), m_ui.construction.pending_road_tile, // BL-1402
             m_ui.construction.pending_road_tier, m_ui.construction.pending_road_side);
+        if (r != construction_result::placed) audio::note_ui("ui_refused"); // SOUND.md § 3
         m_play_log.direct(m_world, "place_road", construction_result_name(r), m_sim_loop.day_tick(),
                           m_ui.construction.pending_road_tile, null_entity, -1, -1,
                           static_cast<int>(m_ui.construction.pending_road_tier));
@@ -3521,6 +3554,7 @@ void app::render()
     {
         const entity_id doomed = m_ui.construction.pending_demolish;
         const bool      razed  = demolish_building(m_world, player_actor(m_world), doomed); // BL-1402
+        if (!razed) audio::note_ui("ui_refused"); // SOUND.md § 3
         m_play_log.direct(m_world, "demolish", razed ? "applied" : "refused", m_sim_loop.day_tick(),
                           null_entity, doomed, -1, -1, 0);
         if (razed)
@@ -3549,6 +3583,7 @@ void app::render()
         // BL-1406: the player's actor pays — its nation's treasury once folded.
         const survey_dispatch_result sr = dispatch_survey(m_world, m_ui.pending_survey_dispatch,
                                                           player_actor(m_world));
+        if (sr != survey_dispatch_result::success) audio::note_ui("ui_refused"); // SOUND.md § 3
         m_play_log.direct(m_world, "survey", survey_dispatch_result_name(sr), m_sim_loop.day_tick(),
                           null_entity, m_ui.pending_survey_dispatch, -1, -1, 0);
         m_ui.pending_survey_dispatch = null_entity; // consume the request
@@ -4272,110 +4307,8 @@ void app::render()
             m_quit_requested = true;
     }
 
-    // F10 display / options window (BL-076). Self-contained; changes apply live to
-    // the SDL window and persist to options.cfg immediately.
-    if (m_show_options)
-    {
-        // Opened from the escape menu it stands beside the menu's presses rather than
-        // on them, so the press that opened it can close it (the toggle rule).
-        if (m_ui.show_system_menu)
-        {
-            ImGui::SetNextWindowPos(ImVec2{disp.x * 0.5f - ui::px(156.0f), disp.y * 0.5f},
-                                    ImGuiCond_Appearing, ImVec2{1.0f, 0.5f});
-            // No size set: the right-edge pivot reads the window's real width. A set
-            // width would seat it from that width on every reopening, over the presses.
-        }
-        else
-        {
-            ImGui::SetNextWindowPos(
-                ImVec2{disp.x * 0.5f, disp.y * 0.5f}, ImGuiCond_Appearing, ImVec2{0.5f, 0.5f});
-            ImGui::SetNextWindowSize(ui::px(320.0f, 0.0f), ImGuiCond_Appearing);
-        }
-        if (ImGui::Begin("Options", &m_show_options,
-                         ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoCollapse))
-        {
-            ImGui::SeparatorText("Display");
-
-            struct preset { int w, h; const char* label; };
-            static const preset presets[] = {
-                {1280, 720,  "1280 x 720"},
-                {1600, 900,  "1600 x 900"},
-                {1720, 1080, "1720 x 1080"},
-                {1920, 1080, "1920 x 1080"},
-                {2560, 1440, "2560 x 1440"},
-            };
-            // Selection = the matching preset, or "Custom" for a free-dragged size.
-            int cur = -1;
-            for (int i = 0; i < IM_ARRAYSIZE(presets); ++i)
-                if (presets[i].w == m_settings.window_w && presets[i].h == m_settings.window_h)
-                    cur = i;
-            const char* preview = (cur >= 0) ? presets[cur].label : "Custom";
-
-            ImGui::BeginDisabled(m_settings.fullscreen);
-            if (ImGui::BeginCombo("Resolution", preview))
-            {
-                for (int i = 0; i < IM_ARRAYSIZE(presets); ++i)
-                {
-                    if (ImGui::Selectable(presets[i].label, i == cur))
-                    {
-                        m_settings.window_w = presets[i].w;
-                        m_settings.window_h = presets[i].h;
-                        // SDL refuses a size on a maximised window (Ben, 2026-11-09:
-                        // the pick changed nothing on screen), so the pick restores it
-                        // first. Here and not in apply_display_settings: VSync and
-                        // Fullscreen must not un-maximise.
-                        if (SDL_GetWindowFlags(m_window) & SDL_WINDOW_MAXIMIZED)
-                            SDL_RestoreWindow(m_window);
-                        apply_display_settings();
-                        SDL_SyncWindow(m_window);
-                        save_settings();
-                    }
-                }
-                ImGui::EndCombo();
-            }
-            ImGui::EndDisabled();
-
-            if (ImGui::Checkbox("Fullscreen", &m_settings.fullscreen))
-            {
-                apply_display_settings();
-                save_settings();
-            }
-            if (ImGui::Checkbox("VSync", &m_settings.vsync))
-            {
-                apply_display_settings();
-                save_settings();
-            }
-
-            // BL-1537 (RENDERING.md § Art direction and palette): the land lift's
-            // trial levels. A change re-bakes the land; the sea keeps its colour.
-            ImGui::SeparatorText("Map");
-            static const char* land_lift_labels[] = {"Off", "+15%", "+30%", "+45%"};
-            static_assert(IM_ARRAYSIZE(land_lift_labels) == ui::ground::k_land_lift_levels);
-            if (ImGui::BeginCombo("Brightness", land_lift_labels[m_settings.land_lift]))
-            {
-                for (int i = 0; i < IM_ARRAYSIZE(land_lift_labels); ++i)
-                {
-                    if (ImGui::Selectable(land_lift_labels[i], i == m_settings.land_lift))
-                    {
-                        m_settings.land_lift = i;
-                        m_ground.set_land_lift(i);
-                        save_settings();
-                    }
-                }
-                ImGui::EndCombo();
-            }
-
-            // Live window size (also reflects a free drag-resize of the frame).
-            int win_w = 0, win_h = 0;
-            SDL_GetWindowSize(m_window, &win_w, &win_h);
-            ImGui::TextDisabled("Window: %d x %d", win_w, win_h);
-
-            ImGui::Separator();
-            if (ImGui::Button("Close"))
-                m_show_options = false;
-        }
-        ImGui::End();
-    }
+    // F10 / Esc menu / main menu Options window (BL-076; SOUND.md § 8).
+    draw_options_window(disp);
 
     // F9 research canvas, also reachable from nav rail slot 4: the Digitisation
     // tree's ring (BL-1276) — inspect, and plan the seat's nation's queue.
@@ -4436,6 +4369,11 @@ void app::load_settings()
             else if (key == "fullscreen") m_settings.fullscreen = (std::stoi(val) != 0);
             else if (key == "vsync")      m_settings.vsync      = (std::stoi(val) != 0);
             else if (key == "land_lift")  m_settings.land_lift  = std::stoi(val);
+            else if (key == "vol_master") m_settings.vol_master = std::stof(val);
+            else if (key == "vol_ui")     m_settings.vol_ui     = std::stof(val);
+            else if (key == "vol_event")  m_settings.vol_event  = std::stof(val);
+            else if (key == "vol_bed")    m_settings.vol_bed    = std::stof(val);
+            else if (key == "mute")       m_settings.mute       = (std::stoi(val) != 0);
         }
         catch (const std::exception&) { /* skip malformed value */ }
     }
@@ -4446,6 +4384,161 @@ void app::load_settings()
     m_settings.window_w = std::max(960, m_settings.window_w);
     m_settings.window_h = std::max(540, m_settings.window_h);
     m_settings.land_lift = std::clamp(m_settings.land_lift, 0, ui::ground::k_land_lift_levels - 1);
+    for (float* v : {&m_settings.vol_master, &m_settings.vol_ui, &m_settings.vol_event, &m_settings.vol_bed})
+        *v = std::isfinite(*v) ? std::clamp(*v, 0.0f, 1.0f) : 0.8f;
+}
+
+// The Options window (MENU.md § Application / system menu): a Display tab and an Audio tab.
+// Self-contained; every change applies live and persists to options.cfg. Drawn by the in-game
+// shell and by the main menu, so the volume can be set before a game exists.
+void app::draw_options_window(const ImVec2& disp)
+{
+    if (!m_show_options)
+        return;
+    // Opened from a menu it stands beside the menu's presses rather than on them, so the
+    // press that opened it can close it (the toggle rule).
+    if (m_ui.show_system_menu || m_screen == app_screen::menu)
+    {
+        // The main menu's presses are a fixed 280 px (draw_main_menu); the escape menu's scale.
+        const float beside = m_screen == app_screen::menu
+                                 ? 140.0f + ImGui::GetStyle().WindowPadding.x + 12.0f
+                                 : ui::px(156.0f);
+        ImGui::SetNextWindowPos(ImVec2{disp.x * 0.5f - beside, disp.y * 0.5f},
+                                ImGuiCond_Appearing, ImVec2{1.0f, 0.5f});
+        // No size set: the right-edge pivot reads the window's real width. A set
+        // width would seat it from that width on every reopening, over the presses.
+    }
+    else
+    {
+        ImGui::SetNextWindowPos(
+            ImVec2{disp.x * 0.5f, disp.y * 0.5f}, ImGuiCond_Appearing, ImVec2{0.5f, 0.5f});
+        ImGui::SetNextWindowSize(ui::px(320.0f, 0.0f), ImGuiCond_Appearing);
+    }
+    if (ImGui::Begin("Options", &m_show_options,
+                     ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoCollapse))
+    {
+        if (ImGui::BeginTabBar("##options_tabs"))
+        {
+            if (ImGui::BeginTabItem("Display"))
+            {
+                ImGui::SeparatorText("Display");
+
+                struct preset { int w, h; const char* label; };
+                static const preset presets[] = {
+                    {1280, 720,  "1280 x 720"},
+                    {1600, 900,  "1600 x 900"},
+                    {1720, 1080, "1720 x 1080"},
+                    {1920, 1080, "1920 x 1080"},
+                    {2560, 1440, "2560 x 1440"},
+                };
+                // Selection = the matching preset, or "Custom" for a free-dragged size.
+                int cur = -1;
+                for (int i = 0; i < IM_ARRAYSIZE(presets); ++i)
+                    if (presets[i].w == m_settings.window_w && presets[i].h == m_settings.window_h)
+                        cur = i;
+                const char* preview = (cur >= 0) ? presets[cur].label : "Custom";
+
+                ImGui::BeginDisabled(m_settings.fullscreen);
+                if (ImGui::BeginCombo("Resolution", preview))
+                {
+                    for (int i = 0; i < IM_ARRAYSIZE(presets); ++i)
+                    {
+                        if (ImGui::Selectable(presets[i].label, i == cur))
+                        {
+                            m_settings.window_w = presets[i].w;
+                            m_settings.window_h = presets[i].h;
+                            // SDL refuses a size on a maximised window (Ben, 2026-11-09:
+                            // the pick changed nothing on screen), so the pick restores it
+                            // first. Here and not in apply_display_settings: VSync and
+                            // Fullscreen must not un-maximise.
+                            if (SDL_GetWindowFlags(m_window) & SDL_WINDOW_MAXIMIZED)
+                                SDL_RestoreWindow(m_window);
+                            apply_display_settings();
+                            SDL_SyncWindow(m_window);
+                            save_settings();
+                        }
+                    }
+                    ImGui::EndCombo();
+                }
+                ImGui::EndDisabled();
+
+                if (ImGui::Checkbox("Fullscreen", &m_settings.fullscreen))
+                {
+                    apply_display_settings();
+                    save_settings();
+                }
+                if (ImGui::Checkbox("VSync", &m_settings.vsync))
+                {
+                    apply_display_settings();
+                    save_settings();
+                }
+
+                // BL-1537 (RENDERING.md § Art direction and palette): the land lift's
+                // trial levels. A change re-bakes the land; the sea keeps its colour.
+                ImGui::SeparatorText("Map");
+                static const char* land_lift_labels[] = {"Off", "+15%", "+30%", "+45%"};
+                static_assert(IM_ARRAYSIZE(land_lift_labels) == ui::ground::k_land_lift_levels);
+                if (ImGui::BeginCombo("Brightness", land_lift_labels[m_settings.land_lift]))
+                {
+                    for (int i = 0; i < IM_ARRAYSIZE(land_lift_labels); ++i)
+                    {
+                        if (ImGui::Selectable(land_lift_labels[i], i == m_settings.land_lift))
+                        {
+                            m_settings.land_lift = i;
+                            m_ground.set_land_lift(i);
+                            save_settings();
+                        }
+                    }
+                    ImGui::EndCombo();
+                }
+
+                // Live window size (also reflects a free drag-resize of the frame).
+                int win_w = 0, win_h = 0;
+                SDL_GetWindowSize(m_window, &win_w, &win_h);
+                ImGui::TextDisabled("Window: %d x %d", win_w, win_h);
+                ImGui::EndTabItem();
+            }
+            if (ImGui::BeginTabItem("Audio"))
+            {
+                // SOUND.md § 8: a volume per group and a mute. A slider saves on release,
+                // not on every drag step; the level applies live while dragging.
+                bool changed = ImGui::Checkbox("Mute", &m_settings.mute);
+                bool done    = changed;
+                const auto vol = [&](const char* label, float& v) {
+                    float pct = v * 100.0f;
+                    if (ImGui::SliderFloat(label, &pct, 0.0f, 100.0f, "%.0f%%"))
+                    {
+                        v = pct / 100.0f;
+                        changed = true;
+                    }
+                    done |= ImGui::IsItemDeactivatedAfterEdit();
+                };
+                ImGui::BeginDisabled(m_settings.mute);
+                vol("Master", m_settings.vol_master);
+                ImGui::SeparatorText("Groups");
+                vol("Interface", m_settings.vol_ui);
+                vol("Events", m_settings.vol_event);
+                vol("Background", m_settings.vol_bed);
+                ImGui::EndDisabled();
+                if (changed) push_audio_volumes();
+                if (done) save_settings();
+                if (!m_audio.has_device())
+                    ImGui::TextDisabled("No audio device: the game is silent.");
+                ImGui::EndTabItem();
+            }
+            ImGui::EndTabBar();
+        }
+        ImGui::Separator();
+        if (ImGui::Button("Close"))
+            m_show_options = false;
+    }
+    ImGui::End();
+}
+
+void app::push_audio_volumes()
+{
+    m_audio.set_volumes({m_settings.vol_master, m_settings.vol_ui, m_settings.vol_event,
+                         m_settings.vol_bed, m_settings.mute});
 }
 
 void app::save_settings() const
@@ -4460,7 +4553,12 @@ void app::save_settings() const
         << "window_h="   << m_settings.window_h        << '\n'
         << "fullscreen=" << (m_settings.fullscreen ? 1 : 0) << '\n'
         << "vsync="      << (m_settings.vsync ? 1 : 0)      << '\n'
-        << "land_lift="  << m_settings.land_lift           << '\n';
+        << "land_lift="  << m_settings.land_lift           << '\n'
+        << "vol_master=" << m_settings.vol_master          << '\n'
+        << "vol_ui="     << m_settings.vol_ui              << '\n'
+        << "vol_event="  << m_settings.vol_event           << '\n'
+        << "vol_bed="    << m_settings.vol_bed             << '\n'
+        << "mute="       << (m_settings.mute ? 1 : 0)      << '\n';
 }
 
 void app::apply_display_settings()

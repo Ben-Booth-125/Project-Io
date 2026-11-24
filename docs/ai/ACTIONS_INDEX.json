@@ -434,6 +434,22 @@
    "Keyboard; opens the centred Options window"
   ],
   [
+   "chrome.options_tab_display",
+   "Options window, tab bar"
+  ],
+  [
+   "chrome.options_tab_audio",
+   "Options window, tab bar"
+  ],
+  [
+   "chrome.options_mute",
+   "Options window, Audio tab"
+  ],
+  [
+   "chrome.options_set_volume",
+   "Options window, Audio tab, the four sliders"
+  ],
+  [
    "chrome.f11_frame_hud",
    "Keyboard; works on every screen (menu, wizard, and in game)"
   ],
@@ -468,6 +484,10 @@
   [
    "chrome.menu_load",
    "Main menu, primary button column, between New Game and Quit"
+  ],
+  [
+   "chrome.menu_options",
+   "Main menu, primary button column, between Load and Quit"
   ],
   [
    "chrome.menu_quit",

@@ -1,4 +1,5 @@
 #include "foldout_column.hpp"
+#include "audio/ui_cues.hpp"
 
 #include "header_panel.hpp"  // header_panel_height
 #include "nav_pane.hpp"      // nav_pane_width
@@ -178,7 +179,10 @@ void nav_button(const char* label, int id, int& view, bool* close)
         if (active && close)
             *close = false;
         else
+        {
+            if (view != id) audio::note_ui("ui_tab"); // SOUND.md § 3: a tab switch
             view = id;
+        }
     }
     if (active)
         ImGui::PopStyleColor();

@@ -1906,8 +1906,67 @@
     "App is in game.",
     "Not while an ImGui widget owns the keyboard."
    ],
-   "expected_output": "Toggles the Options window: a Display section (Resolution preset combo, Fullscreen, VSync), an Accessibility section (UI Scale), a Map section (Brightness), a live window-size readout, and Close. Every change applies live to the SDL window and persists to options.cfg immediately.",
-   "reason_to_select": "To adjust display and UI-scale settings mid-session."
+   "expected_output": "Toggles the Options window: two tabs. Display holds the Display section (Resolution preset combo, Fullscreen, VSync), the Map section (Brightness) and a live window-size readout; Audio holds Mute, Master and the Interface / Events / Background volumes (SOUND.md § 8). Close sits below both. Every change applies live and persists to options.cfg.",
+   "reason_to_select": "To adjust display, map or sound settings mid-session."
+  },
+  {
+   "id": "chrome.options_tab_display",
+   "family": "chrome",
+   "surface": "Options window, tab bar",
+   "press": "Click the Display tab.",
+   "args": [],
+   "preconditions": [
+    "The Options window is open (chrome.f10_options, chrome.escape_options or chrome.menu_options)."
+   ],
+   "expected_output": "Shows the Display tab: resolution, fullscreen, VSync, brightness, the window-size readout.",
+   "reason_to_select": "To reach the display and map settings."
+  },
+  {
+   "id": "chrome.options_tab_audio",
+   "family": "chrome",
+   "surface": "Options window, tab bar",
+   "press": "Click the Audio tab.",
+   "args": [],
+   "preconditions": [
+    "The Options window is open (chrome.f10_options, chrome.escape_options or chrome.menu_options)."
+   ],
+   "expected_output": "Shows the Audio tab: Mute and the four volume sliders, or a line saying no audio device is open.",
+   "reason_to_select": "To reach the sound settings."
+  },
+  {
+   "id": "chrome.options_mute",
+   "family": "chrome",
+   "surface": "Options window, Audio tab",
+   "press": "Tick or untick Mute.",
+   "args": [],
+   "preconditions": [
+    "The Options window is open (chrome.f10_options, chrome.escape_options or chrome.menu_options)."
+   ],
+   "expected_output": "Silences every sound at once, or restores it; the sliders keep their values and grey out while muted. Persists to options.cfg.",
+   "reason_to_select": "To silence the game without losing the chosen levels."
+  },
+  {
+   "id": "chrome.options_set_volume",
+   "family": "chrome",
+   "surface": "Options window, Audio tab, the four sliders",
+   "press": "Drag the Master, Interface, Events or Background slider.",
+   "args": [
+    {
+     "name": "group",
+     "type": "enum(master|interface|events|background)",
+     "meaning": "Which slider."
+    },
+    {
+     "name": "percent",
+     "type": "int 0..100",
+     "meaning": "The level."
+    }
+   ],
+   "preconditions": [
+    "The Options window is open (chrome.f10_options, chrome.escape_options or chrome.menu_options)."
+   ],
+   "expected_output": "Sets that level live while dragging; saves to options.cfg on release. Interface covers presses and time controls, Events the game events and alerts, Background the bed (SOUND.md § 8).",
+   "reason_to_select": "To turn a kind of sound up or down."
   },
   {
    "id": "chrome.f11_frame_hud",
@@ -2025,6 +2084,18 @@
    ],
    "expected_output": "Replaces the button with the list of saves by name, newest first, and a Back press; pressing a row opens that save. Opening one shows the loading screen (Loading the save) while the home world's ground bakes, then enters play. A save that cannot be read leaves the list up with the reason beneath it.",
    "reason_to_select": "To go back to a saved campaign from the entry screen, after Exit to Menu or a fresh launch."
+  },
+  {
+   "id": "chrome.menu_options",
+   "family": "chrome",
+   "surface": "Main menu, primary button column, between Load and Quit",
+   "press": "Click Options (click again to close it).",
+   "args": [],
+   "preconditions": [
+    "App is on the main menu screen."
+   ],
+   "expected_output": "Toggles the Options window beside the menu, the press lit while it is open (toggle rule). Nothing else changes; settings persist to options.cfg as they change.",
+   "reason_to_select": "To set the volume or display before starting or loading a game."
   },
   {
    "id": "chrome.menu_quit",

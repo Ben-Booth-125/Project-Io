@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*123 entries — 66 open, 57 resolved.*
+*124 entries — 67 open, 57 resolved.*
 
 ---
 
@@ -740,6 +740,20 @@ BL-1678 was merged as complete (Ben, 2026-11-20) onto the playtest lanes, where 
 **Why it matters.** The two cost rulings were made apart and compound. Rivals start the game short of money, and the build-out the settle leaves is thinner.
 
 *Files: `src/world/carried_supplies.cpp`, `docs/military/MILITARY.md`, `tools/verify/player_seed_sweep.cpp`*
+
+### NR-1266 — Novelty: sound has no prior owner; SOUND.md is new, with delegated defaults
+*novel-work · raised 2026-11-22 · from sound design session (BL-1746, sound cues and bed)*
+
+No doc, code or backlog item owned sound. docs/ui/SOUND.md now does, from Ben's form answers. Calls taken on his behalf: confirm-never-inform (no sound-only information); trade silent beyond its alerts; alerts sound per severity tier, not per kind; a rival event that targets the player counts as own; shell sounds (presses, alerts, time) ignore the canvas filter; quiet on focus loss; merge window starts near 0.25 s. Added while building (2026-11-22): the escape menu pause plays time_pause; a ledger-to-ledger switch plays ledger_open; clicking a chart bar (an ImGui hover target) plays the plain press. Round 2 (Ben, 2026-11-22): battle won/lost dropped, so no battle results are collected; noise is allowed only for physical motion (clicks, thrusters); the synth gained a filter sweep (lp1).
+
+**Why it matters.** Novelty should be chosen, not accreted (standing rules). Sound is a new layer, and these defaults set its grammar.
+
+- Accept SOUND.md as written
+- Amend any of the listed defaults
+
+> **Recommendation:** Accept, and tune the palette by ear at the first live session.
+
+*Files: `docs/ui/SOUND.md`, `CLAUDE.md`*
 
 ---
 
